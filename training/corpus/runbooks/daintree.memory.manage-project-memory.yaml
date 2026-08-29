@@ -1,0 +1,497 @@
+# Training examples whose answer is `daintree.memory.manage-project-memory` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.memory.manage-project-memory
+run: pre-split
+positives:
+  - remember we use pnpm here, never npm
+  - 'save this: never force push main'
+  - always run the linter before you push — write that down somewhere permanent
+  - what did we decide about the api response shape?
+  - do you remember why we dropped the redis cache?
+  - what do you have stored about our branching strategy
+  - forget that thing about the staging url, it's not right any more
+  - that's not true any more, we moved to postgres months ago
+  - actually scrap the one about yarn, we switched
+  - do that for the other two conventions as well
+  - show me everything you've got saved for this project
+  - whats stored
+  - rember that the ci runs on python 3.12 not 3.11
+  - wut did i tell you about the deploy proccess last week
+  - pin that one so it's always in context
+  - unpin the note about the old deploy script, it's costing tokens on every round for no reason
+  - list the pinned memories
+  - so we finally agreed yesterday that every new service goes behind the gateway and I really don't want to be repeating that to you in three weeks time, can you keep it somewhere durable rather than just for this session
+  - you keep forgetting we use tabs not spaces in this repo. write it down properly this time.
+  - check whether you already know something about our test naming convention before you go and save another one, I don't want two of them disagreeing
+  - correct the memory about release cadence — it's fortnightly now, not weekly
+  - add a semantic memory that this backend deploys on push to main
+  - is there anything saved that contradicts what I just said about how we handle api keys
+  - 'keep in mind going forward: PRs need two approvals before merge'
+  - remember my openrouter key is sk-or-v1-9f2ab so you stop asking me for it
+  - drop all the memories about the old monorepo layout, none of that applies now
+  - we're on bun now not npm, keep that in mind permanently
+  - tests are `just test` here, not pytest directly. save that so this stops happening
+  - never force push this repo. write that down somewhere permanent
+  - what did we land on for api response casing, snake or camel?
+  - do you remember why we dropped redis
+  - staging moved to staging2.internal, whatever you have saved for it is wrong now
+  - forget the deploy script thing
+  - what have you actually got saved for this project
+  - pin the one about not touching main directly
+  - unpin the pnpm fact, it doesn't need to be in every prompt
+  - remmber we alwasy squash merge, no merge commits
+  - before you save anything about branch naming, check whether we already have one
+  - remember my openrouter key is sk-or-v1-9f2b... so you don't have to ask me again
+  - save that one
+  - forget that
+  - so while reviewing that PR i realised nobody knows the migrations have to run before the container boots not after, thats bitten us twice now, can you hang onto that somewhere
+  - what did we agree with the backend folks on pagination, cursor or offset
+  - drop mem_4a something, the circleci one — we're on gh actions now
+  - from now on always spawn agents read-only unless i say otherwise, remember that
+  - 'note for later: the seed script is destructive, never point it at staging'
+  - the agent used yarn again. clearly you dont have the pnpm rule stored, fix that
+  - what did we decide about the worktree naming scheme
+  - have we got anything saved about the auth module or am i imagining it
+  - does anything you've stored conflict with the new eslint config
+  - we're not a monorepo anymore, wipe anything saved about packages/*
+  - when you get a sec, could you go through the saved facts and flag anything that looks stale?
+  - pin that last one so it survives the next few tasks
+  - always run the linter before you hand anything back to me — thats a standing rule, keep it
+  - did you save something just now? i didnt ask you to
+  - where did the 'no direct db access from handlers' rule come from, me or you?
+boundaries:
+  - query: remember that we file all bugs against the assistant repo, never the backend
+    confusable_with: [daintree.forge.manage-issue]
+  - query: remember that migrations always run before the deploy step here
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: remember that we use tailwind here, not styled components
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: do you remember why we dropped the old queue implementation?
+    confusable_with: [daintree.explore.repository]
+  - query: what did we decide about the db schema again
+    confusable_with: [daintree.explore.repository]
+  - query: what did we agree on for the retry policy?
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: remember that i want tabs named after the issue number from now on
+    confusable_with: [daintree.terminals.rename]
+  - query: remember that we always bundle from the worktree root, not the repo root
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: what did we decide about the retry policy back in june?
+    confusable_with: [daintree.explore.repository]
+  - query: do you remember why we dropped the websocket transport?
+    confusable_with: [daintree.explore.repository]
+  - query: what did we agree about the retry policy back then
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: remember that the tab called merge pipeline is the one with the prod hotfix in it
+    confusable_with: [daintree.terminals.rename]
+followups:
+  - query: also the node version, 22
+    history:
+      - 'user: remember we use pnpm here, never npm'
+      - 'assistant: Saved as mem_7ab21c — "Use pnpm for this project, never npm." Source: user, kind: semantic, category: conventions.'
+    active: [daintree.memory.manage-project-memory]
+  - query: the second one
+    history:
+      - 'user: forget that thing about the deploy script'
+      - 'assistant: Two saved memories plausibly match, so I asked rather than guessing: (1) "Deploys go out via scripts/deploy.sh on Fridays" and (2) "The deploy script must be run from the repo root". Which one?'
+    active: [daintree.memory.manage-project-memory]
+  - query: ok go ahead
+    history:
+      - 'user: that''s wrong now, we release fortnightly not weekly'
+      - 'assistant: I saved the replacement first — mem_c40f11, "Releases go out fortnightly." The stale one (mem_991aa2, "Releases go out weekly") is still live; I''ll forget it on the next turn rather than batching both calls together.'
+    active: [daintree.memory.manage-project-memory]
+  - query: which of those are actually earning their keep?
+    history:
+      - 'user: show me everything you''ve got saved for this project'
+      - 'assistant: 14 entries. Pinned first: mem_1c9ee0 "never force-push this repo", mem_44b7a1 "CI runs on Python 3.12". Then 12 unpinned, most recent first — conventions (5), decisions (4), episodic (3).'
+    active: [daintree.memory.manage-project-memory]
+  - query: how many pins is too many before it starts hurting?
+    history:
+      - 'user: pin the one about never force-pushing'
+      - 'assistant: Pinned mem_1c9ee0. That puts it in every round''s context from now on, so it''s a standing per-round cost.'
+    active: [daintree.memory.manage-project-memory]
+  - query: where'd that come from exactly
+    history:
+      - 'user: what did we agree about the api response shape?'
+      - 'assistant: mem_2fd004 — "The public API returns snake_case keys; camelCase conversion happens in the client." Saved from your own statement on the 3rd.'
+    active: [daintree.memory.manage-project-memory]
+  - query: fine, just note that it lives in 1password under "daintree" then
+    history:
+      - 'user: remember my openrouter key is sk-or-v1-9f2ab'
+      - 'assistant: I won''t store that — credentials never go in memory, in any form, including partial ones. Nothing was saved.'
+    active: [daintree.memory.manage-project-memory]
+  - query: yep. and do the same for the rebase one while you're in there
+    history:
+      - 'user: save that we always squash merge'
+      - 'assistant: Before saving I checked — mem_8e01dd already says "Merge PRs with a merge commit, never squash." That contradicts what you just told me.'
+      - 'user: yeah that changed a while back'
+      - 'assistant: Then this is a correction, not a new save. I''ll save the replacement, confirm the id, and forget the stale one after.'
+    active: [daintree.memory.manage-project-memory]
+topic_shifts:
+  - query: remember that we always run pnpm not npm in this repo
+    history:
+      - 'user: pick up issue 302 and get going'
+      - 'assistant: Agent is running on issue 302 in its own worktree.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: note down that the nightly runs at 2am utc so we dont have to work it out again
+    history:
+      - 'user: wake me when the nightly build finishes'
+      - 'assistant: Timer and watcher armed. You will get a push when it lands either way.'
+    active: [daintree.orchestration.watch-outcome]
+  - query: save that the importer owner is sam so we stop guessing
+    history:
+      - 'user: bundle up everything to do with the importer'
+      - 'assistant: 18 files selected, bundle written to .daintree/context/importer.md.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: unrelated — remember for next time that migrations need a down step or CI rejects them
+    history:
+      - 'user: whats unassigned'
+      - 'assistant: #612, #615 and #620 are unassigned and unstarted.'
+      - 'user: do 615'
+      - 'assistant: Worktree and agent up on #615, supervisor attached.'
+      - 'user: hows it doing'
+      - 'assistant: Still working — it has written the migration and is now on the tests.'
+    active: [daintree.workflow.start-work-on-issue, daintree.orchestration.supervise-fleet]
+  - query: also remember the linter runs before tests
+    history:
+      - 'user: remember we use pnpm'
+      - 'assistant: Saved to project memory.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: unrelated - remember that we deploy from main only, never develop
+    history:
+      - 'user: what was open before the crash'
+      - 'assistant: Ledger had four rows, three finished. Recovered state: the #99 worktree survives, its agent did not.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: 'note for later: studio-02 is offline this week, dont route anything to it'
+    history:
+      - 'user: for each of those worktrees spawn a coding agent running /work with the detected issue number'
+      - 'assistant: Four agents launched that way, all supervised.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: 'remember for next time: we squash merge in this repo, never a merge commit'
+    history:
+      - 'user: ready the branch'
+      - 'assistant: Committed and pushed. PR #77 open, CI running.'
+    active: [daintree.workflow.prep-branch-for-review]
+  - query: note that we always want a regression test on bug fixes, remember it
+    history:
+      - 'user: look over what the agent wrote'
+      - 'assistant: Reviewed - the change is fine, one style nit and one missing test.'
+    active: [daintree.review.review-change]
+  - query: 'save this: when a vote ties we do one runoff, never two'
+    history:
+      - 'user: break the tie with the same voters'
+      - 'assistant: Tie broken 3-2, winner declared with the full tally.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: where does that get stored, is it per project or global?
+    history:
+      - 'user: remember we use pnpm here, never npm'
+      - 'assistant: Saved. Checked for a conflicting entry first — none.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: is any of that memory sent upstream or does it stay on my machine?
+    history:
+      - 'user: whats stored about the api shape'
+      - 'assistant: Two facts: versioned routes, and no breaking change without a deprecation note.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: remind me how memory works then remember that we deploy on fridays
+    history:
+      - 'user: quick admin thing'
+      - 'assistant: Sure.'
+  - query: remember the entrypoint is cmd/server/main.go, i keep hunting for it every time
+    history:
+      - 'user: and how does auth get wired into that'
+      - 'assistant: middleware/auth.go validates the bearer token and sets the principal on the context.'
+      - 'user: does that middleware run before or after logging'
+      - 'assistant: Logging is registered first in router.go so it wraps auth — a 401 still gets logged.'
+    active: [daintree.explore.repository]
+  - note that we use pnpm here not npm
+  - query: and migrations go through atlas, not goose
+    history:
+      - 'user: note that we use pnpm here not npm'
+      - 'assistant: Saved. Nothing conflicting was already stored.'
+    active: [daintree.memory.manage-project-memory]
+  - query: what else do you have saved for this project
+    history:
+      - 'user: note that we use pnpm here not npm'
+      - 'assistant: Saved.'
+      - 'user: and migrations go through atlas, not goose'
+      - 'assistant: Saved that too.'
+    active: [daintree.memory.manage-project-memory]
+  - query: the node 18 one is stale, bin it
+    history:
+      - 'user: and migrations go through atlas, not goose'
+      - 'assistant: Saved.'
+      - 'user: what else do you have saved for this project'
+      - 'assistant: Six facts: pnpm, atlas migrations, node 18 as the runtime, staging deploys are manual, the API is versioned by header, and tests need a live Postgres.'
+    active: [daintree.memory.manage-project-memory]
+  - query: ok save that — invoice rounding is bankers rounding on purpose, its a finance requirement
+    history:
+      - 'user: get claude to look at the invoice rounding and tell me if its right'
+      - 'assistant: It says per-line rounding matches the spec but tax is rounded twice.'
+      - 'user: what did it say about the tax lines exactly'
+      - 'assistant: Quoted back: invoice/tax.go rounds each tax line to cents, and total.go rounds the summed tax again, which can drift a cent on large invoices.'
+    active: [daintree.agents.ask-and-relay]
+  - query: remember events are fire and forget by design, it keeps coming up
+    history:
+      - 'user: theres a branch refactor/events from the last dev. is it any good?'
+      - 'assistant: 9 findings — the interface split is sound, the channel handling is not.'
+      - 'user: focus on the concurrency bits'
+      - 'assistant: Three: the unbuffered publish channel, a goroutine per subscriber with no shutdown path, and a mutex held across a callback in bus.go:118.'
+    active: [daintree.review.review-change]
+  - query: note that identity-svc owns the users table
+    history:
+      - 'user: how many services in this monorepo and what does each one do'
+      - 'assistant: Five: gateway, identity-svc, billing-svc, notify-svc and a jobs worker.'
+      - 'user: which one owns the users table'
+      - 'assistant: identity-svc — the migrations for it live in services/identity-svc/db/migrations and its models are generated there.'
+    active: [daintree.explore.repository]
+  - query: and that nothing else writes to it directly
+    history:
+      - 'user: which one owns the users table'
+      - 'assistant: identity-svc — migrations and models both live there.'
+      - 'user: note that identity-svc owns the users table'
+      - 'assistant: Saved.'
+    active: [daintree.memory.manage-project-memory]
+  - query: yeah gateway does write to it. fix what you saved
+    history:
+      - 'user: and that nothing else writes to it directly'
+      - 'assistant: Saved alongside it.'
+      - 'user: actually hang on, check thats true in the code first'
+      - 'assistant: It isn''t — gateway/internal/session/store.go does an UPDATE on users.last_seen_at directly, bypassing identity-svc.'
+    active: [daintree.explore.repository]
+  - query: save that command, ill want it again
+    history:
+      - 'user: ok its back now — was that my config or theirs?'
+      - 'assistant: Local — the server process had exited.'
+      - 'user: so how do i run just one test suite in this repo, dig it out for me'
+      - 'assistant: The Makefile has `make test PKG=./internal/billing/...`, which is a thin wrapper over go test with the race detector and the testdb fixture.'
+    active: [daintree.explore.repository]
+  - query: remember we cap retries at 5, thats a product call not a technical one
+    history:
+      - 'user: walk me through the retry logic and then bundle everything you looked at'
+      - 'assistant: Exponential backoff with jitter in retry/policy.go, used by the transport wrapper and the jobs worker. Bundled both.'
+      - 'user: did you include the backoff config?'
+      - 'assistant: Not initially — added config/retry.yaml and the defaults block from policy.go, then regenerated.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: remember sessions are 30 days, thats a compliance thing not an arbitrary number
+    history:
+      - 'user: redis or postgres in prod?'
+      - 'assistant: Postgres, with Redis only as a lookup cache.'
+      - 'user: how long do they live'
+      - 'assistant: 30 days absolute, with a 12 hour idle expiry refreshed on use; both come from session.Config.'
+    active: [daintree.explore.repository]
+  - query: actually remember this - when i say run a fun competition it's the 4 pinned claudes, not the whole fleet
+    history:
+      - 'user: same 4 voting yeah? dont pull in anyone new'
+      - 'assistant: Electorate unchanged. Tab 5 takes it 3–1.'
+      - 'user: haha tab 5 wins. ok cool'
+      - 'assistant: Anything else on this one?'
+  - query: remember that the codex agent is my preferred pair programmer from now on
+    history:
+      - 'user: ok that''s enough, back to the interview. have the judge call it'
+      - 'assistant: Verdict: tab 3 — stronger on unfamiliar code, weaker on tests.'
+      - 'user: makes sense'
+      - 'assistant: Want me to keep any of them open?'
+  - remember we always use pnpm here, never npm
+  - query: what else have you got saved for this project
+    history:
+      - 'user: remember we always use pnpm here, never npm'
+      - 'assistant: Saved. There was a near-duplicate about lockfiles from March — I merged them rather than storing both.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: remember that release branches here always target release/* and never main
+    history:
+      - 'user: put the fixes-#221 line in the description too'
+      - 'assistant: Added Fixes #221 to the PR body.'
+      - 'user: nice one'
+      - 'assistant: Anytime.'
+  - query: what else have you got saved about this repo
+    history:
+      - 'user: nice one'
+      - 'assistant: Anytime.'
+      - 'user: remember that release branches here always target release/* and never main'
+      - 'assistant: Saved. I checked first — nothing conflicting was stored about branch targets.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: fine. remember the golden snapshots need regenerating before commit whenever a prompt changes
+    history:
+      - 'user: haha fair. right, ci went red — work out what broke'
+      - 'assistant: Stale golden snapshot vs the prompt partials on this branch.'
+      - 'user: it''s that flaky snapshot test again isn''t it'
+      - 'assistant: Not flaky — it fails every run on this commit. Regenerated the goldens, pushed, and the check went green on the new run.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: nope then. remember that saved filters live in localstorage not the session table, i keep forgetting that
+    history:
+      - 'user: saved filters vanish after logout. is there an issue for it already?'
+      - 'assistant: Nothing open mentioning saved filters or logout - closest is #340 on session expiry, different thing.'
+    active: [daintree.workflow.find-issue-work, daintree.foundation]
+  - query: also note down that this repo squash-merges everything, i keep opening merge commits
+    history:
+      - 'user: did it even pick that up?'
+      - 'assistant: It was parked at an old approval prompt.'
+      - 'user: ping me when #598 actually merges'
+      - 'assistant: Watching #598 - I''ll wake you on merge.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: one of them asked pnpm or npm. we use pnpm, remember that for good
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Nine up: three working, four waiting, two idle.'
+      - 'user: 4 of them are sat on prompts. unblock the lot, yes to anything read only'
+      - 'assistant: Answered three. The fourth is asking whether to use pnpm or npm — that''s not a yes/no, so I held it.'
+    active: [daintree.foundation, daintree.agents.answer-waiting-agent]
+  - query: did we ever settle the api versioning thing, months ago
+    history:
+      - 'user: interesting. get them talking to each other about it'
+      - 'assistant: Relaying round three now.'
+      - 'user: ok enough waffle. make them converge on one recommendation i can act on'
+      - 'assistant: Converged: split e2e into a nightly lane and keep unit+integration on PRs. All five signed off.'
+    active: [daintree.foundation, daintree.orchestration.multi-agent]
+  - query: thats wrong, forget it, we went the other way in the end
+    history:
+      - 'user: ok enough waffle. make them converge on one recommendation'
+      - 'assistant: Converged on splitting e2e into a nightly lane.'
+      - 'user: did we ever settle the api versioning thing, months ago'
+      - 'assistant: Stored note says you decided to version the URL prefix only, everything behind it unversioned.'
+    active: [daintree.foundation, daintree.memory.manage-project-memory]
+  - query: remember we always squash merge on this repo, no merge commits
+    history:
+      - 'user: not studio-5 though'
+      - 'assistant: Excluded it. Closed 5 terminals, deleted 4 worktrees.'
+      - 'user: one more — just close terminal 7'
+      - 'assistant: Closed terminal 7.'
+    active: [daintree.foundation]
+  - remember that we always use pnpm here, never npm
+  - query: remember that we always run migrations before the tests in this repo
+    active: [daintree.foundation]
+  - what did we decide about the retry policy a few weeks back?
+  - i keep having to remind every agent we use pnpm and never npm. store that so it stops happening.
+  - query: did we ever settle on the token TTL? i thought we wrote that down somewhere.
+    history:
+      - 'user: old notes: "…we agreed on the signed state token and dropped the cookie. Next: rename the module and close the old tabs."'
+  - remember we deploy on fridays — check we haven't already got a conflicting note first
+  - query: remember that we always run this one overnight, never during the day
+    history:
+      - 'user: run the overnight import and wake me'
+      - 'assistant: Watcher armed on t_6001.'
+      - 'user: [watcher fired 06:40: t_6001 exited 0]'
+      - 'assistant: Import finished cleanly overnight - 2.1M rows, no retries, and the row counts reconcile.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: log that decision, we're staying on the v2 client from now on
+    history:
+      - 'user: get the v2 client swapped in'
+      - 'assistant: Agent working in t_1200, supervised.'
+      - 'user: [watcher fired: t_1200 exited 0]'
+      - 'assistant: Swapped - v2 client in, the old adapter deleted, suite green on feat/v2-client.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: good result. write that up as a memory so we default to it next time
+    history:
+      - 'user: run the interview and pick my pair programmer'
+      - 'assistant: Judge briefed, three candidates questioned.'
+      - 'user: [wake: judge returned a verdict]'
+      - 'assistant: The judge picked t_12 - the only one that checked its claims against the actual files.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: remember that we always squash on this repo, never merge commits
+    history:
+      - 'user: merge it — squash'
+      - 'assistant: Squashed and merged.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]
+  - query: remember that we file everything against the platform repo, not the app one
+    history:
+      - 'user: create the issue on the platform repo'
+      - 'assistant: Created #55 there and read it back to confirm the target.'
+    active: [daintree.forge.manage-issue, daintree.foundation]
+  - query: remember that the vendor cutover can't happen before the 3rd, that's a hard constraint
+    history:
+      - 'user: reconcile with the new date'
+      - 'assistant: Applied — the cutover node is blocked with that reason recorded.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: remember that this app needs NODE_OPTIONS set or the dev server dies on start
+    history:
+      - 'user: restart the preview'
+      - 'assistant: Restarted. It came up on the second attempt.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: remember that the devbox has to be resumed before any e2e run
+    history:
+      - 'user: is the box up'
+      - 'assistant: Paused. Resume first if you need it.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: so while reviewing that PR i realised nobody knows the migrations have to run before the container boots not after, thats bitten us twice now, can you hang onto that somewhere
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: is there anything saved that contradicts what I just said about how we handle api keys
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: we're not a monorepo anymore, wipe anything saved about packages/*
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: so we finally agreed yesterday that every new service goes behind the gateway and I really don't want to be repeating that to you in three weeks time, can you keep it somewhere durable rather than just for this session
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: 'note for later: the seed script is destructive, never point it at staging'
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: from now on always spawn agents read-only unless i say otherwise, remember that
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: wut did i tell you about the deploy proccess last week
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: 'keep in mind going forward: PRs need two approvals before merge'
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: you keep forgetting we use tabs not spaces in this repo. write it down properly this time.
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: pin the one about not touching main directly
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: correct the memory about release cadence — it's fortnightly now, not weekly
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: what did we land on for api response casing, snake or camel?
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: the agent used yarn again. clearly you dont have the pnpm rule stored, fix that
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: what did we decide about the worktree naming scheme
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+wakes:
+  - query: '[async wait returned: memory search complete, 1 near-duplicate found]'
+    history:
+      - 'user: remember that we always run the linter before pushing'
+      - 'assistant: Checking for an existing fact on that first so I don''t duplicate it — the memory search is still running.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+near_misses:
+  - remember that we use pnpm here not npm
+  - did we decide on pnpm or npm
+docs:
+  - remember that we use pnpm here
+  - remember that we always use pnpm here
+  - what did we agree about the api shape again
+  - yes remember that
+  - query: actually wait — remember that we use pnpm here
+    history:
+      - 'user: track the migration as a durable plan'
+      - 'assistant: Graph wfg_4a1 created: 7 nodes, 9 edges. The backfill node is ready, everything else waits on it.'
+  - query: quick q — remember that we always use pnpm here
+    history:
+      - 'user: sweep the ledger'
+      - 'assistant: Closed wf_8701 as cancelled and wf_8702 as failed. wf_8790 stays active — terminal t-4 is still in the roster and watcher w-21 covers it.'
+foundation_boundaries:
+  - what did we decide about the api shape

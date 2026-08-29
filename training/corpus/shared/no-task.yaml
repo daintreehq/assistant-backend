@@ -1,0 +1,157 @@
+# Curated rows tagged `no_task` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: no_task
+run: pre-split
+empty_kind: no_task
+examples:
+  - thanks
+  - perfect
+  - nice one
+  - lgtm
+  - yep thats it
+  - ta
+  - cheers
+  - thnaks
+  - great, thanks
+  - awesome
+  - sweet
+  - got it
+  - understood
+  - sounds good
+  - no notes
+  - yeah thats the one
+  - exactly what i wanted
+  - much appreciated
+  - right gotcha
+  - ok that makes sense
+  - brilliant, cheers
+  - all good
+  - perfect thank you
+  - query: lovely, cheers
+    history:
+      - 'user: tidy up the terminals from this morning'
+      - 'assistant: Confirmed and torn down: closed 5 terminals, deleted 2 worktrees, cancelled 3 watchers, marked 3 ledger rows done.'
+  - query: much better ta
+    history:
+      - 'user: rename these tabs so i can tell them apart'
+      - 'assistant: Retitled them: ''auth-cache'', ''docs-sweep'', ''ci-flake''.'
+  - query: nice
+    history:
+      - 'user: is that PR green?'
+      - 'assistant: Yes — all six checks passed on #331, and the review decision is approved.'
+  - query: great
+    history:
+      - 'user: ping me when the build finishes'
+      - 'assistant: Watcher armed on terminal 3 — I''ll wake you when it exits.'
+      - 'assistant: Build finished green after 4m12s.'
+  - query: ok good enough for me
+    history:
+      - 'user: review the diff on feat/rate-limit'
+      - 'assistant: Two independent reviewers ran. One medium finding: the limiter resets on redeploy (limiter.go:88). Nothing blocking.'
+  - query: cool, thats me done for the day
+    history:
+      - 'user: verify the agent actually ran the migration'
+      - 'assistant: Verified — migration 0042 is in the diff, applied cleanly, and the test suite passes on the branch.'
+  - query: ok im happy with that
+    history:
+      - 'user: whats blocking issue 88'
+      - 'assistant: Nothing on the forge side — PR #91 is green and approved, waiting on you to merge.'
+  - query: beautiful
+    history:
+      - 'user: bundle everything for the payments module'
+      - 'assistant: Generated payments-context.md — 41 files, 118k, saved at .daintree/bundles/payments-context.md.'
+  - hmm
+  - interesting
+  - wow that was fast
+  - haha
+  - lol that agent is very confident about itself
+  - man this thing is quick
+  - i was not expecting that
+  - typical
+  - of course it did
+  - well thats annoying
+  - ha, classic
+  - honestly im impressed
+  - wild
+  - yeah i figured
+  - makes sense i guess
+  - thinking out loud here but i probably over engineered that whole thing last week
+  - im not sure how i feel about that
+  - this is genuinely fun
+  - sigh
+  - whatever, its friday
+  - you and me both
+  - that was painless for once
+  - i keep forgetting how much i like this setup
+  - ok thats genuinely cool
+  - kinda amazing tbh
+  - long day
+  - query: that was way faster than doing it by hand
+    history:
+      - 'user: put an agent on each of those four issues'
+      - 'assistant: Four agents launched, one per issue, each in its own worktree with a supervisor watcher.'
+      - 'assistant: All four are done. Four PRs open, all green.'
+  - query: ha, knew it would be the cache
+    history:
+      - 'user: why is ci red'
+      - 'assistant: Fixed and verified green — the cache key omitted the lockfile hash, so stale deps were restored. One line in ci.yml.'
+  - what time is it
+  - wat day is it
+  - how many agents can i run at once
+  - whats 3*7
+  - whats 128 * 4
+  - what model are you
+  - how many runbooks do you load at a time
+  - whats my timezone
+  - 45 minutes from now is what time
+  - convert 2.5 hours to minutes
+  - what does lgtm stand for again
+  - spell occurrence for me
+  - give me a random number between 1 and 100
+  - how long is a fortnight
+  - is it monday already
+  - whats a decent branch name for a typo fix
+  - quick sanity check, 0.1 + 0.2 isnt exactly 0.3 right
+  - roughly how much does one of these turns cost me
+  - whats the difference between a worktree and a branch
+  - what does daintree even mean
+  - can you count to five
+  - how many days until the end of the month
+  - whats the git command to undo the last commit but keep the changes
+  - who built you
+  - wait, go back
+  - ignore that
+  - never mind
+  - nvm
+  - scratch that
+  - let me rephrase
+  - hold on
+  - one sec
+  - brb
+  - wait no
+  - disregard my last message
+  - actually hang on let me think about it
+  - sorry that was meant for a different window
+  - srry wrong tab
+  - i typed that wrong, give me a sec
+  - you know what, forget it
+  - let me start over
+  - that came out wrong
+  - not you, sorry
+  - hmm let me word that better
+  - ignore what i just typed, wrong project
+  - pretend i didnt say that
+  - hey
+  - morning
+  - you there?
+  - hello
+  - yo
+  - hey there
+  - good morning
+  - afternoon
+  - im back
+  - sup
+  - evening, ready when you are
+  - hey, give me a minute to get coffee

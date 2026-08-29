@@ -1,0 +1,392 @@
+# Training examples whose answer is `daintree.forge.land-pull-request` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.forge.land-pull-request
+run: pre-split
+positives:
+  - 'approve #412'
+  - hit approve on the retry-backoff one and say the fix looks right to me
+  - request changes on 88 — the migration doesn't roll back cleanly and there's no down step at all. write that up properly
+  - stick alice and bob on as reviewers for the auth PR
+  - can you ask the platform team to review 219
+  - take 305 out of draft
+  - flip that back to draft, i'm not done with it
+  - mark it ready for review
+  - dismiss the codex review on 77, it was looking at the old head. review id is 2884991
+  - 'close #150, we''re not doing it'
+  - reopen 91
+  - squash merge it
+  - merge 204 with a rebase please
+  - land this PR
+  - approve and merge
+  - merge it once it's ready
+  - can you merge that one from yesterday, the docs typo one
+  - 'ok ship #333'
+  - get 42 in, squash is fine
+  - i want the two commits kept separate on that one so do a proper merge commit, not a squash
+  - convert 77 to a draft for now, i've got second thoughts about the API shape
+  - put greg down as a reviewer on the one i just opened
+  - close the stale PR on the perf branch, it's ancient
+  - i closed the wrong one this morning. can you undo that
+  - approve it but leave a note that the test coverage is thin
+  - changes requested on that PR. the error handling swallows everything and we'll never see a failure in prod. say that
+  - 'merge it, squash, and use the commit title ''fix(auth): drop the stale session probe'''
+  - un-draft 512 and request a review from whoever owns that directory
+  - 'merge the assistant-backend one, not the CLI one — both are open and both are #41'
+  - go ahead and approve, though it's my own PR so it'll probably bounce
+  - is 88 green? if it is, merge it
+  - check the checks and then squash it in
+  - read the review decision on 204 and if it says approved go ahead and land it
+  - 'you told me #204 was green ten minutes ago, so go on then, merge it'
+  - don't tell me the status again, i just want it merged
+  - checks and reviews are all fine by me. record the approval
+  - you already reviewed it and said it was fine, so put the approval on it
+  - i've read the diff myself and it's good — approve on my behalf
+  - don't re-review it, just hit approve
+  - all the findings from that review got fixed. so approve rather than request changes
+  - i want an actual approval recorded on github, not just you telling me it looks fine
+  - your review said one blocker. put that on the PR as request changes, word for word
+  - CI's finally green after all that faffing. merge it
+  - the flake cleared on a re-run. land 219, squash
+  - checks are red but it's the unrelated lint job and we're abandoning this anyway. close it
+  - don't go fixing anything, that failing check isn't required. merge
+  - one required check is still red so hold off merging — put it back to draft instead
+  - the PR's already open, i just need it out of draft
+  - 'PR exists, it''s #77. mark it ready and get the reviewers on it'
+  - no need to push anything, everything's already up there. approve it
+  - branch is pushed, PR is up, it's been reviewed. just land the thing
+  - i opened it as a draft by mistake this morning, can you fix that
+  - don't set a watcher on it, just merge it now
+  - i'm not waiting around for it — check now and merge if it's good
+  - forget the ping-me-when-it-merges thing, merge it yourself
+  - rather than watching it, squash it in and tell me it's done
+  - Squash and merge pull request 42 after checking every gate.
+  - Approve PR 19 with a short note saying the implementation looks good.
+  - Request changes on PR 77 and explain that the auth check is missing.
+  - Mark draft pull request 31 ready for review.
+  - Convert PR 8 back to draft until the migration is complete.
+  - Request alice and the platform team as reviewers on pull request 54.
+  - Close PR 12 without merging it.
+  - Reopen pull request 12 and put it back in review.
+  - Land PR 101 with a rebase merge once its checks and reviews are safe.
+  - Merge pull request 5 using a merge commit.
+  - Approve and then squash-merge PR 66 if the repository gates allow it.
+  - Tell me whether PR 72 is actually safe to merge, then merge it with squash.
+  - Dismiss review id 987 on PR 44 with the reason that it applies to an obsolete commit.
+  - Add the release-engineering team to PR 9's requested reviewers.
+  - Make PR 23 ready and request bob's review.
+  - The work is abandoned; close its pull request but leave the branch.
+  - Reopen the closed pull request and do not merge it yet.
+  - Request changes publicly with the exact findings I supplied.
+  - Sign off on this PR but do not merge it.
+  - Use squash to land this exact PR and verify the merged state afterward.
+boundaries:
+  - query: merge 447 once the checks pass
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: approve that pull request and merge it
+    confusable_with: [daintree.forge.manage-issue]
+  - query: reopen that pull request, i closed it by mistake
+    confusable_with: [daintree.forge.manage-issue]
+  - query: request changes on 61, the error handling is wrong
+    confusable_with: [daintree.forge.manage-issue]
+  - query: mark the PR ready, it's out of draft now
+    confusable_with: [daintree.forge.manage-issue]
+  - query: add tim as a reviewer on that PR
+    confusable_with: [daintree.forge.manage-issue]
+  - query: approve it and merge once the checks come back
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Reopen pull request 12 and request reviewers.
+    confusable_with: [daintree.forge.manage-issue]
+followups:
+  - query: squash
+    history:
+      - 'user: merge 412'
+      - 'assistant: Before I merge: #412 "fix(auth): drop the stale session probe", auth/session-probe -> develop. Roll-up conclusive and success, 4/4 required checks passing, reviewDecision APPROVED, mergeable true. Which method — merge, squash or rebase?'
+    active: [daintree.forge.land-pull-request]
+  - query: yep that's the right one, go
+    history:
+      - 'user: land the docs one'
+      - 'assistant: Two open PRs mention docs. I mean #388 "docs: fix the retry-policy table", docs/retry-table -> main. Confirm that''s the target and I''ll go.'
+    active: [daintree.forge.land-pull-request]
+  - query: why does it still say review_required, it's literally got my approval on it now
+    history:
+      - 'user: approve 219'
+      - 'assistant: Approved — review submitted, state APPROVED, commit c41f9ab. Re-read the PR afterwards and reviewDecision still reports REVIEW_REQUIRED.'
+    active: [daintree.forge.land-pull-request]
+  - query: try it again with the same key, don't double-post
+    history:
+      - 'user: request changes on 88, the down migration is missing'
+      - 'assistant: The call came back ambiguous — I can''t tell whether the review was submitted. Re-reading the PR shows no new review, so nothing landed.'
+    active: [daintree.forge.land-pull-request]
+  - query: 'put a body on it: looks good, one nit about the retry cap'
+    history:
+      - 'user: approve the backoff PR'
+      - 'assistant: Ready to approve #301, retry/backoff -> develop. Approval body is optional — want one, or bare approval?'
+    active: [daintree.forge.land-pull-request]
+  - query: actually no, reopen it, i spoke too soon
+    history:
+      - 'user: close 150'
+      - 'assistant: Closed. #150 reads back state CLOSED, merged false.'
+    active: [daintree.forge.land-pull-request]
+  - query: and mark it ready while you're in there
+    history:
+      - 'user: put alice and the platform team on 512 as reviewers'
+      - 'assistant: Requested. Complete lists come back as users [alice], teams [platform] — nothing was rejected. It''s still a draft, so they won''t be notified yet.'
+    active: [daintree.forge.land-pull-request]
+  - query: what did the forge actually give back
+    history:
+      - 'user: squash it in'
+      - 'assistant: Merged #412 with squash. Result merged true, sha 7d1e02b, and the re-read confirms merged true, state MERGED.'
+    active: [daintree.forge.land-pull-request]
+  - query: id's 3129884
+    history:
+      - 'user: dismiss that stale review on 77'
+      - 'assistant: I can''t — nothing on the read surface lists review ids, and I won''t guess one. Give me the review id from the PR page and a dismissal message and I''ll do it.'
+    active: [daintree.forge.land-pull-request]
+  - query: don't wait a minute, just go now
+    history:
+      - 'user: merge it, rebase'
+      - 'assistant: The roll-up says success but you pushed 20 seconds ago and the wrapper lags about a minute — that green may be the previous head. I''d rather re-read before merging.'
+    active: [daintree.forge.land-pull-request]
+  - query: ok do 415 the same way
+    history:
+      - 'user: merge 412 with a squash'
+      - 'assistant: Merged #412, sha 7d1e02b, confirmed merged on re-read.'
+    active: [daintree.forge.land-pull-request]
+  - query: so set a reminder instead and i'll do it myself later
+    history:
+      - 'user: merge it when the checks go green'
+      - 'assistant: I can''t promise that — the PR watcher only sees open/merged/draft/closed, it doesn''t observe CI, and the merge action can''t be pre-authorized for a wake turn.'
+      - 'user: seriously? there''s no auto-merge at all?'
+      - 'assistant: Not through here. I can check and merge interactively now, or leave something watching PR state and you confirm the merge when it wakes you.'
+    active: [daintree.forge.land-pull-request]
+  - query: Do not merge; show me exactly what is unknown.
+    history:
+      - 'user: Squash-merge PR 42.'
+      - 'assistant: The check roll-up is inconclusive because zero required checks were reported.'
+    active: [daintree.forge.land-pull-request]
+  - query: Use rebase.
+    history:
+      - 'user: Merge PR 11.'
+      - 'assistant: You have not selected a merge method.'
+    active: [daintree.forge.land-pull-request]
+  - query: Report that blocker and stop before merging.
+    history:
+      - 'user: Approve PR 7.'
+      - 'assistant: The approval landed but the PR still reports review required.'
+    active: [daintree.forge.land-pull-request]
+  - query: Check it now and ask me before the merge call.
+    history:
+      - 'user: Merge this PR once green.'
+      - 'assistant: Automatic CI-triggered merging is not available from this surface.'
+    active: [daintree.forge.land-pull-request]
+  - query: 'Use: the retry loop loses the original error.'
+    history:
+      - 'user: Request changes on PR 3.'
+      - 'assistant: I need a public explanation.'
+    active: [daintree.forge.land-pull-request]
+  - query: Read it back and confirm the PR itself now says merged.
+    history:
+      - 'user: Merge PR 88 with squash.'
+      - 'assistant: The forge returned merged true and a SHA.'
+    active: [daintree.forge.land-pull-request]
+topic_shifts:
+  - query: right, that's enough looking at it — approve it and squash it in
+    history:
+      - 'user: review the changes on the caching branch'
+      - 'assistant: Two read-only reviewers came back. One real finding: the TTL is read before the config is loaded in cache/init.go:22. Everything else is style.'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: ok CI's finally green on 318, land it
+    history:
+      - 'user: why is CI red on 318'
+      - 'assistant: The integration job was timing out on a leaked db connection. Fixed in store/pool.go and pushed.'
+      - 'user: rerun it'
+      - 'assistant: Rerun triggered, all four jobs green now.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: put sarah and the platform team on that PR as reviewers
+    history:
+      - 'user: what''s the state of #204'
+      - 'assistant: Open, CI green, no reviews yet, one comment from the bot about coverage.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: flip it out of draft, it's ready for people to look at now
+    history:
+      - 'user: push this up and open a PR'
+      - 'assistant: Committed 6 files, pushed feat/webhook-retry, opened PR #412 as a draft.'
+    active: [daintree.workflow.prep-branch-for-review]
+  - query: i want changes requested on it — the migration is not reversible and that needs saying publicly
+    history:
+      - 'user: look over what the agent wrote on the schema branch'
+      - 'assistant: Findings: the down migration drops a column with no backup, and there''s no index on the new FK. Both in db/migrations/0031.sql.'
+    active: [daintree.review.review-change]
+  - query: close 291 without merging, we went a different way
+    history:
+      - 'user: catch me up on what''s still open'
+      - 'assistant: Two PRs from last week: #291 (the retry rewrite) and #303 (docs). Neither has moved in five days.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: yeah it did the work properly. merge it, rebase not squash
+    history:
+      - 'user: did that agent actually do what i asked before i merge'
+      - 'assistant: Verified — the diff touches exactly the three files in the ticket, tests were added, and the suite passes on the branch.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: reopen 188, turns out we do still want it
+    history:
+      - 'user: anything small unassigned in the tracker'
+      - 'assistant: #402, #405 and #418 are all unassigned and look like an hour each.'
+    active: [daintree.workflow.find-issue-work]
+  - query: drop that stale review off it, the guy who left it is on leave and it's blocking us
+    history:
+      - 'user: what''s holding up the auth PR'
+      - 'assistant: One CHANGES_REQUESTED review from three weeks ago; CI is green and the conflicts are resolved.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: convert it back to draft, i don't want anyone reviewing it while i rework the interface
+    history:
+      - 'user: where''s the plugin loader implemented'
+      - 'assistant: plugins/loader.go, with the registry in plugins/registry.go and the lifecycle hooks in plugins/hooks.go.'
+    active: [daintree.explore.repository, daintree.foundation]
+  - query: approve 77 and then merge it with a squash
+    history:
+      - 'user: get an agent to fix the off-by-one in the paginator'
+      - 'assistant: Agent finished, pushed, and it opened PR #77 off the fix branch.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: stick a review request on it for the two backend folks before it goes stale
+    history:
+      - 'user: bundle everything touching the billing webhooks'
+      - 'assistant: 22 files bundled to ./context/billing-webhooks.xml, nothing truncated.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: land 520 please, whichever merge method the repo normally uses is fine but tell me which one you're using
+    history:
+      - 'user: how are the agents doing'
+      - 'assistant: Three finished, one still writing tests. The finished ones all have PRs up: 518, 519, 520.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: mark the docs one ready for review, it's been sitting in draft since tuesday
+    history:
+      - 'user: tidy up the terminals from friday''s batch'
+      - 'assistant: Closed five exited terminals and removed two merged worktrees. Left the docs worktree alone, it still has uncommitted work.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: go ahead and merge the hotfix PR, we need it out before the demo
+    history:
+      - 'user: remind me in 30 minutes to check the deploy'
+      - 'assistant: Timer set for 30 minutes.'
+    active: [daintree.orchestration.watch-outcome]
+  - query: merge the fix PR, it's green
+    history:
+      - 'user: reload the preview and check'
+      - 'assistant: Reloaded. Only the new navigation generation is clean — no errors after the reload.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: merge the PR that's been sitting on that branch, it's approved
+    history:
+      - 'user: pause the box, that work is done'
+      - 'assistant: Paused and verified.'
+    active: [daintree.worktree.manage-resource]
+  - query: the auth PR is green now, approve and squash it
+    history:
+      - 'user: give the agents their own worktrees'
+      - 'assistant: Four created; every agent told once to continue in its new directory.'
+    active: [daintree.worktree.relocate-agents]
+  - query: 'merge #418 for me'
+    history:
+      - 'user: isolate the four agents into worktrees'
+      - 'assistant: Done — four worktrees off develop, four agents redirected, nothing closed.'
+    active: [daintree.worktree.relocate-agents]
+  - query: mark that PR ready for review and then merge it once checks pass
+    history:
+      - 'user: move each agent to its own tree'
+      - 'assistant: Three worktrees created and all three agents told where they now live.'
+    active: [daintree.worktree.relocate-agents]
+  - query: 'merge the assistant-backend one, not the CLI one — both are open and both are #41'
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: Make PR 23 ready and request bob's review.
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: 'merge it, squash, and use the commit title ''fix(auth): drop the stale session probe'''
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: Close PR 12 without merging it.
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: checks are red but it's the unrelated lint job and we're abandoning this anyway. close it
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: i want an actual approval recorded on github, not just you telling me it looks fine
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: put greg down as a reviewer on the one i just opened
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: Request alice and the platform team as reviewers on pull request 54.
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: 'approve #412'
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: 'ok ship #333'
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: stick alice and bob on as reviewers for the auth PR
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: don't re-review it, just hit approve
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: merge it once it's ready
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: Use squash to land this exact PR and verify the merged state afterward.
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: un-draft 512 and request a review from whoever owns that directory
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: don't set a watcher on it, just merge it now
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: don't go fixing anything, that failing check isn't required. merge
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: Land PR 101 with a rebase merge once its checks and reviews are safe.
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: Sign off on this PR but do not merge it.
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+wakes:
+  - query: '[forge activity: pull request changed]'
+    active: [daintree.forge.land-pull-request]
+  - query: '[watcher fired: PR #318 state changed to merged]'
+    history:
+      - 'user: merge 318 once it''s green'
+      - 'assistant: Not mergeable yet — required checks are still pending. I armed a PR watch instead; the merge still needs a fresh check and your confirmation.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]
+foundation_boundaries:
+  - merge 412
+  - squash and merge that PR
+  - 'approve #88'
+  - just hit merge on it, it's been green all morning
+  - mark PR 55 ready for review
+  - put marco and priya on 77 as reviewers
+  - close PR 33, we're not doing it
+  - request changes on 51 — the migration isn't reversible
+  - reopen 210, i closed it by mistake
+  - convert 62 back to draft

@@ -78,13 +78,19 @@ training/logs/
 # that matter are transcribed into training/EXPERIMENTS.md — which is the record.
 # The report is published as a claude.ai artifact, not carried in the repo.
 training/results/
-# Per-run generator journals (the raw agent output a retrain assembles from).
-# Session-local by design and not reconstructible from a fresh clone, so they are
-# not the record — assemble_data folds them into training/data/selection.jsonl,
-# which is. Ignored so a retrain does not leave untracked clutter behind.
-training/journals/
-# Generated synthetic corpora are NOT ignored: training/data/*.jsonl is checked in
-# as the record of what the shipped weights were trained on.
+# NOT ignored, and each for its own reason — the corpus is three planes:
+#   training/journals/  RAW. What a generating agent actually returned. Committed
+#                       BECAUSE it is not reconstructible: the generator is a
+#                       nondeterministic paid model, so a discarded journal is a
+#                       row that can never be traced to a prompt again. These used
+#                       to be ignored, which left the generated artifact as the
+#                       only evidence and made "regenerate" mean "append".
+#   training/corpus/    CURATED. Hand-edited YAML; the source of truth.
+#   training/data/      COMPILED. selection.jsonl + corpus-lock.json, both produced
+#                       by training.compile_corpus and gated in CI against the
+#                       curated plane. Committed as the record of what the shipped
+#                       weights were trained on — ~3 MB, well under anything that
+#                       would justify LFS or DVC.
 
 # Local runbook selection (serving side). Model GRAPHS are tracked via Git LFS
 # (.gitattributes). fp32 graphs are NOT tracked: they exist only so the exporter

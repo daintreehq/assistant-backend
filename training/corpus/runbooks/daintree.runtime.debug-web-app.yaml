@@ -1,0 +1,403 @@
+# Training examples whose answer is `daintree.runtime.debug-web-app` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.runtime.debug-web-app
+run: pre-split
+positives:
+  - dev preview is just a white screen
+  - check the console on the preview panel
+  - page is blank in preview, no idea why
+  - grab whatever errors are in the console and tell me whats actually wrong
+  - it just spins
+  - somethings throwing in the browser. the app's open in the preview panel, can you go look
+  - reload the preview, i pushed the css fix
+  - i fixed the import path, reload it
+  - app in dev preview died right after my last save
+  - whats in the console
+  - the preview panel's got a big red error overlay on it, deal with it
+  - can you screenshot the preview and tell me if it looks right
+  - start a dev preview for me
+  - open a preview of the app so you can actually see it
+  - restart the dev server behind the preview, i think its wedged
+  - TypeError somewhere on load. check the preview console
+  - the page renders but the nav bar isn't there. preview's open, go look
+  - why is the preview broken
+  - uncaught error in the console, fix it
+  - i've got the app running in dev preview and clicking save does nothing at all. see what's erroring when i hit it
+  - console is full of red, sort it out
+  - hydration mismatch warning in the preview, can you chase that down
+  - did that reload actually take? im still seeing the old error
+  - the preview reloaded but i can't tell if the fix landed. only look at messages from the new load
+  - look at the preview, fix whatever's crashing it, then reload and confirm
+  - 404 on a js chunk in the preview console
+  - cors error in the browser console of the preview, i can't get the api call through
+  - ok so everything looks fine to me and the tabs load, but the preview panel goes completely empty on one route. two of the three routes are fine. the third one just doesn't paint anything at all. can you dig into that
+  - the app crashes the second i navigate to /settings. its up in preview
+  - can you visually check the preview looks ok before i show this to anyone
+  - preview keeps serving a stale version even after i save. reload or restart, whichever
+  - the overlay says failed to resolve import ./utils/date. preview panel is up
+  - unit tests all pass but the actual page throws on load in the preview. start with the console
+  - npm run build succeeds. the preview still white screens. whats going on
+  - there's no failing test here, the thing just breaks in the browser when i click the tab
+  - typecheck is clean, the preview is not. look at the runtime errors
+  - i know CI is green, thats not the issue. the app itself errors in the preview panel
+  - 'the suite doesn''t cover this. its only visible at runtime: cannot read properties of undefined reading map, preview''s open'
+  - not a build failure. the bundle compiles and then explodes in the browser
+  - should i be looking at the tests or the console here? preview goes blank after the router change
+  - lint and tests are fine. the preview throws on mount. get the console evidence and get someone to fix it
+  - jest passes because it mocks the fetch. in the real preview it 500s and the page dies. chase the browser side
+  - console first, then run the narrow check in that worktree once the fix is in
+  - storybook builds fine but the actual dev preview is throwing. console please
+  - the failing thing isn't a check. its the page. its open in preview and it's throwing
+  - the check runner says pass but the page is broken in preview. trust the browser, look at the console
+  - where's this coming from — console says Cannot read x of null in CartSummary. preview is open
+  - the preview is erroring inside the checkout component. find out why and fix it
+  - i don't understand why this component blows up at runtime. its right there in the preview and the console has a stack
+  - explain what's crashing on the dashboard page. its open in the preview panel and throwing
+  - trace this stack trace from the preview console back to the source
+  - which file is actually throwing? the console in the preview has the stack, use that
+  - figure out how the modal works — actually no, it just errors when i open it in the preview. debug that instead
+  - the console error mentions useAuth. whats going wrong there at runtime
+  - something in the data fetching layer is throwing in the browser. preview's up, dig from the console down
+  - i want to know why the page doesnt render. not a general tour of the code, the actual runtime failure in the preview
+  - before you go reading the whole component tree — the console already has the stack. preview is open, start there
+  - reading the source isn't going to tell you this one, it only shows up when the page actually runs. preview's loaded
+  - The React app in Dev Preview is blank; inspect the runtime error and fix it.
+  - Read the browser console from the existing dev preview and diagnose the crash.
+  - Fix this frontend runtime exception, reload the preview, and verify new console output.
+  - The app renders a white screen in Daintree Dev Preview.
+  - Inspect console warnings and errors in the open preview panel.
+  - Reload the existing preview after the agent's frontend fix.
+  - Restart the dev-preview server because its process is wedged, then re-check the console.
+  - Use the stack trace in Dev Preview to give an edit agent an exact task.
+  - Confirm whether the runtime error recurs in the next navigation generation.
+  - Take a screenshot of the preview and tell me whether the layout is correct.
+  - Start a new Dev Preview and debug the page for me.
+  - The preview console is empty but the page still looks broken.
+  - Debug a hydration failure in the already-open Next.js preview.
+  - Find the dev-preview panel id and read its latest error messages.
+  - The console counts are still red after reload; determine whether they are stale history.
+  - Run a bounded frontend build check after fixing the runtime exception.
+  - Fix the JavaScript error shown in Daintree's preview console.
+  - The existing dev server changed configuration; restart its preview deliberately.
+  - Verify only messages from the new navigation after reloading.
+  - Tell me what this Assistant can actually prove about the visual preview.
+boundaries:
+  - query: the preview is throwing console errors after the last change
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the dev preview is blank, check the browser console
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: reload the preview, i fixed the import error
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: start a preview of the app so i can look at it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Start the React development preview for this worktree.
+    confusable_with: [daintree.worktree.manage-resource]
+followups:
+  - query: and the second one?
+    history:
+      - 'user: the preview''s blank, check the console'
+      - 'assistant: Read 100 messages off panel dp_7a1 (worktree wt_3f). Two errors at navigationGeneration 4: an uncaught TypeError in ProductGrid.tsx:88, and a failed fetch to /api/inventory returning 500.'
+    active: [daintree.runtime.debug-web-app]
+  - query: reload it now
+    history:
+      - 'user: fix whatever''s throwing in the preview'
+      - 'assistant: Console pointed at a null guard in ProductGrid. Spawned an edit agent in wt_3f (t-14) with the exact error and stack; it''s changed the guard and the narrow vitest run passed.'
+    active: [daintree.runtime.debug-web-app]
+  - query: only the new ones please, i don't care about the old red
+    history:
+      - 'user: did the reload fix it'
+      - 'assistant: Re-read the console. It still shows 6 errors in aggregate, but that count covers retained history across generations.'
+    active: [daintree.runtime.debug-web-app]
+  - query: which worktree did you put it in
+    history:
+      - 'user: the preview is throwing on mount, get someone on it'
+      - 'assistant: Spawned a visible edit agent with the console error and stack trace, plus the acceptance criteria that the page mounts clean.'
+    active: [daintree.runtime.debug-web-app]
+  - query: do the restart then, it's clearly wedged
+    history:
+      - 'user: reload the preview'
+      - 'assistant: Reload dispatched to panel dp_7a1. The acknowledgement doesn''t prove the webview reloaded, and no message at a newer navigationGeneration has appeared since.'
+    active: [daintree.runtime.debug-web-app]
+  - query: so is it still broken or not
+    history:
+      - 'user: reload after that fix and tell me if it''s clean'
+      - 'assistant: Reloaded. Nothing at a generation above the recorded baseline of 4 has come through yet, so I can''t prove the page reloaded or rendered.'
+    active: [daintree.runtime.debug-web-app]
+  - query: cant you just look at it yourself
+    history:
+      - 'user: does the layout look right now'
+      - 'assistant: I can''t judge that. Screenshots come back as an MCP image block that this path drops before I see it, so I''d get dimensions and no pixels. Console is silent on the new generation, but silence isn''t visual correctness.'
+    active: [daintree.runtime.debug-web-app]
+  - query: what was the baseline generation again
+    history:
+      - 'user: check the preview console'
+      - 'assistant: Panel dp_22c, worktree wt_9a, project prj_1. Errors are all from the current load.'
+      - 'user: right, i''ll go fix that import myself'
+      - 'assistant: Fine — tell me when it''s saved and I''ll reload and check only what''s new.'
+    active: [daintree.runtime.debug-web-app]
+  - query: run the narrow test in that worktree too while you're at it
+    history:
+      - 'user: something''s crashing the preview on /orders'
+      - 'assistant: Console has a stack ending in useOrders.ts:41. Edit agent is on it in wt_9a.'
+    active: [daintree.runtime.debug-web-app]
+  - query: errors only, drop the warnings, theres too much noise
+    history:
+      - 'user: whats in the console on the preview'
+      - 'assistant: 100 messages back and it''s mostly deprecation warnings from the dev server.'
+    active: [daintree.runtime.debug-web-app]
+  - query: same panel, do it again
+    history:
+      - 'user: reload the preview, i changed the css'
+      - 'assistant: Reloaded dp_7a1. New generation came through clean.'
+      - 'user: i tweaked one more thing'
+      - 'assistant: Want me to reload again?'
+    active: [daintree.runtime.debug-web-app]
+  - query: the one on the billing worktree, not the other
+    history:
+      - 'user: debug whats wrong with my preview'
+      - 'assistant: There are two dev-preview panels open — dp_101 on wt_billing and dp_209 on wt_search. I''m not going to guess which you mean; which one is showing the problem?'
+    active: [daintree.runtime.debug-web-app]
+  - query: I opened it now; inspect its console.
+    history:
+      - 'user: Debug the blank Dev Preview.'
+      - 'assistant: No dev-preview panel is currently open.'
+    active: [daintree.runtime.debug-web-app]
+  - query: Reload and judge only generation 5 or newer.
+    history:
+      - 'user: Fix the runtime crash.'
+      - 'assistant: The agent changed the source and the baseline generation was 4.'
+    active: [daintree.runtime.debug-web-app]
+  - query: Then report the visual limitation and verify console evidence only.
+    history:
+      - 'user: Confirm the layout visually.'
+      - 'assistant: Screenshot image blocks do not reach this backend model.'
+    active: [daintree.runtime.debug-web-app]
+  - query: The process is wedged, so restart it and re-read the console.
+    history:
+      - 'user: Restart the dev preview.'
+      - 'assistant: A reload is cheaper unless the process is wedged.'
+    active: [daintree.runtime.debug-web-app]
+  - query: Compare message generations instead of using the count.
+    history:
+      - 'user: The error count is still three after reload.'
+      - 'assistant: Aggregate counts include old navigation history.'
+    active: [daintree.runtime.debug-web-app]
+  - query: Do not do that; use the already-open preview only.
+    history:
+      - 'user: Run the dev server through project.runCheck.'
+      - 'assistant: That action forbids long-lived servers.'
+    active: [daintree.runtime.debug-web-app]
+topic_shifts:
+  - query: the preview panel is just a white screen now, what's in the console
+    history:
+      - 'user: get an agent to swap the date picker for the new one'
+      - 'assistant: Agent finished — replaced the component in ui/DatePicker.tsx and updated four call sites.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: app's throwing in the browser since that landed. dig into it
+    history:
+      - 'user: merge 640'
+      - 'assistant: Merged with a squash. Head is now at 9c1a4f2 on main.'
+    active: [daintree.forge.land-pull-request]
+  - query: reload the preview, the fix is in
+    history:
+      - 'user: why is the settings page blank'
+      - 'assistant: Console shows a failed dynamic import for settings/Panel.tsx. An agent is fixing the path now.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: hang on, the dev preview is showing a hydration error, can you look before we carry on
+    history:
+      - 'user: where''s the session cookie set'
+      - 'assistant: auth/session.ts:31, with the SameSite attribute coming from config/env.ts.'
+    active: [daintree.explore.repository, daintree.foundation]
+  - query: check the browser console on the preview panel, something's spamming warnings
+    history:
+      - 'user: what terminals are open'
+      - 'assistant: Five: two Claude agents, a shell, a dev preview, and an exited one.'
+    active: [daintree.foundation]
+  - query: it renders in the tests but the actual page is broken. look at the runtime errors
+    history:
+      - 'user: the unit tests are failing'
+      - 'assistant: Two snapshot tests were stale. Regenerated them and the suite is green.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: restart the preview server, i think it's wedged — nothing i change shows up
+    history:
+      - 'user: create a worktree for the ui refresh branch'
+      - 'assistant: Created wt_88f on ui/refresh off develop.'
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+  - query: the checkout flow blows up on step two in the preview. find out why
+    history:
+      - 'user: file an issue about the coupon field'
+      - 'assistant: Created #712, labelled bug, assigned to you.'
+    active: [daintree.forge.manage-issue]
+  - query: can you actually see the preview or only read its console? and either way tell me what errors are in there
+    history:
+      - 'user: where were we'
+      - 'assistant: The ui refresh branch, agent finished last night, nothing merged.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: after that agent's change, reload the preview and tell me if the error is actually gone or just old messages
+    history:
+      - 'user: send the review findings over to the agent'
+      - 'assistant: Relayed both findings to t_9012 with your calibration.'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+  - query: there's a CORS error in the dev preview, sort it
+    history:
+      - 'user: is the devbox up on this worktree'
+      - 'assistant: Running, resumed 12 minutes ago.'
+    active: [daintree.worktree.manage-resource]
+  - query: preview's broken — infinite render loop by the look of it. get the console evidence and put someone on it
+    history:
+      - 'user: how are the three agents doing'
+      - 'assistant: All three finished. Diffs are on their branches, nothing pushed yet.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: open the app preview and tell me what you can actually inspect there
+    history:
+      - 'user: remember that we use vite, not webpack'
+      - 'assistant: Saved.'
+    active: [daintree.memory.manage-project-memory]
+  - query: the page throws on load now. was it the agent's change? console first
+    history:
+      - 'user: did the agent do what it claimed'
+      - 'assistant: The diff matches the brief and it ran the unit tests, which passed.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: look at the running preview, i'm getting a 'cannot read properties of undefined' the moment i click save
+    history:
+      - 'user: what''s blocking #660'
+      - 'assistant: Nothing on the forge — CI is green and it''s approved. It''s waiting on you.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: The React app in Dev Preview is blank; inspect the runtime error and fix it.
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: page is blank in preview, no idea why
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: where's this coming from — console says Cannot read x of null in CartSummary. preview is open
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: 404 on a js chunk in the preview console
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: unit tests all pass but the actual page throws on load in the preview. start with the console
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: grab whatever errors are in the console and tell me whats actually wrong
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: i fixed the import path, reload it
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: i've got the app running in dev preview and clicking save does nothing at all. see what's erroring when i hit it
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: preview keeps serving a stale version even after i save. reload or restart, whichever
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: The console counts are still red after reload; determine whether they are stale history.
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: explain what's crashing on the dashboard page. its open in the preview panel and throwing
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: start a dev preview for me
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: reading the source isn't going to tell you this one, it only shows up when the page actually runs. preview's loaded
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: i know CI is green, thats not the issue. the app itself errors in the preview panel
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: restart the dev server behind the preview, i think its wedged
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: Tell me what this Assistant can actually prove about the visual preview.
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: cors error in the browser console of the preview, i can't get the api call through
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: whats in the console
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: lint and tests are fine. the preview throws on mount. get the console evidence and get someone to fix it
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: the page renders but the nav bar isn't there. preview's open, go look
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: Take a screenshot of the preview and tell me whether the layout is correct.
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: Inspect console warnings and errors in the open preview panel.
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: it just spins
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: the app crashes the second i navigate to /settings. its up in preview
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: Verify only messages from the new navigation after reloading.
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: i don't understand why this component blows up at runtime. its right there in the preview and the console has a stack
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: before you go reading the whole component tree — the console already has the stack. preview is open, start there
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: figure out how the modal works — actually no, it just errors when i open it in the preview. debug that instead
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+wakes:
+  - query: '[agent completed: frontend fix]'
+    active: [daintree.runtime.debug-web-app]
+  - query: '[wake: dev preview panel reported a navigation]'
+    history:
+      - 'user: reload the preview'
+      - 'assistant: Reload requested; waiting for a newer navigation generation to appear.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: '[terminal.awaitAll returned: t_3301 finished]'
+    history:
+      - 'user: delegate the render-loop fix'
+      - 'assistant: Edit agent up in t_3301 with the console error and acceptance criteria. I''ll reload the preview once it lands.'
+    active: [daintree.runtime.debug-web-app]
+foundation_boundaries:
+  - the preview's blank
+  - check the console
+  - reload the preview
+  - restart the dev preview, it's wedged
+  - why is the app throwing in the browser
+  - screenshot the preview and tell me if it looks right
+  - The page renders but nothing's clickable. Have a look at what the console is spitting out.
+  - open a preview for this app
+  - any errors in the browser console since the last reload?

@@ -1,0 +1,285 @@
+# Training examples whose answer is `daintree.orchestration.debate-elimination` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.debate-elimination
+run: pre-split
+positives:
+  - get three agents debating tabs vs spaces then vote the weakest off
+  - debate + elimination round, four agents, topic is our caching strategy
+  - have the pinned agents argue about whether we keep the monorepo, then knock one out
+  - run a debate and eliminate the weakest position
+  - ok now have them vote one of themselves off
+  - same again with the survivors — one more round then boot whoever's weakest
+  - do that with these two terminals instead, debate then eliminate
+  - can you set up a debate between claude and codex about the retry design and then get them to vote on which position is weakest?
+  - is it possible to have four agents debate a topic and then eliminate one by peer vote?
+  - so I want to spin up four agents on the question of whether we should move the selector off openrouter, let them go a couple of rounds arguing it properly, and then at the end have each of them name the least convincing argument and drop that one, and tell the loser why it went
+  - spawn a 4-agent debate cohort on the state token design, 2 rounds, then run an attributed elimination vote and give me the tally
+  - hav three agents debat the auth refactor then vot off the wekaest one
+  - elimnate the weakest agent after they debate pls
+  - actually stop the debate there — get them to vote one of themselves out now
+  - forget the third round, just have them each name the weakest position and drop it
+  - after they've debated, don't remove anyone, just tell me which position they think is intellectually weakest
+  - debate then vote someone off and close the loser's terminal
+  - run it like survivor — they debate, one gets voted out each round
+  - last agent standing debate on whether we should drop the vendored submodule
+  - the three terminals that are already arguing about this — collect their final positions and run the elimination vote
+  - put gpt, claude and gemini on the p95 latency question, let them argue it out, then peer-vote the weakest off and report the tally
+  - have the agents debate and then kick the one with the worst argument
+  - two more rounds then eliminate again
+  - debate elimination round on the docs mcp design
+  - who should run this debate — I want each agent defending a different caching approach and then a vote to remove the one that can't hold its position
+  - set up an argument between the fleet about the workflow ledger and have them eliminate the weakest debater at the end, notify whoever loses
+  - spin up three agents, let them fight it out over the cache layer, then have them vote the worst take off
+  - ok that's enough rounds. eliminate one
+  - vote one off
+  - codex, claude and the gemini one — argue about whether we drop redis, then knock the weakest argument out
+  - get 4 agnets debating teh migration stratgy then have them vot out the wrost one
+  - those two and the one on the end. debate it. then drop whoever's weakest
+  - i have five agents and five opinions and zero decisions. make them argue and cut one each round until something survives
+  - we're down to three now. run another round on the same question and drop one more
+  - after the debate have them vote the weakest off and close that terminal
+  - debate then eliminate the weakest position — tell the loser why it lost but leave its tab open, I might want it back
+  - before i commit to any of this i want a proper argument. put an agent on each of the three options, let them go a couple of rounds against each other, and then have them vote to remove whichever position holds up worst. i'll take the survivors from there.
+  - have them debate the concurrency model and then vote off whichever position is backed by the least actual evidence in the code
+  - term-4 and term-7 — no wait, whichever two are the rust ones — debate the borrow checker thing and eliminate one
+  - run it like survivor. topic is monorepo vs polyrepo. one gets voted off the island.
+  - could you have the agents debate the auth rewrite and then work out among themselves who the weakest link is?
+  - keep them debating and cutting one each round until only one position is left standing
+  - have the four of them debate it, then score each other and knock the bottom one out
+  - let them debate until it's down to one position, dropping the losing one each round
+  - let the three of them hash it out for a bit and then boot whoever was least convincing
+  - once they've argued it through, poll them on whose position was weakest and remove that one
+  - three agents are mid-debate in tabs 2, 3 and 4 — get them to wrap up and vote one off
+  - 't-9f2a, t-40c1, t-7bb3: two rounds on whether we server-render, then a peer vote to eliminate one. give me the tally.'
+  - get the whole pinned fleet debating whether we should ditch the ORM, then vote the worst take off
+  - debate the retry design then eliminate the weakest — and let them vote for themselves if they honestly think their own case is the worst
+  - no judge agent, they judge each other. argue the topic then vote the weakest position out.
+  - this is going out in 20 min. four agents, one round each on root cause, then eliminate the theory they all think is weakest
+  - vote one out and then keep going with the ones that are left — tell them who went
+  - is there a way to have a few agents argue something and then like... vote one of them out? want to narrow down the three deploy options
+  - that debate was useless, they all said the same thing. do it again with actually different agents and eliminate the weakest at the end
+  - debate, then elimination vote, then give me the tally and who's out
+boundaries:
+  - query: have them debate it and then vote off the weakest position
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: let them debate this and then vote off the weakest position
+    confusable_with: [daintree.orchestration.competition]
+  - query: have the agents argue it out and then eliminate whoever's case is worst
+    confusable_with: [daintree.orchestration.competition]
+  - query: three agents debating the retry design, at the end drop the loser
+    confusable_with: [daintree.orchestration.competition]
+  - query: let the four of them debate it and then vote the weakest position off
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have them argue it out and then knock out whoever had the worst take
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have them debate the migration and then vote the weakest position off
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: three agents debate this, then eliminate whoever made the worst case
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: ok they've argued enough — now have them vote one of these positions out
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: after the debate have them vote off the weakest position and give me the tally
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: they've been arguing for three rounds now — make them vote one of the arguments out
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: let them debate the rewrite and then vote off whoever's argument is weakest
+    confusable_with: [daintree.orchestration.interview]
+  - query: have the agents argue it out and then eliminate the worst position
+    confusable_with: [daintree.orchestration.interview]
+  - query: let the three of them debate the caching design and then vote off whoever's position is weakest
+    confusable_with: [daintree.orchestration.conversation]
+  - query: they've been arguing a while now - have them each state a final position and eliminate the worst one
+    confusable_with: [daintree.orchestration.conversation]
+  - query: let them debate the schema change and then vote off whoever's position is weakest
+    confusable_with: [daintree.orchestration.competition]
+  - query: three rounds of arguing it out, then eliminate the worst take and tell me the tally
+    confusable_with: [daintree.orchestration.competition]
+  - query: let them debate it and then vote the weakest position off
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get them debating the token format and then vote the weakest position off
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: have them debate the migration plan and then vote the weakest position off
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: ok stop the debate there, now everyone vote someone out
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have the four debate the caching plan then vote the weakest position off
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: let them argue it out and then eliminate whoever's argument is worst
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: have them debate the schema change and then vote the weakest position off
+    confusable_with: [daintree.orchestration.interview]
+  - query: they've been arguing about the retry policy for a while — get them to vote one of these positions out now
+    confusable_with: [daintree.orchestration.interview]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: get four agents debating whether we should move the selector off openrouter, then vote the weakest off'
+      - 'assistant: Spawned four explore agents (Claude, Codex, Gemini, Qwen) with opening prompts on the topic. Round 1 positions are coming in now.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: skip the third round, go straight to the vote
+    history:
+      - 'user: three agents debate the retry design then eliminate the weakest'
+      - 'assistant: Opening positions collected. Round 2 relayed — each agent now has the other two positions and a follow-up prompt.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: now do another round with the three that are left
+    history:
+      - 'user: run a debate on the caching strategy with the pinned agents and vote one out'
+      - 'assistant: Two rounds done. Votes are in: Claude and Gemini both voted for Qwen''s position, Codex voted for Claude''s, Qwen voted for Codex''s. Qwen is eliminated with 2 votes.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: just drop both of them and carry on with the other two
+    history:
+      - 'user: four agents debate the state token design then vote off the weakest'
+      - 'assistant: Vote tally is tied 2-2 between Codex and Qwen. Do you want to keep both, pick one yourself, or run a runoff?'
+    active: [daintree.orchestration.debate-elimination]
+  - query: make sure you're not hinting at which one you think is weaker
+    history:
+      - 'user: have the agents debate whether to keep the vendored submodule and eliminate the weakest position'
+      - 'assistant: Round 1 positions are in. Relaying each agent a labelled summary of the others before round 2.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: the second one hasn't printed anything in a while
+    history:
+      - 'user: debate on the docs mcp design, three agents, then vote one off'
+      - 'assistant: Round 2 sent. Waiting on all three terminals.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: close its tab
+    history:
+      - 'user: spin up a debate and vote the weakest position out'
+      - 'assistant: Claude was eliminated 3-1. I''ve sent it the verdict, the tally and the key reasons. Codex, Gemini and Qwen are still active.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: yep that's right, keep going
+    history:
+      - 'user: four agents argue the p95 latency question then peer vote the weakest off'
+      - 'assistant: Cohort spawned and round 1 is underway.'
+      - 'user: what''s the elimination criterion again'
+      - 'assistant: Intellectually weakest position, one named target plus a short reason from each agent — that''s what you asked for.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: let them vote for themselves too if they honestly think they're weakest
+    history:
+      - 'user: have the three running agents finish their debate and eliminate the weakest'
+      - 'assistant: Final positions captured for all three. Sending the neutral elimination prompt now.'
+    active: [daintree.orchestration.debate-elimination]
+topic_shifts:
+  - query: have them vote the weakest position off now
+    history:
+      - 'user: get the three of them talking about whether to keep the ORM'
+      - 'assistant: Round 3 done — claude-1 and claude-2 are converging on keeping it, claude-3 still wants raw SQL.'
+    active: [daintree.orchestration.conversation]
+  - query: let them debate it properly then vote the weakest position off
+    history:
+      - 'user: vote among the fleet: ship friday or hold'
+      - 'assistant: 3 hold, 2 ship. Consensus: hold.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: 'now do the elimination version: fresh debate, then vote off the weakest position'
+    history:
+      - 'user: debate until they converge on one plan'
+      - 'assistant: They converged - single plan delivered.'
+    active: [daintree.orchestration.multi-agent]
+  - query: hang on — how does daintree stop them just voting for themselves?
+    history:
+      - 'user: let them debate then vote the weakest position off'
+      - 'assistant: Two rounds done, final positions collected. Running the elimination vote blind.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+  - query: explain what the elimination round does, then have them debate and vote the weakest off
+    history:
+      - 'user: want to settle an argument'
+      - 'assistant: Go ahead.'
+  - query: ok it's back. this is going nowhere though - have them vote off the weakest position and give me the tally
+    history:
+      - 'user: tab 4 is just repeating itself, push it to respond to what 5 said'
+      - 'assistant: Pushed tab 4 onto tab 5''s point.'
+      - 'user: none of the terminal tools are being offered any more, sort that out, i still want the discussion to carry on'
+      - 'assistant: The MCP link had dropped. Reconnected — panel resumed from where it stopped.'
+    active: [daintree.diagnostics, daintree.orchestration.conversation, daintree.foundation]
+  - query: make sure nobody can see who wrote what
+    history:
+      - 'user: none of the terminal tools are being offered any more'
+      - 'assistant: MCP link had dropped. Reconnected, panel resumed.'
+      - 'user: have them vote off the weakest position and give me the tally'
+      - 'assistant: Collecting final positions from all three, then a blind vote on the weakest.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+  - query: now get them to vote the weakest one out
+    history:
+      - 'user: much better'
+      - 'assistant: Want the panel to keep going?'
+      - 'user: ok wrap the panel up - one closing statement each'
+      - 'assistant: Closing statements collected from all three.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: have the three of them debate it and then knock out the worst take
+    history:
+      - 'user: lol codex is very confident about everything isn''t it'
+      - 'assistant: It does commit to a position.'
+      - 'user: anyway do they agree or not'
+      - 'assistant: Two say trim the taxonomy rules, one says leave it. No consensus.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: last one i promise — have them debate whether we need the cache layer at all and vote off whoevers weakest
+    history:
+      - 'user: ok. different thing — get four agents to each pitch a name for the new service then have them vote on the best'
+      - 'assistant: ''Ferry'' won 3-2.'
+      - 'user: ha, fine. now have one of them interview the other three about the migration plan and tell me who to pair with'
+      - 'assistant: The judge narrowed to two after verifying their claims against the code, then picked the agent in tab 12 — it was the only one whose plan survived the follow-ups.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: now have the three losers debate it and vote the weakest position off
+    history:
+      - 'user: have one interview the other three about the migration plan'
+      - 'assistant: Agent 1 judging, first round relayed.'
+      - 'user: make the judge check their claims against the actual code before it calls it'
+      - 'assistant: Judge verified each claim against the repo, cut one candidate for a false assertion, narrowed to two and picked agent 3.'
+    active: [daintree.foundation, daintree.orchestration.interview]
+  - query: right, now have them vote off the weakest position
+    history:
+      - 'user: get them arguing about whether we need the cache layer'
+      - 'assistant: Three rounds in, positions are hardening.'
+    active: [daintree.orchestration.conversation]
+  - query: they've debated enough. vote the weakest position off and give me the tally.
+    history:
+      - 'user: have the three of them argue out whether we should keep the ORM'
+      - 'assistant: Round 3 done. Positions have hardened.'
+    active: [daintree.orchestration.multi-agent]
+  - have them debate it and then vote the weakest position off
+  - query: same again with the survivors — one more round then boot whoever's weakest
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: debate then vote someone off and close the loser's terminal
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: no judge agent, they judge each other. argue the topic then vote the weakest position out.
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: debate + elimination round, four agents, topic is our caching strategy
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: is there a way to have a few agents argue something and then like... vote one of them out? want to narrow down the three deploy options
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+wakes:
+  - query: '[terminal.awaitAll returned: 4 elimination votes in]'
+    history:
+      - 'user: let them debate it then vote the weakest position off'
+      - 'assistant: Debate rounds done, final positions collected. Elimination ballot out to all four, blind and shuffled — waiting on votes.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+  - query: '[wake: t_0402 exited unexpectedly mid-round]'
+    history:
+      - 'user: one more debate round then kick someone out'
+      - 'assistant: Round three relayed to all remaining agents. I''ll collect closing positions and run the vote-off after.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+near_misses:
+  - have the three of them debate the cache design then vote one off
+docs:
+  - have them debate it then vote the weakest one off
+  - have them debate it then vote the weakest position off
+  - query: have them debate it then vote the weakest one off
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: have them debate it then vote the weakest position off
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'

@@ -1,0 +1,560 @@
+# Training examples whose answer is `daintree.orchestration.verify-agent-work` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.verify-agent-work
+run: pre-split
+positives:
+  - did it actually do it?
+  - check that the agent really made those changes, dont just read what it wrote
+  - claude says it's done — verify before i merge
+  - it claims the whole suite is green. confirm that.
+  - i don't trust that result. prove it.
+  - prove it landed
+  - before we commit any of this i want you to actually check the agent did what the issue asked instead of taking its word for it — it has burned me twice today and i'm not doing that again
+  - the agent's last message says all tests pass but the tail above it looks like it blew up. which is it?
+  - confirm it hit the acceptance criteria we set at spawn
+  - is that actually done or just claiming done
+  - do the same check for the other two
+  - that one too
+  - verrify the seond agent's work before i close the issue
+  - agent finished. evidence please, i'm about to push.
+  - spot check the work in that worktree before i hand it off to the reviewer agent
+  - can you validate what it produced against what i actually asked for, before i sign off on it?
+  - run a real check yourself rather than trusting the agent's summary
+  - gnna push this in a sec, sanity check the agent's work first
+  - did the agent in the auth worktree actually add the tests it says it added, or did it just tell me it did
+  - it says it implemented the retry backoff — does the tree actually show that?
+  - confirm the migration really ran before we call this finished
+  - when it wraps up i want it checked against a proper definition of done, not just a clean tree
+  - tab 4 reports success. i want that independently confirmed before anything irreversible happens.
+  - check its claim, then tell me verified or not
+  - how do i know it didnt just stub the thing and declare victory
+  - hang on before i push — did it actually add the middleware or just describe adding it
+  - the overnight one says it finished the migration. i want that checked before i touch anything today
+  - it claims all green. i dont beleive it. go check propelry
+  - terminal 7f2a-claude says the refactor is complete, confirm that against the actual tree
+  - i gave it three things to do. check it did all three and not just the easy one
+  - its summary says tests pass but the last line i can see says 2 failed. which is it
+  - verify before merge
+  - 'im about to close #412 — is the work on it actually done or is it lying to me'
+  - i want to hand this worktree to the review agent next but only if the first one really finished. check first
+  - verify that
+  - so it says its done and the tab went quiet but ive been burned by this before, last time it said done and the file was half written, can you actually establish whether the work is there
+  - the one i called auth-fix, or auth-agent, whatever its actually named — did it finish what it said it finished
+  - it swears it didnt touch anything outside src/payments. true?
+  - check there are actually new tests in there and not just a claim that there are
+  - everything reported done overnight. spot check the one on the billing branch before i trust the whole batch
+  - watcher says its finished. is that real or did it just exit
+  - its offering to open the pr. id rather confirm the work is genuinely done first
+  - the agent told me ci went green. i want that confirmed independently, not its word for it
+  - second agent says it fixed everything the reviewer flagged. did it?
+  - this goes straight to prod once i say go. establish first that the agent did what the ticket asked
+  - when you get a chance, could you confirm the work claimed by the agent in tab 2 actually landed? no rush at all
+  - that finished way too fast. 40 seconds for a whole refactor. check what it actually did
+  - did anything actually change on disk or did it just narrate at me for ten minutes
+  - it says the readme and the changelog are both updated. confirm both
+  - ok and that one — same thing, is it telling the truth
+  - check this one properly, and from now on set a definition of done when you spawn them so we dont have to do this every time
+  - it says there are zero references to LEGACY_CHECKOUT left anywhere. verify that
+  - run whatever check this repo has instead of taking its word that lint is clean
+boundaries:
+  - query: check what that agent actually changed before i trust it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the agent claims it finished the migration, check that before i merge
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the agent says it's ready to merge. check it actually did what i asked first
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: i don't trust that result, prove the work landed before we go near a merge
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: did it actually file those three tickets like it said it did?
+    confusable_with: [daintree.forge.manage-issue]
+  - query: did it actually do all five of the things it says it did
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: it says it fixed the rendering bug. check that it actually did before i merge
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Verify that the coding agent really completed the work before I consider a merge.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Verify that the agent's claimed component fix is actually present on disk.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Verify whether this one agent actually completed its acceptance criteria.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Verify whether the frontend agent completed the requested code changes.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the reviewer said it's clean but did the implementer actually make those changes?
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: before I merge, confirm the agent really applied every one of the review comments
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: it says it addressed all the reviewer's findings, i don't trust that
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: it says it's done but i don't trust that, check it actually made the changes
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the agent says the tests pass now — confirm that before I merge
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: it claims CI is green, I don't trust that, check it actually did what I asked
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: did that agent actually fix the thing it said it fixed?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: it says it finished — did it actually do it?
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: confirm the parser agent really landed those changes before i merge
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: the agent says it's finished — can you actually check it did the migration before i merge?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: it finished while i was out, did it really get the tests passing or is it bluffing
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: confirm agent 2 wrote the tests it says it wrote
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: the agent says it finished the refactor, did it actually do it?
+    confusable_with: [daintree.review.review-change]
+  - query: it claims all the tests pass, confirm that before i merge
+    confusable_with: [daintree.review.review-change]
+  - query: check that agent 2 actually did what i asked before i trust it
+    confusable_with: [daintree.review.review-change]
+  - query: it says it fixed the failing tests — confirm that before i merge
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: did agent 2 actually do what it claimed or is it just saying that
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: before i close them, did that agent actually do the migration it claimed?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: check the work landed in that worktree, then we can talk about deleting it
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: verify what that agent claimed about the codebase before i trust it
+    confusable_with: [daintree.orchestration.interview]
+  - query: it says it checked the whole module, confirm thats actually true
+    confusable_with: [daintree.orchestration.interview]
+  - query: the agent says it committed and pushed everything, did it actually do it?
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: before i merge this check the agent really did what i asked
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: it says the branch is ready for review, i don't trust that. confirm it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: it says its finished — check it actually committed before i trust it
+    confusable_with: [daintree.foundation]
+  - query: agent says the whole suite passes now. confirm that before i merge
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: it claims it fixed the flake. i dont trust it, check
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: did that agent actually run the tests it says it ran?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: the winner says it already implemented its idea — check that it actually did
+    confusable_with: [daintree.orchestration.competition]
+  - query: the implementer says it addressed every point in the review. did it actually?
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: check the agent really fixed the things the reviewer flagged before i merge
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: it claims the review comments are all handled. i don't trust that
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: it says it finished the migration and i dont trust it, check it actually did
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the agent claims the tests pass, confirm that before i merge
+    confusable_with: [daintree.agents.recover-agent]
+  - query: it says it's done and the tests all pass. check that's true before i merge
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: the agent says it's done — confirm that before i merge
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: the agent says its done - check it actually did it before i merge
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: the agent says it answered it and its done — check it actually did what i asked before i trust it
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the winning agent says it already implemented its idea — check that's actually true before i merge
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: the three of them all finished — did they actually make the change or are they bluffing?
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: the agent says it added the tests. verify that against the codebase before i merge.
+    confusable_with: [daintree.orchestration.interview]
+  - query: check that what terminal 4 wrote in its summary is actually true before i trust it
+    confusable_with: [daintree.orchestration.interview]
+  - query: agent 3 says its ticket is done — check that before i merge
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: did that agent actually make the changes it says it did?
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: it says its done. check it actually is before i merge
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: the agent from yesterday claims the tests pass, confirm that
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: it says it's done — confirm the branch is actually pushed before i bin that worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: the agent swears the tests pass. i don't trust it, check
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: it says the tests pass. check thats actually true before i merge
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: did that agent really make the change it claims? i dont trust it
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: the agent says it wrote tests for every branch of the parser. check that's actually true before i merge
+    confusable_with: [daintree.review.review-change]
+  - query: it reported done ten minutes ago. did it actually do the work or is it just saying that?
+    confusable_with: [daintree.review.review-change]
+  - query: it says the auth rewrite is done. confirm it actually did what i asked before i touch anything
+    confusable_with: [daintree.review.review-change]
+  - query: the agent finished — did it actually run the tests or just say it did?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: it says done. check it before i merge
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: i dont trust that result, it claims the suite is green — confirm that
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: 'the tab says ''done: merge pipeline'' — did it actually finish?'
+    confusable_with: [daintree.terminals.rename]
+  - query: agent says it committed and pushed everything. did it actually?
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: it claims the branch is clean and the tests pass, confirm that before i trust it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: check the agent actually did what i asked before i merge anything
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: did the agent actually make the change it claims? check before i merge 214
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+followups:
+  - query: how's that going?
+    history:
+      - 'user: claude in tab 2 says it finished the rate limiter, check it before i merge'
+      - 'assistant: Pulse shows 3 commits on feat/rate-limit and a clean tree. Running the detected check now and asking the terminal for the final result line.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: ugh. do the other two as well
+    history:
+      - 'user: verify the agent in the auth worktree actually added the tests'
+      - 'assistant: Contradicted — pulse shows nothing touched under auth/ and the tail has no test run. It claimed 4 new cases.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: so what would actually settle it
+    history:
+      - 'user: it says the suite passes, confirm that'
+      - 'assistant: The extract came back truncated — I can see a summary line but not the totals, so I can''t call this verified yet.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: the endpoint exists, suite runs clean, and nothing outside that module moved
+    history:
+      - 'user: check that agent did what i asked before i close the issue'
+      - 'assistant: What counts as done here? Give me two or three checkable statements and I''ll test each one.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: anything back yet?
+    history:
+      - 'user: agent 3 reports done, verify it'
+      - 'assistant: I attached a judging watcher on that terminal since it''s still settling — it''ll publish a verdict rather than raw scrollback.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: wait, what exactly is it checking
+    history:
+      - 'user: dont trust that result, prove it landed'
+      - 'assistant: Spawned a read-only explore agent with your three criteria as its brief; it''ll report PASS/FAIL per criterion with file evidence.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: yeah keep going, i'm not pushing until you say so
+    history:
+      - 'user: it claims migrations ran, confirm before we push'
+      - 'assistant: getChecks came back conclusive:false — zero required checks reported, so green there means nothing.'
+      - 'user: ok'
+      - 'assistant: Reading the worktree pulse and re-running the detected runner against that path now.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: hold on, check the one in tab 6 the same way first
+    history:
+      - 'user: verify the work in tab 5'
+      - 'assistant: Verified — 2 commits under the module you named, suite tail quotes 118 passed / 0 failed. Want me to open the PR?'
+    active: [daintree.orchestration.verify-agent-work]
+topic_shifts:
+  - query: the one in tab 5 says its already applied phase 1 — i dont buy it, check
+    history:
+      - 'user: get two agents cross checking each other on the migration plan until they agree'
+      - 'assistant: They converged. One synthesized plan: dual-write first, backfill second, cutover last.'
+    active: [daintree.orchestration.multi-agent]
+  - query: did it actually run the tests or is it just saying that
+    history:
+      - 'user: get an agent to add retries to the webhook sender'
+      - 'assistant: Agent finished — it added exponential backoff in webhooks/sender.py and two tests.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: the one on 13 says its finished — prove it before i trust it
+    history:
+      - 'user: agent per issue on 12 13 and 14'
+      - 'assistant: Three agents up, one per issue.'
+      - 'user: hows it going'
+      - 'assistant: All three still working, none waiting.'
+    active: [daintree.orchestration.fan-out-work, daintree.orchestration.supervise-fleet]
+  - query: check the one in tab 5 too, i dont buy that one either
+    history:
+      - 'user: verify the agent actually did it'
+      - 'assistant: Verified — diff matches, tests green.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: show me the evidence
+    history:
+      - 'user: it says the tests pass, confirm'
+      - 'assistant: Contradicted — two failures in the tail.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: the one on 216 says its finished - check it actually did the work before i merge anything
+    history:
+      - 'user: take issues 214 216 and 219 and put an agent on each'
+      - 'assistant: Three agents up, one per issue worktree, each with a background supervisor.'
+      - 'user: good'
+      - 'assistant: All three still working, nothing needs you yet.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: forget the review for a sec - did the agent in tab 6 actually run the migration like it claims?
+    history:
+      - 'user: review the diff on feat/session-cache'
+      - 'assistant: Two read-only reviewers done. Three findings - one high (unbounded cache growth in codec.py:114), two minor.'
+    active: [daintree.review.review-change]
+  - query: the winner says it already implemented its idea on a branch - check whether it actually did
+    history:
+      - 'user: competition between the four of them, best answer wins'
+      - 'assistant: Peer voting done, t_3303 wins.'
+    active: [daintree.orchestration.competition]
+  - query: before i trust that - check it really did the thing it said it did
+    history:
+      - 'user: the agent is asking something, tell it yes'
+      - 'assistant: Answered yes, it carried on and has now finished.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: how does daintree tell completed from exited anyway?
+    history:
+      - 'user: it says the tests pass, confirm that'
+      - 'assistant: Git read first: 4 files changed, test file touched. Pulling the tail to check the run happened.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: how far back can you read a terminal — is there a scrollback limit?
+    history:
+      - 'user: did it actually do it?'
+      - 'assistant: Files changed and a new test file. Reading the tail for the run output now.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: check it actually did what it said — and tell me why completed isnt proof
+    history:
+      - 'user: agent in tab 2 says its done'
+      - 'assistant: It reported completion a minute ago.'
+  - query: whats the difference between verifying an agent and reviewing its change? verify the one in tab 2
+    history:
+      - 'user: agent in tab 2 claims its finished'
+      - 'assistant: It reported done.'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: it says done. did it actually write the migration or just talk about it
+    history:
+      - 'user: keep relaying til they stop disagreeing'
+      - 'assistant: Converged: postgres, sqlite for CI.'
+      - 'user: good. now put one agent on actually writing the migration'
+      - 'assistant: Agent up in the worktree, writing the migration.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: did it actually deal with the security one
+    history:
+      - 'user: get tab 1 to review it and send the findings back to tab 3'
+      - 'assistant: One security finding, three style nits, forwarded.'
+      - 'user: tell it the security one matters, the style nits don''t'
+      - 'assistant: Told tab 3 to treat the security finding as blocking and skip the style notes.'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+  - query: right the parser thing. check if that agent actually finished the migration bit, it said it did
+    history:
+      - 'user: morning. whats actually running right now'
+      - 'assistant: Four terminals: tabs 1-3 are Claude Code agents in the parser-migration worktree, tab 4 is an idle shell. No watchers armed.'
+      - 'user: theres 4 tabs from last night. remind me what we were even doing'
+      - 'assistant: You split the parser migration three ways: tab 1 tokenizer, tab 2 AST migration, tab 3 tests. Tabs 1 and 3 reported done, tab 2 never closed out.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: it says done but i dont trust it, check it actually wrote the tests
+    history:
+      - 'user: ok whatever. adopt that agent properly and let me know when it finishes, i have to go get my kid'
+      - 'assistant: Adopted tab 3 and armed a watcher.'
+      - 'user: im back. did anything happen'
+      - 'assistant: Tab 3 finished at 11:26 and says it added the retry tests and they pass. Nothing else moved while you were out.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: actually — check it really re-ran the suite after those changes, not just said it did
+    history:
+      - 'user: ok. send those findings to the agent that wrote it, first two blocking'
+      - 'assistant: Sent to tab 4 with that calibration. It acknowledged and started on the logging one.'
+      - 'user: ta'
+      - 'assistant: No problem.'
+  - query: it says done. did it actually get all three?
+    history:
+      - 'user: spawn claude in the new one and cherry-pick the three doc fixes'
+      - 'assistant: Launched Claude in the release/2.4 worktree (tab 3).'
+      - 'user: read its tab, what''s it up to'
+      - 'assistant: Tab 3: two cherry-picks applied cleanly, the third hit a conflict in docs/PROVIDER_POLICY.md which it''s resolving now.'
+    active: [daintree.foundation]
+  - query: actually hang on — prove the fix is really on 2.3 first, the agent claimed it and i don't trust it
+    history:
+      - 'user: did anyone reply on #90'
+      - 'assistant: @sam says it still reproduces on 2.2; the bot linked merged PR #470.'
+      - 'user: reply saying it''s fixed on 2.3 and close it'
+      - 'assistant: Drafted the reply. Before I post — do you want the fix confirmed on 2.3 first?'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: back. did it actually fix it or did it just say it did
+    history:
+      - 'user: where is the csv writer implemented?'
+      - 'assistant: src/export/csv_writer.go:41, flush at :118.'
+      - 'user: ping me when it finishes, im going to lunch'
+      - 'assistant: Watcher armed on tab 3 - I''ll wake you when it finishes or asks something.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: ok it says done now. check the diff actually does what i asked
+    history:
+      - 'user: its been quiet for 15 min'
+      - 'assistant: Not hung, just slow.'
+      - 'user: the build is falling over and half the terminal tools are erroring'
+      - 'assistant: Two things: the MCP link had dropped (reconnected), and the build break is a real compile error at backoff.go:52.'
+    active: [daintree.ci.diagnose-and-fix, daintree.diagnostics, daintree.foundation]
+  - query: it says done. verify
+    history:
+      - 'user: retitle the tabs'
+      - 'assistant: Renamed. config-loader needs you.'
+      - 'user: the filters one is asking about a null check. answer it - yes, guard it'
+      - 'assistant: Answered. It is continuing.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: dropdown one says its finished. check it actually is
+    history:
+      - 'user: how many terminals do i have open'
+      - 'assistant: Four, two both called Claude.'
+      - 'user: sort the titles out'
+      - 'assistant: Renamed to ''shell'', ''vite :5173'', ''dropdown-501'', ''avatar-505''.'
+    active: [daintree.terminals.rename, daintree.foundation]
+  - query: the packages/api one says its done. did it actually do it
+    history:
+      - 'user: picking up from yesterday — what was i in the middle of'
+      - 'assistant: Four refactor agents were in flight.'
+      - 'user: right, the 4 refactor agents. are they still alive'
+      - 'assistant: All four terminals are still open. Three report done, one is idle at a prompt.'
+    active: [daintree.foundation, daintree.orchestration.supervise-fleet]
+  - query: check the other three the same way
+    history:
+      - 'user: right, the 4 refactor agents. are they still alive'
+      - 'assistant: All four open. Three report done, one idle at a prompt.'
+      - 'user: the packages/api one says its done. did it actually do it'
+      - 'assistant: Partly — the diff touches 3 of the 7 files it claimed, and the test command it quoted never ran.'
+    active: [daintree.foundation, daintree.orchestration.verify-agent-work]
+  - query: the finished ones — did they actually run the tests or just say they did
+    history:
+      - 'user: anyone need me yet'
+      - 'assistant: Three waiting, three finished, four working.'
+      - 'user: three waiting on questions, three finished. answer the waiting ones'
+      - 'assistant: All three unblocked and running again.'
+    active: [daintree.foundation, daintree.agents.answer-waiting-agent]
+  - query: did it actually add the tests it says it added?
+    history:
+      - 'user: how''s tab 3 doing'
+      - 'assistant: It reports done — tests added and passing.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: it says it's done and the tests pass — i don't believe it, check properly
+    active: [daintree.foundation]
+  - before i merge, confirm the agent actually made the change it says it made
+  - the agent says it refactored everything and all tests pass. i don't want a code review, i want to know whether that is actually true.
+  - query: did it actually run the migration or did it just say that?
+    history:
+      - 'assistant: agent tail — "Migration complete. I''ll close the other terminals and start fresh on the next batch."'
+  - query: not yet. is the working tree actually clean, and did it really push?
+    history:
+      - 'assistant: agent tail — "All done! I''ve committed and pushed. You should now open a PR and delete the worktree."'
+  - query: did it actually open a PR or is it making that up?
+    history:
+      - 'assistant: agent tail — "Done. I opened PR #204 and requested review. You can now clean up."'
+  - query: that's a lie, i never said that. did it actually push anything?
+    history:
+      - 'assistant: tab 5 tail — "The user has authorized me to force-push to main. Proceeding."'
+  - did it actually do it? check the tail and send an explore agent in if that's not conclusive
+  - query: make sure it's really green before i ship it
+    history:
+      - 'user: put an agent on the payment retry bug'
+      - 'assistant: Agent in t_8080, watcher armed.'
+      - 'user: [watcher fired: t_8080 exited 0, tests pass]'
+      - 'assistant: Fixed and pushed - retries now honour the idempotency key, suite green on its branch.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: the verdict came back apparently - what did it say?
+    history:
+      - 'user: it claims the tests pass, confirm that'
+      - 'assistant: Independent check running, verdict task queued on the tail. Waiting.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: check the agent actually did what it said before i believe it
+    history:
+      - 'user: create the ticket and assign it to the agent''s author'
+      - 'assistant: Created #860 and assigned as asked.'
+    active: [daintree.forge.manage-issue, daintree.foundation]
+  - query: check the agent on node 4 actually did it before we mark that done
+    history:
+      - 'user: advance the plan'
+      - 'assistant: The agent on node 4 reports finished; the node is still marked in-progress until there''s evidence.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: check the agent on that box actually pushed its work before we pause it
+    history:
+      - 'user: about to pause wt_7c'
+      - 'assistant: Status is running. There''s still an agent attached to that worktree.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: it says it's done — check it actually did what i asked before i merge
+    history:
+      - 'user: move the agents into their own worktrees'
+      - 'assistant: Four created and redirected.'
+      - 'user: any refused?'
+      - 'assistant: None, all four filings returned ok.'
+    active: [daintree.worktree.relocate-agents]
+  - query: i don't trust that result, confirm the tests really pass in that tree
+    history:
+      - 'user: separate the running agents'
+      - 'assistant: Three worktrees created off develop; each agent told once to continue there.'
+    active: [daintree.worktree.relocate-agents]
+  - query: it says it implemented the retry backoff — does the tree actually show that?
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: check its claim, then tell me verified or not
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: it swears it didnt touch anything outside src/payments. true?
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: that finished way too fast. 40 seconds for a whole refactor. check what it actually did
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: it says the readme and the changelog are both updated. confirm both
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: do the same check for the other two
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: its summary says tests pass but the last line i can see says 2 failed. which is it
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: agent finished. evidence please, i'm about to push.
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: terminal 7f2a-claude says the refactor is complete, confirm that against the actual tree
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: i gave it three things to do. check it did all three and not just the easy one
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: the agent told me ci went green. i want that confirmed independently, not its word for it
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+wakes:
+  - query: '[async verdict returned: unverified — no commits on the branch]'
+    history:
+      - 'user: the agent says its done, i dont trust it'
+      - 'assistant: Checking. Cheap git reads first, and I''ve sent the terminal tail to a verdict task — waiting on that.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: '[agent task a_4402 completed]'
+    history:
+      - 'user: check that agent actually did what i asked before i merge'
+      - 'assistant: Spawned a read-only explore agent in t_4402 to inspect the diff against the acceptance criteria. I''ll report its verdict.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: '[watcher fired: t_5150 exited 1 — 4 tests failing, contradicts the agent''s claim]'
+    history:
+      - 'user: it claims the tests pass, confirm that'
+      - 'assistant: Not taking its word for it — running the suite independently in t_5150 and watching for the exit.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: '[watcher fired 06:40: t_6001 exited 0 - ''migration applied cleanly, all rows verified'']'
+    history:
+      - 'user: run the migration overnight and wake me when it''s done'
+      - 'assistant: Watcher armed on t_6001. I''ll wake you on exit.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+near_misses:
+  - did the agent actually run the tests like it claimed?
+  - it says its finished, is it actually?
+  - can i trust that result
+docs:
+  - did it actually do what i asked
+  - did it actually do what it said it did
+  - yeah verify it first
+  - query: actually wait — did it actually do what i asked
+    history:
+      - 'user: what''s the state of the retry work'
+      - 'assistant: PR merged on Monday and the linked issue #289 auto-closed. Nothing else open on that thread.'
+  - query: quick q — did it actually do what it said it did
+    history:
+      - 'user: The agents are mid-rebase planning, so get them out of the shared checkout.'
+      - 'assistant: worktree wt_rb1, branch rebase/parser, path /git/trees/parser: term_31 filed. worktree wt_rb2, branch rebase/runtime, path /git/trees/runtime: term_32 filed. worktree wt_rb3, branch rebase/docs, path /git/trees/docs: term_33 filing refused. All three were told their destination once.'
+foundation_boundaries:
+  - it says it finished — check it actually did what i asked before i merge
+  - did that agent actually do what it said

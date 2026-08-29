@@ -10,39 +10,21 @@ test suite at all.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
 
-from benchmarks.runbook_selection.cases import load_cases
 from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+from training.compile_corpus import _benchmark_strings
+from training.compile_corpus import norm as _norm
+from training.corpus_source import load_examples
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS = REPO_ROOT / "training" / "data" / "selection.jsonl"
 
 
-def _norm(text: str) -> str:
-    """``assemble_data._norm``, duplicated deliberately.
-
-    Importing it would make this test depend on `training/` being importable,
-    which it is not in every environment the suite runs in. The function is four
-    tokens long and its job is to be stable; if it ever changes, this guard going
-    green on a stale copy is a smaller risk than the guard not running at all.
-    """
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
-
-
-def _benchmark_strings() -> set[str]:
-    out: set[str] = set()
-    for case in load_cases(load_catalog(default_runbooks_dir())):
-        for msg in case.messages:
-            if isinstance(msg.content, str):
-                out.add(_norm(msg.content))
-        if case.turn_context:
-            out.add(_norm(case.turn_context))
-    out.discard("")
-    return out
+def _benchmark_strings_cached() -> set[str]:
+    return _benchmark_strings(load_catalog(default_runbooks_dir()))
 
 
 @pytest.mark.skipif(not CORPUS.is_file(), reason="training corpus not present")
@@ -70,38 +52,48 @@ def test_no_query_carries_both_documentation_labels() -> None:
     conflicting = sorted(q for q, seen in labels.items() if len(seen) > 1)
     assert not conflicting, (
         f"{len(conflicting)} query/queries carry BOTH is_docs labels: "
-        f"{conflicting[:3]}. Resolve in training/augment_context.py, which "
-        f"propagates the docs bundle's label and asserts this same invariant."
+        f"{conflicting[:3]}. Fix it in training/corpus/ — a `docs:` value on the "
+        f"example, or the file-level default — and recompile."
     )
 
 
-@pytest.mark.skipif(not CORPUS.is_file(), reason="training corpus not present")
-def test_a_benchmark_greeting_never_collides_with_a_corpus_greeting() -> None:
+def test_no_curated_example_collides_with_the_held_out_benchmark() -> None:
     """A booby trap for whoever adds the next greeting-shaped benchmark case.
 
-    `assemble_data`'s contamination gate drops any training row whose query OR
-    HISTORY matches a held-out benchmark string — correctly, since a benchmark
-    message pasted into a generated history is exactly as much leakage as one in
-    the query. But the social lead-in rows carry their greeting IN the history,
-    so wording a benchmark greeting the same way as a corpus one deletes the
-    rows that teach the lesson the case is checking. The gate only prints a
-    non-failing note, the corpus still trains, and the case simply starts
-    failing for a reason nobody can see in the diff.
+    The contamination gate drops any row whose query OR HISTORY matches a
+    held-out benchmark string — correctly, since a benchmark message pasted into
+    a generated history leaks exactly as much as one in the query. But the
+    social lead-in rows carry their greeting IN the history, so wording a
+    benchmark greeting the same way as a corpus one deletes every row that
+    teaches the lesson the case is checking. The gate prints a non-failing note,
+    the corpus still trains, and the case starts failing for a reason nobody can
+    see in the diff.
 
-    So the two vocabularies must stay disjoint, and that is asserted here rather
-    than left as a comment somebody has to find.
+    This asserts against the CURATED plane, not the compiled one, and that is
+    the whole point: by the time a row reaches `selection.jsonl` the gate has
+    already deleted it, so the compiled corpus is the one place the collision is
+    guaranteed to be invisible. An earlier version of this guard could only
+    check the hardcoded greeting list of a since-retired augmentation script,
+    and so covered greetings alone; the source plane makes the general form
+    checkable.
+
+    A failure is fixed by rewording the BENCHMARK case, not by deleting the
+    training row: the benchmark is the held-out evidence and the corpus is what
+    is allowed to move.
     """
-    social = pytest.importorskip(
-        "training.augment_context", reason="training/ not importable here"
-    ).SOCIAL
-    held_out = _benchmark_strings()
+    held_out = _benchmark_strings_cached()
     collisions = sorted(
-        {_norm(s) for pair in social for s in pair} & held_out
+        {
+            _norm(text)
+            for ex in load_examples()
+            for text in (ex.query, *(h.partition(":")[2] or h for h in ex.history))
+            if _norm(text) in held_out
+        }
     )
     assert not collisions, (
-        f"greeting(s) used by BOTH the corpus augmentation and a benchmark case: "
-        f"{collisions}. Reword the benchmark case — matching a corpus greeting "
-        f"silently drops every social lead-in row that carries it."
+        f"{len(collisions)} curated string(s) also appear in a benchmark case: "
+        f"{collisions[:3]}. Every row carrying one is silently dropped at compile. "
+        f"Reword the benchmark case."
     )
 
 

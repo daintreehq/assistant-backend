@@ -1,0 +1,581 @@
+# Training examples whose answer is `daintree.orchestration.status-and-resume` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.status-and-resume
+run: pre-split
+positives:
+  - catch me up
+  - what was I working on before I closed everything last night?
+  - ok im back after the weekend, no idea what state anything is in — walk me through what's still going, what finished, what's waiting on me, and anything I abandoned halfway
+  - whats stil in flight
+  - sweep the ledger and the live supervisors and give me one ranked picture with real ids
+  - pick that back up from last night
+  - the workflow list still shows those five poll agents as active and they finished hours ago. sort it out
+  - why does workflow.list keep telling me stuff is active when the terminals are long gone?
+  - close out the stale rows
+  - record the PR on that workflow row
+  - back-fill the ledger — branch, worktree and pr number on any row missing them
+  - what happened while I was at lunch?
+  - pull the audit log for the last couple hours and tell me what errored
+  - resume the session on the auth worktree
+  - list the sessions i can resume
+  - are any of my older sessions still resumable or did I lose all that?
+  - status sweep
+  - im back. state of everything please
+  - did anything actually finish while i was away
+  - i've lost the thread completely — what did we have running across all these tabs and which of it is still open
+  - do the same for the other two worktrees, what's still outstanding on those
+  - reconcile every active row against what's actually still running and close whatever's dead
+  - what's open and in flight right now across the whole session
+  - carry on with the thing from this morning
+  - the injected turn state keeps replaying the same three workflows at me every turn, none of them are real any more
+  - morning. where did we leave off friday
+  - been away 2 weeks, whats still open here
+  - why does it keep telling me 3 workflows are active when nothing is running
+  - workflow list still shows all five agents from the poll as active. they finished hours ago
+  - put the PR number on the workflow row for the auth-refresh branch
+  - export the audit log for last night and tell me what errored
+  - can we resume that session from this morning in the payments worktree
+  - did i ever finish the rate limiter thing or did that just get dropped
+  - sitrep
+  - show me the workflow list
+  - was at lunch for an hour, what happened while i was gone
+  - 'pick up where that agent got to on #212 yesterday'
+  - my machine restarted halfway through the fanout. what survived and what didnt
+  - ok so i had like three things going yesterday, one was the schema migration, one was that flaky auth test, and i think something with the docs? honestly no clue where any of them ended up. sort me out
+  - sam takes over tomorrow. give me a standing picture of everything in flight with the real ids
+  - pull up workflow wf-88, i think thats the one from tuesday
+  - reconcile the workflow ledger for me, half those rows are lying
+  - standup in 2 mins, what am i in the middle of
+  - wat was i workin on b4
+  - catch me up and tell me what needs me first
+  - new session but i was mid something. can you reconstruct it
+  - that workflow row has no branch or worktree on it, fill in what you can
+  - what sessions can i even resume
+  - went to bed at 11. give me the rundown of what happened overnight
+  - whats left on my plate from earlier
+  - is anything actually still running or is the workflow list lying to me again
+  - did any tool calls get denied yesterday afternoon
+  - the rows from yesterdays fanout all still say active. which of them actually got anywhere
+boundaries:
+  - query: where were we with the fleet
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: I came back after the weekend; reconstruct which worktree tasks were in flight and resume the unfinished ones.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Where did we leave the multi-worktree rollout last session, and what is still open in the ledger?
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: catch me up, what was i in the middle of
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: what's still open from last night's run
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the workflow list still shows those as active, tidy it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: pick up where we left off yesterday
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: what's left on each of these and where did we get to
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: catch me up on where each piece of work stands
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: what was each of them doing before i closed the laptop
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: tidy the ledger rows, several still show as active but they're finished
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: pick up where each of those left off last week
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: where were we on that issue from last week
+    confusable_with: [daintree.forge.manage-issue]
+  - query: the workflow list still shows that issue's row as active and it's long finished
+    confusable_with: [daintree.forge.manage-issue]
+  - query: where were we
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: what was i in the middle of last week? i've completely lost it
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the workflow list still says that one is active but it finished days ago, tidy it up
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: what happened while i was on holiday
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: record the PR number onto that ledger row
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: where were we on the web rewrite, whats still in flight
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: whats still in flight from yesterday, i lost track
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: the migration plan from monday, where did we actually get to?
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: workflow list still shows the schema rollout as active. is it? close it out if not.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Catch me up. I've been off since Wednesday and there were three phases of that thing running.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: what's still in flight
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: i had a big multi-step thing going yesterday. pick it up.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the ledger's full of rows from that batch. which of them are real and which are stale?
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: what happened while i was away, anything land, anything die?
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: record the PR number on that workflow row, it's 512
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: where were we with the auth rollout
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: There were ordered steps and I've lost the thread. Reconstruct what finished and what's still open from the ledger.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: resume that session from friday, the deploy one
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: why does it still say active when the terminals are gone
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Where did we leave off yesterday? Reconstruct the existing session state.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Where were we yesterday and which old ledger rows are still active?
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: what worktrees did i have going yesterday, where were we
+    confusable_with: [daintree.foundation]
+  - query: catch me up — what's still open from last night
+    confusable_with: [daintree.foundation]
+  - query: what was i working on before, pick it back up
+    confusable_with: [daintree.foundation]
+  - query: do you remember what I was working on before the weekend?
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: what did we leave half finished yesterday
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: catch me up, I've forgotten where we got to on the auth branch
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: where were we? i'm pretty sure there was something still running from last night
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the workflow list still shows that job as active but it finished ages ago
+    confusable_with: [daintree.agents.recover-agent]
+  - query: what was i working on before i shut the laptop, anything still in flight?
+    confusable_with: [daintree.agents.recover-agent]
+  - query: where did we leave off on that migration? something stalled and i lost the thread
+    confusable_with: [daintree.diagnostics]
+  - query: the workflow list still shows that job as active, whats going on there
+    confusable_with: [daintree.diagnostics]
+  - query: what happened while i was away? something looks off
+    confusable_with: [daintree.diagnostics]
+  - query: just got back — what happened while i was away?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: catch me up, where did we leave off last night?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: whats still in flight from yesterday's overnight run
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: what was i working on across all those worktrees last night, catch me up
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: where were we with all this yesterday — did any of it get confirmed?
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: catch me up on what those agents got through while i was away
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: what was i in the middle of checking last session
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: catch me up — what was i working on yesterday?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: where were we before i closed everything down last night
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: what's still running from last night?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: why does the workflow list still show that batch as active? it finished hours ago
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: the ledger is full of stale rows, sort it out
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: what was i working on yesterday
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: remind me which tickets i already started
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: catch me up — what issue work is still open from last session
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: pick up where we left off on that issue from yesterday
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: i started something last session and never finished it, lets carry on with it
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: which worktree was I working in yesterday and what was still open there?
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: where were we yesterday, catch me up
+    confusable_with: [daintree.foundation]
+  - query: what was i working on before the machine rebooted? i want to pick it back up
+    confusable_with: [daintree.foundation]
+  - query: the workflow list still shows that issue as active even though the pr merged ages ago
+    confusable_with: [daintree.foundation]
+  - query: the workflow list still shows that issue as active but it was merged days ago
+    confusable_with: [daintree.diagnostics]
+  - query: catch me up — i lost the whole session when the app crashed last night
+    confusable_with: [daintree.diagnostics]
+  - query: what was i in the middle of? nothing on screen looks familiar
+    confusable_with: [daintree.diagnostics]
+  - query: what were we doing before i shut the laptop yesterday
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: remind me where we left off on the auth branch
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: catch me up, whats still open from this morning
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: where were we? what was in flight when i shut the laptop last night
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the workflow list still shows the auth work as active but that shipped last week, tidy it up
+    confusable_with: [daintree.agents.recover-agent]
+  - query: catch me up on what happened while i was away this morning
+    confusable_with: [daintree.agents.recover-agent]
+  - query: what was i in the middle of yesterday? was anything left hanging?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: where were we with the auth work? i closed the laptop yesterday
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: catch me up on what happened while i was away
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: what happened to that batch i fanned out yesterday?
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: catch me up — where did all those parallel tickets get to
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: what was i working on before the weekend?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: why does the workflow list still show 4 rows active when everything merged?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: what's still in flight from last night's fan-out?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: where were we? i havent opened this since thursday
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: what happened while i was away — did any of it finish, and whats still open on the ledger
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: the workflow list still shows the billing one active but that shipped days ago
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: which issues did we already start last session? catch me up
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: did i leave anything half finished in flight
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: what happened while i was asleep
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: the overnight thing finished at some point, where did it leave off
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: what were all these terminals working on before i shut the laptop last night?
+    confusable_with: [daintree.terminals.rename]
+  - query: catch me up, where did we leave the merge pipeline tab
+    confusable_with: [daintree.terminals.rename]
+  - query: i cant remember what i was in the middle of on friday, what was still in flight
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: which worktree was i working in yesterday? i've completely lost track of where that branch went
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: where were we on 412?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: pick up what i was doing yesterday
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: whats still in flight from last nights session?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+followups:
+  - query: close the stale ones
+    history:
+      - 'user: where were we'
+      - 'assistant: Swept the ledger and live supervisors. Needs you: one queue item on wf_8812. Live + supervised: wf_8790 (terminal t-4, watcher w-21). Live but UNsupervised: t-9 on the parser worktree — outcome unknown. Closed: wf_8701 and wf_8702 (terminals gone, no surviving outcome) as cancelled. Resumable: 3 sessions, newest on auth-refactor.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: adopt that one
+    history:
+      - 'user: im back, whats still going'
+      - 'assistant: wf_8790 is live and supervised. t-9 is live but nothing is watching it — I can''t tell you whether it finished or stalled.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: the second one
+    history:
+      - 'user: what was i working on friday'
+      - 'assistant: Three resumable sessions came back, newest first: (1) auth-refactor on wt-3, saved 18:40 Fri; (2) parser-cleanup on wt-7, saved 16:02 Fri; (3) docs-pass on wt-1, saved 11:55 Fri.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: and the other worktree?
+    history:
+      - 'user: catch me up on everything still open'
+      - 'assistant: Four active rows. wf_8790 and wf_8801 are live on the api worktree; wf_8712 and wf_8715 have no terminals left. Offered to close the last two on the tails I read.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: yeah do that, last two hours, errors only
+    history:
+      - 'user: what happened while i was away'
+      - 'assistant: Two rows ended while you were out. I can pull the audit log for the window if you want the detail — filtered to errors it''s one read.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: hang on, why is 8790 still active
+    history:
+      - 'user: sweep the ledger'
+      - 'assistant: Closed wf_8701 as cancelled and wf_8702 as failed. wf_8790 stays active — terminal t-4 is still in the roster and watcher w-21 covers it.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: yeah put it on, and check the others for the same
+    history:
+      - 'user: whats still in flight'
+      - 'assistant: Three live rows plus two I closed. wf_8790''s branch is feat/token-rotation; no PR recorded on the row.'
+      - 'user: is there a PR on that branch?'
+      - 'assistant: Yes — #418, open, headRef feat/token-rotation. Want it on the row?'
+    active: [daintree.orchestration.status-and-resume]
+  - query: fine, do it
+    history:
+      - 'user: where did we leave the parser work'
+      - 'assistant: The session record is there (wt-7, saved Fri 16:02) but there''s no restore — bringing it back means a fresh agent in that worktree with a task prompt I write from the ledger row and the branch state. Its old conversation is gone.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: ok noted. anything from before yesterday still hanging around?
+    history:
+      - 'user: im back. state of everything'
+      - 'assistant: Needs you now: queue item q-12 (agent asking about a migration). Live + supervised: wf_8790. Live unsupervised: t-9. Closed two rows as cancelled.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: how's that going
+    history:
+      - 'user: the workflow list is full of junk, half of it finished ages ago'
+      - 'assistant: Reading each row against reality now — workflow.get on the five active ones, then a bounded tail read per surviving terminal.'
+    active: [daintree.orchestration.status-and-resume]
+topic_shifts:
+  - query: where were we on the payments thing from friday
+    history:
+      - 'user: figure out what each terminal is doing and title it'
+      - 'assistant: Renamed all 7 — e.g. ''auth refactor'', ''flaky test triage'', ''docs sweep''.'
+    active: [daintree.terminals.rename]
+  - query: what else is still in flight from earlier today
+    history:
+      - 'user: interview the agents and tell me which knows this codebase best'
+      - 'assistant: claude-4 wins — it was the only one that correctly located the migration runner and quoted it.'
+    active: [daintree.orchestration.interview]
+  - query: so where did we leave the actual implementation of it, i think there was an agent on it
+    history:
+      - 'user: what did we decide about the queue backend'
+      - 'assistant: Stored fact from 12 June: SQS, chosen over Redis for the at-least-once guarantee.'
+    active: [daintree.memory.manage-project-memory]
+  - query: pick 388 back up
+    history:
+      - 'user: where were we'
+      - 'assistant: 412 mid-run, 388 waiting on review.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: ok different - what else was i in the middle of before this? anything left over from yesterday
+    history:
+      - 'user: is this branch ready to push?'
+      - 'assistant: Yes - clean tree, tests green, no debug leftovers. Pushed and PR opened.'
+    active: [daintree.workflow.prep-branch-for-review]
+  - query: ok now catch me up on everything else that was in flight before this blew up
+    history:
+      - 'user: the build broke, work out why'
+      - 'assistant: A dependency bumped a minor version and changed a default. Pinned it, build is green.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: ok so where were we on the auth work? what is still actually open across sessions
+    history:
+      - 'user: tidy up the terminals'
+      - 'assistant: Closed the five you confirmed. Two left open because agents are still live in them.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: different thing - where were we on the billing work? anything left open from last week
+    history:
+      - 'user: grill the three of them on the auth flow, best one wins'
+      - 'assistant: Winner: t_0404, it was the only one that cited the actual middleware.'
+    active: [daintree.orchestration.interview]
+  - query: remind me, does the ledger survive restarting the app?
+    history:
+      - 'user: where were we'
+      - 'assistant: Two ledger rows still open from yesterday: issue 388 (PR up, review pending) and an unclosed fan-out of three.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: does daintree keep history across sessions or just this one?
+    history:
+      - 'user: catch me up on what happened while i was out'
+      - 'assistant: Two watchers fired — build green, PR merged. One agent still waiting on a question.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: tell me what the ledger is for and then catch me up on where we were
+    history:
+      - 'user: been away a few days'
+      - 'assistant: Welcome back.'
+  - query: tell me what the workflow ledger tracks, then tidy the stale rows on it
+    history:
+      - 'user: ledger looks wrong'
+      - 'assistant: Several rows still read active.'
+  - where were we yesterday, i had some agent thing going
+  - query: right the bake-off. is that still in flight or did it finish
+    history:
+      - 'user: where were we yesterday, i had some agent thing going'
+      - 'assistant: The ledger has a design bake-off across four agents, last touched 18:40, still marked active.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: theres 4 tabs from last night. remind me what we were even doing
+    history:
+      - 'user: morning. whats actually running right now'
+      - 'assistant: Four terminals: tabs 1-3 are Claude Code agents in the parser-migration worktree, tab 4 is an idle shell. Two worktrees exist, parser-migration and main. No watchers or timers armed.'
+    active: [daintree.foundation]
+  - query: back. what did i miss
+    history:
+      - 'user: hang on ignore that, standup in 5. just put a watcher on tab 2 and ping me when its done'
+      - 'assistant: Watcher armed on tab 2. I''ll wake you when it goes idle or asks a question.'
+      - 'user: ta'
+      - 'assistant: Go to your standup.'
+  - query: im back. did anything happen
+    history:
+      - 'user: hang on whats the difference between a watcher and a timer again'
+      - 'assistant: A watcher wakes me on a terminal or PR state change; a timer just fires after a delay.'
+      - 'user: ok whatever. adopt that agent properly and let me know when it finishes, i have to go get my kid'
+      - 'assistant: Nudged tab 3 back into motion, adopted it into the roster and armed a watcher. I''ll report when it settles.'
+    active: [daintree.agents.recover-agent, daintree.orchestration.watch-outcome]
+  - query: any pings while i was out?
+    history:
+      - 'user: and the failed one — is it hung or has daintree lost the terminal? clicking it does nothing'
+      - 'assistant: Stale terminal id, the process exited at 10:31.'
+      - 'user: leave it. im off to lunch, keep an eye on the other three and wake me if any of them need input'
+      - 'assistant: Watchers armed on tabs 3, 6 and 8. I''ll wake you on a question or a finish.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: where were we
+    history:
+      - 'user: hows that going'
+      - 'assistant: Two rounds done, they agree on the N+1 but not the index.'
+      - 'user: school just rang, i have to go. park it — leave them running and tell me when all three have answered'
+      - 'assistant: Watchers armed on all three. I''ll wake you when the last one reports.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: christ. which of those are actually still in flight
+    history:
+      - 'user: how many worktrees do i have'
+      - 'assistant: Nine, plus main: issue-412, issue-77, parser-migration, spike/fonts, redis-cache, billing-fixtures, and three called tmp-1 through tmp-3.'
+    active: [daintree.foundation]
+  - morning. what's still running from last night?
+  - query: back. anything happen while i was out?
+    history:
+      - 'user: what branch and worktree did that end up on'
+      - 'assistant: fix/518-selector-retry-log, worktree ../assistant-backend-518, tab 4.'
+      - 'user: i''m afk for a bit — watch it, and check if anyone''s replied on the issue thread while you''re at it'
+      - 'assistant: Watcher armed on tab 4 (wakes on finish, failure or a question). The thread has one reply from @jules asking whether this covers the utility-task path too.'
+    active:
+      - daintree.orchestration.watch-outcome
+      - daintree.workflow.follow-up-on-issue
+      - daintree.foundation
+  - where were we on the selector work
+  - query: meeting done. where were we
+    history:
+      - 'user: put an agent in it with that bundle'
+      - 'assistant: Agent running in tab 7.'
+      - 'user: wake me if it finishes or asks something, im in a meeting'
+      - 'assistant: Watcher armed on tab 7.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - morning, what was i in the middle of yesterday
+  - picking up from yesterday — what was i in the middle of
+  - query: the workflow list still says 9 active and half of those shipped days ago
+    history:
+      - 'user: what happened while i was away'
+      - 'assistant: Four agents finished and two PRs merged overnight. One agent failed on a lint gate and has been idle since 02:10.'
+    active: [daintree.foundation, daintree.orchestration.status-and-resume]
+  - whats still open from last week
+  - where did we get to yesterday on the parser thing
+  - query: catch me up, i shut the laptop mid-run last night
+    active: [daintree.foundation]
+  - what's still in flight from the earlier sessions
+  - the workflow list still shows that as active but it merged days ago — sort the ledger out
+  - pick up whatever i abandoned on friday
+  - not a saved memory — i mean literally, what was i in the middle of on friday? there were agents running.
+  - the workflow list still shows the parser work as active but it merged last week. sort the ledger out.
+  - query: what's actually in flight for me right now? i was out for two days.
+    history:
+      - 'user: slack: "Reminder — everyone please clean up their worktrees before friday, we''re running out of disk"'
+  - catch me up on what's in flight and close off the ledger rows that are obviously finished
+  - query: what else is still open from earlier in the week?
+    history:
+      - 'user: watch the build and wake me'
+      - 'assistant: Watching t_0331.'
+      - 'user: [watcher fired: t_0331 exited 0, artifacts published]'
+      - 'assistant: Build succeeded and the artifacts published. That''s the last thing I had running here.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: and tidy the ledger up, half those rows are stale now
+    history:
+      - 'user: watch the long test run'
+      - 'assistant: Watching t_3003.'
+      - 'user: [watcher fired: t_3003 exited 0 after 51 minutes]'
+      - 'assistant: Full suite passed in 51 minutes, no flakes. That closes out this run.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: did anything else fire while i was asleep?
+    history:
+      - 'user: wake me when the overnight batch finishes'
+      - 'assistant: Watchers armed on all four overnight jobs.'
+      - 'user: [background wake 05:55: all four jobs exited 0]'
+      - 'assistant: All four overnight jobs finished clean. Nothing needed you while you were asleep.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: i was away two hours - what fired while i was gone?
+    history:
+      - 'user: im back, what was i in the middle of'
+      - 'assistant: Two workflows were live when you left; I''m reconstructing them from the ledger now.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: i got woken at 3am by something of yours - what was it?
+    history:
+      - 'user: run the whole batch overnight'
+      - 'assistant: Batch launched, supervisors armed, I''ll wake you on anything that needs you.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: what were we doing before this? i've lost the thread
+    history:
+      - 'user: fix the title on 12'
+      - 'assistant: Title updated and read back.'
+    active: [daintree.forge.manage-issue]
+  - query: what was i working on before all this preview nonsense started?
+    history:
+      - 'user: the app blows up on load'
+      - 'assistant: Traced to the date picker swap. Fixed and verified on the new generation.'
+    active: [daintree.runtime.debug-web-app]
+  - query: catch me up — what was actually in flight before i went away?
+    history:
+      - 'user: pause everything remote, i''m off for a week'
+      - 'assistant: Paused both configured resources and verified each with fresh status.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: the rows from yesterdays fanout all still say active. which of them actually got anywhere
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: sam takes over tomorrow. give me a standing picture of everything in flight with the real ids
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: pick that back up from last night
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: 'pick up where that agent got to on #212 yesterday'
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: carry on with the thing from this morning
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: list the sessions i can resume
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: wat was i workin on b4
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: what's open and in flight right now across the whole session
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: catch me up and tell me what needs me first
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: why does it keep telling me 3 workflows are active when nothing is running
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+wakes:
+  - query: '[async wait returned: resume digest ready]'
+    history:
+      - 'user: where were we'
+      - 'assistant: Pulling the ledger, live supervisors and session history together — the resume digest is still building.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: '[watcher fired: the still-running workflow''s terminal t_6600 exited 0]'
+    history:
+      - 'user: what happened while i was away'
+      - 'assistant: Three workflow rows still show active. Checking each against the live terminals before I report, and I''ve armed a watch on the one that''s genuinely still running.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+near_misses:
+  - what were we doing yesterday, catch me up
+  - whats still open
+  - remind me where i got to
+  - what was i doing before lunch
+  - did anything happen while i was out
+  - pick up where we left off
+  - whats on my plate
+foundation_boundaries:
+  - catch me up, i was out for an hour
+  - pick up where we left off on the auth branch
+  - what happened while i was away
+  - why does the workflow list still show that as active
+  - what have i got still in flight from the last session
+  - resume the thing from this morning
+  - where did we leave off on this branch last night
+  - what's still in flight from yesterday
+  - catch me up, what was i working on before i shut the laptop
+  - the workflow list still says that issue is active, sort it out
+  - pick up whatever we were doing in the auth worktree
+  - i've been away two days — what's the state of everything we kicked off
+  - why does workflow list show that as running when it finished ages ago
+  - record the PR number onto that workflow row
+  - reconstruct what's outstanding across the last few sessions
+  - 'remind me what we already did on #412 and what''s left'
+  - go through the audit log and tell me what actually happened on that run
+  - which workflows are still open, across everything
+  - resume the thing we started this morning and tell me the next step
+  - tidy the stale rows in the ledger, half of them are done
+  - what happened while i was out

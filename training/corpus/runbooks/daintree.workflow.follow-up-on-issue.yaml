@@ -1,0 +1,689 @@
+# Training examples whose answer is `daintree.workflow.follow-up-on-issue` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.workflow.follow-up-on-issue
+run: pre-split
+positives:
+  - is that PR green yet
+  - did ci pass on 412?
+  - check the review state on the auth PR
+  - 'what''s blocking #88'
+  - anyone reply on that issue yet?
+  - read the thread on 231 and tell me what they actually want
+  - pull the check roll-up for the PR on that worktree — counts are fine, i don't need names
+  - so the agent finished on issue 77 ages ago and opened a PR, can you go see whether the reviewer has actually looked at it and whether the checks came back ok, and just tell me where the whole thing is sitting right now
+  - reviewDecision on 145?
+  - comment on 92 saying it shipped and close it
+  - close out that issue with a note pointing at the PR
+  - did it get approved or are they asking for changes
+  - wheres that pr at
+  - now do the same for the other two issues
+  - tell the agent what the reviewer asked for
+  - forward the changes-requested plus the thread asks to whoever's still working on it
+  - 'status of #310 on github'
+  - checks red or green on the PR for the ratelimit ticket?
+  - is there even a PR linked to 405
+  - i pushed that branch about an hour ago and i'm honestly not sure the required checks have settled, go look at the PR and tell me where they're at
+  - see where 88 stands, and if it merged close the issue
+  - whats the ci sayin on that one
+  - grab the comments on issue 12, the newest ones especially
+  - any of my open PRs approved?
+  - did anyone push back on what i proposed in that ticket
+  - did ci pass on the pr the agent opened for 214?
+  - and the second one, is that one green
+  - 412 has been sitting there since tuesday. whats actually blocking it
+  - did anyone approve 88 yet or is it still sitting in review
+  - check pr 3110 i think? the one for the retry backoff. whats its status
+  - status on issue 47
+  - did the maintainer ever reply on that issue i filed
+  - the fix shipped, comment on 214 with the pr link and close it
+  - close 145, its a dupe of 130. leave a note saying so
+  - just tell me if the checks are red on 412, dont fix anything yet
+  - reviewer left changes requested on 88 — pull what they asked for and send it to the agent thats still on it
+  - agent says its done and pushed. what does github actually say about the pr
+  - has 412 merged yet
+  - so i had two prs up last night, one for the parser and one for the config loader, i cant remember either number. can you work out where each stands, ci and review
+  - chekcs on 88?
+  - what did the reviewer actually write on 214, not just approved or not
+  - 203 and 205 both shipped in that pr. comment on both and close them
+  - you said 412 was green ten minutes ago but the merge button is greyed out. re-check
+  - which pr belongs to issue 47
+  - is ci still running on that branch or did it finish
+  - whats the state of 91 right now, still open?
+  - tell the claude tab working on 214 what the failing checks are
+  - Could you check whether the review on PR 88 came back approved or with changes requested?
+  - ci status?
+  - anything new on 47 since yesterday? theres like 30 comments on it
+  - close 176 as not planned and say why in a comment
+  - quick pass over my open prs — which ones are green and which are waiting on a review
+boundaries:
+  - query: is that PR green
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: did the checks pass on 88
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: what did the reviewer actually say on 204
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: has anyone reviewed my PR yet or is it just sitting there
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: what's blocking that one from going in
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: did the reviewer approve it or just leave comments
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: who's down as a reviewer on 77
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: is 305 still a draft
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: did that one ever get merged in the end
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: any new comments on the PR since this morning
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'comment on #91 saying it''s fixed and close it out'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: pull the check roll-up for the PR on the perf branch
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: is it even mergeable, or has it drifted off base
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: tell the agent still working on it what the reviewer flagged on the PR
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: close 314, it's done
+    confusable_with: [daintree.forge.manage-issue]
+  - query: comment on 88 saying we shipped it and shut it
+    confusable_with: [daintree.forge.manage-issue]
+  - query: did anyone ever reply on that issue i filed monday?
+    confusable_with: [daintree.forge.manage-issue]
+  - query: what's the status on 42
+    confusable_with: [daintree.forge.manage-issue]
+  - query: is the PR on that issue green yet
+    confusable_with: [daintree.forge.manage-issue]
+  - query: read me the thread on 155, i think there was pushback
+    confusable_with: [daintree.forge.manage-issue]
+  - query: what did the reviewer actually say on the PR for 90
+    confusable_with: [daintree.forge.manage-issue]
+  - query: what's blocking 233
+    confusable_with: [daintree.forge.manage-issue]
+  - query: tell the agent still working on it what the CI failure on that issue's PR was
+    confusable_with: [daintree.forge.manage-issue]
+  - query: did the checks pass on 512's branch
+    confusable_with: [daintree.forge.manage-issue]
+  - query: post a note on the duplicate pointing at 400 and close the dupe
+    confusable_with: [daintree.forge.manage-issue]
+  - query: is the migration PR green yet
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: did the PR for the render fix pass its checks
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: is 204 green yet
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: what did the reviewer actually say on that PR
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: which check is red on 88
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: what's blocking 419, checks, review, or is it just sat there
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: PR 88. State please. Draft or ready, approved or not, checks passing or not.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: did the review come back changes-requested or is that a stale badge
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: checks on the payments PR, passed?
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: before i do anything else, tell me where 92 stands on the forge
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: there's a red X on that pull request. what's the check called?
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: did 77's PR get approved, and by who
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: the agent's still working on 300. go find out what the reviewer flagged and send it over to it.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: give me the CI roll-up for 145, counts and all
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: has 204 merged yet or is it still sat open
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: comment on 145 saying it shipped in 150 and close it
+    confusable_with: [daintree.forge.manage-issue]
+  - query: has anybody come back on 302 yet
+    confusable_with: [daintree.forge.manage-issue]
+  - query: read me the thread on 55, i've been off for a week
+    confusable_with: [daintree.forge.manage-issue]
+  - query: close out 611 with a note pointing at the merged PR
+    confusable_with: [daintree.forge.manage-issue]
+  - query: post a closing comment on the flaky-test issue and mark it not planned
+    confusable_with: [daintree.forge.manage-issue]
+  - query: any comments on 88 since tuesday
+    confusable_with: [daintree.forge.manage-issue]
+  - query: state of play on issue 512, is there a PR, is it green, did anyone review it
+    confusable_with: [daintree.forge.manage-issue]
+  - query: reply landed on the issue? and what's the check count
+    confusable_with: [daintree.forge.manage-issue]
+  - query: wrap 88 up. comment with the summary and close the issue. leave the PR alone.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Read issue 18 and tell me what its current pull request is waiting for.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Add a final shipped comment to the existing issue and close it.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Is the review on issue 90 approved yet? Just report its state.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Tell me whether pull request 44 is green; do not alter it.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: What did reviewers say on PR 12 and which checks are pending? Read only.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Read the current issue comment thread and summarize the blocker.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Is issue 18's pull request green, and what did reviewers say?
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Post the shipped summary on issue 27 and close it completed.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: What is blocking PR 42 right now?
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Read the comments on the issue linked to PR 42.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: read what the reviewer said on PR 412 and forward the blockers to the agent still working on it
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: the PR just got changes requested — tell the agent what they want fixed
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: check the review decision on that PR then relay it to the implementer terminal
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: someone commented on the issue overnight — pass whatever they said to the agent that's on it
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: is pr 412 green yet?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: just tell me whether the checks passed on that PR, don't fix anything
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: what did the reviewer say on 331 and is anything still blocking it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: is that PR green and what did the reviewer say?
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: is PR 412 green?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: did the checks pass on that PR, and did the reviewer say anything blocking?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: check the pr thread, anyone replied yet?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: what did the reviewer say on PR 231?
+    confusable_with: [daintree.review.review-change]
+  - query: did that PR get approved or is someone still sitting on it
+    confusable_with: [daintree.review.review-change]
+  - query: is the PR on 412 green?
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: did anyone reply on that issue yet
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: check the review state on the pr for the caching ticket and tell me whats blocking it
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: what did the reviewer say on the pr i opened earlier?
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: comment on the issue saying the pr is up and close it out
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: did CI pass on the PR for 412?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: whats blocking issue 88, did the reviewer ever say anything?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: comment on issue 300 saying it's shipped and close it out
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: is PR 214 green yet?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: did CI pass on the release branch?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: 'whats blocking #88, is it the review or the checks?'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: what did the reviewer say on PR 412? paste it into the claude tab
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: github came back changes-requested. tell the agent still working on it what needs fixing
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: the check on that branch went red, let the implementer know what broke
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: 'what did the reviewer decide on #412, did anyone reply on the thread'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: before the judge decides anything, pull the review decision and ci state on pr 418 for me
+    confusable_with: [daintree.orchestration.interview]
+  - query: is the PR on that branch green?
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: what did the reviewer say on 118
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: what did the reviewer actually say on 412?
+    confusable_with: [daintree.review.review-change]
+  - query: is that PR approved yet or still waiting on someone?
+    confusable_with: [daintree.review.review-change]
+  - query: is 412 green yet
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: did anyone reply on 88
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: whats blocking that pr, is it waiting on review
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: read the thread on 77 and tell me what the reviewer wants
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: is 4412 green yet
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: did ci pass on that pr
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: 'what did the reviewer say on #88'
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: is that PR green? did checks pass
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: 'what did the reviewer say on the pr for #412'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: the pr landed, comment on the issue and close it out
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: is the pr for 412 green yet?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: did anyone ever reply on 88?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: what did the reviewer say on the token refresh ticket
+    confusable_with: [daintree.workflow.start-work-on-issue]
+followups:
+  - query: and the review?
+    history:
+      - 'user: is the PR on 88 green?'
+      - 'assistant: forge.getChecks on PR #91 reports state=success, 6 required checks passed, 0 failed, 0 pending. Caveat: that value is provider-cached and can lag ~a minute.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: do the last page too, i want the newest one
+    history:
+      - 'user: did anyone reply on issue 231?'
+      - 'assistant: commentCount is 7. Read the first page via forge.listIssueComments — comments come oldest first, so I have the earliest 5 so far.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: ok tell the agent
+    history:
+      - 'user: what''s blocking #145'
+      - 'assistant: PR #150 is open, reviewDecision CHANGES_REQUESTED, checks passing. The forge doesn''t return review bodies, so I don''t have the actual asks yet.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: cool, comment and close it
+    history:
+      - 'user: where does 92 stand'
+      - 'assistant: PR #95 is merged, checks were green, reviewDecision APPROVED. Issue 92 is still open.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: any luck?
+    history:
+      - 'user: which checks failed on 412?'
+      - 'assistant: The roll-up says 2 failed but carries no check names, so I spawned a read-only explore agent to pull the failing job names off the PR.'
+      - 'user: fine, wait on it'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: same for 89 and 90
+    history:
+      - 'user: is 88 ready to close out?'
+      - 'assistant: PR #91 merged this morning, CI green, approved. Nothing outstanding on the thread.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: hang on, how stale can that number be
+    history:
+      - 'user: did ci pass on the ratelimit PR'
+      - 'assistant: state=success, 4 passed, 0 failed, 0 pending.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: try the close again
+    history:
+      - 'user: comment on 310 saying it shipped and close it'
+      - 'assistant: The comment posted with the PR url. The close call came back with an error — the issue is still open, so this is not finished.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: its the one off the fix/session-expiry branch
+    history:
+      - 'user: whats the state on 405'
+      - 'assistant: forge.getIssue reported no linkedPR key, which means none was reported rather than none existing. Listing open PRs to match on headRef.'
+    active: [daintree.workflow.follow-up-on-issue]
+topic_shifts:
+  - query: is the PR on 221 green yet
+    history:
+      - 'user: catch me up, what was i working on last session'
+      - 'assistant: Two ledger rows still open: #221 (PR opened, awaiting review) and #240 (agent stopped mid-way). Closed 3 stale rows.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: did anyone ever reply on issue 118?
+    history:
+      - 'user: get an agent to write the changelog'
+      - 'assistant: Done, CHANGELOG.md updated with the 14 merged PRs since the last tag.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: check whether the reviewer left anything on PR 88
+    history:
+      - 'user: why cant i see the git tools'
+      - 'assistant: The git integration was disabled in settings — re-enabled, all 9 git tools are offered again.'
+    active: [daintree.diagnostics]
+  - query: actually just check right now — did its checks pass and did anyone review it
+    history:
+      - 'user: tell me when PR 210 merges'
+      - 'assistant: PR watch armed on 210. You will be pinged on merge or close.'
+    active: [daintree.orchestration.watch-outcome]
+  - query: comment on it and close it
+    history:
+      - 'user: whats blocking 140'
+      - 'assistant: One requested change on the migration file.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: ok now the tracker - is PR 388 green and did the reviewer say anything?
+    history:
+      - 'user: agent on the null check in the exporter please'
+      - 'assistant: Fixed and verified in t_9901, one line plus a regression test.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: different issue - whats blocking 51? is its PR green, did anyone reply on the thread?
+    history:
+      - 'user: begin issue 77'
+      - 'assistant: #77 is underway in its own worktree with a supervisor attached.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: and on the forge - is PR 402 green, did the reviewer leave a decision?
+    history:
+      - 'user: point the implementer at the review in tab 4'
+      - 'assistant: Sent, and it reported the review was useful - two of the five findings were real.'
+    active: [daintree.agents.relay-review-feedback]
+  - query: did anyone reply on issue 214 yet? and is its PR green
+    history:
+      - 'user: curate a bundle for the review handoff'
+      - 'assistant: Done, one file, deliberately scoped to the diff plus the two callers.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: remind me whats the difference between watching a pr and just reading it
+    history:
+      - 'user: is that pr green?'
+      - 'assistant: 6 of 7 checks green, e2e still running. Review decision is changes-requested.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: hang on, which forges does daintree support — is it github only?
+    history:
+      - 'user: did anyone reply on 388'
+      - 'assistant: One comment asking for a changelog entry, plus a green roll-up.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: is the pr green? also remind me how the check roll-up is put together
+    history:
+      - 'user: 388 has been open a while'
+      - 'assistant: Want me to check it?'
+  - query: explain how daintree talks to github, then comment on 388 and close it
+    history:
+      - 'user: 388 is basically done'
+      - 'assistant: PR merged this morning.'
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+  - query: meh none of those. actually whats the state of that pr from friday, the auth refactor one
+    history:
+      - 'user: while thats going find me something small i can do myself. anything unassigned and tiny'
+      - 'assistant: Three unassigned and small: #401 typo in the CLI help, #418 flaky timeout in the uploader test, #423 add a --json flag. None are being worked.'
+    active: [daintree.workflow.find-issue-work, daintree.foundation]
+  - query: hold on — did ci pass on the billing pr?
+    history:
+      - 'user: i need a context bundle for the billing subsystem, everything relevant plus the tests'
+      - 'assistant: Proposed 34 files. Anything to add?'
+      - 'user: add the webhook handlers too'
+      - 'assistant: Added src/webhooks/stripe/** and its tests — 41 files now. Say the word and I''ll generate.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: 'ok the one on #418, has its PR gone up yet?'
+    history:
+      - 'user: morning. what''s still running from last night?'
+      - 'assistant: One thing left over: the agent on #418 (branch fix/418-token-refresh) finished around 02:10 and its terminal is idle. The ledger row for #390 was stale, I''ve closed it. Nothing is actively running.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - ci's red on the 302 pr. what failed?
+  - query: ok while that's running — which of my other open prs have red checks
+    history:
+      - 'user: ugh. ok work out why and get it green'
+      - 'assistant: TTL shortened to 60s, test still assumes 300s. Fixed, pushed.'
+      - 'user: is that flaky or real? passed locally for me'
+      - 'assistant: Real, not flaky — it fails deterministically with a frozen clock. It passed for you because your .env still has the old TTL; CI uses the committed default.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: no hang on, that review isn't in a terminal, it's on the PR itself
+    history:
+      - 'user: leave those. back to 302 — did the fix take?'
+      - 'assistant: Green across all five checks.'
+      - 'user: now tell the agent in tab 3 what the reviewer flagged about the retry backoff'
+      - 'assistant: I can''t find a reviewer terminal with backoff findings — tab 2 is a rebase agent and tab 5 is idle. Where is that review?'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+  - query: yeah, forward it to the agent
+    history:
+      - 'user: now tell the agent in tab 3 what the reviewer flagged about the retry backoff'
+      - 'assistant: No reviewer terminal has backoff findings. Where is that review?'
+      - 'user: no hang on, that review isn''t in a terminal, it''s on the PR itself'
+      - 'assistant: Got it — the review on #302 requests changes: jitter missing on the retry backoff, and the max attempt count is off by one. Both from @dmarks.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: which of those branches has green ci now
+    history:
+      - 'user: that did nothing, the titles are unchanged. sort it out and rename them'
+      - 'assistant: MCP link had dropped. Reconnected, titles applied.'
+      - 'user: much better'
+      - 'assistant: Good.'
+  - 'someone opened #57 from a fork. where does it stand — ci, reviews, the thread'
+  - query: right, so the PR duplicates that. comment on it explaining why and close it politely
+    history:
+      - 'user: how does our rate limiter work today?'
+      - 'assistant: Token bucket in internal/ratelimit, applied once in the router chain, keyed by principal.'
+      - 'user: and where''s the config for it'
+      - 'assistant: config.go, the RateLimit block — burst and refill, overridable by RATE_LIMIT_* env vars. Defaults documented in .env.example.'
+    active: [daintree.explore.repository, daintree.foundation]
+  - query: ok reconnected. try the comment again
+    history:
+      - 'user: nothing happened when you tried to post that'
+      - 'assistant: The MCP link is down, so no forge tool was offered. Reconnect from the status bar.'
+      - 'user: is my key even live? don''t want to be burning credit for nothing'
+      - 'assistant: Key is valid and signed in — the failure was the MCP link, not auth. Nothing was charged for the failed call.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: ok write that up as a comment on the issue
+    history:
+      - 'user: poll the pinned agents on queue vs cron'
+      - 'assistant: 3 for the queue, 1 for cron.'
+      - 'user: what did the last one say again'
+      - 'assistant: The fourth (cron): the workload is small and predictable, a cron plus a lock file avoids running a broker, and retries can be made idempotent instead.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: combine both into a review comment on the pr and request changes
+    history:
+      - 'user: review the branch, and get an agent''s take on the caching approach'
+      - 'assistant: 4 findings, one high (cache key omits the catalog revision). Agent''s take below.'
+      - 'user: what did it come back with'
+      - 'assistant: Its answer: approach is sound but the key must include the catalog revision, and an unbounded dict grows per session — suggests an LRU with an explicit cap.'
+    active: [daintree.review.review-change, daintree.agents.ask-and-relay, daintree.foundation]
+  - 'did anyone reply on #90'
+  - query: reply saying it's fixed on 2.3 and close it
+    history:
+      - 'user: did anyone reply on #90'
+      - 'assistant: Two replies. @sam confirms it still reproduces on 2.2, and the bot linked PR #470, which is merged.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: ok good. now do the comment
+    history:
+      - 'user: reply saying it''s fixed on 2.3 and close it'
+      - 'assistant: Drafted. Confirm the fix on 2.3 first?'
+      - 'user: actually hang on — prove the fix is really on 2.3 first, the agent claimed it and i don''t trust it'
+      - 'assistant: Verified: the fix commit is on release/2.3 (cherry-picked, patch-id matches #470), the guard is present in the file on that branch, and the regression test runs there.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+  - query: is ci green on it, and did anyone review it yet
+    history:
+      - 'user: did it actually fix it'
+      - 'assistant: Verified - fix and regression test both present and passing.'
+      - 'user: good enough. push it up and open the pr'
+      - 'assistant: Committed and pushed fix/412-csv-export; PR #602 open against develop.'
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+  - query: did the reviewer say anything on that pr yet
+    history:
+      - 'user: it says done. verify'
+      - 'assistant: Verified.'
+      - 'user: prep it for review'
+      - 'assistant: Pushed fix/filters-logout; PR #611 open.'
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+  - 'ci went red on #388 after my last push. whats failing'
+  - query: good. comment on the issue saying its fixed and close it
+    history:
+      - 'user: back. anyone need me?'
+      - 'assistant: Two working, one waiting.'
+      - 'user: is #388''s pr green now, and if not get it fixed'
+      - 'assistant: Green - the re-run passed, nothing to fix.'
+    active:
+      - daintree.workflow.follow-up-on-issue
+      - daintree.ci.diagnose-and-fix
+      - daintree.foundation
+  - query: 'right that one. is #598 still open, what did the reviewer say'
+    history:
+      - 'user: what was i in the middle of yesterday'
+      - 'assistant: Pagination off-by-one on #377 - PR #598 open, one review comment unaddressed, agent left running in tab 2.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: ok forward both of those to the agent still sitting in tab 2 and tell it to address them
+    history:
+      - 'user: what was i in the middle of yesterday'
+      - 'assistant: Pagination off-by-one, PR #598 open.'
+      - 'user: is #598 still open, what did the reviewer say'
+      - 'assistant: Open, checks green, changes requested - Sam wants page 0 covered and says the offset math reads backwards at repo.go:88.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: are those 3 PRs green
+    history:
+      - 'user: answer the two that are asking, and check whether the api one really finished'
+      - 'assistant: Both unblocked. The api one checks out.'
+      - 'user: three of them are properly done. get those branches pushed and PRs open'
+      - 'assistant: Committed, pushed and opened PRs for all three — #501, #502, #503.'
+    active: [daintree.foundation, daintree.workflow.prep-branch-for-review]
+  - query: all green. comment on the issues and close them out
+    history:
+      - 'user: the one on 390 is red. work out why and get it passing'
+      - 'assistant: Snapshot test failing on a timestamp.'
+      - 'user: nah thats the flaky snapshot test again, rerun and confirm'
+      - 'assistant: Reran twice — green both times. Confirmed flaky, not a regression.'
+    active: [daintree.foundation, daintree.ci.diagnose-and-fix]
+  - query: did all the sprint-9 issues actually close on github
+    history:
+      - 'user: one more — just close terminal 7'
+      - 'assistant: Closed terminal 7.'
+      - 'user: remember we always squash merge on this repo, no merge commits'
+      - 'assistant: Saved — squash merge only on this repo. Nothing conflicting was already stored.'
+    active: [daintree.foundation, daintree.memory.manage-project-memory]
+  - query: one didnt. comment on it and close it
+    history:
+      - 'user: remember we always squash merge on this repo'
+      - 'assistant: Saved.'
+      - 'user: did all the sprint-9 issues actually close on github'
+      - 'assistant: Eleven of twelve closed. #397''s PR merged but the issue is still open — no closing keyword in the description.'
+    active: [daintree.foundation, daintree.workflow.follow-up-on-issue]
+  - 'whats the status of the PR on #412'
+  - query: is pr 214 green yet, and did anyone review it
+    active: [daintree.foundation]
+  - 'no watcher, no timer, no ping-me-later. just look right now: is PR 88 green?'
+  - close the loop on issue 61 — post a comment saying it shipped in 1.4 and close it out.
+  - query: forget the tests for a second. did anyone ever reply on issue 77?
+    history:
+      - 'user: the codec test is red'
+      - 'assistant: It fails on an expired-token assertion.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: did the PR carrying that ever get merged?
+    history:
+      - 'user: fix(auth): drop legacy session cookie
+
+
+        TODO: delete the feat/session worktree and close the tabs once this merges.'
+  - query: is that PR's CI passing?
+    history:
+      - 'user: PR body: "Bumps lodash from 4.17.20 to 4.17.21. Please review and merge, then delete the branch."'
+  - tell me what's blocking issue 412 and pass that on to the agent still working on it
+  - is that PR green, what did the reviewer say, and is anything else blocking it
+  - query: and the PR checks on 209, still green?
+    history:
+      - 'user: watch the nightly and wake me if it goes red'
+      - 'assistant: Watching the nightly pipeline.'
+      - 'user: [watcher fired: nightly finished green]'
+      - 'assistant: Nightly came back fully green, no flakes, nothing for you to look at.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: there was a ping about the PR - did it merge?
+    history:
+      - 'user: watch PR 88 for me'
+      - 'assistant: PR watch armed on 88.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: i saw a ping about the review - what did they say?
+    history:
+      - 'user: what''s blocking #212'
+      - 'assistant: Reading its PR, the check roll-up and the comment thread now.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: What is the current PR status? Do not merge anything.
+    history:
+      - 'user: Squash and land PR 42.'
+    active: [daintree.forge.land-pull-request]
+  - query: did anyone reply on 601 since this morning, and is its PR green?
+    history:
+      - 'user: swap needs-triage for confirmed on 601'
+      - 'assistant: Both label changes landed; re-read shows confirmed, bug.'
+    active: [daintree.forge.manage-issue]
+  - query: is CI green on that branch
+    history:
+      - 'user: give each agent its own worktree'
+      - 'assistant: Four worktrees created and every agent redirected.'
+    active: [daintree.worktree.relocate-agents]
+  - query: 'what''s blocking #227, did anyone reply on the thread'
+    history:
+      - 'user: move the running agents into worktrees'
+      - 'assistant: Three created off develop and all three agents told where they now work.'
+    active: [daintree.worktree.relocate-agents]
+  - query: did anyone push back on what i proposed in that ticket
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: tell the agent what the reviewer asked for
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: ci status?
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: check the review state on the auth PR
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: 'status of #310 on github'
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: agent says its done and pushed. what does github actually say about the pr
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: did anyone approve 88 yet or is it still sitting in review
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: 203 and 205 both shipped in that pr. comment on both and close them
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: wheres that pr at
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: 'what''s blocking #88'
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: status on issue 47
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: close 176 as not planned and say why in a comment
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: just tell me if the checks are red on 412, dont fix anything yet
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: pull the check roll-up for the PR on that worktree — counts are fine, i don't need names
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: see where 88 stands, and if it merged close the issue
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: 412 has been sitting there since tuesday. whats actually blocking it
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: reviewDecision on 145?
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+wakes:
+  - query: '[wake: t_6001 responded, agent has picked up the review blockers]'
+    history:
+      - 'user: what did the reviewer say on 482'
+      - 'assistant: Reviewer requested changes on two files. I''ve forwarded both blockers to the agent still working in t_6001 and I''m waiting for it to acknowledge.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: '[async wait returned: check roll-up complete]'
+    history:
+      - 'user: did ci pass on that pr'
+      - 'assistant: The roll-up is still running — 4 of 7 checks green. Waiting on the rest before I report.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: '[PR watch fired: PR 210 review decision CHANGES_REQUESTED, 6 comments]'
+    history:
+      - 'user: watch PR 210 for me'
+      - 'assistant: PR watch armed on 210. The implementer is still live in t_9 if anything comes back.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+near_misses:
+  - is pr 88 green yet
+  - did anyone reply on that issue
+docs:
+  - whats blocking that PR
+  - query: whats blocking that PR
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: quick q — whats blocking that PR
+    history:
+      - 'user: track the whole billing extraction, each bit gates the next'
+      - 'assistant: wfg_51cc — 8 nodes. Three complete, package split active, release cut and announcement still queued.'

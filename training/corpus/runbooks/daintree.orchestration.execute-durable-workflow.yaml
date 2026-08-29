@@ -1,0 +1,389 @@
+# Training examples whose answer is `daintree.orchestration.execute-durable-workflow` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.execute-durable-workflow
+run: pre-split
+positives:
+  - we're finally moving off the old auth service. it's roughly five phases and every one of them depends on the last — backfill the users table, turn on dual writes, flip reads, verify, then rip the old path out. i need that held somewhere real, not just in your head for one turn
+  - migrate us from mongo to postgres. schema first, then the data copy, then reads, then writes, then we drop the old cluster.
+  - build me a workflow graph for this
+  - plan it out as a dependency graph — i want to see what can actually start now versus what's sat waiting on something
+  - i'm going to have to stop halfway through this today. set it up so we pick back up at exactly the right spot tomorrow instead of me re-explaining the whole thing
+  - reconcile it, three of those steps finished while i was out
+  - what's runnable right now on wfg_8812
+  - 'ordering matters on this one: bump the shared lib, wait for it to publish, then update the three consumers, then delete the vendored copy. do it in that order and don''t get ahead of yourself'
+  - delegate each of these then check it actually landed before moving on. six changes and the last three won't build until the first ones are in
+  - i want proper progress tracking on this. x of y done, what's blocked, not you just telling me it went fine at the end
+  - set the plan up first before you touch a single file
+  - can you actually do dependency tracking on something this size or is that not a thing here
+  - the schema step failed. put it back to ready and try it again, don't tear the whole plan down and start over
+  - scope just changed, we're doing both regions not only us-east. redo the plan on top of the one that's already there
+  - attach that PR to whichever node it came from, i've lost track of which phase the agent was on
+  - wfg_31a0, give me the full one — i want the actual edges not the summary
+  - cancel the plan. leave the terminals alone though, i'm still using two of them.
+  - big one this. we need billing pulled out of the monolith into its own package, every import updated, CI green, then a release cut. each bit gates the next and i'll be in and out all day so it has to survive me closing this thing.
+  - give me completed versus total on the graph and which nodes are blocked
+  - note down that i confirmed the backup finished by hand — there's no tool output for that anywhere
+  - the async wait just came back. reconcile and tell me what's next.
+  - ok so this is staged. feature flag goes in, that deploys, then 5%, watch it, then 50, then 100. i want the gates tracked properly not just remembered
+  - is workflow intelligence even switched on in this build? if it is, plan this properly.
+  - i'm fairly sure there's already an open plan for this. don't go creating a second one.
+  - before anything else, write down what has to happen in what order so we don't do these out of sequence and wreck the branch
+  - checkpoint this, i'm closing the laptop
+  - i want the evidence trail kept on this one. when we come back i want to be able to see why each step got marked done rather than trusting it.
+  - node 22 upgrade across all four services. can't be simultaneous, the shared client has to go first and the rest pick it up after.
+  - make the plan, run whatever's runnable, and come back to me at the first thing that needs a decision from me
+  - add a blocker — the data copy can't start until legal sign off comes through
+  - deprecating the v1 API. announcement, then the deprecation headers ship, then 30 days, then we actually delete the handlers. track the whole thing.
+  - link that worktree to the node it belongs to
+  - three ordered changes, each one needs the previous merged before it makes sense. sequence them and keep it somewhere i can come back to.
+  - we're rotating the signing keys. new key generated, both accepted for a week, clients migrated, old key revoked. i really don't want to lose track of where we are in that.
+  - i keep losing the thread on this thing. can we track it properly with the dependencies written down instead of me re-deriving the order every morning
+  - there's five chunks of work here but they aren't independent — the schema one has to land before the other four can even compile. sequence it, don't just throw five agents at the wall
+  - i know you'd normally give each of these its own agent. these can't work like that. the API change blocks the client change blocks the docs.
+  - six services need the same change but three of them import the one i'm touching first. work out the order then delegate.
+  - don't parallelise this one, the steps stack
+  - use agents if you like but step 3 doesn't start until step 2's PR is actually merged, and i want that tracked rather than you eyeballing it
+  - four tickets in the batch but 512 has to merge before the other three will build. handle that properly.
+  - we got through the first two phases yesterday. pick the plan back up and keep going.
+  - resume the migration from wherever it stopped. and i mean actually push it forward, not just tell me where it is
+  - catch me up on the graph and then run whatever's next in it
+  - reconcile wfg_2f1 against what actually happened overnight and move it along
+  - i was mid-rollout when i had to stop. reopen that plan and take the next step.
+  - what's blocked on the cutover plan, and unblock whatever you can without me
+  - the three agents are done. mark those steps complete and tell me what that unblocks.
+  - agents are fine, i don't need a fleet report. i need to know which phase we're actually on and whether the next one can start.
+  - yeah they're all running. what i care about is whether phase 2 is allowed to start yet.
+  - sweep the agents if you have to but the real question is what the plan says comes after the schema node
+  - when the build finishes i want the next three steps to actually happen, in order. not just a ping.
+  - this runs all afternoon across several stages. i don't want a notification, i want the plan to still be there and still know what's left when i'm back.
+  - if i set a timer will it actually run the rest of this or just poke me?
+  - wake me is fine but the point is there are still four phases to get through in sequence after that
+  - 'for each of these five: spawn, wait, check it landed, then start the next. and remember where we got to if i drop off.'
+  - Plan and carry out this migration as a durable workflow with dependencies.
+  - Track this multi-stage refactor so we can resume it tomorrow without repeating completed steps.
+  - Create a workflow graph for delegate, verify, and report phases.
+  - Execute this rollout in dependency order and preserve progress across restarts.
+  - Break the task into durable nodes and keep exact agent and watcher resources attached.
+  - Resume the existing workflow graph and reconcile what completed overnight.
+  - Show what can run next in the tracked workflow and advance only ready nodes.
+  - The workflow's async job finished; reconcile the graph and continue.
+  - Record this test result as evidence on the verification node.
+  - Attach the spawned terminal to the repair node in the durable plan.
+  - Cancel only the obsolete node in this workflow graph.
+  - The user changed the migration scope; replace the live graph with a replanned one.
+  - Preview the reconcile patch before applying it to the workflow.
+  - Run this ordered issue-to-implementation-to-verification plan across several turns.
+  - Keep a durable record of blockers and the next checkpoint while agents work.
+  - Use workflow intelligence to manage this long-running upgrade.
+  - Plan the dependent phases, launch the agent work, wait asynchronously, and verify at the end.
+  - Reconcile this stale graph against recent failures before doing anything again.
+  - Link the PR and worktree to their exact workflow node.
+  - Continue the wfg workflow from its stored next action, but re-check live state first.
+boundaries:
+  - query: track this multi-phase migration as a workflow with dependencies so we can resume it later
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the search reindex has about nine stages and i keep losing track of which are cleared. keep them and step through
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i want the whole plan kept with what each step is waiting on, and pushed along session to session
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: can we track the dependencies between these pieces properly rather than you re-deriving them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: keep a durable plan for the rewrite with progress on each item and advance it when i come back
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: record the steps, what's blocked on what, and what's done, then move the next one along
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: stop starting from scratch every time. store the graph of work and step through it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i need each stage tracked with its blockers so we can just move to the next one
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: turn the deprecation cleanup into a real tracked workflow with ordering, and keep nudging it on
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: hold all of this — the steps, the blockers, the finished ones — and push it on from there
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: can you keep the plan for each part and advance whichever is unblocked
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: track progress per step and carry it between sessions rather than re-reading everything
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i want the pieces and their order held durably and moved along as they clear
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Track a multi-stage infrastructure migration across several turns.
+    confusable_with: [daintree.worktree.manage-resource]
+followups:
+  - query: run the next one
+    history:
+      - 'user: plan out the mongo to postgres move, the phases depend on each other'
+      - 'assistant: Planned as wfg_4a12 — 9 nodes, 3 ready. First ready node is the schema dump; the data copy waits on it.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: why's that one still sat waiting
+    history:
+      - 'user: what can start now'
+      - 'assistant: Two ready: lint sweep and the shared-lib bump. Four waiting, one blocker open on legal sign-off.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: 'attach the PR to that node, it''s #418'
+    history:
+      - 'user: get the consumer update going'
+      - 'assistant: Spawned an agent on the consumer-update node in t_7712 and recorded the terminal against it.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: if i close this window do i lose all that?
+    history:
+      - 'user: track the v2 deprecation properly, the steps are ordered'
+      - 'assistant: Graph wfg_9d01 stored — 6 nodes, announcement first, handler deletion last behind a 30-day wait.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: the backfill's done, mark it
+    history:
+      - 'user: dual write, then backfill, then flip reads. sequence it.'
+      - 'assistant: wfg_2b7f is live. Dual write is done, backfill is the active node, read flip is waiting on it.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: add a dry run against staging before the cutover
+    history:
+      - 'user: plan the cutover, phases are dependent'
+      - 'assistant: Six nodes planned. Cutover sits behind the verify node; nothing runs until you say go.'
+      - 'user: show me the order again'
+      - 'assistant: schema -> copy -> verify -> cutover -> old-path removal, with the copy and verify gated on each other.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: how many left
+    history:
+      - 'user: keep going on it'
+      - 'assistant: Advanced two nodes. Import rewrite landed, CI node is running now.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: drop the last two phases, we're not doing those anymore
+    history:
+      - 'user: track the whole billing extraction, each bit gates the next'
+      - 'assistant: wfg_51cc — 8 nodes. Three complete, package split active, release cut and announcement still queued.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: no wait, we're doing both regions now. redo it on top of the existing one.
+    history:
+      - 'user: sequence the us-east rollout'
+      - 'assistant: Planned. Flag, deploy, 5%, soak, 50%, 100% — each gated on the previous.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: give me the full view, compact isn't enough
+    history:
+      - 'user: what''s the state of it'
+      - 'assistant: 4 of 11 done, one blocked, next action is to spawn on the client-update node.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: it failed. retry that step rather than replanning the lot.
+    history:
+      - 'user: run whatever''s ready'
+      - 'assistant: Ran the shared-lib publish node. It came back non-zero — reconciled with reason failure, that node is marked failed and the three consumers are still waiting.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: right, park it there. back after lunch.
+    history:
+      - 'user: keep moving through the plan'
+      - 'assistant: Two more nodes complete. The deploy node is waiting on the release build, everything after it is blocked on that.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: Advance the ready node and attach whatever it creates.
+    history:
+      - 'user: Track this migration durably.'
+      - 'assistant: I created graph wfg_alpha and the orient node is ready.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: It just woke us; reconcile the completion before choosing another node.
+    history:
+      - 'user: Continue the workflow.'
+      - 'assistant: The agent terminal is linked and still running asynchronously.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: My answer is the compatibility-first option; apply it to the graph.
+    history:
+      - 'user: Reconcile the plan.'
+      - 'assistant: The backend returned a user question and stored the graph.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: Record the failure, reconcile it, and show whether retry is ready.
+    history:
+      - 'user: Run this workflow.'
+      - 'assistant: The implementation node failed its tool call.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: Force the replan and preserve the superseded graph id in the report.
+    history:
+      - 'user: Change the tracked goal.'
+      - 'assistant: That is a replan rather than a reconcile.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: Cancel the graph only and list the separate cleanup still needed.
+    history:
+      - 'user: Cancel this workflow.'
+      - 'assistant: Graph cancellation will not stop its external resources.'
+    active: [daintree.orchestration.execute-durable-workflow]
+topic_shifts:
+  - query: Okay, stop tracking that plan.
+    history:
+      - 'user: Create a durable workflow graph.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: this is going to take days. set it up as a proper dependency graph so we can pick it up between sessions
+    history:
+      - 'user: where does the tenant id get threaded through'
+      - 'assistant: Three layers: the middleware sets it, the repo layer reads it off context, and about forty call sites pass it explicitly.'
+    active: [daintree.explore.repository, daintree.foundation]
+  - query: before we touch anything else, plan the postgres migration out with the ordering and the dependencies tracked
+    history:
+      - 'user: review the schema branch'
+      - 'assistant: The change is fine in isolation, but it assumes the backfill has already run. That ordering isn''t captured anywhere.'
+    active: [daintree.review.review-change]
+  - query: track this as a durable plan — each phase has to finish before the next one starts and i'll be closing the laptop
+    history:
+      - 'user: start work on #77'
+      - 'assistant: Agent up in wt_4d on issue-77, background watcher attached.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: 'give me a workflow graph for it: extract the client, swap the callers, delete the old package, in that order'
+    history:
+      - 'user: get an agent to pull the http client out into its own package'
+      - 'assistant: Agent launched in the current worktree, working on transport/client.go.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: i want the dependencies modelled properly, not just a list — the deploy step can't start until both backfills report done
+    history:
+      - 'user: put an agent on each of those three tickets'
+      - 'assistant: Three agents launched, one per worktree, all supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: make this resumable. i'll be back tomorrow and i don't want to reconstruct where we got to from memory
+    history:
+      - 'user: what was i doing last night'
+      - 'assistant: Two things: the auth refactor (agent finished, unmerged) and the index migration (nothing started).'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: delegate each step then verify it before the next one kicks off — build that as a tracked plan
+    history:
+      - 'user: did the agent really finish the parser work'
+      - 'assistant: Verified against the diff and the test run. It did.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: reconcile the plan with what actually happened, two of those nodes are done now
+    history:
+      - 'user: how''s everyone doing'
+      - 'assistant: One agent finished, one waiting on a question, one still running.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: there are six ordered steps here and half of them wait on external stuff. i want progress tracked across restarts
+    history:
+      - 'user: clean up the terminals from yesterday'
+      - 'assistant: Six closed, two worktrees removed, ledger tidied.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: let's do this as a durable workflow — the cutover has a rollback branch and i need both paths recorded
+    history:
+      - 'user: is the devbox on the migration worktree running'
+      - 'assistant: Configured and running, last checked a minute ago.'
+    active: [daintree.worktree.manage-resource]
+  - query: plan the whole rename out with dependencies before anything gets touched
+    history:
+      - 'user: what would i have to change to rename the Account model to Tenant'
+      - 'assistant: 61 files, plus two migrations and the public API docs. The API docs can''t change until the deprecation window closes.'
+    active: [daintree.explore.repository]
+  - query: keep a graph of this so if my session dies i can pick up at the right node
+    history:
+      - 'user: prep the branch and open the PR'
+      - 'assistant: PR #620 is up. That''s phase one of four, by the way — the rest of the rollout still isn''t planned.'
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+  - query: attach the worktree and the PR to the right nodes so the plan reflects reality
+    history:
+      - 'user: create a worktree for release/2.1'
+      - 'assistant: Created wt_c40 at ~/trees/release-2-1 on release/2.1 off main.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: this needs a real execution plan with checkpoints, not me remembering the order every morning
+    history:
+      - 'user: remember that the vendor API cutover is scheduled for the 3rd'
+      - 'assistant: Saved.'
+    active: [daintree.memory.manage-project-memory]
+  - query: set up a tracked multi-phase plan for the index rebuild, it spans at least three sittings
+    history:
+      - 'user: why did that check fail'
+      - 'assistant: The query planner regressed after the index change — the test asserts a plan shape that no longer holds.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: can you actually do dependency tracking on something this size or is that not a thing here
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: big one this. we need billing pulled out of the monolith into its own package, every import updated, CI green, then a release cut. each bit gates the next and i'll be in and out all day so it has to survive me closing this thing.
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: Continue the wfg workflow from its stored next action, but re-check live state first.
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: build me a workflow graph for this
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: wfg_31a0, give me the full one — i want the actual edges not the summary
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: we're rotating the signing keys. new key generated, both accepted for a week, clients migrated, old key revoked. i really don't want to lose track of where we are in that.
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: catch me up on the graph and then run whatever's next in it
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: i was mid-rollout when i had to stop. reopen that plan and take the next step.
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: checkpoint this, i'm closing the laptop
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: Preview the reconcile patch before applying it to the workflow.
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: set the plan up first before you touch a single file
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: agents are fine, i don't need a fleet report. i need to know which phase we're actually on and whether the next one can start.
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: plan it out as a dependency graph — i want to see what can actually start now versus what's sat waiting on something
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: i keep losing the thread on this thing. can we track it properly with the dependencies written down instead of me re-deriving the order every morning
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: the schema step failed. put it back to ready and try it again, don't tear the whole plan down and start over
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: Execute this rollout in dependency order and preserve progress across restarts.
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: attach that PR to whichever node it came from, i've lost track of which phase the agent was on
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: the three agents are done. mark those steps complete and tell me what that unblocks.
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: resume the migration from wherever it stopped. and i mean actually push it forward, not just tell me where it is
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+wakes:
+  - query: '[watcher completed: implementation agent exited]'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: '[async completion: linked node settled on wfg_4a1]'
+    history:
+      - 'user: track the migration durably'
+      - 'assistant: Graph wfg_4a1 stored; the backfill node is running with an async handle attached.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: '[wake: watcher on the reindex terminal reports exit 0]'
+    history:
+      - 'user: what''s left on the plan'
+      - 'assistant: One node running — the reindex — and three waiting on it.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: '[timer fired: enqueue reminder — cutover window opens]'
+    history:
+      - 'user: remind me when the cutover window opens'
+      - 'assistant: Reminder queued. It won''t run the graph or wake me on its own.'
+    active: [daintree.orchestration.execute-durable-workflow]
+foundation_boundaries:
+  - track this as a plan i can come back to
+  - make me a workflow graph for the postgres cutover
+  - what can run next on wfg_8812?
+  - reconcile the graph, that node failed
+  - the scope changed — replan the migration graph
+  - I want proper dependencies on this, not a flat list of steps.
+  - set the migration up so it survives me restarting the session
+  - mark prep-schema done on the graph and tell me what that unblocks

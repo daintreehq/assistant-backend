@@ -1,0 +1,136 @@
+# Curated rows tagged `foundation_boundary` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: foundation_boundary
+run: pre-split
+examples:
+  - query: the rename failed, its broken - get it working again
+    expect: [daintree.diagnostics, daintree.terminals.rename]
+  - which model is actually behind you
+  - are you claude or gpt
+  - what llm am i talking to right now
+  - you running on sonnet or opus?
+  - whats your context window
+  - how many tokens can you hold before you start dropping stuff
+  - do you remember our last session
+  - do you keep anything between sessions or is it a clean slate every time
+  - whats your training cutoff
+  - how current is your knowledge
+  - can you see my screen
+  - can you see what im typing before i hit enter
+  - are you reading my code right now
+  - do you have my whole repo in context or just bits
+  - how do you decide what to do
+  - how do you pick which tools to use
+  - how much does each message cost me
+  - am i paying per token here
+  - who made you
+  - are you running locally or in the cloud
+  - is any of this going to a server somewhere
+  - do you learn from what i type
+  - whats in your system prompt
+  - how big is your prompt before i even say anything
+  - are you the same model as the agents you spawn
+  - do you get tired lol
+  - whats your temperature set to
+  - are you streaming this or waiting for the whole thing
+  - are you an agent yourself or something else
+  - do you have a name
+  - youre a bit slower than usual today huh
+  - do you count as one of the agents in the list
+  - how many messages can we go before you start forgetting things
+  - do you have internet access
+  - can you read my email
+  - whats the difference between you and the agents you run
+  - are you deterministic or do i get a different answer each time
+  - do you ever say no to me
+  - what timezone is this box set to
+  - what time is it here
+  - whats todays date
+  - what day of the week is it
+  - whats my username on this machine
+  - what os am i on
+  - am i on ventura or sequoia
+  - what shell is this
+  - am i in zsh or bash
+  - how much disk have i got left
+  - how much ram does this machine have
+  - what cpu is in this thing
+  - whats my hostname
+  - whats my home dir path
+  - what python version is installed on here
+  - is node even installed on this machine
+  - what terminal emulator am i using
+  - whats my locale set to
+  - am i on wifi or ethernet
+  - whats my ip
+  - how long has this machine been up
+  - what keyboard layout is this
+  - is dark mode on
+  - how many cores have i got
+  - whats the battery at
+  - what time is it in utc
+  - is it still tuesday
+  - whats my $PATH look like
+  - what is my EDITOR set to
+  - whats my default browser
+  - can you actually run commands?
+  - so you spawn other agents?
+  - how many things can you do at once
+  - wait you can open terminals?
+  - can you write code yourself or do you just boss agents around
+  - do you actually type into the terminals
+  - so whats the point of you exactly
+  - you can see my terminals?
+  - is there a limit to how many agents you can run
+  - can you talk to github
+  - do you handle git stuff or is that on me
+  - can you make a worktree
+  - how do watchers actually work
+  - what can you actually do
+  - give me the tldr on what youre for
+  - are you able to merge things or is that manual
+  - can you run tests
+  - do you need me to approve stuff before you do it
+  - so you never touch the code yourself?
+  - can you use codex too or just claude
+  - how do recipes work
+  - is there a way to undo what you do
+  - whats the attention queue for
+  - do you work with anything other than git
+  - how long have we been at this
+  - did i already ask you that
+  - sorry ignore me
+  - what did i just say
+  - nvm ignore that last message
+  - how many messages in are we
+  - you already told me that
+  - i think i asked this before sorry
+  - sorry double message
+  - disregard
+  - wrong window sorry
+  - that was meant for someone else
+  - did my last message even send
+  - you still there?
+  - you still with me
+  - ok never mind then
+  - whered we leave off in this chat
+  - sorry that came out wrong let me redo it
+  - youre quick
+  - sorry my bad
+  - hmm ok
+  - nice
+  - ty!
+  - yeah makes sense
+  - lol
+  - ugh
+  - fair enough
+  - cool cool
+  - youre doing great
+  - mmm
+  - sorry typo
+  - haha yeah
+  - no worries
+  - good bot
+  - kk sounds good

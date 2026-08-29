@@ -1,0 +1,220 @@
+# Curated rows tagged `off_domain` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: off_domain
+run: pre-split
+empty_kind: off_domain
+examples:
+  - what is a git worktree actually
+  - how do worktrees work under the hood in git
+  - whats the difference between a worktree and just cloning twice
+  - what does CI actually stand for
+  - difference between ci and cd, people use them interchangeably
+  - whats the difference between rebase and merge
+  - is rebasing public branches actually considered harmful or is that dogma
+  - explain cherry-pick vs revert
+  - should i squash commits before merging
+  - conventional commits — worth it?
+  - what does detached HEAD even mean
+  - how does git bisect work
+  - what is git reflog for
+  - explain what a fast forward merge is
+  - trunk based development vs git flow, thoughts?
+  - whats a monorepo
+  - are git submodules a bad idea in general
+  - what does git stash pop actually do
+  - how does git store objects internally
+  - why do people say force push is dangerous
+  - explain three way merge
+  - branch naming conventions — is there a standard?
+  - what is a merge conflict marker exactly, the <<<<<< stuff
+  - is 100% test coverage a good goal
+  - what makes a test flaky in general
+  - explain what a race condition is
+  - whats the difference between a unit test and an integration test
+  - what is mutation testing
+  - why do people hate mocks so much
+  - what is a smoke test supposed to cover
+  - test pyramid vs testing trophy, whats the argument
+  - what is a canary deploy
+  - blue green deploy explained simply
+  - what does idempotent mean
+  - deadlock vs livelock difference
+  - explain eventual consistency
+  - how does terminal echo work
+  - what is a pty exactly
+  - what does SIGTERM do
+  - difference between sigterm and sigkill
+  - what is a zombie process
+  - what does exit code 137 mean generally
+  - how do ansi escape codes work
+  - what is tmux actually doing under the hood
+  - explain stdin stdout stderr
+  - whats the difference between a process and a thread
+  - what is a daemon process
+  - how does ctrl-c actually kill a program
+  - what does 2>&1 mean
+  - what is a file descriptor
+  - explain unix pipes to me like im new
+  - why is exit status 0 success and not 1, seems backwards
+  - what is job control in a shell, like bg and fg
+  - how do LLM agents work in general
+  - what is RAG
+  - whats a context window
+  - explain what temperature does in an llm
+  - what does top_p actually do
+  - what is a vector database for
+  - how do embeddings work
+  - what does mcp stand for
+  - how does tool calling work in llms generally
+  - what is prompt caching and why does it save money
+  - are ai coding agents actually any good yet
+  - whats the difference between an agent and a chatbot
+  - explain chain of thought prompting
+  - what is a token in llm terms
+  - why do models hallucinate
+  - fine tuning vs rag, when do you pick which
+  - what is a system prompt vs a user prompt
+  - what makes a good code review
+  - how long should a PR be, ideally
+  - what is a draft PR for
+  - should reviewers be allowed to approve their own teams prs
+  - what is pair programming supposed to achieve
+  - explain the codeowners concept
+  - what is technical debt really
+  - what does shift left mean
+  - what is semantic versioning
+  - what does LGTM mean
+  - whats rubber duck debugging
+  - what makes a good bug report
+  - what does done mean in agile, is there a real definition
+  - what is a watchdog timer
+  - what is polling vs long polling
+  - webhooks vs polling, which is better
+  - what does fan out mean in distributed systems
+  - what is backpressure
+  - explain consensus in distributed systems
+  - what is a quorum
+  - how does leader election work
+  - what is a heartbeat in a distributed system
+  - queue vs stack, whats the actual difference
+  - what is amdahls law
+  - does adding more parallel workers always make things faster
+  - how do you onboard onto a new codebase efficiently
+  - what is a call graph
+  - what is infrastructure as code
+  - whats a kanban wip limit for
+  - what is a debate format in general, like oxford style
+  - how does ranked choice voting work
+  - whats the wisdom of crowds thing about
+  - what does dogfooding mean
+  - is code review actually effective at finding bugs, is there research
+  - what is a feature flag
+  - whats the difference between a fork and a branch
+  - what is a git hook
+  - why does everyone use main instead of master now
+  - what is a lockfile for and should i commit it
+  - explain what a linter actually checks vs a formatter
+  - what is static typing buying me really
+  - whats a build cache
+  - what does hermetic build mean
+  - what is a bus factor
+  - whats the weather
+  - is it gonna rain today
+  - what time is it in tokyo
+  - what time is it in SF right now
+  - how many days until christmas
+  - what day of the week is jan 1 2027
+  - is australia ahead or behind utc
+  - how many hours ahead is london from new york
+  - capital of australia
+  - how far is the moon
+  - who wrote dune
+  - whats the tallest mountain in africa
+  - how many countries are in the eu
+  - why is the sky blue
+  - who invented the transistor
+  - what year did the berlin wall come down
+  - whats 15% of 4300
+  - convert 2.5h to minutes
+  - how many bytes in 3.2 gb
+  - whats 1024*768
+  - convert 180 lbs to kg
+  - 72f in celsius
+  - whats the square root of 4096
+  - if something takes 45 min how long for 17 of them
+  - how many seconds in a fortnight
+  - whats 2^32 again
+  - how does a bloom filter work
+  - when should i use a b-tree
+  - whats the difference between a mutex and a semaphore
+  - whats a monad
+  - explain CAP theorem
+  - difference between tcp and udp
+  - explain big o notation quickly
+  - what is tail call optimisation
+  - how does https actually work
+  - whats the difference between authn and authz
+  - what is a race condition exactly
+  - whats the difference between the stack and the heap
+  - how do hash maps handle collisions
+  - what does ACID stand for
+  - explain dependency injection like im five
+  - whats the difference between a left join and an inner join
+  - when is quicksort worse than mergesort
+  - what is backpressure in streaming
+  - why is utf-8 variable width
+  - whats the difference between a compiler and an interpreter
+  - what does the GIL actually do
+  - explain how garbage collection works
+  - what is a deadlock and how do you avoid one
+  - whats the point of a write ahead log
+  - sql vs nosql in one paragraph
+  - how does dns resolution work step by step
+  - whats a red black tree actually for
+  - memoization vs caching, whats the difference
+  - what does zero copy mean
+  - concurrency vs parallelism explain
+  - how does token bucket rate limiting work
+  - what is cors and why does it exist
+  - explain the actor model
+  - whats an LRU cache
+  - difference between git rebase and merge conceptually
+  - what does git reset --soft actually do
+  - whats a monorepo and why do people like them
+  - what does a language server actually do
+  - whats the difference between a mock and a stub
+  - why is floating point maths weird
+  - what does fungible mean
+  - where does the term bikeshedding come from
+  - whats a straw man argument
+  - what does yak shaving actually mean
+  - how do you say thanks in japanese
+  - spell accommodate
+  - is it affect or effect here
+  - whats the plural of octopus
+  - definately or definitely
+  - is it ie or eg when i mean for example
+  - tell me a joke
+  - what should i have for lunch
+  - motivate me
+  - how do i stop procrastinating
+  - im knackered, any tips for staying focused
+  - recommend me a podcast
+  - give me a random fun fact
+  - any tips for sleeping better
+  - is rust worth learning
+  - vim or emacs
+  - should i learn go or rust next
+  - is a standing desk actually worth it
+  - tabs or spaces, settle it
+  - is typescript worth it on small projects
+  - whats the best mechanical keyboard switch
+  - mac or linux for dev work
+  - is it worth learning kubernetes at this point
+  - who won the cricket last night
+  - any good films out at the moment
+  - whats the score in the arsenal game
+  - when is the next f1 race
+  - is the new dune film any good

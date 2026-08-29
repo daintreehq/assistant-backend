@@ -1,0 +1,504 @@
+# Training examples whose answer is `daintree.diagnostics` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.diagnostics
+run: pre-split
+positives:
+  - nothing's responding
+  - the mcp says disconnected, whats going on
+  - none of the terminal tools are doing anything anymore — did daintree drop the connection or is it something on my end?
+  - i asked you to open a terminal two turns ago and literally nothing happened. why?
+  - daintree looks dead. figure out why
+  - why cant you close that tab? is the capability just gone
+  - you keep telling me you can't do that — is the tool actually missing or are you just not finding the right name for it
+  - which daintree tools are actually callable this turn
+  - there's no watcher tool showing up. explain
+  - is my key working
+  - am i actually signed in?
+  - before i fire off five agents — confirm my api key is set up properly, i don't want to find out halfway through that none of this was ever going to work
+  - will this burn credit if im not signed in
+  - check my sign in pls
+  - i keep getting auth errors. is the key rejected, out of credit, or is the provider just unreachable?
+  - give me something i can paste into a bug report
+  - collect diagnostics, im filing an issue with the daintree folks about this
+  - dump whatever state info is safe to share — endpoint, transport, tool count, the error text. going into a github issue
+  - renaming the tabs did nothing at all. sort it out
+  - it's broken, get it working again
+  - worktree creation keeps failing and i have no idea why
+  - why can't I get any of the git tools to fire
+  - same thing again — nothing happened. work out why
+  - do that diagnostic for the key as well
+  - everything i try just silently does nothing. is daintree itself busted?
+  - i've asked you to open two terminals and neither showed up. no error, nothing. what's going on
+  - daintree dead?
+  - nothin is workign since i reconected the vpn, is the mcp link down or somethign
+  - before i kick off the overnight batch — is my key actually live? i don't want six agents burning against a dead key
+  - turns keep dying halfway. is that my key being rejected or have i just run out of credit
+  - Could you do a quick health check on Daintree before we get into anything? Want to make sure the link is up.
+  - you said you couldn't close that tab. why — is the tool actually missing or did you just not have it this turn
+  - i'm writing this up as an issue. give me the connection details, tool count and the exact error text to paste in. obviously no key
+  - just print the key so i can check it matches the one in my env file
+  - you renamed the tabs last turn and the titles are still the old ones. it didn't take. sort it out
+  - context snapshot showed four worktrees an hour ago and now it shows none. i didn't delete anything
+  - can't read any terminal, can't focus any terminal, can't list them either. it's not one agent, it's everything
+  - i asked you to check the PR status and you said the tool errored. that's the third forge thing that's failed. is the link ok
+  - am i signed in? and don't just tell me the mcp says connected, that's not the same thing
+  - ok so i asked for a worktree, then i asked twice more, and there's still nothing in the list, and now i'm not sure if it's the app or you're just not doing it. can you actually tell which
+  - did terminal.newTab get removed? i swear that was a thing last week and now you say you can't do it
+  - i set a watcher on that build like 40 minutes ago and never got woken. did it even arm properly
+  - that just errored out — your side or mine?
+  - why does it say only 3 tools available. there should be way more than that
+  - if the link is down, what can you still do? can you still answer questions or is everything dead
+  - is there no way to pin a terminal or is the tool just not being offered
+  - i changed the endpoint to localhost:8473 earlier and now everything times out. check what it's actually pointed at
+  - you keep telling me you can't do things. is that real or are you guessing. go look
+  - app crashed and i reopened it. is it properly back or is it half connected
+  - i told you to delete that worktree and it's still sitting there. did the call actually go through
+  - everything just stopped. why
+  - quick sanity check on the setup before i leave this running all night — link, tools, key. all of it
+boundaries:
+  - query: i tried to file something and nothing happened at all, the forge tools aren't even showing up
+    confusable_with: [daintree.forge.manage-issue]
+  - query: the workflow tools aren't showing up in this session at all, is daintree broken
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the preview panel won't open at all and half the tools are missing, i think the mcp dropped
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: daintree is eating 4gb of ram, whats going on
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: the app has been pegging my cpu since the update
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: why is daintree so slow today, is something stuck
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: my fans are going mental, is that daintree or the agents i left running
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: nothing responds at all and the mcp looks disconnected
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: the dev preview isn't showing up in the terminal list at all and half the tools are missing. is the MCP down?
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: i clicked open preview and nothing happened. is daintree even connected?
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: why can't you read the console, is that tool not being offered this turn?
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: show me the recent daintree errors, something's been off since the update
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: nothing is responding. terminals, worktrees, none of it. what's going on with daintree itself?
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: I need diagnostics to paste into a bug report. Daintree keeps dropping the preview panel and I want to show them exactly what I am seeing.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: did my last few actions actually register? check the notification log.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: am i signed in properly? things have been failing all morning and i want that ruled out first.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: The Daintree issue tool itself is returning an error; diagnose the integration.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Daintree says its forge MCP is disconnected; work out why.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: The Daintree application is using too much CPU; diagnose Daintree itself.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Why did Daintree fail to create my worktree? Diagnose the control plane.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Daintree's MCP connection is broken and no tools respond.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Why is the Daintree MCP disconnected?
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Why is Daintree itself disconnected and not opening panels?
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the mcp is disconnected, why
+    confusable_with: [daintree.foundation]
+  - query: i tried to close that terminal and nothing happened
+    confusable_with: [daintree.foundation]
+  - query: terminal.read keeps coming back empty, somethings up
+    confusable_with: [daintree.foundation]
+  - query: nothing is responding at all, the mcp shows disconnected
+    confusable_with: [daintree.agents.recover-agent]
+  - query: i asked you to spawn something and there doesn't seem to be a tool for it — is daintree even connected properly?
+    confusable_with: [daintree.agents.recover-agent]
+  - query: fs.search returns nothing no matter what i put in, is something broken
+    confusable_with: [daintree.explore.repository]
+  - query: explore agents wont spawn for me anymore, whats up with daintree
+    confusable_with: [daintree.explore.repository]
+  - query: nothing's running, the mcp link looks dead — none of my tool calls are going through
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: i asked you to run the tests and literally nothing happened, no terminal, no output
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: why can't you read CI on that PR, is forge.getChecks even offered to you?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: why does recipe.list come back empty, is the mcp even connected
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: the recipe tool isn't being offered to you at all, whats going on
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: the worktree create call failed and nothing responded after that — is daintree even connected?
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: copyTree.generate isnt showing up in the tool list, why
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: i asked for it on my clipboard and theres nothing there, clipboard is empty
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: the mcp link is dead, nothing is responding at all
+    confusable_with: [daintree.foundation]
+  - query: is my key actually working or am i about to burn credit on a dead sign-in
+    confusable_with: [daintree.foundation]
+  - query: watcher.list just errors every time i ask, why cant i see my watchers
+    confusable_with: [daintree.foundation]
+  - query: forge.getChecks isnt being offered this turn, why not
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: i asked you to run the tests and literally nothing happened. is the mcp link down?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: daintree cant see any terminals and everything i try errors out
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: you never remember anything between sessions, is something broken with daintree
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: memory save came back with nothing, is the mcp link down?
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: the watchers aren't firing at all. how do watchers even work, and why is nothing waking up
+    confusable_with: [daintree.explore.repository]
+  - query: explain why my worktree list comes back empty when i definitely made two of them
+    confusable_with: [daintree.explore.repository]
+  - query: nothing responds at all this session, no tools are showing up and the mcp link looks dead
+    confusable_with: [daintree.agents.recover-agent]
+  - query: why is terminal.read not even being offered this turn
+    confusable_with: [daintree.agents.recover-agent]
+  - query: is my key actually working or is this all just going to fail silently
+    confusable_with: [daintree.agents.recover-agent]
+  - query: everything i try just errors out, whats broken
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: terminal.rename isnt showing up in my tools, whats going on
+    confusable_with: [daintree.terminals.rename]
+  - query: renaming does nothing at all, titles never change, is the mcp even connected
+    confusable_with: [daintree.terminals.rename]
+followups:
+  - query: and the key thing too?
+    history:
+      - 'user: nothing''s responding, none of the terminal stuff works'
+      - 'assistant: Reading the Daintree status now — the MCP link reports disconnected, endpoint https://daintree.local/mcp, transport stdio, 0 tools. That single fault explains every missing capability. Reconnect step: restart the Daintree app so the link re-establishes.'
+    active: [daintree.diagnostics]
+  - query: still nothing
+    history:
+      - 'user: i did the reconnect you said'
+      - 'assistant: Good — re-reading status to confirm the link came back.'
+    active: [daintree.diagnostics]
+  - query: how much credit is left on it
+    history:
+      - 'user: am i actually signed in? don''t want to waste credit'
+      - 'assistant: Worth being precise here — daintree.status reports the MCP link only, which is a different connection from the model provider. Checking the sign-in path the documentation describes.'
+    active: [daintree.diagnostics]
+  - query: so what can you actually do right now
+    history:
+      - 'user: why cant you rename that tab'
+      - 'assistant: terminal.rename exists in the tool list but is marked callable: false this turn, so it was not offered to me. That is why the rename silently did nothing rather than erroring.'
+    active: [daintree.diagnostics]
+  - query: include the exact error text as well
+    history:
+      - 'user: give me something i can paste into a bug report'
+      - 'assistant: Here is the safe set — status: connected false, endpoint …, transport …, tool count 0; workspace snapshot: 3 terminals, 1 worktree.'
+    active: [daintree.diagnostics]
+  - query: any luck?
+    history:
+      - 'user: the worktree tools arent showing up at all'
+      - 'assistant: Checking whether they exist but were not offered, or are genuinely absent.'
+    active: [daintree.diagnostics]
+  - query: ok. same check on the other machine
+    history:
+      - 'user: everything went quiet after i restarted the app'
+      - 'assistant: Status reports the link is back up with 41 tools callable, so the control plane is healthy again. The quiet period lines up with the restart window.'
+    active: [daintree.diagnostics]
+  - query: wait, could it just be out of credit instead?
+    history:
+      - 'user: is my key working or not'
+      - 'assistant: The MCP link is healthy, which tells us nothing about the provider key — those are separate connections. A connected MCP with a dead key looks perfectly fine in status.'
+      - 'user: right, so how do i check'
+      - 'assistant: Pointing you at the sign-in check from the documentation rather than inferring one from a failed turn.'
+    active: [daintree.diagnostics]
+topic_shifts:
+  - query: hang on, none of the mcp tools are showing up at all now, somethings broken
+    history:
+      - 'user: my agent is stuck, did it even start'
+      - 'assistant: The spawn saga shows it never got a terminalId — the launch failed silently. Re-launched, it is alive now.'
+    active: [daintree.agents.recover-agent]
+  - query: is my key actually working? i dont want to burn credit on a bad sign in
+    history:
+      - 'user: clean up everything from the fan out'
+      - 'assistant: Done — 4 terminals closed, 4 worktrees removed, 4 ledger rows marked done.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: hmm the tool list is missing terminal.sendCommand entirely, whats going on with daintree
+    history:
+      - 'user: get an agent to refactor the config loader'
+      - 'assistant: Launched into the current worktree — it is editing config.py now.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: forget all that, is the mcp server even connected? half my requests are doing nothing
+    history:
+      - 'user: get three agents debating whether to adopt the new framework'
+      - 'assistant: Debate ran three rounds; positions are clear and unchanged.'
+      - 'user: vote one off'
+      - 'assistant: claude-1''s position was eliminated 2-1.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: is it definitely stable now? check again
+    history:
+      - 'user: nothing is responding'
+      - 'assistant: MCP link had dropped. Reconnected.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: hold on, nothing is responding at all now. is the mcp link even up?
+    history:
+      - 'user: split the refactor into three chunks and put an agent on each'
+      - 'assistant: Three agents running on disjoint file sets.'
+      - 'user: any conflicts?'
+      - 'assistant: No overlap - the file scopes are disjoint by construction.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: hang on, the worktree tool isnt being offered anymore and half my commands do nothing. whats wrong with daintree?
+    history:
+      - 'user: start work on the login bug ticket'
+      - 'assistant: Agent is on it in its own worktree.'
+      - 'user: ok'
+      - 'assistant: Still working - it has reproduced the bug and is writing the fix.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: ugh. nothing is responding now, no tools are firing at all - is daintree connected?
+    history:
+      - 'user: i dont trust that result, check it'
+      - 'assistant: You were right to check - the tail contradicts it. Two files it claimed to touch are untouched.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: different question - is my key actually working? i dont want to burn credit if im not signed in
+    history:
+      - 'user: the spawn failed and nothing happened'
+      - 'assistant: The saga shows the launch aborted before the terminal existed. Relaunched cleanly, running now.'
+    active: [daintree.agents.recover-agent]
+  - query: while i do that — what actually runs the mcp server, is it local?
+    history:
+      - 'user: nothing is responding, the mcp looks dead'
+      - 'assistant: daintree.status says the link is down. Reconnect from the status bar and I''ll re-check.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: what does the dot colour in the status bar mean exactly?
+    history:
+      - 'user: why cant i see the worktree tools'
+      - 'assistant: The MCP link dropped after the reload, so nothing under worktree.* is offered. Reconnect and I''ll re-check.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: the mcp looks dead — sort it out, and explain what actually hosts it
+    history:
+      - 'user: nothing works'
+      - 'assistant: Let me check the link.'
+  - query: hang on nothings coming back from you now, is daintree ok?
+    history:
+      - 'user: in that worktree — how does the current caching layer work'
+      - 'assistant: Two-tier: in-process LRU fronting a shared store, TTLs from cache.Config.'
+      - 'user: is any of it redis backed'
+      - 'assistant: Yes — remote.go dials Redis through go-redis; the LRU is purely local and never persists.'
+    active: [daintree.explore.repository]
+  - the fs tools arent showing up for you, whats going on
+  - query: ok its back now — was that my config or theirs?
+    history:
+      - 'user: the fs tools arent showing up for you, whats going on'
+      - 'assistant: The filesystem MCP server is disconnected — it isn''t in this turn''s tool list at all, which is why nothing filesystem-shaped is offered. Reconnecting it from the integrations panel is the one step.'
+    active: [daintree.diagnostics]
+  - query: is my key actually working? dont want to find that out after burning credit
+    history:
+      - 'user: so how do i run just one test suite in this repo, dig it out for me'
+      - 'assistant: `make test PKG=./internal/billing/...`.'
+      - 'user: save that command, ill want it again'
+      - 'assistant: Saved to project memory.'
+    active: [daintree.memory.manage-project-memory]
+  - query: hang on, daintree's gone weird - none of my terminals are showing at all. is it broken?
+    history:
+      - 'user: get them to pick the best one, blind, and score it'
+      - 'assistant: Ballots out with authorship stripped.'
+      - 'user: one of them voted for its own, discount that'
+      - 'assistant: Tab 5''s self-vote dropped. Re-tallying.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: hang on is the mcp even connected? none of the terminal tools seem to be there
+    history:
+      - 'user: i want three agents on the same perf problem, cross checking each other, and one answer at the end'
+      - 'assistant: I tried to open the three terminals and the spawn calls aren''t going through — no terminal tools are being offered this turn.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - query: nothing happened when you tried to post that
+    history:
+      - 'user: and where''s the config for it'
+      - 'assistant: config.go, the RateLimit block, RATE_LIMIT_* env overrides.'
+      - 'user: right, so the PR duplicates that. comment on it explaining why and close it politely'
+      - 'assistant: The comment failed to post — the forge call came back with no result.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: is my key even live? don't want to be burning credit for nothing
+    history:
+      - 'user: comment on it explaining why and close it politely'
+      - 'assistant: The comment failed to post, the call came back with no result.'
+      - 'user: nothing happened when you tried to post that'
+      - 'assistant: The MCP link to Daintree is down, so no forge tool was offered this turn. Reconnect from the status bar and it''ll come back.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: hmm none of the terminal tools are doing anything at all. is daintree even connected
+    history:
+      - 'user: make a worktree and open a claude in it'
+      - 'assistant: Launch returned without a terminalId.'
+      - 'user: nothing happened? i dont see a new tab'
+      - 'assistant: No process, no terminal - the spawn never happened. The worktree does exist.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: hold on, nothing at all is responding now. is daintree itself broken
+    history:
+      - 'user: 5 agents going and 2 of them just stopped dead'
+      - 'assistant: No output for 18 minutes on both.'
+      - 'user: the terminal ids i wrote down dont resolve anymore either'
+      - 'assistant: Those ids are stale — I''ll re-resolve from the live roster rather than trusting the old ones.'
+    active: [daintree.foundation, daintree.agents.recover-agent]
+  - nothing is responding — the MCP link looks dead
+  - query: daintree's gone unresponsive, nothing i click does anything
+    active: [daintree.foundation]
+  - the mcp shows disconnected — what do i do about it
+  - query: why is the worktree tool not being offered this turn? it was there before
+    active: [daintree.foundation]
+  - am i actually signed in? i don't want to burn credit on a dead key
+  - query: i asked you to close a tab and nothing happened, twice now
+    active: [daintree.foundation]
+  - fleet stuff aside — my key. is my openrouter key actually working, or am i about to burn a turn for nothing?
+  - query: why can't i use any of the tools right now?
+    history:
+      - 'user: mcp: connection refused (https://daintree.org/api/mcp)
+
+        Please restart your terminal and try again.'
+  - am I signed in properly, and will this burn credit if I'm not?
+  - query: the watcher fired but nothing looks any different - is the watcher itself broken?
+    history:
+      - 'user: watch tab 5 and wake me if it stalls'
+      - 'assistant: Stall watcher armed on tab 5.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: nothing's responding in daintree at all now, no tools are showing up
+    history:
+      - 'user: merge 555'
+      - 'assistant: Merged with a squash and confirmed on re-read.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]
+  - query: the daintree link seems down, half the tools have vanished from this turn
+    history:
+      - 'user: reconcile the graph'
+      - 'assistant: workflow.reconcile isn''t in the offered tools this turn.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: nothing is responding in daintree, no tools at all this turn
+    history:
+      - 'user: check the resource status'
+      - 'assistant: The call didn''t come back — the MCP link looks down.'
+    active: [daintree.worktree.manage-resource]
+  - query: i'm writing this up as an issue. give me the connection details, tool count and the exact error text to paste in. obviously no key
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: why can't I get any of the git tools to fire
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: context snapshot showed four worktrees an hour ago and now it shows none. i didn't delete anything
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: is my key working
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: nothing's responding
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: will this burn credit if im not signed in
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: before i kick off the overnight batch — is my key actually live? i don't want six agents burning against a dead key
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: you renamed the tabs last turn and the titles are still the old ones. it didn't take. sort it out
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+wakes:
+  - query: '[watcher fired: MCP link back up]'
+    history:
+      - 'user: nothing is responding, whats wrong'
+      - 'assistant: The MCP link is down. Told you the one step to fix it and armed a watch so I can confirm the moment it reconnects.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: '[async wait returned: auth probe finished — 401]'
+    history:
+      - 'user: is my key actually working'
+      - 'assistant: Running a minimal signed check so I can tell you for certain rather than guess. Waiting on it.'
+    active: [daintree.diagnostics, daintree.foundation]
+near_misses:
+  - nothing is responding, is the mcp link dead?
+  - why is nothing responding
+docs:
+  - query: i shared a terminal and nothing showed up on the other machine
+    docs: true
+  - query: why isnt the copytree tool showing up this turn
+    docs: true
+  - query: the mcp says disconnected, what now
+    docs: true
+  - query: is my key actually working or am i about to burn credit for nothing
+    docs: true
+  - query: i clicked approve and nothing happened
+    docs: true
+  - query: watchers are supposed to wake you up right? mine never fired
+    docs: true
+  - query: auto approve is on but it still asks me every single time
+    docs: true
+  - query: docs say i can retitle a tab from the palette, i dont see that option
+    docs: true
+  - query: set a timer for an hour and it never went off
+    docs: true
+  - query: my agents arent showing in the attention queue even though two are waiting
+    docs: true
+  - query: github enterprise is supposed to work but auth keeps bouncing me
+    docs: true
+  - query: give me whatever diagnostics i need to file a bug about this
+    docs: true
+  - query: it says connected but no tools are offered, is that normal
+    docs: true
+  - everything is frozen, nothing responds at all
+  - query: half my worktrees vanished from the list after a restart
+    docs: true
+  - the mcp link is dead, nothing responds
+  - why cant i see the worktree tool this turn
+  - is my key actually working, will this burn credit if its not
+  - query: it says connected but no tools are offered, is that normal
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+    docs: true
+  - query: watchers are supposed to wake you up right? mine never fired
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+    docs: true
+  - query: why isnt the copytree tool showing up this turn in this app
+    docs: true
+  - query: quick q — my agents arent showing in the attention queue even though two are waiting
+    docs: true
+  - query: actually wait — the mcp says disconnected, what now
+    docs: true
+  - query: hang on, before you push — watchers are supposed to wake you up right? mine never fired
+    docs: true
+  - query: why cant i see the worktree tool this turn
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: is my key actually working, will this burn credit if its not
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: the mcp link is dead, nothing responds
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: sorry, unrelated — the mcp link is dead, nothing responds
+    history:
+      - 'user: put an agent on each of the six open tickets'
+      - 'assistant: All six launched with background supervisors.'
+foundation_boundaries:
+  - daintree isnt responding
+  - the mcp link is dead, whats going on
+  - why cant i see any of my tools
+  - i did that and nothing happened, whats wrong
+  - am i actually signed in? i dont want to burn credit
+  - the tool i need isnt showing up in the list
+  - nothing is responding, none of my commands do anything
+  - i cant sign in, whats wrong
+  - nothing's responding and the mcp link looks dead — why
+  - is my key actually working? i don't want to burn credit on a bad sign-in
+  - i asked for a worktree and nothing happened, what's broken
+  - why isn't the rename tool being offered this turn
+  - grab me diagnostics i can paste into a bug report
+  - the tab renaming is broken, get it working again
+  - nothing is responding, the mcp looks dead
+  - will this burn credit if my key isnt working

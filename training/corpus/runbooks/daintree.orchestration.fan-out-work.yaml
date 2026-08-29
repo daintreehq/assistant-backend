@@ -1,0 +1,611 @@
+# Training examples whose answer is `daintree.orchestration.fan-out-work` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.fan-out-work
+run: pre-split
+positives:
+  - put an agent on each of these five issues
+  - take the top 6 open issues and fan them out, one agent per ticket
+  - we've got like eight bugs sitting in the backlog and I'd rather they were all being worked at once instead of me babysitting them one at a time — can you get an agent going on every one of them and just tell me when things land
+  - can you parallelise this across worktrees?
+  - for each of those worktrees open a claude code terminal and run /work with whatever issue number it's sitting on
+  - knock out the backlog
+  - split this refactor into chunks that don't overlap and give each chunk its own agent
+  - fan out
+  - spawn one agent per worktree
+  - batch these — 412, 418 and 421, agent each
+  - do the same for the other three tickets
+  - can we run all of these at the same time or do some of them touch the same files?
+  - assign an agent to each of the unassigned open issues plz
+  - theres 4 wortkrees sitting there doing nothing, put agents in them
+  - break the auth migration into independent pieces and hand each piece to its own agent
+  - how many agents can you actually run at once? i want to throw the whole milestone at them
+  - rocket fuel — max parallel batch across the studios
+  - one terminal per issue, go
+  - open a coding agent in every worktree that has an issue number on it
+  - i've got three unrelated features to land this week, get an agent started on each one in its own branch
+  - distribute these across agents and make sure none of them are editing the same files
+  - kick off the whole batch and inject the relevant context into each terminal
+  - same deal for issues 30 through 35
+  - farm these out to seperate agents in seperate worktrees
+  - split it up between a few agents
+  - morning. we triaged 5 bugs friday — 231 234 236 240 241. can you get one going on each of them now, separate worktrees, before standup
+  - im doing these one at a time like an idiot. just spread them out, an agent per ticket
+  - agent per issue on the whole milestone pls
+  - spin up agnets fot 12 14 and 19 pls, own worktre each
+  - yeah those. one each.
+  - there are like six worktrees sitting there each on its own ticket. drop a claude into every one and tell it to start on whatever issue that worktree is for
+  - i want the logging rewrite done today. carve it up by package and put a separate agent on each package
+  - so the migration touches api, workers and the cron stuff. those bits dont really overlap as far as i can tell. can we do all three at the same time with different agents instead of me babysitting one
+  - how many can this box realistically run? if it's four, take the top four unassigned bugs and start them
+  - start the batch — i think it was 118 through 122? whatever the open ones in the perf milestone are. one agent per
+  - that batch only half worked, 2 of the 6 got terminals and the rest didn't. launch the missing four
+  - three agents are already going. i've got two more tickets, 88 and 91 — put someone on each of those too
+  - the four of them are all free now. split the doc rewrite between them — chapter each, nobody touches anyone else's file
+  - no contest, i don't want them racing. just give each one a different ticket and let them get on with it
+  - four suites are red and they're unrelated to each other. one agent per suite, own worktree, go
+  - right, they agreed. now stop asking them things and actually hand out the work — a piece each
+  - 'before i start: if i wanted issues 501 502 and 505 running in parallel, would they collide? if not set them going'
+  - knock out the whole chores label tonight, agent each, i'm going to bed
+  - branch off main three times — parser, formatter, cli — and put an agent on each with a clear scope
+  - customers are blocked. take the three P0s and start all of them at once, right now
+  - parallelise these
+  - when you have a moment, could you set up one agent per open issue in the docs milestone? no rush.
+  - hmm. six tickets, one machine. i guess do four now and hold two? whatever you think — just get them running
+  - fan these out
+  - these three all touch schema.sql though. can you still run them in parallel or does one have to own it
+  - start agents on 77 88 and 99, and make sure each one gets the relevant context injected for its area
+  - create a worktree with the dev recipe for each of those tickets and put an agent in it
+  - i want 5 agents working right now, pick the 5 most independent open bugs and go
+boundaries:
+  - query: take these six issues and put an agent on each one
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: spawn a claude in every one of those worktrees and run /work with the issue number
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i want the whole backlog worked in parallel, one agent per ticket
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: start a coding agent on each of the open bugs, separate branches
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: fan this out, an agent per module, they're independent
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: put a fresh agent on each of the four worktrees you just made
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: No terminals are running yet; split auth, billing, search, and mail across fresh worktrees and spawn one coding agent in each.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: For the next sprint batch, create six branch folders and launch a new agent per ticket so they can work in parallel.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Those five worktrees are empty. Open a fresh Claude Code session in every one and assign each its matching issue.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Start from scratch with one new checkout and one new coding agent for each of these three independent modules.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Parallelise the eight cleanup tasks across worktrees, spawning a separate agent for every task.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Launch six new coding sessions on six isolated branches; there are no existing agents to preserve.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: I made four empty branch directories already; populate each one with a new agent and give them disjoint file scopes.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Take tickets 301 through 306 and start a new agent in its own worktree for each ticket.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Put a fresh coding agent on each failing package, using separate checkouts because the fixes are independent.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Spin up one new Claude per service and let all seven services be upgraded at once in their own trees.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: None of the workers exists yet; create a cohort across worktrees for the parser, renderer, cache, and CLI tasks.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Work this queue of five migrations in parallel, with a newly spawned terminal and branch folder for each migration.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Create three isolated worktrees and start a new agent in each to implement its assigned compatibility fix.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Break the goal into four independent file areas, then spin up one coding agent per branch to handle them.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: We have no sessions open, so make five worktrees and launch the five agents directly into those directories.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: In every existing issue worktree, open a new terminal and run the issue workflow with that tree's ticket number.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: 'Knock out the unopened backlog concurrently: a fresh agent and separate branch for each selected issue.'
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Assign docs, tests, API, and migration to four newly created agents working in four checkouts.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: There are zero agents right now; fan these nine independent chores out to nine new worktree sessions.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Spawn a new worker per package and keep each worker in the package task's own branch directory.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Open a fresh Codex terminal in each of the six issue worktrees and let them process the batch together.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Provision a new cohort, one agent per worktree, for the four independent security findings.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Copy this task brief into five new agents and start each one on a different isolated subtask.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Schedule the eight maintenance jobs at once by spawning eight agents, each in a newly created checkout.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: grab the top five unassigned issues and put a claude on each in its own worktree
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: parallelise this across worktrees, spawn an agent in each one
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: split the migration into per-directory chunks and launch an agent for each chunk
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: for each of those worktrees create a new claude code terminal and run /work with the issue number it's on
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i've got four independent tickets, get four agents going, one each
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: knock out the whole batch, agent per issue, separate branches, go
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: start eight agents, each on a different failing test file
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: nothing is running yet, spin up an agent per package in the monorepo
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: open a terminal per worktree and set them all working
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: assign each of these issues to its own agent and supervise them in the background
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: we need six parallel workers, one per module, each on its own branch
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: launch one claude per open PR to deal with the review comments
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: batch this out, every one of these bugs gets its own agent and worktree
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: can you take issues 220 through 226 and run them all at once, separate agents
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: make a worktree for each of these tasks and put a fresh agent in each
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: spawn codex in each of the existing issue worktrees and tell them to start
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i want maximum parallelism here, one agent per unit of work
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: fire up an agent for each of the three services, they don't overlap
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: put a new coding agent on every worktree that has an issue number
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: distribute these tickets across agents so they all run simultaneously
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: start a separate claude for each subsystem, no shared files between them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: work the backlog in parallel, create the worktrees and spawn the agents
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: nothing is running yet — put a new agent on each of these five and let them go in parallel
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: open a claude in each of the worktrees that already exist and start them on their issues
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i want six agents going at once, one per package, from a clean start
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: put agents on all five of those tickets at once
+    confusable_with: [daintree.forge.manage-issue]
+  - query: eight tickets, put an agent on each, off you go
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: for each of those worktrees open a claude and run /work with whatever issue number it's on
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: split this across four agents, one package each, they don't touch the same files
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: just knock the whole backlog out in parallel, i don't care about order
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: parallelise the test fixes across the worktrees, they're all separate
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: there are like nine of these and none of them depend on each other. agent each.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: six unrelated tickets in that milestone. one agent each, all at once.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: split the lint cleanup by directory and put an agent on each, nothing depends on anything else
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: for each of those worktrees open a claude terminal and run /work with the issue number it's on
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: knock the whole backlog out in parallel
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: 'I''ve got four independent chores: bump deps, fix the changelog, tidy the imports, regenerate the fixtures. Give each its own agent and its own worktree.'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: parallelise this across the three packages, they don't touch each other
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: an agent per ticket please, 88, 91 and 94
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: put someone on each of those five issues and supervise the lot in the background
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Split these unrelated tickets among separate agents and run them concurrently.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Have three agents independently investigate separate modules.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Split these five unrelated files among agents in parallel.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: put an agent on each of these three modules and give each one the right files as context
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: parallelise this across four agents, each with its own slice of the codebase as its context
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: one agent per issue, and make sure each gets the supporting files and tests for its area
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: give each of the pinned agents one of these issues to work on
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spin up an agent per worktree and let them all get going on their own tickets
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: split this refactor across the fleet, one file each, and supervise them
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spawn an agent on each of these three modules
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: put an agent on every open worktree and get them all going
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: three agents, one per ticket, go
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: i want four agents competing in parallel on the backlog, one issue each
+    confusable_with: [daintree.orchestration.competition]
+  - query: spin up three agents, one per worktree, and see which one finishes first
+    confusable_with: [daintree.orchestration.competition]
+  - query: split this refactor across four agents, a directory each, run them all at once
+    confusable_with: [daintree.orchestration.competition]
+  - query: spin up three agents, one per issue, and get them all going
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: put an agent on each of those worktrees and let them run in parallel
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: split this refactor into three file-scoped chunks and give each chunk its own agent
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: spin up an agent per worktree and get them all going
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: for each of those four worktrees open a coding agent and start it on the issue it's on
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: put an agent on each of these worktrees and let them run in the background
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: the two agents that tied are idle now, give them each one of these issues to work on
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: take those five unassigned issues and put an agent on each
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: knock out the whole backlog in parallel, one agent per ticket
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: for each of the issues we shortlisted spin up a terminal running /work with its number
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: start work on 412, 415 and 419 — one agent each
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: put an agent on every open bug in the backlog and let them run in parallel
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: spin up worktrees for these four tickets and get claude going in each
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: for each of those worktrees create a claude terminal and run /work on the issue it's on
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: one agent per worktree, each one gets the files for its own area
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: split these four tickets across agents, each with the relevant code loaded
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: get the three of them going, one on each of these issues
+    confusable_with: [daintree.orchestration.conversation]
+  - query: four agents, one issue each off the milestone, let them all run in parallel
+    confusable_with: [daintree.orchestration.competition]
+  - query: split the migration into four file-scoped chunks and put an agent on each one
+    confusable_with: [daintree.orchestration.competition]
+  - query: spawn one agent per worktree and have each of them run /work on whatever issue is sitting on it
+    confusable_with: [daintree.orchestration.competition]
+  - query: give each pinned agent one of these four issues and let it actually do the work
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: one agent per worktree, have each of them run /work on the issue it finds there
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: split the lint cleanup across all my configured agents, one directory each
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: one agent per module - auth, billing, search - get all three going in parallel
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: for each of those worktrees open a claude terminal and start it on the issue thats on it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: right, now give each of the two finalists a real ticket to work on
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: put an agent on each of these three issues and let them run
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: i've got four worktrees, spawn a claude in each and work them in parallel
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: split the refactor into four file-scoped chunks and give each agent one, then supervise them
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: debate's over — now give each of the survivors a different ticket to work on
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: give each of the four candidates a different chunk of the refactor and let them run
+    confusable_with: [daintree.orchestration.interview]
+  - query: for each of those four worktrees open a claude and run /work on whatever issue number it's on
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: an agent per ticket on these five, go
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: put an agent on each of these five issues and supervise the lot
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: for each of those worktrees open a claude terminal and run /work with the issue number
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: put an agent on each of those five
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: knock out the whole unassigned backlog in parallel, one terminal per issue
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: for each worktree open a coding agent and run /work with whatever issue number it has
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: for each of those worktrees create a claude code terminal and run /work with the issue number on it
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: take issues 12, 15 and 19, worktree each of them and an agent per ticket
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: take the four p1 bugs and put an agent on each
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: start 88, 91 and 104 in parallel, one terminal each
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: for each of those worktrees spawn a claude terminal running /work with the issue number on it
+    confusable_with: [daintree.workflow.start-work-on-issue]
+followups:
+  - query: yeah all of them except the docs one
+    history:
+      - 'user: take the open bugs and put an agent on each'
+      - 'assistant: Six open bugs. Proposed units: 401 retry backoff, 404 log redaction, 409 config loader, 412 docs typos, 415 flaky payments test, 418 lockfile bump. Which of these should I fan out?'
+    active: [daintree.orchestration.fan-out-work]
+  - query: just serialize those two then
+    history:
+      - 'user: parallelise the auth migration across a few agents'
+      - 'assistant: Disjointness gate: units 2 and 4 both edit the same migration sequence file, so they are not parallel work. I can merge them, serialize them, or re-split. The other three are clean.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: yep go ahead, all seven
+    history:
+      - 'user: throw the whole milestone at them'
+      - 'assistant: That''s seven units. Seven agents is seven watchers and seven wakes on one machine — I''d normally cap around four. Confirm the count before I launch?'
+    active: [daintree.orchestration.fan-out-work]
+  - query: also do 419 while you're at it
+    history:
+      - 'user: agent on each of 401, 404 and 409'
+      - 'assistant: Launched three. 401 -> wt_a/term_1, 404 -> wt_b/term_2, 409 -> wt_c/term_3, each with its own supervisor watcher. Next checkpoint is each watcher''s completed event.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: whats the cap on recipe terminals again
+    history:
+      - 'user: for each of those worktrees spawn a coding agent and run /work on its issue number'
+      - 'assistant: Four worktrees carry issue numbers. Launching one agent per worktree now.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: what did that one actually say
+    history:
+      - 'user: fan these five out'
+      - 'assistant: All five running, one watcher each. I''ll report as each completes.'
+      - 'assistant: Watcher woke: the 404 log-redaction unit reported completed_verified.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: use codex for all of them
+    history:
+      - 'user: split the parser rewrite into independent pieces and give each one an agent'
+      - 'assistant: Three disjoint pieces: lexer, grammar, error messages. Which agent id should I use for the spawns? The registry has claude-code, codex and gemini.'
+    active: [daintree.orchestration.fan-out-work]
+topic_shifts:
+  - query: now split the billing cleanup into 4 chunks and put a separate agent on each
+    history:
+      - 'user: build me a copytree bundle for the billing subsystem'
+      - 'assistant: Selected 22 files across billing/ and its tests, generated the bundle to .daintree/context/billing.md.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: ok stop asking and start doing — give each of them one of the migration tickets
+    history:
+      - 'user: ask the pinned fleet whether we should drop the legacy endpoint'
+      - 'assistant: 4 of 5 said drop it; the dissent flagged two internal callers still on it. Consensus: drop after migrating those.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: take all five and run them in parallel, one agent each
+    history:
+      - 'user: find issues nobody has started'
+      - 'assistant: Shortlist of 5 unassigned and unstarted: #501, #503, #507, #511, #512.'
+    active: [daintree.workflow.find-issue-work]
+  - query: while thats going, take these three tickets and give each one its own agent
+    history:
+      - 'user: that agent has been sat there forever, is it hung'
+      - 'assistant: Hung — no output for 50 minutes and the pty is idle. Killed and relaunched; it is progressing now.'
+    active: [daintree.agents.recover-agent]
+  - query: put an agent on each of those last three, separate work each
+    history:
+      - 'user: whats in worktree list right now'
+      - 'assistant: Four worktrees: main, feature/api-v2, fix/timeouts and spike/wasm.'
+    active: [daintree.foundation]
+  - query: hows it going?
+    history:
+      - 'user: fan the batch across agents'
+      - 'assistant: Six agents launched, one issue each, supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: any update?
+    history:
+      - 'user: put agents on 101 102 and 107'
+      - 'assistant: Three launched, one per issue.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: ok forget the recap - take 217 218 and 221 and put an agent on each
+    history:
+      - 'user: where were we, i was out all afternoon'
+      - 'assistant: Three rows were still open on the ledger. Two are actually finished (PRs merged) and I closed them. The third, #214, has a branch pushed with no PR. Nothing is running right now.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: right, different thing - one agent per open ticket in the milestone, run them all at once
+    history:
+      - 'user: catch me up'
+      - 'assistant: Nothing is live. Last session ended with the cache refactor merged and both worktrees still on disk.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: new job. split the migration work into four file-scoped chunks and give each one its own agent
+    history:
+      - 'user: what was i in the middle of'
+      - 'assistant: One thing: the auth refactor on branch feat/auth-split. Agent finished, no PR opened yet.'
+      - 'user: fine'
+      - 'assistant: Ledger tidied - two stale rows from Tuesday closed out.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: ok. spread the six open bugs across agents, one each, and let them run
+    history:
+      - 'user: resume that thing from yesterday'
+      - 'assistant: Reattached to the #145 workflow - branch is pushed and the PR merged, so I marked the row done. Nothing left to resume.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: quick q while they run — what does auto-approve actually cover?
+    history:
+      - 'user: put an agent on each of these five issues'
+      - 'assistant: Five worktrees created, one agent each, all supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: does daintree cap how many terminals can run at once?
+    history:
+      - 'user: parallelise the backlog across the studios'
+      - 'assistant: Eight units, eight worktrees, one agent each. Fleet supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: how does fanning out work in daintree? anyway put an agent on each of these six issues
+    history:
+      - 'user: got a batch to get through'
+      - 'assistant: Go ahead.'
+  - query: put agents on all of these in parallel, and while they spin up explain how many can run at once
+    history:
+      - 'user: six tickets ready to go'
+      - 'assistant: All six are unassigned.'
+    active: [daintree.workflow.find-issue-work, daintree.foundation]
+  - i've got 5 issues in the backlog and 5 studios free. put an agent on each
+  - query: enough. split that plan into the 4 bits and put an agent on each
+    history:
+      - 'user: i want to watch them argue it out, just relay it'
+      - 'assistant: Relaying as an open discussion.'
+      - 'user: give agent 2 the floor now'
+      - 'assistant: Agent 2 has the floor, caught up on the last two turns.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - take 88 90 and 93 and put an agent on each
+  - query: yeah go, all three
+    history:
+      - 'user: take 88 90 and 93 and put an agent on each'
+      - 'assistant: All three are unassigned and touch different directories, so they can run in parallel. Worktrees and one agent each — go?'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - i've got 6 prs open and half are stale. put an agent on each of the four that need rebasing
+  - query: yeah go
+    history:
+      - 'user: i''ve got 6 prs open and half are stale. put an agent on each of the four that need rebasing'
+      - 'assistant: Four candidates: #287, #295, #302, #311, all behind develop. Plan is one agent per branch in its own worktree, rebase and push. Say go and I''ll launch.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: theres 3 more of these rotting in that package. put a separate agent on each one
+    history:
+      - 'user: work out why and get them green'
+      - 'assistant: Frozen fixture clock; fixed.'
+      - 'user: is it actually flaky or real?'
+      - 'assistant: Real - it fails deterministically with TZ unset, which is how CI runs it.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: ok good. i've got 6 issues tagged sprint-9, put an agent on each
+    history:
+      - 'user: morning. whats actually running right now'
+      - 'assistant: Nothing is live — no terminals, no agents, no worktrees open, and the attention queue is empty.'
+    active: [daintree.foundation]
+  - query: each one gets its own worktree yeah? dont let them share a checkout
+    history:
+      - 'user: morning. whats actually running right now'
+      - 'assistant: Nothing is live — no terminals, no agents, no worktrees open.'
+      - 'user: ok good. i''ve got 6 issues tagged sprint-9, put an agent on each'
+      - 'assistant: Launching six agents, one per issue, each with its own worktree and a background supervisor attached.'
+    active: [daintree.foundation, daintree.orchestration.fan-out-work]
+  - query: take the top 8 of those and fan them out, one agent per issue
+    history:
+      - 'user: anything unassigned in the backlog worth throwing at the fleet'
+      - 'assistant: 11 unassigned and nobody in flight on them — mostly small bugs plus three docs tasks. Shortlist attached.'
+    active: [daintree.foundation, daintree.workflow.find-issue-work]
+  - query: skip 412 actually, its a dupe of 390
+    history:
+      - 'user: anything unassigned in the backlog worth throwing at the fleet'
+      - 'assistant: 11 unassigned, shortlist attached.'
+      - 'user: take the top 8 of those and fan them out, one agent per issue'
+      - 'assistant: Setting up 8 worktrees, one agent each, running /work with the issue number.'
+    active: [daintree.foundation, daintree.orchestration.fan-out-work]
+  - query: now open a coding agent in each and run /work with whatever issue number is on the branch
+    history:
+      - 'user: make plain worktrees for feat/search feat/billing and feat/oauth, no agents yet'
+      - 'assistant: Created all three worktrees off main. No recipes run, no agents launched.'
+    active: [daintree.foundation, daintree.worktree.create-plain-worktree]
+  - query: go, fan out all 10
+    history:
+      - 'user: i want 10 agents on the perf backlog by lunch. whats eligible'
+      - 'assistant: 13 open perf issues, 10 unassigned with nobody in flight. Two look coupled — 601 and 604 touch the same file.'
+    active: [daintree.foundation, daintree.workflow.find-issue-work]
+  - query: put an agent on each of those three and let them run
+    history:
+      - 'user: whats unassigned'
+      - 'assistant: #88, #90 and #93 are all free.'
+    active: [daintree.workflow.find-issue-work]
+  - query: there are five issues in that milestone — one agent each, get them all going
+    active: [daintree.foundation]
+  - don't poll them for opinions. give each of the four studios one of these four tickets and let them actually work.
+  - put an agent on each of those five tickets and make sure each one gets its own worktree
+  - query: i saw something finished, which one was it?
+    history:
+      - 'user: put an agent on each of those five tickets'
+      - 'assistant: Five agents up, one worktree each, all supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: three pings in a row - are they all done?
+    history:
+      - 'user: four agents on four tickets'
+      - 'assistant: Four launched and supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: take the six unassigned tickets and put an agent on each
+    history:
+      - 'user: merge the last two PRs from friday'
+      - 'assistant: Both merged.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]
+  - query: put an agent on each of the three i just filed
+    history:
+      - 'user: turn each of those review findings into its own issue'
+      - 'assistant: Created #841, #842 and #843, all labelled tech-debt.'
+    active: [daintree.forge.manage-issue]
+  - query: the remaining four nodes are independent, just put an agent on each and let them run
+    history:
+      - 'user: what can run now'
+      - 'assistant: Four ready nodes, no dependencies between them, no open blockers.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: spread those four tickets across agents, one each, now that the environments are ready
+    history:
+      - 'user: provision the boxes on all four worktrees'
+      - 'assistant: All four provisioned; status healthy on each.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: morning. we triaged 5 bugs friday — 231 234 236 240 241. can you get one going on each of them now, separate worktrees, before standup
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: that batch only half worked, 2 of the 6 got terminals and the rest didn't. launch the missing four
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: start agents on 77 88 and 99, and make sure each one gets the relevant context injected for its area
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: same deal for issues 30 through 35
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: theres 4 wortkrees sitting there doing nothing, put agents in them
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: four suites are red and they're unrelated to each other. one agent per suite, own worktree, go
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: one terminal per issue, go
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: fan out
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: hmm. six tickets, one machine. i guess do four now and hold two? whatever you think — just get them running
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: right, they agreed. now stop asking them things and actually hand out the work — a piece each
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: distribute these across agents and make sure none of them are editing the same files
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: can we run all of these at the same time or do some of them touch the same files?
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: assign an agent to each of the unassigned open issues plz
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+wakes:
+  - query: '[watcher w_1190 fired: t_8821 exited 0, suite green]'
+    history:
+      - 'user: put an agent on each of the three failing packages'
+      - 'assistant: Spawned three agents — t_8821 (auth), t_8822 (billing), t_8823 (search) — each in its own worktree with a background watcher armed. I''ll report as they land.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: '[watcher w_3302 fired: terminal t_4417 exited 1 — agent crashed mid-run]'
+    history:
+      - 'user: knock out the whole backlog, one agent per issue'
+      - 'assistant: 6 issues, 6 worktrees, 6 agents launched. Supervisors armed on all of them — I''ll come back when the first ones finish.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: '[queue: 3 items need attention]'
+    history:
+      - 'user: split the migration across four agents by directory'
+      - 'assistant: Four disjoint file scopes, four agents up. Watchers armed on each, nothing overlaps.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+near_misses:
+  - put an agent on each of these 5 issues and run them in parallel
+docs:
+  - spin up three agents on those issues
+  - ok go, one agent each
+  - query: sorry, unrelated — spin up three agents on those issues
+    history:
+      - 'user: shut it all down'
+      - 'assistant: Inventory confirmed, teardown running in dependency order.'
+foundation_boundaries:
+  - put an agent on each of these three issues

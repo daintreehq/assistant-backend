@@ -74,9 +74,12 @@ _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
     # The v1 state-token test must build a payload carrying the RETIRED field name;
     # that literal is the whole point of the fixture.
     "tests/unit/test_state_codec.py": ("active_skills",),
-    # Claude Code's own skill directory, referenced by path from the training docs.
+    # Claude Code's own skill directory, referenced by path from the training docs
+    # and, in the ingest module, from the docstring that names where the generating
+    # agents' output schemas are defined. Anthropic's product term, not ours.
     "training/EXPERIMENTS.md": (".claude/skills",),
     "training/README.md": (".claude/skills",),
+    "training/ingest_journal.py": (".claude/skills",),
     # Ignores the pre-rename PACKAGE PATH, which is a directory name and not a
     # present-tense claim about what the code is called — `git mv` cannot rename
     # what was never tracked, so untracked fp32 export leftovers kept surfacing

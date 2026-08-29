@@ -1,0 +1,344 @@
+# Training examples whose answer is `daintree.orchestration.multi-agent` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.multi-agent
+run: pre-split
+positives:
+  - spin up three agents to debate the caching strategy and come back with one answer
+  - get two agents cross-checking each other on this bug and merge what they find
+  - have claude and codex reconcile their answers, i only want one recommendation at the end
+  - put 4 agents on the same perf problem and synthesize whatever they come up with into a single report
+  - so i've got two different opinions on how the auth refactor should go and i don't want to just pick one — can you set up a couple of agents, let them argue it out between rounds, and keep relaying until they actually land on a shared plan?
+  - can you get a couple of agents to hash out the schema design together and come back with one recommendation?
+  - could you have three of them work the same repro and keep going until the diagnoses agree?
+  - is it possible to have two agents iterate on this migration plan together until it stops changing?
+  - fan three explore agents at the same stack trace and run convergence rounds until the diagnoses stop moving
+  - set up a relay loop between terminal-2 and terminal-5 on the rate limiter design, 3 rounds, then synthesize
+  - multi-agent cross-check on this diff, one merged verdict
+  - spwan 3 agents to colaborate on one answer for the queue design
+  - get the two agnets to cross check eachother and giv me the merged result
+  - have them dabate it until they converge, i just want the fnal answer not the transcript
+  - now have those two compare notes and settle on one answer
+  - do that with the other pair as well, relay between them till they agree
+  - get them to reconcile what they each said and give me the single version
+  - take those three and make them work it out together, one answer
+  - the interview's finished — now get the top two to collaborate on one final design
+  - they disagreed in the poll. relay between them properly until they land somewhere
+  - the three answers from that competition contradict each other, have the agents actually reconcile them and tell me the agreed position
+  - have one agent draft the plan and the other tear it apart, then keep passing it back and forth until it settles
+  - keep relaying between the two of them until the positions stop moving
+  - i want a second and third opinion on this design but not separately — make them argue it out and converge
+  - 3 agents same question, cross check, one synthesized answer pls
+  - what if you had two of them iterate on the error handling together, would they converge on something usable?
+  - get two claudes to hash out the caching strategy and give me one recommendation
+  - terminal-7f2a and terminal-91bc disagree on the migration order — bounce it between them till they settle and tell me the answer
+  - they've each given me a different plan. i dont want three plans. make them reconcile it
+  - spin up 3 agnets to cross check teh rate limiter logic and merge waht they find into one list
+  - ok so i've got codex and claude both looking at the same race condition and they've come to different conclusions, can you go back and forth between them a couple times until they actually agree on what the root cause is, i just want one answer at the end
+  - now take the winner and the runner up and have them cross-check each other's designs, then give me the combined version
+  - those two you just interviewed — put them back on the same question and get them to agree
+  - make those two argue it out until they land on the same answer
+  - get the gpt one and the claude one — i think it's terminal 4 and 6? — to reconcile their estimates and give me a single number
+  - prod is down, i've got two agents with conflicting theories, ping between them fast and tell me which cause is real
+  - before I commit to a schema, I'd like three agents to draft it independently and then iterate together into one final schema. can you run that?
+  - converge them
+  - same problem, both agents, two more rounds then summarize into one answer
+  - would you mind having the two review agents compare notes and produce a single agreed list of issues?
+  - agent A says the fix works, agent B says it doesn't. put them on each other and settle it
+  - have claude and codex cross check each other's read of the auth flow and give me the consensus
+  - three agents each wrote a findings list. dedupe it by making them argue over the overlaps, then one merged report
+  - put three agents on the payment bug and have them work it together
+  - ask all four what the root cause is, then send each of them the others' answers and see who changes their mind, i want one conclusion
+  - take the reviewer's findings to the implementer AND bring the implementer's pushback back to the reviewer until they agree on the final list
+  - let them talk it through but i need one decision at the end, not a chat log
+  - have them debate the two approaches and hammer out one plan — no voting anyone off, just get to the merged plan
+  - each of them wrote a version of the migration script. iterate them together until there's one script we all agree on
+  - hm. i think if i had two models look at this dependency graph and then trade notes they'd catch what each other missed... can you do that and give me the union?
+  - good, now round three — send each of them the other two's objections and ask for a final position
+  - relay term-3's answer to term-8 and term-8's back to term-3, keep going till they stop changing their minds
+  - can multiple agents work on the same problem at once and give me one answer? do that for the flaky test
+  - set up a panel on the indexing question but i want a single recommendation out of it, not a discussion
+  - claude wrote the migration plan. get another model to poke holes in it and keep passing it back until neither of them has objections left
+  - they keep talking past each other. relay properly and get me one answer
+boundaries:
+  - query: have three agents debate the caching approach and relay between them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: three agents, same design problem, get them to converge on one answer
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Have several agents independently propose approaches and synthesize them.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Ask three agents to propose UI architectures.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: have the reviewer and the implementer go back and forth until they agree on the fix
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: keep bouncing the findings between those two until they converge on one plan
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: have the three of them work this out between them until they agree on one answer
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get the agents to cross-check each other and give me one merged recommendation
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: let them debate this and keep iterating until they converge, then tell me where they landed
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spawn three agents on the same bug and have them cross-check each other until they agree on a fix
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: have claude and codex argue about the retry design until they land on one answer
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: have the three of them hash out the best caching approach until they agree on one answer
+    confusable_with: [daintree.orchestration.competition]
+  - query: get the agents to debate the schema and come back with a single recommendation
+    confusable_with: [daintree.orchestration.competition]
+  - query: put four agents on the same bug and have them cross-check each other til we get one answer
+    confusable_with: [daintree.orchestration.competition]
+  - query: have the three agents work this problem together and give me one answer at the end
+    confusable_with: [daintree.orchestration.conversation]
+  - query: let them debate the schema until they converge, then merge it into a single recommendation
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get the two agents cross-checking each other's plans until they agree on one approach i can act on
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have the three agents debate the retry design until they agree on one approach and give me the final answer
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: get claude and codex to argue this out and converge on a single recommendation for me
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: let them cross-check each other's positions and merge it all into one plan
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: put three agents on this bug and have them cross-check each other until we land on one answer
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: get a few agents attacking the same perf problem and merge what they find into a single plan
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: have two agents work the migration together and reconcile their answers before you report
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: the three of them disagree — keep relaying between them until they land on one answer
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: get the three agents to cross-check each other on this design until they agree on one answer
+    confusable_with: [daintree.orchestration.interview]
+  - query: have them collaborate on the fix and give me one merged recommendation
+    confusable_with: [daintree.orchestration.interview]
+  - query: have the three of them work this bug together and come back with one answer
+    confusable_with: [daintree.orchestration.conversation]
+  - query: put both agents on the same problem and relay between them until they converge, i want one recommendation at the end
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get them cross-checking each other's plans until they agree, then give me the merged plan
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get the three of them working on the same race condition and keep passing it back and forth until they agree on one fix
+    confusable_with: [daintree.orchestration.competition]
+  - query: have them cross-check each other's analysis and give me one merged answer
+    confusable_with: [daintree.orchestration.competition]
+  - query: get those two to hash out the review findings together and give me one plan
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: get the three of them cross-checking each other until they land on one answer
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: have my pinned agents work the same problem together and give me one merged recommendation
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: ask them all, then feed each one the others' answers and keep going until they agree
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spawn three agents on the same deadlock and keep relaying between them until they agree on one answer
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: have three agents look at the retry logic and hash out one answer between them
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: get two agents to cross-check each other on the codec change and give me the merged answer
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the two of them disagreed — get them working it out between themselves until they land on one answer
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: get the whole group iterating on this together until there's one merged proposal
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have the three of them debate the caching design and come back with one recommendation
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: get claude and codex arguing about the retry logic until they agree on something, then tell me what they landed on
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: put both agents on the same bug, have them cross-check each other and merge it into one diagnosis
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: have both agents cross check each other on the auth bug until they agree on one answer
+    confusable_with: [daintree.orchestration.interview]
+  - query: three agents on the same perf problem, iterate between them until you can give me one merged recommendation
+    confusable_with: [daintree.orchestration.interview]
+  - query: put three of them on the deadlock and have them cross-check each other until we get one answer
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: get the four of them working the same migration together and give me one merged plan
+    confusable_with: [daintree.orchestration.fan-out-work]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: spin up three agents to debate the caching design and converge on one answer'
+      - 'assistant: Spawned three explore agents (terminal-a1f, terminal-b2c, terminal-c9d) and sent round 1. Waiting on all three.'
+    active: [daintree.orchestration.multi-agent]
+  - query: they're still not agreeing, keep going
+    history:
+      - 'user: get two agents cross-checking each other on the auth bug until they agree'
+      - 'assistant: Round 1 done. terminal-77a blames the token refresh window, terminal-91b blames clock skew. Relaying each side''s position for round 2.'
+    active: [daintree.orchestration.multi-agent]
+  - query: also pull in the fourth one, the one looking at the schema
+    history:
+      - 'user: have three agents work the migration plan together and give me one plan'
+      - 'assistant: Round 2 relayed. Positions are narrowing — two now agree on the phased approach.'
+      - 'user: good'
+      - 'assistant: Round 3 sent.'
+    active: [daintree.orchestration.multi-agent]
+  - query: do another round before you write it up
+    history:
+      - 'user: two agents, cross-check the rate limiter design, one answer at the end'
+      - 'assistant: Both agents have delivered round 1 drafts. Sending each the other''s gist now.'
+    active: [daintree.orchestration.multi-agent]
+  - query: don't wait on that one, it's been ages
+    history:
+      - 'user: get the three of them to reconcile their diagnoses into one'
+      - 'assistant: Round 2 complete. terminal-c9d is still working; the other two have converged on the connection pool.'
+    active: [daintree.orchestration.multi-agent]
+  - query: ok that's enough, write it up
+    history:
+      - 'user: have claude and codex iterate on the queue design until it stops changing'
+      - 'assistant: Round 3 relayed. Both are now proposing the same backoff scheme with minor wording differences.'
+    active: [daintree.orchestration.multi-agent]
+  - query: what did the second one actually say?
+    history:
+      - 'user: three agents on the same perf problem, relay between them until they converge'
+      - 'assistant: Round 1 answers are in from terminal-4kk, terminal-5mm and terminal-6nn. Relaying the gists now.'
+    active: [daintree.orchestration.multi-agent]
+  - query: tell them to keep it shorter this round, they're waffling
+    history:
+      - 'user: spawn two agents and have them argue the postgres vs sqlite call until they land somewhere'
+      - 'assistant: Spawned terminal-p1 and terminal-s2, round 1 question sent to both.'
+      - 'user: cool'
+      - 'assistant: Round 1 answers received; relaying each side''s argument for round 2.'
+    active: [daintree.orchestration.multi-agent]
+topic_shifts:
+  - query: ok now have them actually work it out together until they agree on one plan i can hand to an implementer
+    history:
+      - 'user: get everyones opinion on the retry design'
+      - 'assistant: Five answers collected, synthesized: keep exponential backoff, add jitter.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: enough chat - now drive them to one merged answer i can actually use
+    history:
+      - 'user: get them talking about the API shape'
+      - 'assistant: Three rounds relayed, each agent caught up on what the others said. Still going.'
+    active: [daintree.orchestration.conversation]
+  - query: quick aside — can agents talk to each other directly or is it all through you?
+    history:
+      - 'user: get the two of them to hash out the schema and give me one answer'
+      - 'assistant: Round 1 relayed both ways. They disagree on the join table; running round 2.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - query: get the two of them to converge on one answer. remind me first how relaying works
+    history:
+      - 'user: two opinions on the schema'
+      - 'assistant: Both agents are up.'
+  - query: 3 to 1 for postgres. ok now get them to actually hash it out together and come back with one recommendation i can act on
+    history:
+      - 'user: poll the pinned agents - postgres or sqlite for the local ledger'
+      - 'assistant: Same question to all four independently.'
+      - 'user: don''t score it, i just want their raw takes plus where they land'
+      - 'assistant: 3 for postgres, 1 for sqlite on the grounds of zero setup. Raw answers below.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: keep relaying til they stop disagreeing
+    history:
+      - 'user: don''t score it, just their raw takes'
+      - 'assistant: 3 for postgres, 1 for sqlite.'
+      - 'user: get them to actually hash it out together and come back with one recommendation i can act on'
+      - 'assistant: Relaying between them now — each sees the others'' reasoning and I drive rounds until there''s one plan.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - i need the three of them to cross check each other on the auth refactor and come back with one plan
+  - query: keep going till they actually agree, don't stop at the first draft
+    history:
+      - 'user: i need the three of them to cross check each other on the auth refactor and come back with one plan'
+      - 'assistant: Relaying between all three until there''s one merged plan. First pass out now.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - i want three agents on the same perf problem, cross checking each other, and one answer at the end
+  - query: restarted it. try again
+    history:
+      - 'user: i want three agents on the same perf problem, cross checking each other, and one answer at the end'
+      - 'assistant: The spawn calls aren''t going through — no terminal tools offered.'
+      - 'user: hang on is the mcp even connected? none of the terminal tools seem to be there'
+      - 'assistant: The Daintree MCP server is disconnected, which is why the whole terminal toolset is missing. Reconnect it from the integrations panel and the tools come back.'
+    active: [daintree.diagnostics, daintree.foundation]
+  - query: hows that going
+    history:
+      - 'user: hang on is the mcp even connected? none of the terminal tools seem to be there'
+      - 'assistant: MCP was disconnected — reconnect and the tools return.'
+      - 'user: restarted it. try again'
+      - 'assistant: Three agents up in tabs 9, 10 and 11, each looking at the slow report query from a different angle. First relay round is out.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - query: right, pull their answers together into one recommendation
+    history:
+      - 'user: school just rang, i have to go. park it — leave them running and tell me when all three have answered'
+      - 'assistant: Watchers armed on all three.'
+      - 'user: where were we'
+      - 'assistant: Three agents on the slow report query. All three finished while you were out — tabs 9, 10 and 11 each posted a final answer, and none of them have been merged into anything yet.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: ok enough waffle. make them converge on one recommendation i can act on
+    history:
+      - 'user: ask the pinned ones whether our test suite is too slow'
+      - 'assistant: Four of five say yes; one blames CI.'
+      - 'user: interesting. get them talking to each other about it, i want to watch it play out'
+      - 'assistant: Relaying round three now — each gets the floor and a catch-up of what the others said.'
+    active: [daintree.foundation, daintree.orchestration.conversation]
+  - i don't want them debating and i don't want a winner. i want one merged answer out of the three of them, keep passing it back and forth until they agree.
+  - relay between them until they converge on one answer and give me the merged result
+  - query: something fired - have they converged yet?
+    history:
+      - 'user: three agents on the deadlock, one answer at the end'
+      - 'assistant: Round two relayed between them.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - query: fan three explore agents at the same stack trace and run convergence rounds until the diagnoses stop moving
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: they disagreed in the poll. relay between them properly until they land somewhere
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: have them dabate it until they converge, i just want the fnal answer not the transcript
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: let them talk it through but i need one decision at the end, not a chat log
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: would you mind having the two review agents compare notes and produce a single agreed list of issues?
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: have them debate the two approaches and hammer out one plan — no voting anyone off, just get to the merged plan
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: they've each given me a different plan. i dont want three plans. make them reconcile it
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: claude wrote the migration plan. get another model to poke holes in it and keep passing it back until neither of them has objections left
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: get two claudes to hash out the caching strategy and give me one recommendation
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: good, now round three — send each of them the other two's objections and ask for a final position
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+wakes:
+  - query: '[terminal.awaitAll returned: 3 finished round one]'
+    history:
+      - 'user: get three agents to cross check each other on this bug and give me one answer'
+      - 'assistant: All three have the problem statement. Round one out — I''ll relay between them until they converge.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - query: '[wake: 2 replied, t_0205 has been silent for 9 minutes]'
+    history:
+      - 'user: have them iterate until they agree on the fix'
+      - 'assistant: Round two relayed — each agent now has the others'' positions. Waiting on their revised answers before I synthesize.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+near_misses:
+  - have both agents hash it out and give me one answer on the cache design
+docs:
+  - have both agents cross-check each other and give me one answer
+  - have a look at what the agents are all doing and debate whether we keep the retry wrapper, converge on one answer
+  - query: quick q — have both agents cross-check each other and give me one answer
+    history:
+      - 'user: resume the devbox on wt_44'
+      - 'assistant: Resumed; fresh status reads running.'
+  - query: side question, have a look at what the agents are all doing and debate whether we keep the retry wrapper, converge on one answer
+    history:
+      - 'user: move each agent to its own tree'
+      - 'assistant: Should I keep the existing worktree as-is afterwards, or is it meant to be emptied out?'

@@ -1,0 +1,466 @@
+# Training examples whose answer is `daintree.agents.answer-waiting-agent` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.answer-waiting-agent
+run: pre-split
+positives:
+  - tell the agent yes
+  - agent in tab 2 is asking something, answer it and tell me what it says
+  - three of them are waiting on questions, unblock them all
+  - claude is asking whether it should also refactor the tests — say no, keep it in scope
+  - it's blocked on a prompt, just send y
+  - so the agent in the auth worktree has stopped and it wants to know if it can force push the branch. tell it absolutely not, it should open a PR instead, and then stick with it until it's done and tell me what it ends up doing
+  - can you go through the ones that are sitting on questions and answer them? anything that's an actual decision, come back to me before you send it
+  - after that fan out I've got like four agents all parked on prompts. read what each one is asking, answer the obvious ones, and report back who still needs me
+  - awaitAll came back with an askingQuestion array of 3 — pull each question by terminalId and send the protocol reply
+  - roster shows waitingReason question on two terminals, unblock both
+  - the agnet is asknig me somethign, tell it to go ahead
+  - answr the waiting agnets pls
+  - yes to that one, no to the second
+  - reply yes to the permission prompt in the deploy tab, wait for it to finish, then give me the url it prints
+  - there's an inbox item about an agent asking a question — deal with it
+  - unblock anything waiting on input
+  - whats it asking? answer it if its obvious
+  - the agent wants to know which branch to base off — tell it develop
+  - send yes to terminal 7, it's been waiting on me
+  - answer the waiting agents and then give me each one's test results
+  - it asked a follow up — tell it pnpm not npm
+  - two of them are stuck on questions, read them out to me first and then send my answers
+  - did any of the agents ask me anything? if so just answer them
+  - both of those prompts are the same question, answer both with yes and re-await
+  - claude in tab 2 wants to know if it should update the snapshot tests too — tell it no, stay in scope
+  - 4 of the 6 issue agents are sitting on questions. unblock whatever you can and bring me the rest
+  - it wants permission to run the migration against staging. yes.
+  - tell it yes
+  - one of them — the billing branch one i think — popped a prompt at me, deal with it
+  - answer the prompt in terminal 7 with postgres, then give me the row count it prints at the end
+  - teh agent is blockd on some prompt, unblokc it now pls we need this deploy out
+  - there's an inbox item from the auth agent asking something. handle it and clear it off the queue
+  - agents been stuck ten minutes on a y/n prompt. just say yes
+  - check the three claude tabs and answer anything they're waiting on. nothing else, don't touch the rest
+  - it's showing QUESTION_ID=q_4f2 with some question about the index — reply no to that
+  - both are asking about the package manager. frontend one gets pnpm, the api one gets uv
+  - so i started that worktree agent before lunch and it's stopped to ask whether it can bump the lockfile, which is fine, so tell it to go ahead and then let me know whether the build goes green after
+  - it came back with another question, env file this time. .env.local
+  - the agent asked whether to keep backwards compat — answer it yes and tell me what it does next
+  - ok that one's answered, now put me on the next one that's still waiting
+  - anything waiting on me? if it's a yes/no just say yes
+  - it's asking to force push. tell it absolutely not, open a PR instead
+  - reply to terminal 12 with 'skip the e2e suite' — or is it 11? whichever one is asking
+  - say yes to the prompt then sit on it until the full test run finishes, however long that takes
+  - could you answer the prompt agent-3 is showing please? the answer is main.
+  - why does it keep asking me things. answer it and don't come back unless it's something that actually matters
+  - they all want to know if they're allowed to install deps. yes to all of them
+  - 'two waiting: the lint one is easy, say yes. the other one about dropping the old api endpoint i want to look at first'
+  - yeah tell it to go with option b
+  - unblock the deploy agent — the answer is prod — and then summarise whatever it does after that
+  - it's asking me to confirm the tests passed before it commits. they did, tell it yes
+  - the reviewer terminal is asking whether it should cover the tests as well. tell it yes, everything under src
+  - agent asking abt branch name -> tell it feat/rate-limit
+  - answer whatever the api-worker terminal is stuck on with the defaults, i don't want to be involved
+boundaries:
+  - query: The agent in worktree wt_api is asking whether to overwrite the generated file; answer its question and let it continue.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the agent in tab 3 is asking whether to overwrite the file, tell it yes
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: a couple of them are sitting there asking something, handle it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: each of those has a prompt waiting for an answer, go through them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: they're all blocked on questions, unblock each one
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: it's asking whether to carry on to the next stage. tell it yes.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: three agents are waiting on questions about the css, just say yes to all of them
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the implementer is asking whether it should apply the reviewer's suggestion — tell it yes
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: three of the agents are waiting on questions, go answer them and report the results
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: the agent's been stuck for ten minutes waiting on a yes/no prompt, just answer it
+    confusable_with: [daintree.agents.recover-agent]
+  - query: three of them are frozen on a permission prompt, unblock them and report back
+    confusable_with: [daintree.agents.recover-agent]
+  - query: it's not moving because it's asking about the file path — tell it to go ahead
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the agent is asking something, tell it yes and relay what it comes back with
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: claude in tab 2 is waiting on a question, unblock it and report the result
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: three of them are sitting on prompts, answer them and bring back what they finish with
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: two of them are asking something, just say yes and let them carry on
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: the agents are all waiting on prompts, unblock them and report what they come back with
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: it's asking whether to overwrite the file — tell it go ahead
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: one of the voters is asking me something instead of voting, go tell it to just pick one
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: the agent in tab 2 is asking me something, tell it yes and let it carry on
+    confusable_with: [daintree.foundation]
+  - query: two of them are waiting on questions - answer them so they can carry on
+    confusable_with: [daintree.orchestration.conversation]
+  - query: two of the contest agents are sitting there asking me something, tell them yes and let them carry on
+    confusable_with: [daintree.orchestration.competition]
+  - query: the agent in tab 2 is asking if it should overwrite the config, tell it yes and let it carry on
+    confusable_with: [daintree.agents.recover-agent]
+  - query: its been sitting there for ten minutes on a y/n prompt, just answer it
+    confusable_with: [daintree.agents.recover-agent]
+  - query: three of them are all asking questions at once, unblock them and tell me what they come back with
+    confusable_with: [daintree.agents.recover-agent]
+  - query: three of the agents are sitting on prompts waiting for an answer, unblock them
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: the agent is asking whether it should install the missing package, tell it yes
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: the claude terminal is asking me something — tell it yes and report what it comes back with
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: agent 3 is sitting on a prompt, answer it and relay the result
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: two of them are waiting on questions, unblock them and tell me what they say
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: one of the voters is sitting there asking something, just tell it yes
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: the agent in tab 3 is asking me something mid-debate, tell it to keep going
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: the agent is asking whether to keep the old field. tell it yes and let it carry on
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: which agent is asking me something? one of them's blocked on a prompt i think
+    confusable_with: [daintree.orchestration.interview]
+  - query: all four of them are sitting on a permission prompt, say yes to each
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: the claude it launched is asking whether to overwrite the lockfile, tell it yes
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: the migration agent is asking something, tell it yes and wait for it to carry on
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: three of them are waiting on questions. answer them all yes and report what they come back with
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: its blocked on a prompt about overwriting the file — say no
+    confusable_with: [daintree.orchestration.supervise-fleet]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: three agents are parked on questions, read them and answer the obvious ones'
+      - 'assistant: Sent yes to term-a and term-c (both asking to add tests for the touched files). term-b is asking whether to drop the legacy column — that''s destructive, I left it for you. term-a and term-c are running again.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: did it finish yet
+    history:
+      - 'user: the deploy agent is asking to continue, tell it yes and give me the url when it lands'
+      - 'assistant: Sent yes to terminal 4. It''s still building — I''ll keep waiting for the url.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: staging one
+    history:
+      - 'user: unblock whatever''s waiting'
+      - 'assistant: Two answered. The third (term-9, "which bucket should artifacts go to?") is a real choice — what do you want?'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: show me the next one
+    history:
+      - 'user: answer the waiting agents, no extra scope'
+      - 'assistant: Answered four of them with no. term-2 and term-6 are still working; term-8 is still waiting on you about the API version bump.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: same answer for that one
+    history:
+      - 'user: two agents are asking if they should also update the docs — say no'
+      - 'assistant: Sent no to both. term-1 came back with a follow-up: it wants to know if it can skip the snapshot tests.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: no to both, and then just tell me when everyone's done
+    history:
+      - 'user: after the fan-out five of them are sitting on prompts, sort it out'
+      - 'assistant: Read all five questions in one pass. Three were covered by your original request — answered. Two need you.'
+      - 'user: which two?'
+      - 'assistant: term-3 (force push to main?) and term-7 (delete the old migration file?).'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: also do the third one, it's got the same prompt up
+    history:
+      - 'user: agent 2 is asking something, answer it yes'
+      - 'assistant: Confirmed the prompt first — it''s asking to install the missing dev dependency. Sent yes. Waiting for it to continue.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: wait which terminal was that again
+    history:
+      - 'user: the claude tab wants permission to run the migration, tell it to go ahead'
+      - 'assistant: Sent. It''s applying the migration now, I''ll pull the summary out when it settles.'
+    active: [daintree.agents.answer-waiting-agent]
+topic_shifts:
+  - query: the agent in tab 3 is sat on a permission prompt, tell it yes
+    history:
+      - 'user: ask claude what it makes of the retry logic'
+      - 'assistant: It says the backoff is fine but the jitter is applied after the cap, so long tails collapse. Quoted retries.py:58.'
+    active: [daintree.agents.ask-and-relay]
+  - query: the two waiting ones — answer them, both yes, and tell me what they come back with
+    history:
+      - 'user: sweep the fleet'
+      - 'assistant: 5 running, 1 unsupervised (adopted), 2 waiting on questions.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: two more just started asking, do those as well
+    history:
+      - 'user: the agent is asking something, say yes'
+      - 'assistant: Answered t_3302, it''s continuing.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: two of them are sat on a prompt waiting - tell them yes and let them carry on
+    history:
+      - 'user: agent per ticket on the whole backlog batch'
+      - 'assistant: Five agents launched, one per issue.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: the agent in tab 2 is asking me something - answer it, yes to whatever it wants
+    history:
+      - 'user: push this and get a PR up'
+      - 'assistant: Pushed, PR #402 open.'
+    active: [daintree.workflow.prep-branch-for-review]
+  - query: so how does daintree know its asking rather than just idle?
+    history:
+      - 'user: the agent is asking something, tell it yes'
+      - 'assistant: It asked whether to overwrite the existing migration. Replied yes, waiting for it to continue.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: why do they stop and ask instead of just going — is that a daintree setting?
+    history:
+      - 'user: three of them are waiting on questions, unblock them'
+      - 'assistant: All three asked about the same migration. Answered each; they''re continuing.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: the agent is asking something — answer it yes. also what makes it stop and ask?
+    history:
+      - 'user: somethings blinking in tab 3'
+      - 'assistant: That agent is waiting on a prompt.'
+  - query: two of them are waiting on a question, just say yes to both and let them carry on
+    history:
+      - 'user: i''ve got 5 issues and 5 studios free. put an agent on each'
+      - 'assistant: Five agents launched, one issue each.'
+      - 'user: how''s everyone doing'
+      - 'assistant: Two working, two waiting on questions, one finished.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: gemini is asking me something before it'll answer, tell it yes
+    history:
+      - 'user: codex never came up, nothing happened when you launched it'
+      - 'assistant: Spawn returned no terminal id. Relaunched as tab 6.'
+      - 'user: it''s up now. carry on with the panel'
+      - 'assistant: Codex caught up on the two rounds it missed. Floor is back with claude.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: just tell it yes, use the existing config
+    history:
+      - 'user: meh none of those. actually whats the state of that pr from friday, the auth refactor one'
+      - 'assistant: PR #396 approved by one reviewer but checks are red — two integration cases fail.'
+      - 'user: checks are red? work out why and get it green'
+      - 'assistant: Both failures come from the session fixture not being reset between cases. Fix pushed, rerun in progress. Also — the agent on 412 is waiting on a question: reuse the existing retry config, or add a new one?'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: two of them are waiting on questions? unblock both, yes to everything
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Six agents: two finished, one working, two waiting on questions, one failed. The failed one is tab 7.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: tab 5's asking something. say yes and let it carry on
+    history:
+      - 'user: yeah, forward it to the agent'
+      - 'assistant: Relayed both comments to tab 3 with anchors.'
+      - 'user: how''s everyone doing, anything need me?'
+      - 'assistant: 5 agents: 2 working, 1 finished (tab 6, clean), 1 waiting on a question (tab 5), 1 unsupervised (tab 7 — adopted, watcher attached). Tab 5 is the only one that needs you.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: it's asking whether to bump the lockfile. tell it yes, pnpm only
+    history:
+      - 'user: i''m afk — watch it, and check the issue thread'
+      - 'assistant: Watcher armed on tab 4. One reply from @jules on the thread.'
+      - 'user: back. anything happen while i was out?'
+      - 'assistant: The agent finished the code change, then stopped on a question about the lockfile 20 minutes ago. Nothing else moved.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: tab 2 and tab 4 are both sat on a prompt, deal with them
+    history:
+      - 'user: yeah go'
+      - 'assistant: Four agents launched, tabs 2-5, one per branch.'
+      - 'user: how are they getting on'
+      - 'assistant: Tab 2 done (pushed), tab 3 and 5 working, tab 4 waiting on a conflict question. Nothing failed.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: its asking whether to add a migration. tell it yes, use a migration
+    history:
+      - 'assistant: Started #412 - agent in tab 3.'
+      - 'user: pop me into that terminal, whats it saying'
+      - 'assistant: Focused tab 3. It has read the exporter and is writing a failing test for the dropped final row.'
+    active: [daintree.foundation]
+  - query: its asking if it should touch the test file too. tell it yes and to add a regression test
+    history:
+      - 'user: make me a worktree for fix/retry-backoff'
+      - 'assistant: Created worktree off develop.'
+      - 'user: now put claude in there and get it fixing'
+      - 'assistant: Claude running in tab 2 in that worktree, briefed on the double-doubling in the sleep calc.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: the filters one is asking about a null check now. answer it - yes, guard it
+    history:
+      - 'user: how are they both doing'
+      - 'assistant: tab 4 editing, tab 5 waiting on a question.'
+      - 'user: retitle the tabs then tell me which needs me'
+      - 'assistant: Renamed to ''filters-logout'' and ''config-loader''. config-loader needs you - precedence question.'
+    active:
+      - daintree.terminals.rename
+      - daintree.orchestration.supervise-fleet
+      - daintree.foundation
+  - query: the agent wants to know which breakpoint to target. tell it 768
+    history:
+      - 'user: what recipes have we got'
+      - 'assistant: frontend-dev and api-dev.'
+      - 'user: run the frontend one there'
+      - 'assistant: frontend-dev running in the #501 worktree; vite up on :5173.'
+    active: [daintree.recipe.run-or-create, daintree.foundation]
+  - query: its stuck on a question about DST. tell it to follow the IANA rules and not hardcode offsets
+    history:
+      - 'user: #77. put an agent on it'
+      - 'assistant: Started #77, agent in tab 2.'
+      - 'user: how long do these usually take lol'
+      - 'assistant: Depends on the bug - this one is probably twenty minutes.'
+  - query: two of them are asking me something. just say yes to both
+    history:
+      - 'user: each one gets its own worktree yeah?'
+      - 'assistant: Confirmed — six separate worktrees. All six agents running.'
+      - 'user: how are they all doing'
+      - 'assistant: Four working, two waiting on questions, none failed. The two waiting want confirmation before touching migration files.'
+    active: [daintree.foundation, daintree.orchestration.supervise-fleet]
+  - query: 4 of them are sat on prompts. unblock the lot, yes to anything read only
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Nine agents up: three working, four waiting on questions, two finished and idle.'
+    active: [daintree.foundation, daintree.orchestration.supervise-fleet]
+  - query: right now tell it pnpm and let it carry on
+    history:
+      - 'user: 4 of them are sat on prompts. unblock the lot'
+      - 'assistant: Three answered; the fourth is asking pnpm or npm.'
+      - 'user: one of them asked pnpm or npm. we use pnpm, remember that for good'
+      - 'assistant: Saved: this project uses pnpm as its package manager. No conflicting fact was stored.'
+    active: [daintree.foundation, daintree.memory.manage-project-memory]
+  - query: three waiting on questions, three finished. answer the waiting ones
+    history:
+      - 'user: thats a lot of tabs. name them after the issue numbers'
+      - 'assistant: Retitled all ten.'
+      - 'user: anyone need me yet'
+      - 'assistant: Three waiting on questions, three finished, four still working. Nothing failed.'
+    active: [daintree.foundation, daintree.orchestration.supervise-fleet]
+  - query: one sec — the agent's asking a yes/no, tell it yes and let it carry on
+    history:
+      - 'user: kick off the migration agent'
+      - 'assistant: Running in tab 4.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: it's asking whether to overwrite the file — tell it yes and let it carry on
+    active: [daintree.foundation]
+  - three of them are blocked on prompts, unblock them and tell me what each one came back with
+  - the agent isn't hung and the spawn worked fine — it's sitting on a y/n about overwriting pnpm-lock.yaml. tell it yes.
+  - query: tell it no
+    history:
+      - 'assistant: tab 2 tail — "Waiting for your input: should I bump the major version? (y/n)"'
+  - query: all three are asking the same thing. say yes to all of them and tell me what they come back with.
+    history:
+      - 'assistant: tabs 3, 5 and 7 all show: "Do you want to proceed? ❯ 1. Yes  2. No"'
+  - three of them are waiting on questions — answer them all and tell me what they came back with
+  - query: the alert said 3 of 5 are waiting on questions - go deal with them
+    history:
+      - 'user: five agents, one ticket each'
+      - 'assistant: Five up and supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: which agent is asking me something? i got a ping
+    history:
+      - 'user: how are the agents doing'
+      - 'assistant: Four working, one nearly done. Watchers armed on all of them.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: the agent pinged me - i think it's asking something, go answer it
+    history:
+      - 'user: get an agent adding the missing tests'
+      - 'assistant: Agent in t_1616, watcher armed.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: one of the agents is asking me something, just say yes
+    history:
+      - 'user: request changes on 88, the migration isn''t reversible'
+      - 'assistant: Changes requested with that reason in the body.'
+    active: [daintree.forge.land-pull-request]
+  - query: the agent doing the fix is asking me something, tell it to keep the existing prop name
+    history:
+      - 'user: delegate the fix'
+      - 'assistant: Spawned an edit agent with the console error and acceptance criteria.'
+    active: [daintree.runtime.debug-web-app]
+  - query: two of them are asking questions, go answer them
+    history:
+      - 'user: move the agents into their own worktrees'
+      - 'assistant: Four created off develop; each terminal filed and told to continue in its new directory.'
+    active: [daintree.worktree.relocate-agents]
+  - query: it wants permission to run the migration against staging. yes.
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: there's an inbox item about an agent asking a question — deal with it
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: why does it keep asking me things. answer it and don't come back unless it's something that actually matters
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: answr the waiting agnets pls
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: ok that one's answered, now put me on the next one that's still waiting
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: the agent wants to know which branch to base off — tell it develop
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: one of them — the billing branch one i think — popped a prompt at me, deal with it
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: the agent asked whether to keep backwards compat — answer it yes and tell me what it does next
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: yeah tell it to go with option b
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+wakes:
+  - query: '[watcher fired: t_0022 stopped again — askingQuestion, wants a second confirmation]'
+    history:
+      - 'user: the agent in tab 2 is asking something, tell it yes'
+      - 'assistant: Sent the confirmation to t_0022. Waiting for it to carry on so I can report what you asked for.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: '[terminal.awaitAll returned: 2 finished, 1 askingQuestion]'
+    history:
+      - 'user: three of them are blocked on prompts, unblock them all'
+      - 'assistant: Answered all three — t_11, t_12, t_14 — with the protocol reply. Waiting on them to continue.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: '[background wake: t_7001 idle, agent completed]'
+    history:
+      - 'user: it wants permission to write the file, say yes and tell me what it produces'
+      - 'assistant: Approved in t_7001. Watching for it to finish so I can report the output.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: '[watcher w_310 fired 03:12: t_9002 is asking a question and has been idle since]'
+    history:
+      - 'user: run it overnight and wake me if anything needs me'
+      - 'assistant: Watcher armed on t_9002 with a needs-input trigger. Sleep well.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: '[wake: 4 of 4 terminals now report waitingReason=question]'
+    history:
+      - 'user: leave it all running while i''m in standup'
+      - 'assistant: Watchers armed on all four terminals so nothing sits idle unnoticed.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+near_misses:
+  - the agent in tab 3 is asking something, tell it yes
+docs:
+  - agent 2 is asking something, tell it yes
+  - the agent is asking something, tell it yes
+  - go ahead and answer it
+  - yes tell it yes
+  - query: yes tell it yes
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: go ahead and answer it
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: actually wait — yes tell it yes
+    history:
+      - 'user: get the three of them to cross-check each other and give me one answer'
+      - 'assistant: One merged answer delivered, with the two disagreements resolved.'
+  - query: quick q — the agent is asking something, tell it yes
+    history:
+      - 'user: keep going on it'
+      - 'assistant: Advanced two nodes. Import rewrite landed, CI node is running now.'
+foundation_boundaries:
+  - the agent in 3 is asking me something — tell it yes and let it carry on

@@ -58,15 +58,48 @@ python3.12 -m venv .venv-train
 Training auto-selects MPS on Apple silicon (measured 5.7x faster than CPU for
 training; inference stays CPU/ONNX regardless).
 
+## The corpus is three planes
+
+The training data is not one file. It is a raw plane, a curated plane and a
+compiled artifact, and keeping them apart is what makes the corpus something you
+can delete from.
+
+```
+training/journals/   RAW      what a generating agent returned. Append-only, committed.
+training/corpus/     CURATED  hand-edited YAML, one file per runbook. SOURCE OF TRUTH.
+training/data/       COMPILED selection.jsonl + corpus-lock.json. Generated; CI-gated.
+```
+
+`training/corpus/README.md` is the authoring reference — read it before writing
+examples. The short version: a row answering exactly one runbook lives in
+`corpus/runbooks/<id>.yaml`, anything else in `corpus/shared/<source>.yaml`, and
+`selection.jsonl` is a build output that nobody edits by hand.
+
+This replaced a single `selection.jsonl` that was both the assembler's output
+and its own input — `assemble_data.py` took the committed corpus as `--base` and
+appended to it. Nothing could be removed by regenerating; provenance was one
+flat `source` string; and re-running a generator grew the corpus instead of
+reproducing it (the retired `augment_context.py` measured 9,903 rows becoming
+10,405, and shipped a guard against its own re-run whose documented recovery was
+`git show <commit>:…jsonl >`). Compiling is now a pure function: run it twice,
+get the same bytes.
+
 ## Pipeline
 
 ```bash
 # 1. Generate synthetic data (Workflow agents; see .claude/skills/retrain-selector
 #    for prompts + schemas). Journals land under the session's workflows dir.
 
-# 2. Assemble + validate. Drops benchmark collisions (reports the count),
-#    validates every id against the live catalog, unpairs foundation labels.
-.venv-train/bin/python -m training.assemble_data --journal <journal.jsonl> [...]
+# 2. Fold the journal into the CURATED corpus, and archive the journal itself.
+#    Idempotent: examples already present are skipped, so re-running is a no-op.
+.venv-train/bin/python -m training.ingest_journal <journal.jsonl> --run <run-id>
+
+#    Then edit training/corpus/**.yaml by hand — that is the point of the plane.
+#    Delete what the generator got wrong; it will stay deleted.
+
+# 2b. Compile. Drops benchmark collisions (reports the count), validates every id
+#     against the live catalog, unpairs foundation labels, and writes the lockfile.
+.venv-train/bin/python -m training.compile_corpus
 
 # 3. Train stage 1, THEN stage 2. The order is load-bearing: stage 2 trains
 #    against shortlists from a FROZEN stage 1, so retraining stage 1 afterwards
@@ -85,8 +118,10 @@ training; inference stays CPU/ONNX regardless).
 ## The one rule that matters
 
 **`benchmarks/runbook_selection/cases/` is held out.** Generating agents are
-forbidden from reading it; `assemble_data` normalises every generated query and
-drops collisions (8 caught so far); thresholds are tuned on held-out *synthetic*
+forbidden from reading it; `compile_corpus` normalises every query — and every
+history line, which is model input too — and drops collisions, measuring the
+count rather than trusting anyone about it; `tests/unit/test_training_corpus.py`
+asserts none survived. Thresholds are tuned on held-out *synthetic*
 splits only. After many inspect-iterate cycles the benchmark has drifted toward
 a dev set — before any final adoption claim, write a fresh ~50-case signoff set
 blind.
@@ -110,7 +145,10 @@ runbook lands in a crowded neighbourhood, it needs data — in both directions.
 | `setwise_model.py` | stage 2's architecture, shared by trainer and exporter |
 | `train_setwise.py` | stage 2: the set-wise head over a frozen shortlist |
 | `export_two_stage.py` | ONNX export (both encoders + head) + decision-parity gate |
-| `assemble_data.py` | journals → validated corpus; contamination gate |
+| `corpus_source.py` | the curated plane: schema, loader, writer |
+| `ingest_journal.py` | raw journal → curated YAML; idempotent, archives the journal |
+| `compile_corpus.py` | curated YAML → `selection.jsonl` + lockfile; every gate lives here |
+| `prune_run.py` | removes every example a named generation run contributed |
 | `eval_two_stage.py` | **canonical** eval: shipped artifact, shipped policy, fp32+int8+diff |
 | `calibrate_floors.py` | re-derives the admission floors against a fresh export |
 | `try_runbook_text.py` | scores a proposed whenToUse/summary edit — no retrain, no writes |

@@ -1,0 +1,377 @@
+# Training examples whose answer is `daintree.worktree.manage-resource` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.worktree.manage-resource
+run: pre-split
+positives:
+  - is my devbox still running
+  - check the cloud box on the billing worktree
+  - whats the remote resource doing on wt_3a1
+  - did the sandbox for the perf tree come back up after last night
+  - is anything actually provisioned behind the hotfix worktree or is it just a checkout
+  - remote status for the tree im sitting in right now please
+  - the card says unknown for the devbox — is that up or down
+  - spin up the cloud box for the migration worktree
+  - provision the remote for wt_11c
+  - i need that devbox today, bring it up
+  - nothing has been set up on the auth tree yet. get its resource going
+  - provision it, and if it times out halfway dont just fire it off a second time
+  - pause the devbox on billing, im done for the day
+  - kill the cloud box to save money
+  - im heading out — park the remote on the perf tree
+  - put the sandbox to sleep for the weekend
+  - wake the devbox back up for billing
+  - resume the remote on wt_3a1
+  - bring the box back, i need to run the seed script on it
+  - start the remote for that tree again, i paused it friday
+  - these devboxes are costing a fortune. what's actually up right now
+  - anything i can pause to stop burning cash
+  - im getting billed for something in the cloud and i think its one of my worktrees
+  - pause the box at 6
+  - remind me to shut the remote down before i log off tonight
+  - can it come back up at 9 tomorrow so its warm when i start
+  - set something up so it isnt sat running all weekend
+  - tear down the resource on the old spike tree, completely gone
+  - destroy the devbox for wt_9d40, i dont need that env any more
+  - can you just delete the whole cloud env for that tree
+  - how do i ssh into the devbox for this worktree
+  - connect me to the remote on billing
+  - the status had an endpoint in it — give me the ssh line for it
+  - i made the worktree for feat/search yesterday, does it have a cloud box or do i need to bring one up
+  - tree's checked out already. now get its remote going
+  - when you added that worktree did it provision anything remote or just the local files
+  - the worktree exists, the machine behind it doesnt. sort the second part
+  - i dont need another worktree, i need the one i have to have a box behind it
+  - set up the resource for the branch i checked out this morning
+  - wt_11c is fine on disk but nothing answers on the remote side
+  - you made me a worktree for chore/bump-deps last week — is it burning cloud money
+  - adding a worktree doesnt start the devbox too does it? check wt_44de
+  - the worktree got created but the provision step never ran, did it?
+  - new branch is in its own tree now — does that come with a machine or is that a separate step
+  - im finished with that tree but dont delete it, just stop it costing me
+  - leave the worktree where it is, only pause whats running in the cloud
+  - before i clean anything up — which of these trees still have live remotes
+  - dont remove the checkout, just power off its box
+  - pause everything remote, im not tearing anything down yet
+  - i want to keep the code. i just dont want to pay for the machine
+  - shut the cloud box down for the night on wt_44de
+  - clean up the cloud side only, leave my terminals and trees alone
+  - am i paying for the four worktrees i left open last week
+  - which of my trees have something live in the cloud right now
+  - that tree is dead to me. can the box at least go to sleep, ill delete the worktree myself later
+  - half these trees are stale but before i touch anything tell me whats costing money
+  - dont delete anything! i only asked whether the devbox is up
+  - im not cleaning up yet, just pause the remote on the two oldest trees
+  - Check the current worktree's remote devbox status.
+  - Provision the cloud resource configured for this exact worktree.
+  - Pause this worktree's devbox to save cost.
+  - Resume the paused remote resource and verify it came back.
+  - Show whether the resource is healthy or unknown right now.
+  - Provision the environment, then read fresh status instead of trusting the acknowledgement.
+  - Pause this resource tonight if the assistant can do that automatically.
+  - Schedule a reminder for me to pause this devbox later, since automation may not be possible.
+  - Tear down this worktree's cloud environment safely.
+  - Connect me to the remote worktree resource.
+  - The provision call timed out; check status before retrying.
+  - Use the exact non-active worktree id for the resource status call.
+  - Resume the resource and report its provider status timestamp.
+  - Is a status command configured for this worktree's resource?
+  - Pause the worktree environment but do not destroy it.
+  - Bring the remote box back online for this branch.
+  - Create the configured devbox infrastructure for the feature worktree.
+  - Tell me why automatic pause and resume cannot run unattended.
+  - The resource action says the target is not configured even though I named another worktree.
+  - Inspect the resource state without dumping credential-bearing metadata.
+boundaries:
+  - query: the gpu worktree's cloud box is parked, bring it back up
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: provision the remote environment for that tree
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: The cloud devbox attached to the analytics worktree is paused; resume that remote resource.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Pause the remote environment for this branch folder tonight to save cost.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: pause the devbox on the ml worktree to save money
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: is the remote environment for that tree still running
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: resume the cloud machine attached to the training worktree
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: can we schedule the devbox to pause at 6pm
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: what's that worktree's remote resource costing while it sits idle
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: pause the devbox on that worktree overnight, it's costing a fortune
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: provision the devbox on that worktree so i can run the app there
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Check the remote cloud devbox status for this worktree.
+    confusable_with: [daintree.runtime.debug-web-app]
+followups:
+  - query: pause it then
+    history:
+      - 'user: is the devbox up on the billing tree'
+      - 'assistant: Fresh status on wt_3a1 (billing): lastStatus running, checked just now, no error.'
+    active: [daintree.worktree.manage-resource]
+  - query: the billing one
+    history:
+      - 'user: pause the cloud box'
+      - 'assistant: Two worktrees have a configured resource — wt_3a1 (billing) and wt_11c (chore/bump-deps). Which one?'
+    active: [daintree.worktree.manage-resource]
+  - query: did it actually come up though, or is that just the call returning ok
+    history:
+      - 'user: provision the remote for the migration tree'
+      - 'assistant: Provision acknowledged for wt_7b02. The acknowledgement only means the configured command returned — re-reading status now to confirm the external state.'
+    active: [daintree.worktree.manage-resource]
+  - query: fine, wheres that dialog
+    history:
+      - 'user: tear down the resource on the spike tree'
+      - 'assistant: I won''t run teardown from here — its project-defined commands can destroy unrecoverable infrastructure and I can''t preview them. The worktree card''s Teardown Resource dialog shows the exact commands before you confirm.'
+    active: [daintree.worktree.manage-resource]
+  - query: so theres no way to get a shell on it from in here at all?
+    history:
+      - 'user: ssh me into the devbox'
+      - 'assistant: Connect is a UI-only action — it isn''t exposed to me, and I won''t guess an SSH command from the status endpoint. Use the connect control on the worktree card.'
+    active: [daintree.worktree.manage-resource]
+  - query: yeah a reminder is fine, do that
+    history:
+      - 'user: pause the box at 6 tonight'
+      - 'assistant: I can''t schedule the pause itself — the raw call can''t be pre-authorized, so no timer or watcher can run it later. I can set a reminder that pings you at 6 and nothing else.'
+    active: [daintree.worktree.manage-resource]
+  - query: and the perf tree too while youre in there
+    history:
+      - 'user: park the remote on billing, im done'
+      - 'assistant: Paused wt_3a1. Follow-up status shows pausedAt updated; lastStatus still reads running until the next status command lands, so I re-ran it — now stopped.'
+    active: [daintree.worktree.manage-resource]
+  - query: unknown meaning what exactly — is it costing me or not
+    history:
+      - 'user: whats the status of the box on wt_44de'
+      - 'assistant: The status command ran and returned unknown, last checked 30 seconds ago. I''m treating that as unknown rather than healthy.'
+    active: [daintree.worktree.manage-resource]
+  - query: ok ive focused it now, try again
+    history:
+      - 'user: resume the remote on wt_9d40'
+      - 'assistant: The resume was refused as not configured, but that check looks at the focused worktree rather than the one I named. I''m not going to switch trees behind your back — focus wt_9d40 and I''ll retry.'
+    active: [daintree.worktree.manage-resource]
+  - query: how long does it usually take before i can reach it
+    history:
+      - 'user: bring the sandbox back for the perf tree'
+      - 'assistant: Resume acknowledged on wt_ce18. Fresh status now reports running, endpoint present, no error.'
+    active: [daintree.worktree.manage-resource]
+  - query: dont fire it again, check first
+    history:
+      - 'user: provision the auth worktree'
+      - 'assistant: The provision call timed out in transport. That doesn''t prove the project command did nothing, so I''m re-reading status before considering a retry.'
+    active: [daintree.worktree.manage-resource]
+  - query: pause the two idle ones, leave the migration box alone
+    history:
+      - 'user: whats costing me money right now'
+      - 'assistant: Three trees have a live remote: wt_3a1 (running, idle since Friday), wt_11c (running, idle 3 days), wt_7b02 (running, active migration work).'
+    active: [daintree.worktree.manage-resource]
+  - query: Resume it instead and verify with another status call.
+    history:
+      - 'user: Provision this worktree resource.'
+      - 'assistant: Fresh status says it is already paused.'
+    active: [daintree.worktree.manage-resource]
+  - query: Okay, create a reminder only and make clear it runs nothing.
+    history:
+      - 'user: Pause it tonight.'
+      - 'assistant: Raw resource calls cannot be granted to timers.'
+    active: [daintree.worktree.manage-resource]
+  - query: Do not run it; tell me where the UI preview is.
+    history:
+      - 'user: Tear down the devbox.'
+      - 'assistant: The assistant cannot preview the project-defined destructive commands.'
+    active: [daintree.worktree.manage-resource]
+  - query: Report that verification is unavailable and stop.
+    history:
+      - 'user: Check remote resource status.'
+      - 'assistant: The status action returned configured false.'
+    active: [daintree.worktree.manage-resource]
+  - query: Read status before attempting any replay.
+    history:
+      - 'user: Provision the remote box.'
+      - 'assistant: The transport failed after dispatch and the outcome is ambiguous.'
+    active: [daintree.worktree.manage-resource]
+  - query: Point me to the worktree card control instead.
+    history:
+      - 'user: Connect to the resource.'
+      - 'assistant: The connect action is not exposed to the Assistant MCP.'
+    active: [daintree.worktree.manage-resource]
+topic_shifts:
+  - query: is the cloud box on that worktree still burning money?
+    history:
+      - 'user: clean up the worktrees from last week'
+      - 'assistant: Removed three merged ones. Left wt_2b — it still has the devbox attached.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: pause the remote box on the migration worktree, i'm done for the night
+    history:
+      - 'user: start work on #501'
+      - 'assistant: Worktree wt_7e created, agent running on issue-501.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: bring the devbox back up before the agent starts, it can't build without it
+    history:
+      - 'user: put an agent on the compile errors in the vendor package'
+      - 'assistant: Ready to launch. Which worktree should it run in?'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: what's the resource status on wt_3c?
+    history:
+      - 'user: which worktrees exist'
+      - 'assistant: wt_1a, wt_3c and wt_9d. wt_3c is the only one on a release branch.'
+    active: [daintree.foundation]
+  - query: provision the remote environment for this one, the local machine can't hold the dataset
+    history:
+      - 'user: make a worktree for the analytics spike'
+      - 'assistant: Created wt_ab1 at ~/trees/analytics-spike on spike/analytics.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: can you pause those boxes at 6pm every day? i keep forgetting and the bill is silly
+    history:
+      - 'user: ping me when the deploy finishes'
+      - 'assistant: Watcher armed on the deploy terminal.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: i want to tear the devbox down entirely on the old spike worktree
+    history:
+      - 'user: what''s still in flight'
+      - 'assistant: Nothing running. Two stale ledger rows from the spike work, both closed out now.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: how do i actually ssh into the devbox for this worktree?
+    history:
+      - 'user: the preview is showing a 502 from the api'
+      - 'assistant: Console confirms the fetch to /api/v1/orders returns 502. The backend isn''t reachable from the preview.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: resume the remote resource on wt_44, i'm picking that work back up
+    history:
+      - 'user: catch me up on the search work'
+      - 'assistant: The branch is three commits ahead, unpushed, and the worktree wt_44 is still there from Thursday.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: before we merge, shut down the cloud box attached to that branch — no point paying for it after
+    history:
+      - 'user: approve and merge 802'
+      - 'assistant: Approved and merged with a squash. The PR reads merged:true on re-read.'
+    active: [daintree.forge.land-pull-request]
+  - query: which of these worktrees have devboxes attached and what state are they in
+    history:
+      - 'user: rename the tabs so i can tell the agents apart'
+      - 'assistant: Retitled all four by what they''re working on.'
+    active: [daintree.terminals.rename, daintree.foundation]
+  - query: cheapest thing i can do right now to stop the spend on these remote envs?
+    history:
+      - 'user: how are the agents getting on'
+      - 'assistant: Two finished, two idle for the last half hour with nothing queued.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: spin the devbox up on the perf worktree, i need the big machine for the benchmark
+    history:
+      - 'user: run the recipe on a new worktree off main'
+      - 'assistant: Created wt_e12 with the perf recipe; it spawned one agent which is idle.'
+    active: [daintree.recipe.run-or-create, daintree.foundation]
+  - query: did that pause actually take? check the real status not just what it told you
+    history:
+      - 'user: file an issue about the seed script'
+      - 'assistant: Created #815 and labelled it infra.'
+    active: [daintree.forge.manage-issue]
+  - query: put the remote box for wt_9d to sleep, that work's parked until next month
+    history:
+      - 'user: unassign me from 350'
+      - 'assistant: Unassigned. The issue is still open with no assignee.'
+    active: [daintree.forge.manage-issue, daintree.foundation]
+  - query: Use the exact non-active worktree id for the resource status call.
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: The resource action says the target is not configured even though I named another worktree.
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: is anything actually provisioned behind the hotfix worktree or is it just a checkout
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: remote status for the tree im sitting in right now please
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: im heading out — park the remote on the perf tree
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: pause everything remote, im not tearing anything down yet
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: Check the current worktree's remote devbox status.
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: is my devbox still running
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: tear down the resource on the old spike tree, completely gone
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: tree's checked out already. now get its remote going
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: wake the devbox back up for billing
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: The provision call timed out; check status before retrying.
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: Pause this resource tonight if the assistant can do that automatically.
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: destroy the devbox for wt_9d40, i dont need that env any more
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: the status had an endpoint in it — give me the ssh line for it
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: Inspect the resource state without dumping credential-bearing metadata.
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: spin up the cloud box for the migration worktree
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: can you just delete the whole cloud env for that tree
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+wakes:
+  - query: '[timer fired: pause reminder]'
+    active: [daintree.worktree.manage-resource]
+  - query: '[timer fired: pause devbox]'
+    history:
+      - 'user: remind me at 6 to pause the boxes'
+      - 'assistant: Reminder timer set. It runs nothing — I''ll still need you here to pause them.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: '[wake: reminder tm_902 elapsed — remote resource check]'
+    history:
+      - 'user: remind me in two hours to check the devbox'
+      - 'assistant: Timer set for 120 minutes.'
+    active: [daintree.worktree.manage-resource]
+  - query: '[watcher fired: terminal t_5510 went idle]'
+    history:
+      - 'user: pause the box after the agent finishes'
+      - 'assistant: Watching t_5510. When it settles I''ll come back to you before pausing anything.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+foundation_boundaries:
+  - is the devbox up
+  - pause the devbox
+  - resume the remote box for this worktree
+  - provision the resource for wt_9c
+  - how do i connect to the devbox?
+  - tear down the cloud box for the old branch
+  - pause it at six so we stop paying for it overnight
+  - what's the remote resource status on the api worktree

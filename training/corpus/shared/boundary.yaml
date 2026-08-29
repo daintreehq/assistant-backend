@@ -1,0 +1,70 @@
+# Curated rows tagged `boundary` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: boundary
+run: pre-split
+examples:
+  - query: what's the actual difference between squash and rebase merges
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: nice, that's the last one for the week
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: what makes a good issue title anyway
+    confusable_with: [daintree.forge.manage-issue]
+  - query: ha, classic. ok thanks
+    confusable_with: [daintree.forge.manage-issue]
+  - query: hold on, let me go read it first
+    confusable_with: [daintree.forge.manage-issue]
+  - query: what's the difference between the workflow list and a workflow graph anyway
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: great, that's a weight off
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: is our production site down right now
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: whats the current best practice for lazy loading images
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: does chrome still support that api or did they drop it
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: why is our marketing site slow on mobile
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: what does a 502 from cloudflare usually mean
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: can you check what the staging url is actually serving right now
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: how do i change the preview panel keybinding in daintree
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: roughly how much memory does daintree normally use
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: start the dev server
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: run npm run dev in tab 2
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: spin up the local api on 8080 so i can poke at it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: how do worktree remote resources get configured in the first place
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: does every worktree get its own devbox or is it shared
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: find me an unassigned bug and then get it started
+    expect: [daintree.workflow.find-issue-work, daintree.workflow.start-work-on-issue]
+    confusable_with: [daintree.forge.manage-issue]
+  - query: create a worktree on the cost-cutting branch, cost/idle-shutdown, off main, and title the tab idle-shutdown
+    expect: [daintree.worktree.create-plain-worktree, daintree.terminals.rename]
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Review the deployed website's public documentation, not a local Dev Preview.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Create an issue for this bug and then immediately start an agent fixing it.
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+  - query: Review PR 42 for security and squash-merge it if the findings are clear.
+    expect: [daintree.review.review-change, daintree.forge.land-pull-request]
+  - query: Make CI green and then merge the pull request with rebase.
+    expect: [daintree.ci.diagnose-and-fix, daintree.forge.land-pull-request]
+  - query: Plan a durable workflow to fix the red CI checks and verify them.
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.ci.diagnose-and-fix]
+  - query: The preview is blank and the production build also fails; diagnose both.
+    expect: [daintree.runtime.debug-web-app, daintree.ci.diagnose-and-fix]
+  - query: start three agents on those issues, name each tab after its ticket
+    expect: [daintree.orchestration.fan-out-work, daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.terminals.rename]
+  - query: i can't create worktrees at all any more — the worktree tools aren't even showing up for you
+    expect: [daintree.diagnostics, daintree.worktree.create-plain-worktree]

@@ -1,0 +1,393 @@
+# Training examples whose answer is `daintree.orchestration.runoff-tiebreaker` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.runoff-tiebreaker
+run: pre-split
+positives:
+  - break the tie
+  - run a runoff between the two that tied
+  - tiebreaker round with the same agents
+  - those two are level, do a tie-breaker with the same crew
+  - do that again but only with the two that tied
+  - yeah go again between those two
+  - ok so agent 2 and agent 4 both finished on three points so we dont actually have a winner. can you get one more fresh short answer out of each of them and then have the whole group vote again between just those two and tell me who takes it
+  - scores came out claude 2, codex 2, gemini 1 — top two are tied and I don't want to start the whole thing over. take the tied pair, one new entry each, send both back to all three to vote blind, then give me the tally
+  - we've got a tie at the top — can you run a second round to settle it?
+  - how do we settle this? both of them got 2 votes
+  - can you do a head to head between the two that tied?
+  - tied 3-3, run a runoff ballot among the tied entrants, same electorate, blind labels, rotate the tag order
+  - peer vote came back deadlocked — tie-break round, same cohort, no new spawns
+  - theres a tie, do a runof round pls
+  - brake the tie with anotehr vote between the top two
+  - tie brekaer between agnet 1 and agent 3
+  - runoff on the original submissions, don't ask them for new ones — just have everyone revote between those two entries
+  - nobody won, two-way tie. same agents, one more round.
+  - still tied after that runoff, go again
+  - three-way tie at the top, run the runoff across all three
+  - have the tied agents submit one more each and let the original voters pick the winner
+  - settle the tie
+  - we need a winner — another vote round with just the top two, and dont spawn anything new
+  - is there a way to break this tie without starting the whole contest over?
+  - second one tied too — run it off same as before
+  - the vote deadlocked at 2-2. rerun the ballot with just those two entries and tally it properly this time
+  - 3-3. run it again with just those two
+  - we got a tie betwen the claude one and the codex one, do a runof
+  - runoff
+  - ok so the vote came back 2 for entry A and 2 for entry B and I really don't want to be the one picking, can you get those two to write something new and then have all the same voters go again
+  - term_9f2c and term_a41b both landed on 4 points — new submissions from each, same voters, tally it
+  - those two tied, break it
+  - your count was off, it's actually even. redo the vote properly this time
+  - this is the second time it's come out level. just sort it out.
+  - if the scores come out level when they're done, run a second round between whoever's on top and I'll take that as final
+  - wasn't it gemini and the sonnet one that ended up equal? tiebreak between them please
+  - nobody won, score the top two again with fresh entries
+  - poll everyone again but only on the two that came out tied
+  - we can't eliminate anyone, they're level — do another round on those two and vote again
+  - the judge couldn't split them. get new answers from the top 2 and let the rest of them vote on it
+  - the two that tied should each have another go and then the group picks a winner
+  - tied again. this time spawn one fresh agent as the deciding vote and rerun the tiebreak
+  - don't make them write anything new, just re-vote on the same two entries
+  - still 2-2. go again.
+  - not sure how you'd even do this but they're deadlocked, can you get an actual winner out of them
+  - run the tiebreak but this time don't tell them who wrote which entry
+  - do the runoff on the tied pair and then give me combined totals with the earlier points folded in
+  - either break this tie or just tell me it's a draw, don't make something up
+  - demo in like 5 min and the vote's stuck even, run the quick runoff now
+  - same tiebreak as last time but nobody gets to vote for their own entry
+  - three of them are on 3 points each. new entries from all three and everyone votes
+  - yep, runoff between those two then
+  - hang on, that wasn't a win, they were joint first. run the extra round
+boundaries:
+  - query: the poll came out 2-2, run a tie-break round with the same agents
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: its tied, do a runoff between the two that tied and get the fleet to vote again
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: it's tied 2-2, run another round with just those two
+    confusable_with: [daintree.orchestration.competition]
+  - query: the vote came out even — do a tiebreaker with the same agents
+    confusable_with: [daintree.orchestration.competition]
+  - query: dead heat. get new submissions from the two that tied and re-vote
+    confusable_with: [daintree.orchestration.competition]
+  - query: they tied — run another round between the two that came out level
+    confusable_with: [daintree.orchestration.conversation]
+  - query: the vote was 2-2, do a runoff with the same agents
+    confusable_with: [daintree.orchestration.conversation]
+  - query: that vote tied — run a runoff with the same agents and break it
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: the vote came out 2-2, run a runoff between those two
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: it's tied — do another round with just the tied agents and break it
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: nobody won the elimination vote, tie-break it with the same voters
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: the vote tied — run another round with the two that tied and break it
+    confusable_with: [daintree.orchestration.interview]
+  - query: they tied 2-2. run another round between just the two that tied and settle it
+    confusable_with: [daintree.orchestration.conversation]
+  - query: vote was a dead heat - get the tied agents to resubmit and have the others pick again
+    confusable_with: [daintree.orchestration.conversation]
+  - query: we ended 2-2, run a second round between the two that tied
+    confusable_with: [daintree.orchestration.competition]
+  - query: the vote tied — get fresh submissions from just those two and re-poll the same agents
+    confusable_with: [daintree.orchestration.competition]
+  - query: the poll came back 2-2. run a runoff with the same agents
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: tied again — break it with the same cohort, don't add anyone new
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: the vote tied 2-2, run a runoff with the same agents
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: the elimination vote came back 2-2. run a runoff with the tied pair
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: two of them tied in that vote, break it with the same cohort
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: nobody won that vote outright, do a second round between the top two
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: the vote came out 2-2. run a runoff between those two with the same agents voting.
+    confusable_with: [daintree.orchestration.interview]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: agent 2 and agent 4 both ended on three points, run a runoff'
+      - 'assistant: Saved the cohort map to scratch. Sent both tied agents a prompt for one new short entry and I''m awaiting them now — the three original voters are untouched.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: any votes back yet
+    history:
+      - 'user: break the tie between claude-1 and claude-3'
+      - 'assistant: Both runoff entries are in. Ballots went out to all four original voters as Entry A / Entry B with the order rotated per voter. Awaiting their picks.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: just ask it again for one pick
+    history:
+      - 'user: tie-break round please'
+      - 'assistant: Three of the four voters picked cleanly. The fourth came back with a full ranking instead of a single label, so its ballot isn''t countable yet.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: what did the other one actually write?
+    history:
+      - 'user: run the runoff between the two that tied'
+      - 'assistant: Runoff tally: Entry A 3 votes, Entry B 1. Entry A was agent 4, so agent 4 takes it.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: actually pull the third one in too, it was only a point behind
+    history:
+      - 'user: two-way tie, run it off'
+      - 'assistant: Prompted both tied entrants for a fresh short answer; awaiting them before I build the ballot.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: make sure they cant tell whose is whose
+    history:
+      - 'user: settle the tie with another round'
+      - 'assistant: New entries collected from both tied agents. Building the ballot now.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: another round
+    history:
+      - 'user: run a runoff, they''re tied at 3'
+      - 'assistant: Runoff came back 2-2 — still tied. Want another round, co-winners, or a secondary criterion?'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: what's it look like with the first round scores added on
+    history:
+      - 'user: tiebreaker between agent 1 and agent 3'
+      - 'assistant: Entries collected and ballots sent.'
+      - 'user: nice'
+      - 'assistant: Votes are in — agent 1 takes the runoff 3-1.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+topic_shifts:
+  - query: its tied, run a runoff between those two
+    history:
+      - 'user: run a competition — each agent gives me one idea for the caching layer then they vote'
+      - 'assistant: Ballot run. claude-1 and claude-3 tied on 4 points each; claude-2 got 2.'
+    active: [daintree.orchestration.competition]
+  - query: those two are dead level now, do a runoff with the same crowd
+    history:
+      - 'user: have them debate the schema change then vote one position off'
+      - 'assistant: claude-3''s position was eliminated 3-1. The remaining two positions are still live.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: run a tie-break round between those two with the same agents
+    history:
+      - 'user: ask the fleet which caching layer to use'
+      - 'assistant: Votes are in and it is 2-2 between redis and in-process.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: that was a dead heat between 2 and 3 on points - do a runoff with the same cohort
+    history:
+      - 'user: each agent gives me one interesting fact then they vote on the best'
+      - 'assistant: Submissions collected, ballots sent blind and shuffled, tallied. t_0303 wins 3-1.'
+    active: [daintree.orchestration.competition]
+  - query: break the tie then, same cohort, one more round
+    history:
+      - 'user: interview them on the codebase and name a winner'
+      - 'assistant: Judge verified claims against files and declared it a dead tie between t_0202 and t_0303.'
+    active: [daintree.orchestration.interview]
+  - query: quick q, how long can an agent sit waiting before it times out?
+    history:
+      - 'user: it tied, run a runoff between the top two'
+      - 'assistant: New submissions requested from both tied entrants. Same cohort votes again.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: it tied — run the runoff, and explain how the tally works
+    history:
+      - 'user: the vote came out 2-2'
+      - 'assistant: Yes, a dead tie.'
+  - query: two way tie? ugh. run a tiebreak between those two
+    history:
+      - 'user: yes blind. go'
+      - 'assistant: All four have the prompt. Two submissions in, waiting on tab 4 and tab 5.'
+      - 'user: are the other two done yet'
+      - 'assistant: All four in. Ballots went out blind. Tally: tab 2 on 3, tab 5 on 3, tab 4 on 1, tab 1 on 1.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: same 4 voting yeah? dont pull in anyone new
+    history:
+      - 'user: are the other two done yet'
+      - 'assistant: All four in. Tally: tab 2 on 3, tab 5 on 3, tab 4 on 1, tab 1 on 1.'
+      - 'user: two way tie? ugh. run a tiebreak between those two'
+      - 'assistant: Runoff between tab 2 and tab 5 — a fresh submission from each, then a second vote.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: 1-1-1?! do a runoff
+    history:
+      - 'user: have them vote off the weakest position and give me the tally'
+      - 'assistant: Final positions, then a blind vote.'
+      - 'user: make sure nobody can see who wrote what'
+      - 'assistant: Positions relayed with authorship stripped and order shuffled. Result: one vote each.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+  - query: 2-2? do a runoff between those two
+    history:
+      - 'user: is that still in flight or did it finish'
+      - 'assistant: Stale row, nothing running. Closed it out.'
+      - 'user: start it again - 4 agents, one paragraph each, then they vote. ping me when it''s decided'
+      - 'assistant: Four agents up, submissions out, blind ballot after. Watcher set to wake you on the result.'
+    active:
+      - daintree.orchestration.competition
+      - daintree.orchestration.watch-outcome
+      - daintree.foundation
+  - query: still tied 😑
+    history:
+      - 'user: start it again, ping me when it''s decided'
+      - 'assistant: Four agents up, watcher set.'
+      - 'user: 2-2? do a runoff between those two'
+      - 'assistant: Runoff between tab 1 and tab 4 — fresh paragraph from each, same four voting.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: so who actually won in the end
+    history:
+      - 'user: still tied 😑'
+      - 'assistant: Third round out with a tighter brief.'
+      - 'user: cancel the watcher you set, i''m here anyway'
+      - 'assistant: Watcher cancelled.'
+    active: [daintree.foundation]
+  - query: three way tie lol. runoff
+    history:
+      - 'user: tally'
+      - 'assistant: One point each — three-way tie.'
+      - 'user: wait who''s the judge again - actually doesn''t matter'
+      - 'assistant: No problem.'
+  - query: same three, new fact each, don't add anyone
+    history:
+      - 'user: wait who''s the judge again - actually doesn''t matter'
+      - 'assistant: No problem.'
+      - 'user: three way tie lol. runoff'
+      - 'assistant: Runoff over the same three, fresh fact from each.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: tie for worst. runoff on those two
+    history:
+      - 'user: anyway do they agree or not'
+      - 'assistant: Two say trim, one says leave it. No consensus.'
+      - 'user: have the three of them debate it and then knock out the worst take'
+      - 'assistant: Two debate rounds, final positions, then a blind vote on the weakest. Vote came back tied.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+  - query: 3-3?? ugh. run a runoff between them
+    history:
+      - 'user: ask the pinned agents which of these two schema designs theyd go with'
+      - 'assistant: Polled all six pinned agents blind. It came out 3-3 — A for migration simplicity, B for query performance.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: its 2-2 between agent 2 and agent 4. run a runoff with the same five
+    history:
+      - 'user: spin up 5 agents, one caching idea each, then vote'
+      - 'assistant: Five submissions collected.'
+      - 'user: votes have to be blind, dont tell them whose is whose'
+      - 'assistant: Relabelled the entries A–E, shuffled the order per agent, no authorship shown. Tally: A 2, D 2, B 1.'
+    active: [daintree.foundation, daintree.orchestration.competition]
+  - query: it tied 2-2. same three agents, run it again on just the two that tied.
+    history:
+      - 'assistant: Final tally: entry A 2 votes, entry B 2 votes. Tied.'
+    active: [daintree.orchestration.competition]
+  - query: break it — new submissions from the two that tied, then re-poll the same cohort
+    history:
+      - 'user: the vote came back 2-2 between agent 1 and agent 3'
+      - 'assistant: Tied at two points each.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: i saw the runoff finish, who won
+    history:
+      - 'user: break the tie with the same voters'
+      - 'assistant: Runoff submissions requested from both tied entrants, then the original cohort votes.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: run a runoff between the two that tied
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: is there a way to break this tie without starting the whole contest over?
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: still tied after that runoff, go again
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: nobody won, two-way tie. same agents, one more round.
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: run the tiebreak but this time don't tell them who wrote which entry
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: the judge couldn't split them. get new answers from the top 2 and let the rest of them vote on it
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: can you do a head to head between the two that tied?
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: tied again. this time spawn one fresh agent as the deciding vote and rerun the tiebreak
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: brake the tie with anotehr vote between the top two
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: we need a winner — another vote round with just the top two, and dont spawn anything new
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: tied 3-3, run a runoff ballot among the tied entrants, same electorate, blind labels, rotate the tag order
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: poll everyone again but only on the two that came out tied
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: don't make them write anything new, just re-vote on the same two entries
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: have the tied agents submit one more each and let the original voters pick the winner
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: yep, runoff between those two then
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: do that again but only with the two that tied
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: we can't eliminate anyone, they're level — do another round on those two and vote again
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+wakes:
+  - query: '[wake: both runoff submissions received]'
+    history:
+      - 'user: they tied, run it off'
+      - 'assistant: Fresh submissions requested from both tied entrants, same cohort will vote. Waiting on the two new entries.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: '[terminal.awaitAll returned: 4 voted, 1 no response]'
+    history:
+      - 'user: break the tie with the same agents'
+      - 'assistant: Runoff ballot out to the original five voters, entries unlabelled and order shuffled. Waiting on the tally.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: '[terminal.awaitAll returned: 4 ballots in - tied 2-2 between t_11 and t_13]'
+    history:
+      - 'user: four agents, best refactor idea wins, they vote on each other'
+      - 'assistant: All four submissions in, blind ballot out to the cohort.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: '[async wait returned: 6 verdicts collected - 3 postgres, 3 sqlite]'
+    history:
+      - 'user: poll the pinned agents - postgres or sqlite for this'
+      - 'assistant: Question out to all six, neutral phrasing, no steer.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: '[background wake: tally complete - three-way tie at 2 points each]'
+    history:
+      - 'user: run the contest across all eight and declare a winner'
+      - 'assistant: Eight submissions relayed back out for blind peer voting.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: '[background wake: tally done - 2 for order A, 2 for order B, 1 abstained]'
+    history:
+      - 'user: ask all of them which migration order is safer and tally it'
+      - 'assistant: Ballot out to the five pinned agents.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+near_misses:
+  - it tied. run a runoff with the same cohort
+docs:
+  - they tied, do a runoff
+  - its tied, run a runoff between those two
+  - query: its tied, run a runoff between those two
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: sorry, unrelated — its tied, run a runoff between those two
+    history:
+      - 'user: Isolate the seven running maintenance agents by task.'
+      - 'assistant: worktrees wt_mn1 through wt_mn7 created on branches maint/logging, maint/cache, maint/config, maint/docs, maint/tests, maint/types, maint/build at /repo/.maint/logging through /repo/.maint/build. Seven terminal sends completed.'
+  - query: side question, they tied, do a runoff
+    history:
+      - 'user: cancel the graph, we''re not doing the cutover'
+      - 'assistant: Graph cancelled. Note that doesn''t close terminals, remove worktrees or revoke grants — those are separate.'

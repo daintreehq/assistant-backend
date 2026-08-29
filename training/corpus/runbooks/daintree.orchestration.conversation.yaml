@@ -1,0 +1,335 @@
+# Training examples whose answer is `daintree.orchestration.conversation` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.conversation
+run: pre-split
+positives:
+  - get them talking
+  - let claude and codex talk to each other about the caching design
+  - spin up two agents and have them chat about whether we should drop redis — you just sit in the middle and pass messages back and forth, i want to read the whole thing
+  - facilitate a roundtable with the three pinned agents on our error handling story
+  - can you host a panel discussion between the agents about the migration plan?
+  - have the three of them hash it out
+  - put them in a group chat and see where it goes
+  - i want a back and forth between those two, you relay
+  - moderate a discussion between the four agents on whether the selector should stay a separate call, couple of rounds then stop
+  - keep the conversation going, one more lap around the table
+  - let them keep chatting
+  - set up a converstaion between agent 1 and agent 2 about the auth refactor
+  - get the two explore agents talkign to each other, i just wanna watch what happens
+  - relay messages between claude and gemini about the schema until one of them runs out of things to say
+  - run a roundtable — 3 agents, open ended, no winner, no scoring, just let them discuss the architecture and tell me what came up
+  - have agent A ask agent B about its approach, then let B answer, then A again — a few rounds of that
+  - start a panel with the 3 pinned ones, topic is our retry backoff
+  - can they talk amongst themselves about this?
+  - one on one between those two terminals, you pass the messages
+  - fire up a couple of agents and let em riff on ideas for the onboarding flow
+  - i want an open ended dialogue between the agents — no verdict, no vote, just conversation, and catch each one up on what the others said
+  - kick off a group chat with all four, give each one the floor in turn
+  - 'conversation between the 2 agents pls, topic: is our retry logic sane'
+  - have them discuss it until they agree or until i stop you
+  - would you mind relaying between the two of them so they can actually respond to each other? they can't see each other's terminals
+  - let the new one join the discussion the other two are having
+  - get claude and codex chatting about the retry design, few rounds
+  - term-4 and term-7 - have them go back and forth on the caching approach, maybe 3 rounds each
+  - can u put the two agnets in a converstaion abt the migration plan, jst let them talk to each other
+  - so i've got opus in tab 2 and sonnet in tab 5 and they've both given me completely different reads on the queue design. i don't want a verdict from you, i want them to actually talk to each other about it and i'll read along
+  - another two rounds
+  - tell them to drop the test talk and get back to the schema, then carry on
+  - agent 3 never answered its turn. skip it this round and let the other two keep going
+  - i don't want a merged answer, just let them riff on it and show me the transcript
+  - ask the pinned agents about the retry design but have them actually respond to each other, not just answer me one by one
+  - have the four of them discuss it - no scoring, no winner, i just want the discussion
+  - let the two of them interview each other back and forth, nobody's judging, i just want to see what comes up
+  - instead of me ferrying notes between the reviewer and the implementer, just put them in a back and forth until they've talked it through
+  - they're just repeating themselves. push it along - get sonnet to respond directly to what opus actually said
+  - i think it's term_9? whichever one is the go agent - get it and the python one talking about the interface boundary
+  - spin up 4 agents and run a panel discussion on whether we ditch the ORM. you moderate.
+  - group chat between the three of them, topic is what to name the new package
+  - before i decide, i'd like two agents to discuss redis vs postgres for the queue for a few rounds, then give me a summary of where they landed
+  - give them an opener about the plugin api and see where it goes
+  - opus keeps saying it'll message the other agent directly. it can't right? just take its message and pass it on, keep the thread moving
+  - don't spawn anything new - use the three tabs already open and get a discussion going about the failing e2e suite
+  - prod is down and the two agents have completely different theories. put them head to head now, i want them arguing it out live
+  - keep them going until they stop disagreeing or 6 rounds, whichever comes first
+  - could you facilitate a short back-and-forth between the two claude terminals about the auth refactor please?
+  - hmm. maybe if the two of them actually talked instead of me copy pasting between tabs... yeah. do that, relay between them
+  - add the fourth agent into the discussion and catch it up on what the others have said so far
+  - you merged both their replies into one blob. do the relay properly, one speaker at a time, and keep going
+boundaries:
+  - query: get the pinned agents talking to each other about this and see where it goes
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: host a roundtable between the three agents on the architecture, give each of them the floor
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get the three of them talking to each other and see where it goes
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: host a roundtable between the agents about the architecture, i just want to watch it play out
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: let claude and codex chat about the API design for a while, keep it going
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: get the four of them talking about the architecture and just let it run, no winner needed
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: host a roundtable between the agents on whether to ship the local selector, i just want to watch
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: let them debate each other back and forth, relay it, see where it goes
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: these two are split on it, just let them talk it out and relay between them, see where it ends up
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have the three of them talk it out about the schema design, i just want to watch where it goes
+    confusable_with: [daintree.orchestration.interview]
+  - query: get them talking to each other about the perf regression and keep it going for a few rounds
+    confusable_with: [daintree.orchestration.interview]
+  - query: moderate a roundtable between the agents on whether we should adopt bun
+    confusable_with: [daintree.orchestration.interview]
+  - query: just let the four of them talk about it and see where it goes
+    confusable_with: [daintree.orchestration.competition]
+  - query: get them chatting to each other about the caching design, I just want to watch
+    confusable_with: [daintree.orchestration.competition]
+  - query: put the reviewer and the coder in a room and let them argue about the design, see where it goes
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: get my pinned agents talking to each other about the schema and see where it goes
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: host a roundtable with the three agents on whether to drop py3.11
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spawn a couple of agents and just let them talk about the retry logic, see where it goes
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: let those two just talk it out, i want to see where it goes
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: get the three of them talking to each other about the architecture and let it run, i want to watch
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: have claude and codex just chat about the tradeoffs, see where it goes
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: relay between them for a few rounds — no need for a conclusion, i just want to read the back and forth
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: let the three of them talk to each other about the schema for a while, I just want to watch where it goes
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: host a roundtable between the four agents on monorepo vs polyrepo, no verdict needed
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: keep them talking, give each one the floor in turn
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: get the three of them talking about the caching strategy and see where it goes
+    confusable_with: [daintree.orchestration.interview]
+  - query: host a roundtable between claude and codex on the migration plan. no verdict needed, just let them go.
+    confusable_with: [daintree.orchestration.interview]
+  - query: let them hash the api shape out between themselves and relay it back and forth for a while
+    confusable_with: [daintree.orchestration.interview]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: get claude and codex talking about whether we should drop the redis cache'
+      - 'assistant: Spawned both in explore mode and gave Claude the floor first. Claude argues the cache is masking an N+1; relaying that to Codex now.'
+    active: [daintree.orchestration.conversation]
+  - query: another two rounds then wrap it
+    history:
+      - 'user: facilitate a roundtable between the three pinned agents on our error handling'
+      - 'assistant: Round 1 done — each gave an opening statement. Passing the floor back to the first one with a catch-up on the other two.'
+    active: [daintree.orchestration.conversation]
+  - query: tell that one to be way more concrete, actual file names
+    history:
+      - 'user: put the four of them in a group chat about the migration plan'
+      - 'assistant: Three have spoken so far. The fourth is vague — mostly restating the others.'
+      - 'user: keep going'
+      - 'assistant: Relayed round two. The fourth is still hedging.'
+    active: [daintree.orchestration.conversation]
+  - query: wait what did the second one say exactly
+    history:
+      - 'user: let those two agents hash out the auth refactor, you relay'
+      - 'assistant: Two exchanges in. Agent A wants middleware, Agent B wants it at the router.'
+    active: [daintree.orchestration.conversation]
+  - query: add a third one to the mix
+    history:
+      - 'user: start a panel with claude and gemini on the selector design'
+      - 'assistant: Both are running and have traded opening messages.'
+    active: [daintree.orchestration.conversation]
+  - query: nice, thats the interesting bit. keep em on it
+    history:
+      - 'user: get them talking about the retry backoff'
+      - 'assistant: Round one relayed. Both landed on jittered exponential backoff pretty quickly.'
+      - 'user: push them on the failure modes'
+      - 'assistant: Relayed that. They''re now disagreeing about what to do on a 429 with no Retry-After.'
+    active: [daintree.orchestration.conversation]
+  - query: the second one looks stuck
+    history:
+      - 'user: roundtable with the three explore agents on the caching layer'
+      - 'assistant: Two rounds done. Agent 2 hasn''t produced anything on its last turn — re-awaiting.'
+    active: [daintree.orchestration.conversation]
+  - query: ok stop them there and give me the gist
+    history:
+      - 'user: let claude and codex talk it out about the schema'
+      - 'assistant: Three exchanges. They''ve agreed on the table shape but not the index strategy.'
+    active: [daintree.orchestration.conversation]
+  - query: do the same for the other two terminals after this
+    history:
+      - 'user: have the three of them discuss the deploy pipeline, open ended'
+      - 'assistant: Opening lap complete, all three have spoken. Starting round two with the first speaker.'
+    active: [daintree.orchestration.conversation]
+  - query: which terminal is which again
+    history:
+      - 'user: moderate a chat between those two agents about the test suite'
+      - 'assistant: Relayed the opener. Agent A says the fixtures are the bottleneck.'
+      - 'user: carry on'
+      - 'assistant: Agent B disagrees and blames the DB setup per test. Passing back to A.'
+    active: [daintree.orchestration.conversation]
+topic_shifts:
+  - query: just let them talk to each other about it and see where it goes
+    history:
+      - 'user: poll everyone on the naming for the new module'
+      - 'assistant: Three voted `session`, two voted `turn`. No strong argument either way.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: now just let the three of them have an open chat about what to do about it, i want to watch
+    history:
+      - 'user: get the two agents to cross check the perf numbers and give me one answer'
+      - 'assistant: Converged: the regression is real, about 18%, and it is in the serializer not the DB.'
+    active: [daintree.orchestration.multi-agent]
+  - query: keep it going for a few more rounds
+    history:
+      - 'user: get them talking about the schema change'
+      - 'assistant: Four rounds relayed, they''re converging.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: actually get 1102 and 1103 talking to each other about the schema choice, let it run and see where it goes
+    history:
+      - 'user: run through the fleet for me'
+      - 'assistant: Three agents: t_1101 done, t_1102 and t_1103 still working. Nothing needs input.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: now just let them talk to each other about it, no scoring, see where it goes
+    history:
+      - 'user: have them each submit an idea and peer judge it'
+      - 'assistant: Done - full tally attached, t_0110 wins.'
+    active: [daintree.orchestration.competition]
+  - query: wait, does each of them see the whole conversation or only what you pass along?
+    history:
+      - 'user: let the three of them talk it out about the api shape'
+      - 'assistant: Round 3 relayed. They''ve converged on versioned routes but disagree on deprecation.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: let the three of them talk it out about the api shape, but first tell me what each one sees
+    history:
+      - 'user: bored, lets try something'
+      - 'assistant: Sure.'
+  - query: hang on. before it decides - drop the judging for a bit and just let the top 2 talk to each other about it, i want to watch how they reason
+    history:
+      - 'user: make it a proper grilling - the judge should check their claims against the actual repo'
+      - 'assistant: Deep mode, verified claims, narrowing to a top 2.'
+      - 'user: which one ended up as judge'
+      - 'assistant: Tab 1 is judging. Tabs 2, 3 and 5 are candidates; it''s on round two of follow-ups and has cut tab 2.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: give the other one the floor
+    history:
+      - 'user: which one ended up as judge'
+      - 'assistant: Tab 1 judging, top 2 are tab 3 and tab 5.'
+      - 'user: drop the judging for a bit and just let the top 2 talk to each other, i want to watch how they reason'
+      - 'assistant: Judging paused. Passing the floor between tab 3 and tab 5 and catching each up as it goes.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - get the agents in tab 2, 4 and 5 talking to each other about whether we should split the orchestrator. just let it run, i want to see where it goes
+  - query: another round
+    history:
+      - 'user: get the agents in tab 2, 4 and 5 talking to each other about whether we should split the orchestrator. just let it run'
+      - 'assistant: All three are in. Opening statement each, then I pass the floor round and catch each up on what it missed.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: tab 4 is just repeating itself. push it to actually respond to what 5 said
+    history:
+      - 'user: get 2, 4 and 5 talking about whether we should split the orchestrator'
+      - 'assistant: Opening statements in, passing the floor round.'
+      - 'user: another round'
+      - 'assistant: Round two done. 4 and 5 are converging; 2 is holding out on blast radius.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - spin up a 3 way panel between claude, codex and gemini on error handling style in this repo
+  - query: it's up now. carry on with the panel
+    history:
+      - 'user: spin up a 3 way panel between claude, codex and gemini on error handling style'
+      - 'assistant: Launching all three.'
+      - 'user: codex never came up, nothing happened when you launched it'
+      - 'assistant: The spawn returned no terminal id. Relaunched — it''s up now as tab 6.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: ok wrap the panel up - one closing statement each
+    history:
+      - 'user: name them by what they''re each arguing for'
+      - 'assistant: Renamed: ''result types'', ''panic+recover'', ''sentinel errors''.'
+      - 'user: much better'
+      - 'assistant: Want the panel to keep going?'
+  - query: actually i don't want a merged plan. i want to watch them argue it out - just relay it and let it run
+    history:
+      - 'user: i need the three of them to cross check each other on the auth refactor and come back with one plan'
+      - 'assistant: Relaying until there''s one merged plan.'
+      - 'user: keep going till they actually agree, don''t stop at the first draft'
+      - 'assistant: Round three — still split on session invalidation.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+  - query: give agent 2 the floor now
+    history:
+      - 'user: keep going till they actually agree'
+      - 'assistant: Round three — still split on session invalidation.'
+      - 'user: i don''t want a merged plan, i want to watch them argue it out - just relay it and let it run'
+      - 'assistant: Dropped the synthesis target. Relaying it as an open discussion, floor passed in turn.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: back to the agents — let them talk to each other about the migration order, i want to see where it goes
+    history:
+      - 'user: fine B it is. hold on my build just broke, whats going on'
+      - 'assistant: Missing workspace link from a mismatched lockfile.'
+      - 'user: ah yeah that was me. ok'
+      - 'assistant: Reinstalling with pnpm in that worktree will clear it.'
+  - query: give it 3 more rounds
+    history:
+      - 'user: ah yeah that was me. ok'
+      - 'assistant: Reinstalling with pnpm in that worktree will clear it.'
+      - 'user: back to the agents — let them talk to each other about the migration order, i want to see where it goes'
+      - 'assistant: Three rounds in. They''ve converged on doing the read path first but are still arguing about whether the backfill can run online.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: interesting. get them talking to each other about it, i want to watch it play out
+    history:
+      - 'user: right now tell it pnpm and let it carry on'
+      - 'assistant: Answered — all nine unblocked.'
+      - 'user: ask the pinned ones whether our test suite is too slow, i want a spread of opinions'
+      - 'assistant: Four of five say yes, two blame the e2e layer specifically, one says it''s fine and CI is the problem.'
+    active: [daintree.foundation, daintree.agents.poll-pinned-agents]
+  - get the three of them talking to each other about it, see where it goes
+  - no interview, no judge, nobody wins. just have the three of them talk to each other about the caching design and let it run a while.
+  - get the three of them talking and catch each one up on what the others said while it was away
+  - query: they're just repeating themselves. push it along - get sonnet to respond directly to what opus actually said
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: get them talking
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: get the two explore agents talkign to each other, i just wanna watch what happens
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: kick off a group chat with all four, give each one the floor in turn
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: start a panel with the 3 pinned ones, topic is our retry backoff
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: run a roundtable — 3 agents, open ended, no winner, no scoring, just let them discuss the architecture and tell me what came up
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+wakes:
+  - query: '[agent task a_0302 completed]'
+    history:
+      - 'user: let the two of them hash out the api shape, i want to watch'
+      - 'assistant: Floor given to t_0301 first. It has spoken; passing the floor to t_0302 with a catch-up of what was said.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: '[wake: t_0303 replied]'
+    history:
+      - 'user: get them talking about the caching design'
+      - 'assistant: Three agents in the room, floor order set. Round one relayed, waiting on the next speaker.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+near_misses:
+  - get them talking to each other about the api shape, see where it goes
+docs:
+  - get the three of them talking to each other
+  - get the three of them talking to each other, see where it goes
+  - query: get the three of them talking to each other
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: side question, get the three of them talking to each other, see where it goes
+    history:
+      - 'user: it says the suite passes, confirm that'
+      - 'assistant: The extract came back truncated — I can see a summary line but not the totals, so I can''t call this verified yet.'

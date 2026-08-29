@@ -1,0 +1,391 @@
+# Training examples whose answer is `daintree.orchestration.competition` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.competition
+run: pre-split
+positives:
+  - spin up 4 agents, one fun fact each, then have them pick a winner
+  - run a little contest between the agents — each one gives me an interesting fact, then they all read each other's and vote on the best one, and you tally it up at the end
+  - can you have the three claudes each propose an approach and then peer-vote on which is best?
+  - blind ballot peer scored contest, 3 entrants, tally and declare
+  - i want a scored contest btwn the agents, blind ballot, no one shoud know whos entry is whos
+  - do the same thing again but this time make them score each other's
+  - each agent submits one idea. two points for the top pick, one for the runner up. tally it and tell me who won
+  - have them all come up with a name for the project and then pick the best one between themselves
+  - set up a bakeoff — 3 agents, each writes their own take on the caching layer, then a neutral judge agent picks the winner
+  - ask 5 agents for the weirdest thing they know about this codebase then run a vote on the best one
+  - do a peer judged competition with the pinned fleet
+  - get each agent to write a one-liner joke and then have them judge each other blind
+  - three agents, one design proposal each, blind peer vote, tally, declare a winner or a tie
+  - who wins if we let them judge each other's answers?
+  - spawn three agents, ask each for one improvement idea, then send everyone else's ideas around and have them rank them
+  - lets do a little tournament, everyone submits a tagline and they score eachother
+  - run the fact competition again but with six agents this time
+  - ask each agent to pitch one refactor, then have a neutral judge agent read all the pitches and declare the winner
+  - have the agents compete on who can explain the auth flow best, and let them vote
+  - get 4 agents to each name their favourite tool in this repo, then award points from the votes
+  - could you run a best-idea shootout across the cohort, peer scored, and tell me the tally?
+  - each agent gives one hot take, then everyone picks their favourite that isnt their own, tally it up
+  - now do that with those two as well — same submission then vote thing
+  - 'i''ve got five agents open and i want something a bit fun: get each of them to write one sentence about what makes this codebase weird, then swap them around anonymously and have them vote for the best sentence, and at the end tell me the scores'
+  - three of them are idle — get each one to give me one weird fact about this codebase, then they vote on the best
+  - codex, claude, gemini and the local one — one name each for the ingest service, then blind vote, winner takes it
+  - run a bake-off between them
+  - get the 4 agnets to each wrtie one idea for the onboarding flow then have em pcik the best and tally it
+  - each agent submits one perf idea. 2 points for my pick, 1 point per vote it gets from the others. tally and tell me who won
+  - ok they've all answered — now send everyone the other three answers with the names stripped and get them to vote
+  - spin up a fourth agent as a judge, give it all three proposals with no names on them, whatever it says goes
+  - give all four of them the same flaky test and see who gets the cleanest fix, then have them judge each other's diffs
+  - have each of the pinned agents pitch one API shape for the webhooks endpoint and then vote on each other's
+  - no interviewer, just have them all submit and score each other, best writeup wins
+  - same problem, all three, but I don't want them agreeing on one answer — separate submissions then a vote
+  - no debate. one submission each, one vote each, highest score wins.
+  - agent 2 is off the rails, pull it out of the contest and keep going with the rest
+  - do that competition thing with these ones
+  - run the fact contest with terminal 4, 7 and 9 — 9 might be dead, if it is just do it with the other two
+  - I've got four agents up from earlier. I want each one to give me a single sentence describing what this repo actually does, no talking to each other. Then show them all four anonymised and have them pick the most accurate one, and tell me the score.
+  - your tally's wrong, B got two votes not one. recount and give me the winner again
+  - winner gets to write its own acceptance speech, send it over
+  - two of them voted for their own entry. redo the ballot properly so nobody can see who wrote what
+  - 'planning a little contest: 5 agents, one refactor idea each for the payments module, blind peer vote, winner''s idea is what we build'
+  - each agent picks the most cursed line in this repo and then they vote on the worst one
+  - claude vs codex — better commit message for this diff. they judge each other.
+  - get three agents to each write one error message for the rate limit, anonymise them and have the agents pick
+  - have each submit a one-paragraph migration plan then score them against each other and rank the lot
+  - one design idea each, they vote, and if it ends tied just tell me it's tied — don't pick one
+  - each writes one test-strategy proposal, then peer review — everyone reads everyone's and picks a winner
+  - whole fleet, one haiku each about our build system, then vote on the best
+  - tally it up, tell me who won, and close everything except the winner's tab
+boundaries:
+  - query: get the four agents to each pitch a fix for the layout bug then vote on the best
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: ask each agent for one interesting idea then have them vote on whose is best and declare a winner
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: run a contest between the pinned agents, award points for the best answer and tally the score
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get two agents to each write a version of the parser and then pick the better one
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: ask each agent for their best idea on this then have them vote for the winner
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: have each agent pitch an idea then let them vote on whose was best
+    confusable_with: [daintree.orchestration.conversation]
+  - query: run a contest between the three of them — one interesting fact each, then score each other and declare a winner
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have each agent submit one idea, then let them peer-vote the best one
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: run a contest between the four agents on this, score them and tell me who won
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: get each of them to pitch a design and have the others pick the strongest
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: ask each agent for its best idea for the cache key and then have them vote on the best one
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: give each of them one shot at the design, then peer-judge the entries and declare a winner
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: run a contest between the agents on this, score their entries and tell me who wins
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: give the same task to four agents and score whose solution comes out best
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: have each of them write their own version of the parser and then vote on the winner
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: forget the tie, set up a brand new contest — each of the four gives me one interesting fact and then they peer vote on the best one
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: run a competition between the pinned agents, score it and declare a winner
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have each of them submit a design idea, send the ideas round for a blind vote and tally the points
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have each agent submit its best idea for the onboarding flow, then let them vote on the best one and declare a winner
+    confusable_with: [daintree.orchestration.interview]
+  - query: run a contest between the four agents, one interesting fact each, award points, who wins?
+    confusable_with: [daintree.orchestration.interview]
+  - query: get them each to write a proposal, score them, and tell me who came first
+    confusable_with: [daintree.orchestration.interview]
+  - query: have the four of them each pitch a design idea, then send everyone the others' pitches and vote on the best, tally it
+    confusable_with: [daintree.orchestration.conversation]
+  - query: let them talk, each proposes an approach, then they score each other's and we see who wins
+    confusable_with: [daintree.orchestration.conversation]
+  - query: each agent writes its own proposal, then show them everyone else's and have them pick the best — award points
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: 'run a contest between the pinned agents: one design idea each, peer vote, declare a winner'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: ask each agent for one idea to speed up the selector, then score them and tell me who won
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: get all five agents to submit their best idea for the caching layer, then have them vote on whose is best
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: run a little contest — one interesting fact each, then they score each other and we see who wins
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: score their entries and declare a winner
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: spawn three more agents and run a fresh contest between them
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: start a new competition, different set of agents this time, same topic
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: ask each of them for one design and then have them vote on the best one
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: score their submissions and tell me who won
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: get all three to write an idea for the landing page, award points, and declare a winner
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: ask each agent for one design idea, then send everyone the others' ideas and have them vote for the best one
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: each of them writes one interesting fact, then they score each other and I want a winner
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: have the four agents each pitch a fix, blind vote on the best pitch, declare a champion
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: have each agent submit one refactor idea, then send everyone else's around, let them vote, and tally it
+    confusable_with: [daintree.orchestration.interview]
+  - query: ask each of the four for their most interesting fact about this repo, award points and declare a winner
+    confusable_with: [daintree.orchestration.interview]
+  - query: each agent writes a proposal for the queue rewrite, they peer judge them, best one wins
+    confusable_with: [daintree.orchestration.interview]
+  - query: give all three the same ticket, let them each write their own version and then score them
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: have them each submit a patch for the same bug and peer-vote the best one
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: have each agent write its own take on the fix, then get them to vote on which one is best
+    confusable_with: [daintree.review.review-change]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: run a contest — four agents, one interesting fact each, then they vote on the best'
+      - 'assistant: Spawned four agents (Alpha, Bravo, Charlie, Delta), each asked for one fact. Waiting on all four now.'
+    active: [daintree.orchestration.competition]
+  - query: did they vote yet?
+    history:
+      - 'user: three agents, one design idea each, then blind peer vote'
+      - 'assistant: All three entries are in. I''ve stripped the authors, tagged them Entry 1/2/3 with the order rotated per voter, and sent the ballots out.'
+    active: [daintree.orchestration.competition]
+  - query: charlie's stuck, take it out
+    history:
+      - 'user: get five agents to each submit a tagline and score each other'
+      - 'assistant: Five spawned and submitting. I''ll relay the entries blind once they''re all in.'
+    active: [daintree.orchestration.competition]
+  - query: make sure nobody gets shown their own entry
+    history:
+      - 'user: run the fact competition with four agents'
+      - 'assistant: Entries collected, ballots out, waiting on votes.'
+    active: [daintree.orchestration.competition]
+  - query: nice. close everything except the winner
+    history:
+      - 'user: contest — each agent pitches one refactor, then they peer vote'
+      - 'assistant: Tally is in. Bravo wins with 3 votes; Alpha 1, Delta 0. Bravo proposed collapsing the two retry paths.'
+    active: [daintree.orchestration.competition]
+  - query: make it give a little acceptance speech
+    history:
+      - 'user: four agents, best one-liner about this repo wins, they vote'
+      - 'assistant: Delta took it 2 votes to 1. Full tally and entries below.'
+    active: [daintree.orchestration.competition]
+  - query: actually add one more to the mix
+    history:
+      - 'user: spawn three agents, one idea each, peer scored'
+      - 'assistant: Three are running now — Alpha, Bravo, Charlie. I''ll wait on all three before compiling the ballot.'
+    active: [daintree.orchestration.competition]
+  - query: what did entry 3 actually say again?
+    history:
+      - 'user: run a scored contest, each agent one submission, blind ballot'
+      - 'assistant: Votes are read. It''s a 2-2 tie between Entry 1 (Alpha) and Entry 3 (Charlie) — reporting it as a tie rather than picking.'
+      - 'user: hm ok'
+    active: [daintree.orchestration.competition]
+topic_shifts:
+  - query: now make them each submit one wild idea for the roadmap and score each other on it
+    history:
+      - 'user: have one agent interview the others and pick who i should pair with'
+      - 'assistant: The judge narrowed to claude-2 and claude-5, verified their claims against the code, and picked claude-2.'
+    active: [daintree.orchestration.interview]
+  - query: run another round with a new prompt
+    history:
+      - 'user: run the idea competition'
+      - 'assistant: claude-3 won with 6 points.'
+    active: [daintree.orchestration.competition]
+  - query: change of plan - ask all four pinned agents for one design idea each then have them vote on the best one
+    history:
+      - 'user: get going on #500'
+      - 'assistant: Started - branch, worktree, agent, watcher all in place.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: now make it a contest - each of them writes one migration plan, then they vote on the best and we score it
+    history:
+      - 'user: poll the pinned agents on whether we should drop the v1 endpoint'
+      - 'assistant: Four verdicts in. Three say drop it after a deprecation window, one says keep. Consensus: drop with a window.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: now take the surviving position and have all of them submit a design for it, then score those
+    history:
+      - 'user: have them debate it then vote the weakest position off'
+      - 'assistant: Debate ran, elimination ballot tallied - the eager-loading position was voted off 3-1.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: quick one — how many agents can i actually have pinned at once?
+    history:
+      - 'user: have the four of them pitch a caching design and vote on the best'
+      - 'assistant: All four submissions in. Ballot blinded and shuffled per voter; votes coming back.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: run a competition between them on caching designs — first explain how the blind vote works
+    history:
+      - 'user: four agents idle'
+      - 'assistant: All four are free.'
+  - ok i've got 4 claudes pinned. get each of them to come up with the most interesting thing about this codebase then have them vote on whose is best
+  - query: yes blind. go
+    history:
+      - 'user: ok i''ve got 4 claudes pinned. get each of them to come up with the most interesting thing about this codebase then have them vote on whose is best'
+      - 'assistant: Four pinned agents found. Each gets one independent submission, then I relay all four back for a peer vote. Anonymise the ballots?'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: are the other two done yet
+    history:
+      - 'user: get each of them to come up with the most interesting thing about this codebase then have them vote on whose is best'
+      - 'assistant: Each gets one submission, then a peer vote. Anonymise the ballots?'
+      - 'user: yes blind. go'
+      - 'assistant: All four have the prompt. Two submissions in, waiting on tab 4 and tab 5.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: ok park that for a sec. different thing - i want 3 agents to each pitch a design for the new watcher api and then vote on whose pitch is best
+    history:
+      - 'user: how''s everyone doing'
+      - 'assistant: Two working, two waiting on questions, one finished.'
+      - 'user: two of them are waiting on a question, just say yes to both'
+      - 'assistant: Both answered and generating again.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: ok now show each of them everyone else's answer and get them to pick the best one, blind, and score it
+    history:
+      - 'user: ask claude in tab 2 what it makes of the retry logic'
+      - 'assistant: It says the retry budget is shared across attempts.'
+      - 'user: now ask all the pinned ones the same thing'
+      - 'assistant: Same question out to all four independently. Answers in — three flag the shared budget, one flags the jitter.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: one of them voted for its own, discount that
+    history:
+      - 'user: now ask all the pinned ones the same thing'
+      - 'assistant: Three flag the shared budget, one flags the jitter.'
+      - 'user: show each of them everyone else''s answer and get them to pick the best one, blind, and score it'
+      - 'assistant: Each agent now has the other three answers with authorship stripped and is scoring them.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: so where'd the scores land
+    history:
+      - 'user: daintree''s gone weird - none of my terminals are showing'
+      - 'assistant: MCP server had disconnected. Reconnect and it comes back.'
+      - 'user: ok it''s back'
+      - 'assistant: Good — all four agents still there.'
+  - fun one - get all the pinned agents to tell me the most interesting fact they can find about the repo then vote for the best fact
+  - query: make sure they don't know who wrote which fact when they vote
+    history:
+      - 'user: fun one - get all the pinned agents to tell me the most interesting fact about the repo then vote for the best fact'
+      - 'assistant: One fact each from all four, then their own facts become the ballot they vote on.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: forget it, run with the other 3
+    history:
+      - 'user: make sure they don''t know who wrote which fact'
+      - 'assistant: Ballots unattributed. Three facts in so far.'
+      - 'user: agent 4 hasn''t submitted anything, it''s just sat there with nothing on screen'
+      - 'assistant: It never got past startup — no prompt was ever delivered to that terminal.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: tally
+    history:
+      - 'user: agent 4 hasn''t submitted anything'
+      - 'assistant: It never got past startup.'
+      - 'user: forget it, run with the other 3'
+      - 'assistant: Running with tabs 1, 2 and 3. Ballots out, unattributed.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: ok. different thing — get four agents to each pitch a name for the new service then have them vote on the best
+    history:
+      - 'user: im in a meeting til 2. dont let them stall, wake me if one needs input'
+      - 'assistant: Watchers armed on all three.'
+      - 'user: back. sweep them, anything need me?'
+      - 'assistant: 88 and 90 finished and pushed. 93 is waiting on a question about whether to bump the schema version. That''s the only thing needing you.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - spin up 5 agents, get one caching idea out of each, then have them vote on the best one
+  - query: votes have to be blind, dont tell them whose is whose
+    history:
+      - 'user: spin up 5 agents, get one caching idea out of each, then have them vote on the best'
+      - 'assistant: Five agents spawned, submissions collected. Sending each the other four for peer voting now.'
+    active: [daintree.foundation, daintree.orchestration.competition]
+  - get each of the pinned agents to tell a joke, then have them vote on whose was best
+  - query: nobody tallied it. count the votes across the three submissions and tell me who won.
+    history:
+      - 'assistant: All three agents submitted their entries and peer votes are in.'
+  - run the contest, tally the peer votes and declare the winner
+  - query: two of them voted for their own entry. redo the ballot properly so nobody can see who wrote what
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: spin up 4 agents, one fun fact each, then have them pick a winner
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: get the 4 agnets to each wrtie one idea for the onboarding flow then have em pcik the best and tally it
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: who wins if we let them judge each other's answers?
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: run a bake-off between them
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: run a little contest between the agents — each one gives me an interesting fact, then they all read each other's and vote on the best one, and you tally it up at the end
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: now do that with those two as well — same submission then vote thing
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: three of them are idle — get each one to give me one weird fact about this codebase, then they vote on the best
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: get each agent to write a one-liner joke and then have them judge each other blind
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: ask 5 agents for the weirdest thing they know about this codebase then run a vote on the best one
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: winner gets to write its own acceptance speech, send it over
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: lets do a little tournament, everyone submits a tagline and they score eachother
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: whole fleet, one haiku each about our build system, then vote on the best
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: spawn three agents, ask each for one improvement idea, then send everyone else's ideas around and have them rank them
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: run the fact competition again but with six agents this time
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+wakes:
+  - query: '[terminal.awaitAll returned: 4 submissions in]'
+    history:
+      - 'user: have the four of them each come up with an interesting fact and score it'
+      - 'assistant: Round one out — each agent asked for one independent submission, no cross-talk. Waiting on all four before I build the blind ballot.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: '[wake: all ballots returned]'
+    history:
+      - 'user: run a contest, best refactor idea wins'
+      - 'assistant: Submissions collected and shuffled unlabelled. Ballots sent to all five for blind peer voting — waiting on the votes.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: '[async wait returned: tie confirmed, 4-4]'
+    history:
+      - 'user: score them and tell me who won'
+      - 'assistant: Votes in, tallying. Two entries are level on 4 points each — asking the cohort for a decisive read before I call it.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+near_misses:
+  - score their submissions, peer vote, declare a winner
+docs:
+  - run a little competition, best idea wins
+  - score their submissions and declare a winner
+  - query: run a little competition, best idea wins
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: quick q — run a little competition, best idea wins
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Swept the fleet: two finished, three working, one waiting. Watchers armed on the movers.'

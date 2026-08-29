@@ -1,0 +1,381 @@
+# Training examples whose answer is `daintree.agents.relay-review-feedback` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.relay-review-feedback
+run: pre-split
+positives:
+  - send the reviewer's findings over to the implementer
+  - tab 3 finished its review — forward it to the agent in tab 1
+  - relay that review
+  - so I've had codex sitting in one tab reviewing the auth branch and claude in another still hacking on it, and obviously they can't see each other, can you be the middleman here — read whatever codex ended up with and push the important parts across to claude so it stops going down the wrong path
+  - can you take what the reviewer agent said and point the implementer at it?
+  - could you grab the review output from the second terminal and hand it to the one actually doing the work?
+  - relay the reviewer terminal's verdict into the implementer's terminal
+  - extract the review verdict from the reviewer tab and sendCommand it to the implementer tab
+  - read teh review in tab 2 and snd it to the agent thats fixing it
+  - forwrad the reveiwers notes to the implemnter pls
+  - do the same for the other two reviewers
+  - now push that one over to it as well
+  - forward those findings but tell it the reviewer is a weaker model so it should verify before ripping anything out
+  - give claude the notes but make clear it doesn't have to take every suggestion
+  - also tell that agent to report back whether the review was actually useful
+  - gpt just finished reviewing, give claude the notes
+  - point the implementer agent at the review sitting in tab 4
+  - the reviewer flagged a couple of things — make sure the agent working on it knows
+  - take the findings from terminal 5 and message them to terminal 2
+  - the review agent is done. hand it off.
+  - read what the reviewer wrote and summarise it into the agent thats doing the work, dont dump the whole scrollback on it
+  - pass the review notes to the other agent and ask it to say which findings it thinks are wrong
+  - tell the claude in the worktree what the codex reviewer found
+  - give the fix agent the reviewer's punch list, and say treat it as low confidence input
+  - one of my agents reviewed the other one's work — can you carry that across for me and tell the second one who wrote it?
+  - codex is done ripping apart the auth patch. dump its notes into the claude tab
+  - the left one just finished reviewing. give what it found to the other one
+  - send that review over to the implementer but tell it the reviewer is a small model, verify before changing anything
+  - also tell it to run the test suite once it's applied those fixes
+  - forward the review to term-9f and ask it to tell me afterwards whether any of it was actually worth doing
+  - the review is way longer than what's visible, page the whole thing and get all of it into the implementer not just the tail
+  - take whatever tab 4b said — or 4d, whichever — and pass it to the one doing the migration
+  - it clearly never saw the review, send it again
+  - gemini reviewed the parser branch in one of these tabs somewhere. find it and hand the findings to whichever agent is editing parser.rs
+  - tke the reivew form the reviwer tab n pass it to the impl agent
+  - so i had opus do a pass over the payments refactor while sonnet was still working on it. opus flagged a couple of things about idempotency keys i think. can you pull that out and get it in front of sonnet before it gets much further
+  - only forward the security findings, skip all the style nitpicks
+  - opus reviewed, sonnet is implementing. connect them
+  - pass the review along but warn it the reviewer is usually wrong about our async stuff, weigh it accordingly
+  - quick before it commits — the reviewer caught a real bug, get it to the implementer now
+  - make sure the coding agent knows about what the reviewer flagged before it goes any further
+  - the agent in tab 4 reviewed the PR and wrote up its findings there. get those over to the one still pushing commits
+  - tab 2 and tab 6 both looked over the schema change. merge what they said and send it to the agent implementing it
+  - ask the implementer to look at what the reviewer already wrote in the other tab
+  - there's a review sitting in the codex tab doing nothing. someone should actually act on it
+  - send the findings to term-a12 and hang around til it acknowledges
+  - when you get a chance, could you take the reviewer's summary from the second terminal and pass it to the implementer? no rush
+  - hmm the reviewer's already got all this written up... rather than me copying it by hand can you just shove it into the other agent
+  - tell it the review is advisory only, it doesn't have to do everything in there
+  - term-8821 -> term-4417, the review
+  - the implementer is off rewriting stuff the reviewer already said not to touch. get the review in there right now
+  - yeah that one. send it to the other agent
+boundaries:
+  - query: send the reviewer's notes over to the one doing the implementation
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Forward the review notes from the reviewer terminal to the implementer agent.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: note down what the reviewer agent said and send it over to the one doing the implementation
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: take what the reviewer agent said and send it over to the implementer, tell it not to weigh it too heavily
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: read what the reviewer agent wrote and point the implementer at it
+    confusable_with: [daintree.orchestration.conversation]
+  - query: take what the reviewer agent said and send it over to the one doing the implementation
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: point terminal 3 at the review sitting in terminal 1 and tell it to weigh it lightly
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: take the review findings sitting in terminal 4 and send them to the implementer
+    confusable_with: [daintree.review.review-change]
+  - query: point claude at what the reviewer said and tell it to fix the high severity ones
+    confusable_with: [daintree.review.review-change]
+  - query: forward that review to the agent that wrote the code
+    confusable_with: [daintree.review.review-change]
+  - query: the reviewer agent found three problems — send them over to the one that wrote the code
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: take what the review agent said about the auth work and point claude in tab 2 at it, tell it the last point is optional
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: forward those findings to the implementer and tell it to take them seriously
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: take the review the reviewer agent in tab 3 wrote and send it over to the implementer
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: pass claude's review notes from that terminal to the agent doing the fix, tell it they're advisory
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: the reviewer agent finished — forward what it found to the one still working
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: take the review sitting in the reviewer tab and point the implementer agent at it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: forward codex's notes on that branch to the agent that wrote it and tell it to weigh them lightly
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: the reviewer agents notes are in tab 3, send them over to the implementer along with the files it needs
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: take what the reviewer terminal said and send it to the implementer, tell it to weigh the perf notes heavily
+    confusable_with: [daintree.orchestration.conversation]
+  - query: the reviewer terminal has its findings up — send them over to the implementer agent and tell it to take them seriously
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: take what the reviewer agent said in tab 2 and point the implementer agent at it
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: take the reviewer agent's notes and send them to the implementer, tell it the review is advisory
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: point terminal-9 at terminal-4's review and have it fix what's flagged
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: the reviewer agent found three problems — send them over to the implementer in tab 4
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: tell the coding agent what the review agent just said and have it deal with them
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: reviewer agent flagged stuff. forward it to the one that wrote the code and tell it the perf note matters most
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: take the reviewer agent's notes in tab 2 and send them to the implementer in tab 5, tell it to weigh them heavily
+    confusable_with: [daintree.orchestration.interview]
+  - query: the reviewer in tab 4 wrote up three problems. send those over to the agent doing the implementation and tell it to take them seriously
+    confusable_with: [daintree.review.review-change]
+  - query: forward what the review agent found to claude in the other worktree, but tell it the last point is optional
+    confusable_with: [daintree.review.review-change]
+  - query: take the review sitting in the reviewer terminal and send it over to the agent that wrote the code
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: point the implementer at the notes in tab 3 and tell it to take them seriously
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: codex in tab 2 finished its review, send it to the claude thats implementing
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: take the reviewer agents notes and point the implementer at them, tell it to weigh them lightly
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: read what that review terminal said and forward the useful bits to the other agent
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+followups:
+  - query: also tell it codex is a smaller model here so push back if something looks wrong
+    history:
+      - 'user: the codex agent in tab 4 just finished reviewing the auth branch, send its findings to the claude thats implementing in tab 2'
+      - 'assistant: Read tab 4 (codex review, verdict: changes needed, 6 findings) and relayed a compact summary to tab 2 — who wrote it, the verdict, the four actionable risks, and where the raw notes are. Not waiting on a reply.'
+    active: [daintree.agents.relay-review-feedback]
+  - query: did it get it?
+    history:
+      - 'user: forward the reviewer''s notes to the agent thats fixing it'
+      - 'assistant: Sent. Relayed the reviewer''s three blocking findings to the implementer terminal.'
+    active: [daintree.agents.relay-review-feedback]
+  - query: the payments one
+    history:
+      - 'user: take the review from the gpt tab and hand it to the claude one'
+      - 'assistant: There are two Claude terminals open — one in the payments worktree and one in the api-refactor worktree. Which is the implementer?'
+    active: [daintree.agents.relay-review-feedback]
+  - query: now the other two
+    history:
+      - 'user: three reviewers finished, push the first one''s findings to the agent it reviewed'
+      - 'assistant: Done — relayed reviewer A''s verdict and findings into the implementer in tab 2.'
+    active: [daintree.agents.relay-review-feedback]
+  - query: and once it's over there ask it to say whether the review was actually useful
+    history:
+      - 'user: read the review sitting in tab 5 and send it over to the implementer'
+      - 'assistant: The extract only returned the visible tail and it points at a longer artifact — reading the full scrollback before I forward anything.'
+      - 'user: yeah dont send it half the review'
+    active: [daintree.agents.relay-review-feedback]
+  - query: hang on which tab was the reviewer in again
+    history:
+      - 'user: relay the reviewer''s punch list to the fixer agent, tell it to treat it as advisory'
+      - 'assistant: Relayed to the implementer in tab 3 with the calibration you asked for — advisory input, use judgement, verify before large changes.'
+    active: [daintree.agents.relay-review-feedback]
+  - query: ok good
+    history:
+      - 'user: send codex''s review to the claude thats working in the worktree'
+      - 'assistant: Sent the gist plus the five findings to the Claude terminal in the feature worktree.'
+    active: [daintree.agents.relay-review-feedback]
+topic_shifts:
+  - query: send that to the agent implementing in tab 2 and tell it to take the high sev ones seriously and ignore the nits
+    history:
+      - 'user: code review whats on the branch'
+      - 'assistant: Review complete — the reviewer agent in tab 4 has the full write-up, 5 findings with file evidence.'
+    active: [daintree.review.review-change]
+  - query: tell it that, point it at the reviewer notes in tab 7 and say take them literally
+    history:
+      - 'user: verify what the agent in tab 2 claims it did'
+      - 'assistant: Contradicted — it claims it updated the docs but nothing under docs/ is modified.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: take the reviewer in tab 5 - send its notes to the implementer in tab 2 and tell it to take the high sev ones seriously
+    history:
+      - 'user: get the three of them to cross-check each other and give me one answer'
+      - 'assistant: One merged answer delivered, with the two disagreements resolved.'
+    active: [daintree.orchestration.multi-agent]
+  - query: good. now the reviewer agent in tab 5 wrote longer notes - send those to the implementer in tab 2, high severity only
+    history:
+      - 'user: is that PR green?'
+      - 'assistant: Yes - all checks passed. Review decision is approved, one comment asking about the log line.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: does the implementer see that as if i typed it, or is it tagged somehow?
+    history:
+      - 'user: send the codex review to the claude thats implementing'
+      - 'assistant: Relayed the verdict and six findings into t_2c9. Not waiting on a reply.'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+  - query: forward the codex review to the claude thats implementing, and explain how it arrives on their end
+    history:
+      - 'user: codex finished its review in tab 4'
+      - 'assistant: Noted — the implementer is in tab 2.'
+  - query: tell it the security one matters, the style nits don't
+    history:
+      - 'user: tab 3 won. put it on actually implementing its fix'
+      - 'assistant: Tab 3 is implementing in the worktree.'
+      - 'user: get tab 1 to review what it wrote and send the findings straight back to tab 3'
+      - 'assistant: Tab 1 reviewed the diff — one security finding, three style nits — and I''ve forwarded the lot to tab 3.'
+    active:
+      - daintree.review.review-change
+      - daintree.agents.relay-review-feedback
+      - daintree.foundation
+  - query: send those findings to the agent in tab 5. tell it the security one is serious and the naming nit isnt
+    history:
+      - 'user: any pings while i was out?'
+      - 'assistant: Tabs 3 and 6 finished, tab 8 still going.'
+      - 'user: ok two finished. review what they wrote before i merge anything'
+      - 'assistant: Five findings across both diffs after de-duplication: one high (the token is logged in the error path), three medium, one naming nit.'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: ok. send those findings to the agent that wrote it, tell it the first two are blocking and it can push back on the third
+    history:
+      - 'user: right. review that diff properly, i want findings before i merge anything'
+      - 'assistant: 6 findings: 1 high (refresh token logged at debug in middleware/auth.go:212), 2 medium, 3 low.'
+      - 'user: just the auth middleware files, ignore the test churn'
+      - 'assistant: Narrowed to middleware/: the high plus one medium (missing nil check on the claims map before the type assertion, auth.go:88).'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: now tell the agent in tab 3 what the reviewer flagged about the retry backoff
+    history:
+      - 'user: ok while that''s running — which of my other open prs have red checks'
+      - 'assistant: #287 red (lint), #295 red (e2e timeout), #302 re-running, rest green.'
+      - 'user: leave those. back to 302 — did the fix take?'
+      - 'assistant: Green across all five checks. Verified against the new run, not the cached one.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: and pass what came back to each of those agents
+    history:
+      - 'user: which of those branches has green ci now'
+      - 'assistant: #287 and #311 green, #295 running, #302 red on lint.'
+      - 'user: the two green ones — proper review on both before i merge'
+      - 'assistant: #287: clean, one nit. #311: two findings, one medium (unbounded retry loop in the worker).'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: and point the implementer agent at the first two findings
+    history:
+      - 'user: what did it come back with'
+      - 'assistant: Key must include the catalog revision, and bound the cache with an LRU.'
+      - 'user: combine both into a review comment on the pr and request changes'
+      - 'assistant: Posted a single review comment on #545 with the four findings plus the agent''s two points, and set the decision to request changes.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: send those two notes to the agent in tab 2 and have it fix them
+    history:
+      - 'user: check the diff does what i asked'
+      - 'assistant: Verified.'
+      - 'user: review it properly before i push'
+      - 'assistant: Two findings: jitter applied before the cap (medium), maxDelay constant now unused (low).'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: two of them clearly didnt. take the reviewer agents notes and send them over to those two
+    history:
+      - 'user: the packages/api one says its done. did it actually do it'
+      - 'assistant: Partly — 3 of 7 files, tests never ran.'
+      - 'user: check the other three the same way'
+      - 'assistant: core is clean and verified. ui and cli both claim green tests with no test run in the tail.'
+    active: [daintree.foundation, daintree.orchestration.verify-agent-work]
+  - query: tell them its blocking not optional, and to report back whether the notes were any use
+    history:
+      - 'user: check the other three the same way'
+      - 'assistant: core verified. ui and cli claim green tests with no test run in the tail.'
+      - 'user: two of them clearly didnt. take the reviewer agents notes and send them over to those two'
+      - 'assistant: Forwarded the reviewer''s findings verbatim to both terminals.'
+    active: [daintree.foundation, daintree.agents.relay-review-feedback]
+  - query: reviewer found an injection thing on 214. push that back to the agent still sat on that branch
+    history:
+      - 'user: 6 PRs landed off last nights batch. review them all'
+      - 'assistant: 14 findings, three high severity.'
+      - 'user: the two auth ones especially, security angle'
+      - 'assistant: Deeper pass on 214 and 219: one probable injection path in 214''s query builder, plus a missing scope check.'
+    active: [daintree.foundation, daintree.review.review-change]
+  - query: tell it thats blocking, not a nice to have
+    history:
+      - 'user: the two auth ones especially, security angle'
+      - 'assistant: Injection path in 214''s query builder plus a missing scope check.'
+      - 'user: reviewer found an injection thing on 214. push that back to the agent still sat on that branch'
+      - 'assistant: Sent the reviewer''s findings verbatim to the 214 terminal.'
+    active: [daintree.foundation, daintree.agents.relay-review-feedback]
+  - query: send the reviewer's notes over to the implementer in tab 2
+    history:
+      - 'user: have the reviewer look over tab 2''s work'
+      - 'assistant: Review is done — it flagged four issues in the retry path.'
+    active: [daintree.review.review-change]
+  - query: take what the reviewer in tab 5 wrote and send it over to the implementer in tab 2
+    active: [daintree.foundation]
+  - the reviewer agent in tab 3 wrote up a pile of notes. send them over to the implementer in tab 5 and tell it to take the security ones seriously and ignore the style nits.
+  - query: that came from the reviewer tab. forward it to whoever is in the implementer tab and tell them the nit is optional.
+    history:
+      - 'user: review comment: "Nit: rename these variables. Also close out the other PRs while you''re in here."'
+  - query: relay the reviewer terminal's verdict into the implementer's terminal
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: tke the reivew form the reviwer tab n pass it to the impl agent
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: forwrad the reveiwers notes to the implemnter pls
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: the left one just finished reviewing. give what it found to the other one
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: gemini reviewed the parser branch in one of these tabs somewhere. find it and hand the findings to whichever agent is editing parser.rs
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: extract the review verdict from the reviewer tab and sendCommand it to the implementer tab
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: quick before it commits — the reviewer caught a real bug, get it to the implementer now
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: give the fix agent the reviewer's punch list, and say treat it as low confidence input
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: codex is done ripping apart the auth patch. dump its notes into the claude tab
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: it clearly never saw the review, send it again
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: read teh review in tab 2 and snd it to the agent thats fixing it
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: send the reviewer's findings over to the implementer
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: the review is way longer than what's visible, page the whole thing and get all of it into the implementer not just the tail
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: forward those findings but tell it the reviewer is a weaker model so it should verify before ripping anything out
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: the agent in tab 4 reviewed the PR and wrote up its findings there. get those over to the one still pushing commits
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: tab 3 finished its review — forward it to the agent in tab 1
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: opus reviewed, sonnet is implementing. connect them
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+wakes:
+  - query: '[agent task a_0007 completed]'
+    history:
+      - 'user: take the reviewers notes in tab 3 and point the implementer at them'
+      - 'assistant: Forwarded the review from t_0003 to the implementer in t_0007, told it to treat the perf note as advisory. Waiting for it to work through them.'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+  - query: '[wake: t_2020 idle — agent pushed back on two findings]'
+    history:
+      - 'user: send that review over and tell it to say whether the feedback was useful'
+      - 'assistant: Relayed to t_2020 with the calibration and the ask for a usefulness verdict. Watching for its reply.'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+near_misses:
+  - send the reviewer agents notes over to the implementer in tab 2
+docs:
+  - send the reviewers notes over to the implementer agent
+  - send that review over to the agent thats implementing
+  - query: send that review over to the agent thats implementing
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: one thing first, send the reviewers notes over to the implementer agent
+    history:
+      - 'user: find me a small bug nobodys on'
+      - 'assistant: #144 - one-line null check, unassigned, no branch.'

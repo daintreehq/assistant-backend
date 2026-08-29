@@ -1,0 +1,581 @@
+# Training examples whose answer is `daintree.orchestration.supervise-fleet` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.supervise-fleet
+run: pre-split
+positives:
+  - hows everyone doing
+  - fleet status
+  - anything need me?
+  - is anyone stuck?
+  - sweep the agents
+  - check on them
+  - wats everyone up to, anythign finsihed?
+  - chek the agnets and tell me who needs me
+  - i've got six claude tabs open from this morning and honestly no idea which ones are done, which are still chewing and which died somewhere along the way — go through all of them and give me the rundown
+  - before i step out can you run through everything that's running — what landed, what blew up, what's waiting on me. don't close anything, just report
+  - awaitAll the cohort and classify them, finished / working / waiting / failed
+  - state-only sweep over the roster please, and resolve the queue items for anything that actually landed
+  - did any of them finish while i was in that meeting?
+  - which ones are genuinely still working vs just sat there doing nothing?
+  - a couple of these have no supervisor attached, adopt them
+  - attach supervisors to whatever's running unwatched and then tell me where everything is at
+  - show me the next one
+  - next one that needs input
+  - arm the three review tabs so what i type goes into all of them
+  - disarmAll, i've completely lost track of what's armed
+  - broadcast whatever i type to the four backend agents
+  - who's blocked
+  - what's the state of play across all the agents — one line per tab, then just the stuff that actually needs a decision from me
+  - 'give me a per terminal roll-up: id, title, class, and for the finished ones what they actually landed'
+  - back. where's everyone at
+  - standup in 5 — anything need me before i go
+  - so i fired off like five refactor agents before the call and havent looked at them since, two were on the payments stuff i think. can you go through them all and tell me which are done and which are still chewing
+  - just the three review agents, how are they doing
+  - some of them are stuck on questions i think — go through the lot, unblock what you can and tell me whats left
+  - which of them are actually finished at this point
+  - a couple of these are running with nothing watching them, adopt them
+  - theres an agent still going from this morning that nobody picked up. its fine, just attach a supervisor and fold it in with the rest
+  - arm the two backend tabs, im going to type the same thing into both
+  - i have no clue whats armed right now. clear it all and arm just the auth one
+  - stop sending what i type to everything
+  - show me the next one thats waiting
+  - hows evryone doign
+  - nobody's said anything in half an hour. go check on them all
+  - one of the tabs just went red. run through all of them and tell me what state each is in
+  - i fanned out 8 issues an hour ago, do a sweep
+  - my inbox has like 9 agent things in it, go through them and clear the ones youve already told me about
+  - ok and the rest of them?
+  - when you get a chance, could you go round the agents and give me a one line summary of each?
+  - check on whatevers running on feat/billing and feat/exports
+  - the one called claude-4 or t_44 or whatever — sweep the whole lot anyway and tell me where each of them is at
+  - battery's at 3% — quick pass, is anything blocked
+  - morning. anything need me?
+  - one of thems been on the same step forever and i dont know which. go through them and find it
+  - who's stuck?
+  - 12 running. dont give me all of them, just the ones that actually need a decision from me
+  - is everything thats running actually being watched? attach one to anything thats not
+  - something just pinged. which one was it and how are the others doing
+boundaries:
+  - query: what are all these agents actually doing right now
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: keep an eye on the four of them and wake me when they're done
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: send this message to all four agents
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: The agents already have separate worktrees; sweep the running fleet and tell me which ones are blocked.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Check every live terminal in these branch folders and act on anything waiting or failed.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: how's everyone doing, anything need me
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: sweep the running agents and tell me who's stuck
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: check in on the fleet and act on whatever's finished
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: is anyone waiting on me right now
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: triage all the running terminals please
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: go through each of the running agents and deal with whatever needs me
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: check on all of them and move me to the next one that needs attention
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: is anyone stuck across the four of them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: adopt these running agents so i can steer them from here
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: how's everyone doing
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: anything need me right now?
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: is anyone stuck in there
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: how's everyone doing on that migration? anyone stuck?
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: sweep the agents working the rollout and tell me who's finished and who's waiting
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: There are five agents up from that plan. Triage them all and act on whatever needs acting on.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Check every currently running agent and handle anyone waiting.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Check whether the existing agent in this worktree is still running.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Supervise all running frontend agents and answer any waiting prompts.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Triage the agents that are running right now.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Check whether the current coding agent is still working.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: go through the terminals and tell me if any of them need me
+    confusable_with: [daintree.foundation]
+  - query: check on the agents and deal with whatever's finished
+    confusable_with: [daintree.foundation]
+  - query: sweep everything thats running and see whos stuck
+    confusable_with: [daintree.foundation]
+  - query: sweep the fleet — wrap up the finished ones, answer whoever's waiting, and tell me who's stuck
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: catch me up on the agents, who's blocked and who's done
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: how's everyone doing? sweep the fleet and tell me if anyone needs me
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: sweep the agents and tell me who's finished, who's working and who needs input
+    confusable_with: [daintree.agents.recover-agent]
+  - query: is anyone stuck? give me a rundown of all the running agents and act on whatever's done
+    confusable_with: [daintree.agents.recover-agent]
+  - query: catch me up on the agents, is anyone stuck
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: anything need me? show me the next one
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: keep an eye on the agents for me — is anyone stuck?
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: sweep the fleet and tell me who's waiting
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: check on all the agents i fanned out earlier — is anyone stuck?
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: how's the parallel batch going, anything need me?
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: check on all the agents and tell me which ones have actually finished
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: how's everyone doing, anyone done yet?
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: sweep the agents — whos finished, whos stuck, who needs me
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: how's the agent in the dev tab doing, anything need me?
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: sweep the fleet and tell me which ones are actually finished
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: any of these dead? do a pass over the terminals
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: been away an hour — is anyone stuck or waiting on me?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: figure out what each of these terminals is doing and tell me
+    confusable_with: [daintree.terminals.rename]
+  - query: go through the tabs and give me a one-liner on each, what's everyone up to
+    confusable_with: [daintree.terminals.rename]
+  - query: all these claude tabs look identical, what is each of them actually working on right now
+    confusable_with: [daintree.terminals.rename]
+  - query: anything need me? check the agents and say which ones are stuck
+    confusable_with: [daintree.terminals.rename]
+  - query: hows everyone doing? anything need me right now
+    confusable_with: [daintree.foundation]
+  - query: go through the running agents one by one and deal with whatever each of them needs
+    confusable_with: [daintree.foundation]
+  - query: sweep the fleet, tell me who finished, who's stuck, and who nobody is watching
+    confusable_with: [daintree.foundation]
+  - query: sweep the running agents and tell me which ones are blocked
+    confusable_with: [daintree.diagnostics]
+  - query: how are the three agents getting on? anything need me?
+    confusable_with: [daintree.orchestration.conversation]
+  - query: how are the five contestants doing, anyone stuck?
+    confusable_with: [daintree.orchestration.competition]
+  - query: how are the reviewer and the implementer doing?
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: hows everyone doing, anything need me?
+    confusable_with: [daintree.agents.recover-agent]
+  - query: is anyone stuck? give me the rundown on all of them
+    confusable_with: [daintree.agents.recover-agent]
+  - query: sweep the agents and tell me whos done and whos still working
+    confusable_with: [daintree.agents.recover-agent]
+  - query: sweep the agents — close out the ones that finished, answer anything waiting, and tell me who's stuck
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: check on all my agents — anyone stuck?
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: how's everyone doing, does anything need me?
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: how are the competition agents doing? anyone stuck or waiting on me?
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: how are the agents on the shared problem doing? anything need me?
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: everything reported done overnight. sweep the lot and tell me what still needs me
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: six agents running, which are finished, which are stuck, which are waiting on something
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: check on the agents
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: how's everyone doing on their tickets?
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: anything need me? all six are still going right
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: sweep the fleet, anyone idle or stuck
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: how's everything going in there, anything need me?
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: catch me up on the agents
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: go through the running agents and unblock whoever you can
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: how's everyone doing? anything stuck?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: check on the 6 agents from the batch and tell me who needs me
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: sweep the fleet — who's finished, who's still working?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: anyone stuck? does anything need me
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: go through the running agents and deal with whatever finished
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: go through each agent and tell me what its doing
+    confusable_with: [daintree.terminals.rename]
+  - query: six of these are running, which one is stuck? give me a rundown
+    confusable_with: [daintree.terminals.rename]
+  - query: whats each tab up to right now, anything need me?
+    confusable_with: [daintree.terminals.rename]
+followups:
+  - query: ok show me the failed one
+    history:
+      - 'user: how''s everyone doing?'
+      - 'assistant: Swept all five. tmux-1 review agent finished (tests green, pushed). tmux-2 finished. tmux-3 is waiting on a question. tmux-4 still working on the migration. tmux-5 failed, exit 1.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: and the other four?
+    history:
+      - 'user: anything need me?'
+      - 'assistant: Two of the six need you: tmux-3 is asking about the schema change, and tmux-5 exited 1 on a lint error. The other four are still working.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: anything changed?
+    history:
+      - 'user: sweep the agents and tell me where we''re at'
+      - 'assistant: Three finished, two still working. I''ve put the two still-working ones on one async wait and resolved the inbox items for the three that landed.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: yeah do both
+    history:
+      - 'user: check on the fleet'
+      - 'assistant: Four running. tmux-2 and tmux-7 have no supervisor attached — they''re left over from this morning. Want me to adopt them?'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: arm the two that are still going, i want to type into both
+    history:
+      - 'user: whats everyone up to'
+      - 'assistant: Six terminals. Two finished, one waiting, three working — full breakdown above. Nothing else is armed right now.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: what about stuff with no tab? timers, watchers, that kind of thing
+    history:
+      - 'user: run through the agents for me'
+      - 'assistant: Here''s the per-terminal roll-up for the five visible tabs — two finished, three working.'
+      - 'user: fine, keep an eye on the three'
+      - 'assistant: Put all three on one async wait. I''ll report when they settle.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: cool. how many of these are on the feature branch?
+    history:
+      - 'user: is anyone stuck'
+      - 'assistant: Nobody''s hung. tmux-4 is waiting on a question and the rest are working normally.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: do the same for the studio-02 ones
+    history:
+      - 'user: sweep the three review agents on studio-01'
+      - 'assistant: All three on studio-01: two finished with findings, one still running.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: next
+    history:
+      - 'user: show me the next one that needs input'
+      - 'assistant: Focused tmux-6 — it''s asking whether to bump the lockfile.'
+    active: [daintree.orchestration.supervise-fleet]
+topic_shifts:
+  - query: hows everyone doing
+    history:
+      - 'user: take issues 214 216 and 219 and put an agent on each'
+      - 'assistant: Spawned three agents, one per issue worktree. All three are running with background watchers attached.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: ok now actually go through them and tell me which need me and which are stuck
+    history:
+      - 'user: rename these tabs, they all say claude'
+      - 'assistant: Retitled all five by what each is doing.'
+    active: [daintree.terminals.rename]
+  - query: right, the other thing
+    history:
+      - 'user: first tidy the ledger, then i want the fleet swept'
+      - 'assistant: Ledger tidied — 4 stale rows closed, 2 genuinely still in flight.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: and now?
+    history:
+      - 'user: how''s everyone doing'
+      - 'assistant: All five running, nothing blocked.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: hows everyone doing across the whole fleet? anything need me?
+    history:
+      - 'user: apply the docs recipe here'
+      - 'assistant: Docs recipe ran. One agent is up in t_7702 building the site.'
+    active: [daintree.recipe.run-or-create]
+  - query: how are the other agents doing, the ones actually working? anything need me
+    history:
+      - 'user: roundtable between the three of them on error handling'
+      - 'assistant: Relayed six turns. Conversation is winding down, positions are close.'
+    active: [daintree.orchestration.conversation]
+  - query: sweep the whole fleet for me - whos done, whos working, anything unsupervised
+    history:
+      - 'user: three of them are waiting on questions, unblock them'
+      - 'assistant: All three answered with the protocol reply and continued. Two are back to working, one finished.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: hows the fleet? anyone stuck or waiting on me
+    history:
+      - 'user: forget that thing about the staging url, its wrong now'
+      - 'assistant: Removed. Nothing else references it.'
+    active: [daintree.memory.manage-project-memory]
+  - query: hold on, what counts as needs-attention in the queue exactly?
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Six agents: three working, one waiting on a question, one exited clean, one unsupervised.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: sorry — what does unsupervised mean in daintree terms?
+    history:
+      - 'user: sweep the agents and tell me who needs me'
+      - 'assistant: Two waiting on questions, one failed spawn, four still working.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: before you sweep the fleet, remind me what the attention queue tracks — then do the sweep
+    history:
+      - 'user: hi'
+      - 'assistant: Hi. Four agents are running from earlier.'
+  - query: sweep the agents and tell me who needs me — also what does unsupervised mean here
+    history:
+      - 'user: been afk 30 min'
+      - 'assistant: Five agents still running.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: how's everyone doing
+    history:
+      - 'user: i''ve got 5 issues in the backlog and 5 studios free. put an agent on each'
+      - 'assistant: Five agents launched, one issue each, own worktree per agent, background supervisor on all of them.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: right, back to the issue agents. anything need me?
+    history:
+      - 'user: just show all of them the same three and get them to pick'
+      - 'assistant: One question, your three options, each picks independently.'
+      - 'user: tally it up'
+      - 'assistant: 2 for option B, 1 for option A. B''s edge is the single watcher record.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: hows that lot going
+    history:
+      - 'user: give agent 2 the floor now'
+      - 'assistant: Agent 2 has the floor.'
+      - 'user: enough. split that plan into the 4 bits and put an agent on each'
+      - 'assistant: Four agents launched, one slice each, no overlapping files.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: hm. anyway hows the batch doing
+    history:
+      - 'user: yeah go, all three'
+      - 'assistant: Three worktrees, an agent each, supervisors attached.'
+      - 'user: one sec — get an agent to look at the config loader and tell me if theres a race in there'
+      - 'assistant: It says yes: the lazy singleton in config/loader.py isn''t guarded, so two threads can both build settings. It cited loader.py:41-58.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: back. sweep them, anything need me?
+    history:
+      - 'user: hm. anyway hows the batch doing'
+      - 'assistant: 88 testing, 90 implementing, 93 quiet for 6 minutes.'
+      - 'user: im in a meeting til 2. dont let them stall, wake me if one needs input'
+      - 'assistant: Watchers armed on all three with a question-and-idle wake. Nothing will act unattended.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+  - query: how's everyone doing, anything need me?
+    history:
+      - 'user: no hang on, that review isn''t in a terminal, it''s on the PR itself'
+      - 'assistant: The review on #302 requests changes: missing jitter, off-by-one max attempts.'
+      - 'user: yeah, forward it to the agent'
+      - 'assistant: Relayed both comments verbatim to tab 3 with the file and line anchors. It''s picking up the jitter one first.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: how are they getting on
+    history:
+      - 'user: put an agent on each of the four that need rebasing'
+      - 'assistant: #287, #295, #302, #311. Say go and I''ll launch.'
+      - 'user: yeah go'
+      - 'assistant: Four agents launched (tabs 2-5), one per branch, each in its own worktree with a background supervisor.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: i also stuck one on the config loader bug earlier. how are they both doing
+    history:
+      - 'user: spawn an agent in a new worktree, branch fix/filters-logout'
+      - 'assistant: Claude running in tab 4.'
+      - 'user: ok'
+      - 'assistant: Standing by.'
+  - query: back. anyone need me?
+    history:
+      - 'user: put a separate agent on each of the other 3'
+      - 'assistant: Three agents up, one per test.'
+      - 'user: brb coffee'
+      - 'assistant: Take your time.'
+  - query: how are they all doing
+    history:
+      - 'user: ok good. i''ve got 6 issues tagged sprint-9, put an agent on each'
+      - 'assistant: Launching six agents, one per issue, each with its own worktree.'
+      - 'user: each one gets its own worktree yeah? dont let them share a checkout'
+      - 'assistant: Confirmed — six separate worktrees, no shared checkout. All six agents are running.'
+    active: [daintree.foundation, daintree.orchestration.fan-out-work]
+  - query: right, the 4 refactor agents. are they still alive
+    history:
+      - 'user: picking up from yesterday — what was i in the middle of'
+      - 'assistant: Four refactor agents were in flight across packages/api, packages/ui, core and cli. Three ledger rows still show active.'
+    active: [daintree.foundation, daintree.orchestration.status-and-resume]
+  - query: hows the fleet looking
+    history:
+      - 'user: take the top 8 and fan them out, one agent per issue'
+      - 'assistant: Setting up 8 worktrees, one agent each.'
+      - 'user: skip 412 actually, its a dupe of 390'
+      - 'assistant: Dropped 412 — seven agents launched, all supervised.'
+    active: [daintree.foundation, daintree.orchestration.fan-out-work]
+  - query: two of those have nobody watching them. adopt them
+    history:
+      - 'user: hold on, nothing at all is responding. is daintree itself broken'
+      - 'assistant: MCP link was down. Reconnect from the status bar.'
+      - 'user: ok mcp is back. list every terminal you can see'
+      - 'assistant: Five terminals: three agents working, two idle with no watcher attached.'
+    active: [daintree.foundation]
+  - query: anyone need me yet
+    history:
+      - 'user: go, fan out all 10'
+      - 'assistant: Ten worktrees, ten agents, all supervised.'
+      - 'user: thats a lot of tabs. name them after the issue numbers'
+      - 'assistant: Retitled all ten to their issue numbers plus a two-word summary each.'
+    active: [daintree.foundation, daintree.terminals.rename]
+  - query: whats everyone up to
+    history:
+      - 'user: kick off the batch'
+      - 'assistant: Five agents launched, one per issue.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: how's the fleet doing, anything need me?
+    active: [daintree.foundation]
+  - sweep the agents and deal with whatever you can without bothering me
+  - is anyone stuck? show me the next one that needs input
+  - query: go through them all and tell me which are done, which are chewing and which have fallen over
+    active: [daintree.foundation]
+  - arm the two that finished so i can type into them, and tell me what's left
+  - i renamed all the tabs myself last night, forget titles. which of those agents is actually still doing something and which are just sitting idle?
+  - i fanned six of them out an hour ago. don't start any more. how are they doing?
+  - load the fan-out runbook and then tell me which of the agents are idle
+  - query: and the rest?
+    history:
+      - 'user: how''s everyone doing?'
+      - 'assistant: Swept 8 agents — 2 waiting, 3 working, 1 failed, 2 idle. I acted on the failed one.'
+    active: [daintree.orchestration.supervise-fleet]
+  - sweep the agents, act on whatever needs acting on, and tell me what still needs me
+  - query: the watcher just pinged, what happened?
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Swept the fleet: two finished, three working, one waiting. Watchers armed on the movers.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: loads of notifications just came through - sweep them and tell me what actually needs me
+    history:
+      - 'user: six agents on six tickets'
+      - 'assistant: Six launched, all supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: how's the rest of the fleet doing, anyone stuck?
+    history:
+      - 'user: merge 700'
+      - 'assistant: Merged. Two other agents are still running their own tickets.'
+    active: [daintree.forge.land-pull-request]
+  - query: how's the whole fleet looking right now, is anyone waiting on me?
+    history:
+      - 'user: reconcile after that wake'
+      - 'assistant: Patch applied, two nodes advanced.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: how are the other agents doing while we've been on this?
+    history:
+      - 'user: check the preview again'
+      - 'assistant: Two new-generation warnings, no errors.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: how's everyone doing, anything need me right now
+    history:
+      - 'user: put each running agent in its own worktree'
+      - 'assistant: Five worktrees created and all five agents told once.'
+    active: [daintree.worktree.relocate-agents]
+  - query: something just pinged. which one was it and how are the others doing
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: chek the agnets and tell me who needs me
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: nobody's said anything in half an hour. go check on them all
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: disarmAll, i've completely lost track of what's armed
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: attach supervisors to whatever's running unwatched and then tell me where everything is at
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: one of thems been on the same step forever and i dont know which. go through them and find it
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: check on whatevers running on feat/billing and feat/exports
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: morning. anything need me?
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: a couple of these have no supervisor attached, adopt them
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: just the three review agents, how are they doing
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: wats everyone up to, anythign finsihed?
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: one of the tabs just went red. run through all of them and tell me what state each is in
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: a couple of these are running with nothing watching them, adopt them
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+wakes:
+  - query: '[watcher fired: t_8110 idle — agent finished]'
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Swept the fleet: 2 finished, 3 working, 1 waiting on a question, 1 unsupervised (now adopted). Armed a watcher on the two that looked close to done.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: '[queue: 2 items need attention]'
+    history:
+      - 'user: anything need me right now'
+      - 'assistant: Two agents want input — I''ve armed both terminals for your typed reply and put a watch on the rest of the fleet.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: '[background wake: t_8114 went idle]'
+    history:
+      - 'user: show me the next one'
+      - 'assistant: Focused t_8114 — still generating. Watching it so I can move you on when it settles.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+near_misses:
+  - hows everyone doing, anyone stuck?
+  - hows it looking out there
+  - everything ok?
+  - are they all still going?
+  - hows the fleet doing
+  - anyone stuck?
+  - who needs me
+  - quick sanity check on the agents pls
+  - hows everyone getting on
+docs:
+  - whats everyone doing
+  - query: whats everyone doing
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: one thing first, whats everyone doing
+    history:
+      - 'user: prep for review'
+      - 'assistant: Verdict ready with no runners detected, so verification is thin. Committed and pushed; PR opened.'
+foundation_boundaries:
+  - sweep the fleet and sort out whoever is blocked
+  - go through the running agents and act on each one
+  - arm all the agents for my input
+  - triage the running agents and tell me what still needs me
+  - show me the next one that needs attention
+  - check on all of them and adopt any thats running without a supervisor
+  - whos finished and whos still going, and deal with the finished ones
+  - sweep the agents and deal with whatever's stuck or waiting
+  - is anyone blocked? go through all of them and unstick what you can
+  - triage the fleet and tell me what still needs me
+  - check on all the agents and handle the finished ones
+  - show me the next agent that needs attention
+  - there's an agent running from earlier that nobody's watching — adopt it and keep tabs
+  - anyone finished? anyone failed? sort each of them out
+  - arm the terminals so i can type into them myself
+  - catch me up on the agents and unblock whatever you can

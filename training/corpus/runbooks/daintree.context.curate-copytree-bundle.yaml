@@ -1,0 +1,342 @@
+# Training examples whose answer is `daintree.context.curate-copytree-bundle` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.context.curate-copytree-bundle
+run: pre-split
+positives:
+  - copytree bundle for the auth flow
+  - bundle everything relevant to the billing subsystem — the handlers, the schemas, the config and any tests that touch it
+  - make me a reference file of the terrain system
+  - can you put together a context bundle for the payment retry bug? I keep re-pasting the same four files into other tools and it's driving me mad, I want one file that has the queue code, the retry handler, the config and whatever tests cover it
+  - copy the websocket code to my clipboard so I can paste it into chatgpt
+  - ctx bundle over src/worldgen, src/terrain and src/world, markdown format, with line numbers
+  - cna you bundle up the prompt assembler stuff plus its goldens, i keep re-explaining it to people
+  - do the same thing for the notifications module
+  - what would you actually put in a context bundle for the state token code?
+  - I need a code context file for a review I'm about to do on the retry logic
+  - grab everything under services/ and contracts/ into one file for me
+  - pack the runbook loader, the catalog and their tests into one bundle
+  - put together context for the docs MCP feature so I can hand it off tomorrow morning — include the client, the wiring in the orchestrator and the tests
+  - can you copytree just what changed on this branch?
+  - one file with all the auth stuff pls, keep it under 400kb
+  - bundle the CLI tool registry code and its fixtures and stick it on my clipboard
+  - assemble reference context for the workflow intelligence subsystem — entry points, the typed contracts, the validation and the task profiles
+  - give me a dump of the providers package as one xml context file
+  - make a context file someone could read to get onboarded onto the selector
+  - bundle the streaming path incl. sse event shapes, ndjson if it supports it
+  - wat files would i need to hand someone to explain the orchestrator? bundle em up
+  - same thing but for the other two dirs we looked at
+  - is there a way to get all the terminal management code into a single reference file?
+  - context bundle for issue 412's area please — not starting work on it, I just want the files in front of me
+  - bundle the files I touched today, sorted by modified
+  - copytree bundle for the payments module
+  - put src/worldgen src/terrain and src/world into one file for me
+  - copy the whole auth subsystem onto my clipboard, im pasting it into gemini
+  - contractor starts monday and i need to hand him the ingest pipeline. one reference file with the pipeline, its config and the tests around it
+  - that came back noFilesMatched. the paths are real, i just ls'd them
+  - it truncated. bump the size cap and run it again, i'd rather have the whole thing
+  - cn u mke a contxt bundel for teh websockt reconnect stuff
+  - same again but from the billing worktree
+  - give me the schema layer as markdown, with line numbers
+  - bundle only what i've touched since main
+  - whats the thing that squashes a bunch of files into one big text file. do that for the retry logic
+  - run tree-copy, copytree? whatever its called, over the notification service
+  - '#412 is the cache stampede bug. i want one file with everything someone would need to read to understand it, tests included'
+  - reviewer wants context for the migration change. make them a single file they can open
+  - so ive been going back and forth with claude in the browser and every time i have to re-paste half the repo. can you just collect the whole terrain generation side, the noise stuff, the biome tables, whatever config feeds them, into one file so i stop doing this by hand
+  - rate limiter is melting prod. every file that touches it, one blob, now
+  - in the feat/invoices worktree, bundle the invoice + tax code
+  - bundle the parser but leave the test fixtures out, theyre enormous
+  - just give me the file path, dont touch my clipboard
+  - ok take those seven files you just found and turn them into one reference file
+  - how many tokens would the whole api dir be as a bundle?
+  - the generated grpc client is gitignored but i need it in there anyway
+  - if it has to drop stuff keep the newest files
+  - name the run 'auth flow context' and bundle the login path
+  - find everything that touches session expiry and put it in a file i can read offline
+  - i want a context file ready so i can feed an agent later, the whole checkout flow
+  - which worktree am i in? bundle the graphql resolvers out of it
+  - bundle the config layer as ndjson, im going to script over it
+  - make me a snapshot of the billing code i can attach to an email
+boundaries:
+  - query: bundle up all the files related to the worktree handling so i can paste them somewhere
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: bundle everything relevant to the migration into one reference file
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: bundle all the frontend files into one context file for me
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Bundle the relevant parser files into one CopyTree reference file.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Make a context bundle from the files in this worktree.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Create a CopyTree bundle containing the UI component and its tests.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: bundle up everything relevant to the auth flow so i can paste it somewhere else
+    confusable_with: [daintree.explore.repository]
+  - query: make me a copytree of the payment subsystem, include the tests and supporting files
+    confusable_with: [daintree.explore.repository]
+  - query: pull together a reference file with all the code that touches the scheduler
+    confusable_with: [daintree.explore.repository]
+  - query: find everything related to billing, including the tests, and bundle it into a context file
+    confusable_with: [daintree.explore.repository]
+  - query: i need a reference file of the auth subsystem with its helpers, stick it on my clipboard
+    confusable_with: [daintree.explore.repository]
+  - query: work out which files matter for the upload path and give me a copytree of them
+    confusable_with: [daintree.explore.repository]
+  - query: bundle up everything to do with the billing subsystem into one context file
+    confusable_with: [daintree.orchestration.fan-out-work]
+followups:
+  - query: also throw in the middleware tests
+    history:
+      - 'user: bundle everything relevant to the auth flow, including the tests'
+      - 'assistant: Searched for the auth surfaces and settled on src/auth/session.py, src/auth/tokens.py, src/middleware/auth.py and tests/test_auth*.py. Generating the bundle now.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: hm, try it again?
+    history:
+      - 'user: copytree bundle for the terrain system'
+      - 'assistant: includePaths with the bare directories matched zero files — noFilesMatched came back true. Checking .copytreeignore and .gitignore before I retry.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: now put it on my clipboard
+    history:
+      - 'user: make me a reference file for the billing subsystem'
+      - 'assistant: Done — 34 files, 210 KB, ~52k estimated tokens, written to /var/folders/.../billing-context.xml. Nothing was truncated.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: just drop the fixtures then
+    history:
+      - 'user: bundle the whole services directory'
+      - 'assistant: The run came back truncated — truncatedBy maxTotalSize, 12 files dropped. I''d rather narrow the selection than silently ship a partial bundle.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: roughly how big is this going to end up?
+    history:
+      - 'user: pull together context on the streaming path so I can hand it to someone'
+      - 'assistant: Chasing imports out from the SSE writer now — three more files look relevant.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: do the same for src/world and src/biomes
+    history:
+      - 'user: bundle src/worldgen and src/terrain'
+      - 'assistant: Scoped both directories and generated the bundle — 61 files, no budget flags fired.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: wait, which worktree are you doing this in?
+    history:
+      - 'user: context bundle for the selector plus its tests'
+      - 'assistant: I''ll resolve the worktree first, then search for the selector surfaces.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: yeah that's fine, go ahead
+    history:
+      - 'user: i need one file with all the retry logic in it'
+      - 'assistant: Found the retry handler, the backoff helper and two test modules. Anything else you want swept in before I generate?'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: can you add line numbers to it
+    history:
+      - 'user: bundle the prompt assembler stuff'
+      - 'assistant: Settled on the assembler, the four templates and the golden snapshots. Generating now.'
+      - 'user: markdown not xml'
+      - 'assistant: Switched format to markdown and regenerated — 18 files, ~40k tokens.'
+    active: [daintree.context.curate-copytree-bundle]
+topic_shifts:
+  - query: bundle all of that plus the tests into one context file for me
+    history:
+      - 'user: explain how the auth flow hangs together'
+      - 'assistant: Walked it end to end: auth.py Principal, the bearer extraction in deps.py, and the per-call threading in providers/.'
+    active: [daintree.explore.repository]
+  - query: put together a context bundle of the build config and the CI workflow files so i can paste it to someone
+    history:
+      - 'user: the build broke, fix it'
+      - 'assistant: Fixed — a missing lockfile entry. Build green, verified twice.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: add the middleware tests to it
+    history:
+      - 'user: bundle the auth subsystem'
+      - 'assistant: 28 files written to .copytree/auth.md.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: separate job - bundle everything to do with the auth module into one context file, tests included
+    history:
+      - 'user: knock out the backlog, one agent per issue'
+      - 'assistant: Six agents up. All running with watchers.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: different job - bundle the exporter subsystem and its tests into a context file for later
+    history:
+      - 'user: the tests are failing on develop'
+      - 'assistant: Fixed - a fixture path assumed the old layout. Suite is green and independently reverified.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: before that lands — is there a size cap on a copytree bundle?
+    history:
+      - 'user: bundle everything relevant to the billing flow'
+      - 'assistant: Settled on 14 files plus the tests. Generating the reference file now.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: does that copy to my clipboard automatically or only if i ask?
+    history:
+      - 'user: make me a context bundle for the scheduler'
+      - 'assistant: Selected 11 files and two config templates. Generated to ./context/scheduler.md.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: explain what a context bundle is then build one for the billing flow
+    history:
+      - 'user: need to hand something off'
+      - 'assistant: Sure.'
+  - query: actually — bundle up everything auth related so i can paste it into another chat
+    history:
+      - 'user: remember the entrypoint is cmd/server/main.go'
+      - 'assistant: Saved.'
+      - 'user: what terminals have i got open'
+      - 'assistant: Three: ''shell'', ''claude'' and ''server logs''. No agents running in any of them.'
+    active: [daintree.foundation]
+  - query: chuck the middleware tests in too
+    history:
+      - 'user: what terminals have i got open'
+      - 'assistant: Three: ''shell'', ''claude'', ''server logs''.'
+      - 'user: actually — bundle up everything auth related so i can paste it into another chat'
+      - 'assistant: Selected internal/api/middleware/auth.go, internal/auth/token.go, internal/auth/keys.go and the auth config block, then generated the bundle.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: yeah copy it to the clipboard
+    history:
+      - 'user: actually — bundle up everything auth related so i can paste it into another chat'
+      - 'assistant: Generated a bundle with auth.go, token.go, keys.go and the config block.'
+      - 'user: chuck the middleware tests in too'
+      - 'assistant: Added internal/api/middleware/*_test.go and regenerated the file.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: bundle the limiter, its tests and whatever config it reads
+    history:
+      - 'user: where does the rate limiter live in here'
+      - 'assistant: middleware/ratelimit.go over internal/limiter, config in config/limits.yaml.'
+      - 'user: does it cope with bursts or is it a flat bucket'
+      - 'assistant: There is a burst field on the bucket, but limits.yaml leaves it at zero for every route, so in practice it''s flat.'
+    active: [daintree.explore.repository]
+  - query: oh also grab the redis wrapper it uses
+    history:
+      - 'user: does it cope with bursts or is it a flat bucket'
+      - 'assistant: Burst exists but is zero everywhere in config.'
+      - 'user: bundle the limiter, its tests and whatever config it reads'
+      - 'assistant: Selected middleware/ratelimit.go, internal/limiter/*.go, the matching _test.go files and config/limits.yaml, and generated the bundle.'
+    active: [daintree.context.curate-copytree-bundle]
+  - query: did you include the backoff config?
+    history:
+      - 'user: walk me through the retry logic and then bundle everything you looked at'
+      - 'assistant: retry/policy.go defines an exponential backoff with jitter, applied by the transport wrapper in http/client.go and by the jobs worker separately. Bundled both plus the policy tests.'
+    active: [daintree.explore.repository, daintree.context.curate-copytree-bundle]
+  - i need a context bundle for the billing subsystem, everything relevant plus the tests
+  - query: add the webhook handlers too
+    history:
+      - 'user: i need a context bundle for the billing subsystem, everything relevant plus the tests'
+      - 'assistant: Explored first. Proposed selection: src/billing/**, the two invoice models, the stripe adapter, and tests/billing/**. 34 files. Anything to add before I generate?'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: right, finish the bundle and put it on my clipboard
+    history:
+      - 'user: hold on — did ci pass on the billing pr?'
+      - 'assistant: PR #388 is red on the contract-test job.'
+      - 'user: red? ok dig into whats failing and ping me when its green'
+      - 'assistant: The fixtures were recorded against the old stripe API version. Re-recorded and pushed; PR watcher armed so I''ll wake you when checks turn.'
+    active: [daintree.ci.diagnose-and-fix, daintree.orchestration.watch-outcome]
+  - query: now bundle up everything in the payments module so i can paste it into a review
+    history:
+      - 'user: what''s the uncommitted stuff'
+      - 'assistant: Three prompt partials and a regenerated golden snapshot.'
+      - 'user: ok commit and push, no pr yet'
+      - 'assistant: Committed as one change and pushed the branch with upstream set. No PR opened.'
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+  - query: include the tests and the migrations too
+    history:
+      - 'user: ok commit and push, no pr yet'
+      - 'assistant: Committed and pushed with upstream set.'
+      - 'user: now bundle up everything in the payments module so i can paste it into a review'
+      - 'assistant: Explored first, then generated a bundle: 18 files under payments/ plus the two shared money helpers it imports. Written to the worktree, not copied.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: stick it on my clipboard
+    history:
+      - 'user: now bundle up everything in the payments module'
+      - 'assistant: 18 files plus the two shared money helpers, written to the worktree.'
+      - 'user: include the tests and the migrations too'
+      - 'assistant: Regenerated with tests/payments/** and the four migration files — 31 files total.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: good enough. bundle the queue package and its tests into one context file so i can hand it over
+    history:
+      - 'user: poll the pinned agents on the race'
+      - 'assistant: 3 of 4 say double-unlock.'
+      - 'user: what did the fourth say exactly'
+      - 'assistant: It says close(resultCh) at :188 races with drain(), and the panic is a symptom.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: bundle everything touching the auth module into one context file for the next batch
+    history:
+      - 'user: tell it thats blocking, not a nice to have'
+      - 'assistant: Relayed — it''s rewriting the query builder.'
+      - 'user: is that reviewer terminal still busy or has it finished'
+      - 'assistant: Finished — idle at the prompt, last output was its summary eight minutes ago.'
+    active: [daintree.foundation]
+  - query: chuck the tests in too
+    history:
+      - 'user: is that reviewer terminal still busy'
+      - 'assistant: Finished, idle at the prompt.'
+      - 'user: bundle everything touching the auth module into one context file for the next batch'
+      - 'assistant: Explored and settled a selection — 22 files across src/auth, middleware and the session store. Generating the bundle.'
+    active: [daintree.foundation, daintree.context.curate-copytree-bundle]
+  - bundle up everything touching the auth module into one context file for me
+  - bundle up everything touching the auth flow into one reference file
+  - i've already read the auth flow, i don't need it explained. i need every file in it in one bundle i can hand to another tool.
+  - explore the payments code, settle on the files that matter, then generate the bundle
+  - query: bundle up everything in the auth package so i can paste it into a review
+    history:
+      - 'user: file an issue about the token refresh race'
+      - 'assistant: Created #871, labelled bug and security.'
+    active: [daintree.forge.manage-issue]
+  - query: bundle the whole checkout flow into a context file for me
+    history:
+      - 'user: the checkout page throws at step two'
+      - 'assistant: Console shows the step-two component reading `order.items` before the order resolves.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: wat files would i need to hand someone to explain the orchestrator? bundle em up
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: find everything that touches session expiry and put it in a file i can read offline
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: give me a dump of the providers package as one xml context file
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: so ive been going back and forth with claude in the browser and every time i have to re-paste half the repo. can you just collect the whole terrain generation side, the noise stuff, the biome tables, whatever config feeds them, into one file so i stop doing this by hand
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: make a context file someone could read to get onboarded onto the selector
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: make me a reference file of the terrain system
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: same again but from the billing worktree
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: copy the whole auth subsystem onto my clipboard, im pasting it into gemini
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: copy the websocket code to my clipboard so I can paste it into chatgpt
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: can you put together a context bundle for the payment retry bug? I keep re-pasting the same four files into other tools and it's driving me mad, I want one file that has the queue code, the retry handler, the config and whatever tests cover it
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+wakes:
+  - query: '[async wait returned: copyTree.generate finished]'
+    history:
+      - 'user: bundle everything relevant to the billing subsystem including tests'
+      - 'assistant: Explored the tree, settled a selection of 31 files plus two glob patterns. Running the single generate call now.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - query: '[wake: generate step errored — output exceeded the size bound]'
+    history:
+      - 'user: make me a context file for the websocket layer'
+      - 'assistant: Selection settled, generating the bundle.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+near_misses:
+  - bundle up everything related to the selector so i can paste it somewhere
+docs:
+  - bundle everything about the auth subsystem into a copytree file
+  - bundle everything auth related into a copytree file

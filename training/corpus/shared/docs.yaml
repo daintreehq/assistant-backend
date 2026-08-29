@@ -1,0 +1,1241 @@
+# Curated rows tagged `docs` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: docs
+run: pre-split
+docs: true
+empty_kind: no_task
+examples:
+  - whats the difference between a timer and a watcher
+  - how does auto approve work
+  - does daintree support jetbrains or is it terminal only?
+  - where do i change the keybinding for focusing a terminal
+  - how do i create a worktree
+  - what does the attention queue do exactly
+  - can recipes take arguments
+  - what is a fleet
+  - how do i rename a tab
+  - what models does daintree use under the hood
+  - does daintree send my source code anywhere
+  - what's a grant
+  - how does daintree decide which runbook to load
+  - keyboard shortcut for switching tabs?
+  - can i run daintree across two machines
+  - what does the workflow ledger keep track of
+  - is there a way to set a default coding agent per project
+  - how does the PR watcher know something merged
+  - what github permissions does daintree need
+  - difference between a recipe and a startup script?
+  - does the assistant write code itself or does it always delegate
+  - where do daintree logs live
+  - what's a blocker in a workflow graph
+  - how do i get an agent working on a github issue
+  - whats the right way to clean up after a big fan out
+  - can daintree watch a PR or just terminals
+  - do i need a separate worktree for every agent
+  - how long does an async wait last before it times out
+  - is there a config file and where does it live
+  - what happens to a watcher if i close the terminal it's watching
+  - whats the difference between polling the agents and running a competition
+  - how much does this cost per turn
+  - query: worktree create keeps failing on the branch name, whats going on
+    expect: [daintree.diagnostics, daintree.worktree.create-plain-worktree]
+  - query: recipes list is empty but the file is right there
+    expect: [daintree.diagnostics, daintree.recipe.run-or-create]
+  - query: renaming tabs silently does nothing, get it working
+    expect: [daintree.diagnostics, daintree.terminals.rename]
+  - query: the watcher i set never wakes me, set one up properly this time
+    expect: [daintree.diagnostics, daintree.orchestration.watch-outcome]
+  - query: yep go ahead
+    docs: false
+  - query: nice, that worked
+    docs: false
+  - whats a watcher
+  - what is a recipe in daintree
+  - what does pinned mean for an agent
+  - explain the attention queue
+  - what is an async wait
+  - what does fleet mean here
+  - whats the workflow ledger for
+  - what is a worktree exactly
+  - what do you mean by a visible agent vs a background one
+  - what is a blocker in a workflow graph
+  - whats a supervisor in this thing
+  - terminal vs tab — same thing or different?
+  - what are runbooks and where do they come from
+  - whats the difference between the assistant and an agent
+  - how do i change the shortcut for switching terminals
+  - how do i stop it auto-approving everything
+  - how do i pin a terminal
+  - how do i add an mcp server to daintree
+  - how do i install daintree
+  - how do i sign in
+  - how do i update to the latest version
+  - how do i write a recipe
+  - how do i turn on desktop notifications
+  - how does renaming a tab actually work under the hood
+  - how do i change the theme
+  - how do i reset everything and start clean
+  - how do i see my token usage
+  - how do i give an agent a different model
+  - how do i export a session transcript
+  - how do i configure which coding agent gets used by default
+  - how do i quit without killing my agents
+  - keyboard shortcuts list?
+  - how do i see what the assistant has remembered about this project
+  - does daintree work with jetbrains
+  - can i run this over ssh
+  - is there a web version
+  - does it work on windows
+  - can i use codex instead of claude code
+  - does daintree support gitlab or is it github only
+  - is there an api i can hit
+  - can it use a local model
+  - does it work with monorepos
+  - any vim keybindings support?
+  - can two people share a daintree session
+  - does daintree support bitbucket
+  - where do i set the default model
+  - which config file holds the api key
+  - where does daintree store its data
+  - where are the logs
+  - where do recipes live on disk
+  - what env vars does daintree read
+  - is there a global config or is it per project
+  - where's the settings file on mac
+  - can i change where worktrees get created
+  - why does it close my terminal when the agent exits
+  - what counts as a destructive tool
+  - why do i keep getting confirmation prompts
+  - why does the assistant delegate instead of editing files itself
+  - does daintree send my code to a server
+  - what happens to running agents if i close the app
+  - why did it load a runbook i didnt ask for
+  - what happens if an agent crashes mid task
+  - do watchers survive a restart
+  - what happens to my worktrees if i quit
+  - why is there a delay before the first token
+  - what happens when i hit the rate limit
+  - how much does daintree cost
+  - is there a free tier
+  - whose api key gets billed for all these agents
+  - is there a cap on how many watchers i can have
+  - do i need an openrouter account to use this
+  - how do i cancel my subscription
+  - is there a team plan
+  - difference between a timer and a watcher
+  - watcher vs async wait, whats the actual difference
+  - worktree vs branch — whats the distinction in daintree
+  - recipe vs fleet?
+  - whats the difference between pinned agents and configured agents
+  - difference between fanning out work and running a competition
+  - is a supervisor the same thing as a watcher
+  - poll vs interview, when would i use each
+  - what changed in the last release
+  - is auto-approve a new thing
+  - wheres the changelog
+  - any breaking changes recently?
+  - when did watchers get added
+  - whats new in daintree
+  - ok so i keep hearing about the attention queue but i dont actually get what puts stuff in it, can you explain
+  - sorry noob question, is daintree open source?
+  - docs link for watchers?
+  - is there any documentation on recipes
+  - whats the cli actually called
+  - does daintree need git to work
+  - can i use it without github at all
+  - who makes daintree
+  - is my data used for training
+  - how do i report a bug
+  - whats on the roadmap
+  - is there a way to see everything an agent did after the fact
+  - how long does a watcher stay armed before it gives up
+  - query: ta mate
+    docs: false
+  - query: yep
+    docs: false
+  - query: appreciate it
+    docs: false
+  - query: you legend
+    docs: false
+  - query: wow that was quick
+    docs: false
+  - query: damn that was fast
+    docs: false
+  - query: huh
+    docs: false
+  - query: weird
+    docs: false
+  - query: ohh i see
+    docs: false
+  - query: gotcha
+    docs: false
+  - query: makes sense
+    docs: false
+  - query: that's what i thought
+    docs: false
+  - query: yeah that tracks
+    docs: false
+  - query: kk!
+    docs: false
+  - query: right
+    docs: false
+  - query: good stuff
+    docs: false
+  - query: beautiful
+    docs: false
+  - query: hey again
+    docs: false
+  - query: back
+    docs: false
+  - query: forget what i just said
+    docs: false
+  - query: disregard the last message
+    docs: false
+  - query: sorry wrong window
+    docs: false
+  - query: typo, ignore
+    docs: false
+  - query: asdf
+    docs: false
+  - query: oops
+    docs: false
+  - query: no i meant the other one
+    docs: false
+  - query: actually never mind i see it now
+    docs: false
+  - query: sorry what did you say the second one was
+    docs: false
+  - query: repeat that last bit
+    docs: false
+  - query: say that again
+    docs: false
+  - query: shorter answers please
+    docs: false
+  - query: you dont need to explain every step
+    docs: false
+  - query: stop with the bullet lists
+    docs: false
+  - query: youre repeating yourself
+    docs: false
+  - query: nice, the watcher fired
+    docs: false
+  - query: cool, worktree's gone now
+    docs: false
+  - query: queue's empty now, nice
+    docs: false
+  - query: yep the timer went off, thanks
+    docs: false
+  - query: recipe worked, cheers
+    docs: false
+  - query: wow all four finished already
+    docs: false
+  - query: tabs look way better now, thanks
+    docs: false
+  - query: ha it's still going
+    docs: false
+  - query: lol it renamed itself
+    docs: false
+  - query: that was the right call
+    docs: false
+  - query: no worries, it wasnt important
+    docs: false
+  - query: was just curious
+    docs: false
+  - query: eh forget it
+    docs: false
+  - query: ok 👍
+    docs: false
+  - query: '...'
+    docs: false
+  - query: still there?
+    docs: false
+  - query: you around?
+    docs: false
+  - what's a watcher
+  - what is a worktree in daintree
+  - how does the attention queue work
+  - whats the difference between a watcher and a timer
+  - how do timers work here
+  - what's a recipe
+  - how do recipes work exactly
+  - what does fanning out mean in daintree
+  - can agents keep running in the background
+  - where do i change the theme
+  - whats the keybinding for switching tabs
+  - does daintree run on linux
+  - does daintree support gemini cli
+  - does it work with codex
+  - what models can i use
+  - where are the logs kept
+  - how do i update daintree
+  - what does the pin icon do
+  - can i split panes
+  - how do i set the default agent
+  - shortcut for the command palette?
+  - what does async wait mean in daintree
+  - can i use my own api key
+  - what is daintree
+  - does it work with gitlab
+  - how do i add an mcp server
+  - wheres the config file
+  - what happens to my worktrees when i quit
+  - how do i change the font size
+  - is there a dark mode
+  - how do i pin an agent
+  - whats the diff between a recipe and a fleet
+  - how does daintree pick which runbook to load
+  - do watchers still run if i close the app
+  - how do i give an agent a grant
+  - how do notifications work
+  - does daintree send my code anywhere
+  - how do i change the model the assistant uses
+  - whats the workflow ledger
+  - wheres the audit log
+  - can i drive daintree from a script
+  - whats the difference between pinned and configured agents
+  - how do i make a terminal read only
+  - whats the little clock icon on a tab
+  - how do i turn off notifications
+  - is there an api
+  - where does daintree store its database
+  - what is copytree
+  - how do i use copytree
+  - whats an async verdict
+  - how do i see keyboard shortcuts
+  - does daintree work offline
+  - whats the difference between a terminal and an agent here
+  - query: recipe vs fleet?
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: how do i report a bug
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: what does async wait mean in daintree
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: what are runbooks and where do they come from
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: wheres the config file
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: what happens to running agents if i close the app
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: how does the attention queue work
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: where are the logs kept
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: what is copytree
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: how much does daintree cost
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: what does fanning out mean in daintree
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: whats the workflow ledger
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: whats the difference between pinned and configured agents
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: where are the logs
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: who makes daintree
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: any breaking changes recently?
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: how does the PR watcher know something merged
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: what counts as a destructive tool
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: how do i give an agent a grant
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: does it work with codex
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: is there a dark mode
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: is there an api
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: the watcher i set never wakes me, set one up properly this time
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+    expect: [daintree.diagnostics, daintree.orchestration.watch-outcome]
+  - query: wheres the audit log
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: whats on the roadmap
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: can i run this over ssh
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: how do i cancel my subscription
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: can i change where worktrees get created
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: is there a way to set a default coding agent per project
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: what changed in the last release
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: is there a way to see everything an agent did after the fact
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: does daintree work with jetbrains
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: is auto-approve a new thing
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: is there any documentation on recipes
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: where's the settings file on mac
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: sorry noob question, is daintree open source?
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: how do i turn off notifications
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: how do notifications work
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: does daintree send my source code anywhere
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: how do i see keyboard shortcuts
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: how do i export a session transcript
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: whats the keybinding for switching tabs
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: wheres the changelog
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: does daintree send my code to a server
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: does daintree run on linux
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: how do i turn on desktop notifications
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: how does daintree decide which runbook to load
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: does daintree send my code anywhere
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: how do i change the theme
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: where does daintree store its database
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: what's a grant
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: how do i configure which coding agent gets used by default
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: how do i install daintree
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: why did it load a runbook i didnt ask for
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: what does pinned mean for an agent
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: how does renaming a tab actually work under the hood
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: what does the attention queue do exactly
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: how do i change the font size
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: whats the difference between a watcher and a timer
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: what is an async wait
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: how do i add an mcp server
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: what happens to a watcher if i close the terminal it's watching
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: how does daintree pick which runbook to load
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: how do i quit without killing my agents
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: how does auto approve work
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: does the assistant write code itself or does it always delegate
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: what env vars does daintree read
+    history:
+      - 'user: kick off 1204 with claude'
+      - 'assistant: Launched #1204 in terminal t_c4a with a background watcher. Nothing printed yet — that''s normal for the first few seconds after a spawn.'
+  - query: does daintree work with jetbrains
+    history:
+      - 'user: The test cleanup keeps erasing the implementation edit. Move both live agents apart.'
+      - 'assistant: worktree wt_impl, branch fix/serializer, path /repo/branches/serializer: term_impl filed and told. worktree wt_test, branch test/serializer, path /repo/branches/serializer-tests: term_test filed and told.'
+  - query: does daintree support gemini cli
+    history:
+      - 'user: is the box up'
+      - 'assistant: Paused. Resume first if you need it.'
+  - query: can two people share a daintree session
+    history:
+      - 'user: retitle 214, it just says fix thing'
+      - 'assistant: Proposed: "Retry loop never terminates on 429 responses from the upstream provider". Say the word and I''ll write it.'
+  - query: how do i install daintree
+    history:
+      - 'user: what''s unassigned and small'
+      - 'assistant: #470 and #471 both look self-contained; neither has an assignee.'
+  - query: what is a worktree in daintree
+    history:
+      - 'user: look over what the agent wrote'
+      - 'assistant: Reviewed - the change is fine, one style nit and one missing test.'
+  - query: where does daintree store its database
+    history:
+      - 'user: the unit tests are failing on this branch, work out why and fix it'
+      - 'assistant: Ran the suite in worktree wt-3 — 4 failures in tests/unit/test_selector.py, all from a changed catalog fixture. Explore agent t-14 is confirming the root cause before I put an edit agent on it.'
+  - query: does daintree send my source code anywhere
+    history:
+      - 'user: remember that the staging seed script has to run before the e2e suite'
+      - 'assistant: Saved. Also noted the existing fact about staging resets on Sundays, which sits alongside it.'
+  - query: does daintree need git to work
+    history:
+      - 'user: vote among the fleet: ship friday or hold'
+      - 'assistant: 3 hold, 2 ship. Consensus: hold.'
+  - query: worktree vs branch — whats the distinction in daintree
+    history:
+      - 'user: did it actually do what i asked?'
+      - 'assistant: Verified - the diff matches the acceptance criteria and the tests cover it.'
+  - query: does daintree run on linux
+    history:
+      - 'user: run the runoff between the two that tied'
+      - 'assistant: Runoff tally: Entry A 3 votes, Entry B 1. Entry A was agent 4, so agent 4 takes it.'
+  - query: how do i update daintree
+    history:
+      - 'user: agent per ticket on the whole backlog batch'
+      - 'assistant: Five agents launched, one per issue.'
+  - query: how much does daintree cost
+    history:
+      - 'user: is the devbox up on the billing tree'
+      - 'assistant: Fresh status on wt_3a1 (billing): lastStatus running, checked just now, no error.'
+  - query: does daintree send my code anywhere
+    history:
+      - 'user: code review whats on the branch'
+      - 'assistant: Review complete — the reviewer agent in tab 4 has the full write-up, 5 findings with file evidence.'
+  - query: what does fanning out mean in daintree
+    history:
+      - 'user: put an agent on the docs typo one, #90'
+      - 'assistant: Launched #90 — worktree ~/wt/issue-90, branch docs/90-typo, terminal t_2e8, watcher w_44. Context injected, not assigned.'
+  - query: what models does daintree use under the hood
+    history:
+      - 'user: close the merged worktrees'
+      - 'assistant: Inventoried nine, classified six safe. I need an explicit go-ahead before deleting.'
+  - query: can i run daintree across two machines
+    history:
+      - 'user: run the dev-stack recipe'
+      - 'assistant: Ran dev-stack in the current worktree — 3 processes up, one live agent terminal which I am supervising.'
+  - query: what github permissions does daintree need
+    history:
+      - 'user: separate them so they stop clobbering each other''s files'
+      - 'assistant: Three worktrees created and each agent told where it now lives.'
+  - query: how do i add an mcp server to daintree
+    history:
+      - 'user: plan it out'
+      - 'assistant: Graph wfg_301 stored, 6 nodes. The index rebuild was excluded from scope as you asked.'
+  - query: what does async wait mean in daintree
+    history:
+      - 'user: back'
+      - 'assistant: Welcome back — no agents, no watchers, clean tree.'
+  - query: what is a recipe in daintree
+    history:
+      - 'user: point the implementer at the review in tab 4'
+      - 'assistant: Sent, and it reported the review was useful - two of the five findings were real.'
+  - query: do watchers still run if i close the app
+    history:
+      - 'user: check the preview console'
+      - 'assistant: 14 errors, all the same hydration mismatch on the pricing table.'
+  - query: what happens to running agents if i close the app
+    history:
+      - 'user: i need a context bundle for the billing subsystem, everything relevant plus the tests'
+      - 'assistant: Explored first. Proposed selection: src/billing/**, the two invoice models, the stripe adapter, and tests/billing/**. 34 files. Anything to add before I generate?'
+  - query: what is daintree
+    history:
+      - 'user: land the config PR'
+      - 'assistant: Merged with a rebase.'
+  - query: does daintree work offline
+    history:
+      - 'user: ci is red on my branch, sort it'
+      - 'assistant: Root cause was a stale fixture in test_selector.py. Fixed, re-ran, full suite green and verified independently.'
+  - query: can daintree watch a PR or just terminals
+    history:
+      - 'user: Run this workflow.'
+      - 'assistant: The implementation node failed its tool call.'
+  - query: does daintree support jetbrains or is it terminal only?
+    history:
+      - 'user: where were we'
+      - 'assistant: wf_8790 live and supervised. t-9 is running unsupervised on the parser worktree. Two rows closed as cancelled.'
+  - query: where do daintree logs live
+    history:
+      - 'user: four agents debate the state token design then vote off the weakest'
+      - 'assistant: Vote tally is tied 2-2 between Codex and Qwen. Do you want to keep both, pick one yourself, or run a runoff?'
+  - query: does daintree support gitlab or is it github only
+    history:
+      - 'user: put alice and the platform team on 512 as reviewers'
+      - 'assistant: Requested. Complete lists come back as users [alice], teams [platform] — nothing was rejected. It''s still a draft, so they won''t be notified yet.'
+  - query: who makes daintree
+    history:
+      - 'user: run the qa recipe in the payments worktree'
+      - 'assistant: Recipe ''qa'' loaded — three steps, one live agent. Launching now.'
+  - query: where does daintree store its data
+    history:
+      - 'user: let claude and codex talk it out about the schema'
+      - 'assistant: Three exchanges. They''ve agreed on the table shape but not the index strategy.'
+  - query: sorry noob question, is daintree open source?
+    history:
+      - 'user: isolate the four agents'
+      - 'assistant: wt_b1 feat/webhooks, wt_b2 feat/webooks-retry, wt_b3 feat/queue, wt_b4 feat/dlq. All filed and told.'
+  - query: does daintree support bitbucket
+    history:
+      - 'user: put an agent on each of the open bugs'
+      - 'assistant: Three agents running with supervisors attached.'
+  - query: how does daintree decide which runbook to load
+    history:
+      - 'user: separate the running agents'
+      - 'assistant: Three worktrees created off develop; each agent told once to continue there.'
+  - query: does daintree send my code to a server
+    history:
+      - 'user: where were we on the queue work'
+      - 'assistant: Branch feat/queue-backoff is pushed, PR #388 open, review pending. Nothing running locally.'
+  - query: whats new in daintree
+    history:
+      - 'user: something''s wrong, the export button does nothing'
+      - 'assistant: The console shows an uncaught TypeError in export/handler.ts:41 — `rows` is undefined when the filter returns empty.'
+  - query: how does daintree pick which runbook to load
+    history:
+      - 'user: isolate these four into their own checkouts'
+      - 'assistant: Four worktrees created and all four agents redirected.'
+  - query: can i drive daintree from a script
+    history:
+      - 'user: how many services in this monorepo and what does each one do'
+      - 'assistant: Five under services/: gateway (edge routing, auth), identity-svc (users, sessions), billing-svc, notify-svc and a jobs worker. Shared code lives in pkg/.'
+  - query: is there a dark mode in this app
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: is there a cap on how many watchers i can have in this app
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: how do i change the shortcut for switching terminals in this app
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: where do i change the keybinding for focusing a terminal in this app
+    history:
+      - 'user: give the agents their own worktrees'
+      - 'assistant: Four created; every agent told once to continue in its new directory.'
+  - what's a blocker in a workflow graph in this app
+  - query: whats a watcher in this app
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: what is a recipe in this app
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: how do i get an agent working on a github issue in this app
+    history:
+      - 'user: create a worktree for a new branch fix/session-timeout off main'
+      - 'assistant: Created worktree wt_8f2 at ~/code/app-fix-session-timeout on branch fix/session-timeout, based on main. recipeLaunched was false and no agent was launched.'
+  - is there an api i can hit in this app
+  - what happens when i hit the rate limit in this app
+  - why does the assistant delegate instead of editing files itself in this app
+  - query: why does it close my terminal when the agent exits in this app
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: is there a config file and where does it live in this app
+    history:
+      - 'user: run a runoff, they''re tied at 3'
+      - 'assistant: Runoff came back 2-2 — still tied. Want another round, co-winners, or a secondary criterion?'
+  - whats the workflow ledger for in this app
+  - query: whats the right way to clean up after a big fan out in this app
+    history:
+      - 'user: run a contest, best refactor idea wins'
+      - 'assistant: Winner declared - t_1102 took it 4-1 on peer votes.'
+  - whats the difference between the assistant and an agent in this app
+  - query: is auto-approve a new thing in this app
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: where do this app logs live
+    history:
+      - 'user: spin up three agents to debate the caching design and converge on one answer'
+      - 'assistant: Spawned three explore agents (terminal-a1f, terminal-b2c, terminal-c9d) and sent round 1. Waiting on all three.'
+  - query: is there a web version in this app
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: what is this app
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - what do you mean by a visible agent vs a background one in this app
+  - query: what happens if an agent crashes mid task in this app
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - does it work with monorepos in this app
+  - query: does this app support jetbrains or is it terminal only?
+    history:
+      - 'user: review the auth branch for security'
+      - 'assistant: One reviewer done, nothing found on the token path. Reporting that plainly rather than manufacturing something.'
+  - query: what changed in the last release in this app
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: what env vars does this app read
+    history:
+      - 'user: what can run now'
+      - 'assistant: Four ready nodes, no dependencies between them, no open blockers.'
+  - query: when did watchers get added in this app
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: what does fleet mean here in this app
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - why is there a delay before the first token in this app
+  - does this app work with jetbrains
+  - query: how do i turn off notifications in this app
+    history:
+      - 'user: five agents, one ticket each'
+      - 'assistant: Five up and supervised.'
+  - query: does this app send my code to a server
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: what counts as a destructive tool in this app
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - where do you change the keybinding for focusing a terminal
+  - how do you create a worktree
+  - how do you rename a tab
+  - query: how do you decide which runbook to load
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - how do you get an agent working on a github issue
+  - query: how do you change the shortcut for switching terminals
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - how do you stop it auto-approving everything
+  - how do you pin a terminal
+  - query: how do you add an mcp server to daintree
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: how do you install daintree
+    history:
+      - 'user: need a decision made'
+      - 'assistant: Four agents are pinned.'
+  - query: how do you sign in
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - how do you update to the latest version
+  - how do you write a recipe
+  - how do you turn on desktop notifications
+  - query: how do you change the theme
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: how do you reset everything and start clean
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: how do you see my token usage
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: how do you give an agent a different model
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: how do you export a session transcript
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - how do you configure which coding agent gets used by default
+  - how do you quit without killing my agents
+  - how do you see what the assistant has remembered about this project
+  - query: where do you set the default model
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - how do you cancel my subscription
+  - query: how do you report a bug
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: where do you change the theme
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: how do you update daintree
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - how do you set the default agent
+  - query: how do you add an mcp server
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - how do you change the font size
+  - query: how do you pin an agent
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: how do you pick which runbook to load
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - how do you give an agent a grant
+  - how do you change the model the assistant uses
+  - how do you make a terminal read only
+  - how do you turn off notifications
+  - how do you use copytree
+  - how do you see keyboard shortcuts
+  - how do i give an agent a grant, and is there a shortcut for it?
+  - query: how do i report a bug, and is there a shortcut for it?
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - whats a watcher, and when would i want one?
+  - how do i sign in, and is there a shortcut for it?
+  - query: how do i create a worktree, and is there a shortcut for it?
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - what is a blocker in a workflow graph, and when would i want one?
+  - how do i change the model the assistant uses, and is there a shortcut for it?
+  - how do i change the shortcut for switching terminals, and is there a shortcut for it?
+  - how do i see what the assistant has remembered about this project, and is there a shortcut for it?
+  - query: where are the logs, and can i change it?
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - what is a worktree in daintree, and when would i want one?
+  - query: how do i set the default agent, and is there a shortcut for it?
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - how do you turn on desktop notifications in this app
+  - how do you add an mcp server to this app
+  - how do you sign in in this app
+  - how do you give an agent a different model in this app
+  - one thing first, what models can i use
+  - one thing first, what are runbooks and where do they come from
+  - one thing first, how do i pin an agent
+  - side question, how do i configure which coding agent gets used by default
+  - hang on, before you push — what is a watcher?
+  - one thing first, poll vs interview, when would i use each
+  - side question, how do i see what the assistant has remembered about this project
+  - side question, how do i cancel my subscription
+  - actually wait — is there a config file and where does it live
+  - hang on, before you push — how much does daintree cost
+  - actually wait — how much does this cost per turn
+  - hang on, before you push — how do i update daintree
+  - sorry, unrelated — terminal vs tab — same thing or different?
+  - actually wait — whats the difference between a timer and a watcher
+  - hang on, before you push — sorry noob question, is daintree open source?
+  - actually wait — how do i get an agent working on a github issue
+  - side question, is my data used for training
+  - sorry, unrelated — whats the workflow ledger for
+  - hang on, before you push — is there a dark mode
+  - side question, does daintree send my source code anywhere
+  - actually wait — whats the difference between pinned and configured agents
+  - one thing first, what happens to my worktrees if i quit
+  - one thing first, how do i change the theme
+  - sorry, unrelated — how do i update to the latest version
+  - quick q — is there a cap on how many watchers i can have
+  - actually wait — can i change where worktrees get created
+  - quick q — what is daintree
+  - actually wait — does it work with monorepos
+  - hang on, before you push — who makes daintree
+  - side question, how do i set the default agent
+  - sorry, unrelated — does daintree support bitbucket
+  - sorry, unrelated — is there a team plan
+  - query: eh forget it
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+    docs: false
+  - query: youre repeating yourself
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+    docs: false
+  - query: beautiful
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+    docs: false
+  - query: say that again
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+    docs: false
+  - query: gotcha
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+    docs: false
+  - query: asdf
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+    docs: false
+  - query: ok 👍
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+    docs: false
+  - query: makes sense
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+    docs: false
+  - query: queue's empty now, nice
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+    docs: false
+  - query: right
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+    docs: false
+  - query: you dont need to explain every step
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+    docs: false
+  - query: ta mate
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+    docs: false
+  - query: wow all four finished already
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+    docs: false
+  - query: no worries, it wasnt important
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+    docs: false
+  - query: ohh i see
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+    docs: false
+  - query: kk!
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+    docs: false
+  - query: you around?
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+    docs: false
+  - query: tabs look way better now, thanks
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+    docs: false
+  - query: sorry wrong window
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+    docs: false
+  - query: recipe worked, cheers
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+    docs: false
+  - query: disregard the last message
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+    docs: false
+  - query: no i meant the other one
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+    docs: false
+  - query: nice, that worked
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+    docs: false
+  - query: that was the right call
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+    docs: false
+  - query: repeat that last bit
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+    docs: false
+  - query: cool, worktree's gone now
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+    docs: false
+  - query: weird
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+    docs: false
+  - query: '...'
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+    docs: false
+  - query: oops
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+    docs: false
+  - query: shorter answers please
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+    docs: false
+  - query: quick q — good stuff
+    history:
+      - 'user: what happened while i was away'
+      - 'assistant: Two rows ended while you were out. I can pull the audit log for the window if you want the detail — filtered to errors it''s one read.'
+    docs: false
+  - query: actually wait — wow that was quick
+    history:
+      - 'user: let the three of them talk it out about the api shape'
+      - 'assistant: Round 3 relayed. They''ve converged on versioned routes but disagree on deprecation.'
+    docs: false
+  - query: side question, that's what i thought
+    history:
+      - 'user: give the running agents their own worktrees'
+      - 'assistant: Three worktrees created off develop, all three agents redirected.'
+    docs: false
+  - query: side question, queue's empty now, nice
+    history:
+      - 'user: rename these three by what they''re working on'
+      - 'assistant: Done — ''auth refactor'', ''flaky test hunt'', ''release smoke''.'
+    docs: false
+  - query: side question, tabs look way better now, thanks
+    history:
+      - 'user: swap needs-triage for confirmed on 601'
+      - 'assistant: Both label changes landed; re-read shows confirmed, bug.'
+    docs: false
+  - query: one thing first, hey again
+    history:
+      - 'user: catch me up on what''s still open'
+      - 'assistant: Two PRs from last week: #291 (the retry rewrite) and #303 (docs). Neither has moved in five days.'
+    docs: false
+  - query: side question, was just curious
+    history:
+      - 'user: debate and eliminate'
+      - 'assistant: Eliminated the sharding position. Two positions remain.'
+    docs: false
+  - query: side question, youre repeating yourself
+    history:
+      - 'user: what was i working on'
+      - 'assistant: The ledger has three rows open; two have live agents still running in /Users/greg/src/acme.'
+    docs: false
+  - query: actually wait — yep the timer went off, thanks
+    history:
+      - 'user: three of the five look wedged right after spawn'
+      - 'assistant: that pattern is usually a bad id rather than five simultaneous hangs, so I re-resolved the ids against the roster first. Two were stale; the third is genuinely silent.'
+    docs: false
+  - query: sorry, unrelated — gotcha
+    history:
+      - 'user: find me a small bug nobodys on'
+      - 'assistant: #144 - one-line null check, unassigned, no branch.'
+    docs: false
+  - query: side question, weird
+    history:
+      - 'user: five agents, one ticket each'
+      - 'assistant: Five up and supervised.'
+    docs: false
+  - query: hang on, before you push — stop with the bullet lists
+    history:
+      - 'user: watch PR 88 for me'
+      - 'assistant: PR watch armed on 88.'
+    docs: false
+  - query: side question, sorry what did you say the second one was
+    history:
+      - 'user: edit the body of 155 to describe the new design'
+      - 'assistant: Body replaced wholesale and re-read to confirm.'
+    docs: false
+  - query: one thing first, typo, ignore
+    history:
+      - 'user: tidy all this up, close the terminals and drop the worktrees'
+      - 'assistant: Confirmed and torn down — 6 terminals closed, 4 worktrees deleted, watchers cancelled, ledger rows settled.'
+    docs: false
+  - query: actually wait — nice, that worked
+    history:
+      - 'user: 6 PRs landed off last nights batch. review them all properly'
+      - 'assistant: Ran independent read-only reviewers across all six. 14 de-duplicated findings, three of them high severity.'
+    docs: false
+  - query: hang on, before you push — right
+    history:
+      - 'user: show me the next one'
+      - 'assistant: term_22 is on the migration work, still running. Three others are alive in the same worktree.'
+    docs: false
+  - query: quick q — forget what i just said
+    history:
+      - 'user: two opinions on the schema'
+      - 'assistant: Both agents are up.'
+    docs: false
+  - query: actually wait — ha it's still going
+    history:
+      - 'user: Merge this PR once green.'
+      - 'assistant: Automatic CI-triggered merging is not available from this surface.'
+    docs: false
+  - query: actually wait — back
+    history:
+      - 'user: start work on #412'
+      - 'assistant: Started "Retry backoff never resets" (#412). Worktree at ~/wt/issue-412 on branch fix/412-retry-backoff, agent running in terminal t_9f2 with supervisor watcher w_31 attached. I''ll come back when its completed event lands.'
+    docs: false
+  - query: hang on, before you push — no worries, it wasnt important
+    history:
+      - 'user: kick off 1204 with claude'
+      - 'assistant: Launched #1204 in terminal t_c4a with a background watcher. Nothing printed yet — that''s normal for the first few seconds after a spawn.'
+    docs: false
+  - query: quick q — wow all four finished already
+    history:
+      - 'user: ok i''ve got 4 claudes pinned. get each of them to come up with the most interesting thing about this codebase then have them vote on whose is best'
+      - 'assistant: Four pinned agents found. Each gets one independent submission, then I relay all four back for a peer vote. Anonymise the ballots?'
+    docs: false
+  - query: side question, eh forget it
+    history:
+      - 'user: did the reload fix it'
+      - 'assistant: Re-read the console. It still shows 6 errors in aggregate, but that count covers retained history across generations.'
+    docs: false
+  - query: quick q — no i meant the other one
+    history:
+      - 'user: Assign ticket 22 to me.'
+      - 'assistant: This surface cannot resolve your forge login.'
+    docs: false

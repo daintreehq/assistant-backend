@@ -4,7 +4,7 @@
 > ```
 > stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
 > stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
-> corpus     training/data/selection.jsonl @ 9,774 rows
+> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 9,800 rows
 > train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
 >            stage 2: --epochs 10 --ordering equivariant --seed 41
 > serve      ONNX int8 encoders + fp32 head, ~410 MB whole-process RSS,
@@ -1026,3 +1026,128 @@ be fitted to the question being asked of it. `TODO.md` carries the trigger.
 Reproduce: `benchmarks/runbook_selection/local_runner.py` drives the same artifact;
 the distribution above comes from `SetwiseClassifier.select(...).scores` for the
 first admitted id, scored against each case's `required` set.
+
+---
+
+## 2026-08-29 — the corpus becomes a build artifact, and hard negatives get a consumer
+
+Two changes, one structural and one to stage 1's objective. **No shipped artifact
+was retrained or re-exported**: the compiled corpus holds the same 9,800 rows it
+did before, row for row, so the numbers at the top of this file still describe
+the artifact in `runbooks/local/artifacts/`. The training change applies to the
+next retrain.
+
+### The corpus was its own input
+
+`training/data/selection.jsonl` was both `assemble_data.py`'s output and its
+`--base`. Three consequences, all structural rather than incidental:
+
+- **Nothing could be removed by regenerating.** Only by hand-editing 2.8 MB of
+  JSONL.
+- **Provenance was one flat `source` string.** "Which run added this row" and
+  "drop everything from the run with the bad prompt" were unanswerable.
+- **Re-running a generator grew the corpus rather than reproducing it.**
+  `augment_context.py` measured itself taking 9,903 rows to 10,405 on a second
+  application, and shipped a guard against its own re-run whose documented
+  recovery was `git show <commit>:…jsonl >`. Git was the undo stack for the
+  training data.
+
+Now three planes: `training/journals/` (raw, append-only, **committed** — the
+generator is a nondeterministic paid model, so a discarded journal is a row that
+can never be traced to a prompt again), `training/corpus/` (curated YAML, one
+file per runbook, the source of truth), and `training/data/` (compiled). Placement
+is mechanical: a row answering exactly one runbook lives in that runbook's file,
+anything else in `shared/<source>.yaml`. `compile_corpus` is pure — same bytes on
+a re-run — and `tests/unit/test_training_corpus.py` gates the committed artifact
+against a fresh compile on every push. That gate runs in ORDINARY CI, not the
+training environment: the compile path touches no torch and no weights, only the
+catalog, the benchmark cases and the serving-side query renderer.
+
+Migration was verified lossless: 9,800 rows out, 9,800 back, identical as a
+multiset over query/history/active/expect/is_docs/source/empty_kind, with all
+2,042 confusability entries preserved. Rows predating the split carry
+`run: pre-split`, which is honest — most of those journals are genuinely gone.
+
+### `hard_negatives` was never read by anything
+
+The field was written on 2,042 rows. `train_retriever`'s module docstring said
+it was used "as explicit negatives on top of the in-batch ones"; `targets()`
+said it applied "-inf masking" for them. **No line of code ever read it.** It was
+inert from the day it was written, and the two docstrings were the only evidence
+it had an effect. It was also never mined — the assembler hardcoded the id of
+the runbook whose generation block produced the row.
+
+Two separate repairs:
+
+1. **Naming.** It is now `confusable_with`: the runbooks a HUMAN judged a query
+   could be mistaken for, usually straight out of a `whenToUse` carve-out. That
+   is what the data always was, and it is stable across retrains.
+2. **A consumer.** Against a FULL-CATALOG denominator — every runbook re-embedded
+   each step — adding a confusable runbook "as a negative" is a no-op, because it
+   was in the denominator already. The only thing a hard negative can do here is
+   carry more WEIGHT, so `--hard-negative-weight` multiplies a selected
+   negative's term in the softmax denominator (its logit gets `log w`).
+   Positives never receive it. On top of the authored set, negatives are **mined
+   every epoch** from the live encoder (ANCE-style), filtered by NV-Retriever's
+   `TopK-PercPos` rule — keep a candidate only where
+   `s(q, neg) <= (1 - margin) * s(q, best positive)` — because the top-scoring
+   unlabelled document is very often a legitimate alternative answer, and
+   training the encoder to push it away teaches it something false. Re-mining
+   every epoch is affordable for the same reason the full denominator is: tens
+   of documents, not millions. Held-out runbooks are excluded from mining as
+   well as from training rows, or the zero-shot probe would be measuring a model
+   that had been trained on the thing it is meant not to have seen.
+
+### Measured: 3 seeds, 6 epochs, `w=4.0` against `w=1.0` (the mechanism disabled)
+
+`w=1.0` is exactly the pre-change behaviour, since the field was inert.
+
+| | r@1 off → on | r@3 off → on | r@8 off → on | r@16 off → on |
+|---|---|---|---|---|
+| seed 41 | 0.850 → 0.855 | 0.965 → 0.970 | 0.987 → 0.988 | 0.998 → 0.998 |
+| seed 7 | 0.833 → 0.838 | 0.964 → 0.969 | 0.989 → 0.989 | 0.996 → 0.997 |
+| seed 101 | 0.828 → 0.831 | 0.957 → 0.962 | 0.989 → 0.992 | 0.999 → 0.998 |
+| **mean** | **0.8370 → 0.8413** | **0.9620 → 0.9670** | 0.9883 → 0.9897 | 0.9977 → 0.9977 |
+| sign | **3/3 better** | **3/3 better** | 2/3 better, 1 level | 1 better, 1 level, **1 worse** |
+
+**Read this as small but sign-consistent, not as a win worth quoting.** +0.4pp
+r@1 and +0.5pp r@3 is about five rows of a ~990-row validation split — inside
+what a single seed could produce by luck. What makes it worth keeping is that
+r@3 moved by exactly +0.005 in all three seeds, and that the one regression
+anywhere in the table is seed 101 at r@16 (0.999 → 0.998, a single row) against
+consistent gains at the ranks that decide the top of the list.
+
+**It does not fix anything that is currently broken.** `r@32` is 1.000 with the
+mechanism off, and `r@32` is the metric that decides whether the shortlist loses
+the answer — so this buys precision at the top of a list that already contains
+the right runbook. The real argument for it is structural: a full-catalog
+denominator dilutes as the catalog grows, and at 200-1,000 runbooks the
+contrast against the few genuinely confusable ones is where the signal has to
+come from. `bench scale` already puts the first candidate miss at 500 runbooks.
+
+Kept at `w=4.0` because it is better where it matters and costs a single row
+at one rank on one seed. `--hard-negative-weight 1.0` disables it. Note the LOSS values are not comparable between arms — an inflated
+denominator raises the loss by construction (0.249 vs 0.152 at seed 41), and
+that is arithmetic, not a worse fit.
+
+Cost: one extra forward pass over the training rows per epoch, for mining.
+
+### The zero-shot probe was leakier than its number implied
+
+`--holdout-runbooks` is what produced the **4/14 vs 13/14** figure quoted at
+the top of this file and in `.claude/skills/retrain-selector`. It dropped rows that
+ANSWERED a held-out runbook and nothing else, so three paths still fed the
+encoder the thing it was meant not to have seen:
+
+- the loss DENOMINATOR — the catalog is re-embedded with gradients every
+  step, so every held-out document was explicitly trained as a negative on
+  every row;
+- rows whose ACTIVE SET named it, which `build_query` renders into the
+  `[loaded: …]` prefix (80 such rows for the three ids that were held out);
+- and, once `confusable_with` gained a consumer, 274 authored negatives
+  naming it — a regression this change would have introduced.
+
+All three are closed. **The 4/14 number was measured under the leaky probe**
+and is therefore, if anything, optimistic about a genuinely unseen runbook;
+re-measure before quoting it as a floor. None of this affects an ordinary
+run: `holdout` is empty unless the flag is passed.

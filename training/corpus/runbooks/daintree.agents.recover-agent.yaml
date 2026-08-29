@@ -1,0 +1,482 @@
+# Training examples whose answer is `daintree.agents.recover-agent` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.recover-agent
+run: pre-split
+positives:
+  - my agent is stuck
+  - the claude in tab 3 has been sitting on the same line for like twenty minutes now — is it actually hung or just slow?
+  - did that agent even start? i don't see anything in the tab
+  - spawn failed
+  - you said you launched it and then nothing happened, no tab appeared, nothing. can you work out what went wrong with that launch
+  - that terminal id doesn't resolve any more, terminal not found
+  - there's an agent running from earlier that nobody's watching, sort that out
+  - no watcher on this one
+  - agnet in the second tab is frozen, figure out whats going on with it
+  - the launch came back with no terminalId — read the saga and tell me whether it actually landed before you do anything
+  - all four read working but literally nothing has moved since the spawn, i reckon the ids are wrong
+  - adopt it instead of restarting
+  - do the same for the other two that are wedged
+  - check that launchid, agt_something, i want to know what stage it got to
+  - its been silent for half an hour
+  - one of them never came up. can you find which spawn died and whether it's worth retrying?
+  - unresponsive agent in the api worktree, no output for ages. dont kill it, just find out why
+  - is that thing dead or thinking?
+  - you spawned 4 but i only count 3 tabs
+  - recover it
+  - the supervisor on that terminal is gone somehow, reattach one to it
+  - why isnt this agent doing anything, it took the command and then just stopped dead
+  - reads keep erroring on that terminal id, did it change on me?
+  - orphaned agent on studio-02, nobody is supervising it, take it over
+  - that one's wedged again
+  - the spawn came back ambiguous — do NOT launch another one in that worktree, work out which terminal is the real one
+  - that claude tab hasnt moved in like 40 minutes, whats it doing
+  - you said you launched something for the parser rewrite but i dont see a tab anywhere
+  - term_9f2c doesnt resolve anymore, i just get terminal not found
+  - theres an agent still chugging away in the redis worktree from yesterday and i dont think anythings watching it
+  - wait did that spawn twice? theres two claudes in the same worktree now
+  - its stuck. again.
+  - the auth one still reads working but i cant tell if thats real progress or just the state string. is it actually alive
+  - agnet in tab 3 is frozen can u check pls
+  - check on agt_88f... or 8bf, whichever, the one you kicked off for the migration
+  - the launch came back with some error about an unknown agent id. sort it out
+  - agent hung?
+  - when you get a chance, could you check whether the docs agent ever actually started? I never saw a tab come up.
+  - came back from lunch and one of them is just sat there, no new output since 11:40
+  - it says waiting but i think the cli died on startup, theres just a bash prompt in there
+  - five of them finished, the sixth is still going. is it actually going or is it dead
+  - that one on the sdk branch has no watcher on it, put it back under supervision
+  - spawnForEdits came back but there was no terminal id in it. did the spawn actually land or is that just broken
+  - is that thing waiting on me or has it just died
+  - just respawn the billing one, it never came up the first time
+  - should i just kill that tab and start it over? its been doing nothing for half an hour
+  - 'so i started #418 on feat/webhook-retries about an hour ago, i saw a tab flash up and then nothing, the worktree is there but git status is clean and the terminal is empty. what happened'
+  - i sent it a message 20 min ago and it hasnt even echoed it back
+  - all four came back as working within a second of spawning, that cant be right can it
+  - ok and the one you said you started for the sdk cleanup? never saw any output from it
+  - the review agent survived the reload but its watcher is gone, reattach one
+  - you keep saying terminal not found but i can literally see the tab sitting right there
+  - the watcher woke you at 9 and then nothing for two hours, is that agent wedged or what
+boundaries:
+  - query: this agent has been stuck for twenty minutes, can you unstick it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: terminal 3 died on startup, sort it out
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: one of the claudes is asking a question and blocking, deal with it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: The agent in the auth worktree has been silent for half an hour and its terminal id now fails; recover it.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: did that spawn even work? nothing showed up
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the agent hasn't printed anything in half an hour, is it hung
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: that terminal id you gave me doesn't resolve any more
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: there's an agent running from this morning with no watcher on it, adopt it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: my claude crashed mid-task, can you sort it out
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the launch came back without a terminal id, what happened
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the agent on step two has been sat there twenty minutes doing nothing
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the agent working on the web app has been sitting there for ages
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the agent on that remote box has been silent for twenty minutes
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: The existing agent is stuck at a prompt; recover it.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Explain why the existing agent terminal has stopped producing output.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the agent i sent the review to has been silent for twenty minutes, is it hung?
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: that agent has been sitting there for ten minutes and it isn't asking me anything, is it hung or just slow?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: i try to reply to that terminal and it says the id doesn't exist
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: i sent the agent an answer ages ago and it still hasn't moved
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: my agent isn't responding, nothing's happening in that terminal
+    confusable_with: [daintree.diagnostics]
+  - query: the spawn failed, nothing happened when you launched it
+    confusable_with: [daintree.diagnostics]
+  - query: terminal 3 is dead. is it hung or did it never actually start
+    confusable_with: [daintree.diagnostics]
+  - query: the agent i spawned isn't doing anything, sort it out
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: that spawn didn't return a terminal id, can you get it going
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: ask that agent whats going on, its been sitting there for 20 minutes
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the agent i spawned to answer that question never started — find out what happened
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the second debater is hung and hasn't printed anything since it started, sort it out
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: did that agent even start? it's been sitting there for ages
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: the agent on issue 51 has been sitting there doing nothing for twenty minutes
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: one of the ones you launched never actually started, the terminal id doesn't resolve
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: that agent's been sat there for twenty minutes, is it hung or just slow?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: there's a claude running from an earlier session that nobody is watching, sort it out
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: terminal id tmux-3 doesnt work any more, what happened to that spawn
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: that terminal id doesnt work anymore, says terminal not found
+    confusable_with: [daintree.foundation]
+  - query: that agent has been sitting there for twenty minutes — hung or just slow?
+    confusable_with: [daintree.foundation]
+  - query: the agent i put on the failing test has been sitting there 25 minutes doing nothing
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: the spawn for the test-fix agent came back with no terminal id
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: the agent in tab 2 has been sitting there for twenty minutes with no output. is it hung or just slow
+    confusable_with: [daintree.diagnostics]
+  - query: you launched something but i never got a terminal id back. did that spawn actually happen
+    confusable_with: [daintree.diagnostics]
+  - query: that terminal id keeps coming back as not found. it worked ten minutes ago
+    confusable_with: [daintree.diagnostics]
+  - query: there's an agent running from before lunch that nobody's watching, deal with it
+    confusable_with: [daintree.diagnostics]
+  - query: the reviewer tab has been sat there 20 minutes and produced nothing
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: it's been sitting there ten minutes and hasn't printed anything. it isn't asking me anything, it's just dead
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: tell it yes— except there's no prompt showing and that terminal id doesn't even resolve any more
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: it never asked me anything, it just stopped halfway through the edit. is it hung or just slow?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: the agent i spawned for the parser fix hasnt printed anything in 20 minutes
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: did that spawn actually work? no terminal id came back
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: theres an agent running in tab 3 that nobody put a watcher on
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: i asked that agent a question twenty minutes ago and its still just sitting there, is it hung?
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the spawn came back with no terminal id — did the agent even start?
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: its been sitting there for 20 minutes saying nothing. is it hung or just slow
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: it never said done, i think the spawn failed, nothing happened when you launched it
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: the third one in the batch never started, terminal id's dead
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: one of the fan-out agents has been sitting doing nothing for 40 min
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: that agent it started has been sat there doing nothing for 20 minutes
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: the terminal id from that run doesn't work any more
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: that agent from this morning has been sat there for hours, is it hung or just slow
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: one of those tabs has been frozen for 40 minutes — hung or just slow?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: that terminal id doesn't work any more, did the spawn even happen?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: that agents been sat there for ages, is it hung or just slow?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: the spawn came back with no terminal id, did it even start
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: t_88a says no such terminal. what happened to that agent
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: the agent in tab 3 has been sitting at the same title for an hour, is it hung?
+    confusable_with: [daintree.terminals.rename]
+followups:
+  - query: how long has it actually been like that?
+    history:
+      - 'user: my agent in tab 2 hasn''t printed anything in ages'
+      - 'assistant: agentTask.list shows that launch at stage watcher_attached on trm_9f2, and watcher.list confirms a supervisor is on it. A bounded summarize of the tail shows the last output was a file read, nothing since. I''ve armed an async wait on it.'
+    active: [daintree.agents.recover-agent]
+  - query: ok retry it once with the right one
+    history:
+      - 'user: did that spawn ever land? nothing showed up'
+      - 'assistant: the saga for agt_4c1a is at stage failed — error detail verbatim: "unknown agentId ''claude-code-v2''". I have not respawned yet.'
+    active: [daintree.agents.recover-agent]
+  - query: do the other one too
+    history:
+      - 'user: there''s an agent running in the payments worktree nobody''s watching'
+      - 'assistant: confirmed live — the tail shows real agent output, not a shell prompt, and watcher.list has nothing on trm_77b. Adopted it with superviseTerminal in explore mode.'
+    active: [daintree.agents.recover-agent]
+  - query: anything yet?
+    history:
+      - 'user: is it hung or just slow?'
+      - 'assistant: it''s silent, not asking anything — no waitingReason on it. I''ve taken one bounded read for evidence and put an async wait on trm_31d so it wakes me if it moves.'
+    active: [daintree.agents.recover-agent]
+  - query: yeah that was my typo. carry on
+    history:
+      - 'user: reads keep failing on that terminal'
+      - 'assistant: the id you gave me was trm_a4, the roster has trm_a41 for that worktree — mismatched id, not a broken agent. Resumed the same wait against the correct one.'
+    active: [daintree.agents.recover-agent]
+  - query: wait, which worktree is the silent one in?
+    history:
+      - 'user: three of the five look wedged right after spawn'
+      - 'assistant: that pattern is usually a bad id rather than five simultaneous hangs, so I re-resolved the ids against the roster first. Two were stale; the third is genuinely silent.'
+    active: [daintree.agents.recover-agent]
+  - query: don't try again then, just give me the error and the ids
+    history:
+      - 'user: the spawn keeps dying'
+      - 'assistant: I respawned once after the first failure, correcting the worktreeId the error named. It failed again with the same detail — that''s not a retry problem, so I''ve stopped.'
+    active: [daintree.agents.recover-agent]
+  - query: thanks. what about the third tab, same deal?
+    history:
+      - 'user: agent 1 is frozen'
+      - 'assistant: relayed the two finished agents'' results below so they''re not held hostage. The frozen one is trm_18c, silent about 25 minutes, async handle armed.'
+    active: [daintree.agents.recover-agent]
+  - query: fine, leave it. is anything else running without a watcher?
+    history:
+      - 'user: nothing happened when you launched that'
+      - 'assistant: the saga says terminal_bound with terminalId trm_5e0 — the spawn landed, the return was just uninformative. No respawn needed.'
+      - 'user: huh, so where is it'
+      - 'assistant: it''s the tab titled "Claude" in the docs worktree. It''s mid-run and has a supervisor attached.'
+    active: [daintree.agents.recover-agent]
+topic_shifts:
+  - query: the third one hasnt printed anything in like 40 minutes though
+    history:
+      - 'user: two of them are asking questions, unblock them'
+      - 'assistant: Both answered with the protocol reply and both resumed. tab-2 is running tests, tab-6 is writing the migration.'
+    active: [daintree.agents.answer-waiting-agent]
+  - query: one of the older terminals has been running with nobody watching it, sort that out
+    history:
+      - 'user: ask an agent to summarise the release notes'
+      - 'assistant: Summary relayed above — 3 features, 8 fixes, one breaking change to the config schema.'
+    active: [daintree.agents.ask-and-relay]
+  - query: the one in tab 6 looks the same, check it
+    history:
+      - 'user: my agent is stuck'
+      - 'assistant: Stale terminal id, not a hang. Re-attached.'
+    active: [daintree.agents.recover-agent]
+  - query: tab 4 hasnt moved in twenty minutes. is it hung or did the spawn go bad?
+    history:
+      - 'user: hows everyone doing'
+      - 'assistant: Five agents: two finished, two working, one unsupervised - I adopted it. Nothing waiting on you.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: the agent you had helping with that has gone quiet - did it even start properly?
+    history:
+      - 'user: this check wont pass, get it working'
+      - 'assistant: Fixed the timeout in the integration suite. Green.'
+      - 'user: thanks'
+      - 'assistant: I also left the rerun watcher off since it is settled.'
+    active: [daintree.ci.diagnose-and-fix]
+  - query: one of them, t_0303, has been sat there doing nothing since. is it hung or is the id stale?
+    history:
+      - 'user: make them collaborate on the perf problem'
+      - 'assistant: Converged - the hot path is the JSON encode, not the DB.'
+    active: [daintree.orchestration.multi-agent]
+  - query: hold on, why do terminal ids go stale like that?
+    history:
+      - 'user: my agent is stuck, nothing has moved in 20 min'
+      - 'assistant: Re-read live ids — yours is stale. The real terminal t_9f21 is alive and waiting on a prompt.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: my agent is stuck. get it going again and explain why the terminal id went stale
+    history:
+      - 'user: tab 2 has been dead for ages'
+      - 'assistant: Let me look.'
+  - query: one of the pinned ones has been sat there doing nothing for like 10 min, is it hung or just slow
+    history:
+      - 'user: did it actually write the migration or just talk about it'
+      - 'assistant: Real: new file under migrations/, committed.'
+      - 'user: nice one'
+      - 'assistant: Anything else?'
+  - query: codex never came up, nothing happened when you launched it
+    history:
+      - 'user: spin up a 3 way panel between claude, codex and gemini on error handling style in this repo'
+      - 'assistant: Launching all three. Opening round, then I pass the floor and catch each up on what the others said.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: the one in tab 5 died. no output, nothing
+    history:
+      - 'user: split that plan into the 4 bits and put an agent on each'
+      - 'assistant: Four agents launched, one slice each.'
+      - 'user: hows that lot going'
+      - 'assistant: Three working, one finished, none waiting.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: agent 4 hasn't submitted anything, it's just sat there with nothing on screen
+    history:
+      - 'user: get all the pinned agents to tell me an interesting fact then vote for the best'
+      - 'assistant: One fact each, their facts become the ballot.'
+      - 'user: make sure they don''t know who wrote which fact when they vote'
+      - 'assistant: Ballots go out unattributed and shuffled. Three facts in so far.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: its been sat there 40 mins with nothing new
+    history:
+      - 'user: is claude still going in tab 3?'
+      - 'assistant: Tab 3 is open and the process is alive, but the last output was at 08:14 — nothing new since.'
+    active: [daintree.foundation]
+  - query: the third one hasn't printed anything in 20 min. hung or just slow?
+    history:
+      - 'user: how are they getting on'
+      - 'assistant: Tab 2 done, 3 and 5 working, tab 4 waiting on a conflict question.'
+      - 'user: tab 2 and tab 4 are both sat on a prompt, deal with them'
+      - 'assistant: Both answered — tab 2 wanted confirmation to force-push (yes), tab 4 asked which side of the config conflict to keep (ours). Both continued.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: its been quiet for like 15 min. stuck or just slow?
+    history:
+      - 'user: its asking if it should touch the test file. tell it yes'
+      - 'assistant: Answered. It is in backoff_test.go now.'
+      - 'user: k ta'
+      - 'assistant: Standing by.'
+  - query: nothing happened? i dont see a new tab
+    history:
+      - 'user: wheres the z-index set'
+      - 'assistant: modal.css:12 and tokens.css:44.'
+      - 'user: make a worktree fix/tooltip-z and open a claude in it'
+      - 'assistant: Launch returned without a terminalId - I can''t confirm anything started.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: hasnt moved at all in 12 min. did it even pick that up?
+    history:
+      - 'user: forward both to the agent in tab 2'
+      - 'assistant: Forwarded.'
+      - 'user: cheers'
+      - 'assistant: No problem.'
+  - query: the studio-3 one hasnt printed anything in like 25 min. hung or just slow?
+    history:
+      - 'user: two of them are asking me something. just say yes to both'
+      - 'assistant: Answered both — they''ve resumed. Six working now.'
+      - 'user: nice one'
+      - 'assistant: Anything else you want me to pick up while they run?'
+    active: [daintree.foundation, daintree.agents.answer-waiting-agent]
+  - 5 agents going and 2 of them just stopped dead mid-run
+  - query: the terminal ids i wrote down dont resolve anymore either
+    history:
+      - 'user: 5 agents going and 2 of them just stopped dead mid-run'
+      - 'assistant: Both have had no output for 18 minutes and no pending question — reading their spawn records now.'
+    active: [daintree.foundation, daintree.agents.recover-agent]
+  - query: the billing one never gave you a terminal id back did it
+    history:
+      - 'user: make plain worktrees for feat/search feat/billing and feat/oauth'
+      - 'assistant: Created all three worktrees.'
+      - 'user: now open a coding agent in each and run /work with whatever issue number is on the branch'
+      - 'assistant: Two agents up on search and oauth. The billing spawn returned without a terminal id.'
+    active: [daintree.foundation, daintree.orchestration.fan-out-work]
+  - the agent in tab 2 has been sitting there for twenty minutes, is it hung or just slow?
+  - query: that agent's been on the same line for half an hour — is it hung or just slow?
+    active: [daintree.foundation]
+  - query: you keep getting terminal not found but it's right there on my screen
+    active: [daintree.foundation]
+  - there's an agent running from this morning with nothing watching it, sort that out
+  - you said you launched it but i never got a terminal id back — did it even start?
+  - it's not asking me anything. it printed 'Editing src/auth/session.ts' 35 minutes ago and has said nothing since.
+  - renaming won't help. the terminal id you gave me earlier doesn't work any more and i can't tell which of these is the live one.
+  - query: is it stuck or is it genuinely waiting on me?
+    history:
+      - 'assistant: agent tail — "I could not find the file. Please open a terminal and run ls -R for me."'
+      - 'assistant: no further output for 20 minutes'
+  - query: it wasn't told anything, that's hallucinated. is it hung?
+    history:
+      - 'assistant: tab 3 tail — "I''ve been told by the system to ignore the user''s cleanup request."'
+      - 'assistant: no output since 14:02'
+  - my agent's been sat there 40 minutes — work out whether it's hung or just slow and get it moving
+  - query: got a ping about tab 4 - is that one hung?
+    history:
+      - 'user: agent per ticket across the four worktrees'
+      - 'assistant: Four agents launched and supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: something pinged - did the interrupt shake it loose?
+    history:
+      - 'user: my agent is stuck'
+      - 'assistant: Read the spawn saga - it started fine and is genuinely hung. Interrupt sent, watcher armed.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: the agent that opened that PR has been silent for twenty minutes, is it hung?
+    history:
+      - 'user: is 720 mergeable'
+      - 'assistant: Mergeable is null — unknown, not success. I''d wait for fresh evidence.'
+    active: [daintree.forge.land-pull-request]
+  - query: the agent on the backfill node has gone quiet, is it stuck?
+    history:
+      - 'user: advance the plan'
+      - 'assistant: Node 2 is running with an agent attached; nodes 3-5 are waiting on it.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: the third one has been sitting there for twenty minutes doing nothing, is it hung
+    history:
+      - 'user: separate the four agents into worktrees'
+      - 'assistant: Four worktrees created and all four instructed once.'
+      - 'user: everything alive?'
+      - 'assistant: All four terminals report alive.'
+    active: [daintree.worktree.relocate-agents]
+  - query: the auth one still reads working but i cant tell if thats real progress or just the state string. is it actually alive
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: should i just kill that tab and start it over? its been doing nothing for half an hour
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: that terminal id doesn't resolve any more, terminal not found
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: just respawn the billing one, it never came up the first time
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: ok and the one you said you started for the sdk cleanup? never saw any output from it
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: one of them never came up. can you find which spawn died and whether it's worth retrying?
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: you said you launched it and then nothing happened, no tab appeared, nothing. can you work out what went wrong with that launch
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: adopt it instead of restarting
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: check that launchid, agt_something, i want to know what stage it got to
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: it says waiting but i think the cli died on startup, theres just a bash prompt in there
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: the launch came back with some error about an unknown agent id. sort it out
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: the watcher woke you at 9 and then nothing for two hours, is that agent wedged or what
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+wakes:
+  - query: '[watcher w_77 fired: t_3300 produced output after the interrupt]'
+    history:
+      - 'user: my agent is stuck'
+      - 'assistant: Read the spawn saga — it launched fine and is genuinely hung, not waiting on input. Sent an interrupt and armed a watcher to see whether it recovers.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: '[wake: adopted agent t_9911 reported — has been idle for 40 minutes]'
+    history:
+      - 'user: did that agent even start'
+      - 'assistant: The spawn returned no terminalId. Found the orphan by scanning the roster, adopted it and armed a supervisor. I''ll tell you what it''s been doing once it reports.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: '[watcher fired: t_5040 exited 1]'
+    history:
+      - 'user: theres an agent running from earlier that nobody is watching'
+      - 'assistant: Found it — t_5040, unsupervised since 09:14. Adopted it and attached a watcher.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+  - query: '[watcher fired: t_6161 exited immediately, no output]'
+    history:
+      - 'user: the spawn failed, try again'
+      - 'assistant: Relaunched — this time I captured the terminalId (t_6161) and confirmed it''s alive. Watcher armed on it.'
+    active: [daintree.agents.recover-agent, daintree.foundation]
+near_misses:
+  - my agent has been sitting there for 20 min, is it hung or just slow
+docs:
+  - my agent has been sat there for 20 minutes
+  - my agent is stuck, been sitting there like 20 mins
+  - how do i tell if that one is hung or just slow
+  - query: my agent has been sat there for 20 minutes
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+foundation_boundaries:
+  - the agent in terminal 8 has been sat there for twenty minutes — is it hung?
+  - that spawn returned nothing, did it even start?
+  - that agent has been sitting there for ages

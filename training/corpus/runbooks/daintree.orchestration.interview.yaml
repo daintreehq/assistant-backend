@@ -1,0 +1,320 @@
+# Training examples whose answer is `daintree.orchestration.interview` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.interview
+run: pre-split
+positives:
+  - have one agent interview the other three and pick the best one
+  - interview them
+  - get claude to grill the rest of them about the caching layer and tell me who actually knows it
+  - which of these agents should be my pair programmer? have one of them work it out
+  - one judge, three candidates, topic = error handling. go
+  - i want one agent interviewing the others on rust async and declaring a winner at the end
+  - 'set up an interview: pick a judge from the fleet, have it question the others about this repo''s test strategy, then name a winner'
+  - have the judge verify their claims against the actual code before it decides
+  - interview them but make them prove it — no hand waving, the judge should go read the repo and check
+  - narrow it down to a top 2 and then pick the winner
+  - same thing but deeper this time — have it verify what they say and do follow ups
+  - intrview the four agents and tell me which one actually understands the payment flow
+  - have gpt5 quiz the claude instances on the migration plan and say who came out on top
+  - job interview style — one agent asks the questions, the others answer, best candidate wins
+  - pick a judge and have it ask them all hard questions until it can say who's strongest
+  - who's the best of these three? get one of them to interview the rest and decide
+  - run a verified interview on the indexing subsystem, judge checks their answers against the repo
+  - have one of them do the interviewing and give me the winner plus its reasoning
+  - i need to know which agent to keep around for this project. have one interview the others and report back who wins
+  - do a light q and a interview across the fleet — one asks, rest answer, pick a winner
+  - can you have an agent interview these three about the deploy pipeline and then tell me who to trust with it
+  - have the interviewer ask follow ups if the answers are thin, then declare a winner
+  - ok now do the same interview thing with the two agents on studio-02
+  - have the judge challenge anything they claim thats not backed by the code, shortlist two finalists, then choose
+  - which of these four should i actually pair with? get one of them to interview the rest and decide
+  - have codex interview the others about how our billing module works, and make it actually check the code before it picks. don't let them bluff me
+  - interview them and pick one
+  - hve one of the agnts grill the othrs abt the migraiton stuff n tell me who wins
+  - morning. i've got 3 claude tabs and a codex tab. put codex in the interviewer chair and have it work out which claude actually knows the payments code.
+  - ok now that they're all done — have the first one question the other three about what they changed and pick whose work was strongest
+  - run a hiring panel for a docs-writing agent. one interviewer, three candidates, i want a hire recommendation at the end
+  - t-7 is the judge. t-2, t-3, t-9 are the candidates. topic is our test flakiness. go.
+  - interview all five on concurrency, cut it down to a top 2, then one final round and have the judge choose
+  - i keep handing db work to the wrong agent and losing an hour each time. set up a proper interview, judge and all, and just tell me which one to use for schema stuff.
+  - get the gpt one — sol? whatever it's called — to question the other agents about the auth rewrite and name a winner
+  - so i've got a few agents up and honestly i can't tell which one has actually read this repo and which one is just pattern matching. can you have one of them ask the others properly hard questions about it, chase them when the answers are vague, and tell me who came out on top?
+  - quiz the agents on our event pipeline — one asks, the rest answer, best one wins
+  - oral exam time. one examiner, three examinees, subject is the retry logic. who passes?
+  - could you have one agent interview the others about the caching layer and let me know which one it rates highest?
+  - i want to know which agent should be doing my reviews from now on. have one of them interrogate the rest and give me a verdict
+  - run the interview but tell the judge to push back hard on anything that sounds like a guess
+  - have the judge check whatever they claim against src/ before scoring anyone, then pick
+  - poll them on the schema question, but have one of them ask the follow ups and call the winner at the end
+  - score them, but the scoring should come out of an interview — one agent asking, the rest defending their answers
+  - get them talking about the indexing approach, but one of them runs it and has to name a best at the end
+  - have claude interview the other two agents about the parser and report back who it'd trust with it
+  - do that interview thing with these three
+  - screen the candidate agents on kubernetes knowledge and give me one name
+  - 'before i hand #212 to anyone, have one agent interview the rest on the code that ticket touches and tell me who''s best equipped'
+  - deep version this time please — judge verifies the claims, extra follow up round, then the call
+  - one agent grills the rest on our deploy pipeline until it picks a winner. leave everyone's tabs open after, i want to read them
+  - put one of them in the ref seat and have it question the rest about the websocket layer til it can call it
+boundaries:
+  - query: have one agent interview the others and pick the best one to pair with
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get claude to grill the other agents on this topic and tell me who came out on top
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get one agent to grill the others about the codebase and tell me which one is best
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: have one agent interview the other three and pick who'd be the best pair programmer
+    confusable_with: [daintree.orchestration.competition]
+  - query: get claude to grill the other agents on the architecture and tell me which one actually knows it
+    confusable_with: [daintree.orchestration.competition]
+  - query: one judge agent, three candidates, question them properly and crown a winner
+    confusable_with: [daintree.orchestration.competition]
+  - query: have one of them interview the other three and pick who'd be the best pair programmer
+    confusable_with: [daintree.orchestration.conversation]
+  - query: let the judge agent grill the rest about the codebase and tell me who comes out on top
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have one agent interview the other three and tell me which is best
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: have one agent grill the other three on this topic and pick the best one
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: one of them interviews the rest, narrow it to two, then tell me who to keep
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: have one agent interview the other three, narrow it to the best two and then pick a winner
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have one of them question the other three and then pick the best one to be my pair programmer
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get them all talking with opus grilling the others, then it should name who came out on top
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have gpt interview the other three about the retry logic and tell me which one actually knows it
+    confusable_with: [daintree.orchestration.competition]
+  - query: one of them grills the rest on our auth flow with follow-ups, then names a winner
+    confusable_with: [daintree.orchestration.competition]
+  - query: have one agent interview the others and tell me which one i should pair with
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: pick a judge agent, let it grill the rest on the codebase, then name a winner
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: have one agent grill the others about the auth module and pick the best one
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: have one of them interview the other three and pick the best one
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: narrow it to the top 2 and have the judge push them harder before deciding
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have claude grill the other two on their caching answers and tell me which one i should pair with
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: have gpt interview the other three about the codebase, grill them on their claims and tell me which one to keep
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: one agent asks the questions, the rest answer, narrow it to a top 2 and pick my pair programmer
+    confusable_with: [daintree.orchestration.debate-elimination]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: have one agent interview the other three about the caching layer and pick the best'
+      - 'assistant: Spawned a judge (Interviewer) plus three candidates in explore mode and relayed the judge''s opening questions. Awaiting their answers now.'
+    active: [daintree.orchestration.interview]
+  - query: have it verify their claims against the code before it decides
+    history:
+      - 'user: run an interview, one judge and three candidates, topic is the auth refactor'
+      - 'assistant: Round 1 done — all three answered. I''ve condensed the answers back to the judge and it''s drafting follow-ups.'
+    active: [daintree.orchestration.interview]
+  - query: add the fourth agent as a candidate too
+    history:
+      - 'user: pick a judge and have it grill the others on the test strategy'
+      - 'assistant: Judge is on round 2 of questions. Candidate B gave the thinnest answer so far.'
+    active: [daintree.orchestration.interview]
+  - query: yeah good, keep going
+    history:
+      - 'user: which of these should be my pair programmer? have one interview the rest'
+      - 'assistant: Chose a verified interview since you want a real recommendation. The judge is reading the repo to check what each candidate claimed.'
+    active: [daintree.orchestration.interview]
+  - query: what did the second one actually say again?
+    history:
+      - 'user: interview them on the indexing subsystem and name a winner'
+      - 'assistant: Two rounds in. The judge has narrowed to a top 2 and is asking each of them one last challenge question.'
+    active: [daintree.orchestration.interview]
+  - query: close the losers once it picks
+    history:
+      - 'user: one judge, three candidates, topic error handling'
+      - 'assistant: Spawned and relayed round 1. Candidate C stalled on a permission prompt so I sent it Continue.'
+      - 'user: fine'
+      - 'assistant: Round 2 relayed, awaiting all three.'
+    active: [daintree.orchestration.interview]
+  - query: how many rounds is this going to take
+    history:
+      - 'user: have an agent interview the others and tell me who to trust with the deploy pipeline'
+      - 'assistant: The judge has asked two rounds of questions and is weighing the answers now.'
+    active: [daintree.orchestration.interview]
+  - query: actually make it narrow to a top 2 first
+    history:
+      - 'user: run the interview across the fleet, light q and a is fine'
+      - 'assistant: All four answered round 1. Relaying the condensed answers to the judge.'
+    active: [daintree.orchestration.interview]
+topic_shifts:
+  - query: now have one of them grill the others on it and pick who understood it best
+    history:
+      - 'user: three agents, one problem, converge on a single answer about the index strategy'
+      - 'assistant: They converged on a partial index on (tenant_id, created_at). One answer, agreed by all three.'
+    active: [daintree.orchestration.multi-agent]
+  - query: different - have one agent interview the other three about the schema and pick the best answer
+    history:
+      - 'user: let me know when the migration agent settles'
+      - 'assistant: Watcher on t_2202, armed.'
+    active: [daintree.orchestration.watch-outcome]
+  - query: different format now - have one of them interview the rest about testing and name a winner
+    history:
+      - 'user: run a contest, best refactor idea wins'
+      - 'assistant: Winner declared - t_1102 took it 4-1 on peer votes.'
+    active: [daintree.orchestration.competition]
+  - query: roughly how much does something like this cost me?
+    history:
+      - 'user: have one interview the others and pick my pair programmer'
+      - 'assistant: Judge has asked round one. Verifying two claims against the codebase before round two.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: have one interview the others and pick a winner — and tell me how the judge verifies claims
+    history:
+      - 'user: cant decide which agent to keep'
+      - 'assistant: Three are configured.'
+  - i want one of these agents to interview the other three and tell me which one i should be using as my main pair programmer
+  - query: make it a proper grilling - the judge should check their claims against the actual repo not just take their word
+    history:
+      - 'user: i want one of these agents to interview the other three and tell me which one i should be using as my main pair programmer'
+      - 'assistant: One agent takes the judge seat and questions the other three, then names a winner. Light Q&A or a deep interview with claim checking?'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: which one ended up as judge
+    history:
+      - 'user: i want one of these agents to interview the other three and pick my main pair programmer'
+      - 'assistant: Light Q&A or a deep interview with claim checking?'
+      - 'user: make it a proper grilling - the judge should check their claims against the actual repo'
+      - 'assistant: Deep mode. Judge verifies each claim against the code and issues follow-ups before narrowing to a top 2.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: ok that's enough, back to the interview. have the judge call it
+    history:
+      - 'user: drop the judging, let the top 2 talk to each other'
+      - 'assistant: Passing the floor between tab 3 and tab 5.'
+      - 'user: give the other one the floor'
+      - 'assistant: Tab 5 has the floor, caught up on what tab 3 said.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - have tab 1 grill the other two on how they'd fix the cache invalidation bug, and pick a winner
+  - query: it should verify what they claim against the actual code before deciding
+    history:
+      - 'user: have tab 1 grill the other two on how they''d fix the cache invalidation bug, and pick a winner'
+      - 'assistant: Tab 1 is the judge, tabs 2 and 3 are candidates. Questions going out now.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: ha, fine. now have one of them interview the other three about the migration plan and tell me who to pair with
+    history:
+      - 'user: back. sweep them, anything need me?'
+      - 'assistant: 88 and 90 done, 93 waiting on a schema-version question.'
+      - 'user: ok. different thing — get four agents to each pitch a name for the new service then have them vote on the best'
+      - 'assistant: Four submissions in, blind peer vote tallied: ''Ferry'' won 3 points to 2. No tie.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - ive got 4 agents pinned. have one interview the other three about the migration plan and pick a winner
+  - query: make the judge check their claims against the actual code before it calls it
+    history:
+      - 'user: ive got 4 agents pinned. have one interview the other three about the migration plan and pick a winner'
+      - 'assistant: Agent 1 is judging. First round of questions relayed to the other three, answers coming back now.'
+    active: [daintree.foundation, daintree.orchestration.interview]
+  - i need one agent to grill the other three about the migration plan and pick whoever answers best
+  - have one agent interview the other three, verify their claims against the code and narrow to a top two before picking
+  - query: the judge pinged, has it picked someone?
+    history:
+      - 'user: have the judge interview them and pick the best'
+      - 'assistant: Judge briefed, second round of questions out.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: deep version this time please — judge verifies the claims, extra follow up round, then the call
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: do a light q and a interview across the fleet — one asks, rest answer, pick a winner
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: so i've got a few agents up and honestly i can't tell which one has actually read this repo and which one is just pattern matching. can you have one of them ask the others properly hard questions about it, chase them when the answers are vague, and tell me who came out on top?
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: have gpt5 quiz the claude instances on the migration plan and say who came out on top
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: put one of them in the ref seat and have it question the rest about the websocket layer til it can call it
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: intrview the four agents and tell me which one actually understands the payment flow
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: hve one of the agnts grill the othrs abt the migraiton stuff n tell me who wins
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: interview them but make them prove it — no hand waving, the judge should go read the repo and check
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: 'before i hand #212 to anyone, have one agent interview the rest on the code that ticket touches and tell me who''s best equipped'
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: get claude to grill the rest of them about the caching layer and tell me who actually knows it
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: could you have one agent interview the others about the caching layer and let me know which one it rates highest?
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: have the interviewer ask follow ups if the answers are thin, then declare a winner
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: have the judge verify their claims against the actual code before it decides
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: i need to know which agent to keep around for this project. have one interview the others and report back who wins
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: i want one agent interviewing the others on rust async and declaring a winner at the end
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: one agent grills the rest on our deploy pipeline until it picks a winner. leave everyone's tabs open after, i want to read them
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: ok now do the same interview thing with the two agents on studio-02
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+wakes:
+  - query: '[wake: 3 candidate answers ready for the judge]'
+    history:
+      - 'user: have one of them interview the others and pick the best pair programmer'
+      - 'assistant: t_0100 is the judge. First round of questions relayed to the three candidates — waiting on their answers.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: '[background wake: judge terminal t_0100 idle — verification pass done]'
+    history:
+      - 'user: grill them properly, make the judge check their claims against the code'
+      - 'assistant: Judge is verifying candidate claims against the repo before the follow-ups. Waiting on that pass.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+  - query: '[watcher fired: candidate t_0103 crashed mid-answer]'
+    history:
+      - 'user: narrow it to two and then decide'
+      - 'assistant: Top 2 selected, final round of questions out to both. Waiting on the judge''s verdict.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+near_misses:
+  - have one agent interview the others and pick the best one
+docs:
+  - have one of them interview the rest and pick a winner
+  - have one agent interview the other three and pick a winner
+  - query: have one of them interview the rest and pick a winner
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: quick q — have one agent interview the other three and pick a winner
+    history:
+      - 'user: how''s everyone doing?'
+      - 'assistant: Six agents running: 1,2,4 working, 3 waiting on a question, 5 finished, 6 idle.'

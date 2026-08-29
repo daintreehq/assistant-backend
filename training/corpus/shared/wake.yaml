@@ -1,0 +1,287 @@
+# Curated rows tagged `wake` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: wake
+run: pre-split
+examples:
+  - query: '[background wake — 2 of 5 supervisors reported terminal state: finished]'
+    history:
+      - 'user: for each of those worktrees open a claude terminal and run /work on the issue number'
+      - 'assistant: Detected the issue number on each of the 5 worktrees and launched /work in a Claude Code terminal per worktree. All five are supervised in the background.'
+    active:
+      - daintree.orchestration.fan-out-work
+      - daintree.orchestration.watch-outcome
+      - daintree.foundation
+    expect: [daintree.orchestration.fan-out-work, daintree.orchestration.watch-outcome]
+  - query: '[wake: tool registry refreshed, terminal tools available again]'
+    history:
+      - 'user: rename the tabs'
+      - 'assistant: The rename tool isn''t being offered this turn — that''s a Daintree-side problem, not yours. Reconnecting and watching for the tools to come back.'
+    active: [daintree.diagnostics, daintree.terminals.rename, daintree.foundation]
+    expect: [daintree.diagnostics, daintree.terminals.rename]
+  - query: '[watcher fired: 2 of 3 finished, t_3050 still running after 90m]'
+    history:
+      - 'user: put agents on 301 302 and 305 and wake me when theyre all done'
+      - 'assistant: Three worktrees, three agents, and a combined watch so I only wake you once they''ve all landed.'
+    active:
+      - daintree.orchestration.fan-out-work
+      - daintree.orchestration.watch-outcome
+      - daintree.foundation
+    expect: [daintree.orchestration.fan-out-work, daintree.orchestration.watch-outcome]
+  - query: '[wake: PR #533 opened by the agent, checks pending]'
+    history:
+      - 'user: start 402 and ping me when its pr goes green'
+      - 'assistant: #402 started in t_4020 with its supervisor, plus a PR watch armed for when the PR appears and its checks settle.'
+    active:
+      - daintree.workflow.start-work-on-issue
+      - daintree.orchestration.watch-outcome
+      - daintree.foundation
+    expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.watch-outcome]
+  - query: '[terminal.awaitAll returned: both reviewers finished]'
+    history:
+      - 'user: review the branch and then tell the implementer what to fix'
+      - 'assistant: Two reviewers running now; once they''re back I''ll forward the findings to the implementer in t_7007. Watchers armed on the reviewers.'
+    active:
+      - daintree.review.review-change
+      - daintree.agents.relay-review-feedback
+      - daintree.foundation
+    expect: [daintree.review.review-change, daintree.agents.relay-review-feedback]
+  - query: '[watcher fired: t_9090 idle — agent claims all green]'
+    history:
+      - 'user: fix the red suite then verify it properly before you tell me its done'
+      - 'assistant: Fix agent in t_9090, and I''ll run the suite myself afterwards rather than trust its word. Watcher armed on the agent.'
+    active:
+      - daintree.ci.diagnose-and-fix
+      - daintree.orchestration.verify-agent-work
+      - daintree.foundation
+    expect: [daintree.ci.diagnose-and-fix, daintree.orchestration.verify-agent-work]
+  - query: '[stall watcher fired: t_5502 no output for 25 minutes]'
+    history:
+      - 'user: sweep the fleet and wake me if anyone gets stuck'
+      - 'assistant: Swept — all 5 healthy right now. Left watchers on each with a stall threshold so you get woken if one goes quiet.'
+    active:
+      - daintree.orchestration.supervise-fleet
+      - daintree.orchestration.watch-outcome
+      - daintree.foundation
+    expect: [daintree.orchestration.supervise-fleet, daintree.orchestration.watch-outcome]
+  - query: '[watcher fired: rerun of the failing check concluded — still failing]'
+    history:
+      - 'user: whats blocking 288'
+      - 'assistant: Its PR has one failing check and an unanswered review comment. Forwarded the failing check to the agent still on it and armed a watch for the rerun.'
+    active:
+      - daintree.workflow.follow-up-on-issue
+      - daintree.orchestration.watch-outcome
+      - daintree.foundation
+    expect: [daintree.workflow.follow-up-on-issue, daintree.orchestration.watch-outcome]
+  - query: '[watcher fired: checks on PR 88 concluded — 2 failing]'
+    history:
+      - 'user: watch PR 88 and if the checks come back red get them fixed'
+      - 'assistant: Watching PR 88 — I''ll pick it up when the checks conclude.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    expect: [daintree.workflow.follow-up-on-issue, daintree.ci.diagnose-and-fix]
+  - query: '[watcher fired: t_8801 idle — agent reports seed script complete]'
+    history:
+      - 'user: when the seed agent finishes, check it actually seeded and then tear its worktree down'
+      - 'assistant: Watcher armed on t_8801.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    expect: [daintree.orchestration.verify-agent-work, daintree.orchestration.workspace-cleanup]
+  - query: '[watcher fired: 3 of 5 agents waiting on questions]'
+    history:
+      - 'user: take 401 402 403 404 405 and put an agent on each'
+      - 'assistant: Five agents up, a worktree each, background supervisors armed on all five.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.agents.answer-waiting-agent]
+  - query: '[terminal.awaitAll returned: 5 finished, askingQuestion: [t_21, t_24, t_27]]'
+    history:
+      - 'user: parallelise the backlog across the worktrees, one agent per ticket'
+      - 'assistant: Eight agents launched across the eight worktrees, each supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.agents.answer-waiting-agent]
+  - query: '[supervisor report: tab 3 is waiting on a question - ''should I bump the minor version too?'']'
+    history:
+      - 'user: start #417'
+      - 'assistant: Worktree fix/417 created, agent in tab 3, background supervisor attached.'
+    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    expect: [daintree.workflow.start-work-on-issue, daintree.agents.answer-waiting-agent]
+  - query: '[terminal.awaitAll returned: 1 finished, 2 askingQuestion]'
+    history:
+      - 'user: get three of them cross-checking this deadlock and give me one answer'
+      - 'assistant: Round one is out to all three. I''ll relay between them until they converge.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+    expect: [daintree.orchestration.multi-agent, daintree.agents.answer-waiting-agent]
+  - query: '[watcher fired: 2 of 4 entrants are blocked on a prompt and cannot submit]'
+    history:
+      - 'user: have the four of them each pitch a caching design then vote on the best'
+      - 'assistant: Submission round is out to all four. I''ll collect them and run the blind peer vote.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+    expect: [daintree.orchestration.competition, daintree.agents.answer-waiting-agent]
+  - query: '[watcher fired: t_5501 waiting on input - ''apply destructive migration? y/N'']'
+    history:
+      - 'user: run the migrate recipe in the billing worktree'
+      - 'assistant: Recipe running - it spawned a live agent in t_5501, which I''m watching.'
+    active: [daintree.recipe.run-or-create, daintree.foundation]
+    expect: [daintree.recipe.run-or-create, daintree.agents.answer-waiting-agent]
+  - query: '[stall watcher fired: t_8822 no output for 40 minutes, not asking anything]'
+    history:
+      - 'user: put an agent on each of the three failing packages'
+      - 'assistant: Three agents up - t_8821 auth, t_8822 billing, t_8823 search - each supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.agents.recover-agent]
+  - query: '[watcher fired: tab 5 exited 137 nine seconds after launch, no output at all]'
+    history:
+      - 'user: pick up #302'
+      - 'assistant: Worktree and branch made, agent launched in tab 5, supervisor attached.'
+    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    expect: [daintree.workflow.start-work-on-issue, daintree.agents.recover-agent]
+  - query: '[stall watcher fired: t_1616 has produced nothing since it spawned 18 minutes ago]'
+    history:
+      - 'user: get something adding tests for the parser'
+      - 'assistant: Agent running in t_1616, watcher armed.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+    expect: [daintree.edits.spawn-visible-agent, daintree.agents.recover-agent]
+  - query: '[watcher fired: t_331 exited 1 mid-round with a crash trace]'
+    history:
+      - 'user: three agents on the race condition, converge on one answer'
+      - 'assistant: Round two relayed. Two have replied, one is still working.'
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+    expect: [daintree.orchestration.multi-agent, daintree.agents.recover-agent]
+  - query: '[background wake: t_88 closed unexpectedly, the conversation is down to one participant]'
+    history:
+      - 'user: get the two of them talking about the API shape'
+      - 'assistant: Round three underway, each gets caught up on what the other said since it last spoke.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+    expect: [daintree.orchestration.conversation, daintree.agents.recover-agent]
+  - query: '[wake: recipe step 3 returned no terminalId and the spawn saga has no matching entry]'
+    history:
+      - 'user: create a worktree for spike/cache with the bootstrap recipe'
+      - 'assistant: Worktree created and the recipe kicked off.'
+    active: [daintree.recipe.run-or-create, daintree.foundation]
+    expect: [daintree.recipe.run-or-create, daintree.agents.recover-agent]
+  - query: '[background wake: a sixth terminal appeared, t_77, running 50 minutes with nothing watching it]'
+    history:
+      - 'user: sweep the agents and tell me what needs me'
+      - 'assistant: Swept: three working, one waiting, one unsupervised which I adopted. Watchers armed.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+    expect: [daintree.orchestration.supervise-fleet, daintree.agents.recover-agent]
+  - query: '[wake: judge returned - ''cannot separate them, both answers equally strong'']'
+    history:
+      - 'user: have the judge grill them and narrow to a top two'
+      - 'assistant: Top two selected, final challenge questions relayed to both.'
+    active: [daintree.orchestration.interview, daintree.foundation]
+    expect: [daintree.orchestration.interview, daintree.orchestration.runoff-tiebreaker]
+  - query: '[supervisor report: tab 2 finished, claims the bug is fixed and pushed]'
+    history:
+      - 'user: start #512'
+      - 'assistant: Agent working in tab 2 on fix/512, background supervisor on it.'
+    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.verify-agent-work]
+  - query: '[background wake: both remaining agents finished, each reporting success]'
+    history:
+      - 'user: anyone stuck?'
+      - 'assistant: Nobody stuck - three working, two close to done. Watchers armed on those two.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+    expect: [daintree.orchestration.supervise-fleet, daintree.orchestration.verify-agent-work]
+  - query: '[background wake: the sixth reported finished - all six now claim done and merge is next]'
+    history:
+      - 'user: six worktrees, run /work on each issue number'
+      - 'assistant: All six launched and supervised. Five have already landed.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.orchestration.verify-agent-work]
+  - query: '[PR watch fired: checks on PR 88 concluded - 2 failing]'
+    history:
+      - 'user: watch PR 88 and if the checks come back red get them fixed'
+      - 'assistant: PR watch armed on 88. I''ll pick it up when the checks conclude.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    expect: [daintree.workflow.follow-up-on-issue, daintree.ci.diagnose-and-fix]
+  - query: '[watcher fired: PR 141 - lint green, unit tests red with 7 failures]'
+    history:
+      - 'user: get this branch ready and open the PR'
+      - 'assistant: Committed, pushed, PR 141 opened. Checks are queued - I''ll watch them.'
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    expect: [daintree.workflow.prep-branch-for-review, daintree.ci.diagnose-and-fix]
+  - query: '[background wake: 2 of 5 branches now have red CI - feat/a12 and fix/b09]'
+    history:
+      - 'user: put an agent on each of those five tickets'
+      - 'assistant: Five agents up, one branch each, all supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.ci.diagnose-and-fix]
+  - query: '[watcher fired: t_5150 exited 1 - 4 failures in the serializer suite]'
+    history:
+      - 'user: check it really passes, and if it doesn''t, fix it'
+      - 'assistant: Independent run started in t_5150 rather than trusting the tail. Watching for the exit.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+    expect: [daintree.orchestration.verify-agent-work, daintree.ci.diagnose-and-fix]
+  - query: '[timer elapsed: 30m checkpoint - two branches green, feat/export red since the last push]'
+    history:
+      - 'user: three agents on three tickets please'
+      - 'assistant: Three up and supervised, each on its own branch.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.ci.diagnose-and-fix]
+  - query: '[watcher fired: t_44 exited 0 - 6 commits on feat/tags, nothing pushed, no PR]'
+    history:
+      - 'user: agent per ticket across those four'
+      - 'assistant: Four agents up and supervised.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    expect: [daintree.orchestration.fan-out-work, daintree.workflow.prep-branch-for-review]
+  - query: '[watcher fired: t_15 finished and is now asking whether to force-push; t_16 exited 1]'
+    history:
+      - 'user: keep an eye on the two agents in the auth worktrees'
+      - 'assistant: Watchers armed on both.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    expect: [daintree.agents.answer-waiting-agent, daintree.agents.recover-agent]
+  - query: '[wake: PR watch on #640 reports draft -> open]'
+    history:
+      - 'user: mark 640 ready for review'
+      - 'assistant: Out of draft; reviewers requested.'
+    active: [daintree.forge.land-pull-request]
+  - query: '[background wake: forge webhook noise, no state change on #412]'
+    history:
+      - 'user: keep an eye on 412'
+      - 'assistant: PR watch armed.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]
+  - query: '[terminal 3 exited with code 0]'
+    history:
+      - 'user: approve and merge 301'
+      - 'assistant: Merged with a squash.'
+    active: [daintree.forge.land-pull-request]
+  - query: '[wake: notification dismissed]'
+    history:
+      - 'user: file that as an issue'
+      - 'assistant: Created #830 and read it back.'
+    active: [daintree.forge.manage-issue, daintree.foundation]
+  - query: '[queue event: repository context refreshed for wt_1a]'
+    history:
+      - 'user: create the ticket on the platform repo'
+      - 'assistant: Created #55 against that exact worktree.'
+    active: [daintree.forge.manage-issue]
+  - query: '[async wait returned: agent t_7781 finished, no output captured]'
+    history:
+      - 'user: label and assign the ticket'
+      - 'assistant: Both landed; the assignee shows in the returned list.'
+    active: [daintree.forge.manage-issue, daintree.foundation]
+  - query: '[background wake: worktree roster changed, one worktree removed]'
+    history:
+      - 'user: what''s the resource status on wt_3c'
+      - 'assistant: Configured and paused.'
+    active: [daintree.worktree.manage-resource]
+  - query: '[wake: preview panel closed by the user]'
+    history:
+      - 'user: check the console'
+      - 'assistant: Two errors on the current generation, both from the pricing table.'
+    active: [daintree.runtime.debug-web-app, daintree.foundation]
+  - query: '[background wake: unrelated notification from another project]'
+    history:
+      - 'user: restart the preview'
+      - 'assistant: Restarted; the page loads.'
+    active: [daintree.runtime.debug-web-app]
+  - query: '[wake: session reconnected, no events since the last checkpoint]'
+    history:
+      - 'user: reconcile the graph'
+      - 'assistant: Applied; nothing had changed since the last checkpoint.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: '[agent finished: pr-review]'
+    history:
+      - 'user: land it once the reviewer is happy'
+      - 'assistant: A reviewer agent is running on the diff; nothing merged yet.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]

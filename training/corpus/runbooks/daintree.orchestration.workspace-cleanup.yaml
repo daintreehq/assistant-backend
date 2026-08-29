@@ -1,0 +1,708 @@
+# Training examples whose answer is `daintree.orchestration.workspace-cleanup` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.workspace-cleanup
+run: pre-split
+positives:
+  - close these
+  - clean up the workspace
+  - shut it all down
+  - tidy up the terminals, i'm done for the day
+  - the competition's finished, close all those agent tabs
+  - kill the four terminals from the fan-out, don't need them any more
+  - delete that worktree
+  - can you tear down everything from that batch run?
+  - disarm everything
+  - disarm all the terminals please, i keep typing into the wrong one
+  - mark those workflows done and close the tabs
+  - clean up after the fan out — close the exited agents, cancel their watchers, and drop the merged worktrees
+  - rm the worktree for feature/auth-retry, it's merged
+  - teardown time. everything from this session please
+  - close t-3 and t-7
+  - we're done with the interview thing, shut those agents down
+  - clena up the leftover terminals from yesterday
+  - delete the worktrees for the branches that already landed on main
+  - could you tidy all this up? there are like twelve tabs open and half of them are dead agents from this morning, plus i think there are watchers still hanging around from the batch i ran before lunch
+  - purge everything, fresh start
+  - get rid of the worktrees and the terminals for the issues we shipped
+  - wind it all down pls
+  - close everything except the one i'm sitting in
+  - can we clear out the stale workflow rows and close the finished agents while we're at it
+  - nuke the whole workspace, i want a clean slate before the next batch
+  - shut down the losers from that competition, keep the winner open
+  - all 9 shipped. tear the whole thing down — terminals, worktrees, watchers, the lot
+  - clean up
+  - shut it all down, i'm done for the day
+  - close t-3 t-4 t-9 and t-11, they all exited
+  - delete the worktree for fix/token-refresh, it's merged
+  - get rid of the worktree for the auth thing, feature/auth-cleanup or whatever it was called, the one that merged this morning
+  - disarm everything, i keep typing into the wrong tab
+  - mark those 4 workflow rows done, the PRs merged days ago
+  - the attention queue is full of stuff i already dealt with, clear it out
+  - drop the scratch stores from the benchmark run, i'm at the session limit
+  - there are like 25 tabs open and half of them are dead claude sessions. kill the dead ones
+  - ok so the competition finished and three of them are just sitting there idle now, plus there are two worktrees i never went back to. i don't need any of it. can you get rid of it all
+  - before we start the next batch can you clean out the old worktrees and close whatever's left over from last night
+  - clsoe all teh temrinals form the fanout pls
+  - anything still running from this morning? if it's all finished just close it
+  - cancel the watchers on those two and close them
+  - the agent's done, close its terminal and drop the worktree
+  - close everything except the one i'm in
+  - tidy up the terminals in here
+  - stop tracking those and shut them down
+  - running out of disk. how many worktrees have i got and can we bin the merged ones
+  - nuke the worktrees for 412 and 418
+  - stop everything now, close every agent terminal, i pushed to the wrong branch
+  - when you have a sec, could you tear down the review worktrees? happy for you to leave anything that's still running
+  - we've been at this for hours and there's junk everywhere — supervision, tabs, trees. do a full teardown but leave my dev server alone
+  - close the two that failed
+  - reset the workspace back to just main before the next round
+  - morning. leftover from yesterday — close whatever agents are still hanging around and delete the merged worktrees
+  - there's a couple of stale async waits from the overnight run, cancel those and close the terminals they were on
+boundaries:
+  - query: delete the four worktrees we made earlier and close what's in them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: tear all this down, the branches are merged
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: clean up the worktrees from yesterday
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: close the idle terminals, i'm done with them
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: The work is merged; delete all six worktrees and close every terminal under them.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Tear down the old branch folders, agents, and watchers from yesterday's parallel run.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: We are abandoning this cohort, so close its terminals and remove its isolated checkouts.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: 'Clean the workspace completely: delete the three trees and settle the finished workflow rows.'
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Shut down these agents and remove the worktrees they used; I am explicitly done with all of it.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: shut it all down, i'm finished for today
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: get rid of the worktrees for the merged branches
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: tidy up, close the terminals and remove the trees
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: delete the spike worktree, we're not doing it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: disarm the watchers and close everything from the fan-out
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: remove those four worktrees and mark the workflows done
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: clean the workspace back to just main
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: close all the agent tabs and delete the worktrees they were in
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: clean up the worktrees left over from those tickets
+    confusable_with: [daintree.forge.manage-issue]
+  - query: close everything from that run, i'm done with it
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: clean up the worktrees left over from the frontend batch
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: delete that worktree, im done with it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: clean up — close the terminals and bin the worktrees from that batch
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: shut it all down, nothing from this run is needed
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: get rid of the four trees from the fan-out and mark the workflows done
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: tidy up, theres worktrees everywhere from last week
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: remove the wt for issue 512 and disarm anything watching it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: the spike is over, tear the whole workspace down
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: bin those trees and their branches, i merged everything
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: delete the two worktrees from last week's batch and close their tabs
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: clean up after that run. the worktrees can go, i've merged everything.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: shut it all down. terminals, watchers, the lot.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: get rid of the worktree for the devbox experiment, i'm done with it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Tear down the temporary worktree after the ticket is complete.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Close all agent terminals and clean up the completed workspace.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Delete the obsolete worktrees and close their terminals.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Delete this local worktree and close its terminals.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Clean up all finished worktrees after the parallel run.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Cancel and clean up every abandoned terminal and worktree.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Delete the merged worktree and close its terminals.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Clean up every abandoned cloud-related terminal, but do not touch infrastructure.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: close all these terminals
+    confusable_with: [daintree.foundation]
+  - query: tidy up — shut the tabs and delete the worktrees from that fan-out
+    confusable_with: [daintree.foundation]
+  - query: disarm everything and shut it all down
+    confusable_with: [daintree.foundation]
+  - query: that one's a lost cause, close the terminal and nuke the worktree
+    confusable_with: [daintree.agents.recover-agent]
+  - query: close the three debate terminals, we're done here
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: clean all this up — close the terminals and drop the worktrees
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: mark those workflows done and close the tabs, we're finished
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: tidy everything up, shut it all down
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: shut it all down — close these terminals and delete the worktrees
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: disarm everything and tidy up after the fan-out
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: close all those fan-out terminals and delete the worktrees when you're done
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: delete that worktree we made earlier
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: close everything the recipe opened and nuke the worktree
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: tidy up, shut down all those tabs from the dev setup
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: we've got our winner now — close all the competition terminals and tidy up
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: tidy up the terminals, close everything left over from this morning
+    confusable_with: [daintree.terminals.rename]
+  - query: clean up these tabs, i don't need them any more
+    confusable_with: [daintree.terminals.rename]
+  - query: delete the worktree for fix/login, I'm done with it
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: clean up all the worktrees from yesterday's fan-out and close their terminals
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: remove that worktree and mark the workflow done
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: close those terminals and delete the worktree i was bundling from
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: close these terminals, all of them, im done for the day
+    confusable_with: [daintree.foundation]
+  - query: clean up everything from that fan-out — tabs, worktrees, the watchers, the lot
+    confusable_with: [daintree.foundation]
+  - query: delete the worktree for feat/search and get rid of its tab too
+    confusable_with: [daintree.foundation]
+  - query: forget those worktrees, just delete them
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: clean up, close the terminals and forget the whole fan-out
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: discussion's done, close those three terminals and tidy up
+    confusable_with: [daintree.orchestration.conversation]
+  - query: close all those contest terminals, we're done here
+    confusable_with: [daintree.orchestration.competition]
+  - query: close all those finished tabs and delete their worktrees
+    confusable_with: [daintree.agents.recover-agent]
+  - query: close all those poll terminals, i'm done with them
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: competition's done, close all those terminals for me
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: the debate's finished, close all four of those tabs and delete the worktrees
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: kill everything from that debate, I'm done with it
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: close the three losing tabs from that interview, keep the judge open
+    confusable_with: [daintree.orchestration.interview]
+  - query: batch is done, close all six terminals and delete the worktrees
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: delete the worktree that thing made, i'm done with it
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: close all those tabs it opened and tidy up
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: close these terminals and delete the worktrees from yesterdays fanout
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: tidy all this up and shut everything down
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: fan-outs done — close all those terminals and delete the worktrees
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: tidy all this up, shut down everything from the competition
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: close all these terminals and delete the worktrees, im done
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: clean up after the fan out — disarm everything, close the tabs, delete the trees
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: these tab names are a mess, just close them all
+    confusable_with: [daintree.terminals.rename]
+  - query: tidy up, kill all the finished claude tabs
+    confusable_with: [daintree.terminals.rename]
+  - query: close those terminals and delete the worktrees from the batch
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: delete the hotfix/login worktree
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: i made way too many worktrees, tear down the ones for the finished issues
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: clean up — close those terminals and remove the worktrees that are done
+    confusable_with: [daintree.worktree.create-plain-worktree]
+followups:
+  - query: actually delete the last one, i don't need that task
+    history:
+      - 'user: split the agents into their own worktrees'
+      - 'assistant: Done, four worktrees and four redirected agents.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: second one
+    history:
+      - 'user: clean up after that fan-out please'
+      - 'assistant: Here''s what I found: 6 terminals (4 exited from this session''s spawns, t-11 still working on issue #204, t-2 is a shell I didn''t spawn), 3 watchers, 2 worktrees. How much should I tear down? Options: everything listed, only the terminals I spawned this session, cancel supervision but leave terminals open, or nothing.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: t-1 is mine from earlier, you can close that one too
+    history:
+      - 'user: shut down everything from the competition'
+      - 'assistant: Cancelled 3 watchers and closed t-4, t-5, t-6. I left t-9 running — it''s still working — and t-1 because I can''t attribute it to this session.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: how's it going?
+    history:
+      - 'user: tidy up, we''re done for the day'
+      - 'assistant: Inventory first — reading terminals, worktrees, watchers, async waits, timers and the workflow list.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: yeah leave that one, do the rest
+    history:
+      - 'user: close the agents from the batch and delete their worktrees'
+      - 'assistant: Terminals t-12 through t-15 are closed and their watchers cancelled. Before I delete the worktrees, feat/retry-backoff has uncommitted changes — do you want it kept?'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: ok now close the ones that already exited
+    history:
+      - 'user: disarm everything, i keep broadcasting into the wrong tab'
+      - 'assistant: Disarmed all 5 terminals. The armed set is now empty.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: wait — is anything in those still writing to disk?
+    history:
+      - 'user: clean up the leftovers from this morning''s fan out'
+      - 'assistant: Cancelled 2 stale async waits and 1 timer. Next I''d close t-7 and t-8 (both exited, both spawned this session).'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: and the ledger rows?
+    history:
+      - 'user: tear it all down'
+      - 'assistant: Closed 4 terminals and cancelled their watchers. Worktrees next: wt-auth and wt-parser are both on merged branches.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: do that for the other two as well
+    history:
+      - 'user: close these three and mark the workflows done'
+      - 'assistant: t-3, t-4 and t-6 are closed; watchers w-11 and w-12 cancelled first. Marking workflow rows wf-88 and wf-91 done now.'
+      - 'user: thanks'
+      - 'assistant: Done — both rows are ''done''. Re-read the roster: none of the closed ids appear, 2 terminals still open (t-1 yours, t-9 working).'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: whats t-5 doing
+    history:
+      - 'user: shut the whole session down'
+      - 'assistant: I''ve listed 8 items. Three I''m deliberately leaving: t-2 (working), t-5 (unattributed), and the current worktree. Confirm the rest?'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: go ahead
+    history:
+      - 'user: delete the worktrees for the issues we shipped'
+      - 'assistant: wt-311 and wt-318 are both on merged branches, but t-14 is a live shell inside wt-318 — I''ll close it before removing the directory. OK?'
+    active: [daintree.orchestration.workspace-cleanup]
+topic_shifts:
+  - query: actually before that — close all the terminals from this mornings fan out and delete their worktrees
+    history:
+      - 'user: keep an eye on the overnight run and wake me if it dies'
+      - 'assistant: Watcher armed on terminal 3 with a narrow grant to restart once. You will be woken on failure.'
+    active: [daintree.orchestration.watch-outcome]
+  - query: cool, shut it all down
+    history:
+      - 'user: have the four of them each pitch a design and peer vote'
+      - 'assistant: Winner is claude-4 with 7 points. Full tally and each submission are in the report above.'
+    active: [daintree.orchestration.competition]
+  - query: close the finished ones and bin their worktrees
+    history:
+      - 'user: anything need me?'
+      - 'assistant: 2 finished cleanly, 1 was waiting on a question (answered), 1 failed. Nothing else needs you right now.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: ok were done, disarm everything and close the tabs
+    history:
+      - 'user: break the tie'
+      - 'assistant: Runoff done — claude-2 wins 4-1 on the second round submissions.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+  - query: delete the worktree for 81 then, its merged
+    history:
+      - 'user: where were we'
+      - 'assistant: Three rows open: #77 (agent still running), #81 (PR merged, row stale — closed it), #90 (never started).'
+    active: [daintree.orchestration.status-and-resume]
+  - query: do the cleanup one now
+    history:
+      - 'user: two jobs: get PR 300 merge-watched, and clean up last weeks mess'
+      - 'assistant: Watch armed on PR 300 — you will be pinged when it merges.'
+    active: [daintree.orchestration.watch-outcome]
+  - query: kill those two as well
+    history:
+      - 'user: clean up the terminals'
+      - 'assistant: Four idle ones closed; two still running so I left them.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: and the watchers?
+    history:
+      - 'user: tear down after the fan-out'
+      - 'assistant: 4 terminals closed, 2 worktrees deleted.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: close the four dead tabs and delete the worktrees behind them
+    history:
+      - 'user: whats the state of things'
+      - 'assistant: Two agents finished this morning and their rows are closed. Nothing running.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: ok kill all that off - close those terminals and drop the worktree
+    history:
+      - 'user: whats in the qa recipe and can you run it'
+      - 'assistant: It opens three panes and starts the smoke suite. Ran it - all three panes are up, suite is going.'
+    active: [daintree.recipe.run-or-create]
+  - query: right, tidy up - close those terminals and delete the worktrees we finished with
+    history:
+      - 'user: wrap up the work on 214 for review'
+      - 'assistant: PR #221 is open with the issue linked.'
+    active: [daintree.workflow.prep-branch-for-review]
+  - query: ok clean all this up - close the review tabs and drop the scratch worktree
+    history:
+      - 'user: check this diff for security problems'
+      - 'assistant: No injection or authz issues found. One note on logging a token prefix.'
+    active: [daintree.review.review-change]
+  - query: before i answer that — does deleting a worktree delete the branch too?
+    history:
+      - 'user: clean all this up'
+      - 'assistant: Inventory: 4 terminals, 2 worktrees, 3 watchers. Two worktrees have uncommitted changes — confirm?'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: just curious, does closing a terminal kill the agent or detach it?
+    history:
+      - 'user: shut it all down'
+      - 'assistant: Watchers cancelled, five terminals closed. Worktree removal in dependency order now.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: what does auto-approve cover? also go ahead and clean up these terminals
+    history:
+      - 'user: session got messy'
+      - 'assistant: Six terminals and two worktrees still around.'
+  - query: clean up everything from the fan-out, and explain what order things get torn down in
+    history:
+      - 'user: fan-out finished'
+      - 'assistant: All eight agents exited.'
+  - query: right, now shut all four down and tidy up
+    history:
+      - 'user: haha tab 5 wins. ok cool'
+      - 'assistant: Anything else on this one?'
+      - 'user: actually remember this - when i say run a fun competition it''s the 4 pinned claudes, not the whole fleet'
+      - 'assistant: Saved. No existing fact conflicted with it.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: tab 3 it is. now clean all of them up, close the tabs and drop the worktrees
+    history:
+      - 'user: three way tie lol. runoff'
+      - 'assistant: Runoff over the same three, fresh fact from each.'
+      - 'user: same three, new fact each, don''t add anyone'
+      - 'assistant: Electorate unchanged. Second round in — tab 3 takes it 2–1.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+  - query: fine, good enough. close those two tabs and delete the parser worktree, im done with it
+    history:
+      - 'user: the watcher fired on tab 2 then. pull up the diff and review what it wrote'
+      - 'assistant: Four findings: one high (unbounded recursion in the node walker), two medium, one nit.'
+      - 'user: do a security pass over it too, esp the input parsing'
+      - 'assistant: The input parser doesn''t bound nesting depth — same root cause as the recursion finding. Nothing else of note.'
+    active: [daintree.review.review-change, daintree.foundation]
+  - query: alright thats enough. close all those terminals and cancel whatever supervision is left
+    history:
+      - 'user: back to the agents — let them talk to each other about the migration order, i want to see where it goes'
+      - 'assistant: Three rounds in, converged on read path first.'
+      - 'user: give it 3 more rounds'
+      - 'assistant: They landed on an online backfill behind a flag, with a dual-write window of one release.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+  - query: bin the three dead ones
+    history:
+      - 'user: how many worktrees do i have'
+      - 'assistant: Nine plus main.'
+      - 'user: christ. which of those are actually still in flight'
+      - 'assistant: Live: issue-412 and redis-cache. The three tmp ones have no branch commits and no ledger row; parser-migration and billing-fixtures are merged already.'
+    active: [daintree.orchestration.status-and-resume, daintree.foundation]
+  - query: wait not the redis one, thats got uncommitted stuff
+    history:
+      - 'user: christ. which of those are actually still in flight'
+      - 'assistant: Live: issue-412 and redis-cache. tmp-1..3 are empty; parser-migration and billing-fixtures are merged.'
+      - 'user: bin the three dead ones'
+      - 'assistant: Inventory before I touch anything: tmp-1, tmp-2, tmp-3 are safe. parser-migration and billing-fixtures are merged but have uncommitted files. Confirm the three?'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: right that's enough for today. close the finished tabs and drop their worktrees
+    history:
+      - 'user: how''s everyone doing, anything need me?'
+      - 'assistant: 2 working, 1 finished, tab 5 waiting on a question, tab 7 adopted.'
+      - 'user: tab 5''s asking something. say yes and let it carry on'
+      - 'assistant: It asked whether to delete the deprecated migration — answered yes. It''s running again.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+  - query: right, shut it all down, we're done
+    history:
+      - 'user: the two green ones — proper review on both before i merge'
+      - 'assistant: #287 clean plus a nit, #311 two findings incl. an unbounded retry loop.'
+      - 'user: and pass what came back to each of those agents'
+      - 'assistant: Sent #287''s nit to tab 2 and #311''s findings to tab 5, each told the medium is blocking.'
+    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+  - query: ok i'm done — close the review tabs and delete that worktree
+    history:
+      - 'user: and point the implementer agent at the first two findings'
+      - 'assistant: Sent to tab 3, flagged blocking.'
+      - 'user: how long''s that one been going'
+      - 'assistant: Tab 3 has been running 41 minutes; last output 2 minutes ago.'
+    active: [daintree.foundation]
+  - query: ok close that terminal and delete the worktree, im done with it
+    history:
+      - 'user: push it up and open the pr'
+      - 'assistant: PR #602 open against develop.'
+      - 'user: is ci green on it, and did anyone review it yet'
+      - 'assistant: All four checks passed. No review yet.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: fine. tidy up - close those terminals and drop the flaky-test worktrees
+    history:
+      - 'user: comment on the issue and close it'
+      - 'assistant: Closed #388.'
+      - 'user: whats a watcher again, do they cost anything'
+      - 'assistant: A background supervisor that wakes me on a terminal event - free until something actually fires.'
+  - query: merged. clean up all of yesterdays stuff, terminals worktrees the lot
+    history:
+      - 'user: ping me when #598 merges'
+      - 'assistant: Watching #598.'
+      - 'user: note that this repo squash-merges everything'
+      - 'assistant: Saved.'
+    active: [daintree.memory.manage-project-memory, daintree.foundation]
+  - query: close the other four terminals
+    history:
+      - 'user: its 2-2 between agent 2 and agent 4. run a runoff'
+      - 'assistant: Agent 4 takes it 3–2.'
+      - 'user: ok agent 4 wins. put an agent on actually building that into the redis layer'
+      - 'assistant: Spawned a visible agent in the redis worktree with agent 4''s design as its brief.'
+    active: [daintree.foundation, daintree.edits.spawn-visible-agent]
+  - query: close all the dead terminals and delete the worktrees that already merged
+    history:
+      - 'user: what happened while i was away'
+      - 'assistant: Four finished, two PRs merged, one agent failed on lint.'
+      - 'user: the workflow list still says 9 active and half of those shipped days ago'
+      - 'assistant: Five rows were never settled after their PRs merged. Closed those; four genuinely active remain.'
+    active: [daintree.foundation, daintree.orchestration.status-and-resume]
+  - query: not studio-5 though, thats still chewing on something
+    history:
+      - 'user: the workflow list still says 9 active'
+      - 'assistant: Closed five stale rows; four genuinely active.'
+      - 'user: close all the dead terminals and delete the worktrees that already merged'
+      - 'assistant: Inventory: 6 terminals safe to close, 5 merged worktrees safe to delete, 1 worktree unknown. Confirm and I''ll proceed.'
+    active: [daintree.foundation, daintree.orchestration.workspace-cleanup]
+  - query: right, tear down everything from the interview
+    history:
+      - 'user: cancel that async wait i left on the judge terminal'
+      - 'assistant: Cancelled.'
+      - 'user: spawn something read only to tell me whether 512 is going to conflict with the billing branch'
+      - 'assistant: It says one real overlap — both touch db/schema.ts — everything else is disjoint. Full answer above.'
+    active: [daintree.foundation, daintree.agents.ask-and-relay]
+  - query: sorry, wrong window. clean up the 3 that merged
+    history:
+      - 'user: get the honest ones ready for review'
+      - 'assistant: PRs open for both verified branches.'
+      - 'user: hows the weather looking for tomorrow'
+      - 'assistant: That''s outside what I can see from here — I''m scoped to your terminals, agents and repo.'
+    active: [daintree.foundation, daintree.workflow.prep-branch-for-review]
+  - query: thanks — now close those four terminals and bin the worktrees
+    history:
+      - 'user: how did the batch go'
+      - 'assistant: All four finished cleanly, PRs are up.'
+    active: [daintree.orchestration.supervise-fleet]
+  - query: right, tear it all down — close the tabs, drop the worktrees, close the ledger rows
+    active: [daintree.foundation]
+  - clean up after the competition, none of those agents are needed any more
+  - query: disarm everything and shut the whole lot down, i'm done for the day
+    active: [daintree.foundation]
+  - delete the three issue worktrees, they're all merged now
+  - tidy up — the six tabs from this morning and their worktrees can all go
+  - the bake-off between the two parser designs is over, i picked B. close all four tabs and delete the loser worktrees.
+  - just one quick thing — close the six agent tabs from the fan-out, cancel their watchers and drop the worktrees.
+  - query: close them and drop the worktrees while you're there
+    history:
+      - 'assistant: You have three terminals with no agent attached: 2, 5 and 7, plus their worktrees.'
+    active: [daintree.foundation]
+  - cancel the watchers, close the terminals and delete the worktrees from that batch
+  - clean up after the fan-out, but check with me before you delete anything you're unsure about
+  - query: nice, close it all down
+    history:
+      - 'user: put an agent on each of those four tickets'
+      - 'assistant: Four agents up, one worktree each, all supervised.'
+      - 'user: [background wake: all 4 supervisors reported finished]'
+      - 'assistant: All four landed - 401, 402, 403, 404 - each pushed with a green branch. Nothing is running.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: delete those worktrees
+    history:
+      - 'user: five worktrees, agent each'
+      - 'assistant: Five launched and supervised.'
+      - 'user: [background wake: all five finished]'
+      - 'assistant: All five landed and pushed. The worktrees are still on disk and the terminals still open.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: sweet, tear the whole thing down
+    history:
+      - 'user: three agents on the three failing suites'
+      - 'assistant: Three up and supervised.'
+      - 'user: [background wake: all three green]'
+      - 'assistant: All three suites are green again and each fix is pushed.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: perfect. shut everything down except tab 2
+    history:
+      - 'user: eight agents, eight tickets, go'
+      - 'assistant: Eight launched and supervised.'
+      - 'user: [background wake: 8 of 8 finished]'
+      - 'assistant: All eight landed. Eight terminals and eight worktrees still exist.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: the notification said one of the worktree deletes failed
+    history:
+      - 'user: clean all this up'
+      - 'assistant: Confirmed and started - supervision disarmed, terminals closing, worktree deletes running.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: the teardown notification came through - is everything actually gone?
+    history:
+      - 'user: shut it all down'
+      - 'assistant: Inventory confirmed, teardown running in dependency order.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: close all those terminals and get rid of the merged worktrees
+    history:
+      - 'user: land 512, 513 and 514'
+      - 'assistant: All three merged. Their branches are deleted on the remote.'
+    active: [daintree.forge.land-pull-request, daintree.foundation]
+  - query: tidy up — close the terminals and drop the two dead worktrees
+    history:
+      - 'user: reopen 289'
+      - 'assistant: Reopened; state reads open on the re-read.'
+    active: [daintree.forge.manage-issue]
+  - query: close all those terminals down, i want a clean slate before tomorrow
+    history:
+      - 'user: cancel the graph, we''re not doing the cutover'
+      - 'assistant: Graph cancelled. Note that doesn''t close terminals, remove worktrees or revoke grants — those are separate.'
+    active: [daintree.orchestration.execute-durable-workflow]
+  - query: close that preview panel and the two shells i left open
+    history:
+      - 'user: restart the preview server'
+      - 'assistant: Restart requested with the panel and project ids. It came back and the page loads.'
+    active: [daintree.runtime.debug-web-app]
+  - query: right, now delete that worktree entirely, it's finished with
+    history:
+      - 'user: pause the devbox on wt_9d'
+      - 'assistant: Pause acknowledged and fresh status reads paused.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: ok that's all wrapped up, close the terminals and delete the worktrees
+    history:
+      - 'user: move the agents into separate worktrees'
+      - 'assistant: Five worktrees created and every agent told where it now works.'
+      - 'user: are they all finished?'
+      - 'assistant: All five report done and the branches are pushed.'
+    active: [daintree.worktree.relocate-agents]
+  - query: tear all of this down, i'm finished for the day
+    history:
+      - 'user: split the agents into their own trees'
+      - 'assistant: Four worktrees created, four agents redirected, nothing closed.'
+    active: [daintree.worktree.relocate-agents]
+  - query: clean up the two worktrees we abandoned and mark those workflows done
+    history:
+      - 'user: relocate the running agents into worktrees'
+      - 'assistant: Six worktrees created off develop; all six terminals filed and told.'
+    active: [daintree.worktree.relocate-agents]
+  - query: purge everything, fresh start
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: ok so the competition finished and three of them are just sitting there idle now, plus there are two worktrees i never went back to. i don't need any of it. can you get rid of it all
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: the agent's done, close its terminal and drop the worktree
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: could you tidy all this up? there are like twelve tabs open and half of them are dead agents from this morning, plus i think there are watchers still hanging around from the batch i ran before lunch
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: close t-3 and t-7
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: there are like 25 tabs open and half of them are dead claude sessions. kill the dead ones
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: running out of disk. how many worktrees have i got and can we bin the merged ones
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: close these
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: get rid of the worktree for the auth thing, feature/auth-cleanup or whatever it was called, the one that merged this morning
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: tidy up the terminals, i'm done for the day
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: we've been at this for hours and there's junk everywhere — supervision, tabs, trees. do a full teardown but leave my dev server alone
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: shut it all down, i'm done for the day
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: delete the worktrees for the branches that already landed on main
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: clsoe all teh temrinals form the fanout pls
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+wakes:
+  - query: '[wake: both worktree deletes completed]'
+    history:
+      - 'user: clean all this up'
+      - 'assistant: Inventoried 7 terminals, 3 worktrees, 4 watchers. Confirm and I''ll tear it down.'
+      - 'user: yep go'
+      - 'assistant: Disarming supervision first, then closing terminals and deleting worktrees in dependency order. Two deletes are still running.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: '[background wake: worktree delete failed — uncommitted changes in fix/214-token-refresh]'
+    history:
+      - 'user: shut it all down'
+      - 'assistant: Confirmed list actioned — watchers cancelled, 5 terminals closed. Worktree removal in progress.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+  - query: '[background wake: teardown steps completed, ledger rows settled]'
+    history:
+      - 'user: tidy up everything from the competition'
+      - 'assistant: You confirmed the inventory — 5 competition terminals and 1 worktree. Disarming and closing now, in order.'
+    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+near_misses:
+  - clean up in here
+docs:
+  - tidy up, close the fan out terminals
+  - clean up — close all those terminals and drop the worktrees
+  - go on then, close them
+  - query: clean up — close all those terminals and drop the worktrees
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: one thing first, clean up — close all those terminals and drop the worktrees
+    history:
+      - 'user: reload the preview and check'
+      - 'assistant: Reloaded. Only the new navigation generation is clean — no errors after the reload.'
+  - query: sorry, unrelated — tidy up, close the fan out terminals
+    history:
+      - 'user: move the agents out into separate worktrees'
+      - 'assistant: Done, four of them, nothing torn down.'
+foundation_boundaries:
+  - tidy up, were done for the day
+  - clean up after that fan out - close the terminals and delete the worktrees
+  - disarm everything and close it all down
+  - mark those workflows done and clean up the worktrees
+  - get rid of all the leftover worktrees from last week
+  - close these and delete the branches too
+  - tear down the four worktrees and close their terminals
+  - clean up — close all the agent tabs and delete their worktrees
+  - close these five terminals, none of them are needed
+  - disarm everything and shut it all down for the day
+  - get rid of all the competition agents and their worktrees
+  - clean up after the batch — nothing from that run is needed
+  - remove the stale worktrees and close whatever's attached to them
+  - mark those workflows done and free the space up
+  - clear the decks, everything from the debate run goes
+  - tidy up the terminals, i've got about a dozen open
+  - wipe the leftovers from last week's parallel run — worktrees, tabs, the lot
+  - clean up all these terminals

@@ -1,0 +1,467 @@
+# Training examples whose answer is `daintree.agents.poll-pinned-agents` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.poll-pinned-agents
+run: pre-split
+positives:
+  - poll them
+  - poll the pinned agents on this
+  - second opinion from the fleet please
+  - ask all my pinned agents whether we should switch the package manager to pnpm and tell me what they reckon
+  - i want a consensus read from every configured agent on whether this schema change is safe to ship before i merge it
+  - ask each of the configured agents which of these three designs is best, shuffle the order so nobody gets biased by position, then tally it up for me
+  - what do the pinned agents think about dropping the retry wrapper?
+  - which of these two approaches would the agents pick? ask them all
+  - can you see my pinned agents?
+  - how many pinned agents do i have and what are they called
+  - get a vote from the fleet on A vs B
+  - 'run a straw poll across the configured roster: ship it or hold?'
+  - fan the question out to the whole pinned fleet and synthesize the majority verdict
+  - poll evryone pinned and tell me the concensus
+  - ask all pinned agnets independantly what they'd name this package
+  - get indpendent verdicts frm the fleet on this diff, no debate, just each ones own take
+  - run that past all the pinned ones too
+  - ask them the same thing and see if they agree
+  - put that question to the whole fleet instead
+  - get independent opinions from claude, codex and gemini on this migration plan
+  - spin up one terminal per pinned agent, ask them all the same question about the auth flow, bring back the majority view
+  - ask the pinned agents to vote between option A and option B and count the votes
+  - poll the fleet again but write the prompt neutrally this time, that last one was leading them
+  - get short answers from all the pinned agents on what the biggest risk in this refactor is
+  - have my agents rank these three ideas and tell me where they actually agree
+  - quick vote across the fleet on whether the selector should stay non-thinking
+  - poll the pinned agents — redis or postgres for the job queue? want a consensus
+  - ask all my pinned agents whether we should call it `dispatch` or `submit`, then tell me what most of them said
+  - ive been going round in circles on this. just ask everyone and tell me what wins
+  - there are three schema options in docs/schema.md. put them to the fleet as A/B/C and tally the votes
+  - poll teh configured agnets on wether we shoud drop py3.11 suport
+  - can you actually see my pinned agents?
+  - ask claude, codex and gemini separately what they'd do about the retry backoff and give me the consensus
+  - poll the fleet on this
+  - ok but i want other eyes on it — ask the pinned ones the same question and see if they agree with you
+  - no dont dig through the code yourself, i asked you to ask the agents
+  - that poll prompt was leading, you basically told them which one you liked. redo it neutral with fresh terminals
+  - you put my favourite first for every one of them. shuffle the order per agent and run it again
+  - quick — deploy is in 10 min. ask all the pinned agents if this migration is safe to run and give me the count
+  - everyone gets the same stack trace, ask them independently what they think is causing it, then summarise where they agree
+  - don't reuse the terminals that are already open, spawn a clean one per agent and ask them all the same thing
+  - poll the pinned agents including that gemini-pro one i think i configured
+  - so i've got two ways to do the cache invalidation and honestly both look fine to me. i'd rather not decide alone. can you put both to my pinned agents, no hints about which one i wrote, and tell me which way it lands
+  - ask them all and i specifically want to know who disagreed and why
+  - 'use every configured agent not just the pinned ones — same question to each: is this API shape stable enough to publish'
+  - get recommendations from all the pinned agents on how to structure the workers dir and tell me the common thread
+  - run that past all of them
+  - how many of them ended up picking B? give me the split by agent
+  - Could you please ask each of my pinned agents, independently, whether this error handling approach is sound, and summarise the consensus for me?
+  - give all four agents the same two options and have them vote, then count it up
+  - show the diff to all the pinned agents and ask each one, ship it or don't. i want the split
+  - one terminal per pinned agent, same question to each, nobody talks to anybody — what should we name the module
+  - two of the poll agents are still spinning, just go with the ones that answered and give me the tally
+  - i don't want your opinion on the auth flow, i want the fleet's. ask them
+boundaries:
+  - query: ask each of my pinned agents what they think of this API
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: poll the pinned agents on whether we should drop the console wrapper
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: ask all the pinned agents to weigh in on this review and give me the consensus
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: poll the fleet on whether the reviewer's suggested refactor is worth doing
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: ask the pinned agents whether we go with option A or B and give me the consensus
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: put that question to all four agents and tell me what each of them answers
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: the fleet's waiting on my question — send it out and collect their votes
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: ask the pinned agents what they make of this design and give me the consensus
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: 'poll everyone: should we drop the risk field? want their answers rolled up'
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: ask all three agents the same question about the selector and tell me what they say
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: ask the pinned agents to vote between postgres and sqlite and tally the votes
+    confusable_with: [daintree.orchestration.competition]
+  - query: 'poll everyone: ship friday or monday? count the votes and tell me which wins'
+    confusable_with: [daintree.orchestration.competition]
+  - query: give each agent these three designs and have them score them 1-10, then total it up
+    confusable_with: [daintree.orchestration.competition]
+  - query: ask all the pinned agents what they think about dropping redis — keep them independent, don't show them each other's answers
+    confusable_with: [daintree.orchestration.conversation]
+  - query: poll the fleet on which of these three names is best and give me the consensus
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get each of the agents' opinion on this separately then tell me where they landed
+    confusable_with: [daintree.orchestration.conversation]
+  - query: ask the pinned agents what they think about switching to pnpm and give me the consensus
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: poll the fleet — option a or option b, then tell me where they landed
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: get independent opinions from all of them on this diff and summarise
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: poll the pinned agents on which of these two options is worse
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: ask the fleet to vote, option A or option B, and give me the consensus
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: get everyone's verdict on whether the migration is worth it, no debate needed
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: ask all the pinned agents what they think about switching to pnpm
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: poll the fleet on whether we should split this service and give me the consensus
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: get every agent to vote on which of these three designs to go with
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: we're deadlocked on the caching approach — ask all the agents to vote between redis and in-memory and tell me what they land on
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: get everyone to vote on option A vs option B and count it up
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: ask all the pinned agents which caching strategy we should go with and give me the consensus
+    confusable_with: [daintree.orchestration.interview]
+  - query: 'poll the fleet: option A or option B for the retry backoff, tally it up'
+    confusable_with: [daintree.orchestration.interview]
+  - query: get each of the agents to give me their verdict on whether this migration is safe then summarise
+    confusable_with: [daintree.orchestration.interview]
+  - query: poll the pinned agents on which schema to keep
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: ask the pinned ones what they think and tell me the consensus
+    confusable_with: [daintree.memory.manage-project-memory]
+  - query: ask all the pinned agents which of these three names they prefer - don't let them see each other's answers
+    confusable_with: [daintree.orchestration.conversation]
+  - query: round-robin the pinned fleet with the same question and tally what they say
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get everyone's independent take on the schema change and give me the consensus
+    confusable_with: [daintree.orchestration.conversation]
+  - query: ask the fleet to vote between postgres and sqlite for the queue, tally it and tell me the winner
+    confusable_with: [daintree.orchestration.competition]
+  - query: poll all the pinned agents on whether we should drop node 18 and give me the score
+    confusable_with: [daintree.orchestration.competition]
+  - query: I've got three candidate designs written up here — send all three to the agents and have them pick one, points and all
+    confusable_with: [daintree.orchestration.competition]
+  - query: ask all the pinned agents whether the reviewer's P1 is real and give me the consensus
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: poll the fleet on which of those review findings actually matter
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: ask all the pinned agents whether we should drop the v1 endpoint and tell me where they land
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: three of them are up — put the same question to each and tell me how they vote
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: they're all idle. get each one to pick between redis and postgres for the queue and give me the consensus
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: ask the pinned agents which of these two schemas theyd pick
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: ask the pinned agents what they make of the retry logic
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: get every agent's opinion on dropping the selector cache and tell me where they land
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: poll the fleet — option A or option B for the token format?
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: ask the pinned agents to vote between postgres and sqlite and tell me what they landed on
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: poll the fleet on whether we ship friday and tally it up
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: have everyone vote on these two options I wrote and give me the count
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: ask the pinned agents whether we should use redis or postgres and give me the consensus
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: poll the fleet on the release date, one round
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: get a quick vote from the configured agents on which of these two option names reads better
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: ask the pinned fleet which of these three options is the weakest and why
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: poll everyone on whether we should move to pnpm, just want the consensus
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: get a quick vote from all the agents on option a vs option b
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: ask all the pinned agents which orm we should move to and give me the consensus
+    confusable_with: [daintree.orchestration.interview]
+  - query: poll the fleet on whether we drop node 18. just their votes, no back and forth.
+    confusable_with: [daintree.orchestration.interview]
+  - query: get a one-liner from each of the four agents on what's riskiest in this diff
+    confusable_with: [daintree.orchestration.interview]
+  - query: ask each of the pinned agents which of the three tickets we should do first
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'poll the fleet: is splitting this by package the right call?'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: ask all the running agents which approach theyd pick and give me the consensus
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: poll the pinned agents on whether we should use a queue or a cron for this
+    confusable_with: [daintree.review.review-change]
+  - query: ask all the pinned agents which of these two approaches they'd pick and give me the consensus
+    confusable_with: [daintree.review.review-change]
+followups:
+  - query: how's it going?
+    history:
+      - 'user: poll the pinned agents on whether we should drop the redis cache'
+      - 'assistant: Spawned four read-only poll terminals — claude, codex, gemini and grok — each with the same neutral brief. Waiting on all four now.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: did they all come back yet
+    history:
+      - 'user: ask all the configured agents which of these two retry designs they''d pick'
+      - 'assistant: Options presented as A/B in randomized order per agent. Three of five have answered so far.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: also ask them about the fallback path while they're there
+    history:
+      - 'user: get a vote from the fleet on option A vs option B'
+      - 'assistant: 3-1 for B, one agent still working. B''s reasons: simpler failure mode, no extra dependency.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: add grok to that too
+    history:
+      - 'user: poll my pinned agents on the schema change'
+      - 'assistant: Polled claude, codex and gemini. Consensus 2-1 that it''s safe; gemini flagged the backfill.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: close those terminals
+    history:
+      - 'user: ask the fleet what the biggest risk in this refactor is'
+      - 'assistant: Four verdicts in. Majority say the migration ordering; one says test coverage.'
+      - 'user: who dissented?'
+      - 'assistant: codex — it argued the tests are the real gap.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: just skip that one and give me the rest
+    history:
+      - 'user: poll everyone pinned on whether to keep the selector non-thinking'
+      - 'assistant: Spawned five poll terminals. One of them hasn''t produced output after two re-awaits.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: hang on, that prompt is leading them. redo it properly
+    history:
+      - 'user: ask all pinned agents whether we should ship this today'
+      - 'assistant: Prompt sent: ''The team believes this is ready — do you agree we should ship today?'' Two answers back so far.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: remind me which one said what
+    history:
+      - 'user: get independent opinions from the fleet on the auth rewrite'
+      - 'assistant: Four agents polled, 3-1 in favour, with the dissent about session invalidation.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: ok ask them all what they'd do about the flaky test
+    history:
+      - 'user: can you see my pinned agents?'
+      - 'assistant: Yes — four pinned: claude, codex, gemini, grok.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: nice, thanks
+    history:
+      - 'user: poll the configured agents on which of these three names is best'
+      - 'assistant: Options labelled A/B/C in a different order for each agent, so the tally maps back cleanly. Awaiting all five.'
+    active: [daintree.agents.poll-pinned-agents]
+topic_shifts:
+  - query: quick one for the pinned lot — should we bump to python 3.13 now or after the release? get me a consensus
+    history:
+      - 'user: put an agent on each of the six open tickets'
+      - 'assistant: All six launched with background supervisors.'
+    active: [daintree.orchestration.fan-out-work]
+  - query: 'ok enough talking, just ask all of them straight: rest or grpc, and tally it'
+    history:
+      - 'user: facilitate a roundtable between the agents on the API shape'
+      - 'assistant: Four rounds run, everyone has had the floor twice. No convergence forced.'
+    active: [daintree.orchestration.conversation]
+  - query: ask them the timeline question too
+    history:
+      - 'user: poll the fleet on the endpoint'
+      - 'assistant: 4 of 5 say drop it.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: different thing - ask the pinned fleet whether we should use redis or postgres for the job queue and give me the consensus
+    history:
+      - 'user: put an agent on the docs typo sweep'
+      - 'assistant: Running in t_8801.'
+    active: [daintree.edits.spawn-visible-agent]
+  - query: now poll the pinned agents on whether we should ship this today or wait for the release train
+    history:
+      - 'user: did it actually do what i asked?'
+      - 'assistant: Verified - the diff matches the acceptance criteria and the tests cover it.'
+    active: [daintree.orchestration.verify-agent-work]
+  - query: just do a straight poll of the fleet on the two left, no debate this time
+    history:
+      - 'user: debate and eliminate'
+      - 'assistant: Eliminated the sharding position. Two positions remain.'
+    active: [daintree.orchestration.debate-elimination]
+  - query: different - ask the whole pinned fleet whether we rotate sessions on login, i want a consensus not one opinion
+    history:
+      - 'user: get an agent to look at the auth module and tell me what it finds'
+      - 'assistant: Reported back: three concerns, the biggest is the session fixation risk on login.'
+    active: [daintree.agents.ask-and-relay]
+  - query: how do i change which agents are pinned btw?
+    history:
+      - 'user: poll the pinned ones: ship friday or monday'
+      - 'assistant: Question put to all four in neutral form. Three answers back, one still thinking.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: how do the pinned agents get chosen? poll them on postgres vs sqlite
+    history:
+      - 'user: need a decision made'
+      - 'assistant: Four agents are pinned.'
+  - poll the pinned agents - postgres or sqlite for the local ledger
+  - query: don't score it, i just want their raw takes plus where they land
+    history:
+      - 'user: poll the pinned agents - postgres or sqlite for the local ledger'
+      - 'assistant: Same question to all four, independently, no cross-talk. Collecting verdicts.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: actually no, i already wrote the three designs. just show all of them the same three and get them to pick one
+    history:
+      - 'user: two of them are waiting on a question, just say yes to both'
+      - 'assistant: Both answered.'
+      - 'user: i want 3 agents to each pitch a design for the new watcher api and then vote on whose pitch is best'
+      - 'assistant: Three agents, one pitch each, then a blind peer vote over the pitches.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+  - query: tally it up
+    history:
+      - 'user: i want 3 agents to each pitch a design and vote on whose is best'
+      - 'assistant: One pitch each, then a blind peer vote.'
+      - 'user: actually no, i already wrote the three designs. just show all of them the same three and get them to pick'
+      - 'assistant: Different job then — one question, your three options, each agent picks independently.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: now ask all the pinned ones the same thing
+    history:
+      - 'user: ask claude in tab 2 what it makes of the retry logic'
+      - 'assistant: Tab 2 says the retry budget is shared across attempts, which makes the backoff meaningless past attempt two.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: hmm. get a second opinion off the other two as well
+    history:
+      - 'user: quick one - ask the codex agent if the selector prompt is too long'
+      - 'assistant: Codex says it''s long but the catalog block is most of it, and that part caches — trimming prose won''t move much.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: anyway do they agree or not
+    history:
+      - 'user: get a second opinion off the other two as well'
+      - 'assistant: Same question to both independently.'
+      - 'user: lol codex is very confident about everything isn''t it'
+      - 'assistant: It does commit to a position.'
+  - ask the pinned agents which of these two schema designs theyd go with
+  - 'there''s a design argument on #77, queue vs cron. poll the pinned agents and see what they reckon'
+  - query: what did the last one say again
+    history:
+      - 'user: there''s a design argument on #77, queue vs cron. poll the pinned agents and see what they reckon'
+      - 'assistant: Polled all four pinned agents blind. 3 for the queue, 1 for cron. Consensus is the queue, mainly for retry semantics; the dissent flags the extra infra.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: get a second opinion - poll the pinned agents on whether thats the actual race
+    history:
+      - 'user: help me scope it'
+      - 'assistant: Nil deref at worker.go:212.'
+      - 'user: ask claude what it makes of the mutex usage, just its read'
+      - 'assistant: Its read: the mutex is released before the result write, so a retry can observe a half-written job.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: what did the fourth one say exactly
+    history:
+      - 'user: ask claude what it makes of the mutex usage'
+      - 'assistant: It says the mutex is released before the result write.'
+      - 'user: poll the pinned agents on whether thats the actual race'
+      - 'assistant: 3 of 4 agree it''s the double-unlock in retryOne; the fourth disagrees.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: poll all six — ask each how confident it is that its change is safe to merge
+    history:
+      - 'user: the studio-3 one hasnt printed anything in like 25 min'
+      - 'assistant: Alive, mid test run, not hung.'
+      - 'user: ok its alive. retitle all six tabs and tell me which ones are actually stuck'
+      - 'assistant: Renamed all six to their issue numbers. None are stuck — five working, one waiting on a lint question.'
+    active:
+      - daintree.foundation
+      - daintree.terminals.rename
+      - daintree.orchestration.supervise-fleet
+  - query: ask the pinned ones whether our test suite is too slow, i want a spread of opinions
+    history:
+      - 'user: we use pnpm, remember that for good'
+      - 'assistant: Saved.'
+      - 'user: right now tell it pnpm and let it carry on'
+      - 'assistant: Answered — it''s running again. All nine are unblocked.'
+    active: [daintree.foundation, daintree.agents.answer-waiting-agent]
+  - ask the pinned lot which of these two migration strategies they'd pick and give me the consensus
+  - don't fan anything out. i want the pinned agents to vote on which retry strategy we ship — exponential, jittered, or fixed — and score each one out of 10.
+  - poll the pinned agents on the two options and tell me where they land
+  - query: now put it in front of the pinned agents and see if they'd merge it
+    history:
+      - 'user: get the rate limiter implemented'
+      - 'assistant: Agent in t_5252, supervised.'
+      - 'user: [watcher fired: t_5252 exited 0]'
+      - 'assistant: Rate limiter in, token bucket per key, tests green, committed on feat/ratelimit.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: the poll's done right? give me the consensus
+    history:
+      - 'user: poll the pinned agents on the rollout order'
+      - 'assistant: Neutral question out to all five, verdicts coming back.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: run that past all the pinned ones too
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: i don't want your opinion on the auth flow, i want the fleet's. ask them
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: poll the pinned agents including that gemini-pro one i think i configured
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: that poll prompt was leading, you basically told them which one you liked. redo it neutral with fresh terminals
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: second opinion from the fleet please
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: so i've got two ways to do the cache invalidation and honestly both look fine to me. i'd rather not decide alone. can you put both to my pinned agents, no hints about which one i wrote, and tell me which way it lands
+    history:
+      - 'user: hows your day going'
+      - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: 'run a straw poll across the configured roster: ship it or hold?'
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: one terminal per pinned agent, same question to each, nobody talks to anybody — what should we name the module
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: ask them all and i specifically want to know who disagreed and why
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: i want a consensus read from every configured agent on whether this schema change is safe to ship before i merge it
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: poll the fleet on this
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: poll the pinned agents on this
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+wakes:
+  - query: '[terminal.awaitAll returned: 5 finished]'
+    history:
+      - 'user: poll the pinned agents on whether we should drop the cache layer'
+      - 'assistant: Question sent to all 5 pinned agents, neutrally worded, no leading. Waiting on their verdicts.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: '[wake: 3 of 4 replied, t_0044 timed out with no answer]'
+    history:
+      - 'user: ask the fleet to vote: postgres or sqlite for this'
+      - 'assistant: Both options put to the 4 configured agents in shuffled order with no labels. Collecting answers now.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+  - query: '[queue: 2 poll responses landed]'
+    history:
+      - 'user: ask the two pinned agents which approach they prefer and tally it'
+      - 'assistant: Both polled with the same neutral wording, options shuffled. Waiting on their answers.'
+    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
+near_misses:
+  - poll the pinned agents on whether we should drop node 18
+docs:
+  - poll the pinned agents on which approach to take
+  - query: explain what pinning does then ask the pinned ones what they think of the schema
+    docs: true
+  - poll the pinned agents on which approach we should take
+  - sure, poll them
+  - query: explain what pinning does then ask the pinned ones what they think of the schema
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+    docs: true
+  - query: poll the pinned agents on which approach to take
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
+  - query: poll the pinned agents on which approach we should take
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: hang on, before you push — sure, poll them
+    history:
+      - 'user: the vote came back 2-2 between agent 1 and agent 3'
+      - 'assistant: Tied at two points each.'

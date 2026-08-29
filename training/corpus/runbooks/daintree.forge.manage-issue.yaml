@@ -1,0 +1,357 @@
+# Training examples whose answer is `daintree.forge.manage-issue` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.forge.manage-issue
+run: pre-split
+positives:
+  - file a bug for the double-submit thing on checkout
+  - 'open an issue: rate limiter drops the first request after a restart'
+  - can you raise a ticket for this? the CSV export blows up when a row is empty and it doesn't even say which row
+  - new issue on the assistant repo — sign-in loops forever if the stored token has gone stale. tag it bug.
+  - turn what I just described into an issue
+  - make an issue out of that stack trace
+  - retitle 214. right now it just says "fix thing" which helps nobody. call it "Retry loop never terminates on 429".
+  - the body on 88 is completely out of date now that we know it's the cache. rewrite it with what we actually found.
+  - reopen 341. it came back.
+  - stick the needs-design label on 402
+  - drop the triage label off 155, it's been triaged
+  - assign 77 to marco
+  - unassign me from 512, not getting to it this week
+  - label and assign this ticket — bug, and put priya on it
+  - 'create an issue titled "Docs: worktree lifecycle is undocumented", no body needed, title''s enough'
+  - 'add p1 and regression to #99'
+  - issue 44 has a typo in the title, recieve should be receive. fix it.
+  - i want an issue for this but check we haven't already got one about the flaky migration test
+  - reopen the one about the memory leak, it's definitely not fixed
+  - put good-first-issue on 610 so somebody else can grab it
+  - take me off 233 and put sam on it instead
+  - open a ticket against the CLI repo, not this one — it still sends the docsx flag
+  - edit 156's body to include the repro steps i pasted earlier
+  - add blocked to 300 and take in-progress off
+  - raise an issue for the perf regression and assign it to greg
+  - write it up as an issue. title something along the lines of "Selector degrades open when the routing revision is stale".
+  - 'issue for this please: readyz still returns 200 with runbook learning on in prod. that''s just wrong.'
+  - can you file it and put the docs label on? it's about the missing worktree documentation
+  - change the title on the token issue so it says it's only on refresh
+  - someone needs to own 91. dave hasn't touched it in three weeks, swap him for me — gpriday.
+  - reopen 7 and label it bug while you're in there
+  - log a ticket for the memory thing before i forget
+  - search open issues for anything about the retry loop, and if there's nothing, file one
+  - is there already an issue for the flaky auth test? if not open one with the failure output
+  - before you file it just double check the tracker hasn't already got one about the CSV encoding
+  - look through the open bugs, find the websocket reconnect one, and slap a p2 on it
+  - grab the ticket about the migration timeout and give it a better title
+  - pull up 412 and assign it to me, my login is gpriday
+  - 422 needs reopening — someone closed it but the bug is still very much there
+  - that got closed way too early. put it back.
+  - i don't want to comment on it, just change the title so people can actually find it
+  - don't close it yet, just take the ready-for-review label off
+  - the reviewer's point belongs in the issue body, not buried in another comment. update the description.
+  - add the regression label to 118, that's the third time it's come back
+  - put needs-repro on the one tom filed yesterday
+  - no PR yet — just get the issue filed so there's something to link off
+  - file the issue first, i'll open the pull request myself later
+  - i'm not ready to push anything. just log it as an issue with the repro steps.
+  - there's a leftover TODO in that diff — create an issue for it, don't open a PR
+  - just file it, don't start on it
+  - create the ticket for the cache bug — nobody's working it, i just want it on record
+  - open an issue for the refactor and assign it to me, i'll pick it up next week — mel
+  - make the issue, label it ready, but don't spawn anything
+  - write the ticket up. no agent, no worktree, i just want it in the tracker.
+  - three separate issues out of that review, one per finding, all labelled tech-debt
+  - turn each of those bullets into its own ticket
+  - on the deploy bug issue — ops and p1 labels, and put me down as assignee, gpriday
+  - File a public issue for the login crash and include the reproduction steps I gave you.
+  - Turn this bug report into a forge ticket, but do not start working on it.
+  - Create an issue called Cache eviction races under load.
+  - Open a new issue for this regression and apply the bug label.
+  - Please file this as an issue in the current repository.
+  - Change issue 81's title to reflect the Windows-only crash.
+  - Replace the body of ticket 14 with these corrected reproduction steps.
+  - Reopen issue 233; the problem came back in the latest release.
+  - Add the urgent label to issue 52 without removing its other labels.
+  - Remove the needs-info label from ticket 90.
+  - Assign issue 17 to octocat.
+  - Unassign sam-dev from issue 17.
+  - Create the ticket, label it security, and assign it to alice.
+  - Before filing this crash, check for a likely open duplicate by title.
+  - Edit only the issue body; leave its title unchanged.
+  - Clear the obsolete body text on issue 44 but keep the title.
+  - File a minimal bug with a title and no body.
+  - Reopen the closed ticket and add the regression label.
+  - Make issue 71 belong to the backend team account.
+  - Create a tracking issue from this incident summary and tell me its URL.
+boundaries:
+  - query: reopen issue 91, it's come back
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: slap a needs-backport label on that ticket
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: assign 204 to me and fix the title, it's a typo
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: file an issue for the rollback plan so we don't forget it
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: turn that blank page bug into an issue
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Create an issue describing the flaw found in PR 42.
+    confusable_with: [daintree.forge.land-pull-request]
+followups:
+  - query: actually make it p1 not p2
+    history:
+      - 'user: file a bug for the checkout double-submit, label it p2'
+      - 'assistant: Created #631 in daintreehq/assistant with the p2 label, read back and confirmed. URL: https://github.com/daintreehq/assistant/issues/631'
+    active: [daintree.forge.manage-issue]
+  - query: gpriday
+    history:
+      - 'user: open an issue for the perf regression and assign it to me'
+      - 'assistant: Before I create it — I can''t resolve your forge login from anything I can see. What''s your username on the forge?'
+    active: [daintree.forge.manage-issue]
+  - query: no that's a different bug, file a new one
+    history:
+      - 'user: raise an issue for the migration timeout'
+      - 'assistant: There''s a likely duplicate: #488 "Migration step times out on large tables", still open. Do you want me to update that one or create a separate issue?'
+    active: [daintree.forge.manage-issue]
+  - query: and take the triage one off while you're there
+    history:
+      - 'user: add needs-design to 402'
+      - 'assistant: Added. 402 now carries: bug, needs-design, triage.'
+    active: [daintree.forge.manage-issue]
+  - query: which repo did that land on?
+    history:
+      - 'user: turn that stack trace into an issue'
+      - 'assistant: Filed #77, title "Panic in worktree resolver when locator is empty", body has the trace verbatim.'
+    active: [daintree.forge.manage-issue]
+  - query: put the old body back, i preferred it
+    history:
+      - 'user: rewrite 88''s description with what we found'
+      - 'assistant: Replaced the body on #88 — the old text is gone since body replaces wholesale. Read back and the new description is live.'
+    active: [daintree.forge.manage-issue]
+  - query: did it take the assignee though?
+    history:
+      - 'user: label and assign this ticket, bug plus priya'
+      - 'assistant: Label landed. On the assign call the forge returned an assignees array that doesn''t include priya.'
+    active: [daintree.forge.manage-issue]
+  - query: yeah reopen it
+    history:
+      - 'user: the memory leak one is definitely not fixed'
+      - 'assistant: #341 is closed as of Tuesday. Want me to reopen it?'
+    active: [daintree.forge.manage-issue]
+  - query: shorter title. drop the second half.
+    history:
+      - 'user: retitle 214, it just says fix thing'
+      - 'assistant: Proposed: "Retry loop never terminates on 429 responses from the upstream provider". Say the word and I''ll write it.'
+    active: [daintree.forge.manage-issue]
+  - query: do the same for the other two bullets
+    history:
+      - 'user: turn each of those bullets into its own ticket'
+      - 'assistant: First one is up: #712 "Docs: worktree lifecycle is undocumented", labelled tech-debt.'
+    active: [daintree.forge.manage-issue]
+  - query: sam not marco, i mixed them up
+    history:
+      - 'user: assign 77 to marco'
+      - 'assistant: Assigned. Read back: #77 assignees are [marco].'
+    active: [daintree.forge.manage-issue]
+  - query: wait, does that label even exist on this repo?
+    history:
+      - 'user: create an issue for the readyz thing and tag it prod-risk'
+      - 'assistant: I can create it with that label, but I can''t enumerate the repository''s label catalog from here — if prod-risk doesn''t exist the create will reject it.'
+    active: [daintree.forge.manage-issue]
+  - query: Proceed with a separate issue and label it regression.
+    history:
+      - 'user: File a ticket for the startup crash.'
+      - 'assistant: I found a likely duplicate and asked whether to proceed.'
+    active: [daintree.forge.manage-issue]
+  - query: Use that replacement and leave the title alone.
+    history:
+      - 'user: Update issue 40''s body.'
+      - 'assistant: I read the current issue and prepared the replacement text.'
+    active: [daintree.forge.manage-issue]
+  - query: My login is gpriday; assign that account.
+    history:
+      - 'user: Assign ticket 22 to me.'
+      - 'assistant: This surface cannot resolve your forge login.'
+    active: [daintree.forge.manage-issue]
+  - query: Then just add the recurrence label.
+    history:
+      - 'user: Reopen issue 8.'
+      - 'assistant: The read shows it is already open.'
+    active: [daintree.forge.manage-issue]
+  - query: Continue with the second and verify the full set.
+    history:
+      - 'user: Add urgent and backend to issue 6.'
+      - 'assistant: The first label landed.'
+    active: [daintree.forge.manage-issue]
+  - query: Check whether it exists before retrying.
+    history:
+      - 'user: Create the issue.'
+      - 'assistant: The create response timed out and the result is ambiguous.'
+    active: [daintree.forge.manage-issue]
+topic_shifts:
+  - query: that null deref you found — file it as an issue so we don't lose it
+    history:
+      - 'user: what does the ingest package actually do'
+      - 'assistant: It pulls batches off SQS, normalizes them in ingest/normalize.go, and writes to the warehouse. The dedupe step in ingest/dedupe.go dereferences a pointer that can be nil when the batch is empty.'
+    active: [daintree.explore.repository, daintree.foundation]
+  - query: open a ticket for the flaky one and tag it flaky + ci
+    history:
+      - 'user: is this flaky?'
+      - 'assistant: Yes — TestWorkerDrain fails about one run in six, always on the timing assertion at worker_test.go:118. Not a real regression.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+  - query: put my name on 412 so nobody else picks it up
+    history:
+      - 'user: find me something small nobody''s on'
+      - 'assistant: Three candidates: #412 (config validation), #416 (log noise), #430 (docs typo). None assigned, none with a worktree.'
+    active: [daintree.workflow.find-issue-work]
+  - query: reopen 289, it's come back
+    history:
+      - 'user: what''s the state of the retry work'
+      - 'assistant: PR merged on Monday and the linked issue #289 auto-closed. Nothing else open on that thread.'
+    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+  - query: rewrite the body of 155 — it still describes the old design and it's confusing everyone
+    history:
+      - 'user: pick up 155 and put an agent on it'
+      - 'assistant: Worktree wt_9f2 created on issue-155, agent launched with the ticket text as its brief.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: the reviewer raised three separate things, turn each one into its own issue
+    history:
+      - 'user: review the parser rewrite'
+      - 'assistant: Three findings, all medium: unbounded recursion in parse/expr.go, no fuzz corpus, and the error type swallows position info.'
+    active: [daintree.review.review-change]
+  - query: take the label 'needs-triage' off 601 and put 'confirmed' on instead
+    history:
+      - 'user: did anyone reply on 601'
+      - 'assistant: Two replies. The reporter added a stack trace and someone else confirmed it on 1.4.2.'
+    active: [daintree.workflow.follow-up-on-issue]
+  - query: this whole thing should be a ticket. title it something about the devbox never coming back from pause
+    history:
+      - 'user: is the devbox on the billing worktree still up'
+      - 'assistant: Status came back paused, last checked four minutes ago. Resume returned success but status still reads paused.'
+    active: [daintree.worktree.manage-resource]
+  - query: assign 88 to mia, she wrote that module originally
+    history:
+      - 'user: who''s working on what right now'
+      - 'assistant: Two agents live: one on #86 in wt_1a, one on #90 in wt_3c. #88 has nobody on it.'
+    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+  - query: raise an issue for it, mark it as a bug, and paste the exact error in the body
+    history:
+      - 'user: something''s wrong, the export button does nothing'
+      - 'assistant: The console shows an uncaught TypeError in export/handler.ts:41 — `rows` is undefined when the filter returns empty.'
+    active: [daintree.runtime.debug-web-app]
+  - query: unassign me from 350, i'm not going to get to it this sprint
+    history:
+      - 'user: where were we on the queue work'
+      - 'assistant: #350 is assigned to you with a stale worktree from two weeks ago, nothing pushed. The ledger row is still marked active.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: file that as a ticket before i forget
+    history:
+      - 'user: remember that the staging seed script has to run before the e2e suite'
+      - 'assistant: Saved. Also noted the existing fact about staging resets on Sundays, which sits alongside it.'
+    active: [daintree.memory.manage-project-memory]
+  - query: add the 'good first issue' label to 470 and 471 — actually just 470 for now
+    history:
+      - 'user: what''s unassigned and small'
+      - 'assistant: #470 and #471 both look self-contained; neither has an assignee.'
+    active: [daintree.workflow.find-issue-work, daintree.foundation]
+  - query: fix the title on 12, it says 'confg' and it's been bugging me for weeks
+    history:
+      - 'user: which worktrees are still around'
+      - 'assistant: Four: wt_1a (issue-12), wt_2b (issue-40), wt_5f (spike), wt_7c (docs).'
+    active: [daintree.foundation]
+  - query: make a ticket out of what that agent reported and assign it to whoever owns the scheduler
+    history:
+      - 'user: ask an agent whether the cron scheduler handles DST'
+      - 'assistant: It says no — scheduler/cron.go computes the next run in local time with no DST guard, so twice a year a job either fires twice or not at all.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: raise a ticket for the bit we decided to defer
+    history:
+      - 'user: plan it out'
+      - 'assistant: Graph wfg_301 stored, 6 nodes. The index rebuild was excluded from scope as you asked.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: file that as a bug with the exact console output
+    history:
+      - 'user: check the preview console'
+      - 'assistant: 14 errors, all the same hydration mismatch on the pricing table.'
+    active: [daintree.runtime.debug-web-app]
+  - query: raise a ticket about how slow resume is, it takes four minutes
+    history:
+      - 'user: resume it'
+      - 'assistant: Resumed. Status confirms running after a wait.'
+    active: [daintree.worktree.manage-resource]
+  - query: 'add p1 and regression to #99'
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: Assign issue 17 to octocat.
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: look through the open bugs, find the websocket reconnect one, and slap a p2 on it
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: don't close it yet, just take the ready-for-review label off
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: Reopen issue 233; the problem came back in the latest release.
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: three separate issues out of that review, one per finding, all labelled tech-debt
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: the body on 88 is completely out of date now that we know it's the cache. rewrite it with what we actually found.
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: Create an issue called Cache eviction races under load.
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: issue 44 has a typo in the title, recieve should be receive. fix it.
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: retitle 214. right now it just says "fix thing" which helps nobody. call it "Retry loop never terminates on 429".
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: file the issue first, i'll open the pull request myself later
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: Reopen the closed ticket and add the regression label.
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: Turn this bug report into a forge ticket, but do not start working on it.
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: File a public issue for the login crash and include the reproduction steps I gave you.
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: that got closed way too early. put it back.
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+  - query: stick the needs-design label on 402
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+wakes:
+  - query: '[user returned after confirmation interruption]'
+    active: [daintree.forge.manage-issue]
+foundation_boundaries:
+  - file a bug for this
+  - 'open an issue: the export button does nothing on Safari'
+  - label 88 flaky
+  - assign 412 to me
+  - reopen issue 77
+  - change the title of 33 to something clearer
+  - take the triage label off 90
+  - unassign dan from 51, he's on leave
+  - turn what i just described into a ticket

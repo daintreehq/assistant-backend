@@ -105,20 +105,37 @@ ESTABLISHED runbook is correct and the new one is the hard negative. The new
 runbook's whenToUse fences against its neighbours, but their whenToUse predates it
 and names it nowhere, so without those rows every fence runs one way only.
 
-### 2. Assemble (cumulative by default)
+### 2. Ingest into the curated corpus, then compile
+
+The corpus is **three planes** — raw journals, curated YAML, compiled artifact —
+and the middle one is the source of truth. `training/corpus/README.md` is the
+authoring reference. Read it before writing or editing examples.
 
 ```bash
-$PY -m training.assemble_data --journal <new-journal.jsonl>
+# Folds the journal into training/corpus/**.yaml and archives the journal
+# itself under training/journals/. Idempotent: re-running changes nothing.
+$PY -m training.ingest_journal <new-journal.jsonl> --run <run-id>
 ```
 
-The committed `training/data/selection.jsonl` is carried forward automatically
-(`--base`, on by default) — journals are session-local and NOT reconstructible
-from a fresh clone, so the committed corpus IS the base and new journals extend
-it through the same gates. `--base ''` rebuilds from journals alone.
+Pick a `--run` that names the generation, not the day: `2026-08-29-worktrees`,
+not `journal3`. It is stamped on every example the run contributes and is how a
+bad batch gets found and removed later.
+
+**Now read what landed and edit it.** This is the step the old cumulative
+assembler made impossible — a generator's mistakes were welded into a 2.8 MB
+JSONL that only grew. New examples appear in `training/corpus/runbooks/<id>.yaml`
+(rows answering that one runbook) and `training/corpus/shared/<source>.yaml`
+(rows answering none or several). Delete what is wrong; it stays deleted.
+
+```bash
+$PY -m training.compile_corpus
+```
 
 Watch `dropped_contaminated` (benchmark collisions) and
 `dropped_conflicting_label` (same rendered input, different labels — a noisy
-generator).
+generator). Commit the YAML, the recompiled `training/data/selection.jsonl` and
+the updated `corpus-lock.json` together; `tests/unit/test_training_corpus.py`
+fails if they disagree.
 
 ### 3. Train stage 1, then stage 2
 
@@ -128,11 +145,16 @@ retraining stage 1 afterwards invalidates stage 2's training distribution.
 
 ```bash
 $PY -m training.train_retriever          # ~15 min: watch r@32 stay at 1.000
+                                        # and `hard-neg/row` stay around 4
 $PY -m training.train_setwise --epochs 10 --ordering equivariant
 ```
 
 Watch on stage 1: `r@32` (the shortlist must not be the thing that loses a
-runbook) and `r@8` as the early warning that will matter at 200 runbooks. Watch on
+runbook), `r@8` as the early warning that will matter at 200 runbooks, and
+`hard-neg/row` — the authored `confusable_with` entries unioned with what the
+encoder mined against its own current weights that epoch. Near zero means the
+margin filter is rejecting everything, which is what a corpus whose positives
+and negatives have collapsed together looks like. Watch on
 stage 2: `card` ~0.95 — this is what makes "zero runbooks" work — and
 `val exact-match`.
 

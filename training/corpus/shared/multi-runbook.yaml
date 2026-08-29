@@ -1,0 +1,282 @@
+# Curated rows tagged `multi_runbook` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: multi_runbook
+run: pre-split
+examples:
+  - query: 'kick off #412 and set a watcher so i know the second the PR goes up'
+    expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.watch-outcome]
+  - query: start work on that auth issue, and while it runs ask the pinned agents whether the token refresh approach is sane
+    expect: [daintree.workflow.start-work-on-issue, daintree.agents.poll-pinned-agents]
+  - query: begin issue 88 and remember for next time that this repo uses pnpm not npm
+    expect: [daintree.workflow.start-work-on-issue, daintree.memory.manage-project-memory]
+  - query: 'spin up work on #77 then give the tab a decent title instead of Claude'
+    expect: [daintree.workflow.start-work-on-issue, daintree.terminals.rename]
+  - query: put an agent on each of these five issues and wake me when the last one finishes
+    expect: [daintree.orchestration.fan-out-work, daintree.orchestration.watch-outcome]
+  - query: fan the backlog out one agent per ticket and name each tab after its issue number
+    expect: [daintree.orchestration.fan-out-work, daintree.terminals.rename]
+  - query: clear out the old worktrees from friday first, then put an agent on each of issues 30-34
+    expect: [daintree.orchestration.workspace-cleanup, daintree.orchestration.fan-out-work]
+  - query: agent in tab 3 is asking about the migration, tell it yes, and then let me know when it's actually done
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.watch-outcome]
+  - query: three of them are waiting on prompts, unblock them all and rename the tabs so i can tell them apart
+    expect: [daintree.agents.answer-waiting-agent, daintree.terminals.rename]
+  - query: tell the agent to go ahead, and remember that we always approve schema changes in staging
+    expect: [daintree.agents.answer-waiting-agent, daintree.memory.manage-project-memory]
+  - query: that agent's been sitting there for 20 min, work out if its hung, and stick a watcher on it either way
+    expect: [daintree.agents.recover-agent, daintree.orchestration.watch-outcome]
+  - query: the spawn failed and nothing happened — sort that out then delete the dead worktrees it left behind
+    expect: [daintree.agents.recover-agent, daintree.orchestration.workspace-cleanup]
+  - query: 'my agent is stuck. figure it out and also kick off #101 in the meantime'
+    expect: [daintree.agents.recover-agent, daintree.workflow.start-work-on-issue]
+  - query: why is CI red on that branch — get it green and ping me when it passes
+    expect: [daintree.ci.diagnose-and-fix, daintree.orchestration.watch-outcome]
+  - query: the tests are failing, fix them, and remember the suite needs postgres running locally
+    expect: [daintree.ci.diagnose-and-fix, daintree.memory.manage-project-memory]
+  - query: fix the broken build then close all these leftover terminals
+    expect: [daintree.ci.diagnose-and-fix, daintree.orchestration.workspace-cleanup]
+  - query: renaming the tabs isn't doing anything at all, figure out whats broken and then actually title them
+    expect: [daintree.diagnostics, daintree.terminals.rename]
+  - query: am i even signed in properly? if so go ahead and start on issue 66
+    expect: [daintree.diagnostics, daintree.workflow.start-work-on-issue]
+  - query: the mcp link keeps dropping, tell me why, then once its up put an agent on the parser bug
+    expect: [daintree.diagnostics, daintree.edits.spawn-visible-agent]
+  - query: nothing is responding. work out what's going on and shut down these dead tabs
+    expect: [daintree.diagnostics, daintree.orchestration.workspace-cleanup]
+  - query: spin up an agent to add tests for the retry path and watch it — wake me if it stalls
+    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
+  - query: get an agent refactoring the config loader and title its tab config-refactor
+    expect: [daintree.edits.spawn-visible-agent, daintree.terminals.rename]
+  - query: launch an agent on the css cleanup, and close the two finished ones while you're at it
+    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.workspace-cleanup]
+  - query: put an agent on the dedupe work and remember that we target node 20 here
+    expect: [daintree.edits.spawn-visible-agent, daintree.memory.manage-project-memory]
+  - query: catch me up on what was in flight, then get that branch ready for review
+    expect: [daintree.orchestration.status-and-resume, daintree.workflow.prep-branch-for-review]
+  - query: 'where were we? and is the PR on #55 green yet'
+    expect: [daintree.orchestration.status-and-resume, daintree.workflow.follow-up-on-issue]
+  - query: what was i working on last night — and put an agent on whatever's left
+    expect: [daintree.orchestration.status-and-resume, daintree.edits.spawn-visible-agent]
+  - query: poll the fleet on whether to drop the v1 endpoint, then shut all those agents down
+    expect: [daintree.agents.poll-pinned-agents, daintree.orchestration.workspace-cleanup]
+  - query: rename these tabs first so i can tell them apart, then ask them all which caching strategy they'd pick
+    expect: [daintree.terminals.rename, daintree.agents.poll-pinned-agents]
+  - query: ask the pinned agents to vote on the naming and remember whatever they settle on
+    expect: [daintree.agents.poll-pinned-agents, daintree.memory.manage-project-memory]
+  - query: check the agent actually made the change it claims, then poll the fleet on whether the approach holds up
+    expect: [daintree.orchestration.verify-agent-work, daintree.agents.poll-pinned-agents]
+  - query: did it really run the tests? also tell me whether the PR's checks came back green
+    expect: [daintree.orchestration.verify-agent-work, daintree.workflow.follow-up-on-issue]
+  - query: verify agent 2 actually finished, then spin up a new agent to write the docs for it
+    expect: [daintree.orchestration.verify-agent-work, daintree.edits.spawn-visible-agent]
+  - query: confirm it did what it said and remember that this service needs the migration run before tests
+    expect: [daintree.orchestration.verify-agent-work, daintree.memory.manage-project-memory]
+  - query: send agent 4's review notes over to agent 1, tell it to take them seriously, and let me know when it's applied them
+    expect: [daintree.agents.relay-review-feedback, daintree.orchestration.watch-outcome]
+  - query: forward the reviewer's findings to the implementer and spawn another agent to write regression tests
+    expect: [daintree.agents.relay-review-feedback, daintree.edits.spawn-visible-agent]
+  - query: review the diff on this branch then tidy up the worktrees we're done with
+    expect: [daintree.review.review-change, daintree.orchestration.workspace-cleanup]
+  - query: code review the branch and remember that we never allow raw sql in handlers
+    expect: [daintree.review.review-change, daintree.memory.manage-project-memory]
+  - query: look over what the agent wrote and ping me when that PR merges
+    expect: [daintree.review.review-change, daintree.orchestration.watch-outcome]
+  - query: open the PR for this branch and then delete the worktrees from the finished batch
+    expect: [daintree.workflow.prep-branch-for-review, daintree.orchestration.workspace-cleanup]
+  - query: push it up and open the PR, then rename this tab to review-ready
+    expect: [daintree.workflow.prep-branch-for-review, daintree.terminals.rename]
+  - query: get the branch ready for review and remember we squash merge here
+    expect: [daintree.workflow.prep-branch-for-review, daintree.memory.manage-project-memory]
+  - query: find me a small unassigned bug and ask the fleet which one's worth doing first
+    expect: [daintree.workflow.find-issue-work, daintree.agents.poll-pinned-agents]
+  - query: anything unassigned in the tracker? and remember i don't want frontend work this week
+    expect: [daintree.workflow.find-issue-work, daintree.memory.manage-project-memory]
+  - query: 'whats blocking #23 — read the thread — and ask the pinned agents how they''d reply'
+    expect: [daintree.workflow.follow-up-on-issue, daintree.agents.poll-pinned-agents]
+  - query: check what the reviewer said on that PR and remember the decision about the retry cap
+    expect: [daintree.workflow.follow-up-on-issue, daintree.memory.manage-project-memory]
+  - query: 'comment on #12 and close it, then tear down its worktree'
+    expect: [daintree.workflow.follow-up-on-issue, daintree.orchestration.workspace-cleanup]
+  - query: make a worktree for the hotfix branch and call the tab hotfix
+    expect: [daintree.worktree.create-plain-worktree, daintree.terminals.rename]
+  - query: check out release-3 as a worktree and bundle the payment files into a context file for it
+    expect: [daintree.worktree.create-plain-worktree, daintree.context.curate-copytree-bundle]
+  - query: create a plain worktree off develop and remind me in an hour to come back to it
+    expect: [daintree.worktree.create-plain-worktree, daintree.orchestration.watch-outcome]
+  - query: run the dev recipe in that worktree and rename whatever tabs it opens
+    expect: [daintree.recipe.run-or-create, daintree.terminals.rename]
+  - query: create a worktree with the ci recipe and let me know when it's booted
+    expect: [daintree.recipe.run-or-create, daintree.orchestration.watch-outcome]
+  - query: get the three of them talking about the schema, but rename the tabs first, they're all called claude
+    expect: [daintree.orchestration.conversation, daintree.terminals.rename]
+  - query: let them hash out the caching design between them then close all those terminals when they're done
+    expect: [daintree.orchestration.conversation, daintree.orchestration.workspace-cleanup]
+  - query: run the fun fact contest among the four agents and shut them down after
+    expect: [daintree.orchestration.competition, daintree.orchestration.workspace-cleanup]
+  - query: break the tie with a runoff and then clean up all those terminals
+    expect: [daintree.orchestration.runoff-tiebreaker, daintree.orchestration.workspace-cleanup]
+  - query: have one agent grill the other three on the migration plan and pick a winner, then close the losers' tabs
+    expect: [daintree.orchestration.interview, daintree.orchestration.workspace-cleanup]
+  - query: have them debate the rewrite and vote the weakest position off, then tidy the terminals up
+    expect: [daintree.orchestration.debate-elimination, daintree.orchestration.workspace-cleanup]
+  - query: get the three of them to cross-check each other until you have one answer, then shut them all down
+    expect: [daintree.orchestration.multi-agent, daintree.orchestration.workspace-cleanup]
+  - query: bundle the checkout code into a context file and tell me whether that PR is green
+    expect: [daintree.context.curate-copytree-bundle, daintree.workflow.follow-up-on-issue]
+  - query: explain how the queue retries work and ask the pinned agents if its worth rewriting
+    expect: [daintree.explore.repository, daintree.agents.poll-pinned-agents]
+  - query: explain how the webhook signing works, and check if anyone replied on issue 90
+    expect: [daintree.explore.repository, daintree.workflow.follow-up-on-issue]
+  - query: 'start #14, and while it runs get the idle agents to compete on the best name for the package'
+    expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.competition]
+  - query: 'start work on #90 and clean up last week''s worktrees while it runs'
+    expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.workspace-cleanup]
+  - query: close the three finished ones and retitle whats left by what theyre actually doing
+    expect: [daintree.orchestration.workspace-cleanup, daintree.terminals.rename]
+  - query: watch the deploy for me and rename this tab deploy-watch
+    expect: [daintree.orchestration.watch-outcome, daintree.terminals.rename]
+  - query: why cant i see the worktree tool? and remember we're on the beta channel now
+    expect: [daintree.diagnostics, daintree.memory.manage-project-memory]
+  - query: put an agent on each of those tickets and remember that studio-02 is offline this week
+    expect: [daintree.orchestration.fan-out-work, daintree.memory.manage-project-memory]
+  - query: close the dead terminals, rename what's left, and put an agent on the parser bug
+    expect:
+      - daintree.orchestration.workspace-cleanup
+      - daintree.terminals.rename
+      - daintree.edits.spawn-visible-agent
+  - query: 'answer the agent thats asking, start #51, and ping me when its PR is up'
+    expect:
+      - daintree.agents.answer-waiting-agent
+      - daintree.workflow.start-work-on-issue
+      - daintree.orchestration.watch-outcome
+  - query: fix the red check, rename this tab to ci, and wake me when it goes green
+    expect:
+      - daintree.ci.diagnose-and-fix
+      - daintree.terminals.rename
+      - daintree.orchestration.watch-outcome
+  - query: catch me up, then get the branch ready for review and rename this tab
+    expect:
+      - daintree.orchestration.status-and-resume
+      - daintree.workflow.prep-branch-for-review
+      - daintree.terminals.rename
+  - query: agent per issue on those five, name the tabs after them, and wake me when theyre all done
+    expect:
+      - daintree.orchestration.fan-out-work
+      - daintree.terminals.rename
+      - daintree.orchestration.watch-outcome
+  - query: checks are red on 214 — get them green and then squash it in
+    expect: [daintree.ci.diagnose-and-fix, daintree.forge.land-pull-request]
+  - query: give this PR a proper review and if nothing serious comes up, approve it
+    expect: [daintree.review.review-change, daintree.forge.land-pull-request]
+  - query: merge 88 and then delete the worktree it was on
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.workspace-cleanup]
+  - query: approve 41 and then ping me when it actually merges
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.watch-outcome]
+  - query: land 302 and then close out its issue with a comment saying it shipped
+    expect: [daintree.forge.land-pull-request, daintree.workflow.follow-up-on-issue]
+  - query: push this up as a PR and put priya and marco on it as reviewers
+    expect: [daintree.workflow.prep-branch-for-review, daintree.forge.land-pull-request]
+  - query: The agent says it's done. Check that's actually true, then approve the PR.
+    expect: [daintree.orchestration.verify-agent-work, daintree.forge.land-pull-request]
+  - query: mark 55 ready for review and retitle this tab pr-55 so i dont lose it
+    expect: [daintree.forge.land-pull-request, daintree.terminals.rename]
+  - query: what did the reviewer say on 77? if nothing's blocking, squash it in.
+    expect: [daintree.workflow.follow-up-on-issue, daintree.forge.land-pull-request]
+  - query: the agent in tab 3 is asking whether to force-push. tell it yes, and merge the PR once it settles.
+    expect: [daintree.agents.answer-waiting-agent, daintree.forge.land-pull-request]
+  - query: spawn something read-only to sanity check whether 412 is safe to merge, then merge it if it says yes
+    expect: [daintree.agents.ask-and-relay, daintree.forge.land-pull-request]
+  - query: merge that PR and pause the devbox on its worktree, we're done with it
+    expect: [daintree.forge.land-pull-request, daintree.worktree.manage-resource]
+  - query: file an issue for this crash and then start work on it
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+  - query: turn each of these three bugs into issues and put an agent on each one
+    expect: [daintree.forge.manage-issue, daintree.orchestration.fan-out-work]
+  - query: open an issue for the flaky auth test, then work out why it's flaky
+    expect: [daintree.forge.manage-issue, daintree.ci.diagnose-and-fix]
+  - query: the preview is throwing on load — figure out why and file an issue with the stack trace
+    expect: [daintree.runtime.debug-web-app, daintree.forge.manage-issue]
+  - query: label 88 blocked and then tell me what's actually holding it up
+    expect: [daintree.forge.manage-issue, daintree.workflow.follow-up-on-issue]
+  - query: find me a small unassigned bug and assign it to me
+    expect: [daintree.workflow.find-issue-work, daintree.forge.manage-issue]
+  - query: read the retry code and open issues for anything that looks wrong
+    expect: [daintree.explore.repository, daintree.forge.manage-issue]
+  - query: review this branch and file a ticket for each finding above medium
+    expect: [daintree.review.review-change, daintree.forge.manage-issue]
+  - query: remember that we file frontend bugs under the web label, and file one for this dropdown bug
+    expect: [daintree.memory.manage-project-memory, daintree.forge.manage-issue]
+  - query: create the issue, then let me know if anyone picks it up while I'm out
+    expect: [daintree.forge.manage-issue, daintree.orchestration.watch-outcome]
+  - query: That agent's been stuck for twenty minutes. Sort it out and open a ticket about the hang.
+    expect: [daintree.agents.recover-agent, daintree.forge.manage-issue]
+  - query: reopen 91 and get someone on it — spin up an agent in a fresh worktree
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+  - query: plan the postgres migration as a durable workflow and fan the first phase out across agents
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.fan-out-work]
+  - query: track the rollout as a graph and remind me tomorrow morning to check on it
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.watch-outcome]
+  - query: Where did we get to on that migration? Set whatever's left up as a proper tracked plan.
+    expect:
+      - daintree.orchestration.status-and-resume
+      - daintree.orchestration.execute-durable-workflow
+  - query: make a dependency-aware plan for the API v2 cutover and file an issue for each phase
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.forge.manage-issue]
+  - query: plan this as a workflow graph and put an agent on the first node that's ready
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.edits.spawn-visible-agent]
+  - query: reconcile the graph after that failed node, and check whether the agent's work on the previous one actually held up
+    expect:
+      - daintree.orchestration.execute-durable-workflow
+      - daintree.orchestration.verify-agent-work
+  - query: The plan says phase 3 is ready. Do it, and merge the PR it produces.
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.forge.land-pull-request]
+  - query: set the devbox migration up as a tracked plan and provision the remote box for phase one
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.worktree.manage-resource]
+  - query: clear out the worktrees from the last attempt, then plan the refactor properly with dependencies this time
+    expect:
+      - daintree.orchestration.workspace-cleanup
+      - daintree.orchestration.execute-durable-workflow
+  - query: track this as a workflow and bundle the phase-one files into a context file for whoever picks it up
+    expect:
+      - daintree.orchestration.execute-durable-workflow
+      - daintree.context.curate-copytree-bundle
+  - query: plan the cutover as a graph, then get the four agents to argue about the ordering until they agree on one sequence
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.multi-agent]
+  - query: console is full of errors in the preview and CI's red as well — sort both out
+    expect: [daintree.runtime.debug-web-app, daintree.ci.diagnose-and-fix]
+  - query: work out what's blowing up in the preview, then wake me when the fix has landed
+    expect: [daintree.runtime.debug-web-app, daintree.orchestration.watch-outcome]
+  - query: The preview errors on the checkout page. Check the console, then review the last diff that touched that component.
+    expect: [daintree.runtime.debug-web-app, daintree.review.review-change]
+  - query: explain how the router is wired first, then debug why the preview 404s on refresh
+    expect: [daintree.explore.repository, daintree.runtime.debug-web-app]
+  - query: reload the preview and rename that panel storefront while you're there
+    expect: [daintree.runtime.debug-web-app, daintree.terminals.rename]
+  - query: the preview died right after that agent's change — check the console and verify what it actually touched
+    expect: [daintree.runtime.debug-web-app, daintree.orchestration.verify-agent-work]
+  - query: get the preview clean and then push the branch up for review
+    expect: [daintree.runtime.debug-web-app, daintree.workflow.prep-branch-for-review]
+  - query: the dev preview is erroring and half the daintree tools have vanished too
+    expect: [daintree.diagnostics, daintree.runtime.debug-web-app]
+  - query: debug the preview, and when it's fixed close the two extra panels I opened
+    expect: [daintree.runtime.debug-web-app, daintree.orchestration.workspace-cleanup]
+  - query: The devbox is paused so the preview is dead. Resume it and then debug the preview.
+    expect: [daintree.worktree.manage-resource, daintree.runtime.debug-web-app]
+  - query: pause the devbox and close all the terminals from that batch
+    expect: [daintree.worktree.manage-resource, daintree.orchestration.workspace-cleanup]
+  - query: 'resume the remote box on the api worktree, then start work on #144 in there'
+    expect: [daintree.worktree.manage-resource, daintree.workflow.start-work-on-issue]
+  - query: make a worktree for release/3.2 and get its devbox provisioned
+    expect: [daintree.worktree.create-plain-worktree, daintree.worktree.manage-resource]
+  - query: pause the cloud box and remind me to bring it back up at nine tomorrow
+    expect: [daintree.worktree.manage-resource, daintree.orchestration.watch-outcome]
+  - query: pause the devbox, and remind me where we left off on that ticket before I log out
+    expect: [daintree.worktree.manage-resource, daintree.orchestration.status-and-resume]
+  - query: provision the devbox and put an agent on the integration suite once it's up
+    expect: [daintree.worktree.manage-resource, daintree.edits.spawn-visible-agent]
+  - query: ask the pinned agents whether we should pause the devboxes overnight, then do whatever they land on
+    expect: [daintree.agents.poll-pinned-agents, daintree.worktree.manage-resource]
+  - query: resume the box for the auth worktree and open an issue about how slow provisioning is
+    expect: [daintree.worktree.manage-resource, daintree.forge.manage-issue]

@@ -1,0 +1,401 @@
+# Training examples whose answer is `daintree.worktree.create-plain-worktree` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.worktree.create-plain-worktree
+run: pre-split
+positives:
+  - create a worktree for a new branch fix/login-redirect off main
+  - make me a worktree
+  - add a worktree for chore/bump-deps, base develop
+  - can you set up a worktree for feature/billing without spawning anything in it?
+  - i want to try a risky refactor without messing up my current checkout, so can you carve off a separate working tree on a new branch based on develop — just the tree, I'll open my own editor in it, no agent and no recipe stuff please
+  - spin up a linked worktree with baseBranch origin/develop and fromRemote set, no recipeId
+  - creat a wortree for teh docs branch pls
+  - do that one in its own worktree instead
+  - check out release/2.4 as a worktree
+  - new branch in its own worktree, name it whatever you like, base it on develop
+  - I need a clean isolated checkout to run the old test suite against — worktree off the v2.1 maintenance branch, nothing launched in it
+  - branch off origin/release-3 and put it in a worktree
+  - is there already a worktree on the perf branch? if not make one
+  - put develop in its own working tree
+  - add a second checkout of this repo on a new branch so I can compare side by side
+  - mkae a new worktre for the auth rewrite, brnach off main
+  - worktree for experiment/rag-eval, base main, that's it — don't start an agent
+  - git worktree add equivalent through daintree — branch spike/wasm off main
+  - could you create a plain worktree, new branch called hotfix/csrf, based off the remote main?
+  - set up a worktree so I can test the migration separately
+  - same repo, different branch, own directory — you know the drill. branch name can be anything sensible, base off develop
+  - make one of those for the other branch too
+  - worktree.createWithRecipe but with no recipe — branch chore/lint-fixes off main
+  - i keep stashing to switch branches and it's driving me nuts. give me a dedicated worktree for the sidebar work, new branch, base main, and leave it empty — I don't want claude in there
+  - can I get a worktree on the existing branch feature/search?
+  - need a scratch tree off origin/main, fromRemote, plain — no recipe
+  - set up a worktree + branch for the perf spike, don't launch anything
+  - put this thing on its own branch in its own folder
+  - i need somewhere to try the schema migration without wrecking my current checkout — new worktree off develop please
+  - worktree off main, call it perf-probe
+  - new worktree
+  - can u make me a worktre for branch fix-auth-redirect off develp
+  - branch it off origin/main not my local main, my local is like 40 commits behind
+  - so i've got the rate limiter half done on this branch and now i want to look at the websocket thing but i don't want to stash all this... can i just get a second checkout somewhere? separate dir, branch called ws-spike, off develop
+  - i ran git worktree add myself and now my main checkout is sitting on the wrong branch. can you just do it properly through daintree instead
+  - make a worktree for release-2.4 — actually check first, i think it might already be checked out somewhere
+  - spin up a scratch worktree, name it whatever, off develop
+  - when you have a moment, could you set up a worktree for the branch called docs-rewrite? no agent needed, i just want the directory.
+  - yeah do that one as a worktree instead
+  - worktree for the pr-1204 branch so i can build it locally
+  - make me three empty worktrees off develop, i'll assign work to them later — no agents, nothing running
+  - just give me a worktree. no recipe, no claude, nothing running. worktree.
+  - create a worktree on brnach feature/paymnets-v2 — or whatever it's actually called, the payments one
+  - does daintree do git worktree add? i want feat/websockets in its own directory
+  - sarah's branch review/api-cleanup — i want it checked out beside my work so i can poke at it. not a review, just the checkout.
+  - the test suite takes 20 min. i want a second worktree off the same base so i can keep working while it runs
+  - worktree for a new branch called retry-backoff — off main or develop, whichever we branch from these days
+  - before we start on the caching work let's get a worktree set up for it. branch name cache-layer, base develop.
+  - prod is on fire, i need a hotfix worktree off origin/release-3.1 RIGHT NOW
+  - list my worktrees and if there isn't one for onboarding-flow add it
+  - i nuked that worktree earlier by mistake, recreate it — branch was flaky-e2e off develop
+  - issue 412 needs a branch and a worktree. don't spawn anything, i want to read the code myself first.
+  - set up the worktree for feat/otel and i'll open an agent in it myself later
+  - worktree please, and skip whatever startup recipe it normally wants to run
+  - check out origin/feat/search-v2 as its own worktree
+  - add worktree branch=bugfix/csv-export base=develop
+boundaries:
+  - query: set up a worktree off main for the payments refactor, nothing needs to run in it yet
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: can you just check out release/3.2 as a worktree somewhere
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: make me a new branch directory for the schema migration, i'll work in it myself
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: create a worktree called spike/websockets off develop
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i need a fresh checkout of the repo on a new branch, no agent
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: add a worktree for hotfix/csrf so i can poke at it in my editor
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Add an empty worktree for branch experiment/sql-planner; I do not want any terminal launched.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Check out the existing release/5.1 branch as another work tree, with no agent attached.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Make me an isolated branch folder for a manual prototype; I will use my editor, not an agent.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Create a standalone checkout from develop and leave it empty for later.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Set up one more plain worktree for hotfix/headers, but do not open a coding session.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: I only need a separate checkout to inspect the old branch myself; nothing should run in it.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: make a worktree for feature/dark-mode, nothing running in it
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i want a separate directory checked out on the v2 branch
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: add a tree for the experiment branch so my editor can open both at once
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: can you set up worktrees for main and develop side by side
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: give me an empty worktree off origin/staging
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: new worktree please, branch name is chore/deps-bump
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: i'd like to try something on a throwaway branch in its own folder
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: spin up a worktree for the release branch, i'll do the work by hand
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: put the docs branch in its own working copy
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: create three empty worktrees off main, i'll decide what goes in them later
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: check out the bugfix branch as a worktree, don't launch anything
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: set me up a clean tree for the rewrite, no recipe
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: make a worktree for the migration branch
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: make a worktree for the frontend redesign branch
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: create a worktree for feat/search off develop
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: make a new branch in its own worktree, call it fix/login
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: check out release/2.1 as a worktree please
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: add a tree for the branch codex has been pushing to, dont launch anything in it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: i want billing-v2 in its own tree based off billing
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: set up a separate checkout so i can test two branches at once
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: worktree for hotfix, no agent, no recipe, just the tree
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: give me a worktree on main so i can keep my current one dirty
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: make a worktree for infra/devbox-tuning off main. no recipe, no agent, no cloud box, just the worktree.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: check out release/2.4 as its own worktree
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: new branch chore/resource-limits in a worktree, base develop
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: I want a separate tree for the terraform changes. Branch it off main and call it infra/scale-down. Don't provision anything.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: add a worktree for the branch the devbox config lives on
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: worktree please, branch perf/pool-size, off develop
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: set up a plain worktree for hotfix/quota, nothing running in it
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Create a clean worktree for branch ticket-104 without an agent.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Create a standalone worktree for this branch with no workflow or agent.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Create a plain git worktree for a new feature branch.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Create one ordinary worktree for a new branch.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Create a normal git worktree for branch feature/cache.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: Create a worktree from the default recipe.
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: create a worktree for branch fix/login, no agents or anything
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: make a new branch in its own worktree off main
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: check out release/2.4 as a worktree, thats all i need
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: set up a worktree for the hotfix branch
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: create a worktree called payments-refactor off develop
+    confusable_with: [daintree.terminals.rename]
+  - query: make a new branch in its own worktree named fix/login
+    confusable_with: [daintree.terminals.rename]
+  - query: make me a worktree for the feature/logging branch, no agent
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: make me a worktree for feat/context-bundles
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: make me a worktree for feature/pricing off main, no agent, ill drive it myself
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: make a worktree for feat/pagination, don't open anything in it
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: check out origin/fix/csp as a worktree, nothing else
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: make a worktree for feature/rate-limit
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: check out release/2.4 as a worktree, no agent no recipe
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: make a worktree for the branch feat/rename-tabs
+    confusable_with: [daintree.terminals.rename]
+  - query: make me a worktree for feat/cache-keys, no agent no recipe
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: check out branch fix/upload-race as a worktree
+    confusable_with: [daintree.workflow.start-work-on-issue]
+followups:
+  - query: nice. do another one off origin/develop, call it spike/cache
+    history:
+      - 'user: create a worktree for a new branch fix/session-timeout off main'
+      - 'assistant: Created worktree wt_8f2 at ~/code/app-fix-session-timeout on branch fix/session-timeout, based on main. recipeLaunched was false and no agent was launched.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: ah right. then make a new one, billing-v2, based on billing
+    history:
+      - 'user: make a worktree for the billing branch'
+      - 'assistant: billing is already checked out in worktree wt_3a1 at ~/code/app-billing, so I did not create a duplicate checkout.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: anything, you pick
+    history:
+      - 'user: worktree please, new branch, base develop'
+      - 'assistant: What would you like the branch called?'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: remote. and don't launch anything in it
+    history:
+      - 'user: set up a plain worktree based off main'
+      - 'assistant: Do you mean your local main, or the remote origin/main?'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: did my main tree stay on develop?
+    history:
+      - 'user: add a worktree for chore/bump-deps'
+      - 'assistant: Created wt_11c at ~/trees/chore-bump-deps on chore/bump-deps off main.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: whats the path again
+    history:
+      - 'user: creat a wortree for the docs rewrite'
+      - 'assistant: I''ll create a new branch for it. Base off main or develop?'
+      - 'user: main'
+      - 'assistant: Created wt_44 at ~/trees/docs-rewrite on branch docs-rewrite off main. No recipe, no agent.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: ugh, use master then
+    history:
+      - 'user: worktree for experiment/rag-eval off main, no agent'
+      - 'assistant: The call failed: baseBranch ''main'' was not found — the default branch here is ''master''. Nothing was created and your current worktree is unchanged.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: wait, redo it off origin/develop instead
+    history:
+      - 'user: need a separate tree for the sidebar work'
+      - 'assistant: I can create a plain worktree on a new branch. What base branch should it come off?'
+      - 'user: develop'
+      - 'assistant: Created wt_9c0 at ~/trees/sidebar on branch sidebar off develop.'
+    active: [daintree.worktree.create-plain-worktree]
+topic_shifts:
+  - query: also give me a plain worktree off main called spike/queue, no recipe no agent
+    history:
+      - 'user: run the dev-stack recipe'
+      - 'assistant: Ran dev-stack in the current worktree — 3 processes up, one live agent terminal which I am supervising.'
+    active: [daintree.recipe.run-or-create]
+  - query: set up a worktree on hotfix/login-loop, plain, nothing running in it
+    history:
+      - 'user: tell me what happened while i was on holiday'
+      - 'assistant: 6 workflows completed, 2 abandoned mid-way, and 1 PR is still waiting on you. Stale rows tidied.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: make one for feature/billing-v2 too
+    history:
+      - 'user: create a worktree for feature/pricing-v2'
+      - 'assistant: Created at ../wt-pricing-v2.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: unrelated - make me a plain worktree off release/2.1, no agent no recipe
+    history:
+      - 'user: pick up ticket 302'
+      - 'assistant: Started - worktree, branch and agent all up for #302.'
+    active: [daintree.workflow.start-work-on-issue]
+  - query: different thing - create a worktree for perf-spike off develop, plain, no agent
+    history:
+      - 'user: review whats on develop since friday'
+      - 'assistant: 12 commits reviewed, three findings, none blocking.'
+    active: [daintree.review.review-change]
+  - query: fresh start - make a plain worktree for spike/parquet off main
+    history:
+      - 'user: clean up, close everything from the fan-out'
+      - 'assistant: Inventoried, you confirmed, then: watchers cancelled, six terminals closed, four worktrees deleted, ledger settled.'
+    active: [daintree.orchestration.workspace-cleanup]
+  - query: set me up a plain worktree on release/3.0, no recipe
+    history:
+      - 'user: pin the release process note'
+      - 'assistant: Pinned.'
+    active: [daintree.memory.manage-project-memory]
+  - query: does daintree run the install step for a new worktree or is that on me?
+    history:
+      - 'user: make me a worktree for feat/rate-limits'
+      - 'assistant: Created wt_rate_limits on a new branch off develop. No agent launched.'
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+  - query: while were here — is there a limit on how many worktrees daintree tracks?
+    history:
+      - 'user: check out release/3.2 as a worktree'
+      - 'assistant: Existing branch checked out at ../wt-release-3.2.'
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+  - query: explain how daintree picks a worktree path, then make me one for feat/search
+    history:
+      - 'user: new bit of work coming'
+      - 'assistant: Ready.'
+  - query: how do recipe worktrees differ from plain ones? just make me a plain one for hotfix/ssl
+    history:
+      - 'user: need a clean checkout'
+      - 'assistant: Sure.'
+  - query: make me one then. new branch spike/cache
+    history:
+      - 'user: whats a watcher in daintree'
+      - 'assistant: A background supervisor that wakes me when something changes.'
+      - 'user: ok and how do worktrees work here'
+      - 'assistant: Each worktree is a separate checkout of the repo on its own branch, with its own terminals, so parallel work never collides.'
+  - query: also set me up a plain worktree off main called spike/fonts. no agent no recipe
+    history:
+      - 'user: wait before that — rename these tabs, theyre all called claude and i cant tell whats what'
+      - 'assistant: Retitled all four tabs.'
+      - 'user: better. right, now do the docs recipe'
+      - 'assistant: docs-site is running in the main worktree — install finished, dev server is up on :3000.'
+    active: [daintree.recipe.run-or-create, daintree.foundation]
+  - i need a worktree for release/2.4. just the worktree, don't launch anything in it
+  - query: nothing then. theres a bug where the retry backoff doubles twice. make me a worktree for fix/retry-backoff off develop
+    history:
+      - 'user: morning. what have i got running?'
+      - 'assistant: Nothing running - no agents, watchers or timers. One leftover worktree, release/1.4, from Friday.'
+    active: [daintree.foundation]
+  - query: now make me a worktree fix/queue-race off develop, no agent yet
+    history:
+      - 'user: what did the fourth say exactly'
+      - 'assistant: It blames close(resultCh) at :188.'
+      - 'user: bundle the queue package and its tests into one context file'
+      - 'assistant: Bundle written to .daintree/context/queue-race.md - 14 files.'
+    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
+  - make plain worktrees for feat/search feat/billing and feat/oauth, no agents yet
+  - make me a worktree off main called perf-spike
+  - query: make me a worktree for the hotfix branch — no recipe, no agent, just the worktree
+    active: [daintree.foundation]
+  - check out release/2.1 as its own worktree
+  - forget recipes, i don't want anything auto-running in it. plain worktree off main, branch spike/redis-cache.
+  - make a worktree for hotfix/session-expiry off main and confirm it's actually there
+  - query: Now create a normal local git worktree.
+    history:
+      - 'user: Check the remote resource status.'
+    active: [daintree.worktree.manage-resource]
+  - query: make a plain worktree for the rollback branch, no agent, no recipe
+    history:
+      - 'user: attach the worktree and PR to the right nodes'
+      - 'assistant: Both resources attached: wt_c40 to node 1 and PR #620 to node 2.'
+    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+  - query: make me a plain worktree for hotfix/logging off main
+    history:
+      - 'user: what''s the resource status on wt_3c'
+      - 'assistant: Configured, currently paused, last checked just now.'
+    active: [daintree.worktree.manage-resource, daintree.foundation]
+  - query: creat a wortree for teh docs branch pls
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: set up the worktree for feat/otel and i'll open an agent in it myself later
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: i ran git worktree add myself and now my main checkout is sitting on the wrong branch. can you just do it properly through daintree instead
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: make a worktree for release-2.4 — actually check first, i think it might already be checked out somewhere
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: spin up a scratch worktree, name it whatever, off develop
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: does daintree do git worktree add? i want feat/websockets in its own directory
+    history:
+      - 'user: hows it going'
+      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: I need a clean isolated checkout to run the old test suite against — worktree off the v2.1 maintenance branch, nothing launched in it
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+wakes:
+  - query: '[wake: worktree creation completed]'
+    history:
+      - 'user: make a worktree for the spike branch'
+      - 'assistant: Creating the worktree for spike/vector-index off main through the typed wrapper. No recipe, no agent, as asked.'
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+  - query: '[background wake: worktree add failed — branch already checked out elsewhere]'
+    history:
+      - 'user: check out that branch as a worktree'
+      - 'assistant: Setting up a worktree on the existing branch fix/cache-ttl. Creation in progress.'
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+near_misses:
+  - make me a worktree for the auth fix
+docs:
+  - open a worktree for feat/billing
+  - worktree for the hotfix branch, no agent
+  - query: i dont really get worktrees but make me one for feature/login anyway
+    docs: true
+  - make a worktree for feature/search off a new branch
+  - go for it, make the worktree
+  - query: go for it, make the worktree
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+  - query: open a worktree for feat/billing
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: make a worktree for feature/search off a new branch
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: sorry, unrelated — open a worktree for feat/billing
+    history:
+      - 'user: something''s wrong, the export button does nothing'
+      - 'assistant: The console shows an uncaught TypeError in export/handler.ts:41 — `rows` is undefined when the filter returns empty.'

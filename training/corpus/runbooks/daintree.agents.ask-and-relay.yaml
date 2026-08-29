@@ -1,0 +1,353 @@
+# Training examples whose answer is `daintree.agents.ask-and-relay` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.ask-and-relay
+run: pre-split
+positives:
+  - ask claude what it makes of the retry logic in the provider adapter
+  - get an agent to look at the auth middleware and tell me what it finds
+  - can you spin up codex read-only and ask it whether our token bucket is actually thread safe? i just want to hear what it says, nothing changed on disk
+  - spawn something to check whether the state token codec handles clock skew and report back
+  - 'one agent, one question: is fail-open on the selector the right call? bring me the answer'
+  - ask gemini somehting about the caching layer and tell me what it comes back with
+  - could you get an agent to read services/chat_orchestrator.py and give me its honest take on how big _prepare_inner has gotten?
+  - ask an agent a question — you pick it, something small and safe, i just want to see the round trip work
+  - do the same thing but ask it about the selector prompt instead
+  - have claude code take a look at the docs mcp client and tell me if it spots anything off. read only, dont let it touch files
+  - ask codex about it
+  - i want a second opinion from an agent on whether three active runbooks is the right cap — spawn one, ask, relay whatever it says
+  - get claude's take on the provider routing policy please
+  - spawn a read only explore agent in the backend worktree and ask it how the cache affinity session id is threaded through, then summarise its reply
+  - quick one — pop open an agent and ask what python version we're pinned to
+  - need an agent's read on the prompt assembly order. spawn, ask, relay.
+  - ask one of the configured agents what it would name this module and just give me the answer
+  - is there a way to get an agent to check if there's a race in the speculation handshake and just report back? i dont want it fixing anything
+  - ask claude whether the awaitAll retry loop is correct. i want its verdict not a patch
+  - 'put a question to one of the agents for me: does the golden snapshot flow make sense as written? want its answer this turn, not later'
+  - ask an agent whats it think of our naming in the runbooks dir
+  - spawn an agent, ask it to explain what this repo does in one paragraph, relay it verbatim
+  - can you ask something read-only to confirm the coverage floors actually ratchet and tell me what it found?
+  - get one of them to look at that file and tell me what it reckons
+  - ask codex if the backoff in providers/openrouter.py is actually exponential
+  - spin up gpt-whatsit, the fast one, and ask it why we have two config loaders. dont let it touch anything, just tell me what it says
+  - Could you get a single agent to read through the migration scripts and tell me whether any of them are non-idempotent? Read-only, I just want its answer.
+  - ask claude about that one
+  - ask claude code where the rate limiting lives and paste me what it says
+  - spwan an agnet and ask it wat the deal is wiht the sesion token expiry
+  - spawn something read-only and ask it whatever you think is worth asking about this codebase, curious what it comes back with
+  - in the auth-refactor worktree, ask an agent whether the new middleware is actually wired into the router. just the answer please
+  - the flaky test thing again. dont fix anything — get one agent to look and just tell me what it reckons is going on
+  - prod is behaving weird — quick, spawn an agent and ask it if the pool size changed in the last few commits. need the answer now
+  - so ive been staring at this scheduler for an hour and i dont trust my own reading of it any more. can you fire up one of the agents, read only, and just ask it whether the tick loop can double fire if the timer resets mid flight? i literally only want its answer, nothing touched
+  - get an agent's take on the error mapping and give me its exact wording, not a summary
+  - ask claude what it'd pick between SSE and websockets for our streaming and relay the answer
+  - i think the cache key includes the catalog revision. spawn an agent, ask it to confirm, one line back
+  - ask claude what it thinks of my diff and just tell me what it said
+  - just ask one agent, dont set a watcher or anything, ill sit here
+  - 'codex: does turn_accounting double count usage on a retry? spawn it and report back'
+  - spawn something and ask which package is pulling in lodash
+  - ask one of the agents, doesnt matter which, whether pnpm or bun makes more sense here
+  - ok now ask a fresh agent the same thing and see if it agrees with you
+  - open a claude terminal on the websocket client, ask it if the reconnect has backoff, then close it out — nothing gets changed
+  - ask an agent about the queue.resolve path
+  - get an agent to skim the docs mcp module and give me the gist of how the timeout works
+  - 'ask an agent to read the code behind #412 and tell me whether the fix is really in there'
+  - 'One agent, read-only, single question: is the selector call cached per catalog revision or per session? Report back with whatever it says.'
+  - get sonnet-mini to look at the state codec and tell me if the token is signed or just encoded
+  - theres no agent up yet is there? spawn one and ask it whether we still need the legacy adapter
+  - cba to read this whole file. get an agent to read it and report back what it does
+boundaries:
+  - query: ask an agent what it makes of the retry backoff and tell me what it says
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: ask an agent whether that bug is even reproducible before i write it up
+    confusable_with: [daintree.forge.manage-issue]
+  - query: ask codex what it makes of our hydration approach and tell me what it says
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Ask one read-only agent whether this issue description is clear and relay its opinion.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Ask one agent where the retry policy is implemented and relay the answer.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Ask one read-only agent what the frontend package does and relay its answer.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: spin up an agent to review the retry logic and relay what it says back to me
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: get something to look over the payments module and report its verdict
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: ask claude what it makes of the reviewer's second finding and tell me
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: ask claude what it makes of the retry logic and tell me what it says
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: 'spawn something to answer a question for me: where does the rate limiting actually live?'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: get an agent to look at the migration and come back with whether it's safe
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: get an agent to look at the auth module and report back what it finds
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spawn codex read-only, ask if this migration is safe, relay the answer to me
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: ask claude in tab 3 how the retry logic works and tell me what it says
+    confusable_with: [daintree.explore.repository]
+  - query: get codex to explain the migration system and bring back what it reckons
+    confusable_with: [daintree.explore.repository]
+  - query: spawn an agent to check whether we still use redis anywhere and tell me
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: get an agent to look at the migration and report back what it finds
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: ask claude what it makes of the retry logic
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: ask claude what it makes of the retry logic and relay the answer back to me
+    confusable_with: [daintree.orchestration.conversation]
+  - query: spawn something read-only to look at the auth module and tell me what it says
+    confusable_with: [daintree.orchestration.conversation]
+  - query: just pass one question to that agent for me and bring back what it says
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get an agent to look at the caching layer and report back what it thinks
+    confusable_with: [daintree.review.review-change]
+  - query: spawn something to interrogate the auth module and report back what it finds
+    confusable_with: [daintree.orchestration.interview]
+  - query: ask an agent to summarise the payments module and tell me what it says
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: ask claude what it makes of the migration script
+    confusable_with: [daintree.explore.repository]
+  - query: get codex to look at the scheduler and tell me what it thinks
+    confusable_with: [daintree.explore.repository]
+  - query: spawn gemini read-only, ask it whether our error handling is sane, bring the answer back
+    confusable_with: [daintree.explore.repository]
+  - query: spawn one agent, ask it whether the migration is safe, and relay its answer back to me
+    confusable_with: [daintree.orchestration.conversation]
+  - query: have a quick chat with claude about whether we still need the cache layer and tell me its take
+    confusable_with: [daintree.orchestration.conversation]
+  - query: get an agent talking about the auth module and report what it says back to me
+    confusable_with: [daintree.orchestration.conversation]
+  - query: ask claude which of our caching approaches it likes best and tell me what it says
+    confusable_with: [daintree.orchestration.competition]
+  - query: spawn a reviewer and tell me what it thinks of this diff
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: get an agent to look at the retry logic and report back what it finds
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: ask codex whether that review was fair
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: spin up an agent and ask it whether the retry logic is safe, then tell me what it says
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: 'get claude to look at the connection pool and answer this for me: does it leak sockets under load?'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: ask an agent what the deploy script actually does and report back
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: spawn one read-only agent to check whether the migration is reversible and relay the answer back
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get an opinion from codex on this function
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: spawn something read only to tell me whether the retry logic is exponential, just report the answer back
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: get an agent to look at the auth module and tell me what it makes of it, nothing changed
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: spawn something to give me a second opinion on that winning entry
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: ask claude which argument in this thread it thinks is weakest and tell me what it says
+    confusable_with: [daintree.orchestration.debate-elimination]
+  - query: ask claude which of these three approaches it'd pick and tell me what it says
+    confusable_with: [daintree.orchestration.interview]
+  - query: have one agent look at the three implementations on those branches and tell me which is best
+    confusable_with: [daintree.orchestration.interview]
+  - query: ask the claude in tab 2 what it makes of the diff and just tell me what it says
+    confusable_with: [daintree.review.review-change]
+  - query: spawn one read-only agent to look over the diff and tell me what it says back
+    confusable_with: [daintree.review.review-change]
+  - query: get gpt to have a quick look at the change and relay whatever it comes back with
+    confusable_with: [daintree.review.review-change]
+followups:
+  - query: hows it going
+    history:
+      - 'user: ask claude what it makes of the retry logic in the provider adapter'
+      - 'assistant: Confirmed — spawning a read-only Claude Code agent in explore mode with that question. Waiting on it now.'
+    active: [daintree.agents.ask-and-relay]
+  - query: still waiting?
+    history:
+      - 'user: spawn something read-only to check whether the state token handles clock skew and report back'
+      - 'assistant: Launched agent "skew-check" (terminal t-4b) in explore mode. Awaiting its answer.'
+    active: [daintree.agents.ask-and-relay]
+  - query: just tell it yes
+    history:
+      - 'user: get an agent to look at the auth middleware and tell me what it finds'
+      - 'assistant: Agent spawned on terminal t-9. It''s asking whether it should include the test files in scope.'
+    active: [daintree.agents.ask-and-relay]
+  - query: did it say anything about the refill interval specifically
+    history:
+      - 'user: ask codex whether our token bucket is thread safe'
+      - 'assistant: Codex says it is not — the refill path reads and writes `tokens` without holding the lock, so two concurrent takes can both succeed. (agent: codex, terminal t-2)'
+    active: [daintree.agents.ask-and-relay]
+  - query: give me its exact wording, not the summary
+    history:
+      - 'user: ask claude what it thinks of the prompt assembly order'
+      - 'assistant: Relayed: Claude flags the trailing injected-context block as the only volatile row and says the ordering looks deliberate. (terminal t-7)'
+    active: [daintree.agents.ask-and-relay]
+  - query: nice. now same question but for the speculation path
+    history:
+      - 'user: spawn an agent and ask it how the docs mcp lookup is wired'
+      - 'assistant: Done — agent on terminal t-3 answered: the orchestrator calls the MCP directly with one stateless tools/call, no initialize handshake.'
+    active: [daintree.agents.ask-and-relay]
+  - query: which agent did you end up using?
+    history:
+      - 'user: ask an agent whether the coverage floors actually ratchet'
+      - 'assistant: Spawned a read-only agent (terminal t-11). It''s still working — I''ll re-await it.'
+    active: [daintree.agents.ask-and-relay]
+  - query: yeah ask it the same thing about the selector cadence
+    history:
+      - 'user: get claude''s take on the provider routing policy'
+      - 'assistant: Claude''s answer, relayed: one policy for every call, throughput-sorted with a latency floor; it thinks the latency_critical flag is the only sensible exception. (terminal t-6)'
+      - 'user: ok good'
+      - 'assistant: Anything else you want asked while that terminal is still open?'
+    active: [daintree.agents.ask-and-relay]
+topic_shifts:
+  - query: just get claude-2 on its own to look at cache.py and tell me if the locking is safe
+    history:
+      - 'user: poll the fleet on whether the cache should be write through'
+      - 'assistant: 3 write-through, 1 write-back, 1 abstained. Consensus is write-through.'
+    active: [daintree.agents.poll-pinned-agents]
+  - query: now the asking bit
+    history:
+      - 'user: we need the worktree made and then an agent asked about the schema'
+      - 'assistant: Worktree ../repo-schema created off develop for branch spike/schema. Nothing launched into it.'
+    active: [daintree.worktree.create-plain-worktree]
+  - query: ask it what it would change
+    history:
+      - 'user: ask claude about the retry logic'
+      - 'assistant: It says the jitter lands after the cap.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: different thing - get an agent to look at the rate limiter and tell me what it makes of it
+    history:
+      - 'user: where were we on the queue work'
+      - 'assistant: Branch feat/queue-backoff is pushed, PR #388 open, review pending. Nothing running locally.'
+    active: [daintree.orchestration.status-and-resume]
+  - query: have an agent look at the encoder and tell me what it thinks of the buffer reuse
+    history:
+      - 'user: focus terminal 2'
+      - 'assistant: Focused.'
+    active: [daintree.foundation]
+  - query: quick thing — is read-only actually enforced or is it just a prompt?
+    history:
+      - 'user: ask claude what it makes of the retry logic'
+      - 'assistant: Read-only agent spawned with the question. Waiting on its answer.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: ask claude what it thinks of the retry logic — and remind me whether that costs me credit
+    history:
+      - 'user: hmm'
+      - 'assistant: Go on.'
+  - query: get claude to look at the invoice rounding and tell me if its right
+    history:
+      - 'user: im new here, give me a tour of the billing module'
+      - 'assistant: pricing, invoice and dunning, with the store interface at the package root.'
+      - 'user: how much of that looks like dead code to you'
+      - 'assistant: dunning/legacy.go has no callers outside its own tests, and two exported helpers in pricing are unreferenced.'
+    active: [daintree.explore.repository]
+  - query: what did it say about the tax lines exactly
+    history:
+      - 'user: how much of that looks like dead code to you'
+      - 'assistant: dunning/legacy.go looks unreferenced, plus two pricing helpers.'
+      - 'user: get claude to look at the invoice rounding and tell me if its right'
+      - 'assistant: Asked a read-only agent. It says rounding is applied per line item then summed, which matches the spec, but tax is rounded a second time at the total.'
+    active: [daintree.agents.ask-and-relay]
+  - ask claude in tab 2 what it makes of the retry logic
+  - quick one - ask the codex agent if the selector prompt is too long
+  - query: one sec — get an agent to look at the config loader and tell me if theres a race in there
+    history:
+      - 'user: take 88 90 and 93 and put an agent on each'
+      - 'assistant: Three independent units — worktrees and one agent each, go?'
+      - 'user: yeah go, all three'
+      - 'assistant: Three worktrees created, an agent running /work in each, background supervisors attached to all of them.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+  - query: what did it come back with
+    history:
+      - 'user: can you make me a new recipe that runs the tests on open too'
+      - 'assistant: Can''t author recipes. I can list, run, or create a worktree with one.'
+      - 'user: meh ok. review the branch, and get an agent to tell me what it makes of the caching approach while you''re at it'
+      - 'assistant: Review: 4 findings, one high (the cache key omits the catalog revision). The read-only agent''s take on the approach is below.'
+    active: [daintree.review.review-change, daintree.agents.ask-and-relay, daintree.foundation]
+  - query: ok. ask claude what it makes of the mutex usage in there, just want its read
+    history:
+      - 'user: intermittent panic in the queue worker, help me scope it'
+      - 'assistant: Panic is at queue/worker.go:212, nil deref on job.Result. Two paths reach it, both through the retry loop.'
+    active: [daintree.explore.repository, daintree.foundation]
+  - query: spawn something read only to tell me whether 512 is going to conflict with the billing branch
+    history:
+      - 'user: did it get a worktree'
+      - 'assistant: Yes, ../wt-512 on branch issue-512-migration.'
+      - 'user: cancel that async wait i left on the judge terminal'
+      - 'assistant: Cancelled the async wait on the judge.'
+    active: [daintree.foundation]
+  - ask claude what it makes of the caching layer and tell me what it says
+  - ask claude what it makes of the new retry code and just tell me what it says
+  - there's no competition here and nobody is judging anything. ask claude-2 what it makes of the backoff logic and tell me what it says.
+  - ask an agent what it makes of the queue backpressure and tell me what it says
+  - query: ask claude what it makes of that final diff
+    history:
+      - 'user: have an agent fix the parser bug'
+      - 'assistant: Agent in t_5000, watching it.'
+      - 'user: [watcher fired: t_5000 exited 0]'
+      - 'assistant: Fixed - the lexer was swallowing escaped quotes. Patch is on fix/parser with a test.'
+    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+  - query: ask an agent whats it think of our naming in the runbooks dir
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: ask gemini somehting about the caching layer and tell me what it comes back with
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: spawn something read-only and ask it whatever you think is worth asking about this codebase, curious what it comes back with
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+  - query: get an agent's take on the error mapping and give me its exact wording, not a summary
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: theres no agent up yet is there? spawn one and ask it whether we still need the legacy adapter
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+  - query: spin up gpt-whatsit, the fast one, and ask it why we have two config loaders. dont let it touch anything, just tell me what it says
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+  - query: prod is behaving weird — quick, spawn an agent and ask it if the pool size changed in the last few commits. need the answer now
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: the flaky test thing again. dont fix anything — get one agent to look and just tell me what it reckons is going on
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: ask an agent a question — you pick it, something small and safe, i just want to see the round trip work
+    history:
+      - 'user: yo'
+      - 'assistant: Yo. What are we doing?'
+  - query: ask one of the agents, doesnt matter which, whether pnpm or bun makes more sense here
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: ask claude what it'd pick between SSE and websockets for our streaming and relay the answer
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+wakes:
+  - query: '[agent a_3021 completed]'
+    history:
+      - 'user: ask claude what it makes of the new retry code'
+      - 'assistant: Spawned a read-only agent in t_3021 with the question. Waiting on its answer.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+  - query: '[wake: t_4455 exited without producing an answer]'
+    history:
+      - 'user: get an agent to look at the migration script and tell me if its safe'
+      - 'assistant: Read-only agent up in t_4455 with that exact question. I''ll relay its answer once it lands.'
+    active: [daintree.agents.ask-and-relay, daintree.foundation]
+docs:
+  - yep ask it
+  - query: yep ask it
+    history:
+      - 'user: hi'
+      - 'assistant: Hi — ready when you are.'
+foundation_boundaries:
+  - ask an agent what it makes of the auth module
