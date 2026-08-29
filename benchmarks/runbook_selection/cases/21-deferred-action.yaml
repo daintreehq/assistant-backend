@@ -1,0 +1,80 @@
+# Deferred action: the user asks for something to happen at a stated later time,
+# and the assistant must SCHEDULE it rather than do it now.
+#
+# These exist because the assistant used to refuse this outright. watch-outcome
+# claimed a one-shot timer revokes its own grants before dispatch and therefore
+# could never perform a confirm-required action unattended. That stopped being
+# true in assistant@eef6a6e, which defers the revoke past the dispatch precisely
+# so the fire can spend the grant it was minted for
+# (internal/daemon/scheduler_grant_order_test.go pins it). The runbook kept
+# saying it for another two weeks, so the model kept downgrading real scheduled
+# work to an "enqueue" reminder that provably never runs anything.
+#
+# The boundary being defended is watch-outcome vs edits.spawn-visible-agent:
+# a delayed spawn is a SCHEDULED action, not an immediate one.
+cases:
+  - id: deferred-send-to-existing-terminal
+    category: single-runbook
+    note: >-
+      The plainest form of the capability: an existing terminal, a stated delay, and an
+      explicit "not now". The deliverable is a timer carrying a call_safe_tool payload
+      plus a grant, which is watch-outcome's job. Nothing is being spawned and nothing
+      is being watched for a verdict, so neither spawn-visible-agent nor a terminal
+      watcher is the answer.
+    messages:
+      - role: user
+        content: >-
+          Give it half an hour, then send 'npm run build' to the build terminal.
+          Don't do it now, the deploy is still going.
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: clock-time-kickoff-is-deferred-work
+    category: single-runbook
+    note: >-
+      A wall-clock start time with nobody present. "Without me" is the unattended
+      signal that makes the grant load-bearing, and there is no terminal to observe
+      yet, so this is branch (e) of watch-outcome (work that starts later), not a
+      watcher and not a reminder.
+    messages:
+      - role: user
+        content: >-
+          At 6pm, kick off the nightly deploy check without me. I won't be at my desk.
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: deferred-spawn-is-not-an-immediate-spawn
+    category: routing-trap
+    note: >-
+      THE case this file exists for. Every content word here ("spawn", "agent",
+      "run the tests") is spawn-visible-agent's home vocabulary, and the only thing
+      that makes it watch-outcome's is the time shift. The deliverable is a timer
+      whose call_safe_tool payload spawns AT fire time, not an agent started now, so
+      spawn-visible-agent is excluded from required AND optional. This is the exact
+      failure a user reported: asked to wait ten minutes and then spawn a terminal,
+      the assistant spawned it immediately.
+    messages:
+      - role: user
+        content: >-
+          In ten minutes, spawn a terminal and run the tests. I'm stepping out.
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: immediate-spawn-is-not-deferred-work
+    category: routing-trap
+    note: >-
+      The reverse fence, and the reason it is here rather than assumed. Widening
+      watch-outcome's whenToUse to claim deferred spawns risks it stealing ordinary
+      immediate ones. Same vocabulary as the case above with the time shift removed,
+      so the answer must flip back: spawn NOW, and watch-outcome excluded from
+      required and optional.
+    messages:
+      - role: user
+        content: >-
+          Spawn an agent on the payments worktree and have it run the full test suite.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
