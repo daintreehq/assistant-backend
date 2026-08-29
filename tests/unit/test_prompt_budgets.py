@@ -112,7 +112,27 @@ from daintree_assistant_server.runbooks.catalog import load_catalog
 # `40-communication.md` ceiling below — withdrawing the opening-clause permission
 # now that the fast-response stage runs on every eligible turn. The whole increase
 # is that one rule; nothing else grew. See the per-partial note for the argument.
-BASE_PROMPT_CEILING = 26112
+#
+# RAISED 26112 -> 26368 B, for ONE new rule in `20-tool-discipline.md`: a delay the
+# user asked for is part of the goal.
+#
+#   What behaviour needs this?  A request to act after a stated wait was answered by
+#   acting immediately, and then by reporting the wait as having happened. The
+#   correction has to fire on a ZERO-RUNBOOK turn — the incident had no runbook
+#   loaded — so a runbook cannot own it and `daintree.orchestration.watch-outcome`
+#   (which does own the mechanism) is not reached in time to help.
+#
+#   Why here rather than the hard rules?  It is turn mechanics: it says what to do
+#   with a delay, not what is permitted. It sits directly under the "no reliable
+#   clock" bullet, which is the other half of the same subject and its only
+#   plausible alternative owner.
+#
+#   What it cost: 176 B for the new bullet, less 33 B recovered by tightening the
+#   Supervision bullet in the same file (a refused unattended call is refused ON THE
+#   SPOT; the pending-approval item authorizes future fires and replays nothing).
+#   26166 B measured against a 26368 B ceiling — the same ~200 B of slack the 26112 B
+#   ceiling carried, so this stays a ratchet rather than a raised roof.
+BASE_PROMPT_CEILING = 26368
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is
