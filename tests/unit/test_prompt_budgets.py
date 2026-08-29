@@ -127,11 +127,17 @@ from daintree_assistant_server.runbooks.catalog import load_catalog
 #   clock" bullet, which is the other half of the same subject and its only
 #   plausible alternative owner.
 #
-#   What it cost: 176 B for the new bullet, less 33 B recovered by tightening the
-#   Supervision bullet in the same file (a refused unattended call is refused ON THE
-#   SPOT; the pending-approval item authorizes future fires and replays nothing).
-#   26183 B measured against a 26368 B ceiling — the same ~185 B of slack the 26112 B
-#   ceiling carried, so this stays a ratchet rather than a raised roof.
+#   What it cost: 266 B, and NOTHING was recovered. 184 B is the new bullet with its
+#   newline; the other 82 B is the Supervision bullet in the same file GROWING
+#   (502 -> 584 B) to say what a refused unattended call actually does — it is
+#   refused ON THE SPOT and nothing replays it, and the pending-approval item it
+#   leaves authorizes FUTURE fires rather than that call. That correction spends
+#   bytes, it does not save them. 20-tool-discipline.md moves 9403 -> 9669 B against
+#   its unchanged 10 KiB per-partial ceiling.
+#
+#   Why it is still a ratchet: 26183 B measured leaves 185 B of slack under the
+#   26368 B ceiling, where the 26112 B ceiling carried 195 B. The ceiling ends
+#   TIGHTER against its content than it started, not looser.
 BASE_PROMPT_CEILING = 26368
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
