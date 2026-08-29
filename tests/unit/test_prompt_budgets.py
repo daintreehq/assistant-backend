@@ -130,7 +130,7 @@ from daintree_assistant_server.runbooks.catalog import load_catalog
 #   What it cost: 176 B for the new bullet, less 33 B recovered by tightening the
 #   Supervision bullet in the same file (a refused unattended call is refused ON THE
 #   SPOT; the pending-approval item authorizes future fires and replays nothing).
-#   26166 B measured against a 26368 B ceiling — the same ~200 B of slack the 26112 B
+#   26183 B measured against a 26368 B ceiling — the same ~185 B of slack the 26112 B
 #   ceiling carried, so this stays a ratchet rather than a raised roof.
 BASE_PROMPT_CEILING = 26368
 
