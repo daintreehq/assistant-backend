@@ -113,7 +113,15 @@ class AgentSnapshot(BaseModel):
 
 
 class AgentRosterSnapshot(BaseModel):
-    """A successful agent-registry read, including its completeness markers."""
+    """A successful agent-registry read, including its completeness markers.
+
+    ``default_agent_id`` is the user's explicit default-agent setting;
+    ``resolved_default_agent_id`` is the agent Daintree would actually launch when a
+    caller names none, which differs when there is no explicit pick or the pick's CLI
+    is not currently launchable.  They sit on the roster rather than on a row because
+    the client drops whole rows once its catalog budget is spent, and a default carried
+    on the dropped row would vanish exactly when the catalog is large.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -121,6 +129,8 @@ class AgentRosterSnapshot(BaseModel):
     complete: bool = False
     availability_complete: bool = False
     total_count: int = Field(default=0, ge=0)
+    default_agent_id: str | None = Field(default=None, max_length=16384)
+    resolved_default_agent_id: str | None = Field(default=None, max_length=16384)
 
 
 class StartupContext(BaseModel):

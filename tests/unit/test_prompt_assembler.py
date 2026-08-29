@@ -410,6 +410,102 @@ def test_agent_roster_omits_whole_over_budget_rows_without_truncating_ids() -> N
     assert "1 agent row(s) omitted" in rendered
 
 
+def test_default_agent_is_stated_and_marked_on_its_row(assembler: PromptAssembler) -> None:
+    rendered = assembler.render_startup_context(
+        StartupContext(
+            agent_roster=AgentRosterSnapshot(
+                agents=[
+                    AgentSnapshot(id="claude", source="built-in", toolbar_visible=True),
+                    AgentSnapshot(id="codex", source="built-in", toolbar_visible=False),
+                ],
+                complete=True,
+                total_count=2,
+                default_agent_id="codex",
+                resolved_default_agent_id="codex",
+            )
+        )
+    )
+    assert 'The user\'s default agent is "codex"' in rendered
+    # The row carries it too, so skimming the catalog answers the question.
+    codex_row = next(
+        line for line in rendered.splitlines() if line.startswith("- id") and '"codex"' in line
+    )
+    assert "the user's default agent" in codex_row
+    # A default that is not on the toolbar is still the default.
+    assert "not in main toolbar" in codex_row
+
+
+def test_unlaunchable_default_reports_both_the_pick_and_the_substitute(
+    assembler: PromptAssembler,
+) -> None:
+    rendered = assembler.render_startup_context(
+        StartupContext(
+            agent_roster=AgentRosterSnapshot(
+                agents=[
+                    AgentSnapshot(id="claude", source="built-in", launchable=True),
+                    AgentSnapshot(id="codex", source="built-in", launchable=False),
+                ],
+                complete=True,
+                total_count=2,
+                default_agent_id="codex",
+                resolved_default_agent_id="claude",
+            )
+        )
+    )
+    assert '"codex", but it is not currently launchable' in rendered
+    assert 'Daintree would launch "claude" instead' in rendered
+
+
+def test_no_configured_default_reports_the_first_available_agent(
+    assembler: PromptAssembler,
+) -> None:
+    rendered = assembler.render_startup_context(
+        StartupContext(
+            agent_roster=AgentRosterSnapshot(
+                agents=[AgentSnapshot(id="claude", source="built-in")],
+                complete=True,
+                total_count=1,
+                resolved_default_agent_id="claude",
+            )
+        )
+    )
+    assert "has set no default agent" in rendered
+    assert '"claude"' in rendered
+
+
+def test_roster_without_defaults_renders_no_default_line(assembler: PromptAssembler) -> None:
+    """An older client reports no default; the block must not invent one."""
+    rendered = assembler.render_startup_context(
+        StartupContext(
+            agent_roster=AgentRosterSnapshot(
+                agents=[AgentSnapshot(id="claude", source="built-in")],
+                complete=True,
+                total_count=1,
+            )
+        )
+    )
+    assert "default agent" not in rendered
+
+
+def test_default_agent_id_that_cannot_be_rendered_exactly_is_dropped(
+    assembler: PromptAssembler,
+) -> None:
+    """A repaired id would name a DIFFERENT agent, so it is reported as absent."""
+    rendered = assembler.render_startup_context(
+        StartupContext(
+            agent_roster=AgentRosterSnapshot(
+                agents=[AgentSnapshot(id="claude", source="built-in")],
+                complete=True,
+                total_count=1,
+                default_agent_id="cod\nex",
+                resolved_default_agent_id="claude",
+            )
+        )
+    )
+    assert "cod ex" not in rendered
+    assert "has set no default agent" in rendered
+
+
 def test_tool_projection(assembler: PromptAssembler) -> None:
     req = _req(tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}])
     pr = assembler.build_main_request(

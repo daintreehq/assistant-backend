@@ -283,7 +283,21 @@ class PromptAssembler:
     # ---- prompt fragment rendering --------------------------------------
 
     @staticmethod
-    def _startup_agent_row(agent: AgentSnapshot) -> str:
+    def _exact_agent_id(value: str | None) -> str:
+        """Return an agent id only when it survives sanitizing byte-for-byte.
+
+        Truncating or rewriting an identifier would name a DIFFERENT agent, which the
+        model would then pass to ``agent.launch`` as the user's default. An id that
+        cannot be represented exactly is therefore dropped: "no default reported"
+        degrades safely, "the wrong default" does not.
+        """
+        if not value:
+            return ""
+        sanitized = sanitize_line(value, 512)
+        return sanitized if sanitized == value.strip() else ""
+
+    @staticmethod
+    def _startup_agent_row(agent: AgentSnapshot, default_labels: dict[str, str]) -> str:
         """Render one complete agent row without ever truncating its exact id."""
         quoted_id = json.dumps(agent.id, ensure_ascii=False)
         display_name = sanitize_line(agent.display_name, 512)
@@ -321,6 +335,9 @@ class PromptAssembler:
             row += " (explicitly pinned)"
         elif agent.pinned is False:
             row += " (explicitly hidden)"
+        label = default_labels.get(agent.id)
+        if label:
+            row += f" · {label}"
         return row
 
     def render_startup_context(self, startup: StartupContext) -> str:
@@ -361,12 +378,25 @@ class PromptAssembler:
         roster: dict[str, Any] | None = None
         if startup.agent_roster is not None:
             roster_src = startup.agent_roster
+            configured = self._exact_agent_id(roster_src.default_agent_id)
+            resolved = self._exact_agent_id(roster_src.resolved_default_agent_id)
+            # The row marker and the note below are two views of the SAME two ids, so a
+            # reader who only skims the catalog still sees which agent is the default.
+            default_labels: dict[str, str] = {}
+            if configured:
+                default_labels[configured] = "the user's default agent"
+            if resolved and resolved != configured:
+                default_labels[resolved] = (
+                    "launched when no agent is named"
+                    if not configured
+                    else "launched instead, while the default is unavailable"
+                )
             rows: list[str] = []
             used = 0
             for agent in roster_src.agents[: self.settings.cap_startup_agents]:
                 if not agent.id.strip():
                     continue
-                row = self._startup_agent_row(agent)
+                row = self._startup_agent_row(agent, default_labels)
                 cost = utf8_len(row) + 1
                 if used + cost > self.settings.cap_startup_agent_bytes:
                     continue
@@ -383,10 +413,38 @@ class PromptAssembler:
             if not roster_src.availability_complete:
                 summary += "; one or more availability states are unknown"
             summary += "."
+            # State the default in full even when its row was dropped by the catalog
+            # budget, and never let one id stand in for the other: the configured pick is
+            # what the user chose, the resolved id is what a launch actually gets, and the
+            # gap between them is a fact the user needs said out loud. Ids are JSON-quoted
+            # for the same reason the rows quote them — they are launch identifiers the
+            # model passes back verbatim, not prose.
+            quoted_configured = json.dumps(configured, ensure_ascii=False)
+            quoted_resolved = json.dumps(resolved, ensure_ascii=False)
+            default_note = ""
+            if configured and resolved and configured != resolved:
+                default_note = (
+                    f"The user's default agent is {quoted_configured}, but it is not "
+                    f"currently launchable, so Daintree would launch {quoted_resolved} "
+                    f"instead. Use {quoted_resolved} when no agent is named and say that "
+                    f"you substituted it."
+                )
+            elif configured:
+                default_note = (
+                    f"The user's default agent is {quoted_configured}. Launch it whenever "
+                    f"they ask for work to be done without naming an agent."
+                )
+            elif resolved:
+                default_note = (
+                    f"The user has set no default agent, so Daintree falls through to the "
+                    f"first available one, currently {quoted_resolved}. Use it when no "
+                    f"agent is named."
+                )
             roster = {
                 "rows": rows,
                 "summary": summary,
                 "omitted": max(0, total - len(rows)),
+                "default_note": default_note,
             }
 
         project_instructions = frame_data_block(
