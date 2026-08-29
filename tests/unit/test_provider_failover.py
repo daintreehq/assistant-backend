@@ -1041,6 +1041,60 @@ async def test_an_abandoned_stream_is_evidence_of_nothing() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_completed_fallback_stream_says_nothing_about_the_primary() -> None:
+    """The fallback finishing is evidence about the FALLBACK.
+
+    While the breaker is open the primary is not called at all, so a clean
+    termination on the second host is a generation the first one had no part in.
+    Crediting it would close the breaker on the strength of a turn that never
+    touched the failing host — and every subsequent turn would then re-enter the
+    outage to discover it is still there, which is the cost the breaker exists to
+    stop paying.
+    """
+    clock = _Clock()
+    primary, fallback, provider = _pair(clock)
+    primary.error = upstream_unavailable()
+    for _ in range(EXECUTOR_FALLBACK_FAILURE_THRESHOLD):
+        await provider.complete(_request())
+    assert provider.health.is_open is True
+
+    stream = await provider.open_stream(_request())
+    assert primary.stream_requests == [], "the breaker is open; the primary must be skipped"
+    async for _ in stream:
+        pass
+
+    assert provider.health.is_open is True
+    assert provider.health.consecutive_failures == EXECUTOR_FALLBACK_FAILURE_THRESHOLD
+
+
+@pytest.mark.asyncio
+async def test_a_late_request_fault_is_not_held_against_the_primary() -> None:
+    """A bad body fails identically on both hosts.
+
+    Mid-generation breaks are the one place a request fault can still surface, and
+    counting one would open the breaker over a defect in what this server sent —
+    moving every turn onto a second host that is about to reject the same bytes.
+    The turn stays terminal, as any post-first-frame failure does; only the
+    VERDICT about the host is withheld.
+    """
+    primary, fallback, provider = _pair()
+    for _ in range(EXECUTOR_FALLBACK_FAILURE_THRESHOLD):
+        primary.stream = _Stream(
+            [{"choices": [{"delta": {"content": "a"}}]}],
+            iter_error=upstream_request_rejected("bad body"),
+        )
+        stream = await provider.open_stream(_request())
+        await stream.prefetch_first_event()
+        with pytest.raises(DaintreeError) as caught:
+            await stream.__anext__()
+        assert caught.value.code == "upstream_request_rejected"
+
+    assert fallback.stream_requests == [], "a request fault must not be replayed elsewhere"
+    assert provider.health.consecutive_failures == 0
+    assert provider.health.is_open is False
+
+
+@pytest.mark.asyncio
 async def test_a_second_prefetch_is_not_a_second_chance_at_failover() -> None:
     """By then the first event has been forwarded, so handing off would replay a
     turn whose content the user has already seen."""
@@ -1170,6 +1224,26 @@ async def test_a_skipped_primary_does_not_make_the_cost_unknown() -> None:
 async def test_an_ordinary_turn_reports_a_complete_cost() -> None:
     primary, fallback, provider = _pair()
     result = await provider.complete(_request())
+    assert result.usage.cost_complete is True
+
+
+@pytest.mark.asyncio
+async def test_a_forced_tool_call_on_the_primary_reports_a_complete_cost() -> None:
+    """The mirror of the failed-over case, and the reason `cost_complete` means
+    anything.
+
+    Nothing was abandoned on this turn, so there is no unreported prefill and the
+    number the host gave is the whole of it. A wrapper that marked every tool call
+    incomplete — the easy way to make the failover case pass — would flatten the
+    flag to a constant and the accounting chain would stop being able to tell a
+    partial sum from an exact one on the path where it matters.
+    """
+    primary, fallback, provider = _pair()
+    result = await provider.structured_tool_call(
+        _request(), function_name="pick", function_schema={"type": "object"}
+    )
+    assert result.endpoint == "primary"
+    assert fallback.requests == []
     assert result.usage.cost_complete is True
 
 
