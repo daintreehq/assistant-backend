@@ -104,21 +104,21 @@ THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWh
 1. `timer.schedule` with a `call_safe_tool` payload naming the ONE tool that does the work — `agentTask.spawnForEdits` to start an agent, `terminal.sendCommand` to drive a terminal that already exists. Use `delayMs`. Read the `timerId` off the result.
 2. `grant.create {"actorType":"timer","actorId":"<that tmr_… id>","allowedToolNames":["agentTask.spawnForEdits"],"ttlMs":<the wait plus a margin>,"maxUses":1}` — scoped to exactly the tool the payload names, with `maxUses` matching the fires you actually expect (1 for a one-shot).
 
-   The TTL runs from NOW, not from the fire, so it has to cover the delay plus any lateness (the scheduler ticks every few seconds, and a project with no scheduler running catches up only when one next starts). And do not use this shape for a delay of a few seconds: the timer can fire before the grant lands, and `grant.create` does not check that its actor still exists, so you would be left holding a live grant for a timer that has already gone.
+   The TTL runs from NOW, not from the fire, so cover the delay plus lateness (a project with no scheduler running catches up only when one next starts). Do not use this shape for a few-seconds delay: the timer can fire before the grant lands, and `grant.create` does not check its actor still exists, leaving a live grant for a dead timer.
 
 At fire time the scheduler dispatches that tool as the timer actor, consumes the grant, and publishes the result to the attention queue. Nobody has to be present, and no model turn runs.
 
-It is ONE AT-MOST-ONCE ATTEMPT, not a guarantee. The timer is marked fired before the payload runs and is never rescheduled on failure, and the grant is consumed before the handler discovers it cannot work — so a fire that lands while Daintree is unreachable spends the grant, files an error, and does not retry when it comes back. Say "I have scheduled it", never "it will have run".
+It is ONE AT-MOST-ONCE ATTEMPT. The timer is marked fired before the payload runs and is never rescheduled on failure, and the grant is spent before the handler discovers it cannot work, so a fire landing while Daintree is unreachable burns the grant, files an error and does not retry. Say "I have scheduled it", never "it will have run".
 
-Miss step 2 and the fire is wasted: the dispatch comes back `CONFIRMATION_REQUIRED` and lands as a pending-approval inbox item, which is the same nothing-happened the user asked you to prevent. A `call_safe_tool` payload whose tool needs no confirmation (a read) needs no grant at all.
+Miss step 2 and the fire is wasted: the dispatch returns `CONFIRMATION_REQUIRED` and lands as a pending-approval item, the same nothing-happened the user asked you to prevent. A payload whose tool needs no confirmation (a read) needs no grant.
 
 Three things this does NOT do. Do not promise them:
 
-- **It does not WAKE you.** A timer's own event never triggers an autonomous turn, so the result waits in the inbox until someone looks — UNLESS the payload leaves a watcher behind (spawn with flat `watch:true` + `watchGoal`), whose completion IS a real wake. Watcher attachment is best-effort: a spawn can succeed with a `watcherWarning` and no `watcherId`, and nothing will tell you, so promise the wake only against an id you can see.
+- **It does not WAKE you.** A timer's own event never triggers an autonomous turn, so the result waits in the inbox — UNLESS the payload leaves a watcher (spawn with flat `watch:true` + `watchGoal`), whose completion IS a wake. Attachment is best-effort: a spawn can succeed with a `watcherWarning` and no `watcherId`, so promise the wake only against an id you can see.
 - **It runs ONE tool.** A multi-step sequence is not a timer payload. Make the one tool a spawn whose `taskPrompt` carries the whole job.
 - **It cannot exceed the tier, or reach the ungrantable names in step 3.** The tier gate is checked before any grant is looked up, so a grant never widens what the tier allows. Those still wait for the user, and saying so plainly is the honest answer.
 
-Still prefer starting NOW when the delay was really about not blocking the user: spawn with flat `watch:true` + `watchGoal` and an `acceptanceCriteria` contract, per step 1 — the user is free the moment you hand back. Reach for the timer when the delay is genuinely about the CLOCK, which is what "in ten minutes" and "at 6pm" mean.
+Still prefer starting NOW when the delay was only about not blocking the user: spawn with flat `watch:true` + `watchGoal` and an `acceptanceCriteria` contract, per step 1. Reach for the timer when the delay is about the CLOCK, which is what "in ten minutes" and "at 6pm" mean.
 
 Never pre-spawn an agent now to reserve a terminal id for later. It holds a worktree and burns its context idling, and it is the exact failure branch (e) exists to prevent.
 
