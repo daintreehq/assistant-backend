@@ -43,7 +43,12 @@ Procedure:
 3. Run or create. Both are mutating and will confirm; pass a requestKey when you can (Daintree dedupes on it and strips it before validation).
    - Apply a recipe to an EXISTING worktree -> recipe.run({ recipeId, arguments: { worktreeId? } }) ->
      { spawnedCount, failedCount, failedTerminals: [{ index, reason }] }.
-   - Create a NEW worktree AND run a startup recipe -> worktree.createWithRecipe({ arguments: { branchName?, baseBranch?, recipeId?, fromRemote?, useExistingBranch?, issueNumber? | pullRequestNumber?, assignToSelf? } }) ->
+   - Create a NEW worktree AND run a startup recipe -> worktree.createWithRecipe({ arguments: { source: {…}, recipeId? } }) ->
+     `source` is a DISCRIMINATED UNION on `kind` and names the creation mode; pick exactly one, and note each arm is strict, so a field borrowed from another arm is rejected outright rather than ignored:
+       `{"kind":"newBranch","branchName":"…"}` plus optional `baseBranch`, `fromRemote` (true when baseBranch names a remote like origin/develop), `collisionPolicy` ("suffix" default, or "error"), `issueNumber`, `assignToSelf`.
+       `{"kind":"existingBranch","branchName":"…"}` plus optional `issueNumber`, `assignToSelf` — checked out verbatim, never suffixed.
+       `{"kind":"pullRequest","pullRequestNumber":N}` — nothing else, and never a branch name beside it.
+     `recipeId` stays a TOP-LEVEL sibling of `source` inside `arguments`. The flat spelling (`branchName`/`baseBranch`/`useExistingBranch` at the top of `arguments`) is GONE; `useExistingBranch` no longer exists at all. ->
      { worktreeId, worktreePath, branch, recipeLaunched, spawnedTerminalCount, failedTerminalCount, assignedToSelf, assignedUsername, assignmentError }.
      (issueNumber and pullRequestNumber are mutually exclusive.) recipeLaunched is true iff ≥1 terminal spawned.
 

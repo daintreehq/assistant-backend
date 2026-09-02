@@ -25,10 +25,12 @@ Procedure:
 
 3. Settle every branch name and the base branch BEFORE mutating. One worktree per agent, named for what that agent is doing rather than for its index, so the roster stays readable. If the user says the names can be anything, choose them, state them once, and proceed. If the base is ambiguous, ask.
 
-4. Create the worktrees EMPTY. One `worktree.createWithRecipe` per agent carrying only `branchName` and `baseBranch` inside `arguments`, plus a `requestKey` so a retried timeout cannot create a second worktree.
+4. Create the worktrees EMPTY. One `worktree.createWithRecipe` per agent carrying only a `newBranch` source inside `arguments`, plus a `requestKey` so a retried timeout cannot create a second worktree.
 
        worktree.createWithRecipe({
-         "arguments": { "branchName": "<branch>", "baseBranch": "<base>" },
+         "arguments": {
+           "source": { "kind": "newBranch", "branchName": "<branch>", "baseBranch": "<base>" }
+         },
          "requestKey": "<stable-id-for-this-request>"
        })
 

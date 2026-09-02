@@ -25,7 +25,7 @@ Procedure:
 3. Settle the creation mode before mutating:
    - New branch off a local base: `branchName` plus its `baseBranch`.
    - New branch off a REMOTE base: the same, with `baseBranch` as the remote ref (`origin/main`) and `fromRemote: true`. `fromRemote` says the BASE is remote — it is not a switch for reusing a remote branch.
-   - Reusing an EXISTING branch is not verified through this path. `useExistingBranch` exists in the schema, but the action asks for an available branch name first and suffixes one that is taken, so the reuse then looks for a branch that does not exist. Do not offer it as a mode: report what the branch is already checked out in (step 2), or create a new branch and say so.
+   - Reusing an EXISTING branch IS supported, as its own mode: `source: {"kind":"existingBranch","branchName":"…"}` checks the branch out verbatim — never suffixed, and never silently replaced by a new branch when it is missing. (This used to be broken and this runbook used to say so: the old flat `useExistingBranch` resolved an available name FIRST, so asking to reuse `topic` produced `topic-2`, a branch that by construction did not exist. The discriminated `source` union fixed it. Offer the mode.) Still report what a branch is already checked out in (step 2) before reusing it, because a branch cannot be checked out in two worktrees at once.
    If the user says the name can be anything, choose one short sanitized branch name, state it, and proceed. If the base is ambiguous, ask rather than guessing.
 
 4. Make ONE typed call. It mutates project state, so the harness confirms it at the active tier — do not ask for approval yourself on top of that. Every worktree field belongs inside `arguments`; only an optional `requestKey` is a top-level sibling.
@@ -33,8 +33,11 @@ Procedure:
 
        worktree.createWithRecipe({
          "arguments": {
-           "branchName": "<new-branch>",
-           "baseBranch": "<base-branch>"
+           "source": {
+             "kind": "newBranch",
+             "branchName": "<new-branch>",
+             "baseBranch": "<base-branch>"
+           }
          }
        })
 
@@ -42,12 +45,29 @@ Procedure:
 
        worktree.createWithRecipe({
          "arguments": {
-           "branchName": "<new-branch>",
-           "baseBranch": "origin/<base-branch>",
-           "fromRemote": true
+           "source": {
+             "kind": "newBranch",
+             "branchName": "<new-branch>",
+             "baseBranch": "origin/<base-branch>",
+             "fromRemote": true
+           }
          },
          "requestKey": "<stable-id-for-this-request>"
        })
+
+   - Checking out a branch that already exists:
+
+       worktree.createWithRecipe({
+         "arguments": {
+           "source": { "kind": "existingBranch", "branchName": "<branch>" }
+         },
+         "requestKey": "<stable-id-for-this-request>"
+       })
+
+   Read `branch` back off the result rather than assuming you got the name you asked
+   for: under the default `collisionPolicy` of "suffix" a taken name lands on `<name>-2`,
+   and the result reports which. Pass `"collisionPolicy": "error"` inside a `newBranch`
+   source when a different name would be the wrong answer.
 
    Omit `recipeId`; do not list or inspect recipes for a plain worktree. It is not a
    cosmetic omission: a `recipeId` makes this same call spawn that recipe's terminals,
