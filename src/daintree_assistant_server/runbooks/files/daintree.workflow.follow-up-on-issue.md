@@ -61,8 +61,9 @@ It returns `state`, `isDraft`, `merged`, `baseRef`, `headRef`, and may carry
 `commentCount` and — the field to read here — `reviewDecision`: `APPROVED`,
 `CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null`. A `null` is a real answer meaning
 reviews are not gated, and reads as approved; only an ABSENT key means "not reported". The
-whole result is nullable — a PR that does not exist comes back empty rather than failing,
-so treat empty as absence, not as an error.
+result is an envelope, `{ pr }` — the fields above are on `pr`, not at the top level — and
+a PR that does not exist comes back with `pr` empty rather than failing, so treat empty as
+absence, not as an error.
 
 Do NOT read CI off this call. `ciStatus` is declared on the PR shape but a provider need
 not populate it on a single-PR fetch, and the common one does not — it is absent here, and
