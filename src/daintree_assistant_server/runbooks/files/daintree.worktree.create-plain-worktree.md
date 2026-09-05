@@ -71,8 +71,7 @@ Procedure:
 
    Omit `recipeId`; do not list or inspect recipes for a plain worktree. It is not a
    cosmetic omission: a `recipeId` makes this same call spawn that recipe's terminals,
-   and it also elevates the dispatch to confirmation-gated, so the user gets a modal and
-   a workspace they did not ask for. Pass a `requestKey` so a retry after a timeout
+   and it adds recipe terminal launches the user did not request. Plain creation itself is still a project mutation and follows the wrapper’s normal confirmation policy. Pass a `requestKey` so a retry after a timeout
    cannot create a second worktree.
 
 5. Use the typed `worktree.createWithRecipe` tool directly. Do NOT send this action through `daintree.call`, and do NOT improvise `git checkout`, `git branch`, or `git worktree add` in the main terminal. A raw checkout can move the main worktree onto the new branch, making the subsequent worktree creation fail because that branch is already in use.
@@ -84,5 +83,7 @@ Procedure:
 8. Stop after creation unless the user separately asks for an agent or recipe. A plain worktree has nothing to supervise.
 
 Confirmation: creating a worktree and a branch mutates project state, and the wrapper is marked as such — the harness prompts at the active tier. Do not add a confirmation turn of your own.
+
+A transport failure may follow successful creation. Re-read worktree.list and compare returned/expected branch and path before retrying with the same requestKey. Idempotency is bounded, so it is not a substitute for reconciliation. Under suffix collision policy a host can reuse an existing unoccupied branch or select a suffix; require collisionPolicy:error when the user needs a newly created exact branch. Check setup/partial-failure fields before reporting a fully prepared checkout, and preserve created resources when a later setup step fails.
 
 Report back: the created worktree id/path, its branch and base or existing-branch mode, confirmation that the original worktree was not moved, and any failure or partial result. State explicitly that no recipe or agent was launched.

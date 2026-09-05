@@ -20,117 +20,40 @@ requiredTools:
   - terminal.extract
   - terminal.sendCommand
   - daintree.call
+  - git.getProjectPulse
+  - worktree.list
+  - project.detectRunners
+  - tool.schema
+  - workflow.update
 ---
-Use when: the user wants to ready the current branch for review / open a PR.
+Use when: the user wants a branch prepared, pushed or opened for review, or only a readiness assessment.
 
-The trap this runbook fixes: `workflow.prepBranchForReview` is READ-ONLY despite the
-name. It does NOT commit, push, or open a PR — it returns a verdict you act on. The
-actual prep (commit → push → open PR) is a SEPARATE, confirmed sequence you run after a
-good verdict. So call the verdict freely (no confirmation), then do the real work. The
-focus-hint tools above are not a fence — every registry tool is callable this turn.
+`workflow.prepBranchForReview` is a READ-ONLY diagnostic. It neither stages nor commits nor pushes nor opens a PR. A question about readiness stops after the assessment; a request to prepare/open a PR authorizes the necessary scoped steps, subject to ordinary tool confirmation.
 
 Procedure:
+1. Bind the target. Resolve the exact worktree id AND path from current context or `worktree.getCurrent` / `worktree.list`. Keep that locator on every git/forge read and write. Do not substitute the current worktree when the user named another. Read `git.getProjectPulse` for branch state and recent commits.
+2. Check for an existing PR in that repository: `forge.listPRs({"arguments":{"worktreeId":"<id>","state":"open","search":"head:<verified branch>"}})`. Preserve all filters and locator while paging. Match `headRef` and intended base/repository, not a similar title. If a PR exists, update it; do not create a duplicate. `forge.getPR` takes flat `{worktreeId,prNumber}` and returns `{pr}`. CI is a separate flat `forge.getChecks` call, not evidence from a listing row.
+3. Get readiness for the exact checkout:
 
-## Step 1 — Fix the target
-Call `context.snapshot`, then `worktree.getCurrent`, so you KNOW which worktree/branch
-you are prepping. `prepBranchForReview` targets the active worktree unless you nest a
-`cwd` inside its `arguments` (step 3); a later commit/push lands wherever you point it,
-so be sure it's the branch the user means. `worktree.getCurrent` returns `{ worktree: { id, path,
-branch, prNumber, prUrl, ... } | null }` — if `prNumber` is already set, a PR exists on
-this branch and the job is usually "ready/update it," not "create a new one."
-
-## Step 2 — Don't open a duplicate PR
-`forge.listPRs({ arguments: { state: "open" } })` -> `{ items: [PR...], nextCursor, hasMore }`.
-`forge.listPRs`, `forge.listIssues`, and `forge.getIssue` are passthrough wrappers accepting
-ONLY `arguments` at the top level — nest every query field inside it; a top-level `state` is
-rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
-`daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
-`{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
-carries `number`/`url`/`headRef` — the source branch is `headRef`, NOT `head`, so a match on
-`head` finds nothing and you open a duplicate PR. (`head` IS the right key when you CREATE
-one in step 5; it is an argument there, not a result field.) Do NOT branch on a
-review-decision or CI-status field from a LIST item — neither is guaranteed on a bulk item;
-these summary rows are for duplicate detection, and a field missing here says nothing. (CI and
-review state ARE readable, just not from this call: `reviewDecision` comes from typed
-`forge.getPR` and the CI verdict from `forge.getChecks`, both a focused read on ONE PR —
-daintree.workflow.follow-up-on-issue.) If an open PR's `headRef` is this branch, you are
-updating, not creating — skip the PR-create in step 5 and just push.
-
-## Step 3 — Get the verdict (free, read-only, NO confirmation)
-`workflow.prepBranchForReview` is a passthrough wrapper like the forge ones in step 2, with one
-extra catch: `arguments` is REQUIRED. Call `workflow.prepBranchForReview({ "arguments": {} })` for
-the active worktree, or `workflow.prepBranchForReview({ "arguments": { "cwd": "<path>" } })` to
-target another one. The top level accepts only `arguments` and `requestKey`, so a top-level `cwd`
-is an unknown key and is rejected outright — and omitting `arguments` fails the required check.
-It returns:
+```json tool=workflow.prepBranchForReview
+{"arguments":{"cwd":"<resolved worktree path>"}}
 ```
-{ verdict, hasUncommittedChanges, hasMergeConflicts,
-  stagedCount, unstagedCount, currentBranch, repoState, detectedRunners: [...] }
-```
-`verdict` is one of:
-- `ready` — tree is in a committable/pushable shape. GREEN LIGHT to prep. (This does NOT
-  mean anything was committed or pushed — that's still all on you in step 4/5.)
-- `blocked_uncommitted_changes` — there is work to commit (`stagedCount` /
-  `unstagedCount` > 0). Commit + push it (step 4), then re-check or proceed.
-- `blocked_merge_conflicts` — the branch has conflicts. This is real file work, and you
-  NEVER edit files — see "Checks and conflicts" below.
-- `blocked_repo_busy` — a git operation is in flight. Wait briefly and re-run step 3; do
-  not push into a busy repo.
-- `no_runners_detected` — no test/lint runner was found. Not fatal — proceed, but tell
-  the user verification is thin (nothing ran the suite). `detectedRunners` lists what, if
-  anything, was found.
 
-Use `currentBranch` from this result as the `head` for the PR-create in step 5. Read the
-verdict and route; everything below depends on which one you got.
+   This is `workflow.prepBranchForReview` argument JSON. `arguments` is required; top-level `cwd` is rejected. Read `verdict`, change/conflict flags, staged/unstaged counts, `currentBranch`, `repoState`, `detectedRunners`.
+   - `ready`: git shape is suitable; no check has run yet.
+   - `blocked_uncommitted_changes`: inspect and stage the intended scope, then commit (step 5).
+   - `blocked_merge_conflicts`: delegate conflict resolution to an edit agent in this worktree; recheck afterward.
+   - `blocked_repo_busy`: inspect the in-progress operation and retry once after it settles. Do not abort it or push into it merely to get a green verdict.
+   - `no_runners_detected`: verification is unavailable through detected runners, not passed. Use existing evidence or a scoped agent check; report the gap.
+4. Run the relevant bounded checks before publishing. Take a runnerId from `detectedRunners` or `project.detectRunners` and projectId from actual context. Inspect what the runner does: scripts can deploy, publish or start a server. Call `project.runCheck({"projectId":"<id>","runnerId":"<id>","cwd":"<resolved path>","timeoutMs":600000})` only for the intended check. It re-detects within cwd; report the returned command and `passed`, `exitCode`, `timedOut`, `aborted`, `outputTruncated`. Tool success can contain `passed:false`; timeout/abort is incomplete verification. Delegate failures requiring file edits, use one supervision mode, then run verification on the resulting revision.
+5. Stage deliberately, then commit. The raw git actions have no typed wrappers; discover `tool.schema` when their shape is needed and use `daintree.call` with `{name,arguments,requestKey?}`. Read `git.getStagingStatus` in this worktree first: `git.commit` commits ONLY the index, including anything staged before your task. It does not stage automatically.
+   - Stage only the task's identified files with raw `git.stageFile` and `filePath`, preserving unrelated staged and unstaged work. If an intended commit would include unrelated staged changes, resolve that scope rather than unstaging another person's selection or committing it silently.
+   - `git.stageAll` is appropriate only when ALL changes are intended for this commit; do not use it as a shortcut on a mixed tree.
+   - Re-read staging, then raw `git.commit` with a grounded non-empty `message` and explicit `cwd`. Read the commit result; do not assume a clean tree afterward because unrelated changes may remain.
+6. Push even when no NEW commit was needed. A clean working tree can contain already-committed, unpushed work. Raw `git.push` takes explicit `cwd` and optional `setUpstream:true` for a new branch. Verify the branch and intended commits before publishing. On rejection or an ambiguous transport result, re-read state; never force-push, rewrite history, or blindly repeat commit/push. A requestKey is a bounded retry guard, not permanent exactly-once execution.
+7. Create or ready the PR after a confirmed push. Resolve `base` from repository instructions or an existing PR; do not assume main. Prepare the title/body from the final change and checks actually run. Raw `forge.createPR` takes `worktreeId`, `head` (the actual currentBranch), `base`, `title`, optional `body`/`draft`. Read number/URL from its result. For an existing draft the user wants ready, raw `forge.markPRReadyForReview` takes the same worktree locator and its `prNumber`. If creation times out, look for the matching PR before retrying; retain a unique requestKey for that logical create.
+8. Verify the postcondition. Re-read `forge.getPR` for the recorded number in the same repository; confirm head/base and requested draft/ready state. Report local checks separately from provider CI: cached green does not establish checks ran on the newly pushed revision. Neither readiness nor CI is a code review. Record the PR on the matching workflow row without replacing unrelated array fields.
 
-## Step 4 — Commit and push (the REAL prep — confirmed; via daintree.call)
-There is NO typed `git.commit` / `git.push` / `getStagingStatus` wrapper — those go
-through the raw escape hatch. Do this only when there is work to commit (verdict
-`blocked_uncommitted_changes`, or `ready` with pending changes the user wants in):
-- `daintree.call git.commit { cwd?, message: "..." }` — `message` is REQUIRED and must be
-  non-empty/non-whitespace (the call throws on an empty message). Confirmed.
-- `daintree.call git.push { cwd?, setUpstream?: true }` — pass `setUpstream: true` the
-  FIRST time you push a brand-new local branch, or the push fails with no upstream.
-  Confirmed.
-After committing, the tree is clean; you do not need to re-run `prepBranchForReview`
-unless you want to re-confirm `ready` before opening the PR.
+For delegated fixes, give the edit agent the exact worktree, scope and acceptance criteria. Use a background spawn supervisor or one async/in-turn wait; report partial progress and resume these steps on real results. Keep prior authority across that continuation rather than asking the user to approve the same preparation again.
 
-## Step 5 — Open the PR (confirmed)
-Forge WRITES have no typed wrapper — go through the escape hatch:
-`daintree.call forge.createPR { head: currentBranch, base: "<target>", title: "...", body?, draft? }`.
-This is the one forge mutation here that RETURNS the PR object (`{ number, url, ... }`) —
-most forge writes return void — so capture `number`/`url` now rather than re-listing.
-Confirmed (external risk). If step 2 found an existing open PR on this head, skip create;
-the push already updated it. To flip a draft to ready, `daintree.call forge.markPRReadyForReview`.
-
-## Checks and conflicts — run the check yourself, spawn only for edits
-Running a detected runner is a CALL, not a delegation — do NOT spawn an agent merely to
-execute a check. `project.runCheck({"projectId":"…","runnerId":"…","cwd":"<worktree path>"})`
-is a typed wrapper — call it directly, never through `daintree.call`.
-Take `runnerId` from step 3's `detectedRunners` — never invent one, and confirm what an
-unfamiliar id runs: detection surfaces every runnable script, not just checks, and pointing
-this at a long-lived server blocks until the timeout. Pass `cwd` explicitly for the worktree
-you are prepping: it defaults to the project root, so omitting it silently checks the WRONG
-tree. A failing command comes back as a FAILED CHECK, not an error, so read `passed` rather
-than trusting that the call succeeded; the output tail is diagnostic only, and `command` is
-what actually ran — `runCheck` re-detects inside the `cwd` you passed, so it can differ from
-what the root advertised. On `no_runners_detected` there is nothing to run; say verification
-is thin rather than implying anything passed.
-
-Edit work is different — you NEVER edit files. If the verdict is `blocked_merge_conflicts`,
-or a check failed and the user wants it green before review, spawn a visible agent with
-`agentTask.spawnForEdits` mode:"edit" and supervise it in exactly ONE mode, never both:
-BACKGROUND (spawn WITH `watch: true` + `watchGoal`, then END your turn and react on the
-watcher's `completed_*` event), or IN-TURN (spawn with NO watcher, then `terminal.awaitAll`,
-read the tail once with `terminal.extract`, relay with `terminal.sendCommand`). Finish is
-never a bare `waiting` (an agent shows waiting before it starts, when paused, and when
-backgrounded) and never a transient `completed` (it bounces back within seconds). Once the
-branch is fixed, return to step 3 → 4/5, and re-run the check above rather than taking the
-agent's word for it.
-
-Report back: state the verdict you got, any check you ran (its `command`, `passed`, `exitCode`),
-what you committed/pushed, and the PR number + url — or, if
-blocked, exactly what is blocking and the next action (and, if you spawned a fixer agent,
-its terminalId + watcherId; supervision is durable — the background supervisor keeps watching if the user closes the assistant).
-Never claim "the PR is ready" off `prepBranchForReview` alone: that verdict only means the
-tree is in a committable shape, not that a PR exists.
+Report back: the readiness verdict, verification command/results and limits, which files/commit were included, whether the push succeeded, PR number/URL and confirmed head/base/draft state, or the concrete blocker and any agent/supervision handle still running.

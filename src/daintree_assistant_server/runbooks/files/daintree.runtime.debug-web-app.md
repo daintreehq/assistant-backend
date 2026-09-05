@@ -42,4 +42,6 @@ Procedure:
 
 8. DO NOT CALL `browser.captureScreenshot` FOR MODEL JUDGMENT. The action returns a real MCP image, but this Assistant CLI path currently forwards only text and structured content, not the image block. Calling it would yield dimensions without pixels. If visual QA matters, tell the user that manual inspection is still required; do not infer appearance from console silence.
 
+Preserve the baseline generation even if the read window truncates older console rows. After a reload, a new generation with no relevant error is only “no error observed in captured output”; reproduce the original interaction before concluding it is fixed. Redact credentials from URLs and stack/context data. Revalidate the panel/worktree before restart, and retain async/spawn handles so verification resumes against the same preview after the fix lands.
+
 Report back: panel/worktree/project ids, exact console evidence and navigation generation, agent terminal id and verification command if one ran, whether reload or restart was requested, only the new-generation runtime outcome, and the explicit visual-verification limitation.

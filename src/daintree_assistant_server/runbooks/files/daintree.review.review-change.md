@@ -42,12 +42,14 @@ Procedure:
 
 7. RANK AND REPORT. Order by severity, not by reviewer. Each finding: what is wrong, where (`file:line`), why it matters, and what would fix it. Separate "this is a bug" from "I would have written it differently" — conflating them is how a review becomes noise the user learns to skip.
 
-Then, only if the user asks: relay accepted findings to an implementer with the relay runbook, and check the fixes with a fresh reviewer rather than the one that found the problem — an author reviewing its own fix agrees with itself.
+When fixing is also within the user’s request, relay accepted findings to an implementer with the relay runbook, and check the fixes with a fresh reviewer rather than the one that found the problem — an author reviewing its own fix agrees with itself.
 
 Notes:
 - Reviewers change nothing. If a reviewer reports having edited a file, that is a bug to surface, not a result to accept.
 - Never claim a review is complete when a reviewer crashed or returned nothing. Say which lens went unexamined.
-- Do not spawn a reviewer for a two-line diff you can see in the pulse output. Say what you see and offer a deeper pass.
+- The pulse is branch/change metadata, not a diff. Even a small requested code review needs a reviewer reading the actual change; scope that brief narrowly rather than pretending the pulse supplied code evidence.
 - A review with no findings is a legitimate result. Report it plainly rather than manufacturing something to justify the round.
+
+Freeze the review target: exact branch/base or PR head, plus whether uncommitted changes are included. Require reviewers to identify the revision/path they inspected and give concrete triggering conditions and impact per finding. If the checkout changes during review, report which findings may be stale and review the affected delta. A truncated extraction is not a complete review: use bounded original text for exact findings and label missing coverage. Do not publish a formal forge review merely because the user requested an in-conversation review.
 
 Report back: findings ranked by severity with `file:line` evidence, which criteria were covered and by how many reviewers, anything a reviewer could not assess, and the terminal ids you spawned.

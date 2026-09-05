@@ -12,50 +12,39 @@ requiredTools:
   - terminal.moveToWorktree
   - terminal.sendCommand
   - terminal.read
+  - watcher.list
+  - watcher.cancel
+  - async.list
+  - agentTask.superviseTerminal
+  - workflow.update
 ---
-Use when: live agents are sharing one worktree and each needs its own, without losing the sessions they are already in.
+Use when: existing live agents need separate worktrees while keeping their sessions.
 
-The load-bearing fact, before anything else: **filing a terminal under a different worktree does not move the process.** The agent keeps running in the directory it launched from. What actually relocates the work is TELLING it, in its own session, to continue in the new directory. Treat the tell as the operation and the filing as bookkeeping — a run that files four terminals and stops has moved nothing.
+Moving a panel changes its Daintree grouping, not its process directory or working-tree changes. Telling the agent the destination is a second operation, and even that is not proof it switched. Preserve the original sessions and all uncommitted work.
 
 Procedure:
+1. Read the requested terminals, `worktree.list` and their current paths. Keep a per-agent map of terminalId, old worktreeId/path, new branch/base and destination id/path. Use only the terminals the user intended. Fresh agents belong to the spawn/fan-out runbook.
+2. Inspect whether agents are actively editing and whether the source has uncommitted changes. Separate checkouts do not copy those edits. If work must transfer, first obtain an agent's concrete transfer plan within the user's scope; do not move it by reset, clean, blind cherry-pick or file copying. Arrange a handoff boundary with busy agents so edits cannot continue in the old tree unnoticed.
+3. Settle distinct branch names and bases, using user/repository conventions. Create EMPTY worktrees with `worktree.createWithRecipe`, omitting `recipeId`. Use a distinct stable requestKey for each logical creation and `collisionPolicy:"error"` when an exact new name is required.
 
-1. Route elsewhere first. New agents that do not exist yet are a spawn, not a relocation — `daintree.orchestration.fan-out-work` for a cohort, `daintree.edits.spawn-visible-agent` for one. A worktree with nothing running in it is `daintree.worktree.create-plain-worktree`.
+Example arguments to `worktree.createWithRecipe`:
+```json tool=worktree.createWithRecipe
+{"arguments":{"source":{"kind":"newBranch","branchName":"<chosen branch>","baseBranch":"<verified base>","collisionPolicy":"error"}},"requestKey":"<unique key for this destination>"}
+```
 
-2. Inventory from live state. Read the `# Open terminals` roster already in this turn for each terminal's id, worktree and agent; call `context.snapshot` only when the roster is ambiguous or a target may be gone. Call `worktree.list` for the worktrees that already exist and their paths. Copy every id in full (foundation rule 3). Confirm which terminals the user actually means: an unmarked row may be their own shell or another agent's work, and relocating someone else's terminal interrupts it.
+4. Read every creation result before moving anything. A partial/ambiguous failure requires `worktree.list` reconciliation, not another create. Copy BOTH `worktreeId` and `worktreePath` verbatim; do not construct one from the other.
+5. Move each terminal with the typed wrapper, never through `daintree.call`. Group only terminals sharing the SAME destination; one-worktree-per-agent normally means one call per agent:
 
-3. Settle every branch name and the base branch BEFORE mutating. One worktree per agent, named for what that agent is doing rather than for its index, so the roster stays readable. If the user says the names can be anything, choose them, state them once, and proceed. If the base is ambiguous, ask.
+```json tool=terminal.moveToWorktree
+{"terminalId":"<exact terminal id>","worktreeId":"<returned destination worktreeId>"}
+```
 
-4. Create the worktrees EMPTY. One `worktree.createWithRecipe` per agent carrying only a `newBranch` source inside `arguments`, plus a `requestKey` so a retried timeout cannot create a second worktree.
+   This is `terminal.moveToWorktree` argument JSON. Pass the returned id, not a guessed path or branch; an older host may itself return path-shaped ids. The action can move the whole tab group with the named panel, so inspect grouping before moving and verify any other affected panels afterward. Do not claim independent relocation when a shared tab group moved together; resolve that grouping in Daintree first.
+6. Tell each agent ONCE: `terminal.sendCommand({"terminalId":"<id>","command":"Please continue in the directory <returned worktreePath>. Confirm the directory and branch before editing; leave the original worktree's existing changes intact."})`. If panel filing failed, report that separately; the authorized directory instruction can still be sent to the verified live agent. Do not resend because its ready prompt has not yet changed.
+7. Verify the two postconditions independently: `context.snapshot`/`worktree.list` for panel placement and original branch, then a bounded tail for the agent's acknowledgement of its directory and branch. Panel placement alone cannot prove where file operations occur. If the agent cannot change roots without restart, report the limitation and preserve its session until the user chooses a next step.
+8. Reconcile existing supervision against the new destination. A watcher created for the old worktree retains that verification scope. Read `watcher.list` and `async.list`; do not add a second watcher. If a supervisor must be replaced, retire that exact old watcher, adopt the live terminal with its new worktreeId and acceptance criteria, and save the new handle. Mere `superviseTerminal` deduplication does not update an existing watcher's scope. Update the task's ledger/checkpoint from observed results.
+9. Close nothing; `terminal.close` requires a separate explicit closure request. A refused move does not justify closing/respawning the agent, raw git worktree operations, or deleting its original checkout.
 
-       worktree.createWithRecipe({
-         "arguments": {
-           "source": { "kind": "newBranch", "branchName": "<branch>", "baseBranch": "<base>" }
-         },
-         "requestKey": "<stable-id-for-this-request>"
-       })
+Confirmation: the user's relocation request authorizes the resolved creates, panel moves and directory instructions. Let normal tool gates handle confirmation; ask only for unresolved destinations, transfer decisions or newly discovered scope.
 
-   **Omit `recipeId`.** It is not an optional extra here, it is the difference between an empty worktree and a wrong one: a `recipeId` makes the call spawn that recipe's terminals, so you end up with a second set of agents beside the ones you were asked to move, and it also elevates the dispatch to confirmation-gated, so the user gets a modal for what should have been silent. Do not list or inspect recipes on this path at all.
-
-5. End the turn on those creates and read the real values back. The `worktreeId` and `worktreePath` are minted by this reply, so nothing in the SAME reply can use them (foundation rule 9). Take `worktreePath` from the result verbatim; do not assemble a path by hand from the branch name.
-
-6. File the terminals under their worktree. `terminal.moveToWorktree` is a TYPED wrapper: call it directly, never through `daintree.call`, which returns `USE_TYPED_WRAPPER` and does nothing.
-
-       terminal.moveToWorktree({ "terminalIds": ["<id>", "<id>"], "worktreeId": "<worktreePath>" })
-
-   Send the whole cohort in ONE call with `terminalIds`; use the single `terminalId` form only when moving one. **`worktreeId` takes the worktree PATH, not the id** — the exact `worktreePath` you read back in step 5. A branch name or a worktree id is never accepted. If the move is refused, report the refusal verbatim and stop there: do NOT retry it under another name, do NOT reach for raw `git worktree`, and do NOT fall back to closing the agent and respawning it, which throws away the session you were asked to preserve. Step 7 still runs for every terminal either way.
-
-7. Tell each agent where it now lives. One `terminal.sendCommand` per terminal, with exactly the sentence Daintree itself uses for this:
-
-       terminal.sendCommand({ "terminalId": "<id>", "command": "Please continue in the directory <worktreePath>" })
-
-   Send it once per agent. Step 6 re-files the pane; THIS is what moves the work, so it runs for every terminal regardless of how step 6 went.
-
-8. Do not re-send it. An agent parks at `waiting` with reason `prompt` for a moment BEFORE it picks a delivered instruction up, so a roster still reading waiting right after the send means not-yet-started, not idle-and-ignoring-you. A second send queues a second instruction into a live session and can interleave with whatever the agent was mid-way through. If you need to know it landed, read a bounded tail with `terminal.read` on the next turn instead.
-
-9. Verify from state, not from intent. Re-read the roster or `context.snapshot`: the new worktrees exist at the returned ids, each target terminal is still ALIVE, and the original worktree is still on its own branch. Never claim a terminal is working because you sent it something; report what the state actually says, and if a status you just read contradicts a sentence you just wrote, the state wins.
-
-10. Close nothing. The terminals you relocated are the ones you were asked to keep. `terminal.close` is only ever at the user's explicit request, never your own tidy-up — and never as a recovery move when step 6 is refused.
-
-Confirmation: creating a worktree and a branch mutates project state and the wrapper is marked as such, so the harness prompts at the active tier. Do not add a confirmation turn of your own on top of it, and do not ask permission per terminal for the sends.
-
-Report back: the worktrees created (id, path, branch, base), which terminal was filed under which, whether the filing step succeeded or was refused, that every agent was told once to continue in its new directory, and anything you deliberately did not do — no terminal closed, no agent respawned, no raw git.
+Report back: each terminal's destination id/path/branch, whether panel filing and directory acknowledgement each succeeded, any retained source changes, refreshed supervision handles, and any incomplete relocation.

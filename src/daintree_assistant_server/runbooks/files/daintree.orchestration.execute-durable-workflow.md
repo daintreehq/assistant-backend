@@ -24,7 +24,7 @@ The seven graph tools are REAL Assistant CLI tools and they are registered by DE
 
 Procedure:
 
-1. FEATURE-DETECT FIRST. Require the currently offered tool surface to contain at least `workflow.plan`, `workflow.getGraph` and `workflow.next`. If absent, say Workflow Intelligence is disabled and continue phase-by-phase with the applicable domain runbook; do not claim a durable graph exists. Do not route graph operations through `daintree.call`: these are CLI-local tools, not Daintree MCP actions. `workflow.plan` and `workflow.reconcile` also require a compatible Assistant backend; the other five graph operations are local.
+1. FEATURE-DETECT FIRST. Require the currently offered tool surface to contain at least `workflow.plan`, `workflow.getGraph` and `workflow.next`. If absent, say Workflow Intelligence is unavailable in this session (disabled, unsupported or withheld) and continue phase-by-phase with the applicable domain runbook; do not claim a durable graph exists. Do not route graph operations through `daintree.call`: these are CLI-local tools, not Daintree MCP actions. `workflow.plan` and `workflow.reconcile` also require a compatible Assistant backend; the other five graph operations are local.
 
 2. REUSE BEFORE CREATING. Read the durable workflow digests already injected into the turn. If an open graph covers this same goal, call `workflow.getGraph({"id":"wfg_...","view":"compact"})` and reconcile it rather than planning a duplicate. Use `view:"full"` only when exact nodes, edges, resources or evidence are needed.
 
@@ -48,8 +48,10 @@ Procedure:
 
 9. USE NORMAL ASYNC SUPERVISION for long work. Spawn/watch/await using the relevant orchestration runbook, then attach the returned ids. Linked async settlement can update the linked node, but the wake still needs `workflow.reconcile({"workflowId":"wfg_...","reason":"wake","recentEventLimit":20,"apply":true})` to advance/finalize the plan. Never hand-poll just because a graph exists.
 
-   Graph persistence means the work is AVAILABLE to resume in a later turn; it does not schedule or autonomously resume execution. If the user asks to resume at a future time, use the watch-outcome runbook only for a supported wake source. A timer with an `enqueue` payload is a reminder that neither runs the graph nor wakes the assistant; state that limitation and obtain agreement before scheduling one.
+   Graph persistence means the work is AVAILABLE to resume in a later turn; it does not schedule or autonomously resume execution. The pinned CLI has no timer message payload to launch a future assistant turn. A timer may invoke one supported fixed tool, but even a scheduled reconcile only updates the graph; it does not execute subsequent nodes. For a future resume request, explain this limit and offer an enqueue reminder naming the persisted wfg_ id. Never present that reminder as graph execution.
 
 10. CANCEL HONESTLY. `workflow.cancel({"workflowId":"wfg_...","nodeId":"<optional>","reason":"..."})` changes graph/node state only. It does NOT close terminals, cancel external work, remove worktrees, revoke grants or stop async handles. Those are separate explicit cleanup operations with their own authorization.
+
+Validate every proposed next action against observed state and original authority; backend plan/reconcile output is advisory. After a failed resource attachment or reconcile, preserve the action’s actual result and ids and repair the bookkeeping rather than executing the domain action again. A “done” node without acceptance evidence is not a verified user outcome. On cancellation, report live linked resources separately and stop them only if that cleanup is requested.
 
 Report back: the `wfg_` id, completed/total progress, active or blocked nodes, exact resources still live, evidence behind the current verdict, and the next action or wake checkpoint. If graph tools were unavailable, state that no durable graph was created.

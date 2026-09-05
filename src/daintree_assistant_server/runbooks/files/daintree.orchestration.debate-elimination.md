@@ -47,4 +47,6 @@ Procedure:
 
 Confirmation: Closing eliminated terminals requires an explicit user request. After any close, confirm the exact terminalIds closed and which survivor terminals remain open.
 
+Distinguish a ballot winner from an eliminated participant: tally votes received for elimination and apply only the announced rule. Do not interpret terminal closure, silence or a missing vote as a vote to eliminate. Preserve the requested electorate, show valid/missing counts, and label a result provisional when an unresolved vote could change it. An elimination notification sent through terminal.sendCommand starts another agent turn; do not wait for an unsolicited farewell or call it delivered to a terminal already closed. Keep rounds bounded, obey budgetExhausted, and preserve the remaining cohort’s supervision and state across any handoff.
+
 Report back: the final vote tally, who was eliminated, each agent’s vote and one-line reason, which agents remain active, whether the loser was notified, and any terminal cleanup performed.

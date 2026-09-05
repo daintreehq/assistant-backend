@@ -25,123 +25,92 @@ requiredTools:
   - async.cancel
   - queue.digest
   - queue.resolve
+  - agentTask.superviseTerminal
+  - daintree.invoke
+  - terminal.run.async
+  - tool.schema
 ---
-Use when: the user wants something to OUTLIVE this turn — wake me when it finishes, alert me if it breaks, remind me later, or DO it at a stated later time — rather than a wait you sit through now.
+Use when: the user wants observation, a reminder, or work at a stated later time to outlive this turn.
 
-You are setting up the mechanism, not doing the work in this turn: on a wake you spawn, verify and relay — never fix the build, edit the branch, or land a merge yourself. A scheduled action is the same discipline moved in time: you arrange the ONE call that will run later, you do not run it now. Reads need no authority; only a MUTATION performed unattended needs the grant in step 3.
+Set up the mechanism and report it. A scheduled action is not performed now as well. Preserve the requested delay and existing authority; resolve new scope before scheduling. Distinguish a stored record, an active scheduler, an assistant wake, and a human-facing inbox note.
 
 Procedure:
 
-1. Resolve full terminal ids or the PR number live this turn, then choose ONE mechanism:
-   - Terminal outcome needing classification ("wake me when it's green") → `watcher.terminal.create`, step 2.
-   - A pass/fail verdict → if already settled, `terminal.extract` judges it now. Otherwise use a terminal watcher with `modelJudge`. It matches only a CONFIDENT yes; uncertainty remains UNKNOWN and satisfies nothing, including `not`. Give each outcome its own affirmative question: `stopWhen` an `any` of "did it pass?" and "did it fail?", `alertWhen` the failure question alone.
-   - PR terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`). Read "What the PR watcher cannot watch" before promising a CI alert.
-   - Reminder without work → `timer.schedule` with `enqueue`, step 4.
-   - Work that starts later → a timer with `message`; use `call_safe_tool` only for one already-decided call. See "Work that starts later" for delivery and grant rules. Do NOT do the work now too, or spawn an idle terminal merely to obtain an id.
-   Spawning NOW? `agentTask.spawnForEdits` with flat `watch:true`, `watchGoal:"…"`, and `acceptanceCriteria` already supervises completion. Add no second watcher.
+1. Select ONE mechanism for each target after reading the live ids and existing `watcher.list`, `async.list` or `timer.list` as needed:
+   - Plain completion of running agents: `terminal.await.async`. It returns an accepted handle, then wakes with per-terminal state outcomes. Inspect the task output on the wake; state settlement is not proof of success.
+   - A command to start NOW in a terminal authorized for this task: `terminal.run.async`.
+   - Acceptance-checked agent completion: spawn with `watch:true`, `watchGoal` and edit `acceptanceCriteria`, or adopt with `agentTask.superviseTerminal`. Reuse existing supervision; do not stack an async wait or a foreground wait on it.
+   - A specific condition in terminal output: `watcher.terminal.create`, step 2. If the terminal already settled and only a verdict is wanted, read it once with `terminal.extract`; no watcher is needed.
+   - A PR merging/closing: `watcher.watchPR`. It records a note; it does not wake the assistant or monitor CI/reviews.
+   - A reminder for the human: a timer `enqueue` payload.
+   - Work that must START later: a timer `call_safe_tool` payload targeting one resolved invocation, such as an agent spawn with a self-contained task brief (steps 4–5). Do not spawn an idle agent now merely to obtain an id for later.
 
-2. `watcher.terminal.create` requires `terminalIds` (full ids), `title`, and a plain-language `goal`. Optional: `stopWhen` (ends with `condition_met`), `alertWhen` (alerts and KEEPS running), `cadenceMs` (default 120000), `modelTier` (`small` | `medium`), `startAfterMs`, `stopAfterMs` (default 24 h). Set the horizon you mean; prefer free deterministic conditions in the DSL below and only the cadence you need.
+2. Create an output watcher with required `terminalIds`, `title`, `goal`. Optional `stopWhen` ends it; `alertWhen` alerts while it keeps running. Set `cadenceMs` to the resolution needed (default 120000), `stopAfterMs` to a finite horizon (default 24 hours), and optionally `startAfterMs` and `modelTier:"small"|"medium"`. These generic watchers do not acquire the acceptance-checking behavior of a spawn supervisor just because you wrote a goal. For ordinary agent completion, prefer spawn/adopt supervision.
 
-3. Pre-authorize unattended MUTATIONS now. Only the interactive main actor can mint a grant. Without one, a confirm-required action becomes a pending-approval item; a one-shot `call_safe_tool` timer has already fired and cannot retry that action.
-   `grant.create {"actorType":"wake","actorId":"wake","allowedToolNames":["terminal.sendCommand"],"ttlMs":28800000,"maxUses":3}`
-   - A watcher or timed-message autonomous turn dispatches as `wake`, with literal `actorId:"wake"`. NEVER mint a watcher grant: watcher checks only read and publish.
-   - A `call_safe_tool` timer dispatches as `timer`, with its own `tmr_…` id. Schedule it first, then grant against the returned id in the SAME turn. A timed MESSAGE needs a wake grant instead.
-   - Interactive auto-approve covers neither actor. `ttlMs`, `maxUses`, and at least one scope (`allowedToolNames` / `allowedRiskClasses`) are required. Use explicit tool names, the expected number of calls, and only the needed time window; never a blanket risk-class grant.
-   - `grant.create`, `grant.revoke`, `daintree.call`, and the bare dynamic-invoke entry point cannot be granted. A wrapper-less MCP mutation can use its exact resolved identity daintree.invoke:ACTION; read-risk targets need no grant. Otherwise do it interactively or explain that it waits for the user.
-   - A grant cannot widen the tier: `supervisor` allows read/local/ui, `operator` excludes git/system. The tier gate runs first.
+   Each WatchCondition has EXACTLY ONE key:
+   - Free leaves: `stateIs` (`idle|working|waiting|directing|completed|exited`), `runtimeStatusIs` (`running|exited`), `contains` (literal substring), `regex` (Go/RE2), `noOutputForMs` (no new output for that interval).
+   - Costed leaf: `modelJudge`, a yes/no question checked against the tail at each cadence. Only a confident yes matches; an unknown is not false and does not become true under `not`. Give pass and fail separate affirmative questions. Identical judge wording can be shared across stop/alert checks.
+   - Combinators: `all:[...]`, `any:[...]`, `not:{...}`, with each child the same one-key shape. Keep the tree shallow.
 
-4. Schedule with relative `delayMs`, never an invented `fireAt` — you have no reliable wall clock. Choose the payload:
-   - Reminder: `timer.schedule {"title":"…","delayMs":3600000,"payload":{"type":"enqueue","message":"…"}}`. It posts a note for the human; it runs nothing and does not wake the closed assistant.
-   - Deferred work: `timer.schedule {"title":"…","delayMs":1500000,"payload":{"type":"message","message":"Send npm test to the build terminal and report the result"}}`. At fire time you choose tools against live state. See the timed-message section below.
-   - Frozen call: `payload:{"type":"call_safe_tool","toolCall":{"toolName":"…","args":{…}}}`. Almost any registered tool is eligible except `timer.schedule`; ordinary tier/confirmation rules still apply. See the fixed-call section below.
-   A `repeat` requires `everyMs`. Repeating `message` or `call_safe_tool` must be at least 60s apart and bounded by a realistic `maxRuns` or `until`; `enqueue` is exempt because it only writes a row. Optional `target` labels events with `terminalId` / `worktreeId` / `projectId` / `workflowRunId`; it supplies no payload arguments.
+   Example arguments to `watcher.terminal.create` for a build whose actual output uses these markers:
 
-5. Report the ids and END the turn. Do not also wait in-turn. Distinguish the delivery:
-   - WAKES YOU: a terminal watcher meeting `stopWhen`/`alertWhen`, or a finished `terminal.await.async`. A `watch:true` spawn earns this promise only if it returned a `watcherId`.
-   - ACTS: a timer `message` runs an ordinary turn (normal confirmations when open, wake grants when closed). A `call_safe_tool` runs one fixed call under timer authority and queues its result; it does not itself wake you.
-   - NOTE ONLY: `watcher.watchPR` and timer `enqueue` leave an inbox item until the user looks.
-
-6. When the window closes, inspect `watcher.list`, `timer.list`, `async.list`, `grant.list` (optional `actorId`). Retire with `watcher.cancel` / `timer.cancel` / `grant.revoke` (`{"id":"…"}`) or `async.cancel {"asyncId":"asy_…"}`. Async cancellation stops tracking, not the terminal. Revoke wake grants as soon as the window ends.
-
-## The WatchCondition DSL
-
-`stopWhen` and `alertWhen` each take a WatchCondition: an object with EXACTLY ONE key.
-
-Deterministic leaves — free, prefer these:
-- `stateIs` — agent state: `idle` `working` `waiting` `directing` `completed` `exited`.
-- `runtimeStatusIs` — `running` or `exited`.
-- `contains` — literal substring in the terminal tail.
-- `regex` — Go/RE2, must compile.
-- `noOutputForMs` — no NEW output for that many ms.
-
-Costed leaf: `modelJudge` — a yes/no question answered against the tail on EVERY check, one model call each at `modelTier` (deduped across `stopWhen`/`alertWhen`, so reuse identical wording if both need it). A tight cadence plus a judge over a long night is thousands of calls.
-
-Combinators, one level, each member the same one-key shape: `all: [...]` (AND), `any: [...]` (OR), `not: {...}` (one nested condition).
-
-Worked example — stop when the build resolves, alert if it breaks:
-
-```
-watcher.terminal.create {
-  "terminalIds": ["terminal-<uuid>"],
-  "title": "nightly build",
-  "goal": "watch the build to a verdict and alert me if it fails",
-  "stopWhen": {"any": [{"contains": "BUILD SUCCESSFUL"},
-                       {"contains": "BUILD FAILED"},
-                       {"runtimeStatusIs": "exited"}]},
-  "alertWhen": {"contains": "BUILD FAILED"},
-  "cadenceMs": 30000,
-  "stopAfterMs": 43200000
-}
+```json tool=watcher.terminal.create
+{"terminalIds":["<exact terminal id>"],"title":"nightly build","goal":"Report whether this build passes or fails","stopWhen":{"any":[{"contains":"BUILD SUCCESSFUL"},{"contains":"BUILD FAILED"},{"runtimeStatusIs":"exited"}]},"alertWhen":{"contains":"BUILD FAILED"},"cadenceMs":30000,"stopAfterMs":43200000}
 ```
 
-THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWhen: {"stateIs":"waiting"}`. An agent reads `waiting` before it starts, while paused, and when its window is backgrounded, so a raw state stop fires early and reports a finish that never happened. For an explore or edit agent you usually need NO custom `stopWhen` at all — the default supervisor treats working→waiting as a candidate and CONFIRMS it with a small-model tail check before stopping. If you must express it yourself, pair the state with a judge so a bare idle cannot false-trip:
-`{"all": [{"stateIs": "waiting"}, {"modelJudge": "has the agent posted its final answer and stopped working?"}]}`
+   Check that markers belong to this run, not old scrollback or echoed commands. A marker match is text evidence; exit alone is not a passing result. Never stop an agent watch on bare `stateIs:"waiting"`: it can fire on startup, a permission prompt or a pause. If a custom condition is essential, pair state with a final-answer judge; the standard spawn/adopt supervisor already performs a finish check.
 
-`terminal.await.async` needs none of this DSL — it watches plain agent state and wakes you when every terminal has finished, failed, or asked a question. Reach for the DSL only when the stop or alert depends on what the output SAYS.
+3. Arrange authority BEFORE leaving. Unattended confirm-required mutations need a matching automation grant; interactive auto-approve does not authorize timer/wake actors. Only the interactive main actor can mint one.
+   - For an assistant turn triggered by eligible watcher/async completion while away: `grant.create({"actorType":"wake","actorId":"wake","allowedToolNames":["terminal.sendCommand"],"ttlMs":28800000,"maxUses":3})`. Tailor the tools, lifetime and uses to the requested task.
+   - For a `call_safe_tool` timer: create the timer, read its real `tmr_…` id, then grant against `actorType:"timer",actorId:"<that id>"` in the next tool round of THIS user turn. A grant on the wrong actor is never consumed.
+   - Watcher checks observe and publish; any assistant turn they trigger runs as `wake`. Do not mint an unused watcher-scoped grant for that turn.
+   - Require `ttlMs`, `maxUses` and a narrow non-empty `allowedToolNames` list. Use dotted CLI names, not wire names. TTL starts NOW and must cover delay, expected lateness and execution. No blanket risk-class grants.
+   - `grant.create`, `grant.revoke` and `daintree.call` cannot be granted. For a discovered, reviewed dynamic action, scope to the exact composite `daintree.invoke:<action>`; never to the bare invoker. Check `invocable:true` and `tool.schema` first. Unclassified or withheld actions remain unavailable for unattended execution.
+   - A grant cannot exceed the tier: supervisor permits read/local/ui; operator adds terminal/project/external; system adds git/system. The tier gate runs before the grant lookup. Daintree's own host confirmation can still require the human.
+   If a timer was created but its required grant cannot be obtained, cancel the timer and report that the deferred action was NOT armed; do not leave a predictably failing one-shot scheduled.
 
-## Work that starts later
+4. For a DELAYED AGENT TASK, schedule the spawn itself:
 
-"Wait ten minutes, THEN run it" HAS an unattended path, and there are two shapes of it. Pick by whether the ONE call is already decided.
+```json tool=timer.schedule
+{"title":"run the build later","delayMs":600000,"payload":{"type":"call_safe_tool","toolCall":{"toolName":"agentTask.spawnForEdits","args":{"agentId":"<configured agent id>","mode":"explore","title":"verify build","worktreeId":"<resolved worktree id>","taskPrompt":"Run the requested test suite in this checkout and report the command, result and any failures. Do not change source files.","watch":true,"watchGoal":"Report the completed test result or blocker"}}}}
+```
 
-### The normal shape: a timed message
+   These are `timer.schedule` arguments; the nested args must also match the target tool's schema. Grant the returned timer id permission to call `agentTask.spawnForEdits` before leaving. Resolve the agent and destination NOW. Include the task, limits and success condition in the brief; do not refer only to "that one" or rely on scratch surviving a restart. Do not embed credentials. A later spawn's watcher attachment is best-effort; report the registered timer now and inspect the actual launch/supervision result when available.
 
-`timer.schedule {"title":"…","delayMs":600000,"payload":{"type":"message","message":"Run the test suite in the build terminal and report the result"}}` — ONE call, and usually the whole job. At fire time the message is delivered to you as the user's request and you run an ordinary turn: you pick the tools then, against the world as it actually is, so nothing has to be resolved in advance and a stale id cannot poison it. Write the message the way the user would say it to you.
+   The pinned CLI accepts ONLY `enqueue` and `call_safe_tool`, not a `message` or `run_check` payload. It cannot schedule an arbitrary future assistant conversation or autonomously resume a workflow graph. If the task cannot be expressed as a supported fixed call/agent brief, state that limit and offer a reminder instead of pretending the work is armed.
 
-Do NOT also do the work in this turn. "Start a timer, THEN spawn an agent" means the spawn happens at fire time, not twice.
+   Use relative `delayMs` when no trusted clock is available; do not invent `fireAt`. For a wall-clock request, resolve timezone and delay from a trustworthy time source or ask for the missing time information. Supply only one time form. For repeats choose a sensible `everyMs` plus finite `maxRuns` or `until`, and enough grant uses for the intended runs; the current schema does not enforce a one-minute minimum or finite recurrence. Missed repeats can collapse into one catch-up fire, so this is not a guarantee of one execution per missed interval.
 
-What it delivers depends on where the assistant is when it fires. If the panel is OPEN you get a normal turn with normal confirmations. If it is CLOSED the supervisor runs it as the `wake` actor, so a confirm-required mutation needs a WAKE grant — `grant.create {"actorType":"wake","actorId":"wake","allowedToolNames":["terminal.sendCommand"],"ttlMs":<the wait plus a margin>,"maxUses":1}`. NOT a timer-scoped grant: the fired message dispatches as `wake`, so a `tmr_…` grant is stored and consumed by nothing. A repeating message must be at least 60s apart and bounded by `maxRuns` or `until`.
+5. Use a FROZEN CALL only when one exact invocation is the deliverable:
 
-A timed message is delivered AT LEAST ONCE within an hour of its due time: one interrupted by a restart is delivered again, so when one arrives check before repeating anything destructive. Past that hour it is reported as MISSED and not carried out — acting on a stale instruction is worse than not acting — so say "I have scheduled it", never "it will have run". No autonomous turn can schedule a timer — not a timed message, and not a watcher or async wake that one of them started. Only you, interactively, can. If the instruction cannot be carried out when it fires, it says so and leaves it for the user.
+```json tool=timer.schedule
+{"title":"run the known build command","delayMs":600000,"payload":{"type":"call_safe_tool","toolCall":{"toolName":"terminal.sendCommand","args":{"terminalId":"<exact authorized terminal id>","command":"<verified bounded build command>"}}}}
+```
 
-### The frozen shape: one fixed tool call
+   Schedule first, then grant the returned timer id as step 3 requires. Payload arguments are frozen NOW: supply an explicit worktreeId for a delayed spawn, since an omitted target resolves at FIRE time. `target` only labels events; it supplies no payload argument. Do not use a delay so short that the fire can race the grant.
 
-Use this only when the exact call and its arguments are already known and must not be re-decided at fire time. It is two calls, both in THIS turn, in this order:
+   Despite its name, `call_safe_tool` can target any registered tool, subject to ordinary tier/confirmation policy. Keep this task to the requested work; do not build self-replicating timer chains. It performs ONE AT-MOST-ONCE attempt per firing: the timer is marked fired (or a repeat rescheduled) before dispatch, and a grant is consumed before the handler runs. An unreachable MCP or handler failure burns that attempt; it is not retried. Terminal-fire grant revocation happens AFTER dispatch, so a one-shot can spend its grant. A read-only payload needs no grant.
 
-1. `timer.schedule` with a `call_safe_tool` payload naming the ONE tool that does the work — `agentTask.spawnForEdits` to start an agent, `terminal.sendCommand` to drive a terminal that already exists. Use `delayMs`. Read the `timerId` off the result.
-2. `grant.create {"actorType":"timer","actorId":"<that tmr_… id>","allowedToolNames":["agentTask.spawnForEdits"],"ttlMs":<the wait plus a margin>,"maxUses":1}` — scoped to exactly the tool the payload names, with `maxUses` matching the fires you actually expect (1 for a one-shot).
+   A fixed spawn can carry a multi-step agent brief. It cannot give that agent the Assistant's control-plane tools, and a timer's own result does not wake the Assistant. Do not promise automatic follow-up from an unconfirmed watcher.
 
-   Three details in that pair. `allowedToolNames` matches the DOTTED tool name (`agentTask.spawnForEdits`) — the wire spelling matches nothing and the fire is refused. Pass `worktreeId` explicitly inside the payload args: omitted, a spawn resolves it to whatever is ACTIVE at FIRE time, not the worktree you reasoned about. And `target` only LABELS the events the fire publishes — it never fills a payload argument.
+6. For a REMINDER only:
 
-   The TTL runs from NOW, not from the fire, so cover the delay plus lateness (a project with no scheduler running catches up only when one next starts). Do not use this shape for a few-seconds delay: the timer can fire before the grant lands, and `grant.create` does not check its actor still exists, leaving a live grant for a dead timer.
+```json tool=timer.schedule
+{"title":"review the result","delayMs":3600000,"payload":{"type":"enqueue","message":"Review the build result in Daintree."}}
+```
 
-At fire time the scheduler dispatches that tool as the timer actor, consumes the grant, and publishes the result to the attention queue. Nobody has to be present, and no model turn runs — which is the difference from a timed message, and the reason this shape cannot adapt to anything it finds.
+   `enqueue` posts an inbox note, runs no tool and triggers no autonomous assistant turn. It is not a substitute for requested deferred work unless the user agrees to a reminder. Bound a repeating reminder to the requested cadence and horizon.
 
-A one-shot `call_safe_tool` is ONE AT-MOST-ONCE ATTEMPT (a bounded repeat is rescheduled before each dispatch, so it gets one attempt per firing). The timer is marked fired before the payload runs and is never rescheduled on failure, and the grant is spent before the handler discovers it cannot work, so a fire landing while Daintree is unreachable burns the grant, files an error and does not retry. Say "I have scheduled it", never "it will have run".
+7. Read setup results and END the user turn. Report every actual timer/async/watcher/grant id and which of these applies:
+   - WAKES THE ASSISTANT: eligible terminal watcher events and async completion; inspect per-terminal evidence on the wake.
+   - ACTS LATER: a timer `call_safe_tool` performs one fixed call and records its result. A fixed call itself does not wake the assistant.
+   - LEAVES A NOTE: `watcher.watchPR` or timer `enqueue`.
+   Confirm that the scheduler/background supervisor is available before promising after-close work. If Daintree or its scheduler is stopped, records can remain stored without checking/firing. Say "scheduled" or "watch registered", not "will have run". A missing watcher id on an issue-start result requires a watcher-ledger lookup, not a duplicate launch.
 
-Miss step 2 and the dispatch returns `CONFIRMATION_REQUIRED` and the fire is wasted (step 3). A read-only payload needs no grant.
+8. On a wake, revalidate targets and authority. Read the event and current state; do not replay an already completed action from a stale timer or compacted checkpoint. Report blocked, failed, timed-out and unverified outcomes accurately. A refused one-shot has already fired; a pending approval does not replay it. Take a newly authorized action or reschedule interactively only when the user wants that. Resolve the handled queue item once reported.
 
-Three things this does NOT do. Do not promise them:
+9. Retire only the requested tracking. Use `watcher.cancel({"id":"..."})`, `timer.cancel({"id":"..."})`, `async.cancel({"asyncId":"..."})`, and `grant.revoke({"id":"..."})`. Check scope and shared cohorts before cancelling; cancelling tracking never kills or closes the underlying terminal. Finished watchers are already stopped. Revoke task-specific wake authority when its window ends, preserving grants for unrelated live work.
 
-- **A `call_safe_tool` or `enqueue` timer does not WAKE you.** Their events never trigger an autonomous turn, so the result waits in the inbox — UNLESS the payload leaves a watcher (spawn with flat `watch:true` + `watchGoal`), whose completion IS a wake. Attachment is best-effort: a spawn can succeed with a `watcherWarning` and no `watcherId`, so promise the wake only against an id you can see.
-- **It runs ONE tool.** A multi-step sequence is not a timer payload. Make the one tool a spawn whose `taskPrompt` carries the whole job.
-- **It cannot exceed the tier, or reach the ungrantable names in step 3.** The tier gate is checked before any grant is looked up, so a grant never widens what the tier allows. Those still wait for the user, and saying so plainly is the honest answer.
+PR watcher boundary: `watcher.watchPR({"prNumber":123,"cwd":"<verified worktree path>","title":"PR outcome"})` sees `open|merged|draft|closed` and STOPS ON ITS OWN on merged/closed. A coarse activity ping is not a CI or review verdict. For CI now, use the follow-up-on-issue runbook; for future log diagnosis, supervise an agent terminal that can actually observe the result. Never promise "merge when green" from this watcher or a grant for `daintree.call`.
 
-Still prefer starting NOW when the delay was only about not blocking the user — the spawn shape in step 1. Reach for the timer when the delay is about the CLOCK, which is what "in ten minutes" and "at 6pm" mean.
-
-## What the PR watcher cannot watch
-
-`watcher.watchPR` sees the pull request's state and nothing else: `open` / `merged` / `draft` / `closed`. It polls, and it STOPS ON ITS OWN the moment the PR merges or closes — that is its terminal condition, so there is no watcher left to cancel afterwards and nothing keeps observing a merged PR. It does NOT wake on CI runs, check results, job logs, or review decisions, so never promise an alert "when CI goes green" off a PR watch: a push or a review surfaces only as a coarse "PR has new activity" ping, and a red build on its own surfaces nothing at all.
-
-That is a limit of this WATCHER, not of Daintree. CI roll-ups, review decisions and issue threads are all readable on demand — one-off, in a turn — with the follow-up-on-issue runbook (daintree.workflow.follow-up-on-issue). So when the user wants a CI verdict NOW, read it there rather than leaving a watcher that cannot see it. What still needs an agent in a terminal is the DETAIL no forge read carries: job logs and failure output. To be woken on that, spawn the agent with the spawn-visible-agent runbook and watch that TERMINAL with (a) or (b) — the terminal is the observable thing, not the PR.
-
-Report back: the mechanism you chose and why, every id you left running (watcher, timer, async handle, grant, plus the terminals or PR under watch), what will trigger it and whether that wakes you, acts, or only leaves a note, when the watch and grant expire, and anything that must wait for the user — naming any mutation you could not pre-authorize.
+Report back: the selected mechanism, target and exact handles, trigger/delay/expiry, whether it wakes, acts or only leaves a note, whether scheduling and authority succeeded, and any verification or availability limitation.
