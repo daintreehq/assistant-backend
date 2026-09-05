@@ -17,6 +17,10 @@ requiredTools:
   - queue.resolve
   - terminal.sendCommand
   - watcher.cancel
+  - watcher.list
+  - async.list
+  - workflow.list
+  - agentTask.superviseTerminal
 ---
 Use when: the user wants to start work on a forge issue.
 
@@ -28,8 +32,7 @@ auto-attaches ONE supervisor watcher to the spawned terminal (attachWatcher defa
 true). The supervision choice is therefore ALREADY MADE for you: this path is
 BACKGROUND by design. You set it up, end your turn, and react when the watcher's
 completed_* event lands on the attention queue — so under the foundation's
-one-supervisor rule, never also drive this agent in-turn (terminal.awaitAll /
-terminal.sendCommand) and never attach a second watcher on top of the wrapper's.
+one-supervisor rule, never also wait on this agent in-turn with terminal.awaitAll; a requested answer to a blocking question via terminal.sendCommand remains valid. Never attach a second watcher on top of the wrapper’s.
 
 Procedure:
 
@@ -52,12 +55,8 @@ Procedure:
    `assignees[]`, `commentCount?`, …). Read it before mutating anything — it shapes the
    agent's prompt and tells you if it's already assigned.
 
-3. Resolve the agentId — this is the silent-failure trap. startWorkOnIssue REQUIRES an
-   `agentId`, and its internal spawn does NOT validate it: an unknown or mis-transcribed
-   id still creates a terminal, but command generation fails silently -> a dead,
-   zero-output panel the watcher then babysits forever. A name the user spoke or typed
-   is only a HINT (voice transcription drops letters, so a spoken id arrives subtly
-   misspelled), so
+3. Resolve the agentId before launching. startWorkOnIssue REQUIRES an
+   `agentId`. Current Daintree rejects unknown or non-terminal agent kinds before issue lookup/worktree creation, and reports unavailable CLIs as partial failures rather than a healthy launch. Older hosts can fail later, so still inspect the returned resources. A user-spoken name is a hint;
    resolve it to a REAL configured id. Start from the agent registry in your startup
    context rather than `daintree.call agentSettings.get`, which is a system-risk escape
    hatch requiring typed confirmation. But the registry is not guaranteed complete — it
@@ -90,7 +89,7 @@ Procedure:
    top level. `attachWatcher` is assistant-side only (it controls the auto-watcher and is
    never forwarded to Daintree); leave it out to get the default-true watcher. `requestKey`
    is an optional top-level sibling forwarded to Daintree for idempotency (Daintree dedupes
-   on it and strips it before its own validation) — optional, you don't need to invent one.
+   on it and strips it before its own validation) — choose a distinct stable key for this logical issue launch and preserve it for an identical ambiguous retry; do not use only the issue number across repositories.
    If you set `recipeId`, the recipe's terminals spawn synchronously alongside the work
    agent; agent-sourced recipe terminals are capped at 3 (overflow -> failed). Those extra
    recipe terminals are UNSUPERVISED workspace setup — only the issue work agent gets the
@@ -102,20 +101,18 @@ Procedure:
          terminalId, recipeLaunched, spawnedTerminalCount, failedTerminalCount,
          assignedToSelf, assignedUsername, assignmentError, contextInjected }
 
-   and the assistant wrapper adds the attached `watcherId`. Use `terminalId` (NOT
+   The pinned Assistant wrapper can attach a watcher WITHOUT adding watcherId/workflowRunId to this return. Read watcher.list and match the returned terminalId; inspect workflow.list for its ledger row. An absent return field is not evidence of an absent watcher. Use `terminalId` (NOT
    worktreeId) for any later follow-up. Report: which issue (issueTitle/issueUrl), the
    worktreePath + branch created, the terminalId, the watcherId, whether it was assigned
    (assignedToSelf / assignmentError), and whether context injected (contextInjected).
    Look ahead for partial failure — DON'T claim a clean launch if you see any of these:
    - `terminalId` is null, or a partialSuccessError surfaced (worktree made but the
-     spawn/recipe failed) — say the agent did NOT start.
+     spawn/recipe failed) — report the phase and any known resources. No returned id means startup is unconfirmed; partial details or live state can establish whether a terminal exists.
    - `failedTerminalCount > 0` — a recipe terminal failed; name it.
-   - no `watcherId` / a watcherWarning — the watcher did NOT attach (Daintree/storage
-     error). Say so; either retry the spawn, or supervise the terminal yourself without
-     a tight read-loop (terminal.summarize once it has settled).
+   - Missing watcherId or watcherWarning — inspect watcher.list AND async.list for coverage. If no supervisor exists and the terminal is live, adopt that SAME terminal with agentTask.superviseTerminal, its returned worktreeId and explicit acceptance criteria. Never repeat startWorkOnIssue merely to repair supervision.
 
-6. END your turn. The watcher now supervises the agent in the background and publishes
-   to the attention queue when it settles, so proof of finish is its completed_* event —
+6. Once launch and watcher coverage are confirmed, END your turn. That watcher supervises the agent in the background and publishes
+   to the attention queue when it settles, so completion evidence comes from its completed_* event, interpreted with the verification caveats below —
    never your own glance at the agent's state (the foundation's finish rule). Tell the
    user the work is running and the next checkpoint is that event; supervision is
    durable (the background supervisor keeps watching if the user closes the assistant,
@@ -146,8 +143,10 @@ Procedure:
 Confirmation: workflow.startWorkOnIssue mutates real state and touches the forge —
 confirm before launch per the active tier (external risk).
 
+Read the full issue before launch even when the number is already known, and preserve project context throughout. Current startWorkOnIssue has no general worktree-locator argument: it uses the MCP-bound project; do not add guessed fields to arguments. A setup failure may carry partialSuccessError details with an existing worktree and possibly a terminal. Reconcile those resources before retrying or handing the existing checkout to a task agent. Assignment and context injection are best-effort; report them separately. A watcher attached by this wrapper has no task-specific acceptanceCriteria argument, so its completion event is not proof every requirement in the issue was tested.
+
 Report back: which issue was started (title + url), the worktree path / branch / the
 real terminalId and watcherId, whether it was assigned and context injected, any partial
-failure, and that supervision continues even if they close the assistant (the
+failure, and whether supervision was confirmed to continue after closing the assistant (the
 background supervisor takes over) — the next checkpoint is the watcher's completed_*
 event, not a status you poll yourself.

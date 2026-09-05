@@ -32,7 +32,7 @@ Doing the searching YOURSELF is the third option and almost always the wrong one
 
 Procedure:
 
-1. FIX THE TARGET. The runtime context already carries a one-line worktree summary; call `worktree.getCurrent` when you need the exact `worktreeId` to spawn into, or when the user may have switched. `git.getProjectPulse` when the branch matters to the answer — a question about "the current code" means the current branch's code.
+1. FIX THE TARGET. The runtime context already carries a worktree summary. Resolve the exact id and path when needed; for another named worktree use worktree.list rather than silently substituting worktree.getCurrent. `git.getProjectPulse` when the branch matters to the answer — a question about "the current code" means the current branch's code.
 
 2. DECIDE how to answer. Three tiers, and the middle one is the default:
    - ONE CALL, yourself — only when you already know the exact identifier AND expect a handful of hits: `fs.search({"query":"<literal substring>","glob":".py"})`. Two traps in one call: the search is a LITERAL, case-sensitive substring — not a regex — so search a distinctive identifier rather than a phrase; and `glob` is a filename SUFFIX (".py", ".ts"), not a pattern, so "*.py" matches nothing and returns a confident empty result. If that one search plus one `fs.read` answers it, you are done. **If it does not — if you are about to search a second time, or open a third file — STOP and delegate.** A second exploratory round is the signal, not a licence to continue.
@@ -54,10 +54,12 @@ Procedure:
 6. SYNTHESIZE. Your reply is the explanation, in your own words, with the agent's file evidence carried through. Keep the uncertainty: "the agent could not find where the token is refreshed" is a finding, and silently dropping it is how a gap becomes a wrong belief.
 
 Notes:
-- NEVER report that files changed. This is a read-only path; if something did change, that is a bug worth surfacing, not a result to narrate.
+- Report unexpected file changes as a read-only constraint violation. Do not hide them or accept them as the requested result.
 - Cite evidence, not confidence. `path/to/file.py:120` beats "the codebase appears to use a middleware pattern". A claim with no file behind it should be marked as inference.
 - Do not re-read what you already hold. The agent's report IS the data; re-opening the same files to "check" it burns a round and adds nothing.
-- One agent is usually right for a question with one answer. Reach for several only when the question genuinely has independent parts (frontend and backend, say) — and then use the fan-out runbook rather than hand-rolling it here.
-- If the repo is large and the question vague ("what does this do"), narrow it with the user first rather than launching a survey that takes ten minutes and answers something else.
+- One agent is usually right for a question with one answer. Reach for several only when the question genuinely has independent parts (frontend and backend, say) — and then use independent read-only briefs; the edit fan-out requirement for one worktree per writer does not apply to readers sharing a checkout.
+- If the repo is large and the question vague ("what does this do"), start with a bounded architecture map and evidence-backed entry points, stating the coverage. Ask for a narrower priority only if the request leaves the desired outcome unclear; an explicit comprehensive survey is already authority to investigate broadly.
+
+Respect read scope: fs.* and subagent.run use the assistant project root, not whichever worktree is currently selected in Daintree. For a different checkout, launch the visible explore agent there and require branch/path provenance. Read project instructions, entry points, tests and operational docs appropriate to the question; distinguish generated/vendor code from maintained source. Report searched scope and coverage gaps, and never equate a capped literal search returning no hits with proof a feature is absent.
 
 Report back: the answer to the question asked, the concrete file evidence behind it, what remains uncertain, and the terminal id of any agent you spawned.

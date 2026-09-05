@@ -44,4 +44,6 @@ Procedure:
 
 9. HANDLE THE NONFOCUSED-TARGET EDGE CASE. The provision, pause, resume and teardown availability checks currently examine the focused/active worktree even when `arguments.worktreeId` names another one; status itself does not have this gate. If a valid explicit mutation target is refused as not configured, do not silently switch worktrees through another raw call. Ask the user to select/focus the target worktree or use its worktree-card action.
 
+Do not treat configured:false as proof no remote resource exists: it means the status command is absent, so verification is unavailable. Existing status can include sensitive endpoints/output; report only safe status evidence. Cancellation or timeout is an unknown outcome of an external command, not rollback. Preserve the original target through remediation and distinguish a Daintree availability-gate refusal from failure of the remote resource itself.
+
 Report back: exact worktree id/branch, requested action, pre-action status, acknowledgement, post-action status or why verification was unavailable, and any reminder timer id. For teardown/connect, name the Daintree UI path required instead of claiming the MCP action ran.

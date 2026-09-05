@@ -55,7 +55,7 @@ RELOCATED_RULES: list[tuple[str, str, str]] = [
     ("no blocking reason clears by waiting", "none clears by waiting", "daintree.foundation"),
     ("calls dispatch in emission order", "dispatch in emission order", "daintree.foundation"),
     ("small-model reads dispatch concurrently", "dispatches CONCURRENTLY", "daintree.foundation"),
-    ("an id minted this reply waits a turn", "waits for the NEXT turn", "daintree.foundation"),
+    ("a minted id needs the next tool round", "NEXT TOOL ROUND", "daintree.foundation"),
     # --- from 20-tool-discipline.md, compressed in base, mechanics relocated ---
     ("one extract per terminal, not per cohort", "PER TERMINAL", "daintree.foundation"),
     ("an id array merges rather than fans out", "MERGE the whole cohort", "daintree.foundation"),

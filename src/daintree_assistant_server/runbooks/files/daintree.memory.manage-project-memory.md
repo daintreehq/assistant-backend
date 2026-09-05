@@ -36,7 +36,7 @@ Procedure:
    - ONE fact per memory. A paragraph holding three decisions cannot be corrected or forgotten independently.
    - Write it so it still makes sense in six months: no "the fix we just discussed", no bare pronouns, no relative dates.
 
-4. CORRECT by SAVING FIRST, then forgetting. Save the replacement, wait for a real `mem_…` id back, and only then `memory.forget({"id":"<the stale id>"})`. Never the other way round: forget is a soft delete with NO undo, so a forget-then-save that fails in the middle destroys the old fact and stores nothing in its place. The two calls must be in SEPARATE turns — a batch freezes both sets of arguments before either runs, so the forget cannot depend on the save having succeeded. Leaving both alive for one turn is a small, recoverable cost; losing the fact is not. If the forget then fails, say the store briefly holds two versions rather than reporting a clean correction.
+4. CORRECT by SAVING FIRST, then forgetting. Save the replacement, wait for a real `mem_…` id back, and only then `memory.forget({"id":"<the stale id>"})`. Never the other way round: forget is a soft delete with NO undo, so a forget-then-save that fails in the middle destroys the old fact and stores nothing in its place. The two calls must be in SEPARATE tool rounds within the same user turn — a batch freezes both sets of arguments before either runs, so the forget cannot depend on the save having succeeded. Leaving both alive for one turn is a small, recoverable cost; losing the fact is not. If the forget then fails, say the store briefly holds two versions rather than reporting a clean correction.
 
 5. CONFIRM anything destructive or ambiguous. If the user says "forget that" and more than one memory plausibly matches, do NOT pick one — `user.askMultipleChoice` with the candidate contents and let them choose. Call it alone; the turn blocks on the answer. If exactly one memory matches, forget it and say which.
 
@@ -52,5 +52,7 @@ Notes:
 - A user saying "remember" does not always mean the memory store. "Remember to run the tests before you push" inside one task is an instruction for now — do the thing; save it only if they mean it as a standing rule.
 - Session state belongs in the scratch store, not here: memory survives restarts and is project-wide, which is exactly wrong for a step counter or a list of ids you are working through.
 - When you save on your own initiative, say so in your reply. Silent memory writes are how a store fills with things nobody agreed to.
+
+Correction must preserve intended pinning and lifetime too. Read the old entry’s pinned/category/kind/source/expiry metadata; save with the correct provenance and remaining TTL if it should still expire. If the old entry was pinned and the replacement should be, pin the returned new id successfully BEFORE forgetting the old one. Do not remove the only pinned directive after a failed replacement/pin. `memory.list` and recall are bounded, so an omitted entry is not proof of absence; inspect returned matches before forgetting and report partial failures without claiming a complete correction.
 
 Report back: what you saved, corrected, pinned or forgot, quoting the memory content and its `mem_…` id exactly — and, for a recall, the fact plus where it came from.

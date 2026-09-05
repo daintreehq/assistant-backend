@@ -53,4 +53,6 @@ Procedure:
 
 9. KEEP THE SCOPE BOUNDARY. Closing an issue and posting its final comment belong to `daintree.workflow.follow-up-on-issue`, which sequences those two writes safely. Creating an issue is not permission to start an agent or implementation; do that only on a separate user request through the start-work runbook.
 
+Use the same repository locator through dedupe, mutation and verification; issue numbers alone are not globally unique. If the issue changes between your initial read and a replacement edit, re-read and preserve intervening content rather than overwriting it. The idempotency window is finite and process/session dependent: after an uncertain create or expiration, search and compare the actual issue before retrying. When the user requested several field changes, report each field’s confirmed state so partial success is visible.
+
 Report back: repository/worktree, issue number and URL, exactly which public fields changed, the state read back after the write, and any requested label or assignee the forge did not accept.

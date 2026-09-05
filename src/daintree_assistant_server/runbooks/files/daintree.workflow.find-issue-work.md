@@ -31,8 +31,7 @@ OPEN runs ride every round's turn context as one-line rows, so you usually need 
 all. Reach for `workflow.list({"status":"active"})` (flat args, NOT nested in
 `arguments`) when you want history the turn context does not carry. Each row gives
 `issueNumber` / `prNumber` / `branch`. Build the set of issue numbers already being worked
-— that set is what turns a raw search result into a shortlist worth reading, and it means
-you never propose an issue the user already has a worktree open on.
+— that set helps avoid duplicate starts. A ledger row alone can be stale, so report its evidence and resolve ambiguity rather than calling it a live worker automatically.
 
 ## Step 2 — Put the STRUCTURED filters in real keys, the rest in `search`
 `forge.listIssues` is a passthrough wrapper accepting ONLY `arguments` at the top level;
@@ -95,7 +94,7 @@ there may only be the coarse roll-up rather than the required-check verdict. CI 
 
 ## Step 3 — Page only as far as you need
 The result is `{ items, nextCursor, hasMore }`. To continue, pass the PREVIOUS response's
-`nextCursor` back in the same nested shape; never pass an empty string (it is rejected,
+`nextCursor` back in the same nested shape; preserve the same worktree locator, search, state, sort, direction, perPage and view on every page; never pass an empty cursor string (it is rejected,
 because it would alias page one's cache while asking the provider for an invalid cursor).
 
 ```
@@ -134,6 +133,8 @@ area, label), each with one line of why, and name what you excluded and on what 
 Selection is not a mutation, so none of this needs confirmation. Hand off only when the
 user picks: one issue to start is daintree.workflow.start-work-on-issue, a batch to run
 in parallel is daintree.orchestration.fan-out-work.
+
+Use repository-specific exclusion labels and contribution policy when selecting work; do not treat one provider’s search dialect as universal. A historical PR search needs its own result: closed does not necessarily mean merged, and title search cannot prove which files changed or that a feature shipped. Verify finalists individually and report that limitation. Bound pagination to the requested shortlist and name hasMore/capped results rather than claiming a census. If the user already authorized choosing and starting suitable work, hand the evidenced choice to start-work-on-issue without asking the same permission again.
 
 Report back: the query you actually ran (verbatim, so the user can adjust it), the
 shortlist with a reason each, what you excluded and why (already assigned, linked PR

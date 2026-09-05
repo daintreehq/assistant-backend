@@ -23,7 +23,7 @@ or wants it commented on and closed.
 
 CI, review decisions and issue threads ARE readable — that changed, and older habits
 assume otherwise. Direct Assistant `forge.getChecks` returns a typed check roll-up,
-`forge.getPR` carries `reviewDecision`, and raw Daintree `forge.listIssueComments` reads a
+`forge.getPR` carries `reviewDecision`, and typed Assistant `forge.listIssueComments` reads a
 thread back. Daintree also has a newer PER-CHECK action named `forge.getChecks`, reached
 only through `daintree.call`; the name collision is easy to miss. You no longer need an
 agent to answer "is it green" or "which check failed". What still needs provider tooling
@@ -59,8 +59,7 @@ forge.getPR({"prNumber": <int>})
 
 It returns `state`, `isDraft`, `merged`, `baseRef`, `headRef`, and may carry
 `commentCount` and — the field to read here — `reviewDecision`: `APPROVED`,
-`CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null`. A `null` is a real answer meaning
-reviews are not gated, and reads as approved; only an ABSENT key means "not reported". The
+`CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null`. A `null` means no review gate was reported, not that a person approved the change; only an ABSENT key means "not reported". The
 result is an envelope, `{ pr }` — the fields above are on `pr`, not at the top level — and
 a PR that does not exist comes back with `pr` empty rather than failing, so treat empty as
 absence, not as an error.
@@ -102,7 +101,7 @@ forge.listIssueComments({"issueNumber": <int>, "perPage": 50})
 -> `{ items: [{ id, body, url, createdAt, author? }], nextCursor, hasMore, totalCount? }`.
 Comments arrive OLDEST FIRST, so the newest reply is on the LAST page — page with
 `cursor` to the end before claiming you have read the latest, or you will report a stale
-answer with total confidence. An empty page genuinely means nobody has commented; a
+answer with total confidence. An empty FIRST page with no further pages means no comments were returned; an empty later page does not erase earlier comments. Preserve cursor and location while paging; a
 missing issue or a provider that cannot read threads FAILS instead, so silence here is
 never ambiguous.
 
@@ -125,7 +124,7 @@ or attach a watcher and end the turn. Never both. Report the roll-up you already
 while it works rather than making the user wait for everything.
 
 ## Step 5 — Relay blockers to whoever is still working
-If an implementer agent is still running on this issue, send it the ACTIONABLE content
+When the user requested coordination or fixing, and an implementer is still running on this issue, send it the ACTIONABLE content
 with `terminal.sendCommand` ({"terminalId": "<full id>", "command": "..."}). A bare
 `CHANGES_REQUESTED` is a state, not feedback: relaying it alone tells the agent nothing it
 can act on. Send what you actually hold — the review decision plus the specific asks from
@@ -150,7 +149,7 @@ daintree.call({"name": "forge.addIssueComment",
 
 `body` must be non-empty. Comments are public, notify every watcher, and CANNOT be edited
 or withdrawn through this surface — treat posting as final and get it right the first
-time. Then:
+time. Only when closure was requested, then:
 
 ```
 daintree.call({"name": "forge.closeIssue",
@@ -163,6 +162,8 @@ then close: if the comment fails, do NOT close silently, and if the close fails 
 comment landed, say so plainly rather than reporting a clean finish. Re-read the issue
 before writing if any time has passed — do not add a second closing comment to an issue
 someone already closed.
+
+Keep one explicit worktreeId/path on EVERY read and write, including comments and close; an issue/PR number can identify different objects across repositories. A read-only “what is blocking it?” request stops at the report and does not send instructions or publish comments. Posting a closing comment is required only if the user asked for that comment; a close-only request need not notify watchers with extra prose. For an ambiguous comment result, read the thread and match the actual posted content before retrying, using a stable requestKey for that logical comment. After closing, re-read the issue and verify state/reason. Report paging limits rather than claiming the latest reply when hasMore is still true.
 
 Report back: the issue and PR numbers with the PR url, the CI verdict as the roll-up
 actually stated it (`state` plus the passed/failed/pending counts, and any caveat — a zero

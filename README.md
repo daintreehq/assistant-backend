@@ -44,6 +44,8 @@ This README is a summary. Where it disagrees with one of these, the document win
 | [`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) | Model ids, upstream wire shape, privacy posture, thinking posture, both retry layers, failure mapping |
 | [`docs/KEY_HANDLING.md`](docs/KEY_HANDLING.md) | What a key is, how it moves, where it must never appear, verification, rotation |
 | [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md) | The wire contract |
+| [`docs/RUNBOOKS.md`](docs/RUNBOOKS.md) | Runbook authoring, contract sources, example validation and catalog checks |
+| [`docs/RUNBOOK_AUDIT.md`](docs/RUNBOOK_AUDIT.md) | September 2026 review of all 39 runbooks and remaining runtime limitations |
 | [`docs/CONTEXT_COMPILER.md`](docs/CONTEXT_COMPILER.md) | **Future work, not built.** The query-aware context-compiler design, assessed against what already exists here |
 
 `tests/unit/test_docs_drift.py` pins the highest-risk facts in those documents —
