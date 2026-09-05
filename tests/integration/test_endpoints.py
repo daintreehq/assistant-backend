@@ -621,10 +621,8 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
         assert client.get("/healthz").status_code == 200
 
 
-def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
-    """Production readiness needs no INBOUND key: there is nothing to configure
-    on the door. Only the server's own material — the signing key, the salt, and
-    the two upstream credentials — is validated."""
+def test_prod_refuses_to_serve_without_authentication_enforcement() -> None:
+    """Provider secrets alone cannot make an anonymously funded production API ready."""
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
@@ -639,11 +637,11 @@ def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
     )
     app = create_app(settings=settings)
     with TestClient(app) as client:
-        assert app.state.ready is True
-        assert client.get("/readyz").status_code == 200
+        assert app.state.ready is False
+        assert client.get("/readyz").status_code == 503
         assert client.get("/healthz").status_code == 200
-        # And the open door holds in production too — it is not a dev shortcut.
-        assert client.get("/v1/daintree/capabilities").status_code == 200
+        assert "AUTH_MODE=enforce" in (app.state.ready_error or "")
+        assert client.get("/v1/daintree/capabilities").status_code == 503
 
 
 def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:

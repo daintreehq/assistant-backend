@@ -75,20 +75,23 @@ def test_auth_mode_defaults_to_open() -> None:
     assert _settings().auth_mode == "open"
 
 
-def test_an_unconfigured_deployment_is_ready() -> None:
-    """Production runs the open door today. Requiring OAuth configuration to be
-    present would fail `/readyz` on the very next release, and the revision would
-    never take traffic.
-
-    Asserted through `local_only_problems()` as well, because that is the list
-    lifespan actually reads — `auth_problems()` being empty proves nothing if
-    something else refuses the same deployment for an auth-shaped reason.
-    """
+def test_an_unconfigured_development_deployment_is_ready() -> None:
     assert _settings().auth_problems() == []
     assert _settings().local_only_problems() == []
-    production = _settings(ENVIRONMENT="production")
-    assert production.auth_problems() == []
-    assert not [p for p in production.local_only_problems() if "AUTH" in p or "SUPABASE" in p]
+
+
+@pytest.mark.parametrize("mode", ["open", "observe"])
+def test_production_requires_authentication_enforcement(mode: str) -> None:
+    production = _complete(ENVIRONMENT="production", AUTH_MODE=mode)
+    assert "ENVIRONMENT=production requires AUTH_MODE=enforce" in production.auth_problems()
+    assert "ENVIRONMENT=production requires AUTH_MODE=enforce" in production.local_only_problems()
+    # A valid manifest remains discoverable during an operator's configuration repair.
+    assert production.auth_is_configured
+
+
+@pytest.mark.parametrize("mode", ["open", "observe"])
+def test_staging_still_supports_observation_before_enforcement(mode: str) -> None:
+    assert _complete(ENVIRONMENT="staging", AUTH_MODE=mode).auth_problems() == []
 
 
 @pytest.mark.parametrize("mode", ["open", "observe", "enforce"])
@@ -669,7 +672,7 @@ def test_a_local_or_private_host_is_refused_in_production(host: str) -> None:
 
 
 def test_a_public_host_is_accepted_in_production() -> None:
-    assert _complete(ENVIRONMENT="production").auth_problems() == []
+    assert _complete(ENVIRONMENT="production", AUTH_MODE="enforce").auth_problems() == []
 
 
 # ---- The issuer path is part of the credential check -----------------------

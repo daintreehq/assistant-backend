@@ -312,9 +312,22 @@ def test_dump_dir_fails_readiness_in_production() -> None:
     assert any("DAINTREE_DUMP_UPSTREAM_DIR" in p for p in s.local_only_problems())
 
 
+def _enforced_production_settings(**overrides: object) -> Settings:
+    return _settings(
+        ENVIRONMENT="production",
+        AUTH_MODE="enforce",
+        SUPABASE_AUTH_ISSUER="https://test-project.supabase.co/auth/v1",
+        SUPABASE_JWKS_URL="https://test-project.supabase.co/auth/v1/.well-known/jwks.json",
+        SUPABASE_OAUTH_AUTHORIZE_URL="https://test-project.supabase.co/auth/v1/oauth/authorize",
+        SUPABASE_OAUTH_TOKEN_URL="https://test-project.supabase.co/auth/v1/oauth/token",
+        SUPABASE_OAUTH_CLIENT_ID="test-client",
+        **overrides,
+    )
+
+
 def test_dump_dir_empty_string_is_not_a_problem_in_production() -> None:
     # An empty value means "unset" — it must not trip the production gate.
-    s = _settings(ENVIRONMENT="production", DAINTREE_DUMP_UPSTREAM_DIR="")
+    s = _enforced_production_settings(DAINTREE_DUMP_UPSTREAM_DIR="")
     assert s.local_only_problems() == []
 
 
@@ -347,15 +360,14 @@ def test_runbooks_overlay_dir_fails_readiness_in_staging() -> None:
 
 def test_runbooks_overlay_dir_empty_string_is_not_a_problem_in_production() -> None:
     # An empty value means "unset" — it must not trip the production gate.
-    s = _settings(ENVIRONMENT="production", DAINTREE_RUNBOOKS_OVERLAY_DIR="")
+    s = _enforced_production_settings(DAINTREE_RUNBOOKS_OVERLAY_DIR="")
     assert s.local_only_problems() == []
 
 
 def test_both_local_only_features_are_reported_together() -> None:
     # The gate returns a LIST, and a deploy with two development flags left on
     # should learn about both from one readiness failure rather than one per fix.
-    s = _settings(
-        ENVIRONMENT="production",
+    s = _enforced_production_settings(
         DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dumps",
         DAINTREE_RUNBOOKS_OVERLAY_DIR="/tmp/runbooks",
     )

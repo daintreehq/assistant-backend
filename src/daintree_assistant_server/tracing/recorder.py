@@ -19,6 +19,7 @@ reason it is there.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import secrets
@@ -223,10 +224,14 @@ class DefaultTraceRecorder:
             flush_grace_seconds=self._flush_grace_seconds,
         )
         try:
-            await self._sink.open(trace_id, header.as_dict())
+            # Opening storage is optional work on the first-byte path. Give it
+            # the same bounded grace as the terminal flush; an outage must leave
+            # the turn untraced rather than prevent generation from starting.
+            async with asyncio.timeout(self._flush_grace_seconds):
+                await self._sink.open(trace_id, header.as_dict())
         except Exception:
-            # The ONE sink call the scope's own guard cannot cover, because the
-            # scope does not exist yet. Left unguarded it would turn a storage
+            # The opening call runs outside the scope's event-write guard.
+            # Left unguarded it would turn a storage
             # outage — or, far more likely, an expired credential — into a failed
             # user turn, which is the single thing this subsystem promises never
             # to do. An untraced turn is the correct degradation.

@@ -25,6 +25,7 @@ being unavailable when it is needed.
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -70,6 +71,10 @@ JWKS_MIN_REFRESH_SECONDS = 10
 
 #: A JWKS document is a handful of public keys. Anything larger is not one.
 MAX_JWKS_BYTES = 256 * 1024
+
+# Bound the whole exchange, including a peer that keeps sending small chunks
+# inside httpx's per-read timeout. Refresh holds the shared authentication lock.
+JWKS_FETCH_TIMEOUT_SECONDS = 5.0
 
 #: How long a key set may go WITHOUT a successful refresh and still be trusted.
 #:
@@ -253,14 +258,18 @@ class JwksCache:
             # `follow_redirects` explicitly, not by relying on the client's
             # default: this client is injected, and a redirect here would fetch
             # signing keys from a host the issuer does not name.
-            response = await self.client.get(self.url, follow_redirects=False)
-            response.raise_for_status()
-            declared = response.headers.get("content-length")
-            if declared and declared.isdigit() and int(declared) > MAX_JWKS_BYTES:
-                raise ValueError("jwks document announces an implausible size")
-            if len(response.content) > MAX_JWKS_BYTES:
-                raise ValueError("jwks document is implausibly large")
-            document = response.json()
+            async with asyncio.timeout(JWKS_FETCH_TIMEOUT_SECONDS):
+                async with self.client.stream("GET", self.url, follow_redirects=False) as response:
+                    response.raise_for_status()
+                    declared = response.headers.get("content-length")
+                    if declared and declared.isdigit() and int(declared) > MAX_JWKS_BYTES:
+                        raise ValueError("jwks document announces an implausible size")
+                    body = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        if len(body) + len(chunk) > MAX_JWKS_BYTES:
+                            raise ValueError("jwks document is implausibly large")
+                        body.extend(chunk)
+                    document = json.loads(body)
             key_set = PyJWKSet.from_dict(document)
         except Exception as exc:
             # A fetch failure is NOT a verdict about the token. Keys we already

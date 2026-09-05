@@ -226,33 +226,6 @@ if only one of the two is edited.
 ---
 
 
-## Refuse `AUTH_MODE=open` in production at the cutover
-
-**Trigger: the release that sets production to `enforce`. Not the release that
-made `enforce` possible — those are different days, and an earlier revision of
-this entry got that wrong.**
-
-`Settings.auth_problems()` deliberately does NOT implement the master spec's rule
-that `open` and `observe` are refused in production. The spec is right about the
-destination and wrong about today: `open` IS the deployed production posture, it
-is documented as such in `docs/DAINTREE_API.md`, and `infra/gcp/smoke.sh` asserts
-it. Adding that gate now would fail `/readyz` on the very next release and the
-revision would never take traffic.
-
-This entry previously said the gate had to land in the same commit as the
-verification code, on the reasoning that lifting the "mode not implemented"
-refusal without it was a regression. That was a mistake, and worth naming rather
-than quietly editing: it conflated the code EXISTING with the fleet being SWITCHED
-to it. Between those two events `open` is not merely acceptable in production, it
-is the only correct value — the verifier is built and tested, and no Supabase
-project is provisioned for it to verify against.
-
-The gate belongs to the release that actually flips production, and it is what
-stops the fleet silently sitting on `open` afterwards.
-
----
-
-
 ## Retrain the selector so a reserved candidate can actually be kept
 
 **Trigger: the next selector retrain — this rides along with it, and should not
