@@ -46,6 +46,7 @@ This README is a summary. Where it disagrees with one of these, the document win
 | [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md) | The wire contract |
 | [`docs/RUNBOOKS.md`](docs/RUNBOOKS.md) | Runbook authoring, contract sources, example validation and catalog checks |
 | [`docs/RUNBOOK_AUDIT.md`](docs/RUNBOOK_AUDIT.md) | September 2026 review of all 39 runbooks and remaining runtime limitations |
+| [`docs/INTELLIGENCE_REPORT_APPLICATION.md`](docs/INTELLIGENCE_REPORT_APPLICATION.md) | Applied intelligence-report recommendations, behavior qualification and deferred capabilities |
 | [`docs/CONTEXT_COMPILER.md`](docs/CONTEXT_COMPILER.md) | **Future work, not built.** The query-aware context-compiler design, assessed against what already exists here |
 
 `tests/unit/test_docs_drift.py` pins the highest-risk facts in those documents —
@@ -139,10 +140,11 @@ Set this (see `.env.example` for the full list):
 ```bash
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
 export BASETEN_API_KEY=...               # the upstream credential; funds every turn
-export CEREBRAS_API_KEY=...               # the fast-response stage, which has no off switch
 ```
 
-Those three are the whole list, and all three are the **server's own**. There is no
+Both are the **server's own**. `CEREBRAS_API_KEY` is not required while
+`FAST_RESPONSE_ENABLED` is false; `OPENROUTER_API_KEY` is optional failover
+configuration and does not gate readiness. There is no
 inbound API key to configure — account authentication is OAuth, and its settings
 (issuer, JWKS, client id, and the website's entitlement URL) are public
 configuration rather than secrets, which is why they gate readiness through
@@ -166,7 +168,6 @@ than as a first-turn upstream 401 that reads like the caller's fault.
 ```bash
 # Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
 cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT, BASETEN_API_KEY
-                       # and CEREBRAS_API_KEY
 ./dev                  # exports .env, then runs the server
 ```
 
@@ -296,7 +297,8 @@ believes they have recovered and stops looking.
 
 The deployment mounts state-signing material (`STATE_SIGNING_KEY_CURRENT`,
 `STATE_SALT`) and both upstream credentials — `BASETEN_API_KEY`, which funds
-every turn, and `CEREBRAS_API_KEY`, which funds the fast-response preamble. Four
+every turn, and `CEREBRAS_API_KEY`, reserved for the currently disabled
+fast-response stage. Four
 Secret Manager secrets, all server-owned; `bootstrap.sh` creates and grants all
 four. In production (`ENVIRONMENT=production`) the service fails readiness if a
 secret is weak or default (the packaged `STATE_SALT`, a signing key under 32

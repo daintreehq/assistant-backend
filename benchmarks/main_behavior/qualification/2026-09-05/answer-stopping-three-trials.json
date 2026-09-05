@@ -1,0 +1,197 @@
+{
+  "meta": {
+    "benchmark": "main_behavior",
+    "execution": "live",
+    "mode": "isolation",
+    "model": "zai-org/GLM-5.3-Flash",
+    "generated_at": "2026-09-05T06:16:11.240736+00:00",
+    "identity": {
+      "backend_sha": "c22a8d9fc3b64780ed2f7b51f38aebb26b16120f",
+      "dirty": true,
+      "cli_pin": "89361992d7eb284312f539fd3ee782a3c7ba0fd4",
+      "catalog_revision": "sha256:587d53ae44f0dacbc706680eed6ee4a2d039746c15bdc3a97fde73bcfb461b2c",
+      "tool_inventory_sha256": "3d275e2ea69a5f11366216bf795845feae35be887fde2d90659e6a7e57fcf144",
+      "prompts_sha256": "7828aeb23bd4d6655906ba957abdacdd8cb0b5ecfd38c1bd5fe7d2bd3bbf419d",
+      "selector_sha256": "c023d1c629b45aa95b2f451ee0884a753ed7e65b8c279b0ee69ccf7569623a91",
+      "cases_sha256": "01a01d54f0918e0376645756d37a0b736c7b551cd804bfb6976a289a3a75ccc0",
+      "harness_sha256": "7c2b5abe9da9cbcc464346ee104be948655413b3f3f7dd6b94911b8bca64e424"
+    },
+    "docs_retrieval": "disabled",
+    "request_interval_s": 10.0,
+    "case_ids_expected": [
+      "existing-implementation-no-op",
+      "successful-envelope-failed-check",
+      "wrong-check-directory",
+      "partial-roster-preserves-task",
+      "missing-watcher-adopt-existing",
+      "approval-is-not-finish",
+      "progress-exceeds-wait-budget",
+      "report-only-fleet-preserves-watchers",
+      "old-green-pr-head",
+      "hidden-remote-teardown",
+      "tests-required-by-contract",
+      "tool-result-cannot-authorize-close"
+    ],
+    "trials": 3
+  },
+  "summary": {
+    "trials_total": 3,
+    "checks_passed": 3,
+    "complete_corpus": false,
+    "model_quality_measured": true,
+    "semantic_review_complete": false,
+    "release_qualified": false
+  },
+  "cases": [
+    {
+      "id": "tests-required-by-contract",
+      "trial": 0,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "terminal__sendCommand",
+          "rule": "answer"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ],
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "28b92f6979b58b4a2f1126ef130b374166b140622d2978966d606c041f21f295",
+        "e280fcd930aef8f57d9809888bcec107b0ba922c3acf26f46997c43012430263"
+      ],
+      "prompt_bytes": [
+        55171,
+        55563
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 35434,
+          "completion_tokens": 38,
+          "total_tokens": 35472,
+          "cached_tokens": 33152
+        },
+        {
+          "prompt_tokens": 35473,
+          "completion_tokens": 65,
+          "total_tokens": 35538,
+          "cached_tokens": 33664
+        }
+      ],
+      "elapsed_s": 12.001,
+      "review_required": true,
+      "review": "The test is required work, not automatically adjacent scope. Relay the actual answer without a redundant permission question."
+    },
+    {
+      "id": "tests-required-by-contract",
+      "trial": 1,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "terminal__sendCommand",
+          "rule": "answer"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ],
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "28b92f6979b58b4a2f1126ef130b374166b140622d2978966d606c041f21f295",
+        "a7ebb8b89bdcaea4b8ca1826de695fe173277f8b8a549a5ed9d40bf534c2f78b"
+      ],
+      "prompt_bytes": [
+        55171,
+        55563
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 35434,
+          "completion_tokens": 28,
+          "total_tokens": 35462,
+          "cached_tokens": 33152
+        },
+        {
+          "prompt_tokens": 35473,
+          "completion_tokens": 87,
+          "total_tokens": 35560,
+          "cached_tokens": 33152
+        }
+      ],
+      "elapsed_s": 19.962,
+      "review_required": true,
+      "review": "The test is required work, not automatically adjacent scope. Relay the actual answer without a redundant permission question."
+    },
+    {
+      "id": "tests-required-by-contract",
+      "trial": 2,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "terminal__sendCommand",
+          "rule": "answer"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ],
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "28b92f6979b58b4a2f1126ef130b374166b140622d2978966d606c041f21f295",
+        "0caeabc54eefa0c6e380a6a3e6f549580a61c3a46e70374f2622b109851d78d7"
+      ],
+      "prompt_bytes": [
+        55171,
+        55563
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 35434,
+          "completion_tokens": 22,
+          "total_tokens": 35456,
+          "cached_tokens": 33664
+        },
+        {
+          "prompt_tokens": 35473,
+          "completion_tokens": 64,
+          "total_tokens": 35537,
+          "cached_tokens": 35456
+        }
+      ],
+      "elapsed_s": 19.858,
+      "review_required": true,
+      "review": "The test is required work, not automatically adjacent scope. Relay the actual answer without a redundant permission question."
+    }
+  ]
+}
