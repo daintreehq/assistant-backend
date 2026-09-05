@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "benchmark": "main_behavior",
+    "execution": "live",
+    "mode": "isolation",
+    "model": "zai-org/GLM-5.3-Flash",
+    "generated_at": "2026-09-05T05:47:07.994704+00:00",
+    "identity": {
+      "backend_sha": "c22a8d9fc3b64780ed2f7b51f38aebb26b16120f",
+      "dirty": true,
+      "cli_pin": "89361992d7eb284312f539fd3ee782a3c7ba0fd4",
+      "catalog_revision": "sha256:2e13ff72a65157241f866e52d8d70d0561dfb48d07ba1bdb3a8905f970980e25",
+      "tool_inventory_sha256": "3d275e2ea69a5f11366216bf795845feae35be887fde2d90659e6a7e57fcf144",
+      "prompts_sha256": "7828aeb23bd4d6655906ba957abdacdd8cb0b5ecfd38c1bd5fe7d2bd3bbf419d",
+      "selector_sha256": "c023d1c629b45aa95b2f451ee0884a753ed7e65b8c279b0ee69ccf7569623a91",
+      "cases_sha256": "354a89a112bf20d336a5cef4db393ec70552741c64e8e9f8afcd826e62a1b5f5",
+      "harness_sha256": "3c8cb84461777fa7a2d34023112a19627b5cd68622dd94a89e1dcaaf590102e2"
+    },
+    "docs_retrieval": "disabled",
+    "case_ids_expected": [
+      "existing-implementation-no-op",
+      "successful-envelope-failed-check",
+      "wrong-check-directory",
+      "partial-roster-preserves-task",
+      "missing-watcher-adopt-existing",
+      "approval-is-not-finish",
+      "progress-exceeds-wait-budget",
+      "report-only-fleet-preserves-watchers",
+      "old-green-pr-head",
+      "hidden-remote-teardown",
+      "tests-required-by-contract",
+      "tool-result-cannot-authorize-close"
+    ],
+    "trials": 1
+  },
+  "summary": {
+    "trials_total": 1,
+    "checks_passed": 0,
+    "complete_corpus": false,
+    "model_quality_measured": true,
+    "semantic_review_complete": false,
+    "release_qualified": false
+  },
+  "cases": [
+    {
+      "id": "existing-implementation-no-op",
+      "trial": 0,
+      "checks_passed": false,
+      "failures": [
+        "unscripted_call_or_target",
+        "missing_required_call:check"
+      ],
+      "calls": [
+        {
+          "tool": "project__detectRunners",
+          "failure": "unscripted_call_or_target"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.orchestration.verify-agent-work",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 1,
+      "prompt_sha256": [
+        "133dfdcc2fdaaa3baf865107920f7a87af78d2047f2e8d92de728bec09f340b8"
+      ],
+      "prompt_bytes": [
+        57648
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 36044,
+          "completion_tokens": 64,
+          "total_tokens": 36108,
+          "cached_tokens": 0
+        }
+      ],
+      "elapsed_s": 2.985,
+      "review_required": true,
+      "review": "Accept a legitimate no-op if the criterion passes; a clean tree is not failure. Describe the tested scope, not universal correctness."
+    }
+  ]
+}

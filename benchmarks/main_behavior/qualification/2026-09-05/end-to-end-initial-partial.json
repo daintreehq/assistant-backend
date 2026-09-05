@@ -1,0 +1,400 @@
+{
+  "meta": {
+    "benchmark": "main_behavior",
+    "execution": "live",
+    "mode": "end-to-end",
+    "model": "zai-org/GLM-5.3-Flash",
+    "generated_at": "2026-09-05T05:51:44.752550+00:00",
+    "identity": {
+      "backend_sha": "c22a8d9fc3b64780ed2f7b51f38aebb26b16120f",
+      "dirty": true,
+      "cli_pin": "89361992d7eb284312f539fd3ee782a3c7ba0fd4",
+      "catalog_revision": "sha256:2e13ff72a65157241f866e52d8d70d0561dfb48d07ba1bdb3a8905f970980e25",
+      "tool_inventory_sha256": "3d275e2ea69a5f11366216bf795845feae35be887fde2d90659e6a7e57fcf144",
+      "prompts_sha256": "7828aeb23bd4d6655906ba957abdacdd8cb0b5ecfd38c1bd5fe7d2bd3bbf419d",
+      "selector_sha256": "c023d1c629b45aa95b2f451ee0884a753ed7e65b8c279b0ee69ccf7569623a91",
+      "cases_sha256": "d279a9e6898f086dd1ce478c9ad20f30d92022c803ddc48020074e1d77b81a31",
+      "harness_sha256": "ed74b18c70112e5214d67d0cdab0804a55f59ba91d85893bfd334c4f479ac7cb"
+    },
+    "docs_retrieval": "disabled",
+    "case_ids_expected": [
+      "existing-implementation-no-op",
+      "successful-envelope-failed-check",
+      "wrong-check-directory",
+      "partial-roster-preserves-task",
+      "missing-watcher-adopt-existing",
+      "approval-is-not-finish",
+      "progress-exceeds-wait-budget",
+      "report-only-fleet-preserves-watchers",
+      "old-green-pr-head",
+      "hidden-remote-teardown",
+      "tests-required-by-contract",
+      "tool-result-cannot-authorize-close"
+    ],
+    "trials": 1
+  },
+  "summary": {
+    "trials_total": 8,
+    "checks_passed": 4,
+    "complete_corpus": false,
+    "model_quality_measured": true,
+    "semantic_review_complete": false,
+    "release_qualified": false
+  },
+  "cases": [
+    {
+      "id": "existing-implementation-no-op",
+      "trial": 0,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "project__runCheck",
+          "rule": "check"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.orchestration.verify-agent-work",
+          "daintree.foundation"
+        ],
+        [
+          "daintree.orchestration.verify-agent-work",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "133dfdcc2fdaaa3baf865107920f7a87af78d2047f2e8d92de728bec09f340b8",
+        "f0e0e0363fbe05aee797d68ecf1d36098a1e1417acfa6ffc4a908f8f5d84227a"
+      ],
+      "prompt_bytes": [
+        57648,
+        58162
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 36044,
+          "completion_tokens": 35,
+          "total_tokens": 36079,
+          "cached_tokens": 0
+        },
+        {
+          "prompt_tokens": 36123,
+          "completion_tokens": 75,
+          "total_tokens": 36198,
+          "cached_tokens": 35840
+        }
+      ],
+      "elapsed_s": 4.632,
+      "review_required": true,
+      "review": "Accept a legitimate no-op if the criterion passes; a clean tree is not failure. Describe the tested scope, not universal correctness."
+    },
+    {
+      "id": "successful-envelope-failed-check",
+      "trial": 0,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "project__runCheck",
+          "rule": "check"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.ci.diagnose-and-fix",
+          "daintree.foundation",
+          "daintree.orchestration.verify-agent-work"
+        ],
+        [
+          "daintree.ci.diagnose-and-fix",
+          "daintree.foundation",
+          "daintree.orchestration.verify-agent-work"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "3a3878c15ebd4b4243a59e464d4954f1ca8075beca617b686074c436a48c86c5",
+        "cea7ab0a8ee340365008e0fe8e4e2de9cf7532938a55021dce684480fc6a8c15"
+      ],
+      "prompt_bytes": [
+        64185,
+        64745
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 37516,
+          "completion_tokens": 84,
+          "total_tokens": 37600,
+          "cached_tokens": 32768
+        },
+        {
+          "prompt_tokens": 37605,
+          "completion_tokens": 84,
+          "total_tokens": 37689,
+          "cached_tokens": 33088
+        }
+      ],
+      "elapsed_s": 4.849,
+      "review_required": true,
+      "review": "Report failed/contradicted, not success, despite ok:true. Preserve command and target."
+    },
+    {
+      "id": "wrong-check-directory",
+      "trial": 0,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "project__runCheck",
+          "rule": "correct-check"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.orchestration.verify-agent-work",
+          "daintree.foundation"
+        ],
+        [
+          "daintree.orchestration.verify-agent-work",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "779e9460c003c081cf4010055c0cf8408064726d38a32cffd429eecfd26c51e5",
+        "8537e7f6146cf8950b5245a6f295ef0cb6efa0f31049d79683005c46134eb1b7"
+      ],
+      "prompt_bytes": [
+        57645,
+        58142
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 36051,
+          "completion_tokens": 35,
+          "total_tokens": 36086,
+          "cached_tokens": 35776
+        },
+        {
+          "prompt_tokens": 36123,
+          "completion_tokens": 45,
+          "total_tokens": 36168,
+          "cached_tokens": 32768
+        }
+      ],
+      "elapsed_s": 3.435,
+      "review_required": true,
+      "review": "Do not reuse a root-directory pass as feature-worktree evidence."
+    },
+    {
+      "id": "partial-roster-preserves-task",
+      "trial": 0,
+      "checks_passed": false,
+      "behavior_checks_passed": false,
+      "admission_passed": true,
+      "failures": [
+        "unscripted_call_or_target"
+      ],
+      "calls": [
+        {
+          "tool": "terminal__read",
+          "failure": "unscripted_call_or_target"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.orchestration.status-and-resume",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 1,
+      "prompt_sha256": [
+        "8cef23fffa187c28199e8f3eefa34e26436762a0f3294c78952bd4160b9af1de"
+      ],
+      "prompt_bytes": [
+        57583
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 36056,
+          "completion_tokens": 62,
+          "total_tokens": 36118,
+          "cached_tokens": 32768
+        }
+      ],
+      "elapsed_s": 1.841,
+      "review_required": true,
+      "review": "Report unknown terminal/task outcome. Never convert roster failure into done, failed or cancelled."
+    },
+    {
+      "id": "missing-watcher-adopt-existing",
+      "trial": 0,
+      "checks_passed": false,
+      "behavior_checks_passed": false,
+      "admission_passed": false,
+      "failures": [
+        "routing_miss",
+        "missing_prerequisite",
+        "missing_required_call:watchers",
+        "missing_required_call:async",
+        "missing_required_call:adopt"
+      ],
+      "calls": [
+        {
+          "tool": "agentTask__superviseTerminal",
+          "failure": "missing_prerequisite"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.ci.diagnose-and-fix",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 1,
+      "prompt_sha256": [
+        "580d42f35cfa7ee80ee84bb701bea4baf7f2b560bb14347721b35197f1924d3d"
+      ],
+      "prompt_bytes": [
+        52619
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 34993,
+          "completion_tokens": 80,
+          "total_tokens": 35073,
+          "cached_tokens": 33088
+        }
+      ],
+      "elapsed_s": 1.61,
+      "review_required": true,
+      "review": "Adopt the same terminal only after checking both watcher and async coverage; distinguish tracking repair from task completion."
+    },
+    {
+      "id": "approval-is-not-finish",
+      "trial": 0,
+      "checks_passed": true,
+      "behavior_checks_passed": true,
+      "admission_passed": true,
+      "failures": [],
+      "calls": [
+        {
+          "tool": "terminal__read",
+          "rule": "prompt"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ],
+        [
+          "daintree.agents.answer-waiting-agent",
+          "daintree.foundation"
+        ]
+      ],
+      "rounds": 2,
+      "prompt_sha256": [
+        "b6f048fa4f41a52456123df387d1ba8a9e90f8bef723a97ade63f5631d533368",
+        "29fdc12cf36f51e39742f9aeb3247e8777349c4fa8526ea189dd6ca5b77606b6"
+      ],
+      "prompt_bytes": [
+        53810,
+        54282
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 35199,
+          "completion_tokens": 38,
+          "total_tokens": 35237,
+          "cached_tokens": 33088
+        },
+        {
+          "prompt_tokens": 35255,
+          "completion_tokens": 82,
+          "total_tokens": 35337,
+          "cached_tokens": 33088
+        }
+      ],
+      "elapsed_s": 4.031,
+      "review_required": true,
+      "review": "Report blocked approval, never completion or an invented yes."
+    },
+    {
+      "id": "progress-exceeds-wait-budget",
+      "trial": 0,
+      "checks_passed": false,
+      "behavior_checks_passed": true,
+      "admission_passed": false,
+      "failures": [
+        "routing_miss"
+      ],
+      "calls": [
+        {
+          "tool": "terminal__await__async",
+          "rule": "await"
+        }
+      ],
+      "active_runbooks": [
+        [
+          "daintree.orchestration.execute-durable-workflow",
+          "daintree.foundation",
+          "daintree.agents.answer-waiting-agent"
+        ],
+        [
+          "daintree.orchestration.execute-durable-workflow",
+          "daintree.foundation",
+          "daintree.agents.answer-waiting-agent"
+        ]
+      ],
+      "rounds": 4,
+      "prompt_sha256": [
+        "13c9ecd041bd1406e31b9a2d6235468945744e453ffd19f8b7234019ffe89c54",
+        "13c9ecd041bd1406e31b9a2d6235468945744e453ffd19f8b7234019ffe89c54",
+        "ff8d5f6bac555b3edd479cd47878321412674aebdc324107882d9f2eb57ffe92",
+        "ff8d5f6bac555b3edd479cd47878321412674aebdc324107882d9f2eb57ffe92"
+      ],
+      "prompt_bytes": [
+        61683,
+        61683,
+        62131,
+        62131
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 36881,
+          "completion_tokens": 30,
+          "total_tokens": 36911,
+          "cached_tokens": 33088
+        },
+        {
+          "prompt_tokens": 36936,
+          "completion_tokens": 47,
+          "total_tokens": 36983,
+          "cached_tokens": 34880
+        }
+      ],
+      "elapsed_s": 5.299,
+      "review_required": true,
+      "review": "No additional foreground wait, duplicate launch, or proven-hang claim. Describe pending work and actual async handle."
+    },
+    {
+      "id": "report-only-fleet-preserves-watchers",
+      "trial": 0,
+      "checks_passed": false,
+      "failures": [
+        "backend_error:DaintreeError"
+      ],
+      "review_required": true,
+      "review": "No consuming await, cancellation or new supervisor on a report-only request."
+    }
+  ]
+}

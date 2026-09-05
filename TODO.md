@@ -742,46 +742,34 @@ estimate the refusal currently rests on.
 
 ---
 
-## A behavioural benchmark for the main assistant
+## Main-assistant behavioral qualification
 
-**Trigger: before the first deliberate reduction of `main/base/*.md`,
-`main/response_contract.md.j2` or `daintree.foundation`. Not before, and not as
-a prerequisite for anything else.**
+The intelligence report's Phase A brings this work forward from prompt-size
+ablation to core delivery reliability. A first implementation now lives in
+[`benchmarks/main_behavior`](benchmarks/main_behavior/README.md): twelve synthetic
+cases, pinned isolation and actual local-selection modes, real backend assembly
+and signed continuation state, and a scripted engine that never executes tools.
+The CLI has separate validate/replay/live commands, bounded model-call counts,
+content-free summaries and opt-in local transcripts for semantic review.
 
-The golden suite answers *what bytes changed*. It does not answer whether the
-model still chose the right tool, respected a permission boundary, converged,
-stopped, delegated, verified success, or reported clearly — and that gap is the
-reason "shrink the largest partial" keeps being deferred rather than done.
-`20-tool-discipline.md` is ~9.4 KiB and the foundation ~16 KiB, both plainly
-prunable and neither safely prunable, because a snapshot diff cannot tell a
-removed redundancy from a removed load-bearing rule.
+Offline replay and grader tests establish the harness, not model quality. The
+initial battery passes 12/12 isolation traces; actual selection has three
+admission mismatches (9/12), including one potentially useful alternate resource
+runbook. Preserve those cases as evidence rather than editing their expected
+answers to claim a routing improvement.
 
-Shape: `benchmarks/main_behavior/`, cases in YAML, two modes. **Isolation** pins
-the intended runbook set so a selector error cannot be mistaken for a prompt
-regression; **end-to-end** runs real selection, projection and assembly. A
-prompt edit that REDUCES a permanent layer must pass isolation, and a release
-that changes the assembly or selection architecture should pass both once the
-suite exists. Neither is a gate on work that does not touch those layers — the
-trigger above is the whole scope. Score
-deterministically wherever possible — first-correct-tool rate, forbidden-call
-rate, invalid-argument rate, rounds to completion, premature finish, failure to
-stop, exact-ID preservation, response-contract conformance, injection canary
-leakage — and reserve a judge for report usefulness and unsupported claims.
+Live Baseten diagnostic trials and Go-client HTTP/SSE checks are recorded in
+[the application report](docs/INTELLIGENCE_REPORT_APPLICATION.md); they exposed
+supervision-precondition failures, fixture gaps and an outdated CLI capability
+assertion. They do not establish a paired improvement or release qualification.
 
-The cases that matter first are the rules with no other guard: act in the same
-reply rather than promise later work, delegate expensive search early, preserve
-terminal ownership, do not close a resource nobody asked to close, distinguish
-working from blocked from failed from complete, verify before declaring
-completion, retain the active runbook on continuation and replace it on a topic
-shift.
-
-**Why this is not in CI**: it needs paid completions, and a suite that costs
-money on every push either gets skipped or gets disabled. It belongs beside the
-live provider-contract suite on a low-spend key, run at qualification
-milestones, committing a content-free result artifact (build sha, prompt hash,
-catalog revision, tool-inventory hash, selector artifact revision, pass counts)
-so a dated claim is traceable — the gap `benchmarks/results/` being gitignored
-leaves today.
+**Still owed:** controlled paired trials and broader semantic qualification;
+remaining scenarios from the report (task handoff/writer overlap, delayed actions,
+recipes, compaction and topic shifts); live engine/desktop qualification; and
+content-free reviewed release records. No live result or release qualification
+is claimed by a replay. Keep paid calls outside normal CI, and require the
+relevant isolated behavior checks before further prompt reductions; qualification
+of selection/assembly changes should exercise both modes.
 
 ---
 

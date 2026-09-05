@@ -40,20 +40,18 @@ if [[ -f "$ROOT/.env" ]]; then
 fi
 
 # Friendly heads-up: the server always boots, but /readyz stays 503 without the
-# three required secrets, and this list must stay in step with
+# two required secrets, and this list must stay in step with
 # `Settings.missing_secrets()` — a name missing from here is not a missing warning,
 # it is a developer watching a healthy-looking process answer 503 with nothing on
 # screen to say why.
 #
-# All three are SERVER-owned. BASETEN_API_KEY funds every turn — a request no
+# Both are SERVER-owned. BASETEN_API_KEY funds every turn — a request no
 # longer brings its own key, so there is nothing to fall back on without it.
-# CEREBRAS_API_KEY funds the fast-response preamble, which has no off switch: it
-# runs on every eligible streaming turn, so a missing key fails that stage open
-# every time, which looks exactly like a model that chose to say nothing.
+# FAST_RESPONSE_ENABLED is currently false, so CEREBRAS_API_KEY is optional.
+# OPENROUTER_API_KEY enables failover but does not gate readiness.
 missing=()
 [[ -z "${STATE_SIGNING_KEY_CURRENT:-}" ]] && missing+=("STATE_SIGNING_KEY_CURRENT")
 [[ -z "${BASETEN_API_KEY:-}" ]] && missing+=("BASETEN_API_KEY")
-[[ -z "${CEREBRAS_API_KEY:-}" ]] && missing+=("CEREBRAS_API_KEY")
 if (( ${#missing[@]} )); then
   echo "⚠  Missing: ${missing[*]} — server will boot but /readyz will be 503." >&2
   [[ -f "$ROOT/.env" ]] || echo "   Run:  cp .env.example .env   then fill them in." >&2

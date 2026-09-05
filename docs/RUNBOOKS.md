@@ -53,3 +53,5 @@ rtk proxy git diff --check
 For a catalog-wide change, run the full Python suite and compare routing against the original catalog. Passing the routing quality gate does not mean every case passes, and unchanged selection does not establish execution quality. Report existing misses separately from regressions. Live tool-use trials require a connected Daintree instance and a backend; do not claim such validation from offline schemas or selector tests.
 
 Do not regenerate prompt goldens indiscriminately. Inspect a failure first and update only intentional prompt changes. Do not alter generated CLI references or selector artifacts to make prose checks pass.
+
+The [main-assistant behavior battery](../benchmarks/main_behavior/README.md) adds synthetic tool trajectories through the real backend response loop. Use isolation to separate procedure quality from routing, and end-to-end mode to exercise actual selection. Offline replay verifies the harness; paid model trials and human review are separate qualification steps, not implied by the catalog checks above.
