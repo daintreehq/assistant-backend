@@ -1,15 +1,13 @@
 # Daintree Assistant Server
 
-Production requires `AUTH_MODE=enforce`; an open or observing production instance fails readiness. Development and staging retain `open` and `observe` for local work and authentication rollout. See [the production audit](docs/PRODUCTION_AUDIT_2026-09-05.md) for the remaining release gates.
-
 A Daintree-operated model-orchestration service. It moves the orchestration
 boundary off the local CLI: the server owns the permanent system prompt, the
 runbook catalog and bodies, automatic runbook selection, prompt assembly, and the
 small-model utility prompts. The CLI keeps local state and local tool execution.
 
 **The server holds the upstream credential** (`BASETEN_API_KEY`) and funds every
-turn from it, so a request needs no provider API key of its own. Account authentication
-is selected by `AUTH_MODE`: `open` (the local-development default, under
+turn from it, so a request needs no API key of its own. Account authentication is
+built and switched OFF: `AUTH_MODE` selects `open` (the shipped default, under
 which the `Authorization` header is not read for authentication at all), `observe`
 (a present credential is verified and recorded, and nothing a caller can see
 changes) or `enforce` (a verified credential is required). An account is an

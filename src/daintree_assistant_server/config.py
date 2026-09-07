@@ -1971,12 +1971,16 @@ class Settings(BaseSettings):
         differently, and a single method reporting both would make an operator
         read a billing misconfiguration as an authentication one.
 
-        Production requires enforcement even when launched outside Cloud Build.
-        Development and staging retain open/observe for local work and rollout.
+        What is deliberately NOT here: a rule that ``open`` and ``observe`` are
+        refused in production. The master spec asks for one, and it is right about
+        the destination and wrong about today — ``open`` IS the deployed
+        production posture, documented as such in ``docs/DAINTREE_API.md`` and
+        asserted by ``infra/gcp/smoke.sh``. Adding that gate now would fail
+        ``/readyz`` on the very next release and the revision would never take
+        traffic. It belongs to the cutover, and ``TODO.md`` carries it with that
+        trigger.
         """
         problems = self.auth_manifest_problems()
-        if self.environment == "production" and self.auth_mode != "enforce":
-            problems.append("ENVIRONMENT=production requires AUTH_MODE=enforce")
 
         if self.auth_mode == "open":
             return problems

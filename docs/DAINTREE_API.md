@@ -62,7 +62,7 @@ to read how to sign in before it holds anything to sign in with.
 The posture is named by one server setting, `AUTH_MODE`, so a client never has to infer
 it:
 
-- **`open`** — the default for local development and an available staging posture. The header is not read
+- **`open`** — the default, and what every deployment runs today. The header is not read
   for authentication. (It is still read for redaction, in every mode: an inbound
   `X-Request-Id` that overlaps your credential is discarded rather than logged back to you.)
 - **`observe`** — a credential that IS present is verified and the outcome recorded, and
@@ -81,7 +81,7 @@ anonymous requests.
 
 **The posture is not the environment.** `ENVIRONMENT` (`development`, `test`, `staging`,
 `production`) says where a deployment is and which hardening rules apply to the URLs it
-publishes; `AUTH_MODE` says what it does about credentials. Production requires `AUTH_MODE=enforce`: an open or observing production instance fails `/readyz` with 503 while liveness and authentication discovery remain available for diagnosis. This is enforced by the application as well as the official deployment pipeline. Staging still supports all three postures, and
+publishes; `AUTH_MODE` says what it does about credentials. They are independent axes and
 there is deliberately no fourth `staging` auth mode — a staging deployment sits in
 whichever posture its rollout has reached, and the posture moves by a config-only
 revision rather than a redeploy. The staged rollout, with no secret in it:

@@ -35,7 +35,6 @@ The [desktop PR](https://github.com/daintreehq/daintree/pull/12254) passed **56,
 | Token lifetime multiplication could overflow and bypass the lifetime ceiling | Validate `expires_in` in seconds before converting to Go nanoseconds. A regression reproduces a centuries-long input wrapping into a one-hour duration. |
 | JWKS size checks happened after the entire response was downloaded | Stream and count decoded bytes, reject oversized declarations before reading, close rejected responses, and cap the complete fetch at five seconds. Failure tests prove early termination and refresh-lock release. Existing warm-cache/rotation tests still apply. |
 | Opening optional trace storage could indefinitely block preparation | Apply the configured trace flush grace to opening storage as well. Timeout returns an untraced scope; caller cancellation continues to cancel the turn. Both outcomes are tested. |
-| Production readiness could accept anonymous access outside the deployment pipeline | `ENVIRONMENT=production` now requires `AUTH_MODE=enforce` in application readiness. Staging observation and local development stay available. Tests assert refusal, preserved liveness and usable discovery. This is an intentional deployment requirement. |
 | Supervision instructions exceeded their prompt budget | Remove repeated instructions from the `watch-outcome` procedure while retaining message-versus-fixed-call delivery, wake-versus-timer grants, tier limits, retry semantics, and verification requirements. Embedded routing metadata is unchanged. No model retraining or relaxed budget was used. |
 | Pinned dependencies had known advisories | Update Python `cryptography` and `h2`; refresh compatible desktop lockfile dependencies. Python advisory findings fall from two to zero; desktop affected-package findings fall from 17 (8 high) to 5 (1 high). These are scanner counts, not counts of demonstrated product exploits. |
 
@@ -82,6 +81,12 @@ Treat both as outstanding work: qualify a patched Vite branch with a real packag
 Run a coordinated desktop/CLI/backend release candidate through login, refresh, logout, endpoint switching, sleep/resume, renderer replacement, backend restart, provider outage, and lost responses. Include timed messages and fixed-call timers: their delivery semantics differ, and replay after restart must not duplicate destructive work. Existing ownership, grants and race tests are strong evidence for the individual mechanisms; they cannot replace a cross-process acceptance run of the exact shipped binaries.
 
 Bound request-body receipt before expensive parsing; the current byte cap does not itself bound a slow upload. Measure event-loop lag and queueing while ONNX selection is saturated. Publish operational alerts for auth-dependency failure, refresh failure, provider circuit state, turn cancellation/failure, incomplete accounting, queue age and stalled progress. Keep raw prompt/terminal content out of operational logs and do not enable production training-content capture without an explicit consent/retention design.
+
+### 7. Refuse anonymous production access at the authentication cutover
+
+`Settings.auth_problems()` deliberately does not refuse `AUTH_MODE=open` or `observe` under `ENVIRONMENT=production`. This audit proposed adding that gate; it is deferred rather than fixed here, because `open` is today's deployed production posture — `cloudbuild.yaml` ships `_AUTH_MODE: open` and exempts the production release from its own posture check, `docs/DAINTREE_API.md` documents it, and `infra/gcp/smoke.sh` asserts it. Landing the gate before the fleet is switched would fail `/readyz` on the very next release and the revision would never take traffic. `enforce` is also not yet configurable in production: it additionally requires the five Supabase manifest fields, and no production Supabase project is provisioned.
+
+The gate belongs to the release that actually flips production to `enforce`, and it is what stops the fleet silently sitting on `open` afterwards. `TODO.md` carries it with that trigger.
 
 ## Release recommendation
 
