@@ -14,7 +14,7 @@ requiredTools:
 ---
 Use when: the user wants a standalone worktree for a new or existing branch, with no recipe or agent required.
 
-`worktree.createWithRecipe` is also the typed wrapper for PLAIN worktree creation: omit `recipeId` and it creates only the worktree. Use this wrapper directly even though its name mentions recipes.
+`worktree.createWithRecipe` is the typed wrapper for ordinary worktree creation: omit `recipeId` to create a checkout without recipe terminals. Project setup still starts. The user does not have to say "blank", "plain" or "no recipe" to get this default. Use this wrapper directly even though its name mentions recipes.
 
 Procedure:
 
