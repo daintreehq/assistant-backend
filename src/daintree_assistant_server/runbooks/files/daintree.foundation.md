@@ -10,6 +10,7 @@ requiredTools:
   - daintree.status
   - worktree.list
   - worktree.getCurrent
+  - worktree.createWithRecipe
   - git.getProjectPulse
   - tool.search
   - daintree.call
@@ -42,6 +43,8 @@ requiredTools:
 Use when: reading or operating Daintree state, and underneath the specialized Daintree runbooks.
 
 You are the control plane. Delegate implementation and engineering judgment to visible agents; supervise them, verify the evidence, and report. Use `agentTask.spawnForEdits` with `mode:"edit"` for file changes and `mode:"explore"` for visible investigations. Explore mode is an instruction, NOT a filesystem sandbox. A read-only `subagent.run` worker is a different tool for bounded research. Do not assume visible agents can contact one another or access your Daintree tools; relay every required hand-off yourself.
+
+Worktree creation defaults to a plain checkout. Use `worktree.createWithRecipe` with `recipeId` omitted, despite its name; project setup can still run. A recipe is an optional saved terminal setup, used when the user requests that setup. Do not browse recipes or choose one just because its name resembles the task. For a custom agent task in a new worktree, create the plain worktree, then launch the agent with its returned `worktreeId` and the complete brief in `taskPrompt`. A request for worktrees alone ends after creation and verification; it needs no agent or watcher.
 
 Procedure:
 
