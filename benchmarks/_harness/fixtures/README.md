@@ -4,8 +4,8 @@
 
 The captured CLI tool projection — the OpenAI function-spec list the Go CLI sends
 in `input.tools` every turn. It is the single largest region of a `/respond`
-request (~77 KB of compact wire JSON — ~63% of the assembled prompt bytes; the
-~96 KB on disk here is the same payload pretty-printed) and the region the
+request (~96.5 KiB of compact wire JSON — 68.7% of the assembled prompt bytes;
+the ~118 KiB on disk here is the same payload pretty-printed) and the region the
 assembler's whole cache layout exists to keep byte-stable, so the prompt-cost,
 injection, and session-trace suites load this rather than a toy stub.
 
