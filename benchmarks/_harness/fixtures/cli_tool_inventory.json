@@ -3,7 +3,7 @@
   "type": "function",
   "function": {
    "name": "agentTask__spawnForEdits",
-   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent — never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"…\" (top-level scalars) — do NOT nest them under a \"watcher\" key.",
+   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent — never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"…\" (top-level scalars) — do NOT nest them under a \"watcher\" key. An omitted worktreeId means the worktree this turn started in, and that stays fixed for the whole turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -12,7 +12,7 @@
       "type": "string"
      },
      "agentId": {
-      "description": "Agent to launch (default \"claude\").",
+      "description": "Agent to launch. Omit it to use the user's configured default agent, which is the right choice unless they named one.",
       "type": "string"
      },
      "context": {
@@ -78,7 +78,7 @@
       "type": "object"
      },
      "worktreeId": {
-      "description": "Worktree to run the agent in. Usually OMIT it — Daintree uses the active worktree. The id is a PATH (\"/Users/you/Projects/app\"); a branch name is accepted only as a fallback, and an unresolvable value is rejected with the available list.",
+      "description": "Worktree to run the agent in. OMIT it to use the worktree this turn started in; pass one only to send the agent ELSEWHERE. The id is a PATH (\"/Users/you/Projects/app\"); a branch name is accepted only as a fallback, and an unresolvable value is rejected with the available list.",
       "type": "string"
      }
     },
@@ -715,7 +715,7 @@
   "type": "function",
   "function": {
    "name": "terminal__awaitAll",
-   "description": "Wait for a COHORT of agent terminals to reach an idle prompt. Polls agentState only — no model call, no output read. Call ONCE for the whole cohort, not once per agent. Returns allFinished, a perTerminal array whose status is \"finished\" | \"failed\" | \"question\" | \"working\" (no content), plus top-level stillWorking / askingQuestion id arrays. Terminals settling finished/failed RETIRE their spawn-attached watcher (watchersRetired) — do not watcher.cancel them; expect no later completion notification. An idle reading is imperfect: peek each tail afterwards (no-wait terminal.extract/read) and re-await any 'finished' terminal still looking busy. Re-await stillWorking at most twice (three calls per terminal); past that it is hung — escalate via queue.publish (severity 'blocked') + watcher.terminal.create and end the turn. ENFORCED: all awaitAll calls in a turn share a cumulative 120s foreground-wait budget. On budgetExhausted:true do NOT re-await — hand the stragglers to watcher.terminal.create + queue.publish and end the turn. On interruptedByUser:true the user messaged mid-wait — it is already in the conversation, so read it and adapt before re-awaiting. Read-only; needs Daintree MCP.",
+   "description": "Wait for a COHORT of agent terminals to reach an idle prompt. Polls agentState only — no model call, no output read. Call ONCE for the whole cohort, not once per agent. Returns allFinished, a perTerminal array (status \"finished\" | \"failed\" | \"question\" | \"working\" plus a `finished` flag, no content), and top-level stillWorking / askingQuestion / blocked ids. askingQuestion and blocked settled WITHOUT finishing: allFinished is false and they keep their watchers; only a real finish/exit retires one (watchersRetired) — never watcher.cancel those. An idle reading is imperfect: peek each tail afterwards and re-await any 'finished' terminal still looking busy. Re-await stillWorking at most twice (three calls per terminal); past that it is hung — escalate via queue.publish + watcher.terminal.create and end the turn. ENFORCED: all awaitAll calls in a turn share a cumulative 120s foreground-wait budget. On budgetExhausted:true do NOT re-await — hand the stragglers to watcher.terminal.create + queue.publish and end the turn. On interruptedByUser:true the user messaged mid-wait — it is already in the conversation, so read it and adapt before re-awaiting. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -960,12 +960,30 @@
   "type": "function",
   "function": {
    "name": "terminal__focus",
-   "description": "Bring ONE Daintree terminal to the front in the UI (forwards to Daintree's panel.focus with the terminal id as the panelId). Pure UI: no confirmation, no state change — it does not read, send to, or close anything. Use it when the user asks to see or switch to a terminal, or to point them at a tab you just spawned. Pass the full terminal-<uuid> id.",
+   "description": "Select a terminal in this session's view. Does not switch workspaces or raise a window.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "terminalId": {
-      "description": "Daintree terminal id to focus in the UI.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__revealOwned",
+   "description": "Reveal a terminal this connection created only when the user asks: switch workspace and raise its window. Success accepts navigation; focus may still be pending.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalId": {
       "type": "string"
      }
     },
@@ -1481,7 +1499,7 @@
   "type": "function",
   "function": {
    "name": "recipe__list",
-   "description": "List the Daintree recipes available in this project — the worktree/operation templates that recipe.run and worktree.createWithRecipe execute — with their ids and recipe-defined argument shapes. Read-only passthrough to Daintree. Call it BEFORE recipe.run so you pass a real recipeId and real argument keys instead of guessing. MCP_UNAVAILABLE when Daintree is disconnected.",
+   "description": "List saved workspace recipes when the user requests one. Returns ids, names and terminal counts, NOT startup prompts or argument schemas. A matching name does not prove launch behavior. Skip recipe discovery for plain worktrees or custom agent tasks. Use tool.schema for action arguments. Read-only passthrough; MCP_UNAVAILABLE when disconnected.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1498,7 +1516,7 @@
   "type": "function",
   "function": {
    "name": "recipe__run",
-   "description": "Run a Daintree recipe by recipeId, forwarding the recipe-defined `arguments` record verbatim. MUTATING (always confirms): a recipe can create worktrees, branches and terminals. Read recipe.list first for the real recipeId and argument keys — never invent either. Pass requestKey to make a retry idempotent. Returns Daintree's raw result; a refusal comes back as MCP_TOOL_ERROR.",
+   "description": "Run a requested saved recipe in an existing worktree, immediately launching its terminals and startup prompts. Read recipe.list for recipeId and tool.schema for fields nested inside arguments. For a custom task use agentTask.spawnForEdits with the full taskPrompt. Mutates project state under the active confirmation policy. Pass requestKey for an idempotent retry; returns Daintree's raw result.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1559,7 +1577,7 @@
   "type": "function",
   "function": {
    "name": "worktree__createWithRecipe",
-   "description": "Create a NEW git worktree from a Daintree recipe, forwarding the recipe-defined `arguments` record verbatim (Daintree owns the keys — read recipe.list for the real ones, do not invent them). MUTATING project state, so it always confirms. Prefer agentTask.spawnForEdits when what you actually want is a worktree WITH a supervised agent in it. Pass requestKey so a retry is idempotent.",
+   "description": "Create a git worktree. Recipes are OPTIONAL: default to omitting recipeId unless the user requests a saved setup. Project setup still starts. Read tool.schema for worktree.createWithRecipe; nest source and other host fields inside arguments. No recipe.list needed for plain creation. For custom agent work, create the worktree first, then agentTask.spawnForEdits with its returned worktreeId and full taskPrompt. Supplying recipeId starts saved terminals/prompts immediately. Mutates project state; pass requestKey for an idempotent retry.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1633,7 +1651,7 @@
   "type": "function",
   "function": {
    "name": "forge__getPR",
-   "description": "Get a single forge (GitHub) pull request by number. PARALLEL: forge.getPR calls batched in ONE reply run concurrently — to check several PRs, emit one call each in one batch.",
+   "description": "Get a single forge (GitHub) pull request by number. For several known numbers use forge.getPRs — one call, with a per-number status.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1657,6 +1675,45 @@
     },
     "required": [
      "prNumber"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__getPRs",
+   "description": "Get 2-20 known forge (GitHub) pull requests in ONE call, instead of repeating forge.getPR. Each number carries a status: `found`, `not_found` (asked; not there) or `unresolved` (nothing learned — rate limit or transport). NEVER read `unresolved` as `not_found` — it is not evidence a PR is gone, and acting on it closes live work; re-read those numbers. Not a search; discover with forge.listPRs.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "cwd": {
+      "description": "Legacy alias for worktreePath.",
+      "type": "string"
+     },
+     "prNumbers": {
+      "description": "2-20 DISTINCT numbers you already know, from a listing or the user.",
+      "items": {
+       "minimum": 1,
+       "type": "integer"
+      },
+      "maxItems": 20,
+      "minItems": 2,
+      "type": "array",
+      "uniqueItems": true
+     },
+     "worktreeId": {
+      "description": "Worktree id; beats a path.",
+      "type": "string"
+     },
+     "worktreePath": {
+      "description": "Absolute worktree path.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "prNumbers"
     ],
     "type": "object"
    }
@@ -2220,9 +2277,8 @@
       "type": "string"
      },
      "source": {
+      "description": "Who is reporting. A note to the human — it never starts a turn. \"timer\" and \"terminal_watcher\" are reserved for the engine's own fires and checks.",
       "enum": [
-       "timer",
-       "terminal_watcher",
        "worktree_watcher",
        "pr_watcher",
        "workflow",
@@ -2419,7 +2475,7 @@
   "type": "function",
   "function": {
    "name": "timer__schedule",
-   "description": "Schedule a durable timer that fires once (fireAt ISO-8601 or delayMs) or repeats (repeat.everyMs plus maxRuns/until). payload.type \"call_safe_tool\" runs toolCall.toolName — ANY registered tool, not a safe subset (tier/confirm gates still apply): use agentTask.spawnForEdits to spawn AT fire time, then grant.create (actorType \"timer\", actorId = the returned timerId) for a grantable confirm-required target. \"enqueue\" only posts message and runs nothing. A timer's own event never wakes you. Timers persist after the assistant closes; missed occurrences catch up. Returns timerId.",
+   "description": "Schedule a durable timer that fires once (delayMs) or repeats (repeat.everyMs plus maxRuns/until). To do something LATER — \"in 25 minutes send npm test to the build terminal\", \"start a timer then spawn an agent\" — use payload.type \"message\" with the instruction in payload.message: it reaches you at fire time and you act on it THEN, so do not also do it now. \"enqueue\" posts a note for the human, runs nothing, and catches up if missed. \"call_safe_tool\" runs one named tool with fixed args. A \"message\" over an hour overdue is reported missed, not run late. Prefer delayMs. Returns timerId.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2437,7 +2493,7 @@
       "additionalProperties": false,
       "properties": {
        "message": {
-        "description": "Reminder text for \"enqueue\" (defaults to the timer title). Ignored by \"call_safe_tool\".",
+        "description": "For \"message\", the instruction delivered to you at fire time — write it as the user would, e.g. \"Send npm test to the build terminal and report the result\"; REQUIRED. For \"enqueue\", the human-facing reminder text (defaults to the title). Ignored by \"call_safe_tool\".",
         "type": "string"
        },
        "toolCall": {
@@ -2450,7 +2506,7 @@
           "type": "object"
          },
          "toolName": {
-          "description": "Exact registered tool name — any tool in your inventory, not a restricted subset. Use \"agentTask.spawnForEdits\" to spawn a terminal at fire time.",
+          "description": "Exact registered tool name — almost any tool in your inventory, not a restricted subset, but NOT \"timer.schedule\" (a timer cannot schedule a timer). Use \"agentTask.spawnForEdits\" to spawn a terminal at fire time.",
           "minLength": 1,
           "type": "string"
          }
@@ -2461,9 +2517,10 @@
         "type": "object"
        },
        "type": {
-        "description": "\"enqueue\" posts an inbox item and runs nothing; \"call_safe_tool\" dispatches toolCall.toolName. A timer's own event never wakes you. Success files info (below the deck's attention filter), an ordinary failure error, a confirmation-required denial blocked.",
+        "description": "\"message\" delivers payload.message to YOU at fire time and you act on it then — the choice for any deferred instruction. \"enqueue\" posts an inbox note for the human and runs nothing, waking nobody. \"call_safe_tool\" dispatches one fixed toolCall.toolName.",
         "enum": [
          "enqueue",
+         "message",
          "call_safe_tool"
         ],
         "type": "string"

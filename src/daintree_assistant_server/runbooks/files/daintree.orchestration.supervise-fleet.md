@@ -22,6 +22,7 @@ requiredTools:
   - queue.resolve
   - queue.publish
   - terminal.focus
+  - terminal.revealOwned
   - terminal.arm
   - terminal.disarm
   - terminal.disarmAll
@@ -42,7 +43,7 @@ Procedure:
    - Error/failed: report the safe error and terminal/launch id. Use recover-agent for an authorized recovery; never relaunch a fleet because one member failed.
    - Working and supervised: leave its current supervisor in place.
    - Working and unsupervised: when continued supervision is requested, adopt with `agentTask.superviseTerminal`, supplying mode, worktree and acceptance criteria, OR create one `terminal.await.async` over uncovered terminals for plain finish detection. Do not attach either to a shell that failed startup. Confirm a returned or listed watcher id before promising a wake.
-7. Navigation is separate: `terminal.focus({"terminalId":"<id>"})` shows the chosen agent without answering it. For requested tab titles, use the rename runbook; similar titles alone are not permission to retitle unrelated work.
+7. Navigation is separate, and the two calls are not interchangeable: `terminal.revealOwned({"terminalId":"<id>"})` requests a workspace switch and window raise for a terminal this MCP connection created, while `terminal.focus({"terminalId":"<id>"})` only selects a terminal inside this session's project view, including one you do not own. Follow the foundation's navigation and ownership rules. Neither answers the agent. For requested tab titles, use the rename runbook; similar titles alone are not permission to retitle unrelated work.
 8. Arming changes where the HUMAN'S broadcast input goes. Use `terminal.arm` / `terminal.disarm` for each requested id, or `terminal.disarmAll` only when the whole set is in scope. These calls confirm and return the resulting armed set. Report the actual set, not the intended one; there is no list-armed tool. Never clear the whole broadcast set merely to discover it.
 9. Report promptly. A running task with no observed progress is uncertain, not automatically hung. If all requested work is now under existing or newly established supervision, end the turn and respond to its event rather than polling.
 

@@ -11,7 +11,7 @@ injection, and session-trace suites load this rather than a toy stub.
 
 **Shape:** a bare JSON array of `{"type": "function", "function": {...}}` dicts —
 exactly what `RespondRequest.input.tools` accepts, no envelope. Serialized with
-`json.dumps(tools, indent=1, ensure_ascii=True)` and **no trailing newline**.
+`json.dumps(tools, indent=1, ensure_ascii=False)` and **no trailing newline**.
 Keeping that formatting makes a refresh an additive diff rather than a whole-file
 reflow. Wire names use `__` (`worktree__list`), not `.` — that separator is the
 CLI's OpenAI-name projection of its dotted internal tool ids, and several suites
@@ -55,7 +55,7 @@ each other.
    ```
 3. Re-serialize into this fixture's formatting so the diff stays additive. The
    generator emits two-space indentation with a trailing newline; this fixture uses
-   `indent=1`, `ensure_ascii=True`, no trailing newline. Normalizing here rather
+   `indent=1`, `ensure_ascii=False`, no trailing newline. Normalizing here rather
    than matching formats keeps a refresh from reflowing the whole file:
 
    ```bash
@@ -63,7 +63,7 @@ each other.
    import json, pathlib
    tools = json.loads(pathlib.Path('/tmp/cli_tools.json').read_text())
    dst = pathlib.Path('benchmarks/_harness/fixtures/cli_tool_inventory.json')
-   dst.write_text(json.dumps(tools, indent=1, ensure_ascii=True), encoding='utf-8')
+   dst.write_text(json.dumps(tools, indent=1, ensure_ascii=False), encoding='utf-8')
    print(len(tools), 'tools')
    PY
    ```
@@ -93,7 +93,9 @@ each other.
    python -m tools.baseline capture > benchmarks/baseline.json
    ```
 
-Last refreshed 2026-08-25 (85 -> 79 -> 77 -> 89 -> 96 tools). The 89 -> 96 step is the
+Current capture: CLI `3d0ba02`, 98 tools. This advances the develop pin, adds the owned-reveal wrapper, and captures the existing `forge.getPRs` addition. Unicode is preserved to match the fixture's formatting.
+
+Previously refreshed 2026-08-25 (85 -> 79 -> 77 -> 89 -> 96 tools). The 89 -> 96 step is the
 account-authentication pin move (`2b38799` -> `272b13c`), and it is the one entry in this
 log where **no tool definition changed at all**: `internal/tools/` is byte-identical across
 the two commits. What moved was the generator's own default. `cmd/tooldump` gated the seven

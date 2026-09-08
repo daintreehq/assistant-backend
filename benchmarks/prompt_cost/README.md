@@ -145,7 +145,7 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-25, 39 runbooks / 96 tools (sizes are KiB). The catalog holds 39
+Measured 2026-09-08, 39 runbooks / 98 tools (sizes are KiB). The catalog holds 39
 but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
@@ -155,14 +155,16 @@ costs the selector nothing:
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
 | system+tools stable — topic-shift | **1.0000** (enforced floor) |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~138.2 KB, ~35.2k proxy tok |
-| tool schemas share of request | ~94.8 KB, **68.6%**, ~24.2k tok |
-| base prompt | ~24.7 KB, 17.9%, ~6.3k tok |
-| loaded runbooks (2 active) | ~11.7 KB, 8.4%, ~3.0k tok |
+| total request | ~140.5 KiB, ~35.8k proxy tok |
+| tool schemas share of request | ~96.5 KiB, **68.7%**, ~24.6k tok |
+| base prompt | ~24.9 KiB, 17.7%, ~6.3k tok |
+| loaded runbooks (2 active) | ~12.1 KiB, 8.6%, ~3.1k tok |
 | runbook selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 392–503 B (0–3 runbooks; 16 KiB cap) |
 
-The tool region rose again, 88.2 → 94.8 KiB (~22.5k → ~24.2k proxy tokens), when the
+The current capture pins CLI `3d0ba02`, including `forge.getPRs` from develop and the new `terminal.revealOwned` wrapper. Navigation guidance raises the loaded-runbook region; the deterministic cache-stability checks still pass.
+
+The tool region rose previously, 88.2 → 94.8 KiB (~22.5k → ~24.2k proxy tokens), when the
 pin moved to `272b13c` — the CLI's account-authentication line. **No tool definition
 changed at all** in that step: `internal/tools/` is byte-identical across the two
 commits, and what moved was which tools the capture SELECTS. `cmd/tooldump` had gated
