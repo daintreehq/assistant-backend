@@ -9,6 +9,7 @@ requiredTools:
   - context.snapshot
   - worktree.getCurrent
   - forge.getPR
+  - forge.getPRs
   - forge.getChecks
   - daintree.call
 ---

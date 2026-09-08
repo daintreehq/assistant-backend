@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:77f62953500a3a39d3c358c9dc8476802437b01b0d3b109cd5c7cf77f5fd81be",
+    "revision": "sha256:69ab038997d02e966766de2996ac0176bfe486b1517dcaaef34397e96f92b745",
     "runbooks": 39
   },
   "identity": {
@@ -11,7 +11,7 @@
   },
   "prompt": {
     "base_prompt_bytes": 25505,
-    "runbook_body_bytes_total": 303871,
+    "runbook_body_bytes_total": 303204,
     "subagent_prompt_bytes": 5552
   },
   "selector": {
