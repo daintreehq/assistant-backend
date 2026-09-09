@@ -24,6 +24,7 @@ from ..config import (
     Settings,
 )
 from ..contracts.tasks import (
+    MAX_TASK_OUTPUT_TOKENS,
     CheckpointInput,
     CheckpointOutput,
     ContextCompactInput,
@@ -109,16 +110,43 @@ class TaskParseError(Exception):
         self.kind: RepairKind = kind
 
 
-# Appended to the schema-task failure so a crashed/empty source terminal becomes
-# ACTIONABLE instead of an opaque 502: the model couldn't fit the source into the schema
-# (commonly because the agent crashed or produced nothing relevant), so steer it to read
-# the terminal a different way rather than retrying the same structured extract.
-_EXTRACT_EMPTY_HINT = (
-    "The terminal output likely does not contain the requested information — the agent "
-    "may have crashed or produced nothing relevant. Re-read it with a plain-text "
-    "terminal.extract (no jsonSchema) or terminal.summarize instead of retrying the "
-    "structured extract."
+# Parse failure alone says nothing about whether the source agent crashed or
+# omitted a requested fact. Offer another read path without inventing a cause.
+_EXTRACT_INVALID_HINT = (
+    "The extraction model did not return usable JSON; this does not establish that "
+    "the source lacks the requested information. Read exact wording with terminal.read "
+    "(page any returned artifact), or request fewer fields per terminal. "
+    "Use terminal.summarize for a brief overview, not complete drafts."
 )
+
+
+def _task_output_truncated(task: str, output_tokens: int) -> DaintreeError:
+    """Truncation, quoted in the caller's own units.
+
+    ``output_tokens`` is the budget the CALLER asked for, never the ``max_tokens``
+    actually sent upstream — that carries the server-owned reasoning allowance on
+    top, so a maxTokens of 1024 would be reported back as 1088: a number no client
+    can set and the model cannot reproduce. The CLI forwards this message to the
+    model verbatim, so the number in it has to be one the reader can act on.
+    """
+    # Raising the budget is only actionable BELOW the ceiling. Offering it to a
+    # caller already at the maximum invites the futile same-cap retry this error
+    # exists to prevent, so the remaining remedies stand alone there.
+    raise_remedy = (
+        "raise maxTokens within its limit, " if output_tokens < MAX_TASK_OUTPUT_TOKENS else ""
+    )
+    return DaintreeError(
+        status_code=502,
+        message=(
+            f"Task {task!r} hit its output token limit ({output_tokens}) before finishing. "
+            "This is extraction-model truncation, not missing source content. "
+            "Do not retry the same request or just reduce tailBytes: request fewer fields "
+            f"or one terminal per call, {raise_remedy}or use "
+            "terminal.read and page any artifact for complete drafts."
+        ),
+        type="api_error",
+        code="task_output_truncated",
+    )
 
 
 def _task_output_invalid(task: str, hint: str = "") -> DaintreeError:
@@ -1156,7 +1184,13 @@ class TaskRunner:
         # profile silently has less than 300 for its answer, and a truncation
         # spends the one repair retry against the same cap. See
         # EXECUTOR_REASONING_ALLOWANCE_TOKENS on why it is 64 and not more.
-        max_tokens = profile.max_output_tokens + (
+        output_tokens = profile.max_output_tokens
+        if (
+            isinstance(input_obj, (TerminalExtractTextInput, TerminalExtractJsonInput))
+            and input_obj.max_output_tokens is not None
+        ):
+            output_tokens = input_obj.max_output_tokens
+        max_tokens = output_tokens + (
             self.settings.thinking_headroom_tokens
             if thinking_enabled
             else EXECUTOR_REASONING_ALLOWANCE_TOKENS
@@ -1199,6 +1233,11 @@ class TaskRunner:
         finish = result.finish_reason or "stop"
         endpoint = result.endpoint
         calls = 1
+
+        # Even parseable JSON may omit later terminals when generation is cut
+        # short. A repair at the same cap cannot restore the requested capacity.
+        if profile.id == _SCHEMA_TASK and finish == "length":
+            raise _task_output_truncated(profile.id, output_tokens)
 
         try:
             output = profile.parse_output(result.text, request)
@@ -1255,14 +1294,12 @@ class TaskRunner:
             finish = repair.finish_reason or "stop"
             endpoint = repair.endpoint or endpoint
             calls += 1
+            if profile.id == _SCHEMA_TASK and finish == "length":
+                raise _task_output_truncated(profile.id, output_tokens) from first_error
             try:
                 output = profile.parse_output(repair.text, request)
             except (TaskParseError, ValidationError) as exc:
-                # Don't blame the agent for OUR truncation: _EXTRACT_EMPTY_HINT says the
-                # agent may have crashed, which is a false diagnosis when the repair was
-                # simply cut off at the token cap.
-                truncated = finish == "length"
-                hint = _EXTRACT_EMPTY_HINT if profile.id == _SCHEMA_TASK and not truncated else ""
+                hint = _EXTRACT_INVALID_HINT if profile.id == _SCHEMA_TASK else ""
                 raise _task_output_invalid(profile.id, hint) from exc
 
         # `endpoint`/`calls` for the same reason the selector logs them: a JSON task
