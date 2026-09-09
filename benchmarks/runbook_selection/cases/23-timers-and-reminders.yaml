@@ -32,7 +32,7 @@ cases:
 
   - id: timer-bare-five-minutes-period
     category: single-runbook
-    note: "Measured timer-routing improvement from foundation alone."
+    note: "Desired timer route; the baseline selector chooses foundation alone."
     messages:
       - role: user
         content: "Give me a timer for five minutes."
