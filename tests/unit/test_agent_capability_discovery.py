@@ -43,16 +43,18 @@ def test_discovery_survives_projection_with_the_captured_cli_inventory(
         catalog=catalog,
         messages=[ChatMessage(role="user", content="Look up $work-issue and run it for issue 42")],
     )
-    assert "tool__search" in projection.proposed
-    if active:
-        assert {"tool__schema", "daintree__invoke"} <= projection.proposed
+    # The whole discovery chain, runbook or no runbook: search returns a name,
+    # schema the argument shape, invoke runs it. Withholding is final for the turn,
+    # so a missing middle link is not recoverable by discovery.
+    assert {"tool__search", "tool__schema", "daintree__invoke"} <= projection.proposed
     # Dynamic host actions are discovered through the existing dispatcher.
     assert not any(name.startswith("agentCapabilities__") for name in projection.offered)
 
 
 def test_runbook_lookup_names_match_the_pinned_host_contract() -> None:
     fixture = ROOT / "cli/internal/tools/mcpx/testdata/agent_capabilities.json"
-    assert fixture.is_file(), "Initialize the pinned CLI submodule before testing synchronization"
+    if not fixture.is_file():
+        pytest.skip("cli/ submodule not initialized (git submodule update --init cli)")
     contract = {entry["name"]: entry for entry in json.loads(fixture.read_text())}
     assert set(contract) == {"agentCapabilities.search", "agentCapabilities.get"}
     foundation = load_catalog().get("daintree.foundation")

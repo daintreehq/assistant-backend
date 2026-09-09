@@ -138,7 +138,29 @@ from daintree_assistant_server.runbooks.catalog import load_catalog
 #   Why it is still a ratchet: 26183 B measured leaves 185 B of slack under the
 #   26368 B ceiling, where the 26112 B ceiling carried 195 B. The ceiling ends
 #   TIGHTER against its content than it started, not looser.
-BASE_PROMPT_CEILING = 26368
+#
+# RAISED 2026-09-09, 26368 -> 26624 B, for the agent-capability discovery bullet.
+#
+#   What behaviour needs this?  Agent commands and skills (a Codex `$skill`, a
+#   Claude `/command`) are per-agent and per-worktree, so their names and their
+#   spelling cannot be known from this prompt or from any runbook body. The model
+#   was guessing them — inventing a plausible token and submitting it — which
+#   fails silently inside somebody else's terminal rather than as a tool error we
+#   can see. The rule that fixes it is "these are looked up, and the token you get
+#   back is the token you send", and it has to hold on EVERY turn: the lookup is
+#   the FIRST thing a turn does with a named command, before any runbook that
+#   would explain it can be selected, and a runbook-less turn is exactly where a
+#   user types one.
+#
+#   Why not a runbook?  daintree.foundation and the fan-out runbook both carry the
+#   full procedure (which action, which arguments, revisions, ordering). Only the
+#   one-line "do not guess the token" restraint is here, and only because the
+#   guess happens before selection can help.
+#
+#   What it cost: 153 B for the bullet. 26487 B measured leaves 137 B of slack
+#   under the 26624 B ceiling, against the 185 B the 26368 B ceiling carried — so
+#   this ends tighter than it started, like every raise above it.
+BASE_PROMPT_CEILING = 26624
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is
