@@ -723,9 +723,13 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
                 # Delegate, and make file changes the only sanctioned way.
                 "subagent.run",
                 "agentTask.spawnForEdits",
-                # Discover and reach an unprojected capability.
+                # Discover and reach an unprojected capability. The whole chain:
+                # search names it, schema gives its argument shape, invoke runs it
+                # gated at its own risk, call is the last resort invoke refuses to.
                 "tool.search",
+                "tool.schema",
                 "daintree.listTools",
+                "daintree.invoke",
                 "daintree.call",
                 # Talk to the user; retire what was reported.
                 "user.askMultipleChoice",

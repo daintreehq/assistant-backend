@@ -3,7 +3,7 @@
   "type": "function",
   "function": {
    "name": "agentTask__spawnForEdits",
-   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent — never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"…\" (top-level scalars) — do NOT nest them under a \"watcher\" key. An omitted worktreeId means the worktree this turn started in, and that stays fixed for the whole turn.",
+   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent \u2014 never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"\u2026\" (top-level scalars) \u2014 do NOT nest them under a \"watcher\" key. An omitted worktreeId means the worktree this turn started in, and that stays fixed for the whole turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -43,7 +43,7 @@
       "type": "string"
      },
      "title": {
-      "description": "Short title for the task and any watcher — the task alone, e.g. \"auth refactor\". The agent name is added to the tab for you, so never write an agent name into this title yourself.",
+      "description": "Short title for the task and any watcher \u2014 the task alone, e.g. \"auth refactor\". The agent name is added to the tab for you, so never write an agent name into this title yourself.",
       "type": "string"
      },
      "watch": {
@@ -60,7 +60,7 @@
      },
      "watcher": {
       "additionalProperties": false,
-      "description": "LEGACY nested form of watch / watchGoal / watchCadenceMs. Prefer the FLAT watchGoal / watch fields above — pass those as top-level scalars, never a nested or dotted watcher key.",
+      "description": "LEGACY nested form of watch / watchGoal / watchCadenceMs. Prefer the FLAT watchGoal / watch fields above \u2014 pass those as top-level scalars, never a nested or dotted watcher key.",
       "properties": {
        "cadenceMs": {
         "type": "number"
@@ -94,7 +94,7 @@
   "type": "function",
   "function": {
    "name": "agentTask__superviseTerminal",
-   "description": "Adopt an ALREADY-RUNNING agent terminal into supervision without re-spawning it. Use this to re-attach a supervisor watcher to a terminal that is running but unsupervised — e.g. an agent from a previous session, or a terminal that lost its watcher. Provide the terminalId; supply acceptanceCriteria when there is a concrete definition of done. This does NOT launch an agent and does NOT edit files.",
+   "description": "Adopt an ALREADY-RUNNING agent terminal into supervision without re-spawning it. Use this to re-attach a supervisor watcher to a terminal that is running but unsupervised \u2014 e.g. an agent from a previous session, or a terminal that lost its watcher. Provide the terminalId; supply acceptanceCriteria when there is a concrete definition of done. This does NOT launch an agent and does NOT edit files.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -142,12 +142,12 @@
   "type": "function",
   "function": {
    "name": "agentTask__status",
-   "description": "Read back the durable spawn saga for one launch by its launchId (the agt_… id returned by agentTask.spawnForEdits). Returns the current stage (launch_requested → agent_started → terminal_bound → watcher_attached → confirmed, or failed/ambiguous), the bound terminalId/watcherId, and any error detail — so you can confirm a spawn actually landed instead of trusting the launch call's return alone. Read-only.",
+   "description": "Read back the durable spawn saga for one launch by its launchId (the agt_\u2026 id returned by agentTask.spawnForEdits). Returns the current stage (launch_requested \u2192 agent_started \u2192 terminal_bound \u2192 watcher_attached \u2192 confirmed, or failed/ambiguous), the bound terminalId/watcherId, and any error detail \u2014 so you can confirm a spawn actually landed instead of trusting the launch call's return alone. Read-only.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "launchId": {
-      "description": "The launchId (agt_…) returned by agentTask.spawnForEdits.",
+      "description": "The launchId (agt_\u2026) returned by agentTask.spawnForEdits.",
       "type": "string"
      }
     },
@@ -162,13 +162,13 @@
   "type": "function",
   "function": {
    "name": "agentTask__list",
-   "description": "List recent spawn sagas (newest first) with their stage, bound terminal/watcher, and any error — the 'did my spawns land?' check for agentTask.spawnForEdits. Defaults to THIS session's launches, so stale terminal ids from earlier sessions (whose titles can collide) never mix in; pass scope:\"all\" for older history. Any non-terminal stage belongs to this session — a prior session's in-flight sagas are swept to 'failed' when the DB opens. Read-only.",
+   "description": "List recent spawn sagas (newest first) with their stage, bound terminal/watcher, and any error \u2014 the 'did my spawns land?' check for agentTask.spawnForEdits. Defaults to THIS session's launches, so stale terminal ids from earlier sessions (whose titles can collide) never mix in; pass scope:\"all\" for older history. Any non-terminal stage belongs to this session \u2014 a prior session's in-flight sagas are swept to 'failed' when the DB opens. Read-only.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "scope": {
       "default": "session",
-      "description": "\"session\" (default) lists only launches made by THIS session — the right window for checking whether a batch of spawns landed. \"all\" includes earlier sessions' launches (newest first, up to 20) for history questions.",
+      "description": "\"session\" (default) lists only launches made by THIS session \u2014 the right window for checking whether a batch of spawns landed. \"all\" includes earlier sessions' launches (newest first, up to 20) for history questions.",
       "enum": [
        "session",
        "all"
@@ -185,7 +185,7 @@
   "type": "function",
   "function": {
    "name": "artifact__read",
-   "description": "Read ONE page of an archived artifact: a large tool result that overflowed the inline limit, or the full pre-compaction transcript a [checkpoint] breadcrumb points at (page the relevant parts surgically — never replay the whole transcript). A page is at most 3500 characters, so ONE call never returns the whole artifact. Call with the artifactId and offset 0 (omit limit), then repeat with offset set to the returned nextOffset until eof is true. Setting limit above 3500 does NOT grab it all at once — it still returns one page.",
+   "description": "Read ONE page of an archived artifact: a large tool result that overflowed the inline limit, or the full pre-compaction transcript a [checkpoint] breadcrumb points at (page the relevant parts surgically \u2014 never replay the whole transcript). A page is at most 3500 characters, so ONE call never returns the whole artifact. Call with the artifactId and offset 0 (omit limit), then repeat with offset set to the returned nextOffset until eof is true. Setting limit above 3500 does NOT grab it all at once \u2014 it still returns one page.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -194,7 +194,7 @@
       "type": "string"
      },
      "limit": {
-      "description": "Optional page size in characters. Omit to use the default and maximum of 3500 per read. Do NOT set this to totalChars — one read returns at most 3500 chars regardless.",
+      "description": "Optional page size in characters. Omit to use the default and maximum of 3500 per read. Do NOT set this to totalChars \u2014 one read returns at most 3500 chars regardless.",
       "maximum": 3500,
       "minimum": 1,
       "type": "number"
@@ -216,7 +216,7 @@
   "type": "function",
   "function": {
    "name": "terminal__run__async",
-   "description": "Send a command (or an agent prompt) to ONE Daintree terminal and watch it to completion ASYNCHRONOUSLY. Types and runs it exactly like terminal.sendCommand, then returns IMMEDIATELY with an async handle (asy_…); the runtime polls agent state every second (no model cost, no output reads) until the terminal settles, then WAKES you through the attention queue. Use it instead of terminal.sendCommand + terminal.awaitAll whenever the work will take more than a minute or two, or the user should get your reply now. AFTER calling it, say what is running and END the turn: do NOT awaitAll or extract-wait the same terminal, do NOT poll async.list for it, do NOT re-send. Read the output when the wake arrives. Finish detection tracks agent state, so it is built for agent terminals. DURABLE and project-scoped: the watch survives the assistant closing — the supervisor adopts it — so you MAY promise an after-close or overnight result. It pauses only if Daintree itself closes, and resumes next launch. Mutating (it runs a command), so it confirms like terminal.sendCommand.",
+   "description": "Send a command (or an agent prompt) to ONE Daintree terminal and watch it to completion ASYNCHRONOUSLY. Types and runs it exactly like terminal.sendCommand, then returns IMMEDIATELY with an async handle (asy_\u2026); the runtime polls agent state every second (no model cost, no output reads) until the terminal settles, then WAKES you through the attention queue. Use it instead of terminal.sendCommand + terminal.awaitAll whenever the work will take more than a minute or two, or the user should get your reply now. AFTER calling it, say what is running and END the turn: do NOT awaitAll or extract-wait the same terminal, do NOT poll async.list for it, do NOT re-send. Read the output when the wake arrives. Finish detection tracks agent state, so it is built for agent terminals. DURABLE and project-scoped: the watch survives the assistant closing \u2014 the supervisor adopts it \u2014 so you MAY promise an after-close or overnight result. It pauses only if Daintree itself closes, and resumes next launch. Mutating (it runs a command), so it confirms like terminal.sendCommand.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -253,12 +253,12 @@
   "type": "function",
   "function": {
    "name": "terminal__await__async",
-   "description": "Watch agent terminal(s) to completion ASYNCHRONOUSLY — the out-of-turn twin of terminal.awaitAll. Returns IMMEDIATELY with an async handle (asy_…); the runtime polls agent state every second (no model cost, no output reads) and WAKES you through the attention queue once every terminal has finished, failed, or asked a question, or the deadline passes. Choose by wait length: awaitAll BLOCKS the turn and suits short waits whose results you need to continue; this one lets you reply NOW and end the turn while agents work — right after spawning a cohort, or after sending long work. AFTER calling it, report what is running and END the turn: do NOT also awaitAll or extract-wait the same terminals, and do NOT attach a watcher just for finish detection (watchers are for goal-based observation). Read outputs when the wake arrives. DURABLE and project-scoped: the watch survives the assistant closing — the supervisor adopts it — so you MAY promise an after-close or overnight result. It pauses only if Daintree itself closes, and resumes next launch. Read-only; needs Daintree MCP.",
+   "description": "Watch agent terminal(s) to completion ASYNCHRONOUSLY \u2014 the out-of-turn twin of terminal.awaitAll. Returns IMMEDIATELY with an async handle (asy_\u2026); the runtime polls agent state every second (no model cost, no output reads) and WAKES you through the attention queue once every terminal has finished, failed, or asked a question, or the deadline passes. Choose by wait length: awaitAll BLOCKS the turn and suits short waits whose results you need to continue; this one lets you reply NOW and end the turn while agents work \u2014 right after spawning a cohort, or after sending long work. AFTER calling it, report what is running and END the turn: do NOT also awaitAll or extract-wait the same terminals, and do NOT attach a watcher just for finish detection (watchers are for goal-based observation). Read outputs when the wake arrives. DURABLE and project-scoped: the watch survives the assistant closing \u2014 the supervisor adopts it \u2014 so you MAY promise an after-close or overnight result. It pauses only if Daintree itself closes, and resumes next launch. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "terminalIds": {
-      "description": "The agent terminals to watch — full terminal-<uuid> ids exactly as listed. ONE call covers the whole cohort — never one call per agent.",
+      "description": "The agent terminals to watch \u2014 full terminal-<uuid> ids exactly as listed. ONE call covers the whole cohort \u2014 never one call per agent.",
       "items": {
        "minLength": 1,
        "type": "string"
@@ -291,7 +291,7 @@
   "type": "function",
   "function": {
    "name": "async__list",
-   "description": "List asynchronous operations (terminal.run.async / terminal.await.async): the live ones by default, everything recent with includeFinished. Use it to answer 'what is still running?' — NOT to poll for a completion (completions wake you through the attention queue on their own). Read-only.",
+   "description": "List asynchronous operations (terminal.run.async / terminal.await.async): the live ones by default, everything recent with includeFinished. Use it to answer 'what is still running?' \u2014 NOT to poll for a completion (completions wake you through the attention queue on their own). Read-only.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -309,12 +309,12 @@
   "type": "function",
   "function": {
    "name": "async__cancel",
-   "description": "Stop tracking an asynchronous operation: the runtime stops polling it and will NOT wake you for it. The terminal and whatever runs inside it are NOT touched — nothing is killed or closed. Use it when the user no longer cares about the result. (Actually stopping the process is a separate, explicit user request — e.g. closing the terminal.)",
+   "description": "Stop tracking an asynchronous operation: the runtime stops polling it and will NOT wake you for it. The terminal and whatever runs inside it are NOT touched \u2014 nothing is killed or closed. Use it when the user no longer cares about the result. (Actually stopping the process is a separate, explicit user request \u2014 e.g. closing the terminal.)",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "asyncId": {
-      "description": "The asy_… id returned when the operation started (see async.list).",
+      "description": "The asy_\u2026 id returned when the operation started (see async.list).",
       "type": "string"
      }
     },
@@ -329,7 +329,7 @@
   "type": "function",
   "function": {
    "name": "audit__export",
-   "description": "Export the audit log as JSON or CSV with optional filters (actor, toolName, outcome, and a tsFrom/tsTo time range in Unix ms). Filters are AND-combined; rows are returned newest-first and bounded by `limit`. Read-only — returns the serialized content as a string for the caller to save or inspect.",
+   "description": "Export the audit log as JSON or CSV with optional filters (actor, toolName, outcome, and a tsFrom/tsTo time range in Unix ms). Filters are AND-combined; rows are returned newest-first and bounded by `limit`. Read-only \u2014 returns the serialized content as a string for the caller to save or inspect.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -389,7 +389,7 @@
   "type": "function",
   "function": {
    "name": "terminal__summarize",
-   "description": "Read a bounded tail of a Daintree terminal and summarize it with the small model. The DEFAULT way to relay what an agent said: raw scrollback is garbled, repainted TUI output, so summarizing gives clean prose and keeps it out of your context. Prefer it over terminal.read unless the user needs the exact literal text. PARALLEL: summarize/extract calls batched in ONE reply run CONCURRENTLY — relay a whole cohort as one batch, not one per turn. Read-only; needs Daintree MCP.",
+   "description": "Read a bounded tail of a Daintree terminal and summarize it with the small model. The DEFAULT way to relay what an agent said: raw scrollback is garbled, repainted TUI output, so summarizing gives clean prose and keeps it out of your context. Prefer it over terminal.read unless the user needs the exact literal text. PARALLEL: summarize/extract calls batched in ONE reply run CONCURRENTLY \u2014 relay a whole cohort as one batch, not one per turn. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -420,7 +420,7 @@
   "type": "function",
   "function": {
    "name": "terminal__read",
-   "description": "Read a terminal's raw scrollback tail VERBATIM — no model, no summarization, no token cap. Use this ONLY when you need the exact literal text (the user asked for a precise quote, or you must inspect exact output). For the common 'tell me what the agent said' case, prefer terminal.summarize: a coding agent's raw scrollback is garbled, repainted TUI output that bloats context and reads as broken when pasted back. Request a bounded tail and never echo the whole frame to the user. Read-only; requires Daintree MCP.",
+   "description": "Read a terminal's raw scrollback tail VERBATIM \u2014 no model, no summarization, no token cap. Use this ONLY when you need the exact literal text (the user asked for a precise quote, or you must inspect exact output). For the common 'tell me what the agent said' case, prefer terminal.summarize: a coding agent's raw scrollback is garbled, repainted TUI output that bloats context and reads as broken when pasted back. Request a bounded tail and never echo the whole frame to the user. Read-only; requires Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -453,12 +453,12 @@
   "type": "function",
   "function": {
    "name": "terminal__extract",
-   "description": "Over MULTIPLE terminalIds, MERGES bounded tails via the small model into ONE plain-TEXT answer — never one per terminal. For a distinct answer per agent, or several named fields, use terminal.extract.json with an array schema keyed by terminalId. On a SINGLE terminalId it is the default way to read what an agent said. PARALLEL: no-wait extract/.json calls batched in ONE reply run CONCURRENTLY — emit several independent extractions as one batch, not one per turn; the wait is roughly the slowest single call. A wait-bearing call is a barrier and runs serially. Omit `instruction` to use it as a finished/condition gate (booleans only, no extraction model call). A wait that observes the agent FINISH auto-retires that terminal's spawn-attached watcher (watchersRetired) — the completion is in your hands, so no notification follows. Read-only; needs Daintree MCP.",
+   "description": "Over MULTIPLE terminalIds, MERGES bounded tails via the small model into ONE plain-TEXT answer \u2014 never one per terminal. For a distinct answer per agent, or several named fields, use terminal.extract.json with an array schema keyed by terminalId. On a SINGLE terminalId it is the default way to read what an agent said. PARALLEL: no-wait extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 emit several independent extractions as one batch, not one per turn; the wait is roughly the slowest single call. A wait-bearing call is a barrier and runs serially. Omit `instruction` to use it as a finished/condition gate (booleans only, no extraction model call). A wait that observes the agent FINISH auto-retires that terminal's spawn-attached watcher (watchersRetired) \u2014 the completion is in your hands, so no notification follows. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "instruction": {
-      "description": "What to extract, as plain TEXT (a number, a name, a yes/no, an agent's answer). Omit to run a wait gate only. Over several terminalIds this MERGES them into ONE answer — for named fields, or one answer per terminal, use terminal.extract.json.",
+      "description": "What to extract, as plain TEXT (a number, a name, a yes/no, an agent's answer). Omit to run a wait gate only. Over several terminalIds this MERGES them into ONE answer \u2014 for named fields, or one answer per terminal, use terminal.extract.json.",
       "type": "string"
      },
      "maxAttempts": {
@@ -490,7 +490,7 @@
       "type": "integer"
      },
      "terminalIds": {
-      "description": "Daintree terminal id(s) to read and extract from — full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
+      "description": "Daintree terminal id(s) to read and extract from \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
       "items": {
        "minLength": 1,
        "type": "string"
@@ -502,11 +502,11 @@
      },
      "wait": {
       "additionalProperties": false,
-      "description": "Poll until this holds before extracting; omit to read once. EXACTLY ONE key below, or {} for a genuine FINISH — prefer {} over stateIs:'waiting', which a pre-start prompt also matches. {} is single-terminal; for a cohort use terminal.awaitAll. No modelJudge here.",
+      "description": "Poll until this holds before extracting; omit to read once. EXACTLY ONE key below, or {} for a genuine FINISH \u2014 prefer {} over stateIs:'waiting', which a pre-start prompt also matches. {} is single-terminal; for a cohort use terminal.awaitAll. No modelJudge here.",
       "maxProperties": 1,
       "properties": {
        "all": {
-        "description": "AND — every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -516,7 +516,7 @@
         "type": "array"
        },
        "any": {
-        "description": "OR — at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
+        "description": "OR \u2014 at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -555,7 +555,7 @@
         "type": "string"
        },
        "stateIs": {
-        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished — pass {} instead (it confirms a real finish).",
+        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished \u2014 pass {} instead (it confirms a real finish).",
         "enum": [
          "idle",
          "working",
@@ -581,7 +581,7 @@
   "type": "function",
   "function": {
    "name": "terminal__extract__json",
-   "description": "Extract STRUCTURED JSON from one or more Daintree terminal tails with the small model. Use it for several NAMED fields at once, or one entry PER terminal across a cohort: the multi-terminal tail is labelled by terminalId, so an array schema keyed by terminalId attributes each agent's answer in ONE call. Both `instruction` and `jsonSchema` are required. Same wait, watcher-retirement and PARALLEL batching rules as terminal.extract — use that one for a single value or plain text to relay. Read-only; needs Daintree MCP.",
+   "description": "Extract STRUCTURED JSON from one or more Daintree terminal tails with the small model. Use it for several NAMED fields at once, or one entry PER terminal across a cohort: the multi-terminal tail is labelled by terminalId, so an array schema keyed by terminalId attributes each agent's answer in ONE call. Both `instruction` and `jsonSchema` are required. Same wait, watcher-retirement and PARALLEL batching rules as terminal.extract \u2014 use that one for a single value or plain text to relay. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -590,7 +590,7 @@
       "type": "string"
      },
      "jsonSchema": {
-      "description": "Required. A REAL JSON Schema (the kind you put under a tool's \"parameters\"), NOT an example value. Accepted keywords ONLY: type, properties, required, items, enum, const, additionalProperties, anyOf, oneOf, allOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, minItems, maxItems, uniqueItems. Any other key is REJECTED — no description, title, default, format, examples, $ref or $schema anywhere. Put explanation in instruction. For one entry per terminal, make the value an array of objects each carrying its own terminalId.",
+      "description": "Required. A REAL JSON Schema (the kind you put under a tool's \"parameters\"), NOT an example value. Accepted keywords ONLY: type, properties, required, items, enum, const, additionalProperties, anyOf, oneOf, allOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, minItems, maxItems, uniqueItems. Any other key is REJECTED \u2014 no description, title, default, format, examples, $ref or $schema anywhere. Put explanation in instruction. For one entry per terminal, make the value an array of objects each carrying its own terminalId.",
       "type": "string"
      },
      "maxAttempts": {
@@ -622,7 +622,7 @@
       "type": "integer"
      },
      "terminalIds": {
-      "description": "Daintree terminal id(s) to read and extract from — full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
+      "description": "Daintree terminal id(s) to read and extract from \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
       "items": {
        "minLength": 1,
        "type": "string"
@@ -634,7 +634,7 @@
      },
      "wait": {
       "additionalProperties": false,
-      "description": "Poll until this holds before extracting; omit to read once. EXACTLY ONE key below, or {} for a genuine FINISH — prefer {} over stateIs:'waiting', which a pre-start prompt also matches. {} is single-terminal; for a cohort use terminal.awaitAll. No modelJudge here.",
+      "description": "Poll until this holds before extracting; omit to read once. EXACTLY ONE key below, or {} for a genuine FINISH \u2014 prefer {} over stateIs:'waiting', which a pre-start prompt also matches. {} is single-terminal; for a cohort use terminal.awaitAll. No modelJudge here.",
       "maxProperties": 1,
       "properties": {
        "all": {
@@ -715,13 +715,13 @@
   "type": "function",
   "function": {
    "name": "terminal__awaitAll",
-   "description": "Wait for a COHORT of agent terminals to reach an idle prompt. Polls agentState only — no model call, no output read. Call ONCE for the whole cohort, not once per agent. Returns allFinished, a perTerminal array (status \"finished\" | \"failed\" | \"question\" | \"working\" plus a `finished` flag, no content), and top-level stillWorking / askingQuestion / blocked ids. askingQuestion and blocked settled WITHOUT finishing: allFinished is false and they keep their watchers; only a real finish/exit retires one (watchersRetired) — never watcher.cancel those. An idle reading is imperfect: peek each tail afterwards and re-await any 'finished' terminal still looking busy. Re-await stillWorking at most twice (three calls per terminal); past that it is hung — escalate via queue.publish + watcher.terminal.create and end the turn. ENFORCED: all awaitAll calls in a turn share a cumulative 120s foreground-wait budget. On budgetExhausted:true do NOT re-await — hand the stragglers to watcher.terminal.create + queue.publish and end the turn. On interruptedByUser:true the user messaged mid-wait — it is already in the conversation, so read it and adapt before re-awaiting. Read-only; needs Daintree MCP.",
+   "description": "Wait for a COHORT of agent terminals to reach an idle prompt. Polls agentState only \u2014 no model call, no output read. Call ONCE for the whole cohort, not once per agent. Returns allFinished, a perTerminal array (status \"finished\" | \"failed\" | \"question\" | \"working\" plus a `finished` flag, no content), and top-level stillWorking / askingQuestion / blocked ids. askingQuestion and blocked settled WITHOUT finishing: allFinished is false and they keep their watchers; only a real finish/exit retires one (watchersRetired) \u2014 never watcher.cancel those. An idle reading is imperfect: peek each tail afterwards and re-await any 'finished' terminal still looking busy. Re-await stillWorking at most twice (three calls per terminal); past that it is hung \u2014 escalate via queue.publish + watcher.terminal.create and end the turn. ENFORCED: all awaitAll calls in a turn share a cumulative 120s foreground-wait budget. On budgetExhausted:true do NOT re-await \u2014 hand the stragglers to watcher.terminal.create + queue.publish and end the turn. On interruptedByUser:true the user messaged mid-wait \u2014 it is already in the conversation, so read it and adapt before re-awaiting. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "maxAttempts": {
       "default": 30,
-      "description": "Hard cap on poll rounds (default 30 ≈ 60s at the default 2s interval; max 240). Leave it at the default unless the cohort is known-slow. The turn's shared wait budget can still end the wait sooner.",
+      "description": "Hard cap on poll rounds (default 30 \u2248 60s at the default 2s interval; max 240). Leave it at the default unless the cohort is known-slow. The turn's shared wait budget can still end the wait sooner.",
       "maximum": 240,
       "minimum": 1,
       "type": "integer"
@@ -756,7 +756,7 @@
   "type": "function",
   "function": {
    "name": "fs__list",
-   "description": "List directory entries under the project root (read-only). Skips .git, node_modules, and dist. PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently — to survey several directories, emit one fs.list each in one batch.",
+   "description": "List directory entries under the project root (read-only). Skips .git, node_modules, and dist. PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently \u2014 to survey several directories, emit one fs.list each in one batch.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -778,12 +778,12 @@
   "type": "function",
   "function": {
    "name": "fs__read",
-   "description": "Read a UTF-8 text file from the project (read-only). Reads up to 200000 bytes by default — omit maxBytes and read the whole file. PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently — to read several files, emit one fs.read each in one batch, not one per turn.",
+   "description": "Read a UTF-8 text file from the project (read-only). Reads up to 200000 bytes by default \u2014 omit maxBytes and read the whole file. PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently \u2014 to read several files, emit one fs.read each in one batch, not one per turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "maxBytes": {
-      "description": "OMIT THIS. The default reads up to 200000 bytes — the whole of almost any source file. Use it only to sample the head of a known-huge file, never as caution: a truncated read cannot be continued, so seeing the rest means re-reading from the start.",
+      "description": "OMIT THIS. The default reads up to 200000 bytes \u2014 the whole of almost any source file. Use it only to sample the head of a known-huge file, never as caution: a truncated read cannot be continued, so seeing the rest means re-reading from the start.",
       "type": "number"
      },
      "path": {
@@ -802,7 +802,7 @@
   "type": "function",
   "function": {
    "name": "fs__search",
-   "description": "Substring search across the project's text files (read-only): a recursive walk skipping .git/node_modules/dist and credential paths, an optional filename-suffix `glob`, capped at maxResults (default 50, max 500). Returns file/line/text per match plus a `capped` flag. LITERAL substring — not a regex, not case-insensitive. Locate code here, then read it with fs.read; it runs serially, so prefer one good needle to a batch of searches.",
+   "description": "Substring search across the project's text files (read-only): a recursive walk skipping .git/node_modules/dist and credential paths, an optional filename-suffix `glob`, capped at maxResults (default 50, max 500). Returns file/line/text per match plus a `capped` flag. LITERAL substring \u2014 not a regex, not case-insensitive. Locate code here, then read it with fs.read; it runs serially, so prefer one good needle to a batch of searches.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -830,7 +830,7 @@
   "type": "function",
   "function": {
    "name": "daintree__status",
-   "description": "Report the Daintree MCP link: the endpoint URL it is connected to, connected, transport, tool count, and the error text when it is down. Works even while disconnected — it never fails on a broken link. The endpoint and the same summary ALREADY ride every round's context, so call this only when diagnosing an MCP_UNAVAILABLE failure or when the user asks whether Daintree is reachable — not to orient yourself each turn.",
+   "description": "Report the Daintree MCP link: the endpoint URL it is connected to, connected, transport, tool count, and the error text when it is down. Works even while disconnected \u2014 it never fails on a broken link. The endpoint and the same summary ALREADY ride every round's context, so call this only when diagnosing an MCP_UNAVAILABLE failure or when the user asks whether Daintree is reachable \u2014 not to orient yourself each turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -842,7 +842,7 @@
   "type": "function",
   "function": {
    "name": "daintree__listTools",
-   "description": "List every Daintree MCP action with its description and policy (`risk`, `requiredTier`, `confirms`, `preferredTool`, `invocable`). Prefer `tool.search` — this dumps the whole catalog — and `tool.schema` for one action's arguments. `callable: false` means the action exists but is not in this turn's tool spec.",
+   "description": "List every Daintree MCP action with its description and policy (`risk`, `requiredTier`, `confirms`, `preferredTool`, `invocable`). Prefer `tool.search` \u2014 this dumps the whole catalog \u2014 and `tool.schema` for one action's arguments. `callable: false` means the action exists but is not in this turn's tool spec.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -854,7 +854,7 @@
   "type": "function",
   "function": {
    "name": "tool__search",
-   "description": "Search Daintree MCP actions by keyword. The query splits on spaces and an action matches when EVERY word appears in its name or description, so prefer a couple of plain keywords (e.g. `rename terminal`) over a phrase — name matches rank first. Each match carries its policy: `risk`, `requiredTier`, `confirms`, `preferredTool`, and `invocable` — whether `daintree.invoke` can run it (with `unavailableReason` when not). Read its arguments with `tool.schema` before invoking. `callable:false` means the tool exists but is not in this turn's tool spec.",
+   "description": "Search Daintree MCP actions by keyword. The query splits on spaces and an action matches when EVERY word appears in its name or description, so prefer a couple of plain keywords (e.g. `rename terminal`) over a phrase \u2014 name matches rank first. Each match carries its policy: `risk`, `requiredTier`, `confirms`, `preferredTool`, and `invocable` \u2014 whether `daintree.invoke` can run it (with `unavailableReason` when not). Read its arguments with `tool.schema` before invoking. `callable:false` means the tool exists but is not in this turn's tool spec.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -878,7 +878,7 @@
   "type": "function",
   "function": {
    "name": "tool__schema",
-   "description": "Look up ONE Daintree MCP action's exact input schema — its argument shape — plus its policy (`risk`, `requiredTier`, `confirms`, `invocable`), without invoking it. Call with the literal object {\"name\":\"recipe.run\"}. This schema is what `daintree.invoke` validates arguments against. Reach for it whenever you would otherwise guess an argument key — above all for a wrapper's opaque `arguments` record, whose keys are documented nowhere else.",
+   "description": "Look up ONE Daintree MCP action's exact input schema \u2014 its argument shape \u2014 plus its policy (`risk`, `requiredTier`, `confirms`, `invocable`), without invoking it. Call with the literal object {\"name\":\"recipe.run\"}. This schema is what `daintree.invoke` validates arguments against. Reach for it whenever you would otherwise guess an argument key \u2014 above all for a wrapper's opaque `arguments` record, whose keys are documented nowhere else.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -900,7 +900,7 @@
   "type": "function",
   "function": {
    "name": "daintree__call",
-   "description": "Raw passthrough to ANY Daintree MCP tool. Escape hatch — highest risk ('system'), always confirmed, 'system' tier, never grantable. Prefer a purpose-built tool, then `daintree.invoke` (which gates an action at ITS OWN risk instead of this blanket system-tier prompt). Use this only for an action `daintree.invoke` refuses as policy-unknown. Wrapped tools (agent.launch, terminal.getOutput, panel.focus) are redirected to their wrapper.",
+   "description": "Raw passthrough to ANY Daintree MCP tool. Escape hatch \u2014 highest risk ('system'), always confirmed, 'system' tier, never grantable. Prefer a purpose-built tool, then `daintree.invoke` (which gates an action at ITS OWN risk instead of this blanket system-tier prompt). Use this only for an action `daintree.invoke` refuses as policy-unknown. Wrapped tools (agent.launch, terminal.getOutput, panel.focus) are redirected to their wrapper.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -960,11 +960,12 @@
   "type": "function",
   "function": {
    "name": "terminal__focus",
-   "description": "Select a terminal in this session's view. Does not switch workspaces or raise a window.",
+   "description": "Bring ONE Daintree terminal to the front of THIS session's view \u2014 forwards to Daintree's panel.focus with the terminal id as the panelId. Pure UI: no confirmation, no state change; it does not read, send to, or close anything. It cannot switch workspace or raise a hidden window \u2014 terminal.revealOwned does that. Use it to point the user at a tab you spawned.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "terminalId": {
+      "description": "Full Daintree terminal id (terminal-<uuid>), never a prefix.",
       "type": "string"
      }
     },
@@ -979,11 +980,12 @@
   "type": "function",
   "function": {
    "name": "terminal__revealOwned",
-   "description": "Reveal a terminal this connection created only when the user asks: switch workspace and raise its window. Success accepts navigation; focus may still be pending.",
+   "description": "Reveal a terminal THIS connection created, only when the user asks: Daintree switches to the owning workspace and raises its window. Daintree enforces ownership \u2014 a refusal is final, never retry it through terminal.focus. Success means navigation was accepted, not that focus finished.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "terminalId": {
+      "description": "Full Daintree terminal id (terminal-<uuid>), never a prefix.",
       "type": "string"
      }
     },
@@ -998,7 +1000,7 @@
   "type": "function",
   "function": {
    "name": "terminal__rename",
-   "description": "Set a terminal/agent tab's title. This is how you ORGANISE the workspace: when several agents are all named \"Claude\" (or you've lost track of a fleet), rename each to what it is actually doing so the tabs read at a glance. Pass terminalId + a short name; rename many in ONE batched round (one call per id, all in the same turn). UI-only, no confirmation. Typed wrapper around the Daintree terminal.rename MCP tool — don't reach for it via tool.search or daintree.call.",
+   "description": "Set a terminal/agent tab's title. This is how you ORGANISE the workspace: when several agents are all named \"Claude\" (or you've lost track of a fleet), rename each to what it is actually doing so the tabs read at a glance. Pass terminalId + a short name; rename many in ONE batched round (one call per id, all in the same turn). UI-only, no confirmation. Typed wrapper around the Daintree terminal.rename MCP tool \u2014 don't reach for it via tool.search or daintree.call.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1023,7 +1025,7 @@
   "type": "function",
   "function": {
    "name": "copyTree__generate",
-   "description": "Generate a Daintree 'copy tree' — a concatenated digest of a worktree's files — and return it as text (read-only). Typed wrapper around the Daintree copyTree.generate MCP tool. 'options' is forwarded verbatim; don't invent keys.",
+   "description": "Generate a Daintree 'copy tree' \u2014 a concatenated digest of a worktree's files \u2014 and return it as text (read-only). Typed wrapper around the Daintree copyTree.generate MCP tool. 'options' is forwarded verbatim; don't invent keys.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1050,7 +1052,7 @@
   "type": "function",
   "function": {
    "name": "terminal__sendCommand",
-   "description": "Send a command line to a Daintree terminal — types it into the terminal's input and runs it. Mutating, so it always confirms. Typed wrapper around the Daintree terminal.sendCommand MCP tool.",
+   "description": "Send a command line to a Daintree terminal \u2014 types it into the terminal's input and runs it. Mutating, so it always confirms. Typed wrapper around the Daintree terminal.sendCommand MCP tool.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1075,7 +1077,7 @@
   "type": "function",
   "function": {
    "name": "terminal__close",
-   "description": "Close Daintree terminal(s) — moves each to the trash and ends the agent or process running in it. ONLY when the USER has explicitly asked; closing is never your own decision. Do NOT call it to tidy up, to retire agents you spawned, or to recover from a failed or 'no terminalId' spawn — retry or report that instead. A terminal you did not just spawn may be the user's own live work or another agent mid-task, and closing it ends that work irreversibly. Pass one terminalId, or terminalIds:[...] for a cohort, in ONE call. (terminal.kill deletes PERMANENTLY — prefer close.)",
+   "description": "Close Daintree terminal(s) \u2014 moves each to the trash and ends the agent or process running in it. ONLY when the USER has explicitly asked; closing is never your own decision. Do NOT call it to tidy up, to retire agents you spawned, or to recover from a failed or 'no terminalId' spawn \u2014 retry or report that instead. A terminal you did not just spawn may be the user's own live work or another agent mid-task, and closing it ends that work irreversibly. Pass one terminalId, or terminalIds:[...] for a cohort, in ONE call. (terminal.kill deletes PERMANENTLY \u2014 prefer close.)",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1084,7 +1086,7 @@
       "type": "string"
      },
      "terminalIds": {
-      "description": "Several terminal ids to close in ONE confirmed call (e.g. retiring a spawned cohort) — prefer this over calling terminal.close once per id.",
+      "description": "Several terminal ids to close in ONE confirmed call (e.g. retiring a spawned cohort) \u2014 prefer this over calling terminal.close once per id.",
       "items": {
        "type": "string"
       },
@@ -1100,7 +1102,7 @@
   "type": "function",
   "function": {
    "name": "terminal__moveToWorktree",
-   "description": "Move existing Daintree terminal(s) into ONE already-open worktree. Pass {\"terminalId\":\"terminal-<uuid>\",\"worktreeId\":\"<worktreePath>\"}, or terminalIds:[\"terminal-<uuid>\", ...] to relocate a whole cohort in one call. worktreeId is the exact PATH from worktree.list — a branch name is NEVER accepted. The move does NOT restart the process: a live agent keeps running in the directory it launched from, so you MUST follow up with terminal.sendCommand \"Please continue in the directory <worktreePath>\" — that sentence, not this move, relocates the work.",
+   "description": "Move existing Daintree terminal(s) into ONE already-open worktree. Pass {\"terminalId\":\"terminal-<uuid>\",\"worktreeId\":\"<worktreePath>\"}, or terminalIds:[\"terminal-<uuid>\", ...] to relocate a whole cohort in one call. worktreeId is the exact PATH from worktree.list \u2014 a branch name is NEVER accepted. The move does NOT restart the process: a live agent keeps running in the directory it launched from, so you MUST follow up with terminal.sendCommand \"Please continue in the directory <worktreePath>\" \u2014 that sentence, not this move, relocates the work.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1110,7 +1112,7 @@
       "type": "string"
      },
      "terminalIds": {
-      "description": "Several terminal ids to move into the SAME worktree in one confirmed call (e.g. relocating a spawned cohort) — prefer this over calling terminal.moveToWorktree once per id.",
+      "description": "Several terminal ids to move into the SAME worktree in one confirmed call (e.g. relocating a spawned cohort) \u2014 prefer this over calling terminal.moveToWorktree once per id.",
       "items": {
        "minLength": 1,
        "type": "string"
@@ -1220,7 +1222,7 @@
   "type": "function",
   "function": {
    "name": "copyTree__generateAndCopyFile",
-   "description": "Generate a worktree's copy tree and copy it to the OS clipboard as a file. System tier — always confirms. Typed wrapper around the Daintree copyTree.generateAndCopyFile MCP tool. 'options' is forwarded verbatim.",
+   "description": "Generate a worktree's copy tree and copy it to the OS clipboard as a file. System tier \u2014 always confirms. Typed wrapper around the Daintree copyTree.generateAndCopyFile MCP tool. 'options' is forwarded verbatim.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1247,7 +1249,7 @@
   "type": "function",
   "function": {
    "name": "scratch__create",
-   "description": "Create a named in-memory scratch store for ephemeral within-session data and return its storeId. Use scratch.* tools as a temporary key-value workspace to track intermediate results across the steps of a multi-step task. Scratch data lives only for THIS session and is never persisted — for durable cross-session notes use memory.save instead. Keep the returned storeId; you pass it to scratch.set/get/delete/drop.",
+   "description": "Create a named in-memory scratch store for ephemeral within-session data and return its storeId. Use scratch.* tools as a temporary key-value workspace to track intermediate results across the steps of a multi-step task. Scratch data lives only for THIS session and is never persisted \u2014 for durable cross-session notes use memory.save instead. Keep the returned storeId; you pass it to scratch.set/get/delete/drop.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1268,12 +1270,12 @@
   "type": "function",
   "function": {
    "name": "scratch__set",
-   "description": "Write a key/value into a scratch store (upsert — overwrites an existing key). The value is any JSON (object, array, string, number, boolean, null) and is read back verbatim by scratch.get.",
+   "description": "Write a key/value into a scratch store (upsert \u2014 overwrites an existing key). The value is any JSON (object, array, string, number, boolean, null) and is read back verbatim by scratch.get.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "key": {
-      "description": "The key to write (upsert — overwrites if it already exists).",
+      "description": "The key to write (upsert \u2014 overwrites if it already exists).",
       "minLength": 1,
       "type": "string"
      },
@@ -1282,7 +1284,7 @@
       "type": "string"
      },
      "value": {
-      "description": "Any JSON value to store: object, array, string, number, boolean, or null. Pass it directly as JSON — do NOT wrap it in a string."
+      "description": "Any JSON value to store: object, array, string, number, boolean, or null. Pass it directly as JSON \u2014 do NOT wrap it in a string."
      }
     },
     "required": [
@@ -1348,7 +1350,7 @@
   "type": "function",
   "function": {
    "name": "scratch__drop",
-   "description": "Discard an ENTIRE scratch store and every key in it, freeing one of the 20 per-session store slots (drop a finished store when scratch.create returns SCRATCH_STORE_FULL). Unknown storeId ⇒ SCRATCH_STORE_NOT_FOUND (unrecoverable). Scratch data is in-memory and session-only so nothing durable is lost — but there is no undo. To remove a single key instead, use scratch.delete.",
+   "description": "Discard an ENTIRE scratch store and every key in it, freeing one of the 20 per-session store slots (drop a finished store when scratch.create returns SCRATCH_STORE_FULL). Unknown storeId \u21d2 SCRATCH_STORE_NOT_FOUND (unrecoverable). Scratch data is in-memory and session-only so nothing durable is lost \u2014 but there is no undo. To remove a single key instead, use scratch.delete.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1368,12 +1370,12 @@
   "type": "function",
   "function": {
    "name": "subagent__run",
-   "description": "Delegate ONE research question to a read-only sub-agent working in its own separate conversation; only its short report comes back. Use it when FINDING an answer costs far more context than the answer — one issue among thousands, a symbol across an unfamiliar tree, exploring a tree before a copyTree scope. Nothing it reads enters this conversation. It has read-only tools only (no edits, spawns, terminal input, forge writes) and cannot ask questions, so the brief must stand alone. Fan out independent questions as several calls in one batch. Its transcriptId pages the full run via artifact.read.",
+   "description": "Delegate ONE research question to a read-only sub-agent working in its own separate conversation; only its short report comes back. Use it when FINDING an answer costs far more context than the answer \u2014 one issue among thousands, a symbol across an unfamiliar tree, exploring a tree before a copyTree scope. Nothing it reads enters this conversation. It has read-only tools only (no edits, spawns, terminal input, forge writes) and cannot ask questions, so the brief must stand alone. Fan out independent questions as several calls in one batch. Its transcriptId pages the full run via artifact.read.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "context": {
-      "description": "Optional. Background it cannot discover itself: a constraint the user stated, a decision made earlier, an id you already hold. Never paste file contents or tool output — it can fetch those itself, and pasting re-spends the context this call exists to save.",
+      "description": "Optional. Background it cannot discover itself: a constraint the user stated, a decision made earlier, an id you already hold. Never paste file contents or tool output \u2014 it can fetch those itself, and pasting re-spends the context this call exists to save.",
       "type": "string"
      },
      "deliverable": {
@@ -1387,7 +1389,7 @@
       "type": "number"
      },
      "task": {
-      "description": "The ONE question the sub-agent must answer, as a standalone brief — it sees none of this conversation. Name the thing concretely: \"Find the GitHub issue describing terrain mesh flicker at chunk borders\". Not a topic (\"terrain bugs\"), not a plan, not a multi-part errand.",
+      "description": "The ONE question the sub-agent must answer, as a standalone brief \u2014 it sees none of this conversation. Name the thing concretely: \"Find the GitHub issue describing terrain mesh flicker at chunk borders\". Not a topic (\"terrain bugs\"), not a plan, not a multi-part errand.",
       "type": "string"
      }
     },
@@ -1402,7 +1404,7 @@
   "type": "function",
   "function": {
    "name": "grant__create",
-   "description": "Pre-authorize unattended confirm-required tool use, bounded by TTL, use-count and a tool/risk allowlist. actorType watcher/timer authorizes that one watcher/timer (actorId = its wch_/tmr_ id); actorType \"wake\" with actorId \"wake\" authorizes the supervisor daemon's autonomous wake turns while the user is away (create it when the user asks for unattended work that must MUTATE — e.g. sending terminal commands overnight).",
+   "description": "Pre-authorize unattended confirm-required tool use, bounded by TTL, use-count and a tool/risk allowlist. actorType watcher/timer authorizes that one watcher/timer (actorId = its wch_/tmr_ id); actorType \"wake\" with actorId \"wake\" authorizes the supervisor daemon's autonomous wake turns while the user is away (create it when the user asks for unattended work that must MUTATE \u2014 e.g. sending terminal commands overnight).",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1464,7 +1466,7 @@
   "type": "function",
   "function": {
    "name": "grant__list",
-   "description": "List the LIVE automation grants (non-revoked, non-expired, uses remaining), optionally filtered by actorId: grant id, actorId/actorType (watcher|timer|wake), the allowed risk classes and tool names, expiresAt and usesRemaining. Grants do NOT ride the turn context — call this when the user asks what may run unattended, before minting a duplicate, or to get the id for grant.revoke.",
+   "description": "List the LIVE automation grants (non-revoked, non-expired, uses remaining), optionally filtered by actorId: grant id, actorId/actorType (watcher|timer|wake), the allowed risk classes and tool names, expiresAt and usesRemaining. Grants do NOT ride the turn context \u2014 call this when the user asks what may run unattended, before minting a duplicate, or to get the id for grant.revoke.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1480,7 +1482,7 @@
   "type": "function",
   "function": {
    "name": "grant__revoke",
-   "description": "Revoke an automation grant by its grt_… id, immediately withdrawing that actor's pre-authorization to run confirm-required tools unattended — the next watcher/timer/wake call that needed it becomes a blocked pending-approval inbox item instead. Interactive main actor only (else GRANT_ACTOR_FORBIDDEN). Use it when the user calls off unattended work. Idempotent: only an unknown id fails GRANT_NOT_FOUND — an already-revoked, expired, or used-up grant returns alreadyRevoked:true, not an error, so a redundant revoke after timer.cancel is a no-op.",
+   "description": "Revoke an automation grant by its grt_\u2026 id, immediately withdrawing that actor's pre-authorization to run confirm-required tools unattended \u2014 the next watcher/timer/wake call that needed it becomes a blocked pending-approval inbox item instead. Interactive main actor only (else GRANT_ACTOR_FORBIDDEN). Use it when the user calls off unattended work. Idempotent: only an unknown id fails GRANT_NOT_FOUND \u2014 an already-revoked, expired, or used-up grant returns alreadyRevoked:true, not an error, so a redundant revoke after timer.cancel is a no-op.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1543,7 +1545,7 @@
   "type": "function",
   "function": {
    "name": "worktree__list",
-   "description": "List Daintree's worktrees for this project — each entry's id, path, branch, and whether it is active/main. Read-only passthrough. The CURRENT worktree already rides every round's runtime context, so call this when you need the OTHERS: choosing a spawn target, answering \"which worktrees are ready?\", or resolving a worktreeId — which is a PATH-like id from this list, never a branch name.",
+   "description": "List Daintree's worktrees for this project \u2014 each entry's id, path, branch, and whether it is active/main. Read-only passthrough. The CURRENT worktree already rides every round's runtime context, so call this when you need the OTHERS: choosing a spawn target, answering \"which worktrees are ready?\", or resolving a worktreeId \u2014 which is a PATH-like id from this list, never a branch name.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1560,7 +1562,7 @@
   "type": "function",
   "function": {
    "name": "worktree__getCurrent",
-   "description": "Get the Daintree worktree the user is currently in — its exact id, path, branch and bound issue/PR. The runtime context already carries a ONE-LINE worktree summary every round, so call this only when you need those exact fields (e.g. a worktreeId to spawn into), after an action that may have switched worktrees, or when the runtime context reported no current worktree.",
+   "description": "Get the Daintree worktree the user is currently in \u2014 its exact id, path, branch and bound issue/PR. The runtime context already carries a ONE-LINE worktree summary every round, so call this only when you need those exact fields (e.g. a worktreeId to spawn into), after an action that may have switched worktrees, or when the runtime context reported no current worktree.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1600,7 +1602,7 @@
   "type": "function",
   "function": {
    "name": "forge__listIssues",
-   "description": "List the project's GitHub issues through Daintree's forge integration. `arguments` is a forge-defined options record forwarded verbatim (state, labels, limit, …) — omit it for the default listing rather than inventing keys. Read-only. PARALLEL: forge.* reads batched in ONE reply run concurrently. MCP_UNAVAILABLE when Daintree is disconnected; a forge refusal returns MCP_TOOL_ERROR.",
+   "description": "List the project's GitHub issues through Daintree's forge integration. `arguments` is a forge-defined options record forwarded verbatim (state, labels, limit, \u2026) \u2014 omit it for the default listing rather than inventing keys. Read-only. PARALLEL: forge.* reads batched in ONE reply run concurrently. MCP_UNAVAILABLE when Daintree is disconnected; a forge refusal returns MCP_TOOL_ERROR.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1617,7 +1619,7 @@
   "type": "function",
   "function": {
    "name": "forge__getIssue",
-   "description": "Fetch ONE GitHub issue's detail through Daintree's forge integration. `arguments` is forwarded verbatim — pass the issue number under the key the forge expects (mirror what forge.listIssues returned); do not invent keys. Read-only. PARALLEL: several forge.* reads in ONE batch run concurrently, so fetch multiple issues in a single reply rather than one per turn.",
+   "description": "Fetch ONE GitHub issue's detail through Daintree's forge integration. `arguments` is forwarded verbatim \u2014 pass the issue number under the key the forge expects (mirror what forge.listIssues returned); do not invent keys. Read-only. PARALLEL: several forge.* reads in ONE batch run concurrently, so fetch multiple issues in a single reply rather than one per turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1634,7 +1636,7 @@
   "type": "function",
   "function": {
    "name": "forge__listPRs",
-   "description": "List the project's GitHub pull requests through Daintree's forge integration. `arguments` is a forge-defined options record forwarded verbatim (state, limit, …) — omit it for the default listing rather than inventing keys. Read-only. PARALLEL: forge.* reads batched in ONE reply run concurrently. For one PR's full detail use forge.getPR with its prNumber.",
+   "description": "List the project's GitHub pull requests through Daintree's forge integration. `arguments` is a forge-defined options record forwarded verbatim (state, limit, \u2026) \u2014 omit it for the default listing rather than inventing keys. Read-only. PARALLEL: forge.* reads batched in ONE reply run concurrently. For one PR's full detail use forge.getPR with its prNumber.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1651,7 +1653,7 @@
   "type": "function",
   "function": {
    "name": "forge__getPR",
-   "description": "Get a single forge (GitHub) pull request by number. For several known numbers use forge.getPRs — one call, with a per-number status.",
+   "description": "Get a single forge (GitHub) pull request by number. For several known numbers use forge.getPRs \u2014 one call, with a per-number status.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1665,7 +1667,7 @@
       "type": "integer"
      },
      "worktreeId": {
-      "description": "Worktree id (wt_…). Takes precedence over a path.",
+      "description": "Worktree id (wt_\u2026). Takes precedence over a path.",
       "type": "string"
      },
      "worktreePath": {
@@ -1684,7 +1686,7 @@
   "type": "function",
   "function": {
    "name": "forge__getPRs",
-   "description": "Get 2-20 known forge (GitHub) pull requests in ONE call, instead of repeating forge.getPR. Each number carries a status: `found`, `not_found` (asked; not there) or `unresolved` (nothing learned — rate limit or transport). NEVER read `unresolved` as `not_found` — it is not evidence a PR is gone, and acting on it closes live work; re-read those numbers. Not a search; discover with forge.listPRs.",
+   "description": "Get 2-20 known forge (GitHub) pull requests in ONE call, instead of repeating forge.getPR. Each number carries a status: `found`, `not_found` (asked; not there) or `unresolved` (nothing learned \u2014 rate limit or transport). NEVER read `unresolved` as `not_found` \u2014 it is not evidence a PR is gone, and acting on it closes live work; re-read those numbers. Not a search; discover with forge.listPRs.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1723,7 +1725,7 @@
   "type": "function",
   "function": {
    "name": "forge__getChecks",
-   "description": "Read a pull request's CI check state by PR number. Gate on `conclusive`, NOT on `state`: conclusive=false means the state could not be determined — the forge returned nothing, or reported ZERO required checks, which it also does when it could not read the required list. That is never evidence a merge is safe, even when state is \"success\". Counts cover REQUIRED checks only. Readings are provider-cached (~1m), so an immediate re-read may return the same value. No per-check breakdown exists, so this cannot say WHICH check failed. PARALLEL: forge.* reads batched in ONE reply run concurrently.",
+   "description": "Read a pull request's CI check state by PR number. Gate on `conclusive`, NOT on `state`: conclusive=false means the state could not be determined \u2014 the forge returned nothing, or reported ZERO required checks, which it also does when it could not read the required list. That is never evidence a merge is safe, even when state is \"success\". Counts cover REQUIRED checks only. Readings are provider-cached (~1m), so an immediate re-read may return the same value. No per-check breakdown exists, so this cannot say WHICH check failed. PARALLEL: forge.* reads batched in ONE reply run concurrently.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1737,7 +1739,7 @@
       "type": "integer"
      },
      "worktreeId": {
-      "description": "Worktree id (wt_…). Takes precedence over a path.",
+      "description": "Worktree id (wt_\u2026). Takes precedence over a path.",
       "type": "string"
      },
      "worktreePath": {
@@ -1756,7 +1758,7 @@
   "type": "function",
   "function": {
    "name": "git__getProjectPulse",
-   "description": "Read a worktree's git pulse through Daintree: current branch, uncommitted/staged changes and recent commits. Takes an optional opaque {worktreeId} — omit it for the active worktree. Read-only, no confirmation: this wrapper is why a plain \"what's the git state?\" never needs the system-tier daintree.call escape hatch. For a review-readiness go/no-go verdict use workflow.prepBranchForReview.",
+   "description": "Read a worktree's git pulse through Daintree: current branch, uncommitted/staged changes and recent commits. Takes an optional opaque {worktreeId} \u2014 omit it for the active worktree. Read-only, no confirmation: this wrapper is why a plain \"what's the git state?\" never needs the system-tier daintree.call escape hatch. For a review-readiness go/no-go verdict use workflow.prepBranchForReview.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1773,7 +1775,7 @@
   "type": "function",
   "function": {
    "name": "project__detectRunners",
-   "description": "List the runnable commands a project defines, by inspecting its manifests. The direct source of the runnerId project.runCheck requires — never guess one. It returns every script it finds, publish and deploy included, and synthesizes conventional commands for some frameworks, so check what an unfamiliar runner runs before running it.",
+   "description": "List the runnable commands a project defines, by inspecting its manifests. The direct source of the runnerId project.runCheck requires \u2014 never guess one. It returns every script it finds, publish and deploy included, and synthesizes conventional commands for some frameworks, so check what an unfamiliar runner runs before running it.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1790,7 +1792,7 @@
   "type": "function",
   "function": {
    "name": "project__runCheck",
-   "description": "Run ONE of a project's detected commands (test, lint, build, …) and report its exit code and output. Get runnerId from project.detectRunners — never guess one, and confirm what an unfamiliar id runs, since detection surfaces every script, not only checks. A command that FAILS returns ok with passed:false: read the verdict, not the call. Never point it at a long-lived server — it blocks until the timeout expires.",
+   "description": "Run ONE of a project's detected commands (test, lint, build, \u2026) and report its exit code and output. Get runnerId from project.detectRunners \u2014 never guess one, and confirm what an unfamiliar id runs, since detection surfaces every script, not only checks. A command that FAILS returns ok with passed:false: read the verdict, not the call. Never point it at a long-lived server \u2014 it blocks until the timeout expires.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1805,7 +1807,7 @@
       "type": "string"
      },
      "runnerId": {
-      "description": "Which detected command to run — an id from project.detectRunners. Never guess one.",
+      "description": "Which detected command to run \u2014 an id from project.detectRunners. Never guess one.",
       "minLength": 1,
       "type": "string"
      },
@@ -1829,12 +1831,12 @@
   "type": "function",
   "function": {
    "name": "forge__listIssueComments",
-   "description": "Read ONE page of a GitHub issue's comment thread. Comments come back OLDEST FIRST, so the newest reply is at the END: page with nextCursor until hasMore is false before concluding what the thread says. An empty page genuinely means nobody commented — a missing issue fails instead, so silence is never ambiguous. PARALLEL: forge.* reads batched in ONE reply run concurrently.",
+   "description": "Read ONE page of a GitHub issue's comment thread. Comments come back OLDEST FIRST, so the newest reply is at the END: page with nextCursor until hasMore is false before concluding what the thread says. An empty page genuinely means nobody commented \u2014 a missing issue fails instead, so silence is never ambiguous. PARALLEL: forge.* reads batched in ONE reply run concurrently.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "cursor": {
-      "description": "Opaque cursor — pass the previous response's nextCursor for the next page.",
+      "description": "Opaque cursor \u2014 pass the previous response's nextCursor for the next page.",
       "type": "string"
      },
      "cwd": {
@@ -1876,7 +1878,7 @@
   "type": "function",
   "function": {
    "name": "agentSessionHistory__list",
-   "description": "List CLOSED agent sessions that can be relaunched, from the on-disk journal — which sessions exist, carrying no transcript text. Newest first; read `total`/`hasMore` before concluding you have seen them all. It must resolve a worktree or project scope and FAILS rather than listing everything, so pass one when this session has none. Retention prunes old records, so absence does not prove a session never existed.",
+   "description": "List CLOSED agent sessions that can be relaunched, from the on-disk journal \u2014 which sessions exist, carrying no transcript text. Newest first; read `total`/`hasMore` before concluding you have seen them all. It must resolve a worktree or project scope and FAILS rather than listing everything, so pass one when this session has none. Retention prunes old records, so absence does not prove a session never existed.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1912,7 +1914,7 @@
   "type": "function",
   "function": {
    "name": "browser__getConsoleMessages",
-   "description": "Read captured console output (logs, warnings, errors, stack traces) from a DEV PREVIEW panel — the only panel kind that captures it; any other target fails rather than returning nothing. Omit terminalId for the focused panel. `counts` covers the whole pane, not the rows returned, so a higher errorCount means the level filter or limit hid some.",
+   "description": "Read captured console output (logs, warnings, errors, stack traces) from a DEV PREVIEW panel \u2014 the only panel kind that captures it; any other target fails rather than returning nothing. Omit terminalId for the focused panel. `counts` covers the whole pane, not the rows returned, so a higher errorCount means the level filter or limit hid some.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1945,13 +1947,13 @@
   "type": "function",
   "function": {
    "name": "errors__recent",
-   "description": "List recent entries from Daintree's DIAGNOSTICS error log — runtime and inter-process failures, newest first. SEPARATE store from the user's notification inbox (notifications.recent): a full picture of what went wrong usually means reading both. An empty list means nothing was recorded OR all of it was dismissed. PARALLEL: pair the two in ONE batch and both run concurrently.",
+   "description": "List recent entries from Daintree's DIAGNOSTICS error log \u2014 runtime and inter-process failures, newest first. SEPARATE store from the user's notification inbox (notifications.recent): a full picture of what went wrong usually means reading both. An empty list means nothing was recorded OR all of it was dismissed. PARALLEL: pair the two in ONE batch and both run concurrently.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "includesDismissed": {
       "default": false,
-      "description": "Include errors the user dismissed (default false — active errors only).",
+      "description": "Include errors the user dismissed (default false \u2014 active errors only).",
       "type": "boolean"
      },
      "limit": {
@@ -1970,7 +1972,7 @@
   "type": "function",
   "function": {
    "name": "notifications__recent",
-   "description": "List recent entries from the user's NOTIFICATION INBOX — completion, waiting and informational messages, including quiet ones that never surfaced as a toast — newest first. SEPARATE store from the diagnostics error log (errors.recent): a full picture of what went wrong usually means reading both. PARALLEL: pair the two in ONE batch.",
+   "description": "List recent entries from the user's NOTIFICATION INBOX \u2014 completion, waiting and informational messages, including quiet ones that never surfaced as a toast \u2014 newest first. SEPARATE store from the diagnostics error log (errors.recent): a full picture of what went wrong usually means reading both. PARALLEL: pair the two in ONE batch.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2005,7 +2007,7 @@
   "type": "function",
   "function": {
    "name": "worktree__resource__status",
-   "description": "Run a worktree's configured remote-resource status command (e.g. a cloud devbox) and report what it said. It EXECUTES a real command and waits, so it costs whatever that command costs. `configured:false` means no status command is set up — not a failure, and not evidence the resource is down. A failing status command fails this call rather than returning a stale cached answer, so a result is always fresh.",
+   "description": "Run a worktree's configured remote-resource status command (e.g. a cloud devbox) and report what it said. It EXECUTES a real command and waits, so it costs whatever that command costs. `configured:false` means no status command is set up \u2014 not a failure, and not evidence the resource is down. A failing status command fails this call rather than returning a stale cached answer, so a result is always fresh.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2049,7 +2051,7 @@
   "type": "function",
   "function": {
    "name": "workflow__prepBranchForReview",
-   "description": "Read-only review-readiness check for a branch: inspects the worktree's working tree + detected runners and returns a go/no-go verdict (ready | blocked_uncommitted_changes | blocked_merge_conflicts | blocked_repo_busy | no_runners_detected) plus the uncommitted/conflict flags, staged/unstaged counts, currentBranch, repoState, and detectedRunners. Does NOT commit, push, or open a PR — do the actual prep with git.* / forge.* once the verdict is 'ready'.",
+   "description": "Read-only review-readiness check for a branch: inspects the worktree's working tree + detected runners and returns a go/no-go verdict (ready | blocked_uncommitted_changes | blocked_merge_conflicts | blocked_repo_busy | no_runners_detected) plus the uncommitted/conflict flags, staged/unstaged counts, currentBranch, repoState, and detectedRunners. Does NOT commit, push, or open a PR \u2014 do the actual prep with git.* / forge.* once the verdict is 'ready'.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2072,7 +2074,7 @@
   "type": "function",
   "function": {
    "name": "memory__recall",
-   "description": "BM25-ranked full-text search over this project's saved memories (default 10 hits, max 50; optional category filter). Returns id, content, kind, pinned flag and timestamps. Every turn ALREADY carries the pinned memories plus an automatic recall snapshot for the user's ask — so call this only to dig for what those did not surface (a past decision, a convention, an earlier attempt). Query with a few plain keywords.",
+   "description": "BM25-ranked full-text search over this project's saved memories (default 10 hits, max 50; optional category filter). Returns id, content, kind, pinned flag and timestamps. Every turn ALREADY carries the pinned memories plus an automatic recall snapshot for the user's ask \u2014 so call this only to dig for what those did not surface (a past decision, a convention, an earlier attempt). Query with a few plain keywords.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2099,7 +2101,7 @@
   "type": "function",
   "function": {
    "name": "memory__list",
-   "description": "Browse saved project memories, pinned first then most recent (default 50, max 200); filter by category or pinnedOnly. Pinned memories and this turn's recall hits ALREADY ride every round's turn context, so use this to audit the store — spot a stale fact to memory.forget, or grab a mem_… id to pin/unpin. To find facts on a topic, use memory.recall instead.",
+   "description": "Browse saved project memories, pinned first then most recent (default 50, max 200); filter by category or pinnedOnly. Pinned memories and this turn's recall hits ALREADY ride every round's turn context, so use this to audit the store \u2014 spot a stale fact to memory.forget, or grab a mem_\u2026 id to pin/unpin. To find facts on a topic, use memory.recall instead.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2123,7 +2125,7 @@
   "type": "function",
   "function": {
    "name": "memory__save",
-   "description": "Save ONE durable fact about this project — it persists across sessions and is BM25-searchable via memory.recall. Save decisions, conventions and stable user preferences ('always X', 'never Y'); do NOT save transient run state (use scratch.*) or anything you can re-derive. kind defaults to semantic; use episodic for session-scoped events and ttlMs for a fact with a shelf life. Returns the mem_… id.",
+   "description": "Save ONE durable fact about this project \u2014 it persists across sessions and is BM25-searchable via memory.recall. Save decisions, conventions and stable user preferences ('always X', 'never Y'); do NOT save transient run state (use scratch.*) or anything you can re-derive. kind defaults to semantic; use episodic for session-scoped events and ttlMs for a fact with a shelf life. Returns the mem_\u2026 id.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2165,7 +2167,7 @@
   "type": "function",
   "function": {
    "name": "memory__forget",
-   "description": "Soft-delete ONE project memory by its mem_… id so it stops surfacing in recall, in memory.list, and in the pinned block. Use it when a saved fact is wrong or obsolete — prefer forgetting the stale fact over saving a contradicting one. Unknown id ⇒ MEMORY_NOT_FOUND (unrecoverable). There is no undo tool; the row is soft-deleted, not restorable from here.",
+   "description": "Soft-delete ONE project memory by its mem_\u2026 id so it stops surfacing in recall, in memory.list, and in the pinned block. Use it when a saved fact is wrong or obsolete \u2014 prefer forgetting the stale fact over saving a contradicting one. Unknown id \u21d2 MEMORY_NOT_FOUND (unrecoverable). There is no undo tool; the row is soft-deleted, not restorable from here.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2184,7 +2186,7 @@
   "type": "function",
   "function": {
    "name": "memory__pin",
-   "description": "Pin a project memory by its mem_… id so it rides EVERY round's turn context (the pinned block) and resists pruning. Idempotent. Pin sparingly — each pin costs tokens on every round, so reserve it for standing directives and facts you must not lose mid-task; ordinary facts are fine unpinned and reachable through memory.recall. Unknown id ⇒ MEMORY_NOT_FOUND.",
+   "description": "Pin a project memory by its mem_\u2026 id so it rides EVERY round's turn context (the pinned block) and resists pruning. Idempotent. Pin sparingly \u2014 each pin costs tokens on every round, so reserve it for standing directives and facts you must not lose mid-task; ordinary facts are fine unpinned and reachable through memory.recall. Unknown id \u21d2 MEMORY_NOT_FOUND.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2203,7 +2205,7 @@
   "type": "function",
   "function": {
    "name": "memory__unpin",
-   "description": "Unpin a project memory by its mem_… id: it stays saved and recallable but drops out of the pinned block that rides every round's turn context. Idempotent — unpinning an unpinned memory succeeds. Use it when a pin is no longer worth its per-round token cost. Unknown id ⇒ MEMORY_NOT_FOUND. To delete the fact outright use memory.forget.",
+   "description": "Unpin a project memory by its mem_\u2026 id: it stays saved and recallable but drops out of the pinned block that rides every round's turn context. Idempotent \u2014 unpinning an unpinned memory succeeds. Use it when a pin is no longer worth its per-round token cost. Unknown id \u21d2 MEMORY_NOT_FOUND. To delete the fact outright use memory.forget.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2222,7 +2224,7 @@
   "type": "function",
   "function": {
    "name": "queue__publish",
-   "description": "Publish ONE event to the human's attention inbox — how background work reports without interrupting the conversation. Use it when you must STOP leaving something the user needs to see later (a blocked step, a finished long run, an escalation from a wait you gave up on); in a live turn, just say it in your reply instead. Pass a stable dedupeKey so repeats collapse into one counted item.",
+   "description": "Publish ONE event to the human's attention inbox \u2014 how background work reports without interrupting the conversation. Use it when you must STOP leaving something the user needs to see later (a blocked step, a finished long run, an escalation from a wait you gave up on); in a live turn, just say it in your reply instead. Pass a stable dedupeKey so repeats collapse into one counted item.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2277,7 +2279,7 @@
       "type": "string"
      },
      "source": {
-      "description": "Who is reporting. A note to the human — it never starts a turn. \"timer\" and \"terminal_watcher\" are reserved for the engine's own fires and checks.",
+      "description": "Who is reporting. A note to the human \u2014 it never starts a turn. \"timer\" and \"terminal_watcher\" are reserved for the engine's own fires and checks.",
       "enum": [
        "worktree_watcher",
        "pr_watcher",
@@ -2362,7 +2364,7 @@
   "type": "function",
   "function": {
    "name": "queue__resolve",
-   "description": "Mark ONE attention-queue (inbox) event resolved by its id so it stops appearing in queue.digest and stops re-surfacing as open work. Call it AFTER you have actually acted on the item — resolving is the acknowledgement, not the fix. An unknown or already-resolved id fails QUEUE_NOT_FOUND (unrecoverable). Local bookkeeping only: it never touches terminals, watchers or async work.",
+   "description": "Mark ONE attention-queue (inbox) event resolved by its id so it stops appearing in queue.digest and stops re-surfacing as open work. Call it AFTER you have actually acted on the item \u2014 resolving is the acknowledgement, not the fix. An unknown or already-resolved id fails QUEUE_NOT_FOUND (unrecoverable). Local bookkeeping only: it never touches terminals, watchers or async work.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2381,7 +2383,7 @@
   "type": "function",
   "function": {
    "name": "user__askMultipleChoice",
-   "description": "Ask the human ONE multiple-choice question and wait for the answer, then continue the same turn using it. Give a concise `question` and 2–26 plain-text `options` (no A/B/C prefixes — the client assigns letters). Use it whenever you need a finite decision before proceeding, INSTEAD of asking in prose. Call it ALONE — never in a batch with other tools — and re-plan once the answer arrives. Interactive sessions only: a watcher, timer or non-interactive run cannot ask.",
+   "description": "Ask the human ONE multiple-choice question and wait for the answer, then continue the same turn using it. Give a concise `question` and 2\u201326 plain-text `options` (no A/B/C prefixes \u2014 the client assigns letters). Use it whenever you need a finite decision before proceeding, INSTEAD of asking in prose. Call it ALONE \u2014 never in a batch with other tools \u2014 and re-plan once the answer arrives. Interactive sessions only: a watcher, timer or non-interactive run cannot ask.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2392,7 +2394,7 @@
      },
      "options": {
       "items": {
-       "description": "One selectable option as plain text. Do NOT prefix it with a letter — the client assigns A/B/C… labels.",
+       "description": "One selectable option as plain text. Do NOT prefix it with a letter \u2014 the client assigns A/B/C\u2026 labels.",
        "type": "string"
       },
       "maxItems": 26,
@@ -2416,7 +2418,7 @@
   "type": "function",
   "function": {
    "name": "runbook__run__get",
-   "description": "Read your stepwise progress through a loaded runbook in THIS session: currentStep, per-step status (done|skipped) with notes and timestamps, and the run status. Absence is a NORMAL ok answer ({state: null}) — it means no step has been advanced yet, not an error. Use it after a compaction or a wake turn to find where you left off. Requires a live session.",
+   "description": "Read your stepwise progress through a loaded runbook in THIS session: currentStep, per-step status (done|skipped) with notes and timestamps, and the run status. Absence is a NORMAL ok answer ({state: null}) \u2014 it means no step has been advanced yet, not an error. Use it after a compaction or a wake turn to find where you left off. Requires a live session.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2436,7 +2438,7 @@
   "type": "function",
   "function": {
    "name": "runbook__step__advance",
-   "description": "Record that step N of a loaded runbook is done (or skipped) and move to nextStep; OMIT nextStep to finish the run. Call it as you complete each step, not in one batch at the end — this is the progress record a compaction or a wake turn reads back through runbook.run.get. currentStep never regresses. notes is an optional one-liner about what the step produced. Requires a live session.",
+   "description": "Record that step N of a loaded runbook is done (or skipped) and move to nextStep; OMIT nextStep to finish the run. Call it as you complete each step, not in one batch at the end \u2014 this is the progress record a compaction or a wake turn reads back through runbook.run.get. currentStep never regresses. notes is an optional one-liner about what the step produced. Requires a live session.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2475,7 +2477,7 @@
   "type": "function",
   "function": {
    "name": "timer__schedule",
-   "description": "Schedule a durable timer that fires once (delayMs) or repeats (repeat.everyMs plus maxRuns/until). To do something LATER — \"in 25 minutes send npm test to the build terminal\", \"start a timer then spawn an agent\" — use payload.type \"message\" with the instruction in payload.message: it reaches you at fire time and you act on it THEN, so do not also do it now. \"enqueue\" posts a note for the human, runs nothing, and catches up if missed. \"call_safe_tool\" runs one named tool with fixed args. A \"message\" over an hour overdue is reported missed, not run late. Prefer delayMs. Returns timerId.",
+   "description": "Schedule a durable timer that fires once (delayMs) or repeats (repeat.everyMs plus maxRuns/until). To do something LATER \u2014 \"in 25 minutes send npm test to the build terminal\", \"start a timer then spawn an agent\" \u2014 use payload.type \"message\" with the instruction in payload.message: it reaches you at fire time and you act on it THEN, so do not also do it now. \"enqueue\" posts a note for the human, runs nothing, and catches up if missed. \"call_safe_tool\" runs one named tool with fixed args. A \"message\" over an hour overdue is reported missed, not run late. Prefer delayMs. Returns timerId.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2493,7 +2495,7 @@
       "additionalProperties": false,
       "properties": {
        "message": {
-        "description": "For \"message\", the instruction delivered to you at fire time — write it as the user would, e.g. \"Send npm test to the build terminal and report the result\"; REQUIRED. For \"enqueue\", the human-facing reminder text (defaults to the title). Ignored by \"call_safe_tool\".",
+        "description": "For \"message\", the instruction delivered to you at fire time \u2014 write it as the user would, e.g. \"Send npm test to the build terminal and report the result\"; REQUIRED. For \"enqueue\", the human-facing reminder text (defaults to the title). Ignored by \"call_safe_tool\".",
         "type": "string"
        },
        "toolCall": {
@@ -2506,7 +2508,7 @@
           "type": "object"
          },
          "toolName": {
-          "description": "Exact registered tool name — almost any tool in your inventory, not a restricted subset, but NOT \"timer.schedule\" (a timer cannot schedule a timer). Use \"agentTask.spawnForEdits\" to spawn a terminal at fire time.",
+          "description": "Exact registered tool name \u2014 almost any tool in your inventory, not a restricted subset, but NOT \"timer.schedule\" (a timer cannot schedule a timer). Use \"agentTask.spawnForEdits\" to spawn a terminal at fire time.",
           "minLength": 1,
           "type": "string"
          }
@@ -2517,7 +2519,7 @@
         "type": "object"
        },
        "type": {
-        "description": "\"message\" delivers payload.message to YOU at fire time and you act on it then — the choice for any deferred instruction. \"enqueue\" posts an inbox note for the human and runs nothing, waking nobody. \"call_safe_tool\" dispatches one fixed toolCall.toolName.",
+        "description": "\"message\" delivers payload.message to YOU at fire time and you act on it then \u2014 the choice for any deferred instruction. \"enqueue\" posts an inbox note for the human and runs nothing, waking nobody. \"call_safe_tool\" dispatches one fixed toolCall.toolName.",
         "enum": [
          "enqueue",
          "message",
@@ -2586,7 +2588,7 @@
   "type": "function",
   "function": {
    "name": "timer__list",
-   "description": "List the timers still SCHEDULED (not yet fired, not cancelled): id, title, fireAt (RFC3339 UTC), payloadType, runCount and any repeat settings. Timers do NOT ride the turn context, so this is the only way to see what is pending — call it before scheduling a near-duplicate reminder, when the user asks what is scheduled, or to get a tmr_… id for timer.cancel.",
+   "description": "List the timers still SCHEDULED (not yet fired, not cancelled): id, title, fireAt (RFC3339 UTC), payloadType, runCount and any repeat settings. Timers do NOT ride the turn context, so this is the only way to see what is pending \u2014 call it before scheduling a near-duplicate reminder, when the user asks what is scheduled, or to get a tmr_\u2026 id for timer.cancel.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -2598,7 +2600,7 @@
   "type": "function",
   "function": {
    "name": "timer__cancel",
-   "description": "Cancel a scheduled timer by its tmr_… id (from timer.list): it never fires again and any automation grant held by that timer actor is revoked. Use it when the reminder or scheduled tool call is no longer wanted. An unknown id fails TIMER_NOT_FOUND (unrecoverable). Local bookkeeping only — it never touches terminals or project state. The result reports revokedGrants (live grants that cascade withdrew, 0 if none) — they need no follow-up grant.revoke unless grantRevokeFailed is true.",
+   "description": "Cancel a scheduled timer by its tmr_\u2026 id (from timer.list): it never fires again and any automation grant held by that timer actor is revoked. Use it when the reminder or scheduled tool call is no longer wanted. An unknown id fails TIMER_NOT_FOUND (unrecoverable). Local bookkeeping only \u2014 it never touches terminals or project state. The result reports revokedGrants (live grants that cascade withdrew, 0 if none) \u2014 they need no follow-up grant.revoke unless grantRevokeFailed is true.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2617,13 +2619,13 @@
   "type": "function",
   "function": {
    "name": "watcher__terminal__create",
-   "description": "Attach a durable background watcher to one or more terminals: it classifies their state on a cadence (default 120s), publishes an attention event when alertWhen fires, and ends on stopWhen or after 24h. Use it for work you are NOT waiting on this turn — for an in-turn wait use terminal.awaitAll, and note agentTask.spawnForEdits attaches its own supervisor only when you pass watch:true or watchGoal. stopWhen/alertWhen are one-key WatchCondition objects, e.g. {\"stateIs\": \"idle\"}. Returns the wch_… id.",
+   "description": "Attach a durable background watcher to one or more terminals: it classifies their state on a cadence (default 120s), publishes an attention event when alertWhen fires, and ends on stopWhen or after 24h. Use it for work you are NOT waiting on this turn \u2014 for an in-turn wait use terminal.awaitAll, and note agentTask.spawnForEdits attaches its own supervisor only when you pass watch:true or watchGoal. stopWhen/alertWhen are one-key WatchCondition objects, e.g. {\"stateIs\": \"idle\"}. Returns the wch_\u2026 id.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "alertWhen": {
       "additionalProperties": false,
-      "description": "Condition that publishes an attention alert (the watcher keeps running). A WatchCondition object with EXACTLY ONE of the keys below — the same shape as stopWhen, see its per-key descriptions.",
+      "description": "Condition that publishes an attention alert (the watcher keeps running). A WatchCondition object with EXACTLY ONE of the keys below \u2014 the same shape as stopWhen, see its per-key descriptions.",
       "maxProperties": 1,
       "minProperties": 1,
       "properties": {
@@ -2703,7 +2705,7 @@
       "type": "integer"
      },
      "goal": {
-      "description": "What the watcher is observing for, in plain language — guides its per-check classification.",
+      "description": "What the watcher is observing for, in plain language \u2014 guides its per-check classification.",
       "type": "string"
      },
      "modelTier": {
@@ -2720,7 +2722,7 @@
       "type": "integer"
      },
      "stopAfterMs": {
-      "description": "Lifetime ceiling in ms; defaults to 86400000 (24 h) when omitted — a watcher never runs forever.",
+      "description": "Lifetime ceiling in ms; defaults to 86400000 (24 h) when omitted \u2014 a watcher never runs forever.",
       "minimum": 1,
       "type": "integer"
      },
@@ -2731,7 +2733,7 @@
       "minProperties": 1,
       "properties": {
        "all": {
-        "description": "AND — every nested condition (each the same one-key WatchCondition shape) must hold.",
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape) must hold.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -2741,7 +2743,7 @@
         "type": "array"
        },
        "any": {
-        "description": "OR — at least one nested condition (same one-key shape) holds.",
+        "description": "OR \u2014 at least one nested condition (same one-key shape) holds.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -2756,7 +2758,7 @@
         "type": "string"
        },
        "modelJudge": {
-        "description": "A yes/no question answered against the terminal tail on each check. Costs one model call per check at the watcher's modelTier (deduped across stopWhen/alertWhen) — prefer the free deterministic leaves when they can express the condition.",
+        "description": "A yes/no question answered against the terminal tail on each check. Costs one model call per check at the watcher's modelTier (deduped across stopWhen/alertWhen) \u2014 prefer the free deterministic leaves when they can express the condition.",
         "minLength": 1,
         "type": "string"
        },
@@ -2785,7 +2787,7 @@
         "type": "string"
        },
        "stateIs": {
-        "description": "Fires when the agent state equals this value exactly. A bare stateIs:'waiting' fires too early for 'agent finished' (pre-start, paused, and backgrounded agents also read waiting) — pair it with a modelJudge under all:[...], or rely on the default supervisor's confirmed completion.",
+        "description": "Fires when the agent state equals this value exactly. A bare stateIs:'waiting' fires too early for 'agent finished' (pre-start, paused, and backgrounded agents also read waiting) \u2014 pair it with a modelJudge under all:[...], or rely on the default supervisor's confirmed completion.",
         "enum": [
          "idle",
          "working",
@@ -2800,7 +2802,7 @@
       "type": "object"
      },
      "terminalIds": {
-      "description": "Terminals to watch — full terminal-<uuid> ids exactly as listed.",
+      "description": "Terminals to watch \u2014 full terminal-<uuid> ids exactly as listed.",
       "items": {
        "minLength": 1,
        "type": "string"
@@ -2827,7 +2829,7 @@
   "type": "function",
   "function": {
    "name": "watcher__watchPR",
-   "description": "Create a durable background watcher on ONE GitHub PR: it polls every 60s and publishes an attention event when the PR's state changes (open/merged/closed) or the draft flag flips — use it instead of re-polling forge.getPR yourself. Returns the wch_… id. Project-scoped: it keeps running after the assistant closes and self-expires after 24h unless stopAfterMs says otherwise. It only OBSERVES; it never merges or comments.",
+   "description": "Create a durable background watcher on ONE GitHub PR: it polls every 60s and publishes an attention event when the PR's state changes (open/merged/closed) or the draft flag flips \u2014 use it instead of re-polling forge.getPR yourself. Returns the wch_\u2026 id. Project-scoped: it keeps running after the assistant closes and self-expires after 24h unless stopAfterMs says otherwise. It only OBSERVES; it never merges or comments.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2843,7 +2845,7 @@
       "type": "integer"
      },
      "stopAfterMs": {
-      "description": "Lifetime ceiling in ms; defaults to 86400000 (24 h) when omitted — a watcher never runs forever.",
+      "description": "Lifetime ceiling in ms; defaults to 86400000 (24 h) when omitted \u2014 a watcher never runs forever.",
       "minimum": 1,
       "type": "integer"
      },
@@ -2862,7 +2864,7 @@
   "type": "function",
   "function": {
    "name": "watcher__list",
-   "description": "List the project's ACTIVE watchers: id, kind (terminal|pr_state), title, goal, targets, cadence, status, last classification and nextCheckAt. Live watchers do NOT ride the turn context — this is the ONLY way to see what is being supervised, so call it before attaching a watcher to a terminal (never double-supervise one) and to get the wch_… id for watcher.cancel. Ended watchers are never listed.",
+   "description": "List the project's ACTIVE watchers: id, kind (terminal|pr_state), title, goal, targets, cadence, status, last classification and nextCheckAt. Live watchers do NOT ride the turn context \u2014 this is the ONLY way to see what is being supervised, so call it before attaching a watcher to a terminal (never double-supervise one) and to get the wch_\u2026 id for watcher.cancel. Ended watchers are never listed.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -2874,7 +2876,7 @@
   "type": "function",
   "function": {
    "name": "watcher__cancel",
-   "description": "Stop an ACTIVE watcher by its wch_… id: it stops checking, its automation grants are revoked, and any workflow ledger row it supervises closes as cancelled. Use it when the watched work is done or the user no longer wants it supervised. An already-ended watcher (condition_met/timeout/error/cancelled) returns WATCHER_NOT_FOUND — do not re-cancel. This NEVER touches the terminal: nothing is closed or killed. The result reports revokedGrants (live grants that cascade withdrew, 0 if none) — they need no follow-up grant.revoke unless grantRevokeFailed is true.",
+   "description": "Stop an ACTIVE watcher by its wch_\u2026 id: it stops checking, its automation grants are revoked, and any workflow ledger row it supervises closes as cancelled. Use it when the watched work is done or the user no longer wants it supervised. An already-ended watcher (condition_met/timeout/error/cancelled) returns WATCHER_NOT_FOUND \u2014 do not re-cancel. This NEVER touches the terminal: nothing is closed or killed. The result reports revokedGrants (live grants that cascade withdrew, 0 if none) \u2014 they need no follow-up grant.revoke unless grantRevokeFailed is true.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2893,7 +2895,7 @@
   "type": "function",
   "function": {
    "name": "workflow__create",
-   "description": "Open a workflow ledger row tracking ONE end-to-end unit of work (issue → branch → worktree → agent terminals → PR) so it survives compaction, restarts and wake turns — every open row rides each round's turn context. Status defaults to pending. Returns the wfr_… id; advance the row with workflow.update as the work progresses. A local record only: it spawns nothing and runs nothing.",
+   "description": "Open a workflow ledger row tracking ONE end-to-end unit of work (issue \u2192 branch \u2192 worktree \u2192 agent terminals \u2192 PR) so it survives compaction, restarts and wake turns \u2014 every open row rides each round's turn context. Status defaults to pending. Returns the wfr_\u2026 id; advance the row with workflow.update as the work progresses. A local record only: it spawns nothing and runs nothing.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2988,7 +2990,7 @@
   "type": "function",
   "function": {
    "name": "workflow__get",
-   "description": "Read ONE workflow ledger row by its wfr_… id: status, issue/branch/worktree/PR, the terminal/watcher/queue-event ids it owns, notes and nextAction. Open runs already ride every round's turn context as one-line rows, so call this only when you need a run's FULL detail — its notes, complete id lists, or a run that has already finished. Unknown id ⇒ WORKFLOW_NOT_FOUND (unrecoverable).",
+   "description": "Read ONE workflow ledger row by its wfr_\u2026 id: status, issue/branch/worktree/PR, the terminal/watcher/queue-event ids it owns, notes and nextAction. Open runs already ride every round's turn context as one-line rows, so call this only when you need a run's FULL detail \u2014 its notes, complete id lists, or a run that has already finished. Unknown id \u21d2 WORKFLOW_NOT_FOUND (unrecoverable).",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3007,7 +3009,7 @@
   "type": "function",
   "function": {
    "name": "workflow__list",
-   "description": "List workflow ledger runs, newest-updated first (capped at 100), optionally filtered by status (pending|active|blocked|done|cancelled|failed). OPEN runs already ride every round's turn context as one-line rows, so call this for HISTORY — finished/cancelled/failed runs, or a full listing the user asked for. Each row carries the run id, status, issue/branch/worktree/PR, its id lists and nextAction.",
+   "description": "List workflow ledger runs, newest-updated first (capped at 100), optionally filtered by status (pending|active|blocked|done|cancelled|failed). OPEN runs already ride every round's turn context as one-line rows, so call this for HISTORY \u2014 finished/cancelled/failed runs, or a full listing the user asked for. Each row carries the run id, status, issue/branch/worktree/PR, its id lists and nextAction.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3031,7 +3033,7 @@
   "type": "function",
   "function": {
    "name": "workflow__update",
-   "description": "Patch a workflow ledger row by id: status, issue/branch/worktree/PR fields, nextAction, or the terminalIds/watcherIds/queueEventIds/notes arrays. Every provided ARRAY field REPLACES the stored array wholesale — to append one note or id, read the row with workflow.get and send the full list back. Omitted fields are untouched. A move to done/cancelled/failed stamps completedAt once.",
+   "description": "Patch a workflow ledger row by id: status, issue/branch/worktree/PR fields, nextAction, or the terminalIds/watcherIds/queueEventIds/notes arrays. Every provided ARRAY field REPLACES the stored array wholesale \u2014 to append one note or id, read the row with workflow.get and send the full list back. Omitted fields are untouched. A move to done/cancelled/failed stamps completedAt once.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3132,7 +3134,7 @@
   "type": "function",
   "function": {
    "name": "workflow__plan",
-   "description": "Create a durable workflow execution graph for a multi-step goal. The backend plans it; the plan is validated and stored locally, survives restarts, and its progress digest is shown to you every round. Use for any task with several dependent steps (delegate → supervise → verify → report). Example: {\"goal\": \"Fix the watcher tests and report when the branch is clean\"}. Returns the workflowId (wfg_…), the active nodes, and a recommended next action — which you still execute through normal tools.",
+   "description": "Create a durable workflow execution graph for a multi-step goal. The backend plans it; the plan is validated and stored locally, survives restarts, and its progress digest is shown to you every round. Use for any task with several dependent steps (delegate \u2192 supervise \u2192 verify \u2192 report). Example: {\"goal\": \"Fix the watcher tests and report when the branch is clean\"}. Returns the workflowId (wfg_\u2026), the active nodes, and a recommended next action \u2014 which you still execute through normal tools.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3144,11 +3146,11 @@
       "type": "array"
      },
      "existingWorkflowId": {
-      "description": "wfg_… id of a prior graph this goal relates to.",
+      "description": "wfg_\u2026 id of a prior graph this goal relates to.",
       "type": "string"
      },
      "forceReplan": {
-      "description": "Replace the existing (non-terminal) workflow with a fresh plan. Without it, planning over a live workflow is refused — reconcile instead.",
+      "description": "Replace the existing (non-terminal) workflow with a fresh plan. Without it, planning over a live workflow is refused \u2014 reconcile instead.",
       "type": "boolean"
      },
      "goal": {
@@ -3178,12 +3180,12 @@
   "type": "function",
   "function": {
    "name": "workflow__getGraph",
-   "description": "Read a workflow execution graph (wfg_… id). Use view \"compact\" for a quick progress check, \"full\" when you need exact node/edge/resource state. Never guess graph state — read it here when it matters.",
+   "description": "Read a workflow execution graph (wfg_\u2026 id). Use view \"compact\" for a quick progress check, \"full\" when you need exact node/edge/resource state. Never guess graph state \u2014 read it here when it matters.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "id": {
-      "description": "The wfg_… workflow graph id.",
+      "description": "The wfg_\u2026 workflow graph id.",
       "type": "string"
      },
      "view": {
@@ -3211,7 +3213,7 @@
     "additionalProperties": false,
     "properties": {
      "id": {
-      "description": "The wfg_… workflow graph id.",
+      "description": "The wfg_\u2026 workflow graph id.",
       "type": "string"
      }
     },
@@ -3226,7 +3228,7 @@
   "type": "function",
   "function": {
    "name": "workflow__attachResource",
-   "description": "Link a terminal, watcher, async handle, worktree, branch, PR, or other resource to a workflow graph node, so later events on that resource route back to the right step. Resources created while a single workflow is active are usually linked automatically — attach manually when you spawned something for a specific node. Example: {\"workflowId\": \"wfg_1a2b3c4d\", \"nodeId\": \"n_repair\", \"type\": \"terminal\", \"ref\": \"terminal-…\", \"label\": \"Claude: repair watcher tests\"}.",
+   "description": "Link a terminal, watcher, async handle, worktree, branch, PR, or other resource to a workflow graph node, so later events on that resource route back to the right step. Resources created while a single workflow is active are usually linked automatically \u2014 attach manually when you spawned something for a specific node. Example: {\"workflowId\": \"wfg_1a2b3c4d\", \"nodeId\": \"n_repair\", \"type\": \"terminal\", \"ref\": \"terminal-\u2026\", \"label\": \"Claude: repair watcher tests\"}.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3239,7 +3241,7 @@
       "type": "string"
      },
      "ref": {
-      "description": "The resource's identifier, e.g. a terminal-… id, wch_… id, asy_… handle, branch name, or PR URL.",
+      "description": "The resource's identifier, e.g. a terminal-\u2026 id, wch_\u2026 id, asy_\u2026 handle, branch name, or PR URL.",
       "type": "string"
      },
      "status": {
@@ -3265,7 +3267,7 @@
       "type": "string"
      },
      "workflowId": {
-      "description": "The wfg_… workflow graph id.",
+      "description": "The wfg_\u2026 workflow graph id.",
       "type": "string"
      }
     },
@@ -3282,7 +3284,7 @@
   "type": "function",
   "function": {
    "name": "workflow__recordEvidence",
-   "description": "Record one bounded evidence item against a workflow graph node — an observation, outcome, or decision-relevant fact the graph should remember (mutating tool results are captured automatically; use this for things only you observed). Keep the summary to one sentence.",
+   "description": "Record one bounded evidence item against a workflow graph node \u2014 an observation, outcome, or decision-relevant fact the graph should remember (mutating tool results are captured automatically; use this for things only you observed). Keep the summary to one sentence.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3304,7 +3306,7 @@
       "type": "string"
      },
      "refId": {
-      "description": "Id of the source object (tool call id, evt_…, asy_…).",
+      "description": "Id of the source object (tool call id, evt_\u2026, asy_\u2026).",
       "type": "string"
      },
      "summary": {
@@ -3312,7 +3314,7 @@
       "type": "string"
      },
      "workflowId": {
-      "description": "The wfg_… workflow graph id.",
+      "description": "The wfg_\u2026 workflow graph id.",
       "type": "string"
      }
     },
@@ -3329,7 +3331,7 @@
   "type": "function",
   "function": {
    "name": "workflow__reconcile",
-   "description": "Reconcile a workflow graph against what actually happened: recent tool results, async completions, failures, and blockers are read by the backend, which returns a validated PATCH (node transitions, blockers, next action) that is applied locally. Call it after a meaningful change — a failed tool result, an async completion, a wake, resuming stale work — instead of improvising or repeating calls. It patches the plan; it never re-plans (use workflow.plan with forceReplan for a goal change) and never executes anything itself.",
+   "description": "Reconcile a workflow graph against what actually happened: recent tool results, async completions, failures, and blockers are read by the backend, which returns a validated PATCH (node transitions, blockers, next action) that is applied locally. Call it after a meaningful change \u2014 a failed tool result, an async completion, a wake, resuming stale work \u2014 instead of improvising or repeating calls. It patches the plan; it never re-plans (use workflow.plan with forceReplan for a goal change) and never executes anything itself.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3358,7 +3360,7 @@
       "type": "integer"
      },
      "workflowId": {
-      "description": "The wfg_… workflow graph id.",
+      "description": "The wfg_\u2026 workflow graph id.",
       "type": "string"
      }
     },
@@ -3374,7 +3376,7 @@
   "type": "function",
   "function": {
    "name": "workflow__cancel",
-   "description": "Cancel a workflow graph (or one node of it). LOCAL STATE ONLY: this never closes terminals, deletes worktrees, or cancels external work — those remain explicit, user-approved actions. Suggest any needed cleanup separately.",
+   "description": "Cancel a workflow graph (or one node of it). LOCAL STATE ONLY: this never closes terminals, deletes worktrees, or cancels external work \u2014 those remain explicit, user-approved actions. Suggest any needed cleanup separately.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -3387,7 +3389,7 @@
       "type": "string"
      },
      "workflowId": {
-      "description": "The wfg_… workflow graph id.",
+      "description": "The wfg_\u2026 workflow graph id.",
       "type": "string"
      }
     },

@@ -253,3 +253,26 @@ cases:
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
+
+  - id: fanout-codex-skill-command-chains
+    category: routing-trap
+    note: One independent issue per agent, with ordered skills inside each terminal.
+    messages:
+      - role: user
+        content: >-
+          Open a Codex terminal for each of issues 41, 42 and 43, each in its own
+          worktree. Look up my work-issue and review skills, run work-issue with
+          that issue number, then run review only after its implementation succeeds.
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation, daintree.orchestration.execute-durable-workflow]
+
+  - id: single-issue-custom-skill-not-fanout
+    category: routing-trap
+    note: A single issue with a custom skill remains a single-issue workflow.
+    messages:
+      - role: user
+        content: Start work on GitHub issue 42 using my Codex $work-issue skill in its own worktree.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]

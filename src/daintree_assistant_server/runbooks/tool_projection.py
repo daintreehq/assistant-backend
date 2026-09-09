@@ -122,8 +122,25 @@ ALWAYS_AVAILABLE: frozenset[str] = frozenset(
         # no typed wrapper. `daintree.call` is what makes `daintree.listTools`
         # more than a catalogue — without it the model can see a tool and not
         # invoke it.
+        #
+        # The hatch is a CHAIN, and half of it used to be missing. `tool.search`
+        # returns a name and a policy, not an argument shape; the CLI's own
+        # descriptions send the model on from there to `tool.schema` ("read its
+        # arguments with tool.schema before invoking") and then to
+        # `daintree.invoke` ("only actions tool.search reports invocable: true run
+        # here"), with `daintree.call` reserved for what invoke refuses. Offering
+        # the first and last links and withholding the middle two left a
+        # runbook-less turn able to discover a capability and unable to reach it —
+        # and withholding is final, so nothing recovers it later in the turn. The
+        # inversion is sharpest on `daintree.invoke`: `20-tool-discipline.md` tells
+        # the model to prefer it over the raw `daintree.call` escape hatch, and the
+        # core offered only the one the prompt says not to use. `daintree.foundation`
+        # declares both, which is exactly what disqualifies the unclassified
+        # pass-through from rescuing them.
         "tool.search",
+        "tool.schema",
         "daintree.listTools",
+        "daintree.invoke",
         "daintree.call",
         # Talk to the user and close the loop. `user.askMultipleChoice` is how the
         # base prompt says to ask a finite question; without it the model asks in

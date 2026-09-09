@@ -123,6 +123,7 @@ _NAMED_IN_BASE_PROMPT: frozenset[str] = frozenset(
         "terminal__close",
         "terminal__sendCommand",
         "timer__list",
+        "tool__search",
         "user__askMultipleChoice",
         "watcher__list",
         "worktree__list",
@@ -281,13 +282,28 @@ def test_the_core_holds_nothing_the_prompt_does_not_reach() -> None:
     """
     named = _tools_named_in(PromptLoader().base_prompt()) | _registry_names_in(_turn_footer())
     prose = {wire_name(n) for n in _PROSE_INSTRUCTED}
-    # The discovery escape hatch. These predate enforcement and are not instructed
-    # anywhere in `base/` — they exist so a turn can find and reach a capability it
-    # was not projected, which is the one thing withholding must never make
-    # unrecoverable.
+    # The discovery escape hatch. These are not instructed anywhere in `base/` by
+    # name — they exist so a turn can find and reach a capability it was not
+    # projected, which is the one thing withholding must never make unrecoverable.
+    #
+    # It is a CHAIN, and every link has to be in the core or the hatch dead-ends:
+    # `tool.search` returns a name and a policy, `tool.schema` the argument shape it
+    # deliberately omits, and `daintree.invoke` runs what search reports invocable,
+    # with `daintree.call` the last resort for what invoke refuses. Offering only the
+    # ends of that chain lets a runbook-less turn discover a capability and not reach
+    # it — and the base prompt tells the model to PREFER `daintree.invoke` over
+    # `daintree.call`, so withholding invoke while offering call inverts its own
+    # advice.
     escape_hatch = {
         wire_name(n)
-        for n in ("tool.search", "daintree.listTools", "daintree.call", "daintree.status")
+        for n in (
+            "tool.search",
+            "tool.schema",
+            "daintree.listTools",
+            "daintree.invoke",
+            "daintree.call",
+            "daintree.status",
+        )
     }
     unexplained = sorted({wire_name(n) for n in ALWAYS_AVAILABLE} - named - prose - escape_hatch)
     assert not unexplained, (
