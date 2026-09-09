@@ -15,6 +15,7 @@ requiredTools:
   - terminal.summarize
   - terminal.read
   - terminal.focus
+  - terminal.revealOwned
   - queue.resolve
   - watcher.list
   - async.list
@@ -41,7 +42,7 @@ Cohort branch — two or more terminals are ASKING at once (from step 1). Answer
    d. For answer-only requests, report the sent answers and stop. Only when the user requested resulting output or completion, re-await the cohort ONCE with a real budget — one `terminal.awaitAll({"terminalIds":[...],"maxAttempts":60})` over the ids you answered, never one wait per agent — then peek each tail with one bounded `terminal.read` per terminal (a no-wait plain-text extract over the cohort merges them again): idle is not done. Re-await stragglers at most twice, then hand them to `terminal.await.async` and end the turn.
    e. For (iii), ask the user ONCE for all of them together — terminal id, agent name, question — not one round-trip per agent. Do not answer them on the agents’ behalf.
    f. queue.resolve only the items you actually closed; leave open every item whose agent still needs the user.
-   g. "Show me the next one" is navigation, not an answer: pick the still-waiting terminal out of the roster you already read and `terminal.focus({"terminalId":"<id>"})` it. UI only — it answers nothing and changes no state.
+   g. "Show me the next one" is navigation, not an answer: pick the still-waiting terminal out of the roster you already read. Use `terminal.revealOwned({"terminalId":"<id>"})` if this MCP connection created it; otherwise `terminal.focus({"terminalId":"<id>"})` selects it only inside the current project view. Follow the foundation's navigation and ownership rules. Neither operation answers the agent.
 
 Confirmation: sending input mutates terminal/agent state and may trigger that agent’s next project or external action; confirm before sending — batched cohort sends included — unless the user already explicitly told you the answer and the active tier permits.
 

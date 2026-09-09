@@ -18,6 +18,7 @@ requiredTools:
   - terminal.awaitAll
   - terminal.await.async
   - terminal.focus
+  - terminal.revealOwned
   - terminal.close
   - watcher.terminal.create
   - queue.publish
