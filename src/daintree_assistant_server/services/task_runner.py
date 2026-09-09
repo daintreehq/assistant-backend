@@ -24,6 +24,7 @@ from ..config import (
     Settings,
 )
 from ..contracts.tasks import (
+    MAX_TASK_OUTPUT_TOKENS,
     CheckpointInput,
     CheckpointOutput,
     ContextCompactInput,
@@ -119,14 +120,28 @@ _EXTRACT_INVALID_HINT = (
 )
 
 
-def _task_output_truncated(task: str, max_tokens: int) -> DaintreeError:
+def _task_output_truncated(task: str, output_tokens: int) -> DaintreeError:
+    """Truncation, quoted in the caller's own units.
+
+    ``output_tokens`` is the budget the CALLER asked for, never the ``max_tokens``
+    actually sent upstream — that carries the server-owned reasoning allowance on
+    top, so a maxTokens of 1024 would be reported back as 1088: a number no client
+    can set and the model cannot reproduce. The CLI forwards this message to the
+    model verbatim, so the number in it has to be one the reader can act on.
+    """
+    # Raising the budget is only actionable BELOW the ceiling. Offering it to a
+    # caller already at the maximum invites the futile same-cap retry this error
+    # exists to prevent, so the remaining remedies stand alone there.
+    raise_remedy = (
+        "raise maxTokens within its limit, " if output_tokens < MAX_TASK_OUTPUT_TOKENS else ""
+    )
     return DaintreeError(
         status_code=502,
         message=(
-            f"Task {task!r} hit its output token limit ({max_tokens}) before finishing. "
+            f"Task {task!r} hit its output token limit ({output_tokens}) before finishing. "
             "This is extraction-model truncation, not missing source content. "
             "Do not retry the same request or just reduce tailBytes: request fewer fields "
-            "or one terminal per call, raise maxTokens within its limit, or use "
+            f"or one terminal per call, {raise_remedy}or use "
             "terminal.read and page any artifact for complete drafts."
         ),
         type="api_error",
@@ -1222,7 +1237,7 @@ class TaskRunner:
         # Even parseable JSON may omit later terminals when generation is cut
         # short. A repair at the same cap cannot restore the requested capacity.
         if profile.id == _SCHEMA_TASK and finish == "length":
-            raise _task_output_truncated(profile.id, max_tokens)
+            raise _task_output_truncated(profile.id, output_tokens)
 
         try:
             output = profile.parse_output(result.text, request)
@@ -1280,7 +1295,7 @@ class TaskRunner:
             endpoint = repair.endpoint or endpoint
             calls += 1
             if profile.id == _SCHEMA_TASK and finish == "length":
-                raise _task_output_truncated(profile.id, max_tokens) from first_error
+                raise _task_output_truncated(profile.id, output_tokens) from first_error
             try:
                 output = profile.parse_output(repair.text, request)
             except (TaskParseError, ValidationError) as exc:

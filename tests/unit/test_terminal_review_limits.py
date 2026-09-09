@@ -6,7 +6,7 @@ import pytest
 from fakes import FakeProvider, make_result
 
 from daintree_assistant_server.config import EXECUTOR_REASONING_ALLOWANCE_TOKENS
-from daintree_assistant_server.contracts.tasks import TaskRequest
+from daintree_assistant_server.contracts.tasks import MAX_TASK_OUTPUT_TOKENS, TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.task_runner import TaskRunner
 
@@ -116,3 +116,104 @@ async def test_text_preserves_length_finish_for_cli(
     result = await task_runner.run(TaskRequest(task=task, input={"instruction": "draft"}))
     assert result.finish_reason == "length"
     assert result.output["text"] == "What I'll ship is"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("budget", [1, 300, 1024, 1999])
+async def test_truncation_quotes_the_budget_the_caller_sent(
+    task_runner: TaskRunner, fake_provider: FakeProvider, budget: int
+) -> None:
+    """The number in the message must be one the caller can reproduce.
+
+    ``max_tokens`` carries the server-owned reasoning allowance, so quoting it
+    would report 1088 for a maxTokens of 1024 — a value no client can set.
+    """
+    fake_provider.complete_result = make_result(content='{"result": "cut', finish_reason="length")
+    with pytest.raises(DaintreeError) as exc:
+        await task_runner.run(
+            TaskRequest(
+                task="terminal_extract_json",
+                input={"instruction": "drafts", "max_output_tokens": budget},
+            )
+        )
+    assert exc.value.code == "task_output_truncated"
+    assert f"({budget})" in exc.value.message
+    inflated = budget + EXECUTOR_REASONING_ALLOWANCE_TOKENS
+    assert str(inflated) not in exc.value.message
+
+
+@pytest.mark.asyncio
+async def test_truncation_at_the_ceiling_does_not_advise_raising_maxtokens(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """At the cap that advice is impossible to act on and invites a futile retry."""
+    fake_provider.complete_result = make_result(content='{"result": "cut', finish_reason="length")
+    with pytest.raises(DaintreeError) as exc:
+        await task_runner.run(
+            TaskRequest(
+                task="terminal_extract_json",
+                input={
+                    "instruction": "drafts",
+                    "max_output_tokens": MAX_TASK_OUTPUT_TOKENS,
+                },
+            )
+        )
+    assert exc.value.code == "task_output_truncated"
+    assert "maxTokens" not in exc.value.message
+    # The remedies that ARE actionable at the ceiling must survive.
+    assert "request fewer fields" in exc.value.message
+    assert "one terminal per call" in exc.value.message
+    assert "terminal.read" in exc.value.message
+
+
+@pytest.mark.asyncio
+async def test_truncation_below_the_ceiling_still_advises_raising_maxtokens(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    fake_provider.complete_result = make_result(content='{"result": "cut', finish_reason="length")
+    with pytest.raises(DaintreeError) as exc:
+        await task_runner.run(
+            TaskRequest(
+                task="terminal_extract_json",
+                input={
+                    "instruction": "drafts",
+                    "max_output_tokens": MAX_TASK_OUTPUT_TOKENS - 1,
+                },
+            )
+        )
+    assert "raise maxTokens within its limit" in exc.value.message
+
+
+@pytest.mark.asyncio
+async def test_repair_truncation_also_quotes_the_caller_budget(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    fake_provider.complete_result = [
+        make_result(content="invalid JSON"),
+        make_result(content='{"result": "cut', finish_reason="length"),
+    ]
+    with pytest.raises(DaintreeError) as exc:
+        await task_runner.run(
+            TaskRequest(
+                task="terminal_extract_json",
+                input={"instruction": "draft", "max_output_tokens": 1800},
+            )
+        )
+    assert exc.value.code == "task_output_truncated"
+    assert "(1800)" in exc.value.message
+    assert str(1800 + EXECUTOR_REASONING_ALLOWANCE_TOKENS) not in exc.value.message
+
+
+@pytest.mark.asyncio
+async def test_truncation_without_a_client_budget_quotes_the_profile_default(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """An omitted budget keeps the profile's own cap, and that is what is reported."""
+    fake_provider.complete_result = make_result(content='{"result": "cut', finish_reason="length")
+    with pytest.raises(DaintreeError) as exc:
+        await task_runner.run(
+            TaskRequest(task="terminal_extract_json", input={"instruction": "drafts"})
+        )
+    assert exc.value.code == "task_output_truncated"
+    profile_default = fake_provider.requests[-1].max_tokens - EXECUTOR_REASONING_ALLOWANCE_TOKENS
+    assert f"({profile_default})" in exc.value.message

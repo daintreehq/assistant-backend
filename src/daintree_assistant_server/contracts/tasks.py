@@ -142,6 +142,13 @@ class TerminalSummarizeInput(BaseModel):
     tail: str = Field(default="", max_length=120_000)
 
 
+# The largest budget a caller may ask for, and the CLI's own upper bound. Named
+# because the truncation error has to know when the caller is already AT the
+# ceiling: advising it to raise a budget it cannot raise invites exactly the
+# futile same-cap retry that error exists to prevent.
+MAX_TASK_OUTPUT_TOKENS = 2000
+
+
 class TerminalExtractTextInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -150,7 +157,9 @@ class TerminalExtractTextInput(BaseModel):
     tail: str = Field(default="", max_length=120_000)
     # Shared by the whole extraction, not multiplied by terminal count. Omission
     # keeps the server profile's default; reasoning allowance is server-owned.
-    max_output_tokens: int | None = Field(default=None, ge=1, le=2000, strict=True)
+    max_output_tokens: int | None = Field(
+        default=None, ge=1, le=MAX_TASK_OUTPUT_TOKENS, strict=True
+    )
 
 
 class TerminalExtractJsonInput(BaseModel):
@@ -159,7 +168,9 @@ class TerminalExtractJsonInput(BaseModel):
     terminal_ids: list[str] = Field(default_factory=list)
     instruction: str = Field(min_length=1, max_length=8192)
     tail: str = Field(default="", max_length=120_000)
-    max_output_tokens: int | None = Field(default=None, ge=1, le=2000, strict=True)
+    max_output_tokens: int | None = Field(
+        default=None, ge=1, le=MAX_TASK_OUTPUT_TOKENS, strict=True
+    )
 
 
 class ExtractionVerdictInput(BaseModel):
