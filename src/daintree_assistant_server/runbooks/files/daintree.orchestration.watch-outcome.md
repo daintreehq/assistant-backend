@@ -108,6 +108,8 @@ Procedure:
 {"title":"check deploy status","delayMs":1800000,"payload":{"type":"message","message":"Check whether the deploy in terminal <resolved terminal id> of worktree <resolved worktree id> is still running. Read its current state and relevant output, then report the observed status and evidence. Do not restart, cancel or change the deploy."}}
 ```
 
+   After scheduling a deferred check, confirm its timer ID and due time and end the setup turn. The instruction inside `timer.schedule` describes future work; scheduling success is not a wake or completion event. Do not execute that instruction immediately after storing it. Any observation needed to resolve the subject establishes its state now, not the result of the future check. Perform and report the check when the actual scheduled-message wake arrives.
+
    Resolve the subject before scheduling, and include its exact IDs or path INSIDE the message. `target` is event metadata; it does not supply the future tool arguments. Revalidate the subject when due. A read-only check needs no grant beyond ordinary tool/tier policy. In an attached interactive assistant, the message follows normal confirmation rules. A detached supervisor needs a narrow `actorType:"wake",actorId:"wake"` grant for confirm-required tools, unlike a fixed call's timer-scoped grant. Do not promise unattended mutation just because a message was stored.
 
    A message more than one hour overdue is reported missed rather than executed late. Delivery can repeat after interruption, so check for completed effects before repeating work. Autonomous turns cannot schedule another timer; do not turn a deferred check into a self-renewing timer chain.
