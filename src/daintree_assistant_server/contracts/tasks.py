@@ -148,6 +148,9 @@ class TerminalExtractTextInput(BaseModel):
     terminal_ids: list[str] = Field(default_factory=list)
     instruction: str = Field(min_length=1, max_length=8192)
     tail: str = Field(default="", max_length=120_000)
+    # Shared by the whole extraction, not multiplied by terminal count. Omission
+    # keeps the server profile's default; reasoning allowance is server-owned.
+    max_output_tokens: int | None = Field(default=None, ge=1, le=2000, strict=True)
 
 
 class TerminalExtractJsonInput(BaseModel):
@@ -156,6 +159,7 @@ class TerminalExtractJsonInput(BaseModel):
     terminal_ids: list[str] = Field(default_factory=list)
     instruction: str = Field(min_length=1, max_length=8192)
     tail: str = Field(default="", max_length=120_000)
+    max_output_tokens: int | None = Field(default=None, ge=1, le=2000, strict=True)
 
 
 class ExtractionVerdictInput(BaseModel):
