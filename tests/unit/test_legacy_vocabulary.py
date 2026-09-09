@@ -33,6 +33,45 @@ _ALLOWED_PATHS: dict[str, str] = {
 #: substring that must appear in the offending line for it to be forgiven, so a
 #: blanket exemption cannot hide behind a file-level entry.
 _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
+    # Rendered copies of the external agent capability guidance below.
+    "tests/golden/snapshots/base_prompt.md": ("Agent commands and skills",),
+    "tests/golden/snapshots/task_workflow_plan.md": ("For ordered agent commands or skills",),
+    "tests/golden/snapshots/task_workflow_reconcile.md": ("For command/skill sequences",),
+    "tests/golden/snapshots/upstream_messages.json": ("Agent commands and skills",),
+    "tests/golden/snapshots/upstream_messages_with_terminals.json": ("Agent commands and skills",),
+    # External agents' command/skill catalogs; these are not Daintree runbooks.
+    "benchmarks/runbook_selection/cases/17-fan-out-and-status.yaml": (
+        "fanout-codex-skill-command-chains",
+        "ordered skills inside each terminal",
+        "work-issue and review skills",
+        "single-issue-custom-skill-not-fanout",
+        "single issue with a custom skill",
+        "my Codex $work-issue skill",
+    ),
+    "src/daintree_assistant_server/prompts/main/base/20-tool-discipline.md": (
+        "Agent commands and skills",
+    ),
+    "src/daintree_assistant_server/prompts/tasks/workflow_plan.md": (
+        "For ordered agent commands or skills",
+    ),
+    "src/daintree_assistant_server/prompts/tasks/workflow_reconcile.md": (
+        "For command/skill sequences",
+    ),
+    "src/daintree_assistant_server/runbooks/files/daintree.foundation.md": (
+        "Agent capability lookup:",
+    ),
+    "src/daintree_assistant_server/runbooks/files/daintree.edits.spawn-visible-agent.md": (
+        "3b. A named command or skill",
+    ),
+    "src/daintree_assistant_server/runbooks/files/daintree.orchestration.fan-out-work.md": (
+        "summary: Launch one agent terminal",
+        "whenToUse:",
+        "4. Launch ENTRY A",
+        "NAMED CAPABILITY GATE",
+    ),
+    "src/daintree_assistant_server/runbooks/files/daintree.workflow.start-work-on-issue.md": (
+        "For a user-supplied command or skill",
+    ),
     "CLAUDE.md": (".claude/skills",),
     "README.md": (".claude/skills",),
     "cloudbuild.yaml": (".claude/skills",),
@@ -60,7 +99,16 @@ _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
     "docs/RUNBOOK_CONFIRMATIONS.md": ("*skill*",),
     # Deferred-work entries that quote the retired vocabulary to describe the
     # rename itself, plus the Go path the CLI still uses.
-    "TODO.md": ("skill.go", "skill/skill.go", "skill__", "skill.", "skill\" ->", "skill ->", ".claude/skills", "not `skills`"),
+    "TODO.md": (
+        "skill.go",
+        "skill/skill.go",
+        "skill__",
+        "skill.",
+        'skill" ->',
+        "skill ->",
+        ".claude/skills",
+        "not `skills`",
+    ),
     "benchmarks/_harness/fixtures/README.md": ("skill",),
     # The self-retiring CLI-divergence gate must NAME the pre-rename tool ids;
     # that is how it detects the Go side catching up.
@@ -145,9 +193,7 @@ def test_the_allowlist_does_not_rot() -> None:
     removes them, and eventually the exemptions cover the surface being guarded.
     """
     missing = [
-        rel
-        for rel in list(_ALLOWED_PATHS) + list(_ALLOWED_LINES)
-        if not (REPO_ROOT / rel).exists()
+        rel for rel in list(_ALLOWED_PATHS) + list(_ALLOWED_LINES) if not (REPO_ROOT / rel).exists()
     ]
     assert not missing, (
         f"allowlist names paths that no longer exist: {missing}. Remove them — an "

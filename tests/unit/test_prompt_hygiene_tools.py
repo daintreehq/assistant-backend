@@ -123,6 +123,7 @@ _NAMED_IN_BASE_PROMPT: frozenset[str] = frozenset(
         "terminal__close",
         "terminal__sendCommand",
         "timer__list",
+        "tool__search",
         "user__askMultipleChoice",
         "watcher__list",
         "worktree__list",

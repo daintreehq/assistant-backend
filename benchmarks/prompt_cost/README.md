@@ -145,7 +145,7 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-09-08, 39 runbooks / 98 tools (sizes are KiB). The catalog holds 39
+Measured 2026-09-09, 39 runbooks / 98 tools (sizes are KiB). The catalog holds 39
 but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
@@ -162,7 +162,7 @@ costs the selector nothing:
 | runbook selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 392–503 B (0–3 runbooks; 16 KiB cap) |
 
-The current capture pins CLI `3d0ba02`, including `forge.getPRs` from develop and the new `terminal.revealOwned` wrapper. Navigation guidance raises the loaded-runbook region; the deterministic cache-stability checks still pass.
+The current capture pins CLI `240f0d2`, including `forge.getPRs`, its batch PR read and the `terminal.revealOwned` wrapper. Agent capability entries stay dynamically discoverable through the existing dispatcher, so individual commands add no permanent tool schemas; the deterministic cache-stability checks still pass.
 
 The tool region rose previously, 88.2 → 94.8 KiB (~22.5k → ~24.2k proxy tokens), when the
 pin moved to `272b13c` — the CLI's account-authentication line. **No tool definition

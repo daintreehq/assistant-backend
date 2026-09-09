@@ -3,7 +3,7 @@
 # Consumed by tests/unit/test_runbook_catalog_hygiene.py to check that every runbook's
 # requiredTools entry names a tool that actually exists. It is a SNAPSHOT on purpose:
 # Regenerating it needs a Go build of the pinned cli/ submodule, which CI does not do
-# (it checks the submodule out, but builds nothing). Snapshot taken against cli/ @ 3d0ba02 (origin/develop).
+# (it checks the submodule out, but builds nothing). Snapshot taken against cli/ @ 240f0d2 (feature/agent-capability-discovery).
 #
 # Format: one wire name per line, sorted, "#" lines are comments. The registry maps
 # an internal dotted name to its OpenAI wire name by replacing EVERY "." with "__"

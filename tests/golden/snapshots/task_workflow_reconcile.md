@@ -33,3 +33,5 @@ Rules:
 - If a small finite decision blocks progress, return user_question with concrete options.
 - If the evidence is ambiguous, prefer a blocker or a user_question over guessing — never invent events, resources, or tool results.
 - next_action is a recommendation only; the client's dispatch, confirmation, and grant policy is authoritative.
+
+For command/skill sequences, async completion or idle proves settlement only. A delegate node with expected_evidence stays waiting or blocked until output or other acceptance evidence establishes the outcome; only then mark it done and unlock its dependent command. A failed command, interactive picker, missing approval, or ambiguous submission blocks that issue's later steps while independent chains continue. Preserve saved invocation tokens and arguments, including Codex dollar-prefixed skills. Reconcile live terminal state before recommending any retry of possibly-delivered input.

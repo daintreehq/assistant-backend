@@ -7,6 +7,7 @@ confirmation: "Starting work on one chosen issue. The goal is an isolated worktr
 risk: external
 requiredTools:
   - context.snapshot
+  - agentTask.spawnForEdits
   - forge.listIssues
   - forge.listPRs
   - forge.getIssue
@@ -33,6 +34,8 @@ true). The supervision choice is therefore ALREADY MADE for you: this path is
 BACKGROUND by design. You set it up, end your turn, and react when the watcher's
 completed_* event lands on the attention queue — so under the foundation's
 one-supervisor rule, never also wait on this agent in-turn with terminal.awaitAll; a requested answer to a blocking question via terminal.sendCommand remains valid. Never attach a second watcher on top of the wrapper’s.
+
+For a user-supplied command or skill, resolve its exact invocation and arguments for the destination agent/worktree through the capability catalog. The default issue workflow can submit a different startup task: instead create/reuse the issue worktree without a recipe, then use `agentTask.spawnForEdits` with the selected invocation and full brief as its first task. Several ordered commands need a persisted dependency chain and per-step verification, never one combined multiline submission.
 
 Procedure:
 
