@@ -1,0 +1,61 @@
+# Mission #2: desired routes, including the unresolved bare-timer cases.
+cases:
+  - id: timer-bare-ten-minutes
+    category: single-runbook
+    note: "Known cardinality gap retained as a failing expectation until selector training repairs it."
+    messages:
+      - role: user
+        content: "Set a timer for 10 minutes"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: timer-bare-ten-minutes-period
+    category: single-runbook
+    note: "Punctuation pair; a bare countdown needs no named subject."
+    messages:
+      - role: user
+        content: "Set a timer for 10 minutes."
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: timer-bare-word-duration
+    category: single-runbook
+    note: "A second unpunctuated form retains the unresolved cardinality boundary."
+    messages:
+      - role: user
+        content: "Start a ten-minute timer"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: timer-bare-five-minutes-period
+    category: single-runbook
+    note: "Measured timer-routing improvement from foundation alone."
+    messages:
+      - role: user
+        content: "Give me a timer for five minutes."
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: timer-named-reminder-not-spawn
+    category: routing-trap
+    note: "A reminder is scheduled observation, not immediate agent work."
+    messages:
+      - role: user
+        content: "Remind me in 20 minutes to check on the migration"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: timer-deferred-status-not-immediate-spawn
+    category: routing-trap
+    note: "The assistant must check the subject later, rather than merely leave a human reminder."
+    messages:
+      - role: user
+        content: "Give the deploy half an hour then tell me if it is still running"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]

@@ -60,6 +60,15 @@ positives:
   - dont write it yourself, delegate it. the throttle helper needs a max-attempts arg
   - spin up a read only agent in a tab and have it trace how a request gets from the router down to the db. leave it open, i'll follow along
 boundaries:
+  - query: "Start the smoke-test agent right away in this checkout"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: "Open a terminal now and have an agent inspect the worker logs"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: "Launch an agent immediately to run the integration suite"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.orchestration.watch-outcome]
   - query: spawn a claude to refactor the auth middleware
     confusable_with: [daintree.worktree.relocate-agents]
   - query: get an agent to look through the migration code and tell me what it finds
