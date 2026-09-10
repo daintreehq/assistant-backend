@@ -34,6 +34,8 @@ Use when: the user wants observation, a reminder, or work at a stated later time
 
 Set up the mechanism and report it. A scheduled action is not performed now as well. Preserve the requested delay and existing authority; resolve new scope before scheduling. Distinguish a stored record, an active scheduler, an assistant wake, and a human-facing inbox note.
 
+**Deferred-check setup is not execution.** A `timer.schedule` result, including its ID, due time and echoed message, is setup evidence only. Stored text saying "the check is due" is a future instruction, not a wake. During setup, resolve locators and create all timers and grants required by the current request. Once setup is complete, report the returned IDs and due times and end. Do not inspect a condition requested only for later or claim the check ran. Perform a current observation only if the user separately requested it now. Execute the stored message only on a later turn initiated by the CLI's `[automatic wake-up]` delivery with `Due message:` or `Due messages:`. A tool-result continuation of setup cannot become that turn.
+
 Procedure:
 
 1. Select ONE mechanism for each target after reading the live ids and existing `watcher.list`, `async.list` or `timer.list` as needed:
@@ -108,7 +110,7 @@ Procedure:
 {"title":"check deploy status","delayMs":1800000,"payload":{"type":"message","message":"Check whether the deploy in terminal <resolved terminal id> of worktree <resolved worktree id> is still running. Read its current state and relevant output, then report the observed status and evidence. Do not restart, cancel or change the deploy."}}
 ```
 
-   After scheduling a deferred check, confirm its timer ID and due time and end the setup turn. The instruction inside `timer.schedule` describes future work; scheduling success is not a wake or completion event. Do not execute that instruction immediately after storing it. Any observation needed to resolve the subject establishes its state now, not the result of the future check. Perform and report the check when the actual scheduled-message wake arrives.
+   After scheduling a deferred check, confirm its timer ID and due time and end the setup turn. The instruction inside `timer.schedule` describes future work; scheduling success is not a wake or completion event. Do not execute that instruction immediately after storing it. Resolve the exact path or terminal/worktree IDs before scheduling; locating the subject is not permission to inspect its future condition during setup. Write the stored message as an imperative to perform at delivery, not as a claim that the check is already due or complete.
 
    Resolve the subject before scheduling, and include its exact IDs or path INSIDE the message. `target` is event metadata; it does not supply the future tool arguments. Revalidate the subject when due. A read-only check needs no grant beyond ordinary tool/tier policy. In an attached interactive assistant, the message follows normal confirmation rules. A detached supervisor needs a narrow `actorType:"wake",actorId:"wake"` grant for confirm-required tools, unlike a fixed call's timer-scoped grant. Do not promise unattended mutation just because a message was stored.
 
