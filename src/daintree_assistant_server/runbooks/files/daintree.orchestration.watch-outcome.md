@@ -34,6 +34,8 @@ Use when: the user wants observation, a reminder, or work at a stated later time
 
 Set up the mechanism and report it. A scheduled action is not performed now as well. Preserve the requested delay and existing authority; resolve new scope before scheduling. Distinguish a stored record, an active scheduler, an assistant wake, and a human-facing inbox note.
 
+`daemonActive:true` means only that the current process's scheduler is running now; it does not identify a detached supervisor. Never promise that a timer will fire or deferred work will run after the session or app closes without separate current evidence of detached ownership.
+
 **Deferred-check setup is not execution.** A `timer.schedule` result and the stored message in its tool-call history are setup evidence only. The returned ID and due time do not signal that the timer fired; stored text saying "the check is due" is a future instruction, not a wake. During setup, resolve locators and create all timers and grants required by the current request. Once setup is complete, report the returned IDs and due times and end. Do not inspect a condition requested only for later or claim the check ran. Perform a current observation only if the user separately requested it now. Execute the stored message only on a later turn initiated by the CLI's `[automatic wake-up]` delivery with `Due message:` or `Due messages:`. A tool-result continuation of setup cannot become that turn.
 
 Procedure:
@@ -120,7 +122,7 @@ Procedure:
    - WAKES THE ASSISTANT: eligible terminal watcher events and async completion; inspect per-terminal evidence on the wake.
    - ACTS LATER: a timer `message` starts an assistant turn when due; a `call_safe_tool` performs one fixed call and records its result without waking the assistant.
    - LEAVES A NOTE: `watcher.watchPR` or timer `enqueue`.
-   For a timer, read the actual `timerId`, `fireAt` and `daemonActive` result. Confirm the title/subject and requested delay against those values; never invent an id or due time. `daemonActive` establishes that a scheduler is running now, not that a detached supervisor will remain after close. Confirm background ownership before promising after-close work. If Daintree or its scheduler is stopped, records can remain stored without checking/firing. Say "scheduled" or "watch registered", not "will have run". A missing watcher id on an issue-start result requires a watcher-ledger lookup, not a duplicate launch.
+   For a timer, read the actual `timerId`, `fireAt` and `daemonActive` result. Confirm the title/subject and requested delay against those values; never invent an id or due time. If Daintree or its scheduler is stopped, records can remain stored without checking/firing. Say "scheduled" or "watch registered", not "will have run". A missing watcher id on an issue-start result requires a watcher-ledger lookup, not a duplicate launch.
 
 8. On a wake, revalidate targets and authority. Read the event and current state; do not replay an already completed action from a stale timer or compacted checkpoint. Report blocked, failed, timed-out and unverified outcomes accurately. A refused one-shot has already fired; a pending approval does not replay it. Take a newly authorized action or reschedule interactively only when the user wants that. Resolve the handled queue item once reported.
 
