@@ -1,8 +1,8 @@
-# Mission #2: desired routes, including the unresolved bare-timer cases.
+# Mission #2: bare timers, named reminders and deferred checks.
 cases:
   - id: timer-bare-ten-minutes
     category: single-runbook
-    note: "Known cardinality gap retained as a failing expectation until selector training repairs it."
+    note: "An unpunctuated bare countdown needs the timer procedure."
     messages:
       - role: user
         content: "Set a timer for 10 minutes"
@@ -22,7 +22,7 @@ cases:
 
   - id: timer-bare-word-duration
     category: single-runbook
-    note: "A second unpunctuated form retains the unresolved cardinality boundary."
+    note: "A spelled, hyphenated duration has the same countdown intent."
     messages:
       - role: user
         content: "Start a ten-minute timer"
@@ -32,7 +32,7 @@ cases:
 
   - id: timer-bare-five-minutes-period
     category: single-runbook
-    note: "Desired timer route; the baseline selector chooses foundation alone."
+    note: "A bare timer needs its procedure rather than foundation alone."
     messages:
       - role: user
         content: "Give me a timer for five minutes."

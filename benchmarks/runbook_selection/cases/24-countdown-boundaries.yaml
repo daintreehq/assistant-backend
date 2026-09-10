@@ -1,0 +1,73 @@
+cases:
+  - id: countdown-seconds-with-politeness
+    category: single-runbook
+    note: A countdown duration is not limited to minutes or the original failing wording.
+    messages:
+      - role: user
+        content: "Please start a 45-second timer."
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: countdown-spelled-duration
+    category: single-runbook
+    note: Countdown is the same delayed reminder intent as a bare timer.
+    messages:
+      - role: user
+        content: "Set a countdown for twelve minutes"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: countdown-fractional-hours
+    category: single-runbook
+    note: Preserve fractional durations and polite question-form commands.
+    messages:
+      - role: user
+        content: "Could you set a timer for 1.5 hours?"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: countdown-compound-number
+    category: single-runbook
+    note: A hyphen inside a spoken number is part of the duration.
+    messages:
+      - role: user
+        content: "Start a twenty-five-minute timer"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: countdown-after-supervision
+    category: topic-shift
+    note: A new countdown must retain its meaning with history and another active workflow.
+    active: [daintree.orchestration.supervise-fleet]
+    messages:
+      - role: user
+        content: "What is running?"
+      - role: assistant
+        content: "The build is still running."
+      - role: user
+        content: "Set a timer for 10 minutes"
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: countdown-list-is-state-read
+    category: routing-trap
+    note: Listing existing timers must not become a new countdown request.
+    messages:
+      - role: user
+        content: "List pending timers"
+    expect:
+      required: [daintree.foundation]
+
+  - id: countdown-cancel-is-named-mutation
+    category: routing-trap
+    note: Cancelling a named timer must not become a new countdown request.
+    messages:
+      - role: user
+        content: "Cancel the timer named migration"
+    expect:
+      required: [daintree.foundation]

@@ -15,6 +15,7 @@ server can never import it, so it cannot be the authority.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -136,6 +137,43 @@ QUERY_HISTORY_CHARS = 320
 _ELLIPSIS = " … "
 
 
+_SMALL_NUMBER = (
+    r"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
+)
+_TENS = r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+_NUMBER = (
+    rf"(?:[0-9]+(?:\.[0-9]+)?|a|an|{_SMALL_NUMBER}|"
+    rf"(?:{_TENS})(?:[ -](?:one|two|three|four|five|six|seven|eight|nine))?)"
+)
+_DURATION = rf"{_NUMBER}[ -](?:seconds?|minutes?|hours?)"
+_COUNTDOWN = re.compile(
+    rf"(?:please )?(?:(?:can|could|would) you )?"
+    rf"(?:set|start|create|give me) (?:a |an )?"
+    rf"(?:(?:timer|countdown) for (?P<after>{_DURATION})|"
+    rf"(?P<before>{_DURATION}) (?:timer|countdown))"
+    rf"(?:,? please)?[.!?]?",
+    re.IGNORECASE,
+)
+
+
+def _countdown_query(text: str) -> str:
+    """Give a complete, bare countdown the same ranking view as a reminder.
+
+    The frozen head recognises reminders but drops plain countdowns depending
+    on duration spelling and punctuation. Normalise this narrow synonym before
+    embedding; the model still chooses from the caller's catalog with the same
+    admission rules. Full matching deliberately excludes documentation, quotes,
+    negations, named subjects and compound/deferred actions. The executor and
+    ``last_user_text`` (the independent docs pass) keep the original request.
+    """
+    match = _COUNTDOWN.fullmatch(" ".join(text.split()))
+    if match is None:
+        return text
+    duration = (match.group("after") or match.group("before")).replace("-", " ")
+    return f"Remind me in {duration.lower()}"
+
+
 def _head_and_tail(text: str, budget: int) -> str:
     """``text`` shortened to ``budget`` characters, keeping both ends.
 
@@ -178,6 +216,8 @@ def query_document(
         return (turn_context or "").strip()
 
     newest = _content_text(getattr(eligible[-1], "content", "")).strip()
+    if getattr(eligible[-1], "role", None) == "user":
+        newest = _countdown_query(newest)
     if newest_chars is not None:
         newest = _head_and_tail(newest, newest_chars)
 
