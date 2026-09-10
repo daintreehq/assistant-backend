@@ -6,6 +6,22 @@
 runbook: daintree.orchestration.watch-outcome
 run: pre-split
 positives:
+  - query: "Please start a countdown lasting eight minutes"
+    run: 2026-09-09-mission-2-timers
+  - query: "I need a fourteen-minute timer"
+    run: 2026-09-09-mission-2-timers
+  - query: "Could you time the next ninety seconds for me"
+    run: 2026-09-09-mission-2-timers
+  - query: "Start counting down from six minutes"
+    run: 2026-09-09-mission-2-timers
+  - query: "Put on a timer for seven minutes please"
+    run: 2026-09-09-mission-2-timers
+  - query: "Give me a countdown of eleven minutes"
+    run: 2026-09-09-mission-2-timers
+  - query: "In seventeen minutes remind me to inspect the indexing job"
+    run: 2026-09-09-mission-2-timers
+  - query: "Nudge me about the rollout when the next twelve minutes are up"
+    run: 2026-09-09-mission-2-timers
   - run the migration overnight and wake me if anything blows up
   - keep an eye on tab 3 while I grab lunch
   - set a watcher on the deploy agent, alert me if it errors out
@@ -63,6 +79,18 @@ positives:
   - queue up 'npm run lint' on the api terminal for half an hour from now
   - remind me about the release checklist at 4
 boundaries:
+  - query: "Wait for twelve minutes before you launch a terminal for the smoke tests"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: "Once seven minutes have elapsed, start an agent to inspect the worker logs"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: "Set a nine-minute timer with no task attached"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.foundation]
+  - query: "All I need is a countdown for thirteen minutes"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.foundation]
   - query: tell me when all of those finish
     confusable_with: [daintree.worktree.relocate-agents]
   - query: ping me when the build goes green

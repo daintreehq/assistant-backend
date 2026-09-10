@@ -59,6 +59,15 @@ positives:
   - what is each of these tabs called at the moment
   - 'give me the full picture: terminals, worktrees, watchers, queue'
 boundaries:
+  - query: "Show the timers that are currently pending"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: "Cancel the timer called index checkpoint"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: "What time is the release reminder due"
+    run: 2026-09-09-mission-2-timers
+    confusable_with: [daintree.orchestration.watch-outcome]
   - query: which worktrees do we have open
     confusable_with: [daintree.worktree.relocate-agents]
   - query: switch me over to the billing worktree
