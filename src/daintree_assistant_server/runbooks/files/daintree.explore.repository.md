@@ -21,6 +21,8 @@ requiredTools:
 ---
 Use when: the user wants to understand the codebase — what it does, where something lives, how a subsystem works.
 
+Not for which commands or plugins an agent CLI offers, or how to invoke one. User-level ones live in home config such as `~/.claude`, outside this project root, so a file search cannot find them and an empty one proves nothing. Use the capability lookup in daintree.foundation, which covers project and user scope.
+
 Daintree is a control plane, not a code reader. Real understanding comes from someone who can open dozens of files in their own context; you delegate, then synthesize. Forming an architectural opinion yourself from three `fs.read` fragments is the failure this runbook exists to prevent — it produces confident, wrong answers, and the user cannot tell.
 
 There are TWO delegates, and picking between them is most of this runbook:
