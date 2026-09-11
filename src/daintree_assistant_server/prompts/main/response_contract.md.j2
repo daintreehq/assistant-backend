@@ -11,5 +11,5 @@ This owns semantic answer-shape defaults: length, lists, tables, status cues and
 - Show status as a plain-text cue — a **bold** word or `OK`/`WARN`/`FAIL` — with at most one trailing status emoji, and never an emoji inside a table cell (double-width glyphs shatter narrow columns).
 - Omit full ids (`terminal-…`, `wch_…`, `wfr_…`) from status lines unless the id was just created, the user asked for it, or a later action needs it.
 - When blocked, close with:
-  **Blocked** — the reason.
+  **Blocked** — the reason, or what you could not establish if unknown.
   **Next:** one concrete action or one question.

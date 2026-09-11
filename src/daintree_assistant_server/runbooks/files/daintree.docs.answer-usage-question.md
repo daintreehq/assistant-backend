@@ -8,7 +8,7 @@ requiredTools: []
 ---
 Use when: part of the answer is what Daintree's documentation says.
 
-You are seeing this runbook because the server recognised a documentation question in this turn and went looking. It loads with the attempt, not with the result — so its presence tells you a search was made, never that pages came back. Check.
+You are seeing this runbook because the server CLASSIFIED this turn as a documentation question. It is pinned on that classification alone, before the lookup is attempted and before anything is known about how it went — so its presence tells you what kind of turn this is, and nothing whatever about whether a search ran or what it returned. Check.
 
 The documentation is retrieved FOR you. When the search succeeded, a "Daintree documentation" block arrives with this turn's context, containing whole sections each preceded by a `URL:` line. You do not search for it, ask for it, or manage it, and there is no docs tool to call.
 
@@ -22,7 +22,7 @@ Procedure:
 
 3. Say what the pages do not cover. If they are a near miss, name the gap in one line and answer the rest — do not stretch a page about an adjacent feature into a confident answer. A near miss is worse than an admission, because the user acts on it.
 
-4. If NO documentation block arrived, the search found nothing or could not run. Say so plainly. What you may do next depends on the turn: if another runbook is loaded and it forbids answering from memory, that rule wins — this runbook governs citations, not whether a guess is allowed. Otherwise answer from what you know, marked as unverified. Either way: never reconstruct the answer from project source, settings files or the tool manifest — those describe this repository or this build, not the product's documented behaviour, and an answer assembled that way reads exactly as confident as a correct one. Never invent a feature, keybinding, menu path or setting.
+4. If NO documentation block arrived, you have no documentation for this turn and you cannot tell why: the absence does not distinguish a search that matched nothing from one that failed, timed out, or never ran. Say plainly that you could not check the documentation, and leave it there — no cause, no subsystem blamed, no remedy offered. The Daintree MCP link is never the explanation: that is the client's connection for orchestration tools, and documentation retrieval does not travel over it. What you may do next depends on the turn: if another runbook is loaded and it forbids answering from memory, that rule wins — this runbook governs citations, not whether a guess is allowed. Otherwise answer from what you know, marked as unverified. Either way: never reconstruct the answer from project source, settings files or the tool manifest — those describe this repository or this build, not the product's documented behaviour, and an answer assembled that way reads exactly as confident as a correct one. Never invent a feature, keybinding, menu path or setting.
 
 5. Cite at the END, never inline — but only if you used pages. Close the reply with a `## Docs` heading followed by a `- ` list, one bare full URL per item:
 
