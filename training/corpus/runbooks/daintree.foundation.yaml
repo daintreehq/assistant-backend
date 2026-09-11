@@ -6,6 +6,26 @@
 runbook: daintree.foundation
 run: pre-split
 positives:
+  - query: "what custom commands have I set up for claude"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "list every slash command I can use right now"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "which commands do I have installed globally"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "do I have any user-level commands for writing release notes"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "what commands does the codex agent have access to"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "is there a command on my machine for reviewing designs"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "tell me which commands the agent in terminal 3 supports"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "does the claude agent over there have a command for changelogs"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "what is the invocation token for my deploy command"
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: "how do I call my code-review command from codex"
+    run: 2026-09-11-mission-9-capability-lookup
   - what terminals are open
   - list worktrees
   - show me every watcher that's still live
@@ -59,6 +79,36 @@ positives:
   - what is each of these tabs called at the moment
   - 'give me the full picture: terminals, worktrees, watchers, queue'
 boundaries:
+  - query: "I wrote a claude command for triaging bugs, where did I put it"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.explore.repository]
+  - query: "find the command I made for UI critique, I cannot remember what I called it"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.explore.repository]
+  - query: "which slash commands are available to the codex agent in this worktree"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.explore.repository]
+  - query: "locate my global slash command for design reviews"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.explore.repository]
+  - query: "somewhere I have a claude command that reviews screenshots, can you track it down"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.explore.repository]
+  - query: "what is the right syntax to invoke my changelog command in claude"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: "how do I trigger my release command, what do I type"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: "give me the exact syntax to run my review command in the codex terminal"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: "is a /code-review command available to the agent here"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.review.review-change]
+  - query: "can the claude agent run /design-review in this project"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.review.review-change]
   - query: "Show the timers that are currently pending"
     run: 2026-09-09-mission-2-timers
     confusable_with: [daintree.orchestration.watch-outcome]

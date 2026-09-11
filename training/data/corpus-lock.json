@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 9818,
-  "compiled_sha256": "dae2ce97dc369c8725191b9e95a759849c207d34ab6af36d74b142d511531dbe",
+  "rows": 9844,
+  "compiled_sha256": "00d3d5dfcf3a3e22e1a0ec7824ad5ab5b5c18a55a3cdb4ea60971005b19d132d",
   "label_space_sha256": "18870d567fc71492263668ffd689b608686c4b39df844d4b88e9c963bd8ea6a4",
   "label_space_size": 38,
   "by_source": {
-    "boundary": 2058,
+    "boundary": 2074,
     "docs": 728,
     "followup": 464,
     "foundation": 312,
@@ -16,12 +16,13 @@
     "no_task": 117,
     "no_task_stateful": 531,
     "off_domain": 212,
-    "positive": 2563,
+    "positive": 2573,
     "topic_shift": 2182,
     "wake": 149
   },
   "by_run": {
     "2026-09-09-mission-2-timers": 18,
+    "2026-09-11-mission-9-capability-lookup": 26,
     "pre-split": 9800
   },
   "dropped": {},
@@ -82,10 +83,10 @@
       "sha256": "ecdbb297f9fd0232770c51c5463f49ffd5082a0fade3f7557bc8c039adafcfef"
     },
     "runbooks/daintree.explore.repository.yaml": {
-      "examples": 263,
-      "rows": 263,
+      "examples": 266,
+      "rows": 266,
       "runbook": "daintree.explore.repository",
-      "sha256": "ad311555eedd9d4a41e52ee01db6c29a44aa350fdeaf2b8c4a0a0d9bdb76602c"
+      "sha256": "c969c32cf26c7011c9a0355aacb887a3164dd6b748ab4457ed73d4f19ebe1343"
     },
     "runbooks/daintree.forge.land-pull-request.yaml": {
       "examples": 153,
@@ -100,10 +101,10 @@
       "sha256": "aca755cede3fc15df059be9559277cc6f7f12344da17e37fb62e4fa065e2bbc5"
     },
     "runbooks/daintree.foundation.yaml": {
-      "examples": 638,
-      "rows": 638,
+      "examples": 658,
+      "rows": 658,
       "runbook": "daintree.foundation",
-      "sha256": "08a8990250510d589f674e2d1f8c588fb476c851bc4be431d79bae7459568975"
+      "sha256": "f43562985fa0e1010233397eaf1005a7697260882b5f6677fcf1355e872182d7"
     },
     "runbooks/daintree.memory.manage-project-memory.yaml": {
       "examples": 153,
@@ -190,10 +191,10 @@
       "sha256": "d8db75c71e56fdf82fa4a984d6fa9656f4547fba6de3b34708005faec43c256c"
     },
     "runbooks/daintree.recipe.run-or-create.yaml": {
-      "examples": 168,
-      "rows": 168,
+      "examples": 171,
+      "rows": 171,
       "runbook": "daintree.recipe.run-or-create",
-      "sha256": "ac1c4dbae22c939bc0e89b2af0ac9e873aad3b48e333bc4162a110b0d320e472"
+      "sha256": "fcc762408b258fdce390fb06d0fc7a4ed3e013a56f7143f0ff60aee57e52283c"
     },
     "runbooks/daintree.review.review-change.yaml": {
       "examples": 202,
