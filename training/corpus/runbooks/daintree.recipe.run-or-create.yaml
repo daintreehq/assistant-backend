@@ -62,6 +62,15 @@ positives:
   - load the perf one
   - i need four tabs going at once for this — isn't there a saved thing that does that already? use it
 boundaries:
+  - query: "run the release recipe in a new worktree"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.foundation]
+  - query: "what recipes do we have saved for this project"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.foundation]
+  - query: "start the dev-preview recipe"
+    run: 2026-09-11-mission-9-capability-lookup
+    confusable_with: [daintree.foundation]
   - query: create a worktree with the inrepo-work recipe on it
     confusable_with: [daintree.worktree.relocate-agents]
   - query: run the dev recipe in a new tree please

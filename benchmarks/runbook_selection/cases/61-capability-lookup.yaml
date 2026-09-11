@@ -1,0 +1,49 @@
+# Looking up an agent CLI's own commands or plugins, and how to invoke one.
+# The foundation owns this: its capability-lookup section is the only procedure in
+# the catalog for it (catalog lookup when the host offers it, slashCommands.list
+# when it does not, never the project filesystem, because user-level commands live
+# in home config outside the fs.* root).
+#
+# These pin the phrasings that ALREADY route to the foundation alone, so a later
+# whenToUse edit on a neighbour cannot quietly take the intent. Mission 9 measured
+# more phrasings that route nowhere or to a neighbour (explore.repository,
+# recipe.run-or-create). Prose could not move them without regressing pinned
+# foundation cases, so they are carried as training rows for the next retrain
+# rather than as cases that would fail today.
+
+cases:
+  - id: capability-find-named-command
+    category: foundation-only
+    note: >-
+      The user remembers a command by its purpose, not its token. Nothing about it
+      is repository work: a user-level command lives outside the project root, so
+      searching files cannot answer it and an empty search proves nothing.
+    messages:
+      - role: user
+        content: find my design review command
+    expect:
+      required: [daintree.foundation]
+
+  - id: capability-list-custom-commands
+    category: foundation-only
+    note: >-
+      An inventory of an agent CLI's custom commands. The answer comes from
+      Daintree's capability discovery across project and user scope, not from
+      listing .claude/ in the project, which misses everything user-level.
+    messages:
+      - role: user
+        content: list the custom commands I have for claude
+    expect:
+      required: [daintree.foundation]
+
+  - id: capability-home-config-commands
+    category: foundation-only
+    note: >-
+      Names a home-config path outright. The fs.* tools are confined to the project
+      root and cannot read it, so the only correct route is the capability lookup;
+      a filesystem attempt here is the exact failure this mission started from.
+    messages:
+      - role: user
+        content: show me the commands in ~/.claude/commands
+    expect:
+      required: [daintree.foundation]
