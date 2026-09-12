@@ -129,6 +129,7 @@ from .docs_mcp import (
     DocsLookupError,
     DocsMcpClient,
     DocsSection,
+    enrich_section,
 )
 from .fast_response import (
     FastResponsePolicyDecision,
@@ -2379,6 +2380,31 @@ class ChatOrchestrator:
         turning an enhancement into a regression on exactly the turn it was meant
         to help.
         """
+        # ONE outer handler around the whole body, and the nesting is the point.
+        # The inner clauses exist to log the ordinary failures at the right volume;
+        # this one exists so that NOTHING — a logger that raises, an exception whose
+        # __str__ raises, a bad `is_permanent`, an error building the success line —
+        # can propagate and cost the turn a search that already succeeded. Sibling
+        # `except` clauses do not cover each other, which is exactly the hole a
+        # review found here.
+        #
+        # `Exception`, never `BaseException`: a real cancellation and a process exit
+        # must still propagate. `asyncio.CancelledError` is not an Exception, so it
+        # passes through by construction rather than by being remembered.
+        try:
+            return await self._fetch_top_page(sections, request_id=request_id, timeout=timeout)
+        except Exception:
+            logger.exception("docs_page_unexpected", request_id=request_id)
+            return sections
+
+    async def _fetch_top_page(
+        self,
+        sections: list[DocsSection],
+        *,
+        request_id: str,
+        timeout: float,
+    ) -> list[DocsSection]:
+        """The body of :meth:`_enrich_top_section`. Only that method may call it."""
         if self.docs_client is None:
             return sections
         if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
@@ -2408,9 +2434,6 @@ class ChatOrchestrator:
                 permanent=exc.is_permanent,
             )
             return sections
-        except Exception:
-            logger.exception("docs_page_unexpected", request_id=request_id, path=top.path)
-            return sections
         logger.info(
             "docs_page",
             request_id=request_id,
@@ -2418,10 +2441,11 @@ class ChatOrchestrator:
             bytes=len(markdown.encode("utf-8")),
             elapsed_ms=round((time.perf_counter() - started) * 1000),
         )
-        # `replace`, because DocsSection is frozen and the path is what the
-        # citation is built from: enrichment may change what a section SAYS and
-        # must never change which page it points at.
-        return [replace(top, text=markdown), *sections[1:]]
+        # `enrich_section` keeps the ranked preview and adds the page below it,
+        # under a section's byte cap. It cannot change `path`: the citation is built
+        # from that, so enrichment may change what a section SAYS and must never
+        # change which page it points at.
+        return [enrich_section(top, markdown), *sections[1:]]
 
     # ---- output linting (non-stream backstop; observability) ------------
 

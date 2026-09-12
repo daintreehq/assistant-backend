@@ -808,7 +808,10 @@ async def test_the_top_section_is_enriched_with_the_page_markdown(
     assert calls == ["search", "get_page"], "one extra round trip, on the top hit only"
     assert "+** button in the sidebar" in lookup.sections[0].text
     assert "Command-K then Command-N" in lookup.sections[0].text
-    assert "…" not in lookup.sections[0].text, "the preview's ellipsis is gone with it"
+    # The preview is KEPT and the page added below it — see `enrich_section`: on
+    # some phrasings the ranked snippet is itself the answer, and the page markdown
+    # is capped from the front, so replacing would sometimes lose the better text.
+    assert "branch prefixes" in lookup.sections[0].text
 
 
 @pytest.mark.asyncio
@@ -919,3 +922,72 @@ async def test_the_page_fetch_shares_the_search_s_allowance(
 
     assert lookup is not None, "the search still delivers"
     assert calls == ["search"], "no budget left for a page is a reason to skip, not to overrun"
+
+
+@pytest.mark.asyncio
+async def test_a_raising_logger_cannot_cost_the_turn_its_search(
+    orchestrator: ChatOrchestrator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """"Nothing here may raise" has to survive the FALLBACK path failing too.
+
+    Sibling `except` clauses do not cover each other, so an exception raised while
+    handling a page failure — a logger that throws, an exception whose `__str__`
+    throws, a bad `is_permanent` — used to escape enrichment entirely and take a
+    successful search with it. A review found that hole; this pins it shut.
+    """
+    orchestrator.docs_client = _two_tool_client(
+        PREVIEW_HIT, page=lambda _r: httpx.Response(503, text="down")
+    )
+
+    def exploding_info(event: str, **kw: Any) -> None:
+        if event.startswith("docs_page"):
+            raise RuntimeError("the logger itself is broken")
+
+    import daintree_assistant_server.services.chat_orchestrator as module
+
+    monkeypatch.setattr(module.logger, "info", exploding_info)
+
+    lookup = await orchestrator._lookup_docs(
+        "how do you create a worktree", request_id="r", budget=RequestBudget()
+    )
+
+    assert lookup is not None, "a broken log line must not delete the documentation"
+    assert [s.path for s in lookup.sections] == ["/docs/worktrees/create"]
+
+
+@pytest.mark.asyncio
+async def test_a_cancellation_still_propagates(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """The outer guard is `Exception`, deliberately not `BaseException`.
+
+    A real cancellation and a process exit must still reach the caller; swallowing
+    them to protect a docs section would make the turn unkillable.
+    """
+
+    def cancel(_request: httpx.Request) -> httpx.Response:
+        raise asyncio.CancelledError()
+
+    orchestrator.docs_client = _two_tool_client(PREVIEW_HIT, page=cancel)
+
+    with pytest.raises(asyncio.CancelledError):
+        await orchestrator._lookup_docs(
+            "how do you create a worktree", request_id="r", budget=RequestBudget()
+        )
+
+
+@pytest.mark.asyncio
+async def test_enrichment_adds_the_page_without_losing_the_preview(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """End to end: the block carries BOTH the ranked snippet and the page."""
+    orchestrator.docs_client = _two_tool_client(PREVIEW_HIT)
+
+    lookup = await orchestrator._lookup_docs(
+        "how do you create a worktree", request_id="r", budget=RequestBudget()
+    )
+
+    assert lookup is not None
+    text = lookup.sections[0].text
+    assert "branch prefixes" in text, "the preview stays"
+    assert "+** button in the sidebar" in text, "and the page's steps arrive"

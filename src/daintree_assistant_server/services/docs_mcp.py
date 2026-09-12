@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import httpx
@@ -354,7 +354,9 @@ def _markdown_from_result(result: dict[str, Any]) -> str:
             continue
         if not isinstance(payload, dict):
             continue
-        markdown, _ = sanitize_field(_as_text(payload.get("markdown")), DOCS_SECTION_MAX_BYTES)
+        markdown, _ = sanitize_field(
+            defang_url_lines(_as_text(payload.get("markdown"))), DOCS_SECTION_MAX_BYTES
+        )
         if markdown.strip():
             return markdown
         # A page with no markdown is not an error to retry — it is a page with
@@ -483,7 +485,7 @@ def _section_from_hit(hit: dict[str, Any]) -> DocsSection | None:
     # stating none of its steps. That is why `fetch_page` exists — the caller
     # enriches the top section when the turn can afford a second round trip.
     text, _ = sanitize_field(
-        _as_text(hit.get("chunkText")) or _as_text(hit.get("snippet")),
+        defang_url_lines(_as_text(hit.get("chunkText")) or _as_text(hit.get("snippet"))),
         DOCS_SECTION_MAX_BYTES,
     )
     if not text.strip():
@@ -500,19 +502,92 @@ def _as_text(value: Any) -> str:
     return value if isinstance(value, str) else ""
 
 
+# A `URL:` at the start of a line, which is how `render_docs_sections` states the
+# citation for the section that follows.
+_URL_LINE = re.compile(r"(?m)^(\s*)URL:")
+
+
+def defang_url_lines(text: str) -> str:
+    """Stop quoted page text from impersonating the block's citation metadata.
+
+    `render_docs_sections` prints each section's real address on a line beginning
+    ``URL:``, and the model is told to copy a citation verbatim from one. Section
+    TEXT is documentation we do not control: a page that contains its own
+    line-initial ``URL:`` — quoted, in a code fence, or planted — therefore
+    renders as a citation for a page the search never returned.
+    `frame_data_block` neutralizes the block's delimiters, which is a different
+    problem and does not touch this.
+
+    So the marker is broken where it appears in body text, and only there. A
+    space is enough: a reader loses nothing, and ``URL :`` is no longer the token
+    the citation rule matches. This is not a defence against a malicious docs
+    server — that server is trusted to the extent that its content is quoted at
+    all — it is what stops a page's own prose being read as metadata about it.
+    """
+    return _URL_LINE.sub(r"\1URL :", text)
+
+
+def enrich_section(section: DocsSection, markdown: str) -> DocsSection:
+    """The section with its page's markdown added BELOW its ranked preview.
+
+    Added, not substituted, and that is a correction rather than a preference.
+    The ranked `snippet` is the text the search engine chose for THIS query, so on
+    a phrasing that names what it wants it can already hold the answer — measured:
+    "what's the keyboard shortcut to open the New Worktree dialog" returns the
+    section documenting the chord, while the same question asked as "how do you
+    create a worktree" returns the page's meta description. The page markdown is
+    capped from the front, so replacing the preview would sometimes swap the one
+    text that answered the question for an introduction that does not.
+
+    Capped to a SECTION's budget, because that is what this is: the block cap
+    stops meaning what it says the moment one section is allowed to exceed it.
+    """
+    combined, _ = cap_bytes(
+        "\n\n".join(part for part in (section.text, markdown) if part.strip()),
+        DOCS_SECTION_MAX_BYTES,
+    )
+    return replace(section, text=combined)
+
+
 def render_docs_sections(sections: list[DocsSection]) -> str:
     """Flatten sections to the text that goes in the prompt, under one cap.
 
-    The whole-block cap is applied after joining rather than per section: three
-    short sections and one long one is a normal result shape, and a per-section
-    budget would truncate the long one while leaving the budget unspent.
+    **Capped SECTION-WISE, and the reason is citation integrity rather than
+    tidiness.** Joining everything and cutting the result at a byte count cuts
+    wherever the count lands — which, measured, produces a final
+    ``URL: https://daintree.org/docs/fo`` for a page at ``/docs/four``, and a
+    heading with no URL line under it at all. Both are worse than the section
+    being absent: the model is told to copy a citation verbatim from a ``URL:``
+    line, so a truncated one is a plausible wrong address it has every reason to
+    trust. A section that does not fit whole is therefore dropped whole.
+
+    The FIRST section is the exception, and it is safe for a structural reason:
+    its URL line is at the top, so truncating its tail can only ever cost body
+    text. Without that exception a single oversized section would render an empty
+    block.
     """
     parts: list[str] = []
     for section in sections:
         heading = " — ".join(p for p in (section.title, section.section_title) if p)
         # The complete URL, not a path plus an instruction to prepend an origin.
         parts.append(f"## {heading or section.path}\nURL: {section.url}\n\n{section.text}")
-    capped, truncated = cap_bytes("\n\n".join(parts), DOCS_BLOCK_MAX_BYTES)
-    if truncated:
-        logger.info("docs_context_truncated", sections=len(sections))
-    return capped
+    kept: list[str] = []
+    used = 0
+    dropped = 0
+    for part in parts:
+        # +2 for the "\n\n" join, except before the first part.
+        cost = len(part.encode("utf-8")) + (2 if kept else 0)
+        if kept and used + cost > DOCS_BLOCK_MAX_BYTES:
+            dropped += 1
+            continue
+        kept.append(part)
+        used += cost
+    block, truncated = cap_bytes("\n\n".join(kept), DOCS_BLOCK_MAX_BYTES)
+    if truncated or dropped:
+        logger.info(
+            "docs_context_truncated",
+            sections=len(sections),
+            dropped=dropped,
+            first_section_trimmed=truncated,
+        )
+    return block
