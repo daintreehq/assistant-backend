@@ -25,9 +25,9 @@ import pytest
 
 from daintree_assistant_server.services.docs_mcp import (
     DOCS_BLOCK_MAX_BYTES,
-    DOCS_SECTION_MAX_BYTES,
     DOCS_MCP_PROTOCOL_VERSION,
     DOCS_MCP_URL,
+    DOCS_SECTION_MAX_BYTES,
     DocsLookupError,
     DocsMcpClient,
     DocsSection,
