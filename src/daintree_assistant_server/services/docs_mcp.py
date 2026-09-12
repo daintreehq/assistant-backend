@@ -354,9 +354,7 @@ def _markdown_from_result(result: dict[str, Any]) -> str:
             continue
         if not isinstance(payload, dict):
             continue
-        markdown, _ = sanitize_field(
-            defang_url_lines(_as_text(payload.get("markdown"))), DOCS_SECTION_MAX_BYTES
-        )
+        markdown = _safe_section_text(_as_text(payload.get("markdown")))
         if markdown.strip():
             return markdown
         # A page with no markdown is not an error to retry — it is a page with
@@ -484,9 +482,8 @@ def _section_from_hit(hit: dict[str, Any]) -> DocsSection | None:
     # preview, ellipsized, and on many questions it names the right page while
     # stating none of its steps. That is why `fetch_page` exists — the caller
     # enriches the top section when the turn can afford a second round trip.
-    text, _ = sanitize_field(
-        defang_url_lines(_as_text(hit.get("chunkText")) or _as_text(hit.get("snippet"))),
-        DOCS_SECTION_MAX_BYTES,
+    text = _safe_section_text(
+        _as_text(hit.get("chunkText")) or _as_text(hit.get("snippet"))
     )
     if not text.strip():
         return None
@@ -498,13 +495,43 @@ def _section_from_hit(hit: dict[str, Any]) -> DocsSection | None:
     )
 
 
+def _safe_section_text(raw: str) -> str:
+    """Sanitize, then defang, then cap — in that order, which is the whole point.
+
+    Defanging first leaves three bypasses, all reproduced: ``prose\rURL:`` becomes
+    a fresh line only once ``\r`` is normalised, ``\n\x00URL:`` becomes one only
+    once the NUL is stripped, and ``\nU\u200bRL:`` becomes one only once the
+    zero-width character is removed. Every one of those transformations happens
+    inside `sanitize_field`, so a defang that runs before it is inspecting text
+    that does not exist yet.
+
+    And capping has to come LAST: ``URL:`` -> ``URL :`` adds a byte per
+    occurrence, so defanging a field already trimmed to the ceiling can push it
+    back over. Measured: a 4096-byte sample expanded to 4915.
+    """
+    normalized, _ = sanitize_field(raw, DOCS_SECTION_MAX_BYTES)
+    capped, _ = cap_bytes(defang_url_lines(normalized), DOCS_SECTION_MAX_BYTES)
+    return capped
+
+
 def _as_text(value: Any) -> str:
     return value if isinstance(value, str) else ""
 
 
 # A `URL:` at the start of a line, which is how `render_docs_sections` states the
 # citation for the section that follows.
-_URL_LINE = re.compile(r"(?m)^(\s*)URL:")
+#
+# `[ \t]*`, NOT `\s*`, and that is a correctness bound rather than a nicety. `\s`
+# matches newlines, so under `(?m)` the engine retries the same whitespace run
+# from every line boundary inside it — quadratic on blank-line runs. Measured: a
+# page of 64,000 blank lines took a 4-second docs allowance to 8.1 seconds, and
+# because the work is synchronous the `asyncio.timeout` around it never got to
+# run. Indentation is horizontal by definition; a newline is the thing being
+# anchored to, never part of the indent.
+#
+# Case-insensitive because the rule it protects is matched by eye, not by parser:
+# the model is told to copy the URL from a `URL:` line, and `Url:` reads as one.
+_URL_LINE = re.compile(r"(?im)^([ \t]*)URL:")
 
 
 def defang_url_lines(text: str) -> str:

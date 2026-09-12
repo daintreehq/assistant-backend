@@ -11,6 +11,7 @@ OpenAI wire shape *upstream*, behind the provider abstraction.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
@@ -2342,13 +2343,17 @@ class ChatOrchestrator:
             # to protect.
             timeout=timeout - (time.perf_counter() - started),
         )
-        logger.info(
-            "docs_lookup",
-            request_id=request_id,
-            sections=len(sections),
-            paths=[s.path for s in sections],
-            elapsed_ms=elapsed_ms,
-        )
+        # Suppressed for the same reason as the enrichment guard above: this
+        # method promises never to raise, and until now its own success line was
+        # the one statement outside every handler that could break that promise.
+        with contextlib.suppress(Exception):
+            logger.info(
+                "docs_lookup",
+                request_id=request_id,
+                sections=len(sections),
+                paths=[s.path for s in sections],
+                elapsed_ms=elapsed_ms,
+            )
         return DocsLookup(query=query, sections=sections)
 
     async def _enrich_top_section(
@@ -2394,7 +2399,12 @@ class ChatOrchestrator:
         try:
             return await self._fetch_top_page(sections, request_id=request_id, timeout=timeout)
         except Exception:
-            logger.exception("docs_page_unexpected", request_id=request_id)
+            # The diagnostic is itself best-effort. A guard whose own logging call
+            # can raise is not a guard — it just moves the failure one line down,
+            # and this handler exists precisely for the case where logging is what
+            # broke. Nothing is salvageable from a logger that cannot log.
+            with contextlib.suppress(Exception):
+                logger.exception("docs_page_unexpected", request_id=request_id)
             return sections
 
     async def _fetch_top_page(

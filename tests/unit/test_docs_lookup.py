@@ -939,13 +939,17 @@ async def test_a_raising_logger_cannot_cost_the_turn_its_search(
         PREVIEW_HIT, page=lambda _r: httpx.Response(503, text="down")
     )
 
-    def exploding_info(event: str, **kw: Any) -> None:
-        if event.startswith("docs_page"):
-            raise RuntimeError("the logger itself is broken")
+    def exploding(event: str, **kw: Any) -> None:
+        raise RuntimeError("the logger itself is broken")
 
     import daintree_assistant_server.services.chat_orchestrator as module
 
-    monkeypatch.setattr(module.logger, "info", exploding_info)
+    # BOTH, and that is the point: patching `info` alone left the outer handler's
+    # own `logger.exception` call unguarded, and the review reproduced a raise
+    # straight through it. A guard whose logging can throw is not a guard.
+    monkeypatch.setattr(module.logger, "info", exploding)
+    monkeypatch.setattr(module.logger, "exception", exploding)
+    monkeypatch.setattr(module.logger, "warning", exploding)
 
     lookup = await orchestrator._lookup_docs(
         "how do you create a worktree", request_id="r", budget=RequestBudget()
