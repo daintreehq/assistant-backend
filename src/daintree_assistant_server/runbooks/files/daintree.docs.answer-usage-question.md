@@ -8,6 +8,8 @@ requiredTools: []
 ---
 Use when: part of the answer is what Daintree's documentation says.
 
+Daintree's documentation lives at **https://daintree.org** and nowhere else. Every page is a path under that origin, so `https://daintree.org/docs/worktrees/create` is the shape a real documentation URL has. That is a product fact, not a hint: no other host serves it, and a URL on any other domain is not Daintree's documentation whatever it looks like. Knowing it does NOT license assembling one — a citation still has to come from a page you were given this turn, per step 5 — but it does mean that if you catch yourself about to write a different host, you already know the answer is wrong.
+
 You are seeing this runbook because the server CLASSIFIED this turn as a documentation question. It is pinned on that classification alone, before the lookup is attempted and before anything is known about how it went — so its presence tells you what kind of turn this is, and nothing whatever about whether a search ran or what it returned. Check.
 
 The documentation is retrieved FOR you. When the search succeeded, a "Daintree documentation" block arrives with this turn's context, containing whole sections each preceded by a `URL:` line. You do not search for it, ask for it, or manage it, and there is no docs tool to call.

@@ -128,6 +128,7 @@ from .docs_mcp import (
     DocsLookup,
     DocsLookupError,
     DocsMcpClient,
+    DocsSection,
 )
 from .fast_response import (
     FastResponsePolicyDecision,
@@ -2330,6 +2331,16 @@ class ChatOrchestrator:
         if not sections:
             logger.info("docs_lookup_empty", request_id=request_id, elapsed_ms=elapsed_ms)
             return None
+        sections = await self._enrich_top_section(
+            sections,
+            request_id=request_id,
+            # What is LEFT of the slice this stage was already allowed, not a
+            # second slice. Two calls share one allowance; giving the page its own
+            # `DOCS_LOOKUP_TIMEOUT_SECONDS` would double what the docs stage can
+            # spend and quietly move the preparation deadline this clamp exists
+            # to protect.
+            timeout=timeout - (time.perf_counter() - started),
+        )
         logger.info(
             "docs_lookup",
             request_id=request_id,
@@ -2338,6 +2349,79 @@ class ChatOrchestrator:
             elapsed_ms=elapsed_ms,
         )
         return DocsLookup(query=query, sections=sections)
+
+    async def _enrich_top_section(
+        self,
+        sections: list[DocsSection],
+        *,
+        request_id: str,
+        timeout: float,
+    ) -> list[DocsSection]:
+        """Replace the top section's preview with its page's markdown, or don't.
+
+        The ranked `snippet` is a ~200-character ellipsized preview. It reliably
+        names the right page and frequently states none of its steps, which puts
+        the model in the worst position available: it has a citable URL and no
+        content, so the honest move is to answer from memory and say so — and a
+        remembered menu path the user then hunts for is the failure this exists to
+        stop. The server's own `search` description prescribes the remedy, and
+        `fetch_page` is it.
+
+        **Only the TOP hit, and only its text.** One page is what a usage question
+        usually needs, one extra round trip is what the budget affords, and the
+        lower hits keep their previews so the block still shows what else exists.
+
+        **Returning ``sections`` unchanged is a first-class outcome.** Every
+        failure lands there: no budget, a timeout, a refused path, a page with no
+        markdown, a shape nobody anticipated. This is deliberately NOT inside the
+        caller's try/except — sharing that handler would make a failed page fetch
+        return `None` for the whole lookup and throw away a SEARCH that succeeded,
+        turning an enhancement into a regression on exactly the turn it was meant
+        to help.
+        """
+        if self.docs_client is None:
+            return sections
+        if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
+            logger.info("docs_page_skipped", request_id=request_id, reason="no_budget")
+            return sections
+        top = sections[0]
+        started = time.perf_counter()
+        try:
+            async with asyncio.timeout(timeout):
+                markdown = await self.docs_client.fetch_page(top.path, timeout=timeout)
+        except TimeoutError:
+            logger.info(
+                "docs_page_timeout",
+                request_id=request_id,
+                path=top.path,
+                timeout_ms=round(timeout * 1000),
+            )
+            return sections
+        except DocsLookupError as exc:
+            log = logger.warning if exc.is_permanent else logger.info
+            log(
+                "docs_page_failed",
+                request_id=request_id,
+                path=top.path,
+                reason=str(exc),
+                status=exc.status,
+                permanent=exc.is_permanent,
+            )
+            return sections
+        except Exception:
+            logger.exception("docs_page_unexpected", request_id=request_id, path=top.path)
+            return sections
+        logger.info(
+            "docs_page",
+            request_id=request_id,
+            path=top.path,
+            bytes=len(markdown.encode("utf-8")),
+            elapsed_ms=round((time.perf_counter() - started) * 1000),
+        )
+        # `replace`, because DocsSection is frozen and the path is what the
+        # citation is built from: enrichment may change what a section SAYS and
+        # must never change which page it points at.
+        return [replace(top, text=markdown), *sections[1:]]
 
     # ---- output linting (non-stream backstop; observability) ------------
 

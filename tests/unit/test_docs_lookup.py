@@ -724,3 +724,198 @@ async def test_a_transient_docs_failure_stays_at_info(
     assert len(failures) == 1, logs
     assert failures[0]["log_level"] == "info"
     assert failures[0]["permanent"] is False
+
+
+# ---------------------------------------------------------------------------
+# Page enrichment — the ranked snippet is a preview, not an answer.
+# ---------------------------------------------------------------------------
+
+# Today's server shape, measured against the live endpoint on 2026-09-12: no
+# `chunkText` anywhere, and `snippet` is an ellipsized ~200-character preview that
+# names the page and states none of its steps. This is the hit that made the
+# assistant answer a "how do I create a worktree" question from memory.
+PREVIEW_HIT = {
+    "url": "/docs/worktrees/create",
+    "title": "Create a Worktree | Daintree Docs",
+    "snippet": "Create a Worktree Daintree Docs docs / worktrees / create Create a worktree "
+    "from a new branch, an existing local branch, or a pull request: the dialog fields, "
+    "branch prefixes, path patterns,…",
+}
+
+PAGE_MARKDOWN = (
+    "Create a Worktree | Daintree Docs\n\n## Creating a Worktree\n\nOpen the New Worktree "
+    "dialog from the **+** button in the sidebar, with Command-K then Command-N, or by "
+    "right-clicking any worktree card and choosing **New Worktree**."
+)
+
+
+def _page_body(markdown: str, path: str = "/docs/worktrees/create") -> dict[str, Any]:
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [
+                {"type": "text", "text": json.dumps({"url": path, "markdown": markdown})}
+            ]
+        },
+    }
+
+
+def _two_tool_client(
+    *hits: dict[str, Any],
+    page: Any = None,
+    calls: list[str] | None = None,
+) -> DocsMcpClient:
+    """A docs server answering BOTH tools, dispatching on the tool name.
+
+    ``page`` is either a response body or a callable raising/returning one, so a
+    test can make the page half fail while the search half still succeeds — which
+    is the whole property enrichment has to hold.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        tool = payload["params"]["name"]
+        if calls is not None:
+            calls.append(tool)
+        if tool == "search":
+            return httpx.Response(200, json=_docs_body(*hits))
+        if callable(page):
+            return page(request)
+        return httpx.Response(200, json=page or _page_body(PAGE_MARKDOWN))
+
+    return _docs_client(handler)
+
+
+@pytest.mark.asyncio
+async def test_the_top_section_is_enriched_with_the_page_markdown(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """The point of the whole feature: the block states the steps, not a summary.
+
+    Without this the model holds a citable URL and no content, which is the worst
+    position available — the honest move is then to answer from memory and say so,
+    and a remembered menu path the user hunts for is the failure this prevents.
+    """
+    calls: list[str] = []
+    orchestrator.docs_client = _two_tool_client(PREVIEW_HIT, calls=calls)
+
+    lookup = await orchestrator._lookup_docs(
+        "how do you create a worktree", request_id="r", budget=RequestBudget()
+    )
+
+    assert lookup is not None
+    assert calls == ["search", "get_page"], "one extra round trip, on the top hit only"
+    assert "+** button in the sidebar" in lookup.sections[0].text
+    assert "Command-K then Command-N" in lookup.sections[0].text
+    assert "…" not in lookup.sections[0].text, "the preview's ellipsis is gone with it"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_page_fetch_keeps_the_search_results(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """Enrichment is an enhancement to an enhancement. It may never subtract.
+
+    This is the specific regression the design was reviewed for: if the page fetch
+    shared the search's exception handler, a failing `get_page` would make
+    `_lookup_docs` return None and throw away a search that SUCCEEDED — removing
+    documentation from exactly the turn the change was meant to help.
+    """
+    orchestrator.docs_client = _two_tool_client(
+        PREVIEW_HIT, page=lambda _r: httpx.Response(503, text="upstream down")
+    )
+
+    lookup = await orchestrator._lookup_docs(
+        "how do you create a worktree", request_id="r", budget=RequestBudget()
+    )
+
+    assert lookup is not None, "a failed page fetch must not cost the turn its search"
+    assert [s.path for s in lookup.sections] == ["/docs/worktrees/create"]
+    assert "branch prefixes" in lookup.sections[0].text, "the preview stands unchanged"
+
+
+@pytest.mark.asyncio
+async def test_a_page_with_no_markdown_leaves_the_preview_alone(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """A 200 carrying nothing useful is not a reason to lose the section."""
+    orchestrator.docs_client = _two_tool_client(PREVIEW_HIT, page=_page_body(""))
+
+    lookup = await orchestrator._lookup_docs("worktrees", request_id="r", budget=RequestBudget())
+
+    assert lookup is not None
+    assert "branch prefixes" in lookup.sections[0].text
+
+
+@pytest.mark.asyncio
+async def test_enrichment_never_changes_which_page_a_section_cites(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """Enrichment may change what a section SAYS, never where it points.
+
+    The citation is built from `path`, so a mutation here would produce a reply
+    that quotes one page under another page's URL — worse than either the preview
+    or no documentation at all.
+    """
+    orchestrator.docs_client = _two_tool_client(
+        PREVIEW_HIT, page=_page_body(PAGE_MARKDOWN, path="/docs/somewhere-else")
+    )
+
+    lookup = await orchestrator._lookup_docs("worktrees", request_id="r", budget=RequestBudget())
+
+    assert lookup is not None
+    assert lookup.sections[0].path == "/docs/worktrees/create"
+    assert lookup.sections[0].url == "https://daintree.org/docs/worktrees/create"
+
+
+@pytest.mark.asyncio
+async def test_the_lower_hits_keep_their_previews(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """Only the top hit is enriched: one page is the answer, the rest are context."""
+    second = dict(PREVIEW_HIT, url="/docs/code-forge", snippet="…bulk worktree creation…")
+    orchestrator.docs_client = _two_tool_client(PREVIEW_HIT, second)
+
+    lookup = await orchestrator._lookup_docs("worktrees", request_id="r", budget=RequestBudget())
+
+    assert lookup is not None
+    assert len(lookup.sections) == 2
+    assert "bulk worktree creation" in lookup.sections[1].text
+
+
+@pytest.mark.asyncio
+async def test_the_page_fetch_shares_the_search_s_allowance(
+    orchestrator: ChatOrchestrator,
+) -> None:
+    """Two calls, ONE slice. A second call may not double what the stage spends.
+
+    The page fetch is given what is LEFT of the docs slice, so a tight preparation
+    budget skips it while still delivering the search — the enhancement degrades
+    before the feature does.
+    """
+    calls: list[str] = []
+
+    def slow_search(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_docs_body(PREVIEW_HIT))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        calls.append(payload["params"]["name"])
+        if payload["params"]["name"] == "search":
+            # Burn the slice inside the search, leaving nothing for a page.
+            time.sleep(0.65)
+            return slow_search(request)
+        return httpx.Response(200, json=_page_body(PAGE_MARKDOWN))
+
+    orchestrator.docs_client = _docs_client(handler)
+    budget = RequestBudget(
+        policy=BudgetPolicy(
+            preparation=4.0, open_stall=4.0, first_output=4.0, stream_idle=4.0, total=30.0
+        )
+    )
+
+    lookup = await orchestrator._lookup_docs("worktrees", request_id="r", budget=budget)
+
+    assert lookup is not None, "the search still delivers"
+    assert calls == ["search"], "no budget left for a page is a reason to skip, not to overrun"

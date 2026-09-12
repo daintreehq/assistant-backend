@@ -91,6 +91,13 @@ DOCS_PATH_MAX_CHARS = 200
 
 _SEARCH_TOOL = "search"
 
+# The server's own remedy for a snippet too thin to answer from, named in the
+# `search` tool's description. Its argument is `path`, NOT `url` — the description
+# says "call get_page with the result URL" and the schema requires `path`, and
+# sending `url` is answered with an input-validation error (verified against the
+# live endpoint 2026-09-12).
+_PAGE_TOOL = "get_page"
+
 # One request per connection, so a constant id is enough — and it is what makes
 # the reply checkable: an envelope carrying a different id is not our answer.
 _REQUEST_ID = 1
@@ -168,7 +175,7 @@ class DocsLookup:
 
 
 class DocsMcpClient:
-    """One method, one POST. See the module docstring for why it is not the SDK."""
+    """Two tools, one POST each. See the module docstring for why it is not the SDK."""
 
     def __init__(self, client: httpx.AsyncClient, *, url: str | None = None) -> None:
         self._client = client
@@ -188,14 +195,46 @@ class DocsMcpClient:
         timeout: float,
     ) -> list[DocsSection]:
         """Run the docs server's ``search`` tool. Raises :class:`DocsLookupError`."""
+        result = await self._call(
+            _SEARCH_TOOL, {"query": query, "topK": top_k}, timeout=timeout
+        )
+        return _sections_from_result(result, top_k=top_k)
+
+    async def fetch_page(self, path: str, *, timeout: float) -> str:
+        """A page's indexed markdown, for when the ranked snippet cannot answer.
+
+        The search tool's own description prescribes this: *"If snippets lack
+        detail, call get_page with the result URL for the page's indexed
+        markdown."* It is a SECOND round trip, so it is the caller's job to
+        decide the turn can afford one — and the caller's job to treat a failure
+        here as "no enrichment", never as "no documentation". See
+        ``ChatOrchestrator._enrich_top_section``.
+
+        ``path`` is re-validated rather than trusted. It reaches here from a hit
+        this module already checked, but the check is cheap and this value goes
+        into an outbound request: a module that validates on one path and assumes
+        on the other is one refactor away from not validating at all.
+        """
+        if len(path) > DOCS_PATH_MAX_CHARS or not _is_site_path(path):
+            raise DocsLookupError("refusing to fetch a path that is not a site path")
+        result = await self._call(_PAGE_TOOL, {"path": path}, timeout=timeout)
+        return _markdown_from_result(result)
+
+    async def _call(
+        self, tool: str, arguments: dict[str, Any], *, timeout: float
+    ) -> dict[str, Any]:
+        """One POST, one JSON-RPC result. Every wire property lives HERE.
+
+        Both tools share it deliberately. The redirect refusal, the bounded read,
+        the id correlation and the ``isError`` check are security properties
+        rather than conveniences, and a second copy of this method is a second
+        place for one of them to be forgotten.
+        """
         payload = {
             "jsonrpc": "2.0",
             "id": _REQUEST_ID,
             "method": "tools/call",
-            "params": {
-                "name": _SEARCH_TOOL,
-                "arguments": {"query": query, "topK": top_k},
-            },
+            "params": {"name": tool, "arguments": arguments},
         }
         request = self._client.build_request(
             "POST",
@@ -241,7 +280,7 @@ class DocsMcpClient:
             body = await _read_bounded(response)
         finally:
             await response.aclose()
-        return _parse_search_response(body, response=response, top_k=top_k)
+        return _parse_result(body, response=response)
 
 
 async def _read_bounded(response: httpx.Response) -> str:
@@ -268,9 +307,13 @@ async def _read_bounded(response: httpx.Response) -> str:
     return b"".join(chunks).decode("utf-8", errors="replace")
 
 
-def _parse_search_response(
-    body: str, *, response: httpx.Response, top_k: int
-) -> list[DocsSection]:
+def _parse_result(body: str, *, response: httpx.Response) -> dict[str, Any]:
+    """The ``result`` object from a JSON-RPC reply, or raise.
+
+    Shared by both tools: everything here is about the ENVELOPE, and neither the
+    correlation check nor the tool-error check has anything to do with which tool
+    was called.
+    """
     envelope = _json_body(body, response.headers.get("content-type") or "")
     # Correlate the reply to the request. A JSON-RPC message carrying someone
     # else's id is not this search's answer, and folding it in would put an
@@ -288,8 +331,36 @@ def _parse_search_response(
     # that as success would fold an error message into the prompt as if it were
     # documentation.
     if result.get("isError"):
-        raise DocsLookupError("docs search reported a tool error")
-    return _sections_from_result(result, top_k=top_k)
+        raise DocsLookupError("docs server reported a tool error")
+    return result
+
+
+def _markdown_from_result(result: dict[str, Any]) -> str:
+    """The page's markdown, sanitized and capped to a section's budget.
+
+    Capped to ``DOCS_SECTION_MAX_BYTES`` rather than given a ceiling of its own:
+    this text REPLACES a section's text, so it has to live inside a section's
+    budget or the block cap stops meaning what it says. A real page runs to tens
+    of kilobytes, so this truncates, and truncating from the front is deliberate —
+    a documentation page opens with what it is and how to do the thing, and the
+    reference tail is what a reader skips too.
+    """
+    for block in result.get("content") or []:
+        if not isinstance(block, dict) or block.get("type") != "text":
+            continue
+        try:
+            payload = json.loads(block.get("text") or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        markdown, _ = sanitize_field(_as_text(payload.get("markdown")), DOCS_SECTION_MAX_BYTES)
+        if markdown.strip():
+            return markdown
+        # A page with no markdown is not an error to retry — it is a page with
+        # nothing to add, and the ranked snippet we already hold stands.
+        raise DocsLookupError("docs page carried no markdown")
+    raise DocsLookupError("docs page response carried no content")
 
 
 def _json_body(body: str, content_type: str) -> dict[str, Any]:
@@ -399,6 +470,18 @@ def _section_from_hit(hit: dict[str, Any]) -> DocsSection | None:
     # result.
     if len(path) > DOCS_PATH_MAX_CHARS or not _is_site_path(path):
         return None
+    # `chunkText` FIRST, `snippet` as the fallback — and today every hit takes the
+    # fallback, because the live server returns no `chunkText` at all (measured
+    # 2026-09-12 in both `groupBy` modes: hits carry url, title, sectionTitle,
+    # snippet, score, chunks). It is kept rather than deleted because the tests
+    # above were written against a response that had it, so an older server
+    # contract is the likeliest explanation and a client that stops reading a
+    # richer field the day it returns is a silent downgrade.
+    #
+    # What matters is what the fallback COSTS: `snippet` is a ~200-character
+    # preview, ellipsized, and on many questions it names the right page while
+    # stating none of its steps. That is why `fetch_page` exists — the caller
+    # enriches the top section when the turn can afford a second round trip.
     text, _ = sanitize_field(
         _as_text(hit.get("chunkText")) or _as_text(hit.get("snippet")),
         DOCS_SECTION_MAX_BYTES,

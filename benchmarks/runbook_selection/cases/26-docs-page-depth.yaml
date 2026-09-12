@@ -1,0 +1,94 @@
+# The phrasings from the incident that made the docs block's DEPTH a problem.
+#
+# `25-docs-classification.yaml` already pins the canonical "how do I create a
+# worktree from a pull request?" shape, and the classifier was never what failed
+# here: the turn classified correctly, the search returned the right page, and the
+# block carried the page's ~200-character ellipsized preview instead of its steps.
+# The assistant answered from memory and invented a UI path.
+#
+# So these cases pin the LAYER-1 half of a fix that lives at the retrieval layer.
+# They are the utterances a user actually typed, kept because a phrasing that
+# routes today is a phrasing that can stop routing tomorrow — the retrieval fix is
+# worth nothing on a turn that never asks for documentation. The behavioural half
+# is `tests/unit/test_docs_lookup.py`, which is where page enrichment is pinned.
+#
+# Every case here expects `required: []`. The documentation runbook IS loaded on
+# these turns, but the SERVER pins it off the `docs_query` (config.DOCS_RUNBOOK_ID)
+# and the selector cannot see it, so from the classifier's side the right answer is
+# nothing at all.
+
+cases:
+  - id: docs-how-do-you-create-a-worktree
+    category: docs-classification
+    note: >-
+      The exact utterance from the incident, second person and naming the product —
+      "How do you create a worktree in Daintree?". It classified correctly and was
+      still answered from memory, with a citation to a host that does not serve
+      Daintree's documentation. Kept verbatim.
+    messages:
+      - role: user
+        content: How do you create a worktree in Daintree?
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-make-a-new-worktree-lowercase
+    category: docs-classification
+    note: >-
+      The same intent with no capitals and no punctuation, which is how the
+      question is usually typed. Included because the classifier reads the bare
+      user text and a phrasing that loses its question shape is the cheapest way
+      to fall off the docs path.
+    messages:
+      - role: user
+        content: how do i make a new worktree
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-new-worktree-shortcut
+    category: docs-classification
+    note: >-
+      A keybinding question. It is the phrasing whose ranked snippet DID contain
+      the answer, because naming the dialog surfaces the section that documents it
+      rather than the page preamble — the measurement that showed the depth
+      problem was phrasing-dependent rather than total.
+    messages:
+      - role: user
+        content: whats the keyboard shortcut to open the new worktree dialog
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-worktree-per-issue-in-bulk
+    category: docs-classification
+    note: >-
+      A usage question whose top hit is a DIFFERENT page (the Code Forge bulk
+      creation one), so the page enriched is not always the one a worktree question
+      would suggest. Still a question about the product, not an instruction to do
+      the thing — contrast the trap below.
+    messages:
+      - role: user
+        content: I want a worktree per issue, how do I do that in bulk
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-negative-just-create-the-worktree
+    category: docs-classification
+    note: >-
+      The trap the four above need. Same vocabulary, opposite intent: this user
+      wants the worktree MADE, not explained. A classifier that fires on worktree
+      keywords buys a third-party round trip and a block of irrelevant pages on an
+      operational turn, which is the overwhelming majority of turns.
+    messages:
+      - role: user
+        content: create a worktree on feature/payments and open a terminal in it
+    expect:
+      # The runbook half is measured, not assumed: the classifier picks
+      # create-plain-worktree on this utterance, which is genuinely its clause —
+      # a named branch and no issue behind it. The foundation rides along when
+      # admission pairs it. What the case is FOR is the `docs` half.
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]
+      docs: false

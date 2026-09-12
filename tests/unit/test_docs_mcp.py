@@ -25,6 +25,7 @@ import pytest
 
 from daintree_assistant_server.services.docs_mcp import (
     DOCS_BLOCK_MAX_BYTES,
+    DOCS_SECTION_MAX_BYTES,
     DOCS_MCP_PROTOCOL_VERSION,
     DOCS_MCP_URL,
     DocsLookupError,
@@ -489,3 +490,142 @@ async def test_a_failure_that_was_not_a_status_carries_none() -> None:
         await _client(handler).search("worktrees", timeout=2.0)
     assert caught.value.status is None
     assert not caught.value.is_permanent
+
+
+# ---------------------------------------------------------------------------
+# `get_page` — the server's own remedy for a snippet too thin to answer from.
+# ---------------------------------------------------------------------------
+
+
+def _page_payload(markdown: str) -> dict[str, Any]:
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {"url": "/docs/worktrees/create", "markdown": markdown}
+                    ),
+                }
+            ]
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_todays_server_shape_carries_no_chunktext_and_falls_back_to_snippet() -> None:
+    """The shape the LIVE server returns, captured 2026-09-12.
+
+    ``LIVE_HIT`` above carries `chunkText` and was captured on 2026-08-14. The
+    endpoint no longer returns that field in either `groupBy` mode — hits carry
+    url, title, sectionTitle, snippet, score and chunks — so every section now
+    takes the `snippet` fallback. That is not a bug in the client and it is not
+    free either: `snippet` is an ellipsized preview, which is why the orchestrator
+    enriches the top hit through `fetch_page`.
+
+    Pinned so that a server that starts returning `chunkText` again is a visible
+    change rather than a silent one, and so the fallback is never mistaken for the
+    only path.
+    """
+    today = {
+        "url": "/docs/worktrees/create",
+        "title": "Create a Worktree | Daintree Docs",
+        "sectionTitle": "Bulk Worktree Creation",
+        "snippet": "…Selecting several issues in the Code Forge panel…",
+        "score": 1.93,
+        "chunks": [{"sectionTitle": "Bulk Worktree Creation", "snippet": "…"}],
+    }
+    assert "chunkText" not in today
+
+    sections = await _client(_ok(_payload(today))).search("worktrees", timeout=1.0)
+
+    assert len(sections) == 1
+    assert sections[0].text == "…Selecting several issues in the Code Forge panel…"
+    assert sections[0].url == "https://daintree.org/docs/worktrees/create"
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_returns_the_page_markdown() -> None:
+    markdown = "## Creating a Worktree\n\nOpen the dialog from the **+** button."
+    page = await _client(_ok(_page_payload(markdown))).fetch_page(
+        "/docs/worktrees/create", timeout=1.0
+    )
+    assert page == markdown
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_sends_path_not_url() -> None:
+    """The schema requires `path`; sending `url` is an input-validation error.
+
+    Verified against the live endpoint: ``{"url": "/docs/x"}`` is refused with
+    "expected string, received undefined". The tool's description says "call
+    get_page with the result URL", which is what makes this the easy mistake.
+    """
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content.decode())["params"])
+        return httpx.Response(200, json=_page_payload("# page"))
+
+    await _client(handler).fetch_page("/docs/worktrees/create", timeout=1.0)
+
+    assert seen["name"] == "get_page"
+    assert seen["arguments"] == {"path": "/docs/worktrees/create"}
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_refuses_a_path_that_is_not_a_site_path() -> None:
+    """Re-validated here rather than trusted from the caller.
+
+    ``//evil.com/x`` is a protocol-relative URL that navigates off-site. The path
+    reaching this method has already been checked once, and a module that
+    validates on one path and assumes on the other is one refactor away from not
+    validating at all.
+    """
+    called: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        called.append(str(request.url))
+        return httpx.Response(200, json=_page_payload("# page"))
+
+    client = _client(handler)
+    for path in ("//evil.com/x", "https://evil.com/x", "/docs/x y", "not-a-path"):
+        with pytest.raises(DocsLookupError):
+            await client.fetch_page(path, timeout=1.0)
+    assert called == [], "a refused path must not reach the network"
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_caps_a_large_page_to_a_sections_budget() -> None:
+    """A real page runs to tens of kilobytes; a section's budget is 4 KiB.
+
+    The cap is applied rather than raised: this text REPLACES a section's text, so
+    it has to live inside a section's budget or the whole-block cap stops meaning
+    what it says.
+    """
+    page = await _client(_ok(_page_payload("x" * (DOCS_SECTION_MAX_BYTES * 4)))).fetch_page(
+        "/docs/worktrees/create", timeout=1.0
+    )
+    assert len(page.encode("utf-8")) <= DOCS_SECTION_MAX_BYTES
+
+
+@pytest.mark.asyncio
+async def test_a_page_tool_error_inside_a_200_is_still_a_failure() -> None:
+    """The same rule the search path has: `isError` is not success."""
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {"isError": True, "content": [{"type": "text", "text": "no such page"}]},
+    }
+    with pytest.raises(DocsLookupError):
+        await _client(_ok(body)).fetch_page("/docs/nope", timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_a_page_reply_answering_a_different_request_is_refused() -> None:
+    """Correlation is an envelope property, so it covers both tools."""
+    body = dict(_page_payload("# page"), id=999)
+    with pytest.raises(DocsLookupError):
+        await _client(_ok(body)).fetch_page("/docs/worktrees/create", timeout=1.0)
