@@ -25,6 +25,7 @@ import httpx
 import pytest
 
 from daintree_assistant_server.services.docs_mcp import (
+    _URL_LINE,
     DOCS_BLOCK_MAX_BYTES,
     DOCS_MCP_PROTOCOL_VERSION,
     DOCS_MCP_URL,
@@ -33,6 +34,7 @@ from daintree_assistant_server.services.docs_mcp import (
     DocsMcpClient,
     DocsSection,
     _safe_section_text,
+    defang_url_lines,
     enrich_section,
     render_docs_sections,
 )
@@ -680,15 +682,46 @@ def test_the_block_cap_never_emits_a_truncated_citation() -> None:
     `/docs/four` — a plausible wrong address the model is instructed to trust. A
     missing section is recoverable; a fabricated citation is not.
     """
-    # 4036, not a round number: the cut has to land INSIDE a citation for this to
-    # test anything. At 3996 the fourth body absorbs it and join-then-trim passes
-    # too — the review restored the old behaviour in memory and this test stayed
-    # green, which made it decoration rather than a pin.
-    big = "x" * 4036
+    # DERIVED BY SEARCH, not by arithmetic, and not hardcoded. A fixed 4036 worked
+    # only for these exact headings: changing the first title from "One" to "1"
+    # shifted the naive cut out of a citation and the old join-then-trim
+    # implementation passed again. My own closed-form attempt got it wrong too and
+    # the test silently stopped being a pin. So the body size is SEARCHED for, and
+    # the search itself asserts the premise: there must be a size at which a
+    # join-then-cut would slice through the last section's URL line. That is the
+    # only input on which this test proves anything.
+    names = ("one", "two", "three", "four")
+
+    def parts_for(body_len: int) -> list[str]:
+        return [
+            f"## {name.title()}\nURL: https://daintree.org/docs/{name}\n\n{'x' * body_len}"
+            for name in names
+        ]
+
+    def cut_lands_inside_the_last_url(body_len: int) -> bool:
+        parts = parts_for(body_len)
+        joined = "\n\n".join(parts)
+        if len(joined.encode("utf-8")) <= DOCS_BLOCK_MAX_BYTES:
+            return False  # nothing would be cut at all
+        naive = joined.encode("utf-8")[:DOCS_BLOCK_MAX_BYTES].decode("utf-8", "ignore")
+        last = naive.rfind("URL:")
+        if last == -1:
+            return False
+        tail = naive[last:]
+        # Cut INSIDE the citation: it began, and it is not complete.
+        return "\n" not in tail and tail != f"URL: https://daintree.org/docs/{names[-1]}"
+
+    body = next(
+        (n for n in range(3900, 4120) if cut_lands_inside_the_last_url(n)),
+        None,
+    )
+    assert body is not None, "no body size puts the naive cut inside a citation — test is void"
+
     sections = [
-        DocsSection(path=f"/docs/{name}", title=name.title(), section_title="", text=big)
-        for name in ("one", "two", "three", "four")
+        DocsSection(path=f"/docs/{name}", title=name.title(), section_title="", text="x" * body)
+        for name in names
     ]
+
     block = render_docs_sections(sections)
 
     assert len(block.encode("utf-8")) <= DOCS_BLOCK_MAX_BYTES
@@ -765,17 +798,44 @@ def test_defanging_stays_inside_the_section_budget() -> None:
     assert len(text.encode("utf-8")) <= DOCS_SECTION_MAX_BYTES
 
 
-def test_the_defang_regex_cannot_be_made_quadratic() -> None:
-    """A synchronous regex that outruns the timeout defeats the timeout.
+def test_the_defang_regex_never_lets_indentation_cross_a_newline() -> None:
+    """The deterministic half, and the one that actually pins the fix.
 
-    `\\s*` matches newlines, so under `(?m)` the engine retried the same
-    whitespace run from every line boundary inside it. Measured on a page of
-    64,000 blank lines: a 4-second docs allowance took 8.1 seconds, and because
-    the work is synchronous the `asyncio.timeout` around it never got to run.
-    Indentation is horizontal by definition, so `[ \\t]*` is both correct and
-    linear.
+    `\\s*` matched newlines, so under `(?m)` the engine retried the same whitespace
+    run from every line boundary inside it — quadratic on blank-line runs, and
+    synchronous, so the `asyncio.timeout` around it could not interrupt it.
+    `[ \\t]*` cannot cross a line boundary, which is the property to assert; a
+    stopwatch only observes its consequence.
     """
-    started = time.perf_counter()
-    _safe_section_text("\n" * 64_000 + "URL: https://evil.example/x")
-    elapsed = time.perf_counter() - started
-    assert elapsed < 1.0, f"defanging took {elapsed:.2f}s — the pathological case is back"
+    # A marker indented by a newline is NOT indented: the group may hold spaces and
+    # tabs, never the newline itself.
+    match = _URL_LINE.search("prose\n \t URL: x")
+    assert match is not None
+    assert "\n" not in match.group(1)
+    assert match.group(1) == " \t "
+
+
+def test_the_defang_regex_stays_linear_on_a_pathological_page() -> None:
+    """The performance half, on input the cap cannot shrink and the regex cannot match.
+
+    Two details, both because the first version of this test passed WITH the
+    quadratic regex restored. `_safe_section_text` caps first, so it never saw the
+    adversarial size — this calls the matcher directly. And the suffix has to be
+    NON-matching (`URX:`): the old regex consumed a whitespace run happily when a
+    match followed it, and only backtracked catastrophically when none did.
+
+    Scaling, not a wall-clock ceiling: a fixed threshold on a loaded CI machine is
+    a flake. Quadratic work grows ~4x when the input doubles; linear work does not.
+    """
+    def elapsed_for(blank_lines: int) -> float:
+        text = "\n" * blank_lines + "URX: not a marker"
+        started = time.perf_counter()
+        defang_url_lines(text)
+        return time.perf_counter() - started
+
+    small = max(elapsed_for(32_000), 1e-6)
+    large = elapsed_for(64_000)
+    assert large / small < 3.0, (
+        f"doubling the input multiplied the work by {large / small:.1f}x — "
+        "that is the quadratic backtracking coming back"
+    )

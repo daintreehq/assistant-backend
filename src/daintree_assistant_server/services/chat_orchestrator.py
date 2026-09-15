@@ -498,6 +498,20 @@ def _full_tool_names(request: RespondRequest) -> list[str]:
     return [tool.function.name for tool in (request.input.tools or [])]
 
 
+
+def _quiet_log(log: Any, event: str, **fields: Any) -> None:
+    """Emit a diagnostic, or don't. Never raise doing it.
+
+    For the docs path only, where `_lookup_docs` and `_enrich_top_section` both
+    promise never to raise. A logging call is the one statement in those methods
+    that has nothing to do with the turn and can still end it, and a review found
+    every one of them outside a handler. Not a general-purpose wrapper: everywhere
+    else in this module a failing logger should be loud.
+    """
+    with contextlib.suppress(Exception):
+        log(event, **fields)
+
+
 class ChatOrchestrator:
     def __init__(
         self,
@@ -2292,7 +2306,9 @@ class ChatOrchestrator:
                 budget.remaining(TurnPhase.PREPARATION) - _DOCS_BUDGET_RESERVE_SECONDS,
             )
         if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
-            logger.info("docs_lookup_skipped", request_id=request_id, reason="no_budget")
+            _quiet_log(
+                logger.info, "docs_lookup_skipped", request_id=request_id, reason="no_budget"
+            )
             return None
         started = time.perf_counter()
         try:
@@ -2303,7 +2319,8 @@ class ChatOrchestrator:
             async with asyncio.timeout(timeout):
                 sections = await self.docs_client.search(query, timeout=timeout)
         except TimeoutError:
-            logger.info(
+            _quiet_log(
+                logger.info,
                 "docs_lookup_timeout",
                 request_id=request_id,
                 timeout_ms=round(timeout * 1000),
@@ -2315,7 +2332,8 @@ class ChatOrchestrator:
             # signal; a timeout or a bad payload is one turn's bad luck. Both
             # still fail open — the volume changes, the posture does not.
             log = logger.warning if exc.is_permanent else logger.info
-            log(
+            _quiet_log(
+                log,
                 "docs_lookup_failed",
                 request_id=request_id,
                 reason=str(exc),
@@ -2327,11 +2345,13 @@ class ChatOrchestrator:
         except Exception:
             # The docs server is a third party on the first-byte path. A shape we
             # never anticipated must cost the turn its documentation, not the turn.
-            logger.exception("docs_lookup_unexpected", request_id=request_id)
+            _quiet_log(logger.exception, "docs_lookup_unexpected", request_id=request_id)
             return None
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         if not sections:
-            logger.info("docs_lookup_empty", request_id=request_id, elapsed_ms=elapsed_ms)
+            _quiet_log(
+                logger.info, "docs_lookup_empty", request_id=request_id, elapsed_ms=elapsed_ms
+            )
             return None
         sections = await self._enrich_top_section(
             sections,
@@ -2346,14 +2366,14 @@ class ChatOrchestrator:
         # Suppressed for the same reason as the enrichment guard above: this
         # method promises never to raise, and until now its own success line was
         # the one statement outside every handler that could break that promise.
-        with contextlib.suppress(Exception):
-            logger.info(
-                "docs_lookup",
-                request_id=request_id,
-                sections=len(sections),
-                paths=[s.path for s in sections],
-                elapsed_ms=elapsed_ms,
-            )
+        _quiet_log(
+            logger.info,
+            "docs_lookup",
+            request_id=request_id,
+            sections=len(sections),
+            paths=[s.path for s in sections],
+            elapsed_ms=elapsed_ms,
+        )
         return DocsLookup(query=query, sections=sections)
 
     async def _enrich_top_section(
@@ -2403,8 +2423,7 @@ class ChatOrchestrator:
             # can raise is not a guard — it just moves the failure one line down,
             # and this handler exists precisely for the case where logging is what
             # broke. Nothing is salvageable from a logger that cannot log.
-            with contextlib.suppress(Exception):
-                logger.exception("docs_page_unexpected", request_id=request_id)
+            _quiet_log(logger.exception, "docs_page_unexpected", request_id=request_id)
             return sections
 
     async def _fetch_top_page(
@@ -2418,7 +2437,7 @@ class ChatOrchestrator:
         if self.docs_client is None:
             return sections
         if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
-            logger.info("docs_page_skipped", request_id=request_id, reason="no_budget")
+            _quiet_log(logger.info, "docs_page_skipped", request_id=request_id, reason="no_budget")
             return sections
         top = sections[0]
         started = time.perf_counter()
@@ -2426,7 +2445,8 @@ class ChatOrchestrator:
             async with asyncio.timeout(timeout):
                 markdown = await self.docs_client.fetch_page(top.path, timeout=timeout)
         except TimeoutError:
-            logger.info(
+            _quiet_log(
+                logger.info,
                 "docs_page_timeout",
                 request_id=request_id,
                 path=top.path,
@@ -2435,7 +2455,8 @@ class ChatOrchestrator:
             return sections
         except DocsLookupError as exc:
             log = logger.warning if exc.is_permanent else logger.info
-            log(
+            _quiet_log(
+                log,
                 "docs_page_failed",
                 request_id=request_id,
                 path=top.path,
@@ -2444,7 +2465,8 @@ class ChatOrchestrator:
                 permanent=exc.is_permanent,
             )
             return sections
-        logger.info(
+        _quiet_log(
+            logger.info,
             "docs_page",
             request_id=request_id,
             path=top.path,

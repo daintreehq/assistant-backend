@@ -31,6 +31,7 @@ and ``text/event-stream``, even though it replies with plain JSON.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from dataclasses import dataclass, replace
@@ -531,7 +532,7 @@ def _as_text(value: Any) -> str:
 #
 # Case-insensitive because the rule it protects is matched by eye, not by parser:
 # the model is told to copy the URL from a `URL:` line, and `Url:` reads as one.
-_URL_LINE = re.compile(r"(?im)^([ \t]*)URL:")
+_URL_LINE = re.compile(r"(?im)^([ \t]*)(URL):")
 
 
 def defang_url_lines(text: str) -> str:
@@ -551,7 +552,11 @@ def defang_url_lines(text: str) -> str:
     server — that server is trusted to the extent that its content is quoted at
     all — it is what stops a page's own prose being read as metadata about it.
     """
-    return _URL_LINE.sub(r"\1URL :", text)
+    # The matched token's OWN case is preserved. Rewriting `url:` to `URL :` edits
+    # the content: `url: https://example.org` is a valid YAML key, a Python
+    # annotation and a TypeScript property, and changing its case changes what the
+    # quoted example means. Breaking the marker is the goal; normalising it is not.
+    return _URL_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)} :", text)
 
 
 def enrich_section(section: DocsSection, markdown: str) -> DocsSection:
@@ -611,10 +616,15 @@ def render_docs_sections(sections: list[DocsSection]) -> str:
         used += cost
     block, truncated = cap_bytes("\n\n".join(kept), DOCS_BLOCK_MAX_BYTES)
     if truncated or dropped:
-        logger.info(
-            "docs_context_truncated",
-            sections=len(sections),
-            dropped=dropped,
-            first_section_trimmed=truncated,
-        )
+        # Suppressed for the same reason as every other docs log: this renders on
+        # the path `_lookup_docs` promises never to raise from, and a diagnostic
+        # that can take the turn's documentation with it is worse than a missing
+        # diagnostic.
+        with contextlib.suppress(Exception):
+            logger.info(
+                "docs_context_truncated",
+                sections=len(sections),
+                dropped=dropped,
+                first_section_trimmed=truncated,
+            )
     return block
