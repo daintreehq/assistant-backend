@@ -2383,7 +2383,7 @@ class ChatOrchestrator:
         request_id: str,
         timeout: float,
     ) -> list[DocsSection]:
-        """Replace the top section's preview with its page's markdown, or don't.
+        """Append the top section's page markdown below its ranked preview, or don't.
 
         The ranked `snippet` is a ~200-character ellipsized preview. It reliably
         names the right page and frequently states none of its steps, which puts
