@@ -11,6 +11,7 @@ OpenAI wire shape *upstream*, behind the provider abstraction.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
@@ -128,6 +129,8 @@ from .docs_mcp import (
     DocsLookup,
     DocsLookupError,
     DocsMcpClient,
+    DocsSection,
+    enrich_section,
 )
 from .fast_response import (
     FastResponsePolicyDecision,
@@ -493,6 +496,20 @@ def _full_tool_names(request: RespondRequest) -> list[str]:
     Tool ORDER would then decide the menu, which is neither intended nor stable.
     """
     return [tool.function.name for tool in (request.input.tools or [])]
+
+
+
+def _quiet_log(log: Any, event: str, **fields: Any) -> None:
+    """Emit a diagnostic, or don't. Never raise doing it.
+
+    For the docs path only, where `_lookup_docs` and `_enrich_top_section` both
+    promise never to raise. A logging call is the one statement in those methods
+    that has nothing to do with the turn and can still end it, and a review found
+    every one of them outside a handler. Not a general-purpose wrapper: everywhere
+    else in this module a failing logger should be loud.
+    """
+    with contextlib.suppress(Exception):
+        log(event, **fields)
 
 
 class ChatOrchestrator:
@@ -2289,7 +2306,9 @@ class ChatOrchestrator:
                 budget.remaining(TurnPhase.PREPARATION) - _DOCS_BUDGET_RESERVE_SECONDS,
             )
         if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
-            logger.info("docs_lookup_skipped", request_id=request_id, reason="no_budget")
+            _quiet_log(
+                logger.info, "docs_lookup_skipped", request_id=request_id, reason="no_budget"
+            )
             return None
         started = time.perf_counter()
         try:
@@ -2300,7 +2319,8 @@ class ChatOrchestrator:
             async with asyncio.timeout(timeout):
                 sections = await self.docs_client.search(query, timeout=timeout)
         except TimeoutError:
-            logger.info(
+            _quiet_log(
+                logger.info,
                 "docs_lookup_timeout",
                 request_id=request_id,
                 timeout_ms=round(timeout * 1000),
@@ -2312,7 +2332,8 @@ class ChatOrchestrator:
             # signal; a timeout or a bad payload is one turn's bad luck. Both
             # still fail open — the volume changes, the posture does not.
             log = logger.warning if exc.is_permanent else logger.info
-            log(
+            _quiet_log(
+                log,
                 "docs_lookup_failed",
                 request_id=request_id,
                 reason=str(exc),
@@ -2324,13 +2345,29 @@ class ChatOrchestrator:
         except Exception:
             # The docs server is a third party on the first-byte path. A shape we
             # never anticipated must cost the turn its documentation, not the turn.
-            logger.exception("docs_lookup_unexpected", request_id=request_id)
+            _quiet_log(logger.exception, "docs_lookup_unexpected", request_id=request_id)
             return None
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         if not sections:
-            logger.info("docs_lookup_empty", request_id=request_id, elapsed_ms=elapsed_ms)
+            _quiet_log(
+                logger.info, "docs_lookup_empty", request_id=request_id, elapsed_ms=elapsed_ms
+            )
             return None
-        logger.info(
+        sections = await self._enrich_top_section(
+            sections,
+            request_id=request_id,
+            # What is LEFT of the slice this stage was already allowed, not a
+            # second slice. Two calls share one allowance; giving the page its own
+            # `DOCS_LOOKUP_TIMEOUT_SECONDS` would double what the docs stage can
+            # spend and quietly move the preparation deadline this clamp exists
+            # to protect.
+            timeout=timeout - (time.perf_counter() - started),
+        )
+        # Suppressed for the same reason as the enrichment guard above: this
+        # method promises never to raise, and until now its own success line was
+        # the one statement outside every handler that could break that promise.
+        _quiet_log(
+            logger.info,
             "docs_lookup",
             request_id=request_id,
             sections=len(sections),
@@ -2338,6 +2375,109 @@ class ChatOrchestrator:
             elapsed_ms=elapsed_ms,
         )
         return DocsLookup(query=query, sections=sections)
+
+    async def _enrich_top_section(
+        self,
+        sections: list[DocsSection],
+        *,
+        request_id: str,
+        timeout: float,
+    ) -> list[DocsSection]:
+        """Append the top section's page markdown below its ranked preview, or don't.
+
+        The ranked `snippet` is a ~200-character ellipsized preview. It reliably
+        names the right page and frequently states none of its steps, which puts
+        the model in the worst position available: it has a citable URL and no
+        content, so the honest move is to answer from memory and say so — and a
+        remembered menu path the user then hunts for is the failure this exists to
+        stop. The server's own `search` description prescribes the remedy, and
+        `fetch_page` is it.
+
+        **Only the TOP hit, and only its text.** One page is what a usage question
+        usually needs, one extra round trip is what the budget affords, and the
+        lower hits keep their previews so the block still shows what else exists.
+
+        **Returning ``sections`` unchanged is a first-class outcome.** Every
+        failure lands there: no budget, a timeout, a refused path, a page with no
+        markdown, a shape nobody anticipated. This is deliberately NOT inside the
+        caller's try/except — sharing that handler would make a failed page fetch
+        return `None` for the whole lookup and throw away a SEARCH that succeeded,
+        turning an enhancement into a regression on exactly the turn it was meant
+        to help.
+        """
+        # ONE outer handler around the whole body, and the nesting is the point.
+        # The inner clauses exist to log the ordinary failures at the right volume;
+        # this one exists so that NOTHING — a logger that raises, an exception whose
+        # __str__ raises, a bad `is_permanent`, an error building the success line —
+        # can propagate and cost the turn a search that already succeeded. Sibling
+        # `except` clauses do not cover each other, which is exactly the hole a
+        # review found here.
+        #
+        # `Exception`, never `BaseException`: a real cancellation and a process exit
+        # must still propagate. `asyncio.CancelledError` is not an Exception, so it
+        # passes through by construction rather than by being remembered.
+        try:
+            return await self._fetch_top_page(sections, request_id=request_id, timeout=timeout)
+        except Exception:
+            # The diagnostic is itself best-effort. A guard whose own logging call
+            # can raise is not a guard — it just moves the failure one line down,
+            # and this handler exists precisely for the case where logging is what
+            # broke. Nothing is salvageable from a logger that cannot log.
+            _quiet_log(logger.exception, "docs_page_unexpected", request_id=request_id)
+            return sections
+
+    async def _fetch_top_page(
+        self,
+        sections: list[DocsSection],
+        *,
+        request_id: str,
+        timeout: float,
+    ) -> list[DocsSection]:
+        """The body of :meth:`_enrich_top_section`. Only that method may call it."""
+        if self.docs_client is None:
+            return sections
+        if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
+            _quiet_log(logger.info, "docs_page_skipped", request_id=request_id, reason="no_budget")
+            return sections
+        top = sections[0]
+        started = time.perf_counter()
+        try:
+            async with asyncio.timeout(timeout):
+                markdown = await self.docs_client.fetch_page(top.path, timeout=timeout)
+        except TimeoutError:
+            _quiet_log(
+                logger.info,
+                "docs_page_timeout",
+                request_id=request_id,
+                path=top.path,
+                timeout_ms=round(timeout * 1000),
+            )
+            return sections
+        except DocsLookupError as exc:
+            log = logger.warning if exc.is_permanent else logger.info
+            _quiet_log(
+                log,
+                "docs_page_failed",
+                request_id=request_id,
+                path=top.path,
+                reason=str(exc),
+                status=exc.status,
+                permanent=exc.is_permanent,
+            )
+            return sections
+        _quiet_log(
+            logger.info,
+            "docs_page",
+            request_id=request_id,
+            path=top.path,
+            bytes=len(markdown.encode("utf-8")),
+            elapsed_ms=round((time.perf_counter() - started) * 1000),
+        )
+        # `enrich_section` keeps the ranked preview and adds the page below it,
+        # under a section's byte cap. It cannot change `path`: the citation is built
+        # from that, so enrichment may change what a section SAYS and must never
+        # change which page it points at.
+        return [enrich_section(top, markdown), *sections[1:]]
 
     # ---- output linting (non-stream backstop; observability) ------------
 
