@@ -1,0 +1,63 @@
+# Training examples whose answer is `daintree.worktree.provision-local-environment`
+# and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.worktree.provision-local-environment
+run: 2026-09-18-worktree-provisioning
+
+positives:
+  - all my checkouts point at the same mysql database so only one branch can actually be opened at a time
+  - i have four trees but one docroot, how do i get four sites
+  - the agents can't preview their own work because there's a single dev server
+  - every branch folder needs a separate schema or they keep overwriting each other's migrations
+  - can each checkout get a hostname of its own so i can flip between them in the browser
+  - what do i need so a new tree comes up already working instead of half configured
+  - the second checkout boots and immediately dies because the address is taken
+  - i want the database name derived from the folder so nothing has to be edited by hand
+  - branch directories share a redis keyspace and read each other's cached settings
+  - how do people run more than one copy of this app locally, one per branch
+  - give every checkout a distinct port and write it down somewhere it persists
+  - when i remove a tree i also want its database gone, not left behind
+  - new checkouts are missing vendor and env files so nobody can run them
+  - the uploads folder should stay common but everything else has to be separate
+  - i keep provisioning these by hand every time, automate it on creation
+  - two branches both want localhost:8080 and whichever starts second loses
+  - can daintree run something for me whenever a checkout is made and again when it's removed
+  - stop the trees from sharing one container stack
+  - each one should come with its own copy of the seed data
+  - i need isolation below the code level, the code part already works
+  - the checkouts are fine, it's the runtime underneath them that's shared
+  - work out what has to be duplicated per branch and what can be common
+  - my branch folders all resolve to the same site url
+  - set it up so removing a checkout releases whatever it claimed
+  - the agents keep swapping which copy is active so they can test, i want that to stop
+  - one of them switched the shared install over to its own branch and now the others are testing the wrong code
+  - make it so nobody has to deactivate anyone else's build to look at theirs
+
+boundaries:
+  - query: move the agents that are already running into separate checkouts
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: these two terminals are in the same folder, split them up
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: make a checkout for the billing branch
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: write me a shell script that seeds the database
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: get an agent to write the provisioning scripts for me
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: tear down the checkouts for everything that already landed
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: remove that tree and delete its branch
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: how's the cloud box for this checkout doing
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: spin up the remote sandbox for this branch
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: open a checkout with my usual terminal layout
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: start the dev server in this checkout
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: run the linter here
+    confusable_with: [daintree.recipe.run-or-create]

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 9844,
-  "compiled_sha256": "00d3d5dfcf3a3e22e1a0ec7824ad5ab5b5c18a55a3cdb4ea60971005b19d132d",
-  "label_space_sha256": "18870d567fc71492263668ffd689b608686c4b39df844d4b88e9c963bd8ea6a4",
-  "label_space_size": 38,
+  "rows": 9883,
+  "compiled_sha256": "125f7f794f4a2c0ce01597902da86efd5718d421320693e798d563205f26e6c9",
+  "label_space_sha256": "42c6d752bb7259c29123496348caef1b3e766a84c7e38d5bceb124d5af457e85",
+  "label_space_size": 39,
   "by_source": {
-    "boundary": 2074,
+    "boundary": 2086,
     "docs": 728,
     "followup": 464,
     "foundation": 312,
@@ -16,13 +16,14 @@
     "no_task": 117,
     "no_task_stateful": 531,
     "off_domain": 212,
-    "positive": 2573,
+    "positive": 2600,
     "topic_shift": 2182,
     "wake": 149
   },
   "by_run": {
     "2026-09-09-mission-2-timers": 18,
     "2026-09-11-mission-9-capability-lookup": 26,
+    "2026-09-18-worktree-provisioning": 39,
     "pre-split": 9800
   },
   "dropped": {},
@@ -249,6 +250,12 @@
       "rows": 153,
       "runbook": "daintree.worktree.manage-resource",
       "sha256": "f4527b0490f57c20b378d8180b1962dc0bab4ba8f7ebce66e87100c1ef51a1e1"
+    },
+    "runbooks/daintree.worktree.provision-local-environment.yaml": {
+      "examples": 39,
+      "rows": 39,
+      "runbook": "daintree.worktree.provision-local-environment",
+      "sha256": "d822d4d5d4b11265a61eb1d3f422a22ee8ba7c481bebf5c295460941886c4027"
     },
     "runbooks/daintree.worktree.relocate-agents.yaml": {
       "examples": 676,
