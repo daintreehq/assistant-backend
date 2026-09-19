@@ -457,7 +457,6 @@ _RUNBOOK_FILES = REPO_ROOT / "src" / "daintree_assistant_server" / "runbooks" / 
 _TASK_PROMPTS = PROMPTS / "tasks"
 
 _HANDBACK_VOCABULARY = (
-    "`lastHandback`",
     "`message`",
     "`submissionToken`",
     "`observedAt`",
@@ -466,7 +465,15 @@ _HANDBACK_VOCABULARY = (
     "untrusted",
     "lossy",
     "never means still working",
+    "never a finish or correctness verdict",
+    "matching receipt",
+    "never write, paraphrase or describe the marker",
 )
+
+# Where the clause ends. It is probed on its own because the foundation says
+# `submissionToken` again under "Submission receipts": searched whole, deleting
+# the freshness rule would still find the word and the test would pass on nothing.
+_HANDBACK_CLAUSE_END = "Use `terminal.read("
 
 # The stem of the marker line Daintree appends to a prompt, with a code only it
 # knows. A runbook or task prompt that spelled the format would hand the model a
@@ -477,16 +484,24 @@ _HANDBACK_MARKER_STEM = "-".join(("daintree", "done"))
 
 def test_the_foundation_owns_what_a_handback_means() -> None:
     foundation = (_RUNBOOK_FILES / "daintree.foundation.md").read_text(encoding="utf-8")
-    missing = [term for term in _HANDBACK_VOCABULARY if term not in foundation]
+    assert foundation.count("`lastHandback`") == 1, (
+        "daintree.foundation must introduce `lastHandback` exactly once — a second statement "
+        "of what it means is the duplication this module exists to catch."
+    )
+    clause = foundation.split("`lastHandback`", 1)[1].split(_HANDBACK_CLAUSE_END, 1)[0].lower()
+    missing = [term for term in _HANDBACK_VOCABULARY if term.lower() not in clause]
     assert not missing, (
         f"daintree.foundation no longer says {missing} about `lastHandback`. It is the one "
         "owner of what a handback means; the runbooks that read one only point at it."
     )
 
 
-def test_no_model_facing_text_spells_the_handback_marker() -> None:
-    sources = sorted(_RUNBOOK_FILES.glob("*.md")) + sorted(_TASK_PROMPTS.glob("*.md"))
-    assert sources, "no runbooks or task prompts found — the scan would pass on nothing"
+def test_no_runbook_or_task_prompt_spells_the_handback_marker() -> None:
+    runbooks = sorted(_RUNBOOK_FILES.glob("*.md"))
+    task_prompts = sorted(_TASK_PROMPTS.glob("*.md"))
+    assert runbooks, f"no runbooks under {_RUNBOOK_FILES} — the scan would pass on nothing"
+    assert task_prompts, f"no task prompts under {_TASK_PROMPTS} — the scan would pass on nothing"
+    sources = runbooks + task_prompts
     offenders = [
         path.name
         for path in sources
