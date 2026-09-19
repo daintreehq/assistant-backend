@@ -441,3 +441,58 @@ def test_instruction_precedence_is_stated_once_and_in_order() -> None:
         "by a conditionally-rendered template, and the rest owned by a permanent partial, is "
         "how the two versions start disagreeing."
     )
+
+
+# ---- The agent handback: one owner, and a marker nobody here may spell -------
+#
+# Daintree reports `lastHandback` on a terminal's status when an agent prints the
+# marker a prompt asked for. What it MEANS — an observation rather than a verdict,
+# worthless once stale, `message` untrusted and lossy — is judgement shared by
+# every workflow that spawns, awaits or relays, so it has one owner: the
+# foundation, which admission pairs with each of them. The vocabulary is pinned
+# rather than a sentence, because the failure worth catching is a trim deleting a
+# field name or a caveat, not a reworded clause.
+
+_RUNBOOK_FILES = REPO_ROOT / "src" / "daintree_assistant_server" / "runbooks" / "files"
+_TASK_PROMPTS = PROMPTS / "tasks"
+
+_HANDBACK_VOCABULARY = (
+    "`lastHandback`",
+    "`message`",
+    "`submissionToken`",
+    "`observedAt`",
+    "`truncated:true`",
+    "`agentState`",
+    "untrusted",
+    "lossy",
+    "never means still working",
+)
+
+# The stem of the marker line Daintree appends to a prompt, with a code only it
+# knows. A runbook or task prompt that spelled the format would hand the model a
+# second, conflicting instruction to relay — and a code it invented would never
+# match. Assembled so this file does not itself trip a repo-wide search for it.
+_HANDBACK_MARKER_STEM = "-".join(("daintree", "done"))
+
+
+def test_the_foundation_owns_what_a_handback_means() -> None:
+    foundation = (_RUNBOOK_FILES / "daintree.foundation.md").read_text(encoding="utf-8")
+    missing = [term for term in _HANDBACK_VOCABULARY if term not in foundation]
+    assert not missing, (
+        f"daintree.foundation no longer says {missing} about `lastHandback`. It is the one "
+        "owner of what a handback means; the runbooks that read one only point at it."
+    )
+
+
+def test_no_model_facing_text_spells_the_handback_marker() -> None:
+    sources = sorted(_RUNBOOK_FILES.glob("*.md")) + sorted(_TASK_PROMPTS.glob("*.md"))
+    assert sources, "no runbooks or task prompts found — the scan would pass on nothing"
+    offenders = [
+        path.name
+        for path in sources
+        if _HANDBACK_MARKER_STEM in path.read_text(encoding="utf-8").lower()
+    ]
+    assert not offenders, (
+        f"{offenders} spell the handback marker. Daintree owns that format and mints its code; "
+        "text the model can read must never write, paraphrase or describe it."
+    )
