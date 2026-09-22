@@ -1,0 +1,27 @@
+name: diag
+on:
+  pull_request:
+    branches: [develop]
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        n: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" -c requirements.lock
+      - run: |
+          grep -m1 "model name" /proc/cpuinfo; grep -o -m1 -E "avx512_vnni|avx_vnni" /proc/cpuinfo | head -1 || true
+          PYTHONPATH=src:. python diag/docsp.py 2>/dev/null | sort -n | sed -n '1,14p'
+          echo "== without the provision runbook"
+          git rm -q src/daintree_assistant_server/runbooks/files/daintree.worktree.provision-local-environment.md
+          PYTHONPATH=src:. python diag/docsp.py 2>/dev/null | sort -n | sed -n '1,14p'
