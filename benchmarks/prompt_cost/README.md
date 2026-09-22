@@ -145,8 +145,8 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-09-09, 39 runbooks / 98 tools (sizes are KiB). The catalog holds 39
-but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
+Measured 2026-09-18, 40 runbooks / 98 tools (sizes are KiB). The catalog holds 40
+but the selector prompt renders 39 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
 
@@ -155,9 +155,9 @@ costs the selector nothing:
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
 | system+tools stable — topic-shift | **1.0000** (enforced floor) |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~143.5 KiB, ~36.7k proxy tok |
-| tool schemas share of request | ~97.1 KiB, **67.7%**, ~24.7k tok |
-| base prompt | ~25.2 KiB, 17.6%, ~6.4k tok |
+| total request | ~143.6 KiB, ~36.6k proxy tok |
+| tool schemas share of request | ~97.1 KiB, **67.6%**, ~24.7k tok |
+| base prompt | ~25.4 KiB, 17.7%, ~6.4k tok |
 | loaded runbooks (2 active) | ~14.2 KiB, 9.9%, ~3.6k tok |
 | runbook selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 392–503 B (0–3 runbooks; 16 KiB cap) |

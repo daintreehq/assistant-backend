@@ -1,0 +1,64 @@
+# Recall and routing coverage for worktree local-environment provisioning, which
+# landed in the catalog with none. Until this file existed the selector could have
+# missed daintree.worktree.provision-local-environment on every conversation in the
+# world and the suite would still have reported a clean run.
+#
+# The user text here deliberately avoids the runbook's own trigger phrases: echoing
+# them would measure keyword overlap rather than routing. Each ground truth is
+# decidable from the whenToUse text on disk.
+
+cases:
+  # Provisioning: several worktrees, one runnable environment underneath them. Landed with no coverage,
+  # so until these existed the selector could have missed it on every conversation.
+  - id: provision-shared-database-blocks-testing
+    category: single-runbook
+    note: >-
+      The plain recall case. The user never says "provision", "lifecycle" or "setup
+      script" — they describe the symptom, which is the shape the runbook claims: several
+      checkouts, one runtime resource underneath them.
+    messages:
+      - role: user
+        content: >-
+          I've got four branches checked out but they all read and write the same
+          Postgres, so the moment two of them run migrations everything falls over.
+          Can we sort that out?
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-not-relocate-agents-already-split
+    category: routing-trap
+    note: >-
+      The bait is relocate-agents: running agents, separate checkouts, collision language.
+      Its whenToUse is for agents that SHARE a worktree and need moving; here they are
+      already one per worktree and it has not helped, because what they collide over is
+      underneath the checkouts. provision's whenToUse claims exactly that tell — a shared
+      runtime resource rather than the checkouts themselves. relocate-agents is left out
+      of required and optional, so picking it is a precision failure.
+    messages:
+      - role: user
+        content: >-
+          Each of the three agents already has its own worktree and they're still
+          standing on each other — whichever one boots last can't get the port, and
+          the other two are looking at whatever the first one seeded.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-local-not-remote-resource
+    category: routing-trap
+    note: >-
+      The bait is manage-resource: "spin up", "environment", "per worktree" are its
+      words. But its whenToUse is scoped to a project-configured REMOTE resource — a
+      cloud devbox — and the user is explicit that this is their own laptop with nothing
+      remote configured. manage-resource is excluded, so picking it is a precision
+      failure.
+    messages:
+      - role: user
+        content: >-
+          Nothing of ours is in the cloud, this is all on my laptop. I just want each
+          worktree to come up with its own copy of the stack instead of me wiring it
+          by hand every time.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
