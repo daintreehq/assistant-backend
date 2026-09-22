@@ -60,6 +60,9 @@ positives:
   - dont write it yourself, delegate it. the throttle helper needs a max-attempts arg
   - spin up a read only agent in a tab and have it trace how a request gets from the router down to the db. leave it open, i'll follow along
 boundaries:
+  - query: "write me a shell script that seeds the database"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
   - query: "Start the smoke-test agent right away in this checkout"
     run: 2026-09-09-mission-2-timers
     confusable_with: [daintree.orchestration.watch-outcome]

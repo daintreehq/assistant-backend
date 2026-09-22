@@ -62,6 +62,15 @@ positives:
   - load the perf one
   - i need four tabs going at once for this — isn't there a saved thing that does that already? use it
 boundaries:
+  - query: "open a checkout with my usual terminal layout"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: "start the dev server in this checkout"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: "run the linter here"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
   - query: "run the release recipe in a new worktree"
     run: 2026-09-11-mission-9-capability-lookup
     confusable_with: [daintree.foundation]

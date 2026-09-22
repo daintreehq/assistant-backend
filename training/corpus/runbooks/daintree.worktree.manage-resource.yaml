@@ -85,6 +85,12 @@ positives:
   - The resource action says the target is not configured even though I named another worktree.
   - Inspect the resource state without dumping credential-bearing metadata.
 boundaries:
+  - query: "how's the cloud box for this checkout doing"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: "spin up the remote sandbox for this branch"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
   - query: the gpu worktree's cloud box is parked, bring it back up
     confusable_with: [daintree.worktree.relocate-agents]
   - query: provision the remote environment for that tree

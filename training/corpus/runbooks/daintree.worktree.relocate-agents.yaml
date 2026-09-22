@@ -457,6 +457,13 @@ positives:
   - One agent is updating the submodule pointer while another needs the old submodule checked out for debugging. Give those running sessions separate branch directories.
   - Our merge plan assumes five independent branches, but the five agents are still editing one checkout. Move the same sessions into separate worktrees before the plan becomes fiction.
   - The four live roles are implementation, tests, docs, and migration, but they are all writing here. Give each role its own branch folder and retain the sessions.
+boundaries:
+  - query: "move the agents that are already running into separate checkouts"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: "these two terminals are in the same folder, split them up"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
 followups:
   - query: did they all pick it up
     history:

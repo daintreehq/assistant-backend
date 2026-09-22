@@ -37,27 +37,5 @@ positives:
   - make it so nobody has to deactivate anyone else's build to look at theirs
 
 boundaries:
-  - query: move the agents that are already running into separate checkouts
-    confusable_with: [daintree.worktree.relocate-agents]
-  - query: these two terminals are in the same folder, split them up
-    confusable_with: [daintree.worktree.relocate-agents]
-  - query: make a checkout for the billing branch
-    confusable_with: [daintree.worktree.create-plain-worktree]
-  - query: write me a shell script that seeds the database
-    confusable_with: [daintree.edits.spawn-visible-agent]
   - query: get an agent to write the provisioning scripts for me
     confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: tear down the checkouts for everything that already landed
-    confusable_with: [daintree.orchestration.workspace-cleanup]
-  - query: remove that tree and delete its branch
-    confusable_with: [daintree.orchestration.workspace-cleanup]
-  - query: how's the cloud box for this checkout doing
-    confusable_with: [daintree.worktree.manage-resource]
-  - query: spin up the remote sandbox for this branch
-    confusable_with: [daintree.worktree.manage-resource]
-  - query: open a checkout with my usual terminal layout
-    confusable_with: [daintree.recipe.run-or-create]
-  - query: start the dev server in this checkout
-    confusable_with: [daintree.recipe.run-or-create]
-  - query: run the linter here
-    confusable_with: [daintree.recipe.run-or-create]

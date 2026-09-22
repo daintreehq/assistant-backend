@@ -63,6 +63,9 @@ positives:
   - check out origin/feat/search-v2 as its own worktree
   - add worktree branch=bugfix/csv-export base=develop
 boundaries:
+  - query: "make a checkout for the billing branch"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
   - query: set up a worktree off main for the payments refactor, nothing needs to run in it yet
     confusable_with: [daintree.worktree.relocate-agents]
   - query: can you just check out release/3.2 as a worktree somewhere

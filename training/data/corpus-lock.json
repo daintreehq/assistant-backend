@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 9883,
-  "compiled_sha256": "125f7f794f4a2c0ce01597902da86efd5718d421320693e798d563205f26e6c9",
+  "rows": 9895,
+  "compiled_sha256": "9e41f6ee6ddca6cc65a7e9819dd1dad297876705ac4bd817e3e9d6e8085460a8",
   "label_space_sha256": "42c6d752bb7259c29123496348caef1b3e766a84c7e38d5bceb124d5af457e85",
   "label_space_size": 39,
   "by_source": {
     "boundary": 2086,
-    "docs": 728,
+    "docs": 740,
     "followup": 464,
     "foundation": 312,
     "foundation_boundary": 315,
@@ -23,7 +23,9 @@
   "by_run": {
     "2026-09-09-mission-2-timers": 18,
     "2026-09-11-mission-9-capability-lookup": 26,
-    "2026-09-18-worktree-provisioning": 39,
+    "2026-09-18-worktree-provisioning": 28,
+    "2026-09-22-docs-live-state": 12,
+    "2026-09-22-provision-boundary-fix": 11,
     "pre-split": 9800
   },
   "dropped": {},
@@ -72,16 +74,16 @@
       "sha256": "5d008716953145c48019ac0c6a9a497466b83462b20c8aa6f1f22775670233e8"
     },
     "runbooks/daintree.diagnostics.yaml": {
-      "examples": 205,
-      "rows": 205,
+      "examples": 217,
+      "rows": 217,
       "runbook": "daintree.diagnostics",
-      "sha256": "18cc594dd1b1cb5c9a8d40619a056b3800be24269aed3bf15dda20f30024d8ea"
+      "sha256": "45d880e24fe80b24dfb44178eda48a3faafc2b8286ac7fe3d04434aff58448c4"
     },
     "runbooks/daintree.edits.spawn-visible-agent.yaml": {
-      "examples": 223,
-      "rows": 223,
+      "examples": 224,
+      "rows": 224,
       "runbook": "daintree.edits.spawn-visible-agent",
-      "sha256": "ecdbb297f9fd0232770c51c5463f49ffd5082a0fade3f7557bc8c039adafcfef"
+      "sha256": "f654c6e8dad005094f01b3bd0198815c180aa49240df41e18117af494cda4fb8"
     },
     "runbooks/daintree.explore.repository.yaml": {
       "examples": 266,
@@ -186,16 +188,16 @@
       "sha256": "aeeea7a922e8204e205ce4a167a093ec7804e32f9753c1725479d501440f8126"
     },
     "runbooks/daintree.orchestration.workspace-cleanup.yaml": {
-      "examples": 255,
-      "rows": 255,
+      "examples": 257,
+      "rows": 257,
       "runbook": "daintree.orchestration.workspace-cleanup",
-      "sha256": "d8db75c71e56fdf82fa4a984d6fa9656f4547fba6de3b34708005faec43c256c"
+      "sha256": "7996d73bcd65dfce7639117738383ce9b0262980380d5466ad120215290db216"
     },
     "runbooks/daintree.recipe.run-or-create.yaml": {
-      "examples": 171,
-      "rows": 171,
+      "examples": 174,
+      "rows": 174,
       "runbook": "daintree.recipe.run-or-create",
-      "sha256": "fcc762408b258fdce390fb06d0fc7a4ed3e013a56f7143f0ff60aee57e52283c"
+      "sha256": "40e995efe8262999a452f934cf0e423f0d22f1a815ebb2217d1a555eb4b3e06b"
     },
     "runbooks/daintree.review.review-change.yaml": {
       "examples": 202,
@@ -240,28 +242,28 @@
       "sha256": "a67bd6e272840692402cd87b29681a821f8db340fdb5b420a9c73508b29059d4"
     },
     "runbooks/daintree.worktree.create-plain-worktree.yaml": {
-      "examples": 171,
-      "rows": 171,
+      "examples": 172,
+      "rows": 172,
       "runbook": "daintree.worktree.create-plain-worktree",
-      "sha256": "a7313931bc3f7ad90b1413c48a136eeb854141368691abf28d81ab706f52a84a"
+      "sha256": "b4d8b0c5bfb3f2e6771e09d60ddfcf3e0d25f3df97077072ab167ce40daf44e5"
     },
     "runbooks/daintree.worktree.manage-resource.yaml": {
-      "examples": 153,
-      "rows": 153,
+      "examples": 155,
+      "rows": 155,
       "runbook": "daintree.worktree.manage-resource",
-      "sha256": "f4527b0490f57c20b378d8180b1962dc0bab4ba8f7ebce66e87100c1ef51a1e1"
+      "sha256": "c42bcc288b21da4686fec6a4a589777b71e55790f2cbcc1bb723f94a484fc1f7"
     },
     "runbooks/daintree.worktree.provision-local-environment.yaml": {
-      "examples": 39,
-      "rows": 39,
+      "examples": 28,
+      "rows": 28,
       "runbook": "daintree.worktree.provision-local-environment",
-      "sha256": "d822d4d5d4b11265a61eb1d3f422a22ee8ba7c481bebf5c295460941886c4027"
+      "sha256": "30602e123593003926a6ef78598480ed28fad02af26c8d9e2c515d05b3875185"
     },
     "runbooks/daintree.worktree.relocate-agents.yaml": {
-      "examples": 676,
-      "rows": 676,
+      "examples": 678,
+      "rows": 678,
       "runbook": "daintree.worktree.relocate-agents",
-      "sha256": "603827500832a6236455a812020c0d9d782da1691cc2d038257949cdec2d8b81"
+      "sha256": "999a1a220ad79744c88a1e78b698a888473fb2399ee2b375be7b6a4c15b683bb"
     },
     "shared/boundary.yaml": {
       "examples": 30,

@@ -11,7 +11,7 @@
   "doc_max_length": 384,
   "doc_variant": "full",
   "doc_refresh": 20,
-  "routing_revision_at_train": "routing:94a3c1a6da09478b843b9b1b57d48095",
+  "routing_revision_at_train": "routing:957c10f68c09c332063265912484a9bf",
   "holdout_runbooks": [],
   "retriever_base_model": "sentence-transformers/all-MiniLM-L6-v2",
   "retriever_max_length": 256,

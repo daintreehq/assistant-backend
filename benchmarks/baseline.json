@@ -1,8 +1,8 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:3daa29daf90002f703fd58488a4aab1ed171cf33ad40ad3c8464035dc5d2ae3c",
-    "runbooks": 39
+    "revision": "sha256:3feef91ee3133bf1534b0b0b6a2d86efd07c202b290d3ff87da74a7dfee74fe9",
+    "runbooks": 40
   },
   "identity": {
     "model": "zai-org/GLM-5.3-Flash",
@@ -10,17 +10,17 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 25841,
-    "runbook_body_bytes_total": 327879,
+    "base_prompt_bytes": 25964,
+    "runbook_body_bytes_total": 343440,
     "subagent_prompt_bytes": 5552
   },
   "selector": {
     "candidates": 32,
     "ordering": "equivariant",
-    "routing_revision_at_train": "routing:94a3c1a6da09478b843b9b1b57d48095",
-    "routing_revision_matches_catalog": false,
-    "selector_onnx_bytes": 142587320,
-    "trained_runbooks": 38
+    "routing_revision_at_train": "routing:957c10f68c09c332063265912484a9bf",
+    "routing_revision_matches_catalog": true,
+    "selector_onnx_bytes": 142587340,
+    "trained_runbooks": 39
   },
   "tools": {
     "count": 98,

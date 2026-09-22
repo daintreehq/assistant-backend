@@ -419,6 +419,42 @@ near_misses:
   - nothing is responding, is the mcp link dead?
   - why is nothing responding
 docs:
+  - query: "i shared a terminal out to the fleet and nobody on the other end sees it"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "shared a terminal with the other machines and nothing turned up over there"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "i pinned an agent and it never showed up in the queue on the other box"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "broadcast a terminal to the fleet, the other side is still empty"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "handed a terminal to the fleet and nothing appeared for anyone else"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "i turned on sharing for this tab and the second machine sees nothing"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "sent the terminal across and the far side never picked it up"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "shared this session to the fleet and it didnt land anywhere"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "i enabled the fleet link and nothing is syncing between the two machines"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "put a terminal on the fleet and the other host shows an empty list"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "i shared a worktree with the fleet and the other machine cant see it"
+    run: 2026-09-22-docs-live-state
+    docs: true
+  - query: "the fleet is connected but nothing i share reaches the other side"
+    run: 2026-09-22-docs-live-state
+    docs: true
   - query: i shared a terminal and nothing showed up on the other machine
     docs: true
   - query: why isnt the copytree tool showing up this turn

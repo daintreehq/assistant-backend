@@ -36,5 +36,6 @@
   "daintree.workflow.start-work-on-issue",
   "daintree.worktree.create-plain-worktree",
   "daintree.worktree.manage-resource",
+  "daintree.worktree.provision-local-environment",
   "daintree.worktree.relocate-agents"
 ]

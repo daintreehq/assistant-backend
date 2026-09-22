@@ -62,6 +62,12 @@ positives:
   - morning. leftover from yesterday — close whatever agents are still hanging around and delete the merged worktrees
   - there's a couple of stale async waits from the overnight run, cancel those and close the terminals they were on
 boundaries:
+  - query: "tear down the checkouts for everything that already landed"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: "remove that tree and delete its branch"
+    run: 2026-09-22-provision-boundary-fix
+    confusable_with: [daintree.worktree.provision-local-environment]
   - query: delete the four worktrees we made earlier and close what's in them
     confusable_with: [daintree.worktree.relocate-agents]
   - query: tear all this down, the branches are merged
