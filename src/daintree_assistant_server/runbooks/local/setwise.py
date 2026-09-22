@@ -721,7 +721,12 @@ class SetwiseClassifier:
     #: runbook the model wants that is not currently loaded — must earn the slot
     #: when runbooks are already active: fresh turns admit at the model's word,
     #: busy turns demand real confidence.
-    NEWCOMER_FLOOR_WHEN_ACTIVE = 0.65
+    #:
+    #: 0.75 as of the 2026-09-22 retrain, up from 0.65, and re-derived rather
+    #: than carried: on this artifact 0.75 costs nothing on recall-pass at a
+    #: fixed bonus floor and buys a trial of extras back at every one of them
+    #: (measured over all 207 cases; ``training/calibrate_floors.py``).
+    NEWCOMER_FLOOR_WHEN_ACTIVE = 0.75
 
     #: The recall bonus: the same asymmetry from the other side. A turn that
     #: MISSES its runbook answers without its runbook, the worst outcome
@@ -731,22 +736,31 @@ class SetwiseClassifier:
     #: SOMETHING — an empty answer ("thanks!", off-domain chatter) stays empty,
     #: because polluting a no-task turn is how loading noise becomes the norm.
     #:
-    #: 0.45, and the number is NOT transferable — it is calibrated to this
+    #: 0.55 as of the 2026-09-22 retrain, and the number is NOT transferable —
+    #: it is calibrated to this
     #: artifact's sigmoid. The head that preceded this one shipped 0.55, and the
     #: band genuinely moved: this head is trained with a slot-level BCE over k
     #: candidates rather than a 38-way per-label one, which compresses its
     #: probabilities downward. Re-run ``training/calibrate_floors.py`` after
     #: every export rather than carrying the constant across.
     #:
-    #: Chosen at the KNEE, not the peak. Measured on the shipped int8 artifact,
-    #: recall-pass is flat at 158/169 for every floor from 0.20 to 0.45 and only
-    #: the extras move (55 at 0.20, 41 at 0.45); 0.55 gives up a case for two
-    #: fewer extras. So 0.45 is the lowest floor that is still buying something,
-    #: and everything below it is precision spent for no recall. Picking the
-    #: benchmark's peak instead would be fitting a constant to a suite that has
-    #: been inspected many times (see the caveat at the top of this file's
-    #: companion, training/EXPERIMENTS.md).
-    BONUS_FLOOR = 0.45
+    #: Chosen at the KNEE, not the peak. On the artifact this floor was last
+    #: calibrated against (207 cases, newcomer floor 0.75), recall-pass is flat
+    #: at 194 from 0.45 to 0.50 and 193 from 0.55 to 0.60, while the extras fall
+    #: 40 → 38; strict-pass moves the other way, 165 → 167, because the cases
+    #: being given up are ones the bonus was padding. 0.55 is where that stops
+    #: paying: 0.65 spends a second recall-pass case for one further extra.
+    #:
+    #: The extras figure is also the one gated (``MAX_LOCAL_EXTRA_RATE``, 0.20),
+    #: and it is measured per RUNNER: the 0.45 setting read 41/207 = 0.1981 here
+    #: and 42/207 = 0.2029 on a non-VNNI x86 CI runner, so a floor chosen at the
+    #: local knee alone lands a red build on half the fleet. 0.55 is the lowest
+    #: floor that still clears it with the int8 spread accounted for.
+    #:
+    #: Picking the benchmark's peak instead would be fitting a constant to a
+    #: suite that has been inspected many times (see the caveat at the top of
+    #: this file's companion, training/EXPERIMENTS.md).
+    BONUS_FLOOR = 0.55
 
 
 def admit(

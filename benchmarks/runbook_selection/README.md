@@ -45,7 +45,7 @@ an ANN index.
 `local` gates on **recall-pass** (every required runbook present); `run` gates on
 the exact set. That is not a softer bar chosen to make numbers work — it is each
 selector's actual contract. The local selector's `BONUS_FLOOR` admits a further
-runbook above 0.45 on purpose, because a turn that misses its runbook answers
+runbook above its floor on purpose, because a turn that misses its runbook answers
 without it while a spare runbook costs prompt bytes. Extras are designed
 behaviour here and a defect there. The strict rate is reported and gated too,
 well below the measurement, so a precision collapse still reddens the suite.
