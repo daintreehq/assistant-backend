@@ -11,10 +11,7 @@ import pytest
 from fakes import FakeProvider, make_result
 from pydantic import BaseModel, SecretStr, ValidationError
 
-from daintree_assistant_server.config import (
-    EXECUTOR_MODEL,
-    EXECUTOR_REASONING_ALLOWANCE_TOKENS,
-)
+from daintree_assistant_server.config import EXECUTOR_MODEL, EXECUTOR_REASONING_EFFORT
 from daintree_assistant_server.contracts.tasks import (
     CompactedAgentOut,
     ContextCompactOutput,
@@ -72,28 +69,17 @@ async def test_terminal_summarize_text(task_runner: TaskRunner, fake_provider: F
 async def test_utility_task_runs_non_thinking_without_headroom(
     task_runner: TaskRunner, fake_provider: FakeProvider, settings
 ) -> None:
-    # Utility tasks request the FLOOR (INTERACTIVE_THINKING_ENABLED is False):
-    # bounded extraction/classification over text the client already gathered.
-    #
-    # The max_tokens assertion is the load-bearing half, and what it guards moved
-    # with the serving model. The 4k thinking headroom exists to stop a
-    # chain-of-thought starving the answer, and handing it to a task that is not
-    # deliberately thinking would give it 4k of slack to spend on VISIBLE output —
-    # silently overrunning the cap its profile set. That must still not happen.
-    #
-    # But the floor is not zero on this model, and reasoning shares max_tokens
-    # with the answer, so the cap now carries a SMALL allowance
-    # (EXECUTOR_REASONING_ALLOWANCE_TOKENS) to give the profile back the visible
-    # budget it intended. Both bounds are asserted: enough to cover the reasoning,
-    # nowhere near the thinking headroom.
+    # Utility tasks think at the one serving posture (INTERACTIVE_THINKING_ENABLED
+    # is True). Reasoning shares max_tokens with the answer, so the cap carries
+    # the thinking headroom on top of the profile's visible budget — otherwise a
+    # chain of thought would starve the answer into a `length` truncation.
     fake_provider.complete_result = make_result(content="Tests are green.")
     await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
     req = fake_provider.requests[-1]
-    assert req.thinking_disabled is True
-    assert req.reasoning_effort is None
+    assert req.thinking_disabled is False
+    assert req.reasoning_effort == EXECUTOR_REASONING_EFFORT
     profile = task_runner.profiles["terminal_summarize"]
-    assert req.max_tokens == profile.max_output_tokens + EXECUTOR_REASONING_ALLOWANCE_TOKENS
-    assert req.max_tokens < settings.thinking_headroom_tokens
+    assert req.max_tokens == profile.max_output_tokens + settings.thinking_headroom_tokens
     # And a cache-affinity key keyed by TASK, not by caller: a utility task is one
     # self-contained call over text the client supplied, so the calls that share a
     # prefix are the ones that share a task id. Per task rather than one key for

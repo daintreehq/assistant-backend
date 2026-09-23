@@ -60,7 +60,7 @@ see; `enforce` requires one. All three are built and tested
 (`tests/integration/test_account_auth.py`), and the question this entry used to
 pose — whether an authenticated caller spends Daintree's key or brings their own —
 is answered: an account is an ENTITLEMENT. `Principal` carries an identity and no
-credential, and the server funds every turn from `BASETEN_API_KEY` regardless.
+credential, and the server funds every turn from `OPENAI_API_KEY` regardless.
 
 What is left on THIS side is not code — but two entries below are, and they are
 sequenced into the list:
@@ -539,20 +539,21 @@ Doing (3) alone is what created the contradiction in the first place.
 **Trigger: the next selector retrain, if calibration is added to it.** Not
 scheduled on its own.
 
-The serving model runs at its reasoning FLOOR on every call. The wanted behaviour
-is that it reasons harder when routing is weak — no runbook, or one the classifier
-is unsure of — and stays at the floor when a runbook matches cleanly, so quality is
-bought only where it is needed.
+The serving model (gpt-6-luna on OpenAI) runs at ONE fixed effort, `medium`, on
+every call (`config.EXECUTOR_REASONING_EFFORT`, sent as `reasoning: {"effort": …}`
+by `providers/openai.py`). The wanted behaviour is that it reasons harder when
+routing is weak — no runbook, or one the classifier is unsure of — and less when a
+runbook matches cleanly, so quality is bought only where it is needed.
 
-**The move to GLM-5.3-Flash changed the shape of this, and mostly in its favour.**
-The mechanism used to be "stop sending the disable"; it is now "raise
-`reasoning_effort` from `low` to `high` or `max`", which is a graded dial rather
-than a binary and is exactly what a confidence signal would want to drive.
-`config.EXECUTOR_REASONING_EFFORT` sets the floor and the adapter already sends the
-field on every call, so the plumbing is a per-request override away. Note the
-default cuts the other way now: an omitted field means `high`, so the risk of a
-bug here is an accidentally EXPENSIVE server rather than an accidentally dumb one.
-What is still missing is a trustworthy input.
+**The dial is wider on this model than on any before it.** gpt-6-luna accepts
+`none | low | medium | high | xhigh`, and `none` is a genuine off switch — so a
+confidence signal could move effort in EITHER direction from `medium`, not only up
+from a floor (the GLM-5.3-Flash constraint, where `none` was rejected and an
+omitted field meant `high`, is history). The adapter already sends the field on
+every call, so the plumbing is a per-request override away; today it deliberately
+ignores `thinking_disabled` and forced-tool paths, because one posture is the
+product decision and a second one would be a tier by another name. Deciding to
+vary it reopens that decision. What is still missing is a trustworthy input.
 
 `SelectionDecision.confidence` is not it, and that is measured rather than
 suspected — see "Selector confidence cannot gate reasoning" in
@@ -624,21 +625,24 @@ added beside it.
 
 ---
 
-## Retire the old upstream secret and its IAM grant
+## Retire the old upstream secrets and their IAM grants
 
-**Trigger: after the Baseten rollback window closes.**
+**Trigger: after the OpenAI rollback window closes.**
 
 `infra/gcp/bootstrap.sh` is additive by design, so an UPGRADED project still
-carries what the previous executor needed: a `together-api-key` secret holding a
-live Together credential, and a runtime-service-account accessor binding on it.
-Neither is referenced any more — `cloudbuild.yaml` mounts `baseten-api-key` — so
-the script's claim at the top of its IAM section that the runtime account can read
-"exactly the secrets it mounts" is currently false on such a project.
+carries what the previous executors needed: a `baseten-api-key` secret (the
+GLM-5.3-Flash host, replaced by OpenAI) and, on older projects, a
+`together-api-key` one — each holding a live vendor credential, each with a
+runtime-service-account accessor binding. Neither is referenced any more —
+`cloudbuild.yaml` now mounts `openai-api-key` — so the script's claim at the top of
+its IAM section that the runtime account can read "exactly the secrets it mounts"
+is currently false on such a project.
 
-Nothing breaks while it sits there; it is a live vendor credential readable by the
-service for no reason, which is the kind of thing that is only ever noticed by an
-audit. To close it: revoke the binding, then disable (not delete) the secret
-versions, then delete the secret once a rollback to Together is off the table.
+Nothing breaks while they sit there; each is a live vendor credential readable by
+the service for no reason, which is the kind of thing that is only ever noticed by
+an audit. To close it: revoke the bindings, then disable (not delete) the secret
+versions, then delete the secrets once a rollback to Baseten (or Together) is off
+the table. Revoke the Baseten key at the vendor too.
 
 Related, and cheap to fix in the same pass: `has_version()` accepts a version in
 ANY state, so a secret whose only version is DISABLED reports as ready and then
@@ -653,7 +657,9 @@ fails at the Cloud Run mount. Filter on `state: ENABLED`.
 `benchmarks/_harness/wire.py::cacheable_region_bytes` models the serialization
 ORDER of DeepSeek V4 Flash's chat template — [all system messages] → [tools] →
 [conversation] — which is what made the assembly-order work measurable. The
-serving model is `zai-org/GLM-5.3-Flash` now and its template has not been
+serving model is `gpt-6-luna` on OpenAI's Responses API now: the adapter sends
+system rows as `input` items and `tools` as a separate top-level field, and how the
+host serializes those for its prefix cache is not documented and has not been
 checked against that assumption.
 
 The exact-serialization half of that module is host-agnostic and still exact, and
@@ -661,51 +667,49 @@ prefix caching is still literal-prefix matched, so the metric stays directionall
 useful and the assembly-order rules it justified are still sound. What is no
 longer safe is quoting a cache-region byte count as a fact about production.
 
-## Re-establish the privacy claim against Baseten
+## Re-establish the privacy claim against OpenAI
 
 **Trigger: before any external statement about data handling.** Blocking for that,
 not for engineering.
 
 `docs/PROVIDER_POLICY.md` §4 carries Daintree's no-training claim. Under OpenRouter
 the server ENFORCED it per request (`data_collection: "deny"` plus endpoint
-filtering). A single host has no such lever, so the claim now rests entirely on the
+filtering). A single host has no such lever, so the claim rests entirely on the
 host's published policy — which makes the identity of the host a privacy fact.
 
-**The executor host has now changed TWICE since this entry was written, so any
-reading already done is void.** It was Cerebras, then Together AI, and is now
-Baseten (with Z.ai's weights rather than DeepSeek's) — a different company's terms
-each time. Notes taken against Together say nothing about Baseten.
+**The executor host has changed again, so any reading already done is void.** It
+was Cerebras, then Together AI, then Baseten, and is now OpenAI (`gpt-6-luna`). A
+different company's terms each time; nothing read against an earlier host carries.
 
-The section was written when Cerebras was the sole serving host and still cites
-Cerebras's trust centre. That is no longer the whole picture rather than simply
-wrong: Baseten now answers every executor/utility turn, and Cerebras has RETURNED
-in a narrower role — it writes the fast-response preamble on eligible streaming
-turns (`FAST_RESPONSE_MODEL`), on every eligible turn. Nobody has read either host's terms
-and rewritten this section, so it stays marked unverified rather than re-vendored:
-swapping in a confident guarantee nobody had checked would be the worst possible
-form of this document to be wrong.
+OpenAI's own published position is the starting point, not the conclusion:
+<https://openai.com/enterprise-privacy/> and
+<https://platform.openai.com/docs/guides/your-data>. As published, API data is not
+used for training by default, inputs and outputs may be kept for abuse monitoring
+for up to 30 days, and `store: false` (which every call sends) only means a
+response is not kept for later retrieval. What has NOT been done is confirming
+that against the account tier Daintree actually runs on, including whether any
+zero-data-retention arrangement applies — so §4 stays marked unverified.
 
-To close it: read <https://www.baseten.co/privacy-policy/> and
-<https://www.baseten.co/terms-and-conditions/>, and do the same for Cerebras's current
-terms (not the old trust-centre citation — re-read it, since the relationship
-changed). State what each host actually commits to (training, retention, caching,
-sub-processors) for the content it actually receives, and say plainly which parts
-Daintree can promise and which are each host's to change. This is now a two-host
-privacy statement, not a one-host swap.
+Cerebras still matters: it receives nothing while `FAST_RESPONSE_ENABLED` is
+False, and its terms have to be read before that flag moves, not after.
 
-**And it is now a THREE-host statement, with the newest one the hardest.** The
-executor fallback (`docs/PROVIDER_POLICY.md` §1a) sends the FULL request — prompt,
-runbook bodies, tool schemas, conversation — to OpenRouter on every turn Baseten
-could not answer. Unlike Cerebras's, that path is not waiting on a flag: it runs
-the moment the primary has an incident. OpenRouter is a ROUTER, so its own terms
-are not the end of the question — the endpoint that actually serves the turn has
-terms too, and `sort: "latency"` means which one that is varies per request
-(Modal, Makora, Together and Parasail all answered during one afternoon of
-testing). This server used to bound exactly that with `data_collection: "deny"`
-and sends nothing of the sort today. Whether the fallback should carry it back is
-a decision that belongs WITH this reading rather than ahead of it: adding the
-filter narrows the pool, and narrowing the pool on the path that exists because
-the preferred host is already down is not obviously the right trade.
+**The hardest part is the fallback.** The executor fallback
+(`docs/PROVIDER_POLICY.md` §1a) sends the FULL request — prompt, runbook bodies,
+tool schemas, conversation — to OpenRouter on every turn OpenAI could not answer,
+and that path runs the moment the primary has an incident. OpenRouter is a ROUTER,
+so its own terms (<https://openrouter.ai/privacy>, <https://openrouter.ai/terms>)
+are not the end of the question: with OpenAI excluded, the pool serving
+`openai/gpt-6-luna` is **Azure and Amazon Bedrock**, and `sort: "latency"` means
+which of them answers varies per request. Both have their own data-handling terms
+for hosted OpenAI models, and neither has been read. This server used to bound
+exactly this with `data_collection: "deny"` and sends nothing of the sort today.
+Whether the fallback should carry it back is a decision that belongs WITH this
+reading rather than ahead of it: adding the filter narrows a two-endpoint pool on
+the path that exists because the preferred host is already down.
+
+To close it: state what each host actually commits to (training, retention,
+caching, sub-processors) for the content it actually receives, and say plainly
+which parts Daintree can promise and which are each host's to change.
 
 ## Shed context instead of only refusing it
 
@@ -758,7 +762,8 @@ admission mismatches (9/12), including one potentially useful alternate resource
 runbook. Preserve those cases as evidence rather than editing their expected
 answers to claim a routing improvement.
 
-Live Baseten diagnostic trials and Go-client HTTP/SSE checks are recorded in
+Live diagnostic trials (historical: run against the previous Baseten/GLM-5.3-Flash
+executor, so they say nothing about gpt-6-luna) and Go-client HTTP/SSE checks are recorded in
 [the application report](docs/INTELLIGENCE_REPORT_APPLICATION.md); they exposed
 supervision-precondition failures, fixture gaps and an outdated CLI capability
 assertion. They do not establish a paired improvement or release qualification.
@@ -874,12 +879,11 @@ evidence, reconciliation over a small state ledger — but nothing has tested th
 
 **Trigger: with the live provider-contract suite below.**
 
-**Partly closed by the move to Baseten.** `config.EXECUTOR_CONTEXT_TOKENS` is now
-1,048,576, and unlike the previous entry that figure was READ FROM THE HOST —
-Baseten's `/v1/models` publishes `context_length` (and `max_completion_tokens`:
-131,072) for this model. That is strictly better evidence than the old value had
-(DeepSeek's published figure for weights served elsewhere, never asked of
-Together).
+`config.EXECUTOR_CONTEXT_TOKENS` is now **1,050,000** for gpt-6-luna — the figure
+every endpoint OpenRouter lists for the model publishes. It was NOT read from
+OpenAI itself and has not been probed. (Historically: the Baseten/GLM-5.3-Flash
+value, 1,048,576, was read from that host's own `/v1/models`, which was stronger
+evidence than this one is.)
 
 What remains open is the same thing as before: nobody has asked the endpoint what
 it will actually ACCEPT. So `exceeds_window` still refuses only when the input
@@ -900,8 +904,9 @@ the difference is the template's real cost).
 
 Related and unpinned in the same way: `_CONTEXT_LENGTH_MARKERS` in
 `providers/openrouter.py` matches the host's length-rejection prose by guess, and
-those markers were written for Together's wording, not Baseten's. One deliberately
-oversized live request settles what this host actually says — and with the window
+those markers were written for Together's wording and never checked against
+OpenAI's Responses API, whose error body is a different shape again. One
+deliberately oversized live request settles what this host actually says — and with the window
 now at 1M tokens, the upstream's own rejection is the limit that will fire in
 practice, which makes matching its prose more load-bearing than before, not less.
 
@@ -1003,7 +1008,8 @@ Owed, in the order the risk runs:
    shows the leak at **1 in 8 turns on the same request with no intervention
    present**, so it is a pre-existing, intermittent DeepSeek behaviour that the
    small samples happened to straddle. **That measurement is now about a model
-   that no longer serves** — the executor is GLM-5.3-Flash on Baseten, and whether
+   that no longer serves** — the executor is gpt-6-luna on OpenAI's Responses API
+   (native `function_call` items rather than text-embedded tool syntax), and whether
    it leaks tool-call syntax at all, let alone at 1 in 8, is unmeasured. Re-run
    before treating the rate as current. It is a real bug — see the separate entry
    below — but it is not a reason those attempts failed, and it must not be used
@@ -1077,8 +1083,10 @@ training export is taken seriously.**
 
 `ModelInvocationTrace.wire_request_ref` is defined and always `None`.
 `request_ref` holds the NORMALIZED `ProviderChatRequest`, which is not what the
-provider saw: the adapter renames `max_tokens`, Baseten adds its `reasoning_effort`
-object, Cerebras uses `max_completion_tokens`, and `cache_session_id` is dropped.
+provider saw: the OpenAI adapter rebuilds the whole body in the Responses shape
+(`input` items, `max_output_tokens`, `reasoning: {"effort": …}`, `store: false`,
+`prompt_cache_key`, and no `temperature`/`stop`), the fallback drops the affinity
+key and adds a `provider` block, and Cerebras uses `max_completion_tokens`.
 A replay built from the normalized form is confidently wrong about the request.
 
 The fix is the observer hook the design already anticipates
@@ -1113,16 +1121,24 @@ before the next model or host change.**
 `tests/live/` is EMPTY. The suite that lived there pinned the CEREBRAS wire —
 which parameters were accepted, which were rejected with a 400, the flat error
 body, and that the serving model reported zero reasoning tokens — and it was
-deleted with that adapter, correctly: every one of those rules was the opposite
-of, or absent from, what Baseten wants.
+deleted with that adapter, correctly. Two hosts have served since (Baseten, now
+OpenAI), and neither got a replacement.
 
-Nothing replaced it, so these are now remembered rather than checked:
+Nothing replaced it, so these OpenAI facts — each measured by hand on 2026-09-23
+and written into `providers/openai.py` — are remembered rather than checked:
 
-- that `reasoning_effort: "low"` holds GLM-5.3-Flash near zero reasoning. Hand
-  measurement says 1 of 6 trials on one prompt (§2 of the provider policy); it is
-  a FLOOR rather than an off switch, so unlike the old `{"enabled": false}` claim
-  this one can drift upward on harder prompts without anything breaking;
-- **answered by hand, still unpinned:** Baseten reports NO billed `cost` on either
+- that the host is STRICT: an unknown top-level parameter answers 400, and this
+  model also refuses `temperature` (other than the default), `stop` and chat's
+  `max_tokens` spelling. The adapter builds the body from scratch so none of them
+  is sent; a suite should prove each is still refused, and still not sent;
+- that `/v1/chat/completions` refuses function tools combined with any
+  `reasoning_effort` other than `none` for this model — the whole reason the
+  adapter speaks the Responses API. If that ever lifts, the translation layer
+  becomes optional; if `/v1/responses` ever gains the same restriction, every
+  turn breaks;
+- that `reasoning: {"effort": "medium"}` is accepted alongside tools and a forced
+  `tool_choice`, and that function tools must go `strict: false` explicitly;
+- **answered by hand, still unpinned:** OpenAI reports NO billed `cost` on either
   the streaming or the non-streaming path, so every cost field in a response is
   absent (§5c). A suite should hold that, since a host quietly starting to report
   it would silently change what the accounting chain publishes;
@@ -1148,6 +1164,51 @@ where the first turn after a bad deploy tells you.
 A mocked test proves the adapter builds what we THINK the API wants. Only a live
 one proves the API agrees, and the gap is widest right after a host change —
 which is exactly when this one was removed.
+
+## Replay reasoning items across rounds
+
+**Trigger: evidence that multi-round tool turns lose their plan between rounds —
+or a latency/cost measurement showing re-reasoning is a real share of a turn.**
+
+`providers/openai.py` does not carry reasoning forward. Every call is
+`store: false`, so nothing is retained at OpenAI to reference by id, and the CLI
+round-trips only visible content and tool calls — so each continuation round
+starts from the transcript and re-reasons from scratch, at `medium`, every time.
+The Responses API offers the fix: request `include: ["reasoning.encrypted_content"]`,
+return the encrypted reasoning items to the client, and send them back as `input`
+items on the next round. That is a wire-contract change on both sides (a new
+opaque field on assistant turns, round-tripped verbatim like the old
+`reasoning_content`), so it lands in lockstep with the CLI, and it has to be
+dropped on the fallback path — an encrypted item OpenAI issued is meaningless to
+Azure or Bedrock behind OpenRouter.
+
+## Re-measure confirmation pacing against gpt-6-luna
+
+**Trigger: before tuning any confirmation timing, and at the next latency pass.**
+
+`CONFIRMATION_LEAD_IN_SECONDS` (0.2s) and `CONFIRMATION_PACING_SECONDS` (1.0s) sum
+to a 1.2s budget that was measured with `benchmarks/executor_window` against the
+PREVIOUS executor (first delta of any kind: p50 1.26s, p90 1.52s). gpt-6-luna on
+the Responses API, reasoning at `medium` on every call, is a different first-delta
+distribution — likely later, since reasoning now precedes every visible byte, but
+unmeasured. Overrunning is free (the executor's arrival flushes the rest), so a
+wrong number costs polish rather than latency — but the budget should sit on the
+new median, not the old one. Re-run `executor_window` with spacing, then move the
+constants and the CLAUDE.md numbers together.
+
+## Remove `generation.temperature` and `generation.stop` from the wire
+
+**Trigger: the next CLI release that touches the respond request.** In lockstep
+with the CLI; nothing on this side alone.
+
+`/v1/daintree/respond` still accepts `generation.temperature` and
+`generation.stop`, and they still flow into the normalized `ProviderChatRequest`.
+gpt-6-luna refuses both (a 400 on this host), so `providers/openai.py` never sends
+them and the OpenRouter fallback pops them — which means a caller setting either
+is silently ignored. A parameter that is accepted and does nothing is worse than
+a rejected one. Delete the fields from the request contract and
+`docs/DAINTREE_API.md`, drop them from the CLI in the same change, and let the
+`extra="forbid"` models reject a stale client loudly.
 
 ## Assert the fallback posture in release smoke
 

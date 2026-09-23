@@ -216,13 +216,13 @@ def test_capabilities(client, auth, app) -> None:
     assert "join_separator" not in fast
     # ...and it never names the provider or the model behind it.
     rendered = json.dumps(fast).lower()
-    for internal in ("cerebras", "gemma", "gpt-oss", "glm", "zai", "baseten"):
+    for internal in ("cerebras", "gemma", "gpt-oss", "glm", "zai", "baseten", "openai", "luna", "gpt-6"):
         assert internal not in rendered
     # Hardcoded posture, not config. Asserted as a literal rather than against the
     # constant on purpose: this field is a wire contract the CLI gates its thinking UI
     # on, so the test must fail — and force the CLI to be updated in lockstep — when
-    # the posture moves, not silently track it.
-    assert body["respond"]["thinking_enabled"] is False
+    # the posture moves, not silently track it. (No CLI build reads it today.)
+    assert body["respond"]["thinking_enabled"] is True
     assert body["respond"]["multimodal_images"]["remote_urls"] is False
     # Exact set, not a count: the ids are a frozen wire contract the Go CLI hardcodes
     # (internal/backend/tasks.go + workflowtasks.go). A count-only assertion passed
@@ -611,7 +611,7 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
     from daintree_assistant_server.main import create_app
 
     settings = Settings(**{
-        "ENVIRONMENT": "development", "BASETEN_API_KEY": "",
+        "ENVIRONMENT": "development", "OPENAI_API_KEY": "",
         "STATE_SIGNING_KEY_CURRENT": "sk", "STATE_SALT": "x",
     })
     app = create_app(settings=settings)  # real lifespan (no injected provider)
@@ -632,7 +632,7 @@ def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
-        BASETEN_API_KEY="sk-server-owned",
+        OPENAI_API_KEY="sk-server-owned",
         CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
@@ -661,7 +661,7 @@ def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
-        BASETEN_API_KEY="sk-server-owned",
+        OPENAI_API_KEY="sk-server-owned",
         CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",

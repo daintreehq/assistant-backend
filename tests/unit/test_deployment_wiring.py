@@ -225,7 +225,7 @@ def _validation_script() -> str:
     )
     body: str = step["args"][-1]
     start = body.index("# And the SHAPE of that URL")
-    end = body.index("# baseten-api-key is REQUIRED", start)
+    end = body.index("# openai-api-key is REQUIRED", start)
     block = body[start:end]
     # Extraction lifts the block OUT of its control flow, so on its own this
     # proves the rules work and not that the build runs them. A block placed
@@ -449,7 +449,7 @@ def test_the_build_refuses_a_sample_of_what_readiness_refuses() -> None:
         "https://staging.daintree.org/API/assistant/entitlement",
     ):
         settings = Settings(
-            BASETEN_API_KEY="tgp_v1_test-key",
+            OPENAI_API_KEY="tgp_v1_test-key",
             STATE_SIGNING_KEY_CURRENT="test-signing-key",
             ENVIRONMENT="staging",
             DAINTREE_ENTITLEMENT_URL=url,
@@ -471,7 +471,7 @@ def test_the_build_and_readiness_agree_on_the_one_url_that_should_ship() -> None
 
     url = "https://staging.daintree.org/api/assistant/entitlement"
     settings = Settings(
-        BASETEN_API_KEY="tgp_v1_test-key",
+        OPENAI_API_KEY="tgp_v1_test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         ENVIRONMENT="staging",
         DAINTREE_ENTITLEMENT_URL=url,
@@ -1487,7 +1487,7 @@ def test_the_build_and_readiness_agree_about_the_origin_in_every_environment(
         build_ok = _validate_url(url, environment).returncode == 0
         settings = Settings(  # type: ignore[call-arg]
             STATE_SIGNING_KEY_CURRENT="sk",
-            BASETEN_API_KEY="sk-test",
+            OPENAI_API_KEY="sk-test",
             CEREBRAS_API_KEY="csk-test",
             ENVIRONMENT=environment,
             DAINTREE_ENTITLEMENT_URL=url,
@@ -1644,7 +1644,7 @@ def _run_posture_gate(
             "ENTITLEMENT_MODE": entitlement_mode,
             "DAINTREE_ENTITLEMENT_URL": entitlement_url,
             "STAGING_SUBJECT_GATE_REVISION": gate_revision,
-            "SECRET_FLAGS": "BASETEN_API_KEY=baseten-api-key:latest",
+            "SECRET_FLAGS": "OPENAI_API_KEY=openai-api-key:latest",
             "IAM_PUBLIC": public,
             "SERVICE_EXISTS": service_exists,
             "IAM_READABLE": iam_readable,

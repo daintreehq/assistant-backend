@@ -88,12 +88,11 @@ FLOORS: dict[str, int] = {
     # here is a raw identifier reaching a log pipeline.
     "src/daintree_assistant_server/services/account_context.py": 100,
     "src/daintree_assistant_server/providers/base.py": 92,
-    # The SERVING adapter's implementation. `providers/baseten.py` subclasses it
-    # and changes three class attributes plus a key decoder and the thinking
-    # posture, so this is where
-    # almost every line a real request executes actually lives — it holds the
-    # credential, scrubs it out of echoed upstream error bodies, and owns the
-    # error taxonomy the CLI branches on.
+    # The parent of the SERVING adapter. `providers/openai.py` subclasses it and
+    # replaces the wire (body, result and stream translation), but everything
+    # else a real request executes lives here — it holds the credential, scrubs it
+    # out of echoed upstream error bodies, and owns the error taxonomy the CLI
+    # branches on.
     #
     # 88 rather than a sibling's 92 because the mid-stream transport-failure
     # handlers are awkward to drive through a mock transport, not because less of
@@ -102,12 +101,10 @@ FLOORS: dict[str, int] = {
     # this line until that adapter was deleted; the runner fails on a named file
     # that does not exist, which is how it was caught.)
     "src/daintree_assistant_server/providers/openrouter.py": 88,
-    # The SERVING adapter. On this list for the same reason Cerebras is: it holds
-    # the server credential, and its whole job is the handful of ways its body
-    # differs from the parent — the `reasoning_effort` floor above all, where a
-    # regression is not an error but a silently more expensive server on every
-    # turn. Nothing else would catch that.
-    "src/daintree_assistant_server/providers/baseten.py": 97,
+    # The SERVING adapter. It holds the server credential and translates every
+    # request and response to OpenAI's Responses API, so a regression here is a
+    # failed turn on a strict host — or a stream the orchestrator misreads.
+    "src/daintree_assistant_server/providers/openai.py": 97,
     # The FAST-RESPONSE adapter. On this list because it holds the second server
     # credential and because its whole job is a body that differs from the parent
     # in three specific ways — a regression in any of them is silent on the wire.

@@ -1,5 +1,10 @@
 # Intelligence report application — 5 September 2026
 
+> **Dated record (added 23 September 2026).** Every mention of Baseten below is
+> historical: at the time of this record the executor was GLM-5.3-Flash on
+> Baseten. The serving host is now OpenAI (`gpt-6-luna`); see
+> [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) for the current identity.
+
 Reviewed the complete 1,523-line **Daintree Assistant: Backend Intelligence and
 Runbook Roadmap**, supplied as `daintree-backend-intelligence-report.md` (SHA-256
 `004a670d3c4c7ad42732120b1ff9f6c65a14a819b9d287c3086e207991d50ab1`). This records the selected implementation, not a claim that the
@@ -30,7 +35,8 @@ qualification harness. The catalog remains at 39 entries.
 The README and `dev` wrapper’s remaining mandatory-Cerebras setup instructions
 and warning were corrected
 against the current disabled fast-response stage and readiness checks. Baseten
-remains required; OpenRouter supplies optional failover.
+was then the required executor key (it is now `OPENAI_API_KEY`); OpenRouter
+supplies optional failover.
 
 The permanent prompt also stops telling an unattended actor to simply decide a
 missing user choice, and requires task evidence before claiming async success.

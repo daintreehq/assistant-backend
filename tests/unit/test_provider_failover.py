@@ -110,10 +110,10 @@ def test_the_fallback_sorts_the_endpoint_pool_by_latency() -> None:
 
 
 def test_the_fallback_excludes_the_primary_from_its_own_pool() -> None:
-    """Routing back to Baseten through a second hop cannot help.
+    """Routing back to OpenAI through a second hop cannot help.
 
-    OpenRouter serves these weights from Baseten among nineteen others. This
-    adapter only runs BECAUSE Baseten just failed, so that one endpoint is
+    OpenRouter serves these weights from OpenAI, Azure and Bedrock. This
+    adapter only runs BECAUSE OpenAI just failed, so that one endpoint is
     guaranteed to buy a slower copy of the failure that already happened —
     turning a genuine second opinion into a retry wearing a different hostname.
     """
@@ -140,24 +140,42 @@ def test_the_fallback_still_allows_openrouter_s_own_second_choice() -> None:
     assert _body(_fallback_provider())["provider"]["allow_fallbacks"] is True
 
 
-def test_the_fallback_pins_the_same_reasoning_floor_as_the_primary() -> None:
+def test_the_fallback_pins_the_same_reasoning_effort_as_the_primary() -> None:
     """The point of this host is to be a SUBSTITUTE, not a second product.
 
-    GLM-5.3-Flash cannot be run non-thinking on any host, and an omitted effort
-    means `high`. So the parent's `{"enabled": false}` — correct for a model that
-    can be held down — is here either expensive or undefined, and either way the
-    fallback would answer differently from the primary it stands in for.
+    A fallback that reasoned differently would answer differently from the
+    primary it stands in for, so it sends the primary's one effort whatever the
+    request says.
     """
     body = _body(_fallback_provider(), thinking_disabled=True)
     assert body["reasoning"] == {"effort": EXECUTOR_REASONING_EFFORT}
     assert "enabled" not in body["reasoning"]
 
 
-def test_an_explicit_effort_is_honoured_over_the_floor() -> None:
+def test_an_empty_exclusion_list_sends_no_ignore_field() -> None:
+    """`ignore: []` is not "exclude nothing" to every router; omit it instead."""
+    body = _body(_fallback_provider(ignore_providers=()))
+    assert "ignore" not in body["provider"]
+
+
+def test_the_fallback_never_sends_parameters_the_model_refuses() -> None:
+    """Under `require_parameters`, an unsupported field filters the pool to empty.
+
+    gpt-6-luna refuses `temperature` and `stop` on every endpoint, so sending
+    either would leave OpenRouter no endpoint at all — a fallback that fails
+    precisely when it is needed.
+    """
+    body = _body(_fallback_provider(), temperature=0.2, stop=["x"])
+    assert "temperature" not in body
+    assert "stop" not in body
+
+
+def test_a_requested_effort_does_not_open_a_second_posture() -> None:
+    """The primary ignores a per-request effort; the fallback must too."""
     body = _body(
         _fallback_provider(), thinking_disabled=False, reasoning_effort="high"
     )
-    assert body["reasoning"] == {"effort": "high"}
+    assert body["reasoning"] == {"effort": EXECUTOR_REASONING_EFFORT}
 
 
 def test_the_ordinary_openrouter_adapter_still_sends_no_routing_block() -> None:
@@ -314,7 +332,7 @@ def _pair(clock: _Clock | None = None) -> tuple[_Host, _Host, FailoverProvider]:
             primary,
             fallback,
             fallback_model=EXECUTOR_FALLBACK_MODEL,
-            primary_name="baseten",
+            primary_name="openai",
             fallback_name="openrouter",
             health=health,
         ),
@@ -882,7 +900,7 @@ async def test_a_caller_pinned_credential_never_reaches_the_other_host() -> None
     """A per-call key is scoped to the host it was issued for.
 
     The adapter prefers a request's own key over its configured default, so
-    carrying one across would take a caller's Baseten credential and send it as a
+    carrying one across would take a caller's OpenAI credential and send it as a
     Bearer token to OpenRouter — disclosing a secret to a third party, on the one
     path nobody is watching because it only runs during an outage. Nothing on the
     serving path pins a key today; the field is kept live for the
@@ -894,7 +912,7 @@ async def test_a_caller_pinned_credential_never_reaches_the_other_host() -> None
         ProviderChatRequest(
             model=EXECUTOR_MODEL,
             messages=[{"role": "user", "content": "hi"}],
-            api_key=SecretStr("a-baseten-scoped-key"),
+            api_key=SecretStr("an-openai-scoped-key"),
         )
     )
     assert fallback.requests[0].api_key is None
@@ -1258,7 +1276,7 @@ def _settings(**overrides: Any) -> Any:
     base = {
         "STATE_SIGNING_KEY_CURRENT": "k" * 40,
         "STATE_SALT": "s" * 40,
-        "BASETEN_API_KEY": "baseten-key",
+        "OPENAI_API_KEY": "openai-key",
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
@@ -1277,7 +1295,7 @@ def test_without_a_second_credential_the_deployment_is_exactly_what_it_was() -> 
     CORRECT deployment rather than a broken one — and what it gets must be the
     bare adapter, not a wrapper standing in front of nothing."""
     from daintree_assistant_server.main import _build_provider
-    from daintree_assistant_server.providers.baseten import BasetenProvider
+    from daintree_assistant_server.providers.openai import OpenAIProvider
 
     provider = _build_provider(_settings())
-    assert isinstance(provider, BasetenProvider)
+    assert isinstance(provider, OpenAIProvider)

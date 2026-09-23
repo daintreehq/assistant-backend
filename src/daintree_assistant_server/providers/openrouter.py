@@ -902,9 +902,7 @@ class OpenRouterProvider:
         # and latency on a call whose whole purpose is to be cheap. This is the
         # exact inverse of the retired Cerebras adapter, where the wire has no
         # field that could express the disable and omission IS the posture. The
-        # Baseten subclass pops this object again: the model it serves cannot be
-        # run non-thinking at all, so the only control is a `reasoning_effort`
-        # floor.
+        # OpenAI subclass builds its own body and never sends this object.
         if request.thinking_disabled:
             body["reasoning"] = {"enabled": False}
         elif request.reasoning_effort:
@@ -1045,10 +1043,9 @@ class OpenRouterProvider:
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stream=False,
-            # A forced tool_choice and a chain-of-thought are an awkward pair on
-            # every model this server has run against, and the caller wants one
-            # object back rather than reasoning about it. Pin it non-thinking
-            # regardless of what the caller requested.
+            # The caller wants one object back rather than reasoning about it, so
+            # ask for the least thinking this adapter's host allows (an adapter
+            # with a single fixed posture, like the OpenAI one, sends that).
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=request.timeout,
@@ -1117,7 +1114,12 @@ class OpenRouterProvider:
                 detail=detail,
             )
             raise self._map_http_error(response.status_code, response.headers, detail)
-        return OpenRouterStream(ctx, response, request.model)
+        return self._make_stream(ctx, response, request.model)
+
+    def _make_stream(self, ctx: Any, response: httpx.Response, model: str) -> ProviderStream:
+        """The stream wrapper for an opened response — a seam for a host whose
+        SSE events are not chat-completion chunks (``providers/openai.py``)."""
+        return OpenRouterStream(ctx, response, model)
 
     async def aclose(self) -> None:
         await self._client.aclose()

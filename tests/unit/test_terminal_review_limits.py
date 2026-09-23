@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from fakes import FakeProvider, make_result
 
-from daintree_assistant_server.config import EXECUTOR_REASONING_ALLOWANCE_TOKENS
 from daintree_assistant_server.contracts.tasks import MAX_TASK_OUTPUT_TOKENS, TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.task_runner import TaskRunner
@@ -28,7 +27,7 @@ async def test_requested_budget_reaches_provider(
             },
         )
     )
-    assert fake_provider.requests[-1].max_tokens == budget + EXECUTOR_REASONING_ALLOWANCE_TOKENS
+    assert fake_provider.requests[-1].max_tokens == budget + task_runner.settings.thinking_headroom_tokens
 
 
 @pytest.mark.asyncio
@@ -86,7 +85,7 @@ async def test_repair_truncation_has_specific_error(
     assert exc.value.code == "task_output_truncated"
     assert len(fake_provider.requests) == 2
     assert all(
-        r.max_tokens == 1800 + EXECUTOR_REASONING_ALLOWANCE_TOKENS for r in fake_provider.requests
+        r.max_tokens == 1800 + task_runner.settings.thinking_headroom_tokens for r in fake_provider.requests
     )
 
 
@@ -138,7 +137,7 @@ async def test_truncation_quotes_the_budget_the_caller_sent(
         )
     assert exc.value.code == "task_output_truncated"
     assert f"({budget})" in exc.value.message
-    inflated = budget + EXECUTOR_REASONING_ALLOWANCE_TOKENS
+    inflated = budget + task_runner.settings.thinking_headroom_tokens
     assert str(inflated) not in exc.value.message
 
 
@@ -201,7 +200,7 @@ async def test_repair_truncation_also_quotes_the_caller_budget(
         )
     assert exc.value.code == "task_output_truncated"
     assert "(1800)" in exc.value.message
-    assert str(1800 + EXECUTOR_REASONING_ALLOWANCE_TOKENS) not in exc.value.message
+    assert str(1800 + task_runner.settings.thinking_headroom_tokens) not in exc.value.message
 
 
 @pytest.mark.asyncio
@@ -215,5 +214,5 @@ async def test_truncation_without_a_client_budget_quotes_the_profile_default(
             TaskRequest(task="terminal_extract_json", input={"instruction": "drafts"})
         )
     assert exc.value.code == "task_output_truncated"
-    profile_default = fake_provider.requests[-1].max_tokens - EXECUTOR_REASONING_ALLOWANCE_TOKENS
+    profile_default = fake_provider.requests[-1].max_tokens - task_runner.settings.thinking_headroom_tokens
     assert f"({profile_default})" in exc.value.message

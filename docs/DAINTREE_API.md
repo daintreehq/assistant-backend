@@ -5,15 +5,19 @@ OpenAI-compatible. There is exactly one client (the Daintree Assistant CLI), whi
 the server fully controls, so the wire contract is purpose-built rather than
 shaped around a third-party schema.
 
-The upstream provider is Baseten's Model APIs — its OpenAI-compatible wire shape is
-spoken *internally*, behind a provider abstraction; the main model is
-`zai-org/GLM-5.3-Flash`, named once in `config.EXECUTOR_MODEL`. Baseten
-is a model HOST, not a router: one endpoint serves each model, so there is no
-endpoint-selection policy, no fallback pool and no caller-facing routing preference.
+The upstream provider is OpenAI — its Responses API (`/v1/responses`) is spoken
+*internally*, behind a provider abstraction that translates to and from the
+chat-completions shape the rest of the server uses; the main model is `gpt-6-luna`,
+named once in `config.EXECUTOR_MODEL`. OpenAI is a model HOST, not a router: one
+endpoint serves the model, so there is no endpoint-selection policy on the ordinary
+path and no caller-facing routing preference. (A fallback host exists for outages
+only — OpenRouter serving the same weights from Azure and Amazon Bedrock — and a
+caller can neither choose it nor tell it answered; see
+[`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §1a.)
 All of that is invisible to `/v1/daintree/respond`, which never reports a real model
 id (only the public `daintree-assistant` family). `/v1/daintree/tasks` deliberately
 reports the real upstream model a task profile is configured to use — every profile
-today runs on Baseten's `EXECUTOR_MODEL` — and the operator-facing `/v1/daintree/doctor`
+today runs on OpenAI's `EXECUTOR_MODEL` — and the operator-facing `/v1/daintree/doctor`
 reports it too.
 
 ## Principles
@@ -37,7 +41,7 @@ reports it too.
 ## Authentication
 
 **The credential model is inverted from what an early tester will remember.** The
-SERVER holds the upstream credential (`BASETEN_API_KEY`) and funds every turn from it.
+SERVER holds the upstream credential (`OPENAI_API_KEY`) and funds every turn from it.
 Callers supply no key of their own.
 
 There is no inbound API key to configure. Account authentication is OAuth, and under
@@ -428,7 +432,7 @@ keep.
 `ok`, `provider_rejected`, `credits_exhausted`.
 
 `server_holds_credential` is always `true`, and it is on the wire rather than
-only in this document because every verdict here is about `BASETEN_API_KEY` —
+only in this document because every verdict here is about `OPENAI_API_KEY` —
 the deployment's own key — while the request that asked carried the caller's
 bearer. Without it the available inference from `valid: false` is the wrong one.
 `/v1/daintree/doctor` reports the same field under the same name, deliberately:
@@ -650,7 +654,7 @@ The single generation endpoint. Returns a native JSON body, or — when
     "messages": [                              // required, ≥1; roles: user | assistant | tool
       { "role": "user", "content": "…" },
       { "role": "assistant", "content": null,
-        "reasoning_content": "…",                // thinking-mode CoT; replay verbatim (see Notes)
+        "reasoning_content": "…",                // accepted; not forwarded to the current host (see Notes)
         "tool_calls": [ { "id": "call_1", "type": "function",
                           "function": { "name": "git__status", "arguments": "{}" } } ] },
       { "role": "tool", "tool_call_id": "call_1", "content": "…" }
@@ -722,8 +726,8 @@ The single generation endpoint. Returns a native JSON body, or — when
                  "pinned_runbook_ids": [] },                        // gated: runbooks.pinned_runbook_ids
 
   "generation": {                              // only supported params exist; unknown keys are rejected
-    "temperature": 0.7, "max_tokens": 1024,
-    "stop": ["…"], "response_format": "text",  // "text" | "json_object"
+    "temperature": 0.7, "max_tokens": 1024,     // temperature: accepted, ignored (see Notes)
+    "stop": ["…"], "response_format": "text",  // stop: accepted, ignored; "text" | "json_object"
     "stream": true
   },
 
@@ -757,12 +761,17 @@ Notes:
   client must not send the block to a backend that does not advertise it.
 - `tools`/`tool_calls` use the standard `{id, type, function:{name, arguments}}` shape.
   `tool_choice` is flattened to `{ "name": … }` for the named case.
-- `reasoning_content` (assistant turns only) carries thinking-mode chain-of-thought.
-  It appears in the response only when thinking is enabled; on a turn that performed tool calls it
-  SHOULD be echoed back verbatim on later requests so the model can continue the reasoning that
-  produced those calls (it is ignored on turns that did not). Omit it entirely when thinking is
-  off. The server renames it to the upstream's `reasoning` at the provider boundary; the Daintree
-  wire name never changes. See Prompt assembly & caching.
+- `reasoning_content` (assistant turns only) is the wire slot for a chain-of-thought. It is
+  still accepted on input, but the current host does not receive it: the adapter translates the
+  transcript into Responses input items and drops a replayed chain-of-thought, and the model's
+  own reasoning never reaches the response either (calls are `store: false`, and the adapter
+  surfaces only reasoning *token counts*). Each round therefore starts from the visible
+  transcript. Carrying OpenAI's `reasoning.encrypted_content` across rounds would restore
+  continuity and is a tracked follow-up (`TODO.md`). See Prompt assembly & caching.
+- `generation.temperature` and `generation.stop` are still accepted on the wire but have **no
+  effect**: this model refuses both, so the adapter never sends them (nor chat's `max_tokens`
+  spelling — the cap goes up as `max_output_tokens`). Removing the fields is a lockstep change
+  with the CLI (`TODO.md`).
 - Tool definitions are bounded (total bytes, schema depth, property count, string sizes);
   `function.parameters` must be a JSON object whose root `type`, when present, is `object`.
 - `generation.response_format` `"text"` is the default output mode — sending it is equivalent
@@ -788,7 +797,7 @@ Notes:
   "message": {
     "role": "assistant",
     "content": "…",
-    "reasoning_content": "…",                   // present only when thinking is enabled
+    "reasoning_content": "…",                   // not populated by the current host (see Notes)
     "tool_calls": [ { "id": "call_…", "type": "function",
                       "function": { "name": "git__status", "arguments": "{…}" } } ]
   },
@@ -837,7 +846,7 @@ data: { "id":"pre_…", "content":"Tracing the failing build back to …",
         "provisional": true, "commit_on": "done" }
 
 event: delta
-data: { "content": "Hel" }                      // repeated; may carry "reasoning_content" or "tool_calls" fragments
+data: { "content": "Hel" }                      // repeated; may carry "tool_calls" fragments (and "reasoning_content" on a host that streams it)
 
 event: compaction                                // optional, at most once, immediately before `done`
 data: { "turn_id":"turn-7",
@@ -939,9 +948,10 @@ Guarantees:
   ~10ms in, effectively immediate. `meta` marks runbook selection complete; clients can
   show the runbook-load cue immediately.
 - `status` (optional) marks a generation phase. Today the only phase is `thinking`, emitted
-  once the instant the model's chain-of-thought begins; the `reasoning_content` deltas that
-  follow are the CoT to display. It never appears when thinking is off. Unknown future phases
-  should be ignored by clients.
+  once the instant the model's chain-of-thought begins streaming as `reasoning_content`
+  deltas. The current host's adapter streams no reasoning text (the model reasons, but only
+  its token count comes back), so in practice this event does not appear today; a client must
+  still handle it. Unknown future phases should be ignored by clients.
 - After `meta`, the server opens the (single) upstream stream. Transient open/prefetch
   failure is retried internally before any model delta; exhaustion emits a terminal
   `error` event in the already-open SSE stream.
@@ -1067,12 +1077,12 @@ upstream wait lands in `first_output_ms` rather than being split on a guess.
 `selection_ms` is the LOCAL classifier (~10ms); tens of milliseconds there is
 normal, seconds is not.
 
-`thinking_ms` is usually absent, but it is no longer a guarantee. The interactive
-surface runs at the reasoning FLOOR rather than off — the serving model cannot be
-run non-thinking ([`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §2) — so a turn that
-reasons a little is normal and reports it. Roughly one low-effort call in six did
-so when measured. A LARGE `thinking_ms` is the signal worth acting on; its mere
-presence is not.
+`thinking_ms` is usually absent even though every call reasons. The serving model
+thinks at one fixed effort (`medium`, [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §2),
+but the adapter streams no reasoning text, so there is no reasoning delta for the
+timer to start on; reasoning time shows up inside `first_output_ms` instead. A
+`thinking_ms` that does appear is not an error; read `first_output_ms` for the cost
+of the reasoning itself.
 
 ---
 
@@ -1288,9 +1298,12 @@ worktrees) is treated as untrusted data. Prose fields collapse whitespace; multi
 blocks. Agent ids are the exception to prose normalization: the assembler preserves their
 exact value, JSON-quotes it, and admits or omits each complete row under the roster budget.
 
-No `prompt_cache_key` is sent, and no `provider` block: a model host serves one endpoint per
-model, so there is nothing to select between and no cache-affinity hint to place. Prefix
-caching is implicit at the endpoint that serves the request.
+The primary sends `prompt_cache_key` — the server's computed `cache_session_id`, a salted
+digest naming which calls share a growing prefix — because OpenAI documents it as the
+prefix-cache routing hint. Prefix caching itself is automatic on the literal prefix, so
+prefix stability is still the lever that matters. No `provider` block is sent on the
+ordinary path, and OpenRouter's `session_id` spelling is never sent by anything; the
+outage-only fallback drops the key under both spellings.
 
 **There is no endpoint-selection policy at all any more.** The privacy filter, throughput
 sort, fallback pool, output-quality denylist, sticky-affinity key and caller-facing `routing`
@@ -1299,54 +1312,43 @@ A host has no such pool, so every one of them was deleted rather than neutered, 
 the `upstream_no_compliant_provider` branch of the error taxonomy. Git history has the
 previous revision if that shape is ever needed again.
 
-Reasoning is controlled by `reasoning_effort`, sent explicitly on every call at the
-`low` floor. The unified `reasoning` object is **not** sent: it is not a parameter this
-host documents, and Baseten accepts unknown fields silently, so it could not be relied
-on. Runbook selection sends nothing at all: it is local and makes no upstream call.
+Reasoning is controlled by the Responses API's `reasoning: {"effort": "medium"}`, sent on
+every call. A top-level `reasoning_effort` is **not** sent: that is the Chat Completions
+spelling, and this host rejects unknown fields with a 400. Runbook selection sends nothing
+at all: it is local and makes no upstream call.
 
 The thinking posture is **hardcoded — a product decision like the model ids, not
-configuration**. **It is a FLOOR, not an off switch, and that changed with the serving
-model.** The previous model (DeepSeek V4 Flash) reasoned by default and could be held at
-zero with `{"enabled": false}`. GLM-5.3-Flash cannot: reasoning is always on, `none` is
-rejected, and an ABSENT `reasoning_effort` means `high` — so omitting the field buys the
-most expensive posture rather than the cheapest. The main `/respond` call, every utility
-task and every forced tool call therefore send `reasoning_effort: "low"`.
+configuration** — and it is **one fixed effort, `medium`, on every call**: the main
+`/respond` call, every utility task, and the forced-`tool_choice` / `thinking_disabled`
+paths alike. There is no tier and no caller-reachable second posture. gpt-6-luna accepts
+`none` | `low` | `medium` | `high` | `xhigh`, and `none` is a genuine off, so the posture is
+a choice rather than a constraint. (History: DeepSeek V4 Flash was held at zero; GLM-5.3-Flash
+on Baseten could not be turned off and was pinned at `low`. Neither measurement describes
+this model.)
 
-The workload still does not want a chain-of-thought — the main model routes a request onto
-a runbook and emits tool calls, and the utility tasks are bounded extractions and
-classifications over text the client already gathered — and reasoning costs first-byte
-latency. The floor gets close: measured over 6 trials on one prompt, the field absent
-reasoned on 6 of 6 (median 479.5 reasoning tokens), while `low` reasoned on 1 of 6
-(median 0, the one non-zero trial costing 16 tokens). Close is not zero, and there is no
-lower setting to reach for.
+This is also why the adapter speaks the Responses API at all: on `/v1/chat/completions`
+gpt-6-luna refuses function tools combined with any effort other than `none`, and every
+assistant turn carries tools.
 
 Runbook selection is not part of this decision at all any more: it runs locally and makes
 no upstream call, so it has no thinking posture to set. (Historically it did, and it
 reached "off" first on its own first-byte argument.)
 
 `/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
-(currently `false`), which is what a client should gate any thinking UI on — but **not** a
-promise that `reasoning_content` will be absent. It says what the server REQUESTS; the model
-reasons anyway at the floor, so a client must parse `reasoning_content` unconditionally.
-`respond.reasoning_available` is `true` and states exactly that. Because
-`max_tokens` is shared by reasoning + visible output, a small-output **thinking** call adds
-`THINKING_HEADROOM_TOKENS` to its tight cap so the chain-of-thought can't starve the answer
-into a length truncation. No call requests that tier today, so no call gets that slack —
-handing it to a task that is not deliberately thinking would raise its visible-output ceiling
-above the cap its profile set. But the floor is not zero, and reasoning tokens come out of the
-same budget, so a utility task's cap carries a much smaller `EXECUTOR_REASONING_ALLOWANCE_TOKENS`
-instead: enough to give the profile back the visible budget it intended, nowhere near the
-thinking headroom. The main `/respond` call instead runs on its own flat budget
-(`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
+(currently `true`, as does `/v1/daintree/doctor`). It says the model reasons; it is **not** a
+promise that `reasoning_content` will arrive — the current adapter surfaces no reasoning text,
+only reasoning token counts in usage. `respond.reasoning_available` is `true`, so a client
+must still parse `reasoning_content` whenever it appears. Because the output cap
+(`max_output_tokens` on this host) is shared by reasoning + visible output, every utility task
+adds `THINKING_HEADROOM_TOKENS` (default 4000) to its profile's cap so the chain-of-thought
+can't starve the answer into a `length` truncation. The main `/respond` call instead runs on
+its own flat budget (`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
 
-A request that pins a `tool_choice` is independently clamped to the floor (thinking + a
-forced tool choice was rejected by the previous serving model) — that guard is enforced
-separately from the posture, so it holds if the posture ever rises above the floor. Note
-"clamped", not "off": there is no off on this model, and the adapter sends the floor rather
-than omitting the field, because an omitted `reasoning_effort` means `high` here. When thinking is enabled, the model returns its chain-of-thought as
-`reasoning_content`; the client stores it on the assistant turn and replays it verbatim on any
-turn that performed tool calls, so the model can continue that reasoning. That round-trip stays
-in the contract. Thinking mode ignores `temperature`/`top_p`/penalties.
+A request that pins a `tool_choice` gets the same `medium` effort as everything else: the
+Responses API accepts tools, reasoning and a forced choice together. A replayed
+`reasoning_content` is accepted on the wire and dropped at the adapter (see the `input` notes);
+reasoning is not carried across rounds today. Sampling controls (`temperature`, `stop`) are
+refused by this model and never sent.
 
 ## Errors
 

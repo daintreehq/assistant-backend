@@ -59,7 +59,7 @@
 # of the copy that nobody runs by hand.
 #
 # NO CREDENTIAL IS NEEDED AND NONE IS ACCEPTED. The server holds its own upstream
-# credential (BASETEN_API_KEY) and funds every turn from it, so the metadata
+# credential (OPENAI_API_KEY) and funds every turn from it, so the metadata
 # routes answer an anonymous request. That is also why --full is opt-in and
 # everything else here is not: --full spends DAINTREE's money, not the caller's.
 #
@@ -904,7 +904,7 @@ fi
 
 # A header that IS present. Under `open` it is not read at all — a CLI still
 # sending its old OpenRouter key must be SERVED, not have that key forwarded to
-# Baseten and rejected as the caller's own — and under `enforce` the same
+# OpenAI and rejected as the caller's own — and under `enforce` the same
 # request is a 401, because a credential this deployment cannot verify is not a
 # credential. `observe` behaves exactly as `open` does here, deliberately: it
 # records an outcome and changes nothing a caller can see, so it is indented
@@ -1139,7 +1139,7 @@ else:
     case "${verdict:-MALFORMED}" in
       OK)        pass "/v1/daintree/auth/verify: valid, usable, reason=ok" ;;
       EXHAUSTED) fail "/v1/daintree/auth/verify: the server's key has NO CREDIT REMAINING — this revision cannot answer any turn. Remedy is billing, not the build." "$BODY" ;;
-      REJECTED)  fail "/v1/daintree/auth/verify: the server's key was REJECTED by the provider — check the ${EXECUTOR_KEY_ENV:-BASETEN_API_KEY} secret holds a key for THIS vendor." "$BODY" ;;
+      REJECTED)  fail "/v1/daintree/auth/verify: the server's key was REJECTED by the provider — check the ${EXECUTOR_KEY_ENV:-OPENAI_API_KEY} secret holds a key for THIS vendor." "$BODY" ;;
       *)         fail "/v1/daintree/auth/verify returned an inconsistent verdict" "$BODY" ;;
     esac
   else
@@ -1215,7 +1215,7 @@ print(','.join(s.get('id','') for s in (d.get('runbooks') or {}).get('active', [
       pass "POST /v1/daintree/respond -> \"$reply\" (active runbooks: $active)"
     else
       # A 502 here points at the SERVER's credential, not the caller's: an
-      # invalid or unfunded BASETEN_API_KEY surfaces as the upstream's rejection
+      # invalid or unfunded OPENAI_API_KEY surfaces as the upstream's rejection
       # relayed through this service, since there is nothing else to fall back on.
       fail "POST /v1/daintree/respond returned $code" "$BODY"
     fi

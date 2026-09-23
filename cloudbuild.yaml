@@ -909,12 +909,12 @@ steps:
           esac
         fi
 
-        # baseten-api-key is REQUIRED, not optional like the previous signing key:
+        # openai-api-key is REQUIRED, not optional like the previous signing key:
         # the server holds the upstream credential and `missing_secrets()` gates
         # /readyz on it, so a deploy without it would build a candidate that can never
         # pass its own smoke check. Mounting it unconditionally means a missing secret
         # fails the deploy loudly here rather than as a red /readyz two steps later.
-        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest,BASETEN_API_KEY=baseten-api-key:latest"
+        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest,OPENAI_API_KEY=openai-api-key:latest"
 
         # `describe` distinguishes ABSENT from FORBIDDEN. Treating every failure as
         # "no previous key" would turn a missing IAM grant into a silently
@@ -1007,17 +1007,17 @@ steps:
         # So the conditional mount became the worst of both worlds — the deploy
         # would succeed, the revision would fail /readyz, and the smoke step below
         # would report it as a mystery rather than as the missing secret it is.
-        # Mounting it like baseten-api-key fails the deploy at the Cloud Run step
+        # Mounting it like openai-api-key fails the deploy at the Cloud Run step
         # instead, which names the actual problem. `bootstrap.sh` gates on a version
         # existing for the same reason.
         SECRET_FLAGS="$$SECRET_FLAGS,CEREBRAS_API_KEY=cerebras-api-key:latest"
 
         # openrouter-api-key funds the EXECUTOR FALLBACK — the same weights on a
-        # different host, reached only when Baseten cannot answer
+        # different host, reached only when OpenAI cannot answer
         # (docs/PROVIDER_POLICY.md 1a). Mounted CONDITIONALLY, which is the
         # opposite treatment to the two above and follows from it not gating
         # readiness: without it every turn is still answered and only the ability
-        # to survive a Baseten outage is lost. An unconditional mount would fail
+        # to survive an OpenAI outage is lost. An unconditional mount would fail
         # the deploy of a service that is, by the readiness contract's own
         # standard, complete.
         #
@@ -1054,7 +1054,7 @@ steps:
           exit 1
         else
           echo "Executor fallback: NO openrouter-api-key version — deploying without"
-          echo "  a second host. Every turn is still answered; a Baseten outage is"
+          echo "  a second host. Every turn is still answered; an OpenAI outage is"
           echo "  an outage. /v1/daintree/doctor reports provider.fallback.armed=false."
         fi
 

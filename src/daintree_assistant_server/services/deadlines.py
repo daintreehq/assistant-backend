@@ -102,9 +102,9 @@ class BudgetPolicy:
     Reference points behind the numbers, measured on the serving path:
     ``open_stall`` at 45 s against an open-to-first-event of ~1.2 s and a
     cold-prefill tail in the single-digit seconds — with one retry, a stalled open
-    costs a pause, not the turn. ``first_output`` at 120 s against a non-thinking
-    main model whose first visible token follows its first event almost
-    immediately: it can only bite a stream that is producing nothing a user can
+    costs a pause, not the turn. ``first_output`` at 120 s against a main model reasoning
+    at `medium`, whose first visible token follows seconds after the open at
+    most: it can only bite a stream that is producing nothing a user can
     see. ``total`` at 900 s answers to the Cloud Run request timeout of 960 s
     (``cloudbuild.yaml``), which is the only number it has to stay under; move one
     and move the other.

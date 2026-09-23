@@ -52,9 +52,9 @@ from .observability import (
 )
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
-from .providers.baseten import BasetenProvider
 from .providers.cerebras import CerebrasProvider
 from .providers.failover import FailoverProvider
+from .providers.openai import OpenAIProvider
 from .providers.openrouter import OpenRouterProvider
 from .providers.openrouter_fallback import OpenRouterFallbackProvider
 from .runbooks.catalog import Catalog, CatalogManager, default_runbooks_dir, load_catalog
@@ -446,16 +446,17 @@ def _build_trace_recorder(
 def _build_executor_fallback_provider(settings: Settings) -> ChatProvider | None:
     """The executor's SECOND host, or ``None`` when no credential is configured.
 
-    The same GLM-5.3-Flash weights via OpenRouter, sorted by latency — see
+    The same gpt-6-luna weights via OpenRouter (Azure / Bedrock, OpenAI's own
+    endpoints excluded), sorted by latency — see
     providers/openrouter_fallback.py for the wire, and providers/failover.py for
     when it is reached.
 
     **Returning ``None`` is a normal outcome, not a degraded one that readiness
     should catch.** `OPENROUTER_API_KEY` is deliberately absent from
     `missing_secrets()`: without it every turn is still answered, and what is lost
-    is the ability to survive a Baseten outage. Failing readiness over a spare
+    is the ability to survive an OpenAI outage. Failing readiness over a spare
     tyre would take the server down for a fault it does not have. `_build_provider`
-    below returns the bare Baseten adapter in that case, which is exactly the
+    below returns the bare OpenAI adapter in that case, which is exactly the
     behaviour this deployment had before failover existed.
 
     Its own client, sized like the SERVING one rather than like the compaction
@@ -479,7 +480,7 @@ def _build_executor_fallback_provider(settings: Settings) -> ChatProvider | None
     return OpenRouterFallbackProvider(
         client,
         api_key=settings.openrouter_api_key,
-        # The SAME floor the primary is pinned to. A fallback that reasoned
+        # The SAME effort the primary is pinned to. A fallback that reasoned
         # differently would answer differently, and the point of this host is to
         # be a substitute rather than a second product.
         reasoning_effort=EXECUTOR_REASONING_EFFORT,
@@ -489,19 +490,15 @@ def _build_executor_fallback_provider(settings: Settings) -> ChatProvider | None
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
-    """The serving adapter: Baseten, holding the server's own credential.
+    """The serving adapter: OpenAI, holding the server's own credential.
 
-    The OpenAI-shape adapter, pointed at Baseten's Model APIs. Same SSE, same
-    `max_tokens` spelling, same tool-call chunks as the OpenRouter parent — the
-    vendor difference is the key-probe shape and the THINKING POSTURE, which is
-    the one place this host is not interchangeable: GLM-5.3-Flash cannot be run
-    non-thinking, so the adapter sends `reasoning_effort` where the parent sends
-    a `reasoning` object. See providers/baseten.py.
+    Speaks OpenAI's Responses API and translates to and from the chat shape the
+    rest of the server uses — see providers/openai.py for why Chat Completions
+    cannot serve this model with tools and reasoning together.
 
-    Wrapped in a `FailoverProvider` when a second credential exists, so a Baseten
+    Wrapped in a `FailoverProvider` when a second credential exists, so an OpenAI
     outage stops being a Daintree outage. The wrapper is transparent: everything
-    above the provider boundary still sees one provider and one model, and the
-    Baseten adapter below it is constructed and called exactly as it was before.
+    above the provider boundary still sees one provider and one model.
     """
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(
@@ -512,7 +509,7 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    primary: ChatProvider = BasetenProvider(
+    primary: ChatProvider = OpenAIProvider(
         client,
         # THE server credential. Daintree funds every turn from this key: callers
         # supply none of their own (see auth.py), so a provider built without one
@@ -520,9 +517,9 @@ def _build_provider(settings: Settings) -> ChatProvider:
         # it rather than letting the first turn discover the gap.
         api_key=settings.serving_api_key,
         base_url=settings.serving_base_url,
-        # The floor this model exposes; there is no "off" on these weights. The
-        # decision lives beside the model id in `config` and is injected here so
-        # the adapter does not reach back into settings for it.
+        # The one reasoning posture. The decision lives beside the model id in
+        # `config` and is injected here so the adapter does not reach back into
+        # settings for it.
         reasoning_effort=EXECUTOR_REASONING_EFFORT,
         default_timeout=settings.main_timeout_seconds,
         dump_dir=settings.dump_upstream_dir,

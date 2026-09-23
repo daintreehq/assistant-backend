@@ -419,7 +419,7 @@ def test_the_provider_key_failure_is_an_operator_fault_on_the_wire() -> None:
     """503, not the upstream's 401.
 
     A status is a statement to the CALLER about the CALLER's request. This one
-    describes `BASETEN_API_KEY`, which the caller neither holds nor can replace,
+    describes `OPENAI_API_KEY`, which the caller neither holds nor can replace,
     so forwarding the provider's 401 pointed a user at a credential that was
     never in question. 503 says what is actually true: this deployment cannot
     currently serve. It sits beside `provider_not_configured` — the same operator

@@ -43,7 +43,7 @@ def _client(settings: Settings, provider: Any) -> TestClient:
 
 def _configured_settings(**overrides: Any) -> Settings:
     values: dict[str, Any] = {
-        "BASETEN_API_KEY": "tgp_v1_test-key",
+        "OPENAI_API_KEY": "tgp_v1_test-key",
         "STATE_SIGNING_KEY_CURRENT": "test-signing-key",
         **_COMPLETE,
     }
@@ -125,7 +125,7 @@ def test_the_manifest_version_is_published_in_both_shapes(fake_provider: Any) ->
     with _client(_configured_settings(), fake_provider) as client:
         assert client.get(URL).json()["version"] == 1
     unconfigured = Settings(
-        BASETEN_API_KEY="tgp_v1_test-key", STATE_SIGNING_KEY_CURRENT="test-signing-key"
+        OPENAI_API_KEY="tgp_v1_test-key", STATE_SIGNING_KEY_CURRENT="test-signing-key"
     )
     with _client(unconfigured, fake_provider) as client:
         assert client.get(URL).json()["version"] == 1
@@ -296,7 +296,7 @@ def test_required_is_never_true_without_a_manifest_to_follow(fake_provider: Any)
     from daintree_assistant_server.api.daintree_auth import _auth_config_body
 
     settings = Settings(
-        BASETEN_API_KEY="tgp_v1_test-key",
+        OPENAI_API_KEY="tgp_v1_test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         AUTH_MODE="enforce",
     )
@@ -336,7 +336,7 @@ def test_no_secret_reaches_the_body(fake_provider: Any) -> None:
     so there is no SecretStr on this path that COULD leak — and asserted anyway,
     because "by construction" is a claim a later edit can quietly break."""
     secrets = {
-        "BASETEN_API_KEY": "tgp_v1_together-secret",
+        "OPENAI_API_KEY": "tgp_v1_together-secret",
         "OPENROUTER_API_KEY": "sk-or-openrouter-secret",
         "CEREBRAS_API_KEY": "csk-cerebras-secret",
         "STATE_SIGNING_KEY_CURRENT": "state-current-secret",

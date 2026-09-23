@@ -64,11 +64,11 @@ def settings(tmp_path: Any) -> Settings:
     return Settings(
         # The provider credential, EXPLICITLY. Leaving it out meant it fell
         # through to whatever `.env` held — so a developer with a real
-        # BASETEN_API_KEY ran the redaction tests against their live secret and
+        # OPENAI_API_KEY ran the redaction tests against their live secret and
         # CI, having no `.env`, ran them against the empty string, where
         # `assert key not in body` is unsatisfiable rather than merely weak.
         # A sentinel here makes both environments run the same test.
-        BASETEN_API_KEY="tgp_v1_test-key",
+        OPENAI_API_KEY="tgp_v1_test-key",
         # NOT required for readiness — it left `missing_secrets()` with the
         # fast-response stage's off switch (`FAST_RESPONSE_ENABLED` is False, so
         # no call is ever opened). Kept here so a test that re-enables the stage

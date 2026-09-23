@@ -17,16 +17,16 @@ import pytest
 from pydantic import SecretStr
 
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.providers.baseten import BasetenProvider
+from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 
 _BASE = "https://together.test/v1"
 _KEY = "tgp_v1_taxonomy"
 
 
-def _provider(handler) -> BasetenProvider:  # type: ignore[no-untyped-def]
+def _provider(handler) -> OpenRouterProvider:  # type: ignore[no-untyped-def]
     transport = httpx.MockTransport(handler)
     client = httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(5.0))
-    return BasetenProvider(client, api_key=SecretStr(_KEY), base_url=_BASE)
+    return OpenRouterProvider(client, api_key=SecretStr(_KEY), base_url=_BASE)
 
 
 def _request():  # type: ignore[no-untyped-def]
@@ -244,7 +244,7 @@ def test_our_door_and_the_provider_are_different_codes_and_now_different_statuse
     """Two "a credential was rejected" answers about two different credentials.
 
     They used to share a 401 and be told apart only by `code` — which is the
-    contract, and which held. But the provider one describes `BASETEN_API_KEY`,
+    contract, and which held. But the provider one describes `OPENAI_API_KEY`,
     the server's own, and a 401 is the status that tells a caller to
     authenticate: it was pointing at a credential the caller does not hold and
     could not replace. It was also the only 401 on this surface deliberately

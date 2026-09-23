@@ -18,7 +18,6 @@ from pydantic import BaseModel, SecretStr, ValidationError
 
 from ..config import (
     EXECUTOR_MODEL,
-    EXECUTOR_REASONING_ALLOWANCE_TOKENS,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     Settings,
@@ -701,9 +700,9 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
     # default budget (settings.utility_timeout_seconds). The heavyweight tasks —
     # whole-transcript digestion (checkpoint, memory_distill) and the workflow
     # graph tasks (plan/reconcile/resume digest) — read far more input and emit
-    # large JSON, so they carry an explicit, larger budget of their own. (Not a
-    # reasoning budget: every utility task is non-thinking. See
-    # INTERACTIVE_THINKING_ENABLED and docs/PROVIDER_POLICY.md section 2.)
+    # large JSON, so they carry an explicit, larger budget of their own. (Every
+    # utility task reasons at the one serving posture — see
+    # INTERACTIVE_THINKING_ENABLED — so these budgets include that time.)
     heavy_timeout = 60.0
     return {
         p.id: p
@@ -1164,26 +1163,12 @@ class TaskRunner:
             {"role": "user", "content": user},
         ]
         response_format = {"type": "json_object"} if profile.output_mode == "json" else None
-        # Utility tasks run NON-THINKING — hardcoded posture (see
-        # INTERACTIVE_THINKING_ENABLED in config.py). These are bounded extractions
-        # and classifications over text the client already gathered, which is not
-        # work a chain-of-thought improved enough to pay for its latency.
-        #
-        # The headroom is conditional on the posture, not unconditional: max_tokens
-        # is shared by reasoning + visible output, so a THINKING task needs the slack
-        # to keep its CoT from starving the answer into a finish_reason=length
-        # truncation — but handing that same slack to a NON-thinking task just raises
-        # its visible-output ceiling above the cap its profile deliberately set.
+        # Utility tasks think at the one serving posture (INTERACTIVE_THINKING_ENABLED
+        # in config.py). max_tokens is shared by reasoning + visible output, so the
+        # headroom is added to the profile's cap to keep the chain of thought from
+        # starving the answer into a finish_reason=length truncation.
         thinking_enabled = INTERACTIVE_THINKING_ENABLED
         reasoning_effort = INTERACTIVE_REASONING_EFFORT if thinking_enabled else None
-        # The `else` branch is no longer zero, and that changed with the serving
-        # model. It used to be right: a NON-thinking task spent its whole cap on
-        # visible output, so adding slack would only have raised the ceiling its
-        # profile deliberately set. GLM-5.3-Flash has no off switch — the floor
-        # still reasons sometimes — so without a small allowance a 300-token JSON
-        # profile silently has less than 300 for its answer, and a truncation
-        # spends the one repair retry against the same cap. See
-        # EXECUTOR_REASONING_ALLOWANCE_TOKENS on why it is 64 and not more.
         output_tokens = profile.max_output_tokens
         if (
             isinstance(input_obj, (TerminalExtractTextInput, TerminalExtractJsonInput))
@@ -1191,9 +1176,7 @@ class TaskRunner:
         ):
             output_tokens = input_obj.max_output_tokens
         max_tokens = output_tokens + (
-            self.settings.thinking_headroom_tokens
-            if thinking_enabled
-            else EXECUTOR_REASONING_ALLOWANCE_TOKENS
+            self.settings.thinking_headroom_tokens if thinking_enabled else 0
         )
         provider_request = ProviderChatRequest(
             model=model,

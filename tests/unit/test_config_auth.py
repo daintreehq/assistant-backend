@@ -129,20 +129,18 @@ def test_the_serving_identity_is_pinned_to_literals() -> None:
         EXECUTOR_REASONING_EFFORT,
     )
 
-    assert EXECUTOR_KEY_ENV == "BASETEN_API_KEY"
-    assert EXECUTOR_URL_ENV == "BASETEN_BASE_URL"
-    assert EXECUTOR_ORIGIN == "inference.baseten.co"
-    assert EXECUTOR_MODEL == "zai-org/GLM-5.3-Flash"
+    assert EXECUTOR_KEY_ENV == "OPENAI_API_KEY"
+    assert EXECUTOR_URL_ENV == "OPENAI_BASE_URL"
+    assert EXECUTOR_ORIGIN == "api.openai.com"
+    assert EXECUTOR_MODEL == "gpt-6-luna"
     # Pinned INDEPENDENTLY of anything that derives from it. The oversized-turn
     # tests size their payload FROM this constant, so they stay green if it
     # reverts — they would simply be testing a smaller window without saying so.
-    # This literal is what notices. Read from the host: Baseten's `/v1/models`
-    # publishes `context_length: 1048576` for these weights.
-    assert EXECUTOR_CONTEXT_TOKENS == 1_048_576
-    # The floor, and the most expensive constant in the file to get wrong: this
-    # model has no "off", and an ABSENT `reasoning_effort` means `high` on every
-    # turn and every utility task.
-    assert EXECUTOR_REASONING_EFFORT == "low"
+    # This literal is what notices. Every endpoint OpenRouter lists for these
+    # weights publishes `context_length: 1050000`.
+    assert EXECUTOR_CONTEXT_TOKENS == 1_050_000
+    # The one reasoning posture, sent on every turn and every utility task.
+    assert EXECUTOR_REASONING_EFFORT == "medium"
 
 
 def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() -> None:
@@ -154,7 +152,7 @@ def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() 
     simply somewhere else, which is what a misdirected key actually looks like.
     """
     s = _settings(
-        **{EXECUTOR_URL_ENV: "https://api.openai.com/v1"},
+        **{EXECUTOR_URL_ENV: "https://inference.baseten.co/v1"},
         ENVIRONMENT="production",
         STATE_SIGNING_KEY_CURRENT="y" * 48,
         STATE_SALT="a-real-random-salt-value",
@@ -238,7 +236,7 @@ def _open_request(header: str | None) -> Any:
     """A request object with just enough shape for `authenticate` under `open`."""
     raw = [] if header is None else [(b"authorization", header.encode("iso-8859-1"))]
     settings = Settings(
-        STATE_SIGNING_KEY_CURRENT="x" * 32, BASETEN_API_KEY="sk-server-owned"
+        STATE_SIGNING_KEY_CURRENT="x" * 32, OPENAI_API_KEY="sk-server-owned"
     )
     return SimpleNamespace(
         app=SimpleNamespace(state=SimpleNamespace(settings=settings, token_verifier=None)),
@@ -472,7 +470,7 @@ async def test_require_permission_refuses_a_caller_without_it() -> None:
     dependency = require_permission("chat")
     request = _open_request(None)
     request.app.state.settings = Settings(
-        STATE_SIGNING_KEY_CURRENT="x" * 32, BASETEN_API_KEY="k"
+        STATE_SIGNING_KEY_CURRENT="x" * 32, OPENAI_API_KEY="k"
     )
 
     # Stand in a principal that holds nothing, the way a future second OAuth
@@ -508,7 +506,7 @@ async def test_no_verifier_is_built_for_the_open_door() -> None:
     connection pool for a provider it never calls."""
     from daintree_assistant_server.main import _build_token_verifier
 
-    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, BASETEN_API_KEY="k")
+    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, OPENAI_API_KEY="k")
     verifier, client = await _build_token_verifier(settings)
     assert verifier is None and client is None
 
@@ -519,7 +517,7 @@ async def test_a_configured_non_open_deployment_builds_one() -> None:
 
     settings = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
-        BASETEN_API_KEY="k",
+        OPENAI_API_KEY="k",
         AUTH_MODE="observe",
         SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co/auth/v1",
         SUPABASE_JWKS_URL="https://abcdefghij.supabase.co/auth/v1/.well-known/jwks.json",
@@ -547,7 +545,7 @@ async def test_a_failed_verifier_build_does_not_strand_its_connection_pool() -> 
 
     settings = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
-        BASETEN_API_KEY="k",
+        OPENAI_API_KEY="k",
         AUTH_MODE="observe",
         SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co/auth/v1",
         SUPABASE_JWKS_URL="https://abcdefghij.supabase.co/auth/v1/.well-known/jwks.json",
@@ -605,7 +603,7 @@ async def test_a_failed_verifier_build_does_not_take_liveness_down() -> None:
         app = main_module.create_app(
             settings=Settings(
                 STATE_SIGNING_KEY_CURRENT="x" * 32,
-                BASETEN_API_KEY="k",
+                OPENAI_API_KEY="k",
                 RETRY_BACKOFF_BASE_SECONDS=0.0,
             ),
             provider=FakeProvider(),

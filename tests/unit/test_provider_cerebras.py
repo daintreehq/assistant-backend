@@ -15,8 +15,8 @@ import pytest
 from pydantic import SecretStr
 
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.baseten import BasetenProvider
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
+from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 
 
 def _ok(request: httpx.Request) -> httpx.Response:
@@ -56,7 +56,7 @@ def test_the_parent_still_uses_the_openai_spelling() -> None:
     which is the point.
     """
     client = httpx.AsyncClient(transport=httpx.MockTransport(_ok))
-    body = BasetenProvider(client, api_key=SecretStr("k"))._build_body(
+    body = OpenRouterProvider(client, api_key=SecretStr("k"))._build_body(
         _request(), stream=False
     )
 

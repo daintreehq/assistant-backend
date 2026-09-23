@@ -45,13 +45,13 @@ fi
 # it is a developer watching a healthy-looking process answer 503 with nothing on
 # screen to say why.
 #
-# Both are SERVER-owned. BASETEN_API_KEY funds every turn — a request no
+# Both are SERVER-owned. OPENAI_API_KEY funds every turn — a request no
 # longer brings its own key, so there is nothing to fall back on without it.
 # FAST_RESPONSE_ENABLED is currently false, so CEREBRAS_API_KEY is optional.
 # OPENROUTER_API_KEY enables failover but does not gate readiness.
 missing=()
 [[ -z "${STATE_SIGNING_KEY_CURRENT:-}" ]] && missing+=("STATE_SIGNING_KEY_CURRENT")
-[[ -z "${BASETEN_API_KEY:-}" ]] && missing+=("BASETEN_API_KEY")
+[[ -z "${OPENAI_API_KEY:-}" ]] && missing+=("OPENAI_API_KEY")
 if (( ${#missing[@]} )); then
   echo "⚠  Missing: ${missing[*]} — server will boot but /readyz will be 503." >&2
   [[ -f "$ROOT/.env" ]] || echo "   Run:  cp .env.example .env   then fill them in." >&2
@@ -66,6 +66,6 @@ export DAINTREE_LOG_CONSOLE="${DAINTREE_LOG_CONSOLE:-1}"
 echo "▶ Daintree Assistant Server"
 echo "  python: $PY   logs: console (DAINTREE_LOG_CONSOLE=$DAINTREE_LOG_CONSOLE)"
 # Presence only — never the value.
-echo "  upstream: baseten    key: $([[ -n "${BASETEN_API_KEY:-}" ]] && echo set || echo MISSING)"
+echo "  upstream: openai    key: $([[ -n "${OPENAI_API_KEY:-}" ]] && echo set || echo MISSING)"
 
 exec "$PY" -m daintree_assistant_server

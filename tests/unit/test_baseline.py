@@ -83,7 +83,7 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # the field from `EXECUTOR_PROVIDER`, so asserting only the JSON would let a
     # renamed constant flow through capture unnoticed while every test stayed
     # green — and the provider name reaches the doctor route and the trace record.
-    assert identity["provider"] == EXECUTOR_PROVIDER == "baseten"  # type: ignore[index]
+    assert identity["provider"] == EXECUTOR_PROVIDER == "openai"  # type: ignore[index]
 
 
 def test_the_selector_block_describes_the_shipped_artifact() -> None:

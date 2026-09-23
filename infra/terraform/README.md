@@ -21,7 +21,7 @@ list of what a real deployment passes.
 That gap is not merely incomplete, it is actively unsafe. The application, given
 no `AUTH_MODE`, falls back to its default of `open` — under which the
 `Authorization` header is never read for authentication and every request is the
-same anonymous principal, funded by the server's own Baseten key. Until this
+same anonymous principal, funded by the server's own OpenAI key. Until this
 change the module's defaults then published exactly that: `ingress =
 "INGRESS_TRAFFIC_ALL"`, an `allUsers` grant of `roles/run.invoker`, and
 `environment = "production"`. A `terraform apply` with no `-var` at all produced
@@ -47,7 +47,7 @@ supplies them.
 
 **Acknowledging the first gate does not make this a supported path.** It reduces
 the blast radius of an apply; it changes nothing about the credential model.
-Whatever it builds still mounts the server's own `BASETEN_API_KEY` and still
+Whatever it builds still mounts the server's own `OPENAI_API_KEY` and still
 runs `AUTH_MODE=open`, so every request that reaches it is anonymous and billed
 to Daintree. The gates restrict who can reach the service. Nothing here can make
 a request to it cost the caller anything.
@@ -62,7 +62,7 @@ way to spend against it is the thing that had to go.
 Kept here because they are the reasoning behind the secret list this module does
 carry, and they remain true wherever the service is deployed from:
 
-- **The server holds the upstream credential.** `BASETEN_API_KEY` funds every
+- **The server holds the upstream credential.** `OPENAI_API_KEY` funds every
   turn and is in `Settings.missing_secrets()`, so a deployment without it answers
   `/readyz` with 503 and never serves a request. Callers supply no key of their
   own; an account is an entitlement to spend Daintree's key, never a mapping to
@@ -74,7 +74,7 @@ carry, and they remain true wherever the service is deployed from:
   publishing a service.
 - **`STATE_SALT` must be a real (non-default) value** — readiness fails otherwise
   in any hardened environment (`Settings.weak_secrets`), as does a
-  `BASETEN_BASE_URL` that is not the `https://inference.baseten.co` origin, because
+  `OPENAI_BASE_URL` that is not the `https://api.openai.com` origin, because
   the server's own key is forwarded there.
 - **Do not probe `/healthz` externally.** Google's frontend reserves that path
   and answers it itself, so the request never reaches the container. `/readyz` is

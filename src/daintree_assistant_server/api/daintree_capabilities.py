@@ -137,8 +137,7 @@ async def capabilities(
             # what the CLI gates its thinking UI on, and a hand-maintained copy
             # would drift the moment the posture moves.
             "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
-            # The serving model cannot be run non-thinking, so reasoning output is
-            # always possible regardless of the flag above.
+            # The serving model reasons on every call (see the flag above).
             "reasoning_available": True,
             "multimodal_images": {
                 "data_urls": True,

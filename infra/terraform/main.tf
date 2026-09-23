@@ -141,12 +141,12 @@ resource "google_cloud_run_v2_service" "service" {
         no AUTH_MODE, no ENTITLEMENT_MODE, no DAINTREE_ENTITLEMENT_URL, no Supabase
         issuer/JWKS/OAuth client and no subject gate, so the application falls back
         to AUTH_MODE=open and serves anonymous requests funded by Daintree's own
-        Baseten key.
+        OpenAI key.
 
         If you understand that and want the private skeleton anyway, set
         acknowledge_unsupported_terraform_path = true. The remaining preconditions
         still refuse a public or production apply -- but note what they do NOT
-        change: whatever you build mounts the server's own BASETEN_API_KEY and
+        change: whatever you build mounts the server's own OPENAI_API_KEY and
         runs AUTH_MODE=open, so every request that reaches it is anonymous and
         billed to Daintree. The gates restrict reachability, not the bill.
       EOT

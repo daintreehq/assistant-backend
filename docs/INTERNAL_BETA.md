@@ -34,7 +34,7 @@ is not a description of today's build, so every line carries a status:
 
 | | Requirement | Status |
 |---|---|---|
-| 1 | ~~**OpenRouter is the sole provider.**~~ *(superseded twice — the executor is Together (`config.EXECUTOR_MODEL`), and an eligible turn ALSO reaches Cerebras for the preamble (`config.FAST_RESPONSE_MODEL`). Both receive prompt content; see `docs/PROVIDER_POLICY.md` §1.)* | — |
+| 1 | ~~**OpenRouter is the sole provider.**~~ *(superseded — the executor is `gpt-6-luna` on OpenAI (`config.EXECUTOR_MODEL`), with OpenRouter as a failover host for the same weights; the Cerebras preamble stage (`config.FAST_RESPONSE_MODEL`) would also receive prompt content if re-enabled. See `docs/PROVIDER_POLICY.md` §1.)* | — |
 | 2 | ~~**The tester supplies an OpenRouter key**, and it is theirs.~~ *(superseded — no caller key exists)* | — |
 | 3 | ~~**That key is the HTTP bearer** and funds every upstream call the turn makes.~~ *(superseded — the server's key funds every call)* | — |
 | 4 | ~~**The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector".~~ *(superseded — the INVERSE is now the invariant, and it is the one in §6: `main._build_provider` passes `settings.serving_api_key`, and `missing_secrets()` gates `/readyz` on its presence. The shared credential is not a fallback that crept in; it is the whole funding model.)* | — |
@@ -109,8 +109,8 @@ What follows is a **sequencing** point rather than a reversal. Application-level
 rate limiting is still the wrong layer, and account authentication is still the
 real answer. But "self-limiting" is no longer a reason to wait for it, so the
 interim control belongs at the edge and at the provider: restricted ingress or
-IAM on the Cloud Run service, and a hard spend cap plus alerting on the Together
-account. A billing ceiling is not something application correctness can
+IAM on the Cloud Run service, and a hard spend cap plus alerting on the OpenAI
+(and OpenRouter) accounts. A billing ceiling is not something application correctness can
 substitute for.
 
 ## 5. Required tester disclosure
@@ -122,12 +122,14 @@ Onboarding must state all of this, plainly, before the tester hands over a key:
   protect. (This bullet used to say the opposite, and the reversal is the single
   most important thing on this page to get right: onboarding copy written for the
   old model tells a tester they are paying for their own usage.)
-- **What is promised about their data, and what is not.** Requests go to Together
-  AI, and — on an eligible turn where the fast-response stage is enabled — the
-  same turn's prompt content ALSO goes to Cerebras. Cerebras is not a cache or an
-  infrastructure service in this design; it reads the user's message and the
-  selected runbook bodies. Nobody has checked either host's published terms for
-  the account tiers we actually run on, so make no data-handling promise at all
+- **What is promised about their data, and what is not.** Requests go to OpenAI.
+  When OpenAI cannot answer, the SAME full request goes to OpenRouter, which
+  routes it to Azure or Amazon Bedrock. And — on an eligible turn where the
+  fast-response stage is enabled (it is off today) — the turn's prompt content
+  would ALSO go to Cerebras. None of these is a cache or an infrastructure
+  service in this design; each reads prompt content. Nobody has confirmed any of
+  these hosts' published terms against the account tiers we actually run on, so
+  make no data-handling promise at all
   — not retention, not training, not deletion — until
   [`PROVIDER_POLICY.md` §4](PROVIDER_POLICY.md#4-privacy--what-is-and-is-not-promised)
   stops declaring itself unverified. An unchecked assurance is worse than

@@ -217,7 +217,7 @@ def test_the_preamble_payload_carries_its_commit_semantics(
     rendered = str(payload).lower()
     # The CURRENT fast model is on this list. It was not, which meant the one
     # name most likely to leak was the one name not checked for.
-    for internal in ("cerebras", "gemma", "gpt-oss", "glm", "zai", "baseten"):
+    for internal in ("cerebras", "gemma", "gpt-oss", "glm", "zai", "baseten", "openai", "luna", "gpt-6"):
         assert internal not in rendered
 
 

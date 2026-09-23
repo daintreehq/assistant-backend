@@ -20,98 +20,43 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ---- THE serving identity — one host, one model, both hardcoded -----------
 #
-# Baseten's Model APIs serve `zai-org/GLM-5.3-Flash`, and it serves everything:
-# the main completion and every utility task. Baseten is a model HOST rather
-# than a router, so one endpoint serves the weights and there is nothing to
-# select between. Runbook selection makes no upstream call at all — it is the
-# local ONNX classifier in `runbooks/local/`.
+# OpenAI's Responses API serves `gpt-6-luna`, and it serves everything:
+# the main completion and every utility task. Runbook selection makes no
+# upstream call at all — it is the local ONNX classifier in `runbooks/local/`.
 #
-# This was briefly a two-mode registry (`modes.py`), with a `pro` tier on
-# Cerebras. That is gone: Cerebras's pricing structure could not be made to work
-# for this product, so there is no second route to choose between and a registry
-# over one entry was a lie about the shape of the thing. Git history has it, and
-# a genuine second tier would land there again rather than as a flag here.
-#
-# **The host is a latency decision and the model is a capability one, and this
-# move changed BOTH at once** — which is the thing to remember when reading a
-# benchmark taken before it. The previous identity was
-# `deepseek-ai/DeepSeek-V4-Flash-0731` on Together, itself chosen for host
-# latency (the 62 real utility-task payloads replayed at Together p50 1100ms /
-# p90 1702ms against OpenRouter's 3414ms / 6013ms on the SAME weights, 3.1x).
-# Every latency and cost figure recorded anywhere in this repo predating this
-# change describes those weights on that host, so none of them carry over
-# unre-measured. Git history has the whole of it.
-EXECUTOR_MODEL = "zai-org/GLM-5.3-Flash"
+# **The host AND the model changed together in this move**, exactly as they did
+# in the previous one (DeepSeek V4 Flash on Together → `zai-org/GLM-5.3-Flash`
+# on Baseten). Every latency, cost and quality number recorded anywhere in this
+# repo predating it describes a system that no longer exists; re-measure before
+# citing one. Git history has the whole of the Baseten adapter.
+EXECUTOR_MODEL = "gpt-6-luna"
 
 #: The credential, base URL and production origin for that one host. Named as
 #: constants rather than inlined so readiness messages, the doctor route and the
 #: tests that pin the credential model all read the same three strings.
-EXECUTOR_KEY_ENV = "BASETEN_API_KEY"
-EXECUTOR_URL_ENV = "BASETEN_BASE_URL"
-EXECUTOR_ORIGIN = "inference.baseten.co"
+EXECUTOR_KEY_ENV = "OPENAI_API_KEY"
+EXECUTOR_URL_ENV = "OPENAI_BASE_URL"
+EXECUTOR_ORIGIN = "api.openai.com"
 
 #: The alias returned to clients. The product promise is Daintree, not a
-#: permanent contract with Baseten or Z.ai.
+#: permanent contract with OpenAI.
 PUBLIC_MODEL_ID = "daintree-assistant"
 
-#: The serving model's input context window, in tokens. Hardcoded beside the
-#: model id for the same reason the model is: it is a property of the weights we
-#: chose, not an operational dial.
-#:
-#: **The HOST publishes this one, and it was read from there** — Baseten's
-#: `/v1/models` listing carries `context_length: 1048576` for this model, which
-#: is strictly better evidence than the previous entry had (DeepSeek's published
-#: figure for weights served elsewhere, with nothing here having asked). It is
-#: still not a probe of what the endpoint will actually ACCEPT — `tests/live/`
-#: is still empty (`TODO.md`) — so `services/context_budget.py` keeps refusing a
-#: turn only when the INPUT alone clears the whole window rather than at the
-#: reservation boundary: a ceiling we did not test against may bound a paid
-#: turn, so it is allowed to bound only the ones no reading of it could rescue.
-#:
-#: Note this is an EIGHTFOLD increase over the 131,072 that stood here for
-#: DeepSeek V4 Flash. Nothing in the budgeter scales with it, so the practical
-#: effect is that `exceeds_window` becomes very nearly unreachable and the
-#: upstream's own length rejection becomes the real limit — which is the same
-#: code either way (`_CONTEXT_LENGTH_MARKERS`).
-EXECUTOR_CONTEXT_TOKENS = 1_048_576
+#: The serving model's input context window, in tokens — 1,050,000 as published
+#: by every endpoint OpenRouter lists for these weights. Not a probe of what
+#: OpenAI will actually accept (`tests/live/` is still empty, `TODO.md`), so
+#: `services/context_budget.py` keeps refusing only when the INPUT alone clears
+#: the whole window; the upstream's own length rejection maps to the same code.
+EXECUTOR_CONTEXT_TOKENS = 1_050_000
 
-#: The `reasoning_effort` sent on every executor call.
+#: The `reasoning_effort` sent on EVERY executor call — one posture, no tiers.
 #:
-#: **This model cannot be run non-thinking**, which is new and inverts the rule
-#: the rest of this file was written under. GLM-5.3-Flash reasons
-#: unconditionally: Baseten lists it "always enabled", there is no `none`, and
-#: an ABSENT field means `high`. So unlike DeepSeek — where the unified
-#: `reasoning: {"enabled": false}` genuinely reached zero reasoning tokens —
-#: there is no off switch to hold down here, only a floor to sit on.
-#:
-#: `low` is that floor, and it is close enough to off to be worth the move:
-#: measured over 6 trials on one proof-and-verify prompt, `low` reasoned on 1 of
-#: 6 (median 0, the one non-zero trial costing 16 tokens) against the absent
-#: field's 6 of 6 (median 479.5, spread 161-2519). Passed to the adapter at
-#: construction (`main.py`) rather than read by it, so the product decision
-#: stays here beside the model id and the adapter keeps its one job.
-EXECUTOR_REASONING_EFFORT = "low"
-
-#: Completion-token allowance for the reasoning the serving model emits ANYWAY.
-#:
-#: Not a thinking budget — `thinking_headroom_tokens` (4,000) is that, and it is
-#: still added only when the interactive posture is deliberately switched on.
-#: This is the much smaller correction for a fact that has no off switch: reasoning
-#: tokens are generated tokens and share `max_tokens` with the visible answer, so
-#: on this model a profile's cap is no longer entirely the profile's to spend.
-#:
-#: It exists because the tightest utility profiles cap output at 300 tokens. Before
-#: the move, a non-thinking task genuinely got all 300; now any reasoning comes out
-#: of them, and a JSON task truncated at `finish_reason=length` burns its one
-#: repair retry on the same cap and can fail twice. Adding this back to the cap
-#: restores the visible budget the profile intended rather than enlarging it.
-#:
-#: 64 rather than something rounder: the most reasoning observed at the `low` floor
-#: across every probe was 16 tokens, so this is ~4x the measured worst case while
-#: adding only a fifth to the smallest cap. Raise it if a `length` truncation is
-#: ever actually seen on a utility task; do not raise it speculatively, because
-#: every token here IS also available to visible output.
-EXECUTOR_REASONING_ALLOWANCE_TOKENS = 64
+#: gpt-6-luna accepts `none` | `low` | `medium` | `high` | `xhigh`; `none` is a
+#: genuine off switch (measured: 0 reasoning tokens). `medium` is the product
+#: decision: a thinking model that thinks moderately, on every turn and every
+#: utility task alike. Passed to the adapter at construction (`main.py`) rather
+#: than read by it, so the decision stays here beside the model id.
+EXECUTOR_REASONING_EFFORT = "medium"
 
 # ---------------------------------------------------------------------------
 # The EXECUTOR FALLBACK. A second host for the SAME model, reached only when the
@@ -123,22 +68,19 @@ EXECUTOR_REASONING_ALLOWANCE_TOKENS = 64
 # block on every request, a privacy filter, an output-quality denylist, a
 # sticky-affinity cohort, a caller-facing `routing` preference — existed to
 # choose between endpoints on the ORDINARY path, per turn, as policy. None of
-# that comes back. Baseten is still the host: it answers every turn it can, the
-# body it receives is byte-identical to what it received before this landed, and
+# that comes back. OpenAI is still the host: it answers every turn it can, and
 # nothing a caller sends can steer any of it.
 #
-# What changed is only what happens when Baseten CANNOT answer. Before, a Baseten
-# outage was a Daintree outage — one host, one credential, and a 5xx or a silent
-# socket became a failed turn after the configured retry. There is nothing about
-# `zai-org/GLM-5.3-Flash` that requires Baseten specifically: the same weights
-# are served by twenty other endpoints behind OpenRouter, so the single point of
-# failure was an accident of how the host was picked rather than a property of
-# the product.
+# What this covers is only what happens when OpenAI CANNOT answer. Without it an
+# OpenAI outage is a Daintree outage — one host, one credential. The same
+# `gpt-6-luna` weights are also served by Azure and Amazon Bedrock behind
+# OpenRouter, so the single point of failure is an accident of how the host was
+# picked rather than a property of the product.
 #
 # The public promise is unchanged either way — a caller still targets
 # `daintree-assistant` (`PUBLIC_MODEL_ID`), is never told which host answered,
 # and has no field with which to ask.
-EXECUTOR_FALLBACK_MODEL = "z-ai/glm-5.3-flash"
+EXECUTOR_FALLBACK_MODEL = "openai/gpt-6-luna"
 
 #: The host name, for logs and traces. Never reaches a client.
 EXECUTOR_FALLBACK_PROVIDER = "openrouter"
@@ -166,13 +108,13 @@ EXECUTOR_FALLBACK_SORT = "latency"
 
 #: Endpoints excluded from the fallback pool, by OpenRouter provider slug.
 #:
-#: Baseten is one of the twenty endpoints OpenRouter routes this model to, and it
-#: is the one endpoint guaranteed to be useless here: this path only runs because
-#: Baseten just failed, so routing back to the same infrastructure through a
+#: OpenAI's own endpoints are among those OpenRouter routes this model to, and
+#: they are the ones guaranteed to be useless here: this path only runs because
+#: OpenAI just failed, so routing back to the same infrastructure through a
 #: second hop buys a slower copy of the failure that already happened. Excluding
 #: it makes the fallback a genuinely independent second attempt rather than a
 #: retry wearing a different hostname.
-EXECUTOR_FALLBACK_IGNORED_PROVIDERS = ("baseten",)
+EXECUTOR_FALLBACK_IGNORED_PROVIDERS = ("openai",)
 
 #: Consecutive primary failures before the breaker opens and turns stop being
 #: spent on a host that is not answering.
@@ -187,7 +129,7 @@ EXECUTOR_FALLBACK_IGNORED_PROVIDERS = ("baseten",)
 #: What tripping buys is real, though, and it is why the threshold is not higher:
 #: while the breaker is closed every turn pays the primary's failure before
 #: reaching the fallback, and during an outage that failure is usually a TIMEOUT.
-#: An open breaker is what stops a 10-minute Baseten outage from adding the
+#: An open breaker is what stops a 10-minute OpenAI outage from adding the
 #: connect-or-stall budget to the front of every single turn in it.
 EXECUTOR_FALLBACK_FAILURE_THRESHOLD = 3
 
@@ -272,7 +214,7 @@ FAST_RESPONSE_REASONING_EFFORT = "low"
 #:
 #: **Why off.** The preamble buys a visible line while the reader waits, and it is
 #: worth precisely as much as the wait is long. On the previous executor that gap
-#: was seconds. On `zai-org/GLM-5.3-Flash` via Baseten the executor's first bytes
+#: was seconds. On the current executor the first bytes
 #: arrive fast enough that a line announcing work which has already started reads
 #: as noise, and it delays the real answer to say something that stops being true
 #: almost at once. The stage's own design already conceded the principle —
@@ -294,7 +236,7 @@ FAST_RESPONSE_URL_ENV = "CEREBRAS_BASE_URL"
 FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
 #: The host name, for traces and metrics. Never reaches a client.
 FAST_RESPONSE_PROVIDER = "cerebras"
-EXECUTOR_PROVIDER = "baseten"
+EXECUTOR_PROVIDER = "openai"
 
 #: Why this model and not the 31B Gemma that used to sit here: the stage no
 #: longer writes a considered opening the executor continues from. It writes one
@@ -309,7 +251,6 @@ __all__ = [
     "EXECUTOR_CONTEXT_TOKENS",
     "EXECUTOR_FALLBACK_MODEL",
     "EXECUTOR_MODEL",
-    "EXECUTOR_REASONING_ALLOWANCE_TOKENS",
     "EXECUTOR_REASONING_EFFORT",
     "FAST_RESPONSE_ENABLED",
     "FAST_RESPONSE_MODEL",
@@ -426,8 +367,8 @@ CONFIRMATION_PACING_ENABLED = False
 #:
 #: Hardcoded like the model ids: how long the product pauses before answering is
 #: a benchmarked product decision, not an operational dial. Re-measure after a
-#: host or model change — every number above describes GLM-5.3-Flash on Baseten
-#: with a warm prefix cache, and nothing else.
+#: host or model change — the numbers above were measured on GLM-5.3-Flash on
+#: Baseten with a warm prefix cache, before the move to gpt-6-luna on OpenAI.
 CONFIRMATION_PACING_SECONDS = 1.0
 
 #: A deliberate beat before the first word.
@@ -450,39 +391,19 @@ CONFIRMATION_MIN_PACED_WORDS = 4
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
 #
-# **THIS FLAG NO LONGER MEANS "NO REASONING HAPPENS", AND THAT CHANGED WITH THE
-# HOST.** It used to be literally true: DeepSeek V4 Flash reasons whenever the
-# field is absent, so every call sent `reasoning: {"enabled": false}`, which
-# Together honoured — measured, `reasoning_tokens` left the usage block
-# entirely. GLM-5.3-Flash has no such switch (see EXECUTOR_REASONING_EFFORT
-# above): it reasons unconditionally, and the cheapest posture available is the
-# `low` floor rather than off.
+# The serving model THINKS, at one fixed effort (`EXECUTOR_REASONING_EFFORT`,
+# `medium`), on every turn and every utility task. `/doctor` and
+# `/v1/daintree/capabilities` publish this as `thinking_enabled: true`. Because
+# reasoning tokens share the output cap, a utility task adds
+# `thinking_headroom_tokens` to its profile's cap (services/task_runner.py) so
+# the chain of thought cannot starve the answer into a `length` truncation.
 #
-# So what `False` means HERE is now "ask this host for the least reasoning it
-# will do", and `providers/baseten.py` is what translates it — a request
-# carrying `thinking_disabled=True` is sent at the floor, not with the field
-# omitted, because omission on this host buys `high`. In practice the floor is
-# very close to the old posture (1 of 6 trials reasoned at all, median 0
-# tokens), which is why the flag keeps its name and its value rather than being
-# renamed for a difference that does not show up in a usage block.
-#
-# What it does NOT do any more is guarantee a zero. `/doctor` and
-# `/v1/daintree/capabilities` publish it as `thinking_enabled: false`, and that
-# now reads as a statement about what the server REQUESTS rather than about what
-# the model does. Worth revisiting if a caller ever gates on it.
-#
-# Runbook learning used to be the one deliberate exception — it ran
-# fire-and-forget after the response, so its latency never reached a user. It
-# has been removed.
-INTERACTIVE_THINKING_ENABLED = False
-# The tier the interactive surface would send if that posture were ever flipped
-# back on — i.e. if the server ever wanted MORE than the floor. Kept beside the
-# flag rather than inlined at the one call site that reads it
-# (services/task_runner.py) so the pair stays legible as a single decision — and
-# so flipping the flag does not also require choosing a tier. On this host the
-# accepted values are `low` | `high` | `max`; `high` is also what an omitted
-# field would have bought.
-INTERACTIVE_REASONING_EFFORT = "high"
+# The adapter (`providers/openai.py`) sends the configured effort on every call,
+# including the forced-tool-choice paths that still set `thinking_disabled` —
+# this model accepts tools + reasoning + a forced choice on the Responses API.
+INTERACTIVE_THINKING_ENABLED = True
+#: The effort the interactive surface requests — the same single posture.
+INTERACTIVE_REASONING_EFFORT = EXECUTOR_REASONING_EFFORT
 
 # The development default salt; rejected in production by weak_secrets().
 DEFAULT_STATE_SALT = "daintree-state-salt"
@@ -494,7 +415,7 @@ def _origin_problem(*, value: str, expected_host: str, env_name: str) -> str | N
 
     Extracted from the single-provider version so both providers get the SAME
     check rather than a copy each. The strictness is deliberate on every clause:
-    a non-443 port is a different origin; userinfo (``https://x@inference.baseten.co``)
+    a non-443 port is a different origin; userinfo (``https://x@api.openai.com``)
     still reaches the host but credentials do not belong in this URL in any form;
     and a malformed port must fail readiness rather than the first request.
     """
@@ -1168,18 +1089,16 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider (Baseten Model APIs, OpenAI-compatible) -------
+    # ---- Upstream provider (OpenAI Responses API) ------------------------
     # The model is hardcoded (see EXECUTOR_MODEL above). Only the key and base URL
     # come from the environment.
-    baseten_base_url: str = Field(
-        default="https://inference.baseten.co/v1", alias="BASETEN_BASE_URL"
-    )
+    openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
     # THE server's upstream credential, and the only one there is. Daintree funds
     # every turn from this key: callers no longer supply their own (see auth.py),
     # so this is required for the server to answer anything and is gated by
     # ``missing_secrets``. Local dev reads it from .env; Cloud Run injects it from
     # Secret Manager.
-    baseten_api_key: SecretStr = Field(default=SecretStr(""), alias="BASETEN_API_KEY")
+    openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
 
     # ---- Second provider (OpenRouter) — OPTIONAL, and deliberately not gating.
     # It now funds TWO different things, and they are worth keeping apart because
@@ -1189,23 +1108,23 @@ class Settings(BaseSettings):
     #      compaction, which routes to a model an order of magnitude cheaper per
     #      input token precisely because it re-reads conversation history (see
     #      OPENROUTER_COMPACTION_MODEL in services/task_runner.py).
-    #   2. The EXECUTOR FALLBACK: the same GLM-5.3-Flash weights on a different
-    #      host, reached only when Baseten cannot answer (see
+    #   2. The EXECUTOR FALLBACK: the same gpt-6-luna weights on a different
+    #      host, reached only when OpenAI cannot answer (see
     #      EXECUTOR_FALLBACK_MODEL at the top of this module and
     #      providers/failover.py).
     #
     # It is absent from ``missing_secrets`` ON PURPOSE, and that is still the
     # whole difference between the two credentials — the second use above does
-    # not change it. Without BASETEN_API_KEY nothing can be answered at all, so
+    # not change it. Without OPENAI_API_KEY nothing can be answered at all, so
     # its absence must fail readiness. Without this one every turn is still
     # answered; what is lost is a utility task nothing on the serving path calls
-    # yet, and the ability to survive a Baseten outage. A deployment without it
+    # yet, and the ability to survive an OpenAI outage. A deployment without it
     # is degraded in its ROBUSTNESS, not in its function, and taking the whole
     # server down at readiness over a spare tyre is the wrong trade. ``/doctor``
     # reports whether the fallback is armed so the absence is visible rather than
     # silent.
     #
-    # There is no OPENROUTER_BASE_URL to match ``baseten_base_url``: that one
+    # There is no OPENROUTER_BASE_URL to match ``openai_base_url``: that one
     # exists so tests and local proxies can redirect the credential-bearing
     # serving path, and ``weak_secrets`` pins it back to the real origin in
     # production. Both OpenRouter adapters are constructed against the module
@@ -1215,21 +1134,13 @@ class Settings(BaseSettings):
 
     # ---- Thinking headroom -----------------------------------------------
     # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
-    # the top of this module): main/utility/selector are non-thinking, only the
-    # runbook-learning gate and builder/improver still think. reasoning_content
-    # round-trips through the wire contract so a tool-call turn can replay the
-    # chain-of-thought that produced its calls (the provider adapter renames it to
-    # the wire's `reasoning` on the way out), which the assembler preserves —
-    # that path stays live because the posture is a flag, not a deletion. Thinking
-    # mode ignores temperature/top_p.
+    # the top of this module): the main call and every utility task reason at the
+    # one serving effort. The serving host returns no chain of thought as text, so
+    # there is no reasoning to replay across rounds (providers/openai.py).
     #
-    # Because max_tokens is SHARED by reasoning + visible output, a small-output
-    # THINKING call adds this headroom to its tight output cap so the
-    # chain-of-thought can't starve the answer into a finish_reason=length
-    # truncation. Under the current posture the runbook-learning gate is the only
-    # such call; utility tasks add it only if thinking is switched back on, since
-    # a non-thinking task would otherwise be handed 4k tokens of slack it can
-    # spend on VISIBLE output, silently overrunning its profile's cap. The main
+    # Because max_tokens is SHARED by reasoning + visible output, every utility
+    # task adds this headroom to its tight output cap so the chain-of-thought
+    # can't starve the answer into a finish_reason=length truncation. The main
     # /respond call never uses this: it runs on a single flat budget
     # (MAIN_DEFAULT_MAX_TOKENS == MAIN_MAX_TOKENS_CEILING, clamped for runaway
     # containment), and a client MAY request its own main max_tokens — so headroom
@@ -1339,22 +1250,16 @@ class Settings(BaseSettings):
     # anything pathological. Revisit only from measured latency distributions. The
     # heavyweight transcript/graph tasks also carry an explicit 60s on their
     # TaskProfile so a future default cut cannot silently starve them.
-    # (The original justification here was the ~4k-token reasoning budget of a
-    # thinking-high profile. Utility tasks are NON-thinking now — see
-    # INTERACTIVE_THINKING_ENABLED — so that argument no longer applies; the input
-    # size one does.)
+    # Utility tasks also reason at the serving effort (INTERACTIVE_THINKING_ENABLED),
+    # which this read budget comfortably covers.
     utility_timeout_seconds: float = Field(default=60.0, alias="UTILITY_TIMEOUT_SECONDS")
     upstream_connect_timeout_seconds: float = Field(
         default=10.0, alias="UPSTREAM_CONNECT_TIMEOUT_SECONDS"
     )
 
     # ---- Selector -------------------------------------------------------
-    # The selector is HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED at
-    # the top of this module); its prompt's reason-first JSON key order is the
-    # inline reasoning step. It reached this posture first, on its own first-byte
-    # latency argument, and keeps its own hardcode rather than reading the shared
-    # flag — flipping the interactive posture back on must not silently drag the
-    # selector with it.
+    # Runbook selection is the LOCAL classifier and makes no model call; this cap
+    # is a leftover of the retired prompt-based selector.
     # Sized with wide margin over the observed 120-190-token completions: the
     # reason-first key order puts runbook_ids LAST in the JSON, so a length
     # truncation would now lose the critical key (parse fail -> repair -> possibly
@@ -1362,17 +1267,16 @@ class Settings(BaseSettings):
     selector_max_output_tokens: int = Field(default=800, alias="SELECTOR_MAX_OUTPUT_TOKENS")
 
     # ---- Utility tasks --------------------------------------------------
-    # Named small-model tasks (checkpoint, summarize, classify, workflow_plan, …) are
-    # NON-THINKING, like the rest of the interactive surface — they read
-    # INTERACTIVE_THINKING_ENABLED (task_runner.py), which is False. Each
-    # TaskProfile's max_output_tokens therefore sizes its whole completion;
-    # thinking_headroom_tokens is added only if that flag is switched back on, so a
-    # non-thinking task is never handed 4k tokens of slack to spend on visible
-    # output. json tasks use response_format json_object; no utility task uses a
+    # Named small-model tasks (checkpoint, summarize, classify, workflow_plan, …)
+    # reason at the serving effort, like the rest of the interactive surface — they
+    # read INTERACTIVE_THINKING_ENABLED (task_runner.py), which is True. Each
+    # TaskProfile's max_output_tokens sizes the VISIBLE answer and
+    # thinking_headroom_tokens is added on top for the reasoning that shares the
+    # cap. json tasks use response_format json_object; no utility task uses a
     # forced tool call.
 
     # ---- Retries --------------------------------------------------------
-    # ONE HOP ONLY: backend -> Baseten. Applies to every upstream call (main
+    # ONE HOP ONLY: backend -> OpenAI. Applies to every upstream call (main
     # completion, stream open, selector, utility tasks): retries transient
     # failures only while no model output or replay-unsafe side effect has been
     # exposed. Streaming metadata may already be public during an open/prefetch
@@ -1680,19 +1584,19 @@ class Settings(BaseSettings):
     @property
     def serving_api_key(self) -> SecretStr:
         """The credential that funds every turn."""
-        return self.baseten_api_key
+        return self.openai_api_key
 
     @property
     def serving_base_url(self) -> str:
         """The origin the serving credential is sent to."""
-        return self.baseten_base_url
+        return self.openai_base_url
 
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
         BOTH entries are SERVER-owned, which is the whole shape of the credential
         model: Daintree holds every upstream key and callers hold none (see
-        auth.py). ``BASETEN_API_KEY`` is required for the server to answer
+        auth.py). ``OPENAI_API_KEY`` is required for the server to answer
         anything at all, and its absence must fail READINESS rather than surface a
         turn later as an upstream 401 that reads like the caller's fault. There is
         still no INBOUND key to configure: account authentication is OAuth, and

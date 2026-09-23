@@ -38,18 +38,22 @@ from daintree_assistant_server.config import (
 )
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.baseten import BasetenProvider
+from daintree_assistant_server.providers.openai import OpenAIProvider
+from daintree_assistant_server.providers.openrouter_fallback import OpenRouterFallbackProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
 #: The adapter production builds. Named rather than inlined so the credential
 #: test below asserts the class as well as the key.
-_SERVING_PROVIDER_CLASS = BasetenProvider
+_SERVING_PROVIDER_CLASS = OpenAIProvider
+
+#: The serving host, as the provider policy has to name it.
+_HOST_NAME = "openai"
 
 #: Where the host publishes its data-handling position. Written out rather than
 #: derived from the API origin, because they are genuinely different domains:
-#: Baseten serves from `inference.baseten.co` and publishes policy at
-#: `baseten.co`.
-_POLICY_DOMAIN = "baseten.co"
+#: OpenAI serves from `api.openai.com` and publishes policy at `openai.com`
+#: (and `platform.openai.com` for the API data-usage guide).
+_POLICY_DOMAIN = "openai.com"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "daintree_assistant_server"
@@ -110,18 +114,17 @@ def test_authoritative_docs_exist(doc: Path) -> None:
 #
 # THE MECHANISM CHANGED AND THE COPY DELIBERATELY DID NOT. Under OpenRouter the
 # no-training floor was something this server ENFORCED per request, by sending
-# `data_collection: "deny"` and filtering the eligible endpoint pool. Cerebras is
-# a single host: there is no pool, no filter, and nothing to send. What Daintree
-# can say now rests entirely on Cerebras's own published policy, cited in
-# docs/PROVIDER_POLICY.md section 4.
+# `data_collection: "deny"` and filtering the eligible endpoint pool. The serving
+# host is now a single host (OpenAI): there is no pool, no filter, and nothing to
+# send. What Daintree can say rests entirely on the host's own published policy,
+# cited in docs/PROVIDER_POLICY.md section 4.
 #
-# Cerebras publishes a STRONGER position than the old copy claims — no training,
-# and zero retention of inference inputs and outputs by default. The copy is
-# still not upgraded to match, and that is a decision rather than an oversight:
-# understating a privacy guarantee cannot mislead a user, and overstating one is
-# the failure this whole section exists to prevent. Raising the claim to "does
-# not retain" is a deliberate act that needs a human to verify Cerebras's terms
-# and then relax the scan below — not a default that drifts in.
+# And "does not retain" would be FALSE here, not merely unverified: OpenAI keeps
+# API inputs and outputs for abuse monitoring for up to 30 days by default, and
+# `store: false` only means a response is not kept for later retrieval. So the
+# copy stops at "does not collect or train on", and this scan is what holds it
+# there. Understating a privacy guarantee cannot mislead a user; overstating one
+# is the failure this whole section exists to prevent.
 # ---------------------------------------------------------------------------
 
 # Phrases that assert something stronger than the copy is willing to promise.
@@ -230,12 +233,12 @@ def test_provider_policy_names_the_upstream_whose_policy_this_now_is() -> None:
     the drift in place. It follows the serving constants now.
     """
     text = _read(DOC_PROVIDER).lower()
-    assert "baseten" in text, (
-        "docs/PROVIDER_POLICY.md does not name Baseten, the host whose published "
-        "policy the privacy claim rests on."
+    assert _HOST_NAME in text, (
+        f"docs/PROVIDER_POLICY.md does not name {_HOST_NAME!r}, the host whose "
+        "published policy the privacy claim rests on."
     )
     assert _POLICY_DOMAIN in text, (
-        "docs/PROVIDER_POLICY.md must link Baseten's own authoritative "
+        "docs/PROVIDER_POLICY.md must link the serving host's own authoritative "
         "data-handling page. The privacy claim rests on it, so a reader has to be "
         "able to reach it."
     )
@@ -249,121 +252,136 @@ def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
 
 # ---------------------------------------------------------------------------
 # Thinking posture.
+#
+# The posture has now inverted TWICE, and each time the old sentence survived in
+# prose as the thing a reader believed. DeepSeek V4 Flash could be held at zero
+# ("nothing in this server thinks"); GLM-5.3-Flash on Baseten could not be run
+# non-thinking at all, so the server pinned the `low` floor and published
+# `thinking_enabled: false` as "what is requested". gpt-6-luna on OpenAI THINKS,
+# deliberately, at one fixed effort (`medium`) on every call — and `none` is a
+# genuine off switch on this model, so the old "cannot be run non-thinking"
+# sentence is now wrong in the other direction.
 # ---------------------------------------------------------------------------
 
 
 def test_the_thinking_posture_is_documented() -> None:
-    """The posture INVERTED with the serving model, and the doc must carry it.
+    """One fixed effort, and §2 has to say which one.
 
-    This gate used to require the sentence "nothing in this server thinks", which
-    was true of DeepSeek V4 Flash — a model that reasons by default and can be
-    held down with `reasoning: {"enabled": false}`. GLM-5.3-Flash cannot be held
-    down at all: reasoning is always on, `none` is rejected, and an OMITTED
-    `reasoning_effort` means `high`. So the old sentence is not merely stale, it
-    is backwards, and a reader who believed it would think an omitted field was
-    the cheap default when it is the most expensive one available.
+    Pinned against the constants rather than a literal in the doc alone, so a
+    move to a different effort — a cost and latency change on every turn and
+    every utility task — fails here until §2 is rewritten with it.
     """
-    assert INTERACTIVE_THINKING_ENABLED is False, (
-        "The flag flipped. On this host it means 'request the floor', not 'no "
-        "reasoning occurs' — if it is now True, docs/PROVIDER_POLICY.md section 2 "
-        "and .env.example describe a posture that no longer holds; update them in "
+    assert INTERACTIVE_THINKING_ENABLED is True, (
+        "The flag flipped off. docs/PROVIDER_POLICY.md section 2, .env.example and "
+        "CLAUDE.md all describe a model that thinks on every call; update them in "
         "this commit."
     )
-    assert EXECUTOR_REASONING_EFFORT == "low", (
-        "The pinned effort moved off the floor. That is a cost and latency change "
-        "on every turn and every utility task, so docs/PROVIDER_POLICY.md section "
-        "2 must be rewritten with it."
+    assert EXECUTOR_REASONING_EFFORT == "medium", (
+        "The pinned effort moved. That is a cost and latency change on every turn "
+        "and every utility task, so docs/PROVIDER_POLICY.md section 2 must be "
+        "rewritten with it."
     )
-    text = _read(DOC_PROVIDER).lower()
-    assert "cannot be run non-thinking" in text, (
-        "docs/PROVIDER_POLICY.md section 2 no longer states that the serving "
-        "model cannot be run non-thinking, which is the whole posture."
+    assert INTERACTIVE_REASONING_EFFORT == EXECUTOR_REASONING_EFFORT, (
+        "The interactive surface requests a different effort from the executor "
+        "pin — that is a second posture, i.e. a tier, and §2 says there is one."
     )
-    assert "reasoning_effort" in text, (
-        "docs/PROVIDER_POLICY.md must name the field that actually controls this; "
-        "it is the only control the host exposes."
+    section = doc_section("## 2. ", ends_at="\n## 3. ")
+    assert f"`{EXECUTOR_REASONING_EFFORT}`" in section, (
+        f"docs/PROVIDER_POLICY.md section 2 does not name the pinned effort "
+        f"`{EXECUTOR_REASONING_EFFORT}`."
     )
+    assert "reasoning.effort" in section or '"effort"' in section, (
+        "docs/PROVIDER_POLICY.md section 2 must name the field that actually "
+        "carries the posture on this host's wire (`reasoning.effort` on the "
+        "Responses API)."
+    )
+
+
+#: Posture sentences that were TRUE of an earlier serving model and are false of
+#: this one. Forbidden by exact phrase rather than by shape, because the accurate
+#: copy still discusses thinking at length and a shape-matcher would fire on it.
+#:
+#: The first three are the DeepSeek-era absolute and its runbook-learning
+#: carve-outs; the rest are the GLM-era floor, which is the most likely thing to
+#: be copied forward now because it was current until this move.
+_RETIRED_POSTURE_CLAIMS = (
+    "nothing in this server thinks",
+    "runbook learning is the one surface that still thinks",
+    "skill learning is the one surface that still thinks",
+    "cannot be run non-thinking",
+    "thinking_enabled: false",
+    "the `low` floor",
+    "reasoning floor",
+    "utility tasks are non-thinking",
+)
+
+#: A line naming the retired model or host is describing history, not today.
+_POSTURE_HISTORY_MARKERS = (
+    "historical",
+    "used to",
+    "no longer",
+    "previously",
+    "retired",
+    "superseded",
+    "git history",
+    "glm",
+    "baseten",
+    "deepseek",
+)
 
 
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
-def test_no_document_claims_the_interactive_surface_runs_a_thinking_TIER(
-    path: Path,
-) -> None:
-    """Narrowed, because what it forbids became partly TRUE.
+def test_no_document_states_a_retired_thinking_posture(path: Path) -> None:
+    """Replaces two gates whose premise inverted.
 
-    The original drift was `.env.example` claiming main/utility/gate run
-    thinking-high long after the surface was turned off. The surface now reasons
-    again — at the `low` FLOOR, which it cannot avoid — so "these surfaces think"
-    is no longer simply false. What is still false, and still expensive, is a
-    claim that they run a deliberate thinking TIER: that would tell a reader the
-    4,000-token headroom applies and that `high` is in play, when the server pins
-    the floor and budgets ~64 tokens for it.
+    `test_no_document_claims_the_interactive_surface_runs_a_thinking_TIER` forbade
+    "utility tasks … use thinking", and `test_no_document_claims_a_hard_zero_on_
+    reasoning` forbade only the DeepSeek-era absolute. On this model the first is
+    now TRUE copy — every surface thinks, at `medium` — so keeping it would have
+    required the docs to lie. What drifts now is the other direction: a floor,
+    a "non-thinking" surface or `thinking_enabled: false`, each of which was the
+    accurate sentence one host ago.
 
-    So the pattern still keys on the word "thinking" following a surface name,
-    which the accurate copy avoids — it says "floor", "low", or
-    "reasoning_effort" instead. A hard-zero claim is a different failure and is
-    caught by `test_no_document_claims_a_hard_zero_on_reasoning`.
+    A line that names the retired model or host (or is otherwise marked as
+    history) is exempt: the provider policy's §9 keeps the GLM move as its worked
+    example, and that is labelled history rather than a live claim.
     """
-    stale = re.compile(
-        r"\b(?:main|utility|selector)\b[^.\n]{0,70}"
-        r"\b(?:run|runs|use|uses|with)\b[^.\n]{0,20}"
-        r"thinking(?:-high)?\b",
-        re.IGNORECASE,
-    )
+    offenders: list[str] = []
     for number, line in enumerate(_read(path).splitlines(), start=1):
-        match = stale.search(line)
-        if match is None:
+        lowered = line.lower()
+        if any(marker in lowered for marker in _POSTURE_HISTORY_MARKERS):
             continue
-        # A negated or conditional mention is how the accurate copy talks about it
-        # ("utility tasks are NON-thinking", "only if that flag is switched back on").
-        if re.search(r"\b(?:non-thinking|not|never|no longer|if|off|unless)\b", line, re.I):
-            continue
-        pytest.fail(
-            f"{path.name}:{number} says {match.group(0)!r}. The main completion, "
-            "utility tasks and the selector all send reasoning disabled "
-            "(INTERACTIVE_THINKING_ENABLED is False; the selector hardcodes it "
-            "separately). See docs/PROVIDER_POLICY.md section 2."
+        offenders.extend(
+            f"{path.name}:{number} says {claim!r}"
+            for claim in _RETIRED_POSTURE_CLAIMS
+            if claim in lowered
         )
+    assert not offenders, (
+        "\n".join(offenders) + "\n\nThe serving model thinks on every call at "
+        f"`{EXECUTOR_REASONING_EFFORT}` (INTERACTIVE_THINKING_ENABLED is True). "
+        "See docs/PROVIDER_POLICY.md section 2."
+    )
 
 
-@pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
-def test_no_document_claims_a_hard_zero_on_reasoning(path: Path) -> None:
-    """The retired absolute must not come back anywhere in the prose.
-
-    "Nothing in this server thinks" was accurate for two model generations and is
-    now false, so it is the single most likely sentence to be copied forward from
-    an older revision. It is forbidden by exact string rather than by shape,
-    because the accurate copy still discusses thinking at length and a
-    shape-matcher would fire on that.
-
-    The two stale runbook-learning carve-outs are kept in the same guard: the
-    sentence they qualified was written before the runbook rename, so forbidding
-    only the newer wording would let the original claim return.
-    """
-    text = _read(path).lower()
-    for stale in (
-        "nothing in this server thinks",
-        "runbook learning is the one surface that still thinks",
-        "skill learning is the one surface that still thinks",
-    ):
-        assert stale not in text, (
-            f"{path.name} says {stale!r}. The serving model reasons "
-            "unconditionally and the server pins the `low` floor; see "
-            "docs/PROVIDER_POLICY.md section 2."
-        )
-
-
-# The stale posture survived in *source comments* too — `config.py` justified the
+# The stale posture survives in *source comments* too — `config.py` justified the
 # utility timeout by "every profile runs thinking-high" long after the flag went
-# false. Prose files are not the only place a reader forms a belief.
+# false, and then by "utility tasks are NON-thinking" long after it went true
+# again. Prose files are not the only place a reader forms a belief.
 _STALE_THINKING_COMMENT = re.compile(
-    r"\b(?:every|each|all)\s+(?:utility\s+)?(?:profile|task)s?\b[^.\n]{0,40}"
-    r"\b(?:run|runs|use|uses)\b[^.\n]{0,15}thinking",
+    r"\b(?:utility|task|profile|selector|main)s?\b[^.\n]{0,50}"
+    r"\b(?:are|is|run|runs)\s+non-thinking\b",
     re.IGNORECASE,
 )
 
 
-def test_no_source_comment_claims_utility_tasks_think() -> None:
+def test_no_source_comment_claims_utility_tasks_do_not_think() -> None:
+    """Inverted from `test_no_source_comment_claims_utility_tasks_think`.
+
+    The old gate forbade exactly what is now true. Utility tasks read
+    INTERACTIVE_THINKING_ENABLED, which is True, and the task runner adds
+    `thinking_headroom_tokens` to their cap because of it — so a comment calling
+    them non-thinking is the stale belief now.
+    """
     offenders: list[str] = []
     for path in _python_sources():
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -373,21 +391,30 @@ def test_no_source_comment_claims_utility_tasks_think() -> None:
             if _STALE_THINKING_COMMENT.search(line):
                 offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}")
     assert not offenders, (
-        f"{offenders} still describe utility tasks as thinking. They read "
-        "INTERACTIVE_THINKING_ENABLED, which is False."
+        f"{offenders} still describe a surface as non-thinking. Every call reasons "
+        f"at `{EXECUTOR_REASONING_EFFORT}` (INTERACTIVE_THINKING_ENABLED is True)."
     )
 
 
-def test_task_runner_actually_sends_reasoning_disabled() -> None:
+def test_task_runner_reads_the_shared_posture_and_budgets_for_it() -> None:
     """The behavioural anchor under all the prose above.
 
-    Whatever the comments say, this is what goes on the wire.
+    Whatever the comments say, this is what goes on the wire: the task runner
+    takes its posture from the shared flag, and because that flag is on, it adds
+    the thinking headroom to every profile's cap so reasoning cannot starve the
+    answer into a `length` truncation. The 64-token allowance that existed for
+    the GLM floor (`EXECUTOR_REASONING_ALLOWANCE_TOKENS`) is gone.
     """
     source = inspect.getsource(TaskRunner)
     assert "INTERACTIVE_THINKING_ENABLED" in source, (
         "TaskRunner no longer reads the shared thinking posture; "
         "docs/PROVIDER_POLICY.md section 2 says it does"
     )
+    assert "thinking_headroom_tokens" in source, (
+        "TaskRunner no longer adds the thinking headroom to a task's cap; "
+        "docs/PROVIDER_POLICY.md section 2 says it does"
+    )
+    assert "EXECUTOR_REASONING_ALLOWANCE_TOKENS" not in source
 
 
 # ---------------------------------------------------------------------------
@@ -411,7 +438,7 @@ def test_readme_names_the_pinned_main_model() -> None:
 # ---------------------------------------------------------------------------
 # Credential ownership: the SERVER holds the upstream key.
 #
-# This inverted with the move to Cerebras, and it inverted in the direction that
+# This inverted with the move off caller-supplied keys, and it inverted in the direction that
 # costs money if the docs are wrong. The old arrangement — every caller's bearer
 # token IS the upstream credential — is now false, and a document that still says
 # it tells a tester their key funds their turns when Daintree's does.
@@ -540,7 +567,7 @@ def test_the_open_door_is_still_the_default_posture() -> None:
     """
     from daintree_assistant_server.config import Settings
 
-    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, BASETEN_API_KEY="k")
+    settings = Settings(**{"STATE_SIGNING_KEY_CURRENT": "x" * 32, EXECUTOR_KEY_ENV: "k"})
     assert settings.auth_mode == "open"
     text = _read(SRC_ROOT / "auth.py")
     assert 'if mode == "open"' in text and "return ANONYMOUS" in text, (
@@ -564,7 +591,7 @@ def test_no_route_hands_a_caller_supplied_key_to_the_provider() -> None:
     assert not offenders, (
         f"{offenders} thread a caller-supplied credential to the provider. The "
         "server funds every turn from its own key; a caller's would be forwarded "
-        "to Cerebras and rejected as theirs. See auth.py and docs/KEY_HANDLING.md."
+        "to the upstream and rejected as theirs. See auth.py and docs/KEY_HANDLING.md."
     )
 
 
@@ -655,52 +682,73 @@ def test_provider_policy_describes_a_single_host_upstream() -> None:
     """
     section = doc_section("## 3. ", ends_at="\n### ")
     assert re.search(r"single[- ]host|one endpoint|not a router", section, re.I), (
-        "docs/PROVIDER_POLICY.md section 3 must state that Cerebras hosts one "
-        "endpoint per model. Every removed control follows from that."
+        "docs/PROVIDER_POLICY.md section 3 must state that the serving host is one "
+        "endpoint, not a router. Every removed control follows from that."
     )
 
 
-def test_reasoning_effort_is_sent_by_everything_and_the_doc_says_so() -> None:
-    """The INVERSE of what this gate asserted for two model generations.
+def test_the_one_reasoning_effort_is_sent_by_everything_and_the_doc_says_so() -> None:
+    """The behavioural anchor for §2 and §3, on the adapter production builds.
 
-    It used to be called ``test_no_reasoning_effort_is_sent_by_anything`` and
-    required §2 to name ``reasoning: {"enabled": false}`` as the thing that
-    switches reasoning off. Every clause of that is now wrong: the unified object
-    is never sent, ``reasoning_effort`` IS sent on every single call, and there is
-    no "off" to switch to. It kept passing purely because the rewritten §2 still
-    mentions the retired object as history — a gate held in place by the very
-    text that superseded it, which is why it is replaced rather than adjusted.
+    This gate has been rewritten with every host. It once required
+    `reasoning: {"enabled": false}`; then it required a top-level
+    `reasoning_effort: "low"` and forbade the object. The Responses API spells
+    it `reasoning: {"effort": ...}`, and a top-level `reasoning_effort` is an
+    unknown field there — a 400 on a strict host — so both halves inverted.
 
-    ``INTERACTIVE_REASONING_EFFORT`` still survives as the tier the interactive
-    surface would request if it ever wanted MORE than the floor.
+    Built on a request that sets `thinking_disabled` AND pins a `tool_choice`,
+    because those are the paths an earlier adapter clamped: one posture means
+    they get the same effort as everything else. It also carries the three
+    parameters this model refuses (`temperature`, `stop`, and chat's
+    `max_tokens` spelling), which the adapter must never forward.
     """
-    assert INTERACTIVE_THINKING_ENABLED is False
-    assert INTERACTIVE_REASONING_EFFORT  # the tier above the floor, still unused
-    assert EXECUTOR_REASONING_EFFORT == "low"
+    assert INTERACTIVE_THINKING_ENABLED is True
+    assert EXECUTOR_REASONING_EFFORT == "medium"
 
-    # The BEHAVIOURAL anchor, not just prose: the adapter must put the floor on
-    # the wire rather than omitting the field, on a request that asks for nothing.
-    provider = BasetenProvider(
+    provider = OpenAIProvider(
         None,  # type: ignore[arg-type]  # _build_body never touches the client
         api_key=SecretStr(""),
         reasoning_effort=EXECUTOR_REASONING_EFFORT,
     )
     body = provider._build_body(  # noqa: SLF001
         ProviderChatRequest(
-            model=EXECUTOR_MODEL, messages=[{"role": "user", "content": "hi"}]
+            model=EXECUTOR_MODEL,
+            messages=[{"role": "user", "content": "hi"}],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {"name": "t", "parameters": {"type": "object"}},
+                }
+            ],
+            tool_choice={"type": "function", "function": {"name": "t"}},
+            temperature=0.2,
+            stop=["\n\n"],
+            max_tokens=256,
+            thinking_disabled=True,
         ),
         stream=False,
     )
-    assert body["reasoning_effort"] == "low", (
-        "the adapter stopped sending the floor. An ABSENT reasoning_effort means "
-        "`high` on this host, so this is a silent cost increase on every turn."
+    assert body["reasoning"] == {"effort": "medium"}, (
+        "the adapter stopped sending the one posture, or clamps it on the "
+        "thinking_disabled / forced-tool path. docs/PROVIDER_POLICY.md §2 says "
+        "every call carries the same effort."
     )
-    assert "reasoning" not in body
+    for refused in ("reasoning_effort", "temperature", "stop", "max_tokens"):
+        assert refused not in body, (
+            f"the adapter sent {refused!r}. This host 400s on unknown fields and "
+            "this model refuses temperature/stop; see docs/PROVIDER_POLICY.md §3."
+        )
+    assert body["max_output_tokens"] == 256
+    assert body["store"] is False
+    assert all(tool.get("strict") is False for tool in body["tools"]), (
+        "function tools must be sent `strict: false` explicitly — the Responses "
+        "API defaults them to strict, which the CLI's optional-field schemas "
+        "cannot satisfy (docs/PROVIDER_POLICY.md §3)."
+    )
 
-    text = _read(DOC_PROVIDER).lower()
-    assert "reasoning_effort" in text, (
-        "docs/PROVIDER_POLICY.md §2 no longer names the field that actually "
-        "controls reasoning here — the only control this host exposes."
+    section = doc_section("## 2. ", ends_at="\n## 3. ")
+    assert "every call" in section.lower(), (
+        "docs/PROVIDER_POLICY.md §2 no longer says the effort is sent on every call."
     )
 
 
@@ -1021,10 +1069,12 @@ def test_the_adapter_asks_for_no_cost_opt_in() -> None:
 
     from daintree_assistant_server.providers import openrouter as _or
 
-    source = _inspect.getsource(_or.OpenRouterProvider._build_body)
-    assert '"usage"' not in source, (
-        "_build_body sends a `usage` key. See docs/PROVIDER_POLICY.md section 5c."
-    )
+    for build_body in (_or.OpenRouterProvider._build_body, OpenAIProvider._build_body):
+        source = _inspect.getsource(build_body)
+        assert '"usage"' not in source, (
+            f"{build_body.__qualname__} sends a `usage` key. See "
+            "docs/PROVIDER_POLICY.md section 5c."
+        )
 
 
 def test_the_documented_total_is_a_sum_of_both_calls() -> None:
@@ -1421,6 +1471,13 @@ _RETIRED_CLAIMS = (
     "pass-through for the caller's own",
     "tester pastes their own",
     "the key never leaves the request path",
+    # The cache-affinity field was computed-and-dropped on every host before
+    # OpenAI, which documents `prompt_cache_key`; the primary sends it now.
+    "no `prompt_cache_key` is sent",
+    "computed, and not sent",
+    # Chat Completions cannot serve this model with tools AND reasoning; the
+    # adapter speaks the Responses API.
+    "baseten's model apis",
 )
 
 #: A line may discuss a retired design when it says so. Kept deliberately small:
@@ -1546,7 +1603,7 @@ def test_no_summary_repeats_a_privacy_claim_the_policy_has_not_verified() -> Non
     failure mode a caveat has: it protects the page it sits on and nothing else.
 
     So the gate is conditional, not absolute. While §4 says it is unverified, no
-    summary may state the claim. Once somebody reads Together's terms and rewrites
+    summary may state the claim. Once somebody reads the host's terms and rewrites
     §4, this test stops applying by itself — which is the right shape, because the
     claim becomes repeatable at exactly the moment it becomes true.
     """
@@ -1588,9 +1645,12 @@ def test_no_summary_repeats_a_privacy_claim_the_policy_has_not_verified() -> Non
 #
 # `docs/PROVIDER_POLICY.md` §8 is explicit that the code proves exactly one class
 # of fact — WHICH PARAMETERS WE SEND — and that this is what the drift tests pin.
-# These are that pin for the cache-affinity field. It is the claim most worth
-# holding: a reader who believes a cache key is sent optimizes the key, and the
-# only lever that exists is literal prefix stability.
+# These are that pin for the cache-affinity field, and the fact INVERTED with the
+# move to OpenAI: the primary now sends `prompt_cache_key` (= the computed
+# `cache_session_id`), because OpenAI documents it as the prefix-cache routing
+# hint. What is still never sent is OpenRouter's `session_id` — the fallback
+# drops the key under both spellings. So the scan below now guards `session_id`,
+# and a positive test pins that the primary really does send the one it sends.
 # ---------------------------------------------------------------------------
 
 #: EVERY maintained prose file, not just the seven a reader is pointed at.
@@ -1637,11 +1697,12 @@ def test_the_prose_walk_reaches_the_documents_this_scan_exists_for() -> None:
     assert not any(f.startswith("cli/") for f in found), "vendored CLI must stay excluded"
 
 
-#: Both vendors' WIRE spellings, plus the NORMALIZED request's own field name.
-#: All three are absent from the body; `cache_session_id` is included because
-#: "`cache_session_id` is sent to Together" is exactly as wrong as the other two
-#: and a lookbehind excluding it wholesale let that sentence through.
-_AFFINITY_FIELDS = re.compile(r"prompt_cache_key|cache_session_id|(?<!cache_)session_id")
+#: OpenRouter's WIRE spelling — the one affinity field no adapter sends. The
+#: lookbehind keeps `cache_session_id` out: that field IS forwarded now (as
+#: `prompt_cache_key`, by the primary), so a sentence saying so is true.
+#: `prompt_cache_key` itself is pinned positively by
+#: `test_the_primary_sends_prompt_cache_key_and_the_fallback_does_not` instead.
+_AFFINITY_FIELDS = re.compile(r"(?<!cache_)session_id")
 
 #: A sentence may NAME a field it is telling you is not sent. What fails is a
 #: sentence asserting one is. These are the verbs that make it an assertion.
@@ -1730,13 +1791,13 @@ def _asserts_the_field_is_sent(paragraph: str) -> str | None:
 
 @pytest.mark.parametrize("path", _all_prose_files(), ids=lambda p: p.name)
 def test_no_document_claims_a_cache_affinity_field_is_sent(path: Path) -> None:
-    """CLAUDE.md said calls "still send a `prompt_cache_key`". They never did.
+    """No adapter sends OpenRouter's `session_id`, and no document may say one does.
 
-    The adapter computes the key and `_build_body` drops it, because a host with
-    automatic prefix caching advertises no spelling to send it under and an
-    unadvertised parameter is a needless 400 risk. The prose disagreeing with
-    that is not a cosmetic error: it aims cache work at a field nobody reads, and
-    it did — a paid benchmark A/B'd a parameter that never left the process.
+    This gate was written when CLAUDE.md said calls "still send a
+    `prompt_cache_key`" while no adapter did — a paid benchmark A/B'd a parameter
+    that never left the process. The primary now DOES send `prompt_cache_key`
+    (OpenAI advertises it), so that half moved to a positive test; what is left
+    for the prose scan is the spelling that is still computed-and-dropped.
     """
     offenders: list[str] = []
     for line_number, paragraph in _paragraphs(_read(path)):
@@ -1747,31 +1808,29 @@ def test_no_document_claims_a_cache_affinity_field_is_sent(path: Path) -> None:
     assert not offenders, (
         "prose claims a cache-affinity field reaches the wire:\n  "
         + "\n  ".join(offenders)
-        + "\n\nThe adapter sends neither spelling (docs/PROVIDER_POLICY.md §3a). "
-        "Say what it does instead: the key is computed, and dropped."
+        + "\n\nNo adapter sends `session_id` (docs/PROVIDER_POLICY.md §3a). The "
+        "primary sends `prompt_cache_key`; the fallback sends neither."
     )
 
 
 @pytest.mark.parametrize(
     "prose",
     [
-        # The sentence this test was written for, held as a fixture. A scan that
-        # no longer fires on what motivated it has silently stopped working.
-        "calls still send a `prompt_cache_key` naming their prefix, but as a "
+        # The shape of the sentence this test was written for, held as a fixture.
+        # A scan that no longer fires on what motivated it has stopped working.
+        "calls still send a `session_id` naming their prefix, but as a "
         "*hint* the upstream may ignore",
         # Unrelated negation. A line-wide `_NOT_SENT` search reads the "No" and
         # clears the whole sentence, including the false half after it.
-        "No `provider` block is sent, and a `prompt_cache_key` is attached to "
+        "No `provider` block is sent, and a `session_id` is attached to "
         "every request.",
         # Verbs the first draft of `_SENDS` did not know.
-        "The adapter forwards `prompt_cache_key` upstream.",
-        "Each body contains a `prompt_cache_key`.",
+        "The fallback forwards `session_id` upstream.",
+        "Each body contains a `session_id`.",
         "We add a `session_id` to every completion request.",
-        # The internal spelling. Excluding it wholesale let this through.
-        "`cache_session_id` is sent to Together on every turn.",
         # Markdown soft wrap: the verb and the field name never share a line.
         "Every generation request includes the cache-affinity field\n"
-        "`prompt_cache_key`, so a stable session stays warm.",
+        "`session_id`, so a stable session stays warm.",
     ],
 )
 def test_the_affinity_scan_catches_a_claim_it_must_catch(prose: str) -> None:
@@ -1784,15 +1843,16 @@ def test_the_affinity_scan_catches_a_claim_it_must_catch(prose: str) -> None:
     [
         # The true statements have to survive, or the fix for a failure is
         # deletion rather than correction.
-        "No `prompt_cache_key` is sent, and no `provider` block.",
+        "No `session_id` is sent, and no `provider` block.",
         "`session_id` is computed and never sent to the host.",
-        "It is dropped before the body is built, under both spellings "
+        "The fallback drops it before the body is built, under both spellings "
         "(`prompt_cache_key`, `session_id`).",
-        "`_build_body` strips the `prompt_cache_key` it was handed.",
+        # The CURRENT fact, which the old field list would have failed.
+        "The primary sends `prompt_cache_key` on every call.",
+        "`cache_session_id` is sent to OpenAI as `prompt_cache_key`.",
         "Every main conversation call and utility task carries a "
         "`cache_session_id` on the normalized request.",
-        "An older revision sent a `prompt_cache_key`; this one does not.",
-        "`prompt_cache_key` was the retired Cerebras adapter's spelling.",
+        "An older revision sent a `session_id`; this one does not.",
     ],
 )
 def test_the_affinity_scan_permits_a_true_statement(prose: str) -> None:
@@ -1808,10 +1868,44 @@ def test_the_historical_exemption_is_not_a_universal_escape_hatch() -> None:
     false present-tense claim in one sentence must still fail on the second half.
     """
     prose = (
-        "`session_id` was the retired OpenRouter spelling, and we now send "
-        "`prompt_cache_key` on every request."
+        "`prompt_cache_key` was the retired Cerebras spelling, and the fallback "
+        "now sends `session_id` on every request."
     )
     assert any(_asserts_the_field_is_sent(text) for _, text in _paragraphs(prose))
+
+
+def test_the_primary_sends_prompt_cache_key_and_the_fallback_does_not() -> None:
+    """The positive half of the affinity contract, and the doc that states it.
+
+    OpenAI routes prefix-cache lookups by `prompt_cache_key`, so the primary
+    sends the computed `cache_session_id` under that name. The OpenRouter
+    fallback inherits the parent's drop: its pool is several hosts with their
+    own caches, and neither spelling is part of what it is asked to do.
+    """
+    request = ProviderChatRequest(
+        model=EXECUTOR_MODEL,
+        messages=[{"role": "user", "content": "hi"}],
+        cache_session_id="daintree-main-abc",
+    )
+    primary = OpenAIProvider(
+        None,  # type: ignore[arg-type]  # _build_body never touches the client
+        api_key=SecretStr(""),
+        reasoning_effort=EXECUTOR_REASONING_EFFORT,
+    )._build_body(request, stream=False)  # noqa: SLF001
+    assert primary["prompt_cache_key"] == "daintree-main-abc"
+    assert "session_id" not in primary
+
+    fallback = OpenRouterFallbackProvider(
+        None,  # type: ignore[arg-type]
+        api_key=SecretStr(""),
+    )._build_body(request, stream=False)  # noqa: SLF001
+    assert "prompt_cache_key" not in fallback
+    assert "session_id" not in fallback
+
+    section = doc_section("### 3a. ", ends_at="\n### 3b. ")
+    assert "`prompt_cache_key`" in section and "sent" in section, (
+        "docs/PROVIDER_POLICY.md §3a must say the primary sends `prompt_cache_key`."
+    )
 
 
 def test_both_cached_token_shapes_are_read() -> None:

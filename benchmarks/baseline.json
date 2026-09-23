@@ -5,8 +5,8 @@
     "runbooks": 40
   },
   "identity": {
-    "model": "zai-org/GLM-5.3-Flash",
-    "provider": "baseten",
+    "model": "gpt-6-luna",
+    "provider": "openai",
     "public_model": "daintree-assistant"
   },
   "prompt": {

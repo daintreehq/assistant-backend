@@ -80,7 +80,7 @@ variable "concurrency" {
 # application's own posture is `AUTH_MODE`, which this module cannot set at all:
 # `auth.py` dispatches on that mode, and the shipped default is `open`, under
 # which the Authorization header is never read for authentication and every
-# request is the same anonymous principal funded by the server's own Baseten
+# request is the same anonymous principal funded by the server's own OpenAI
 # key. So a service built from here is exactly as private as its ingress, and no
 # more.
 #
@@ -150,7 +150,7 @@ variable "environment" {
 
 # Secret Manager secret IDs (values are managed out-of-band, never in TF state).
 #
-# THE SERVER HOLDS THE UPSTREAM CREDENTIAL. BASETEN_API_KEY funds every turn and
+# THE SERVER HOLDS THE UPSTREAM CREDENTIAL. OPENAI_API_KEY funds every turn and
 # is in `Settings.missing_secrets()`, so a deployment without it answers /readyz
 # with 503 and can never serve a request. It is listed here for that reason: this
 # map is the complete set of secrets the service mounts, and omitting the one
@@ -175,7 +175,7 @@ variable "secret_ids" {
   default = {
     STATE_SIGNING_KEY_CURRENT = "state-signing-key-current"
     STATE_SALT                = "state-salt"
-    BASETEN_API_KEY          = "baseten-api-key"
+    OPENAI_API_KEY          = "openai-api-key"
     # Required since the fast-response stage lost its off switch: it runs on
     # every eligible turn, so readiness refuses a deployment without it.
     CEREBRAS_API_KEY          = "cerebras-api-key"

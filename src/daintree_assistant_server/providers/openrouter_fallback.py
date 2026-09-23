@@ -1,6 +1,6 @@
-"""The executor's SECOND host: the same GLM-5.3-Flash weights, via OpenRouter.
+"""The executor's SECOND host: the same gpt-6-luna weights, via OpenRouter.
 
-This adapter exists for one job — answering a turn Baseten could not answer —
+This adapter exists for one job — answering a turn OpenAI could not answer —
 and everything unusual about it follows from that job rather than from OpenRouter
 being a router.
 
@@ -9,57 +9,33 @@ is a deliberate exception to a rule the rest of the package keeps.** The parent
 (:mod:`providers.openrouter`) sends none, and
 ``tests/unit/test_provider_openrouter.py::test_no_routing_or_affinity_field_is_ever_sent``
 pins that by name so the retired routing apparatus cannot creep back into the
-ordinary path. Nothing here reopens that: there is no privacy filter, no
-output-quality denylist, no fallback pool the caller can shape, no
-sticky-affinity key, and no caller-facing preference. What is sent is an
-ORDERING — ``{"sort": "latency"}`` — over a pool that genuinely exists, on a path
-that only runs when the preferred host has already failed.
+ordinary path. What is sent here is an ORDERING — ``{"sort": "latency"}`` — over
+a pool that genuinely exists, on a path that only runs when the preferred host
+has already failed. ``config.EXECUTOR_FALLBACK_SORT`` carries the reasoning for
+latency specifically.
 
-The distinction that makes the exception coherent: the deleted block chose
-between endpoints as POLICY on every ordinary turn, against a host that has only
-one endpoint, so it could only ever narrow a pool of one into a pool of zero.
-This one states a preference among twenty real endpoints for a request whose user
-is already waiting out a failure. ``config.EXECUTOR_FALLBACK_SORT`` carries the
-reasoning for latency specifically.
-
-**Baseten is excluded from the pool.** OpenRouter serves this model from Baseten
-among others, and that is the one endpoint that cannot help here: this adapter is
-reached because Baseten just failed, so routing back to the same infrastructure
-through an extra hop buys a slower copy of the failure that already happened.
-``config.EXECUTOR_FALLBACK_IGNORED_PROVIDERS`` holds the slug.
+**OpenAI's own endpoints are excluded from the pool.** OpenRouter serves this
+model from OpenAI, Azure and Amazon Bedrock; this adapter is reached because
+OpenAI just failed, so routing back to it through an extra hop buys a slower
+copy of the failure that already happened. ``config.EXECUTOR_FALLBACK_IGNORED_PROVIDERS``
+holds the slug.
 
 **``require_parameters`` is on**, which is not tidiness. OpenRouter's default is
 to DROP a parameter an endpoint does not support rather than to avoid that
-endpoint, and this server sends parameters whose loss is silent and expensive:
-``response_format`` on every JSON utility task (dropped, the model answers prose,
-the task burns its one repair retry and then 502s) and ``stop`` on the paths that
-set one. Requiring support turns "quietly served wrong" into "served by a
-different endpoint", which with twenty candidates costs nothing worth having.
+endpoint, and ``response_format`` on every JSON utility task is a parameter
+whose loss is silent and expensive. The flip side is that anything the MODEL
+does not support must never be sent at all, or the pool filters to empty: this
+model refuses ``temperature`` and ``stop`` (see ``providers/openai.py``), so
+both are dropped here exactly as the primary drops them.
 
-**The thinking posture is the Baseten adapter's, restated in OpenRouter's
-spelling.** GLM-5.3-Flash cannot be run non-thinking on any host — reasoning is
-always on, there is no ``none``, and an omitted effort means ``high`` — so the
-parent's ``reasoning: {"enabled": false}``, which is exactly right for a model
-that CAN be held down, is the expensive-or-undefined choice here. The floor goes
-on the wire unconditionally, under OpenRouter's canonical ``reasoning.effort``
-(which it normalizes to each endpoint's own ``reasoning_effort``). The effect is
-that a turn answered here reasons the same amount as a turn answered on Baseten,
-which is the property that makes the fallback a substitute rather than a
-different product.
-
-**What it does NOT inherit from the Baseten adapter is the ``reasoning_content``
-un-rename**, and that asymmetry is the point of having two subclasses. Baseten
-spells a replayed chain-of-thought ``reasoning_content`` in both directions;
-OpenRouter's canonical field on an assistant row is ``reasoning``, which is
-precisely what the parent's ``_rewrite_messages`` already produces. So the parent
-is correct here and is left alone.
+**The reasoning posture is the primary's**, under OpenRouter's canonical
+``reasoning.effort``: a turn answered here reasons the same amount as a turn
+answered by OpenAI, which is what makes the fallback a substitute rather than a
+different product. OpenRouter handles tools + reasoning for this model itself.
 
 One capability difference is worth knowing when reading a turn's accounting:
-**OpenRouter reports ``usage.cost`` and Baseten does not**. A failed-over turn is
-therefore priced while an ordinary one is not. Nothing needed changing for that —
-``ProviderUsage.cost`` has always been "not reported" rather than zero — but a
-cost that appears only on the unhappy path is a real thing to remember before
-reading a dashboard.
+**OpenRouter reports ``usage.cost`` and OpenAI does not**. A failed-over turn is
+therefore priced while an ordinary one is not.
 """
 
 from __future__ import annotations
@@ -93,7 +69,7 @@ class OpenRouterFallbackProvider(OpenRouterProvider):
     ) -> None:
         super().__init__(*args, **kwargs)
         # Injected rather than read from `config` inside `_build_body`, matching
-        # `BasetenProvider` and `CerebrasProvider`: the product decisions stay
+        # `OpenAIProvider` and `CerebrasProvider`: the product decisions stay
         # beside the model id and this module keeps its one job. The defaults are
         # those same constants, so a provider built without arguments is built
         # with the shipped posture rather than an accidental one.
@@ -104,16 +80,13 @@ class OpenRouterFallbackProvider(OpenRouterProvider):
     def _build_body(self, request: ProviderChatRequest, *, stream: bool) -> dict[str, Any]:
         body = super()._build_body(request, stream=stream)
 
-        # The floor, unconditionally — see the module docstring. `thinking_disabled`
-        # is honoured as "the cheapest this model will do" rather than dropped,
-        # exactly as `BasetenProvider` honours it: the callers that set it (the
-        # forced single-object path, the assembler's non-thinking pins) are asking
-        # for the least discursive call available, and on these weights omitting
-        # the field asks for the MOST expensive one.
-        if request.thinking_disabled or not request.reasoning_effort:
-            body["reasoning"] = {"effort": self._reasoning_effort}
-        else:
-            body["reasoning"] = {"effort": request.reasoning_effort}
+        # Unsupported by this model on every endpoint; under `require_parameters`
+        # sending either would leave no endpoint to serve the call.
+        body.pop("temperature", None)
+        body.pop("stop", None)
+
+        # The primary's one posture, unconditionally — see the module docstring.
+        body["reasoning"] = {"effort": self._reasoning_effort}
 
         # THE ROUTING BLOCK, and the only one this server sends. Built here rather
         # than held as a constant dict because a shared mutable would be handed to

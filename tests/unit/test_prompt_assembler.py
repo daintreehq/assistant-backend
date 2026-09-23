@@ -386,7 +386,7 @@ def test_runtime_renders_typed_worktree(assembler: PromptAssembler) -> None:
 
 def test_agent_roster_omits_whole_over_budget_rows_without_truncating_ids() -> None:
     settings = Settings(
-        BASETEN_API_KEY="tgp_v1_test",
+        OPENAI_API_KEY="tgp_v1_test",
         STATE_SIGNING_KEY_CURRENT="s",
         CAP_STARTUP_AGENT_BYTES=200,
     )
@@ -521,11 +521,11 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=req, runbooks=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    # Thinking is hardcoded OFF for the main call (posture lives with the model ids
-    # in config.py). Off is the only step below "high" on this model — the effort
-    # tiers collapse, so "low" is not an available middle ground.
-    assert pr.thinking_disabled is True
-    assert pr.reasoning_effort is None
+    # Thinking is hardcoded ON at the one serving effort (posture lives with the
+    # model ids in config.py). Temperature still rides the request; the OpenAI
+    # adapter drops it because this model accepts only the default.
+    assert pr.thinking_disabled is False
+    assert pr.reasoning_effort == "medium"
     assert pr.stream is True
     assert pr.include_usage is True
     assert pr.temperature == 0.5
@@ -619,7 +619,7 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
     # to the upstream model, not to the posture, and this test is what stops flipping
     # INTERACTIVE_THINKING_ENABLED back on from silently reintroducing the 400.
     settings = Settings(
-        BASETEN_API_KEY="tgp_v1_test", STATE_SIGNING_KEY_CURRENT="s",
+        OPENAI_API_KEY="tgp_v1_test", STATE_SIGNING_KEY_CURRENT="s",
     )
     assembler = PromptAssembler(prompt_loader, settings)
     tools = [{"type": "function", "function": {"name": "git__status", "description": "d"}}]

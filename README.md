@@ -5,7 +5,7 @@ boundary off the local CLI: the server owns the permanent system prompt, the
 runbook catalog and bodies, automatic runbook selection, prompt assembly, and the
 small-model utility prompts. The CLI keeps local state and local tool execution.
 
-**The server holds the upstream credential** (`BASETEN_API_KEY`) and funds every
+**The server holds the upstream credential** (`OPENAI_API_KEY`) and funds every
 turn from it, so a request needs no API key of its own. Account authentication is
 built and switched OFF: `AUTH_MODE` selects `open` (the shipped default, under
 which the `Authorization` header is not read for authentication at all), `observe`
@@ -29,8 +29,8 @@ as their own response block, and streaming uses named SSE events (`meta`/`status
 `compaction`/`done`/`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** two internal provider ROLES behind one public model, neither of them selectable by a caller. The **executor** is Baseten's Model APIs (OpenAI-format API spoken *internally*, behind a provider abstraction) — `zai-org/GLM-5.3-Flash` for the main completion and every utility task. It **cannot be run non-thinking** — reasoning is always on and an omitted `reasoning_effort` means `high` — so every call pins the `low` floor ([`docs/PROVIDER_POLICY.md` §2](docs/PROVIDER_POLICY.md)). A **fast-response** stage on Cerebras (`gpt-oss-120b`), which writes a short preamble concurrently with the executor, is **built but currently OFF** (`config.FAST_RESPONSE_ENABLED`) — the new executor answers fast enough that a line announcing work already underway is noise. While it is off, Cerebras receives nothing and `CEREBRAS_API_KEY` is not required; the executor's request is byte-identical either way. The executor also has a **second host**: when Baseten cannot answer, the same turn goes to OpenRouter against the same weights (`z-ai/glm-5.3-flash`) at the same reasoning floor, behind a circuit breaker that stops spending turns on a host that is down and re-probes it every few minutes ([`docs/PROVIDER_POLICY.md` §1a](docs/PROVIDER_POLICY.md)). `OPENROUTER_API_KEY` does not gate readiness — without it every turn is still answered and only the ability to survive an outage is lost.
-- **Selection:** runbook selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Baseten is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference. (The fallback above does send one `provider` block to OpenRouter — `sort: latency` over a pool that genuinely exists — but only on the path that runs when Baseten has already failed, and a caller still cannot express a preference.) (The host-latency argument that pinned the PREVIOUS executor — the same weights via OpenRouter's default routing measured 3.1x slower, p50 3414ms against 1100ms — was about DeepSeek V4 Flash on Together and has not been re-run for this host.) **Data handling is currently UNVERIFIED for ALL THREE hosts** — nobody has read Baseten's, OpenRouter's or Cerebras's terms for the account tiers actually in use, so state nothing about how any of them retains, trains on, or deletes what it is sent. OpenRouter is the sharpest of the three, because it is itself a router: the endpoint that serves a failed-over turn has its own terms, and `sort: latency` means which one that is varies per request ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
+- **Upstream:** two internal provider ROLES behind one public model, neither of them selectable by a caller. The **executor** is OpenAI's Responses API (`https://api.openai.com/v1/responses`, translated to and from the chat shape *internally*, behind a provider abstraction in `providers/openai.py`) — `gpt-6-luna` for the main completion and every utility task. It **thinks, at one fixed effort**: every call sends `reasoning: {"effort": "medium"}`, and there are no tiers ([`docs/PROVIDER_POLICY.md` §2](docs/PROVIDER_POLICY.md)). The Responses API rather than Chat Completions because on the latter this model refuses function tools combined with any reasoning effort other than `none`. (Previously the executor was `zai-org/GLM-5.3-Flash` on Baseten; git history has that adapter.) A **fast-response** stage on Cerebras (`gpt-oss-120b`), which writes a short preamble concurrently with the executor, is **built but currently OFF** (`config.FAST_RESPONSE_ENABLED`) — the executor answered fast enough when that was decided (on GLM-5.3-Flash; not re-measured on gpt-6-luna) that a line announcing work already underway was noise. While it is off, Cerebras receives nothing and `CEREBRAS_API_KEY` is not required; the executor's request is byte-identical either way. The executor also has a **second host**: when OpenAI cannot answer, the same turn goes to OpenRouter against the same weights (`openai/gpt-6-luna`, OpenAI's own endpoints excluded, so the pool is Azure and Amazon Bedrock) at the same reasoning effort, behind a circuit breaker that stops spending turns on a host that is down and re-probes it every few minutes ([`docs/PROVIDER_POLICY.md` §1a](docs/PROVIDER_POLICY.md)). `OPENROUTER_API_KEY` does not gate readiness — without it every turn is still answered and only the ability to survive an outage is lost.
+- **Selection:** runbook selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. OpenAI is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference. (The fallback above does send one `provider` block to OpenRouter — `sort: latency` over a pool that genuinely exists — but only on the path that runs when OpenAI has already failed, and a caller still cannot express a preference.) (The host-latency argument that pinned an EARLIER executor — the same weights via OpenRouter's default routing measured 3.1x slower, p50 3414ms against 1100ms — was about DeepSeek V4 Flash on Together and has not been re-run for this host.) **Data handling is currently UNVERIFIED for ALL THREE hosts** — OpenAI publishes its API data-handling position (cited in [`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md)), but nobody has confirmed it, OpenRouter's (and its Azure/Bedrock endpoints') or Cerebras's terms against the account tiers actually in use, so state nothing about how any of them retains, trains on, or deletes what it is sent. OpenRouter is the sharpest of the three, because it is itself a router: the endpoint that serves a failed-over turn has its own terms, and `sort: latency` means which one that is varies per request ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
 - **Traces:** a restricted training-trace plane (`tracing/`) can store *exact* turn content — messages, tool arguments, the reply — for later model development. It is **off by default** and full-content capture is refused outright in production and staging. Operational logs stay metadata-only and are a separate plane entirely ([`docs/INTERNAL_BETA.md` §9](docs/INTERNAL_BETA.md))
 - **Target:** Google Cloud Run (stateless; signed state token carries the active runbooks)
 
@@ -99,7 +99,7 @@ proof that the whole corpus is accurate.
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, runbooks, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + Baseten/OpenRouter/Cerebras adapters, executor failover, SSE parser
+  providers/      # ChatProvider protocol + OpenAI/OpenRouter/Cerebras adapters, executor failover, SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader
   runbooks/         # Runbook models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed runbook-state token codec
@@ -124,9 +124,10 @@ mypy src/
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
 # Live provider-contract tests: NONE ship today. The suite that existed pinned
-# the Cerebras wire and was deleted with that adapter, so what Baseten accepts
-# and what it 400s are unpinned (see TODO.md). One thing IS now known by hand:
-# Baseten reports no `usage.cost` at all, so every cost figure is null.
+# the Cerebras wire and was deleted with that adapter, so what OpenAI accepts
+# and what it 400s are unpinned (see TODO.md). Known by hand: the host is strict
+# (unknown fields 400; this model refuses temperature and stop), and OpenAI
+# reports no `usage.cost` at all, so every cost figure is null.
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
@@ -139,7 +140,7 @@ Set this (see `.env.example` for the full list):
 
 ```bash
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
-export BASETEN_API_KEY=...               # the upstream credential; funds every turn
+export OPENAI_API_KEY=...                # the upstream credential; funds every turn
 ```
 
 Both are the **server's own**. `CEREBRAS_API_KEY` is not required while
@@ -159,7 +160,7 @@ header IS read for redaction in every mode, so a mis-pasted credential cannot be
 logged back to you.)
 
 Missing required secrets do not crash the process — they fail **readiness**
-(`/readyz` returns 503) so liveness stays green. `BASETEN_API_KEY` is gated
+(`/readyz` returns 503) so liveness stays green. `OPENAI_API_KEY` is gated
 there precisely so its absence surfaces as "this deployment is not ready" rather
 than as a first-turn upstream 401 that reads like the caller's fault.
 
@@ -167,7 +168,7 @@ than as a first-turn upstream 401 that reads like the caller's fault.
 
 ```bash
 # Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
-cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT, BASETEN_API_KEY
+cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT, OPENAI_API_KEY
 ./dev                  # exports .env, then runs the server
 ```
 
@@ -253,7 +254,7 @@ a weaker copy of a couple of these checks, and the copy nobody ran by hand was t
 one gating production.
 
 **It needs no credential and accepts none.** The server holds the upstream key
-(`BASETEN_API_KEY`) and funds every turn from it, so the metadata reads, the
+(`OPENAI_API_KEY`) and funds every turn from it, so the metadata reads, the
 `/auth/verify` sign-in probe (free — a key introspection, not a model call), the
 426 protocol gate on both content endpoints, request-id echo and the typed error
 envelope answer an anonymous request — under `AUTH_MODE=enforce` the checks that
@@ -296,13 +297,13 @@ applied while leaving the service unhealthy is the worst outcome: the operator
 believes they have recovered and stops looking.
 
 The deployment mounts state-signing material (`STATE_SIGNING_KEY_CURRENT`,
-`STATE_SALT`) and both upstream credentials — `BASETEN_API_KEY`, which funds
-every turn, and `CEREBRAS_API_KEY`, reserved for the currently disabled
-fast-response stage. Four
-Secret Manager secrets, all server-owned; `bootstrap.sh` creates and grants all
-four. In production (`ENVIRONMENT=production`) the service fails readiness if a
+`STATE_SALT`) and the upstream credentials — `OPENAI_API_KEY`, which funds
+every turn; `OPENROUTER_API_KEY`, mounted only when a version exists, which funds
+the executor fallback; and `CEREBRAS_API_KEY`, reserved for the currently
+disabled fast-response stage. All server-owned; `bootstrap.sh` creates and grants
+them. In production (`ENVIRONMENT=production`) the service fails readiness if a
 secret is weak or default (the packaged `STATE_SALT`, a signing key under 32
-characters), or if `BASETEN_BASE_URL` is not the real `https://inference.baseten.co`
+characters), or if `OPENAI_BASE_URL` is not the real `https://api.openai.com`
 origin — the server key rides every request to that origin, so a typo'd or
 plain-http host would leak the one credential all of Daintree runs on.
 
