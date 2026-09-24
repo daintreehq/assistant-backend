@@ -157,6 +157,15 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: get gpt to have a quick look at the change and relay whatever it comes back with
     confusable_with: [daintree.review.review-change]
+  - query: ask codex what it thinks of the retry logic in the adapter and tell me
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
+  - query: get claude to explain how our rate limiter decides when to back off
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
+  - query: have an agent look at the quota module and report what it finds
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
 followups:
   - query: hows it going
     history:

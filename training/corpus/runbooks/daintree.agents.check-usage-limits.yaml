@@ -1,0 +1,85 @@
+# Training examples whose answer is `daintree.agents.check-usage-limits` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.check-usage-limits
+run: 2026-09-24-agent-usage-limits
+positives:
+  - how much of my claude allowance is left this week
+  - what percentage of my codex plan have i burned through
+  - is my weekly cap on claude code nearly used up
+  - read me the remaining quota for antigravity
+  - how many premium requests does copilot say i have remaining
+  - check the codex rate limit, i think im about to hit it
+  - whats left on my grok weekly limit
+  - when does the five hour window reset on claude
+  - what time does my codex weekly limit roll over
+  - pull up the usage numbers for every agent i have set up
+  - go through claude, codex and grok and tell me how much headroom each one has
+  - am i going to run out of claude before the week resets
+  - how much gemini quota do i have for today
+  - check my kimi membership quota
+  - show me my remaining credits in antigravity
+  - which of my agents has the most allowance left right now
+  - i keep getting rate limited in codex, how much have i got left
+  - find out what my plan usage is on claude code and codex
+  - open codex and read me its status limits
+  - tell me the reset time and the percent remaining for each agent
+  - how close am i to the session limit in claude
+  - usage check on all the agents please
+  - whats my allowance looking like across the board
+  - how do i see how much usage is left in grok
+  - where do i find my remaining limit in antigravity cli
+  - is there a way to check my cursor usage from the terminal
+  - figure out how to read the usage limit for each supported agent
+  - how much codex have i got left before it cuts me off
+  - hows my quota, i want to know which agent to use for the next big job
+  - can you check whether i have enough claude left to run a long refactor
+boundaries:
+  - query: check my claude usage before you start anything
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: launch codex and claude, then read each ones plan usage back to me
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: start an agent for each of my accounts and check how much allowance is left on each
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: how many premium requests are left on copilot this month
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: tell me when my codex weekly limit resets
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: am i signed in to claude and how much of my plan is used
+    confusable_with: [daintree.diagnostics]
+  - query: codex keeps saying ive hit my limit, how much is actually left
+    confusable_with: [daintree.agents.recover-agent]
+followups:
+  - query: now do grok
+    history:
+      - "user: how much usage do i have left in claude and codex"
+      - "assistant: Claude: 34% of the week left, resets Sep 28. Codex: 25% of the weekly limit left, resets Sep 26."
+    active: [daintree.agents.check-usage-limits]
+  - query: and antigravity?
+    history:
+      - "user: check my codex limits"
+      - "assistant: Codex /status shows 25% of the weekly limit left, resetting Sep 26 at 08:30."
+    active: [daintree.agents.check-usage-limits]
+  - query: same for gemini please
+    history:
+      - "user: how much quota is left on antigravity"
+      - "assistant: agy /usage: 100% left on both Gemini and Claude/GPT families, five-hour and weekly."
+    active: [daintree.agents.check-usage-limits]
+  - query: is that percentage used or remaining?
+    history:
+      - "user: whats left on grok"
+      - "assistant: Grok's Usage limit tab shows a weekly bar at 0%, resetting September 28."
+    active: [daintree.agents.check-usage-limits]
+topic_shifts:
+  - query: before we go on, how much of my codex allowance is left
+    history:
+      - "user: spawn claude on the auth refactor"
+      - "assistant: Claude is working on the auth refactor in terminal t3."
+    active: [daintree.edits.spawn-visible-agent]
+  - query: ok forget the tabs, check my usage limits on claude and codex
+    history:
+      - "user: rename these tabs"
+      - "assistant: Renamed four tabs by branch."
+    active: [daintree.terminals.rename]
