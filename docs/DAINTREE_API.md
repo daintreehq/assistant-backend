@@ -708,6 +708,7 @@ The single generation endpoint. Returns a native JSON body, or — when
     "goal": "…", "is_wake": false,
     "workflow_runs": ["…"],
     "async_operations": ["…"],                 // live runtime-owned async futures (one line each)
+    "scheduled_checkins": ["…"],               // scheduled message timers (a loop's ticks), one line each; send only when capabilities.respond.scheduled_checkins
     "memories": { "pinned": ["…"], "relevant": ["…"] },
     "resumed_watchers": ["…"],               // adopted durable watchers, sent on resume
     "workflow_state": [                        // workflow-intelligence digests (client-owned graphs)

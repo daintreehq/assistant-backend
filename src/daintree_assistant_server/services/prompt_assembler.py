@@ -800,6 +800,9 @@ class PromptAssembler:
         async_operations = _cap_list_combined(
             turn.async_operations, self.settings.cap_async_operations
         )
+        checkins = _cap_list_combined(
+            turn.scheduled_checkins, self.settings.cap_scheduled_checkins
+        )
         pinned = _cap_list_combined(turn.memories.pinned, self.settings.cap_pinned_memories)
         relevant = _cap_list_combined(turn.memories.relevant, self.settings.cap_relevant_memories)
         watchers = _cap_list_combined(
@@ -819,6 +822,7 @@ class PromptAssembler:
             "goal": frame_value(goal, tag="goal"),
             "workflow_runs": workflow_runs,
             "async_operations": async_operations,
+            "scheduled_checkins": checkins,
             "memories": {"pinned": pinned, "relevant": relevant},
             "resumed_watchers": watchers,
             "workflow_state": self._workflow_digests(turn.workflow_state),

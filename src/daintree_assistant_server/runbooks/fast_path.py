@@ -189,7 +189,7 @@ def can_skip_selection(request: RespondRequest, *, prior_active_ids: list[str]) 
             return False
         if turn.goal or turn.workflow_state or turn.workflow_runs:
             return False
-        if turn.async_operations or turn.resumed_watchers:
+        if turn.async_operations or turn.resumed_watchers or turn.scheduled_checkins:
             return False
 
     return is_no_task_utterance(request.input.messages)

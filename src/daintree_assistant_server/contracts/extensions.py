@@ -262,6 +262,13 @@ class TurnContext(BaseModel):
     # terminal.await.async), one pre-formatted line each — rendered so the model
     # always sees its in-flight async work and never re-issues it.
     async_operations: list[str] = Field(default_factory=list)
+    # Scheduled `message` timers that will start a future turn — the ticks of a
+    # supervision loop — one pre-formatted line each, nearest first. Sent on EVERY
+    # turn, wakes included, so a completion wake can see the loop it belongs to
+    # (its id, next tick, runs left, deadline, linked workflow run) without a
+    # timer.list. Advertised as `respond.scheduled_checkins`: this model is
+    # extra="forbid", so a CLI must not send the field to a backend that predates it.
+    scheduled_checkins: list[str] = Field(default_factory=list)
     memories: Memories = Field(default_factory=Memories)
     # Live watchers the CLI ADOPTED from a prior owner at ownership boot
     # (project-scoped supervision resumed automatically) — sent once, on the
