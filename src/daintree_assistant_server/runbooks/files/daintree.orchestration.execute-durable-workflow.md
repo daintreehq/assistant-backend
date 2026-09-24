@@ -17,6 +17,7 @@ requiredTools:
   - workflow.reconcile
   - workflow.cancel
   - user.askMultipleChoice
+  - timer.schedule
 ---
 Use when: several dependent phases need a durable execution graph rather than an in-memory plan.
 
