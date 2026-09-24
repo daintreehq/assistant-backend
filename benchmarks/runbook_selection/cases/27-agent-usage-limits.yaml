@@ -1,0 +1,96 @@
+# Recall and routing coverage for reading an agent CLI's remaining plan allowance.
+# Before daintree.agents.check-usage-limits existed these requests routed to
+# orchestration.fan-out-work, agents.ask-and-relay or orchestration.watch-outcome at
+# 0.99-1.00, or to nothing, and each of those would have acted on the request wrongly:
+# asking an agent in prose makes it guess or search the web, because the figures live
+# only in the CLI's own usage screen.
+#
+# The user text avoids the runbook's own trigger phrases where it can. Each ground truth
+# is decidable from the whenToUse text on disk.
+
+cases:
+  - id: usage-limits-single-agent-remaining
+    category: single-runbook
+    note: >-
+      The plain recall case: one agent, remaining allowance and its reset, in the user's
+      own words ("hammering", "top back up") rather than "usage limit" or "quota".
+    messages:
+      - role: user
+        content: >-
+          I've been hammering Codex all morning. How much of this week's allowance is
+          still there, and when does it top back up?
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: usage-limits-several-agents
+    category: single-runbook
+    note: >-
+      Several agents at once is still one usage check, not a fan-out of work.
+    messages:
+      - role: user
+        content: >-
+          Can you look at Claude Code and Codex for me and say how much plan headroom
+          each one has left?
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: usage-limits-not-ask-and-relay
+    category: routing-trap
+    note: >-
+      The bait is ask-and-relay: "put a question to Codex" is its shape exactly. But
+      what is asked is the account's remaining allowance, which the agent cannot see as a
+      model. check-usage-limits' whenToUse claims that tell (figures read off the
+      agent's own usage screen, never an answer the agent composes). ask-and-relay is
+      excluded, so picking it is a precision failure.
+    messages:
+      - role: user
+        content: "Put a question to Codex: how much of my allowance have I got left?"
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: usage-limits-not-fan-out
+    category: routing-trap
+    note: >-
+      The bait is fan-out-work: two agents started, each reporting back. The deliverable
+      is still each account's remaining quota, not parallel work. fan-out-work is
+      excluded.
+    messages:
+      - role: user
+        content: >-
+          Fire up Codex and Claude and have each of them report back how much quota
+          remains on my account.
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: usage-limits-not-watch-outcome
+    category: routing-trap
+    note: >-
+      The bait is watch-outcome: a later overnight run. But the request is a check to
+      make now, before that run starts; nothing is to be watched or reported later.
+      watch-outcome is excluded.
+    messages:
+      - role: user
+        content: >-
+          Before I kick off the overnight run, check whether Claude has enough weekly
+          allowance left for it.
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: usage-limits-not-diagnostics
+    category: routing-trap
+    note: >-
+      The bait is diagnostics: "subscription" and "active" read as a sign-in or
+      entitlement check. But the subscription is the agent CLI's plan, not Daintree's,
+      and the question is how much of it is used. diagnostics is excluded.
+    messages:
+      - role: user
+        content: >-
+          Is my Claude subscription still active, and how much of it have I used?
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]

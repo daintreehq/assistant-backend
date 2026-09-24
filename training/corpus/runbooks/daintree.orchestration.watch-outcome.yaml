@@ -299,6 +299,12 @@ boundaries:
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: wait until the build finishes in ten minutes or so, then spawn an agent to run the suite
     confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: ping me when the codex run on the billing branch finishes
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
+  - query: in an hour check whether the claude agent has pushed the quota fix
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:

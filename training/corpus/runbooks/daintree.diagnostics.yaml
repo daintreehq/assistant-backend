@@ -167,6 +167,12 @@ boundaries:
     confusable_with: [daintree.terminals.rename]
   - query: renaming does nothing at all, titles never change, is the mcp even connected
     confusable_with: [daintree.terminals.rename]
+  - query: am i actually signed in to daintree, the assistant keeps saying not connected
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
+  - query: daintree says my account is out of credits, what is going on
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
 followups:
   - query: and the key thing too?
     history:

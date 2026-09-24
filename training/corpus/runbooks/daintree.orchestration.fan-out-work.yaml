@@ -330,6 +330,12 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: when an agent wraps up and its PR exists, hand that slot to the next item in the queue
     confusable_with: [daintree.orchestration.runoff-tiebreaker]
+  - query: start codex and claude on the two halves of the usage dashboard feature
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
+  - query: spin up an agent per failing test file and have each fix its own
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-agent-usage-limits
 followups:
   - query: yeah all of them except the docs one
     history:
