@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 9895,
-  "compiled_sha256": "9e41f6ee6ddca6cc65a7e9819dd1dad297876705ac4bd817e3e9d6e8085460a8",
+  "rows": 9906,
+  "compiled_sha256": "d12f551daf6ec322b79edfa81fa629bb37fce7b863f72c46bf5ce847f28204e0",
   "label_space_sha256": "42c6d752bb7259c29123496348caef1b3e766a84c7e38d5bceb124d5af457e85",
   "label_space_size": 39,
   "by_source": {
-    "boundary": 2086,
+    "boundary": 2092,
     "docs": 740,
     "followup": 464,
     "foundation": 312,
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 531,
     "off_domain": 212,
-    "positive": 2600,
+    "positive": 2605,
     "topic_shift": 2182,
     "wake": 149
   },
@@ -26,7 +26,7 @@
     "2026-09-18-worktree-provisioning": 28,
     "2026-09-22-docs-live-state": 12,
     "2026-09-22-provision-boundary-fix": 11,
-    "pre-split": 9800
+    "pre-split": 9811
   },
   "dropped": {},
   "adjusted": {},
@@ -140,10 +140,10 @@
       "sha256": "7ea3295112b9dde2a6773f031c764ee2bd9e6763d549e79989acfb1ed9a7245d"
     },
     "runbooks/daintree.orchestration.fan-out-work.yaml": {
-      "examples": 247,
-      "rows": 247,
+      "examples": 256,
+      "rows": 256,
       "runbook": "daintree.orchestration.fan-out-work",
-      "sha256": "c7528fe7e6bf0dd78732d0a544f0b606953fffef941de7ac3f29b3c8bf258237"
+      "sha256": "413e59fad92334584337cef4656e4183a8db7eec5fef64b860d3751aecb52bdd"
     },
     "runbooks/daintree.orchestration.interview.yaml": {
       "examples": 126,
@@ -182,10 +182,10 @@
       "sha256": "6408ac46526a5acd57548f0a40ee06277a3fd018d27f09b0d4102f71c9a1f58b"
     },
     "runbooks/daintree.orchestration.watch-outcome.yaml": {
-      "examples": 295,
-      "rows": 295,
+      "examples": 297,
+      "rows": 297,
       "runbook": "daintree.orchestration.watch-outcome",
-      "sha256": "aeeea7a922e8204e205ce4a167a093ec7804e32f9753c1725479d501440f8126"
+      "sha256": "fd1ec98403b83ee157034639c1c625447a22d4a2b384e9f9c1b473e22ca0a2a4"
     },
     "runbooks/daintree.orchestration.workspace-cleanup.yaml": {
       "examples": 257,

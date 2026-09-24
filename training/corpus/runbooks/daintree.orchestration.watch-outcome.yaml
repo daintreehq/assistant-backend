@@ -79,6 +79,10 @@ positives:
   - queue up 'npm run lint' on the api terminal for half an hour from now
   - remind me about the release checklist at 4
 boundaries:
+  - query: keep checking that one agent every ten minutes and tell me the moment it's done — nothing else to start after it
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: in twenty minutes launch an agent on the flaky test, just that one
+    confusable_with: [daintree.orchestration.fan-out-work]
   - query: "Wait for twelve minutes before you launch a terminal for the smoke tests"
     run: 2026-09-09-mission-2-timers
     confusable_with: [daintree.edits.spawn-visible-agent]
