@@ -800,9 +800,14 @@ class PromptAssembler:
         async_operations = _cap_list_combined(
             turn.async_operations, self.settings.cap_async_operations
         )
-        checkins = _cap_list_combined(
-            turn.scheduled_checkins, self.settings.cap_scheduled_checkins
-        )
+        # Each row carries a user-written timer title, so it is framed like the goal:
+        # one line already stops a forged heading; the tag stops it reading as prose.
+        checkins = [
+            frame_value(row, tag="checkin")
+            for row in _cap_list_combined(
+                turn.scheduled_checkins, self.settings.cap_scheduled_checkins
+            )
+        ]
         pinned = _cap_list_combined(turn.memories.pinned, self.settings.cap_pinned_memories)
         relevant = _cap_list_combined(turn.memories.relevant, self.settings.cap_relevant_memories)
         watchers = _cap_list_combined(
