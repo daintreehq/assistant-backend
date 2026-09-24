@@ -59,6 +59,12 @@ positives:
   - start agents on 77 88 and 99, and make sure each one gets the relevant context injected for its area
   - create a worktree with the dev recipe for each of those tickets and put an agent in it
   - i want 5 agents working right now, pick the 5 most independent open bugs and go
+  # Rolling queue under a cap (lab mission 22): more units than slots, refill as each lands.
+  - there's a list of 25 small things to polish. keep five agents going on it at once and when one opens its PR hand its slot to the next item
+  - work down this backlog three at a time — new worktree per item, /work in each, refill as they land
+  - rolling batch please. 30 total, never more than 6 live, keep going till the list is empty
+  - queue these up and drip-feed them to agents, at most three running at any moment
+  - as each agent finishes, launch the next ticket from the list. cap it at four
 boundaries:
   - query: take these six issues and put an agent on each one
     confusable_with: [daintree.worktree.relocate-agents]
@@ -316,6 +322,14 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: for each of those worktrees spawn a claude terminal running /work with the issue number on it
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: never let more than 4 of them run at the same time, and once one of them has its pull request up, start the next one on my list
+    confusable_with: [daintree.workflow.prep-branch-for-review, daintree.edits.spawn-visible-agent]
+  - query: every quarter hour look over the running agents and start the next queued ticket whenever a slot frees up, max six
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: carry on until all 20 reviews are through, five at most at a time, and sleep in between checks
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: when an agent wraps up and its PR exists, hand that slot to the next item in the queue
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
 followups:
   - query: yeah all of them except the docs one
     history:

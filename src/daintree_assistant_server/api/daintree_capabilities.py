@@ -157,6 +157,10 @@ async def capabilities(
             # geometry until it sees this flag. Which is why nothing breaks in
             # either rollout order.
             "display_context": True,
+            # `turn.scheduled_checkins`: the scheduled message timers (a supervision
+            # loop's ticks) rendered into every turn's footer. A gate for the same
+            # reason as display_context — TurnContext is extra="forbid".
+            "scheduled_checkins": True,
             "max_active_runbooks": settings.max_active_runbooks,
             "metadata_transport": "body+stream_meta_event",
             # What a request cost, when the upstream says. `total` sums every

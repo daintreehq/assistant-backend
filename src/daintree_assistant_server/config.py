@@ -1580,6 +1580,7 @@ class Settings(BaseSettings):
     cap_goal: int = Field(default=8 * 1024, alias="CAP_GOAL")
     cap_workflow_runs: int = Field(default=24 * 1024, alias="CAP_WORKFLOW_RUNS")
     cap_async_operations: int = Field(default=8 * 1024, alias="CAP_ASYNC_OPERATIONS")
+    cap_scheduled_checkins: int = Field(default=4 * 1024, alias="CAP_SCHEDULED_CHECKINS")
     cap_pinned_memories: int = Field(default=16 * 1024, alias="CAP_PINNED_MEMORIES")
     cap_relevant_memories: int = Field(default=16 * 1024, alias="CAP_RELEVANT_MEMORIES")
     # Max open-terminal inventory rows rendered into the runtime context (issue #286).

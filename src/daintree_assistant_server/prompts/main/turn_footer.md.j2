@@ -19,6 +19,7 @@ request to route on — read it for context and follow its own rules where state
 {% if turn_context.goal %}Current objective: {{ turn_context.goal }}
 {% endif %}{% if turn_context.workflow_runs %}Active workflow runs: {{ turn_context.workflow_runs | join(", ") }}
 {% endif %}{% if turn_context.async_operations %}Async operations in flight (the runtime is watching these and will wake you when each finishes — do NOT re-run, await, or poll them; async.cancel stops one): {{ turn_context.async_operations | join(", ") }}
+{% endif %}{% if turn_context.scheduled_checkins %}Scheduled check-ins (message timers that will start a future turn; an autonomous turn — a wake or a scheduled message — cannot schedule, re-time or re-arm one; only the user's own turn can): {{ turn_context.scheduled_checkins | join(", ") }}
 {% endif %}{% if turn_context.memories and (turn_context.memories.pinned or turn_context.memories.relevant) %}Memories:
 {% if turn_context.memories.pinned %}  Pinned: {{ turn_context.memories.pinned | join(", ") }}
 {% endif %}{% if turn_context.memories.relevant %}  Relevant: {{ turn_context.memories.relevant | join(", ") }}
