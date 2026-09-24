@@ -1,0 +1,60 @@
+# Rolling queue under a concurrency cap (lab mission 22): more units than slots,
+# refill each slot as its agent lands, keep going until the list is empty.
+#
+# Before this file the capped queue split between fan-out-work (which launched the
+# whole set) and watch-outcome (which owns timers, not queues), and "give its slot to
+# the next one" loaded runoff-tiebreaker as the top pick. fan-out-work now carries
+# the procedure (step 10) and its whenToUse claims "a list of work plus a cap".
+#
+# Two measured phrasings still route to watch-outcome / prep-branch-for-review on the
+# shipped artifact; the trained head outweighs the embedded fields there. Their
+# training rows are in the corpus; they are NOT cases here, because a case written
+# to fail pads nothing and hides nothing.
+
+cases:
+  - id: rolling-queue-cap-six-until-done
+    category: single-runbook
+    note: >-
+      The core request: a list larger than the cap, a cap, and a stopping condition.
+      Before the change supervise-fleet rode along as an extra.
+    messages:
+      - role: user
+        content: work through this queue of 30 tasks, 6 agents at a time, and keep going until they're all done
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: rolling-queue-refill-not-watch
+    category: routing-trap
+    note: >-
+      "start the next one whenever one finishes" is a refill, not a deferred action.
+      Before the change watch-outcome rode along; it now names the capped queue as
+      fan-out-work's in its own whenToUse.
+    messages:
+      - role: user
+        content: keep 6 agents busy on this backlog and start the next one whenever one finishes
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: rolling-queue-milestone-four-at-a-time
+    category: single-runbook
+    note: A milestone worked through a four-slot window, refilled as each lands.
+    messages:
+      - role: user
+        content: there are 18 tickets in this milestone; run them through agents, four at a time, starting the next as each one lands
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: single-agent-periodic-check-stays-watch
+    category: routing-trap
+    note: >-
+      The other direction of the new boundary: ONE agent checked periodically with
+      nothing queued behind it is still a watch, not a queue.
+    messages:
+      - role: user
+        content: look in on the build agent every ten minutes and let me know once it has finished
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
