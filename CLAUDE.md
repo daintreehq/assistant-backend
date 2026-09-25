@@ -185,6 +185,12 @@ the tag and renders the verdict. The first-ever deploy of a service goes out at 
 an identity-token `/readyz` check. Project `daintree-research`, region `us-central1`,
 service `daintree-assistant`.
 
+**Where it is live:** `https://assistant.daintree.org`, a Cloud Run domain mapping onto
+`daintree-assistant`, so the MCP endpoint is `https://assistant.daintree.org/v1/daintree/mcp`.
+The raw Cloud Run URL (`https://daintree-assistant-aijjq62rdq-uc.a.run.app`) serves the same
+revision. Every release reaches both; check the domain with
+`./infra/gcp/smoke.sh --url https://assistant.daintree.org --expect-build-sha <sha>`.
+
 Use the **`/release` skill** rather than doing it by hand. `infra/gcp/bootstrap.sh` is the
 idempotent one-time setup; making a new service public is a deliberate
 `PUBLIC_CUTOVER=<service>` run, gated on the smoke test. `infra/gcp/rollback.sh` moves
