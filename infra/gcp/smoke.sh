@@ -25,6 +25,12 @@
 #                                            # Without these, every posture check
 #                                            # below ADAPTS to whatever is reported.
 #
+#   SMOKE_UPSTREAM_PROVIDER=openrouter SMOKE_UPSTREAM_KEY=... \
+#     ./infra/gcp/smoke.sh --expect-caller-upstream true --full
+#                                            # ... on a bring-your-own-key-only
+#                                            # deployment: assert it, and fund
+#                                            # --full's turns with that key.
+#
 #   ./infra/gcp/smoke.sh --expect-client-id 6f0d...apps.example
 #                                            # ... and fail unless the published
 #                                            # OAuth client id is that one.
@@ -62,6 +68,10 @@
 # credential (BASETEN_API_KEY) and funds every turn from it, so the metadata
 # routes answer an anonymous request. That is also why --full is opt-in and
 # everything else here is not: --full spends DAINTREE's money, not the caller's.
+# The one exception is a BYOK-only deployment (REQUIRE_CALLER_UPSTREAM=true),
+# where the server funds nothing: there --full spends the PROVIDER key named by
+# SMOKE_UPSTREAM_PROVIDER / SMOKE_UPSTREAM_KEY, which is sent and never printed.
+# That is a provider key, not an account credential.
 #
 # There is deliberately no way to hand this script a user's access token. An
 # earlier flag took the NAME of an environment variable holding one, so the
@@ -103,6 +113,12 @@ EXPECT_POSTURE=""
 # signed-out user. Read from /version, which is the only endpoint that reports
 # this mode at all — no client-facing surface exposes it, by design.
 EXPECT_ENTITLEMENT=""
+# Whether this deployment refuses a funded request that does not carry the
+# caller's own provider and key (REQUIRE_CALLER_UPSTREAM). `true`|`false`, or
+# empty for "adapt to what /version reports". On such a deployment a header-less
+# /auth/verify is CORRECTLY a 400 upstream_required, and --full's turns need a
+# key from SMOKE_UPSTREAM_PROVIDER / SMOKE_UPSTREAM_KEY (never printed).
+EXPECT_CALLER_UPSTREAM=""
 # The public OAuth client id this deployment should be publishing. Not a secret
 # (the discovery endpoint hands it to anyone) — the reason to assert it is that
 # it names a SPECIFIC Supabase project, so a staging revision carrying
@@ -207,6 +223,14 @@ while [ $# -gt 0 ]; do
                  exit 2 ;;
             esac
             shift 2 ;;
+    --expect-caller-upstream)
+            [ $# -gt 1 ] || { echo "--expect-caller-upstream requires a value" >&2; exit 2; }
+            case "$2" in
+              true|false) EXPECT_CALLER_UPSTREAM="$2" ;;
+              *) echo "--expect-caller-upstream must be true|false, got '$2'" >&2
+                 exit 2 ;;
+            esac
+            shift 2 ;;
     --expect-build-sha)
             [ $# -gt 1 ] || { echo "--expect-build-sha requires a value" >&2; exit 2; }
             # Blank is refused rather than read as "no expectation", for exactly
@@ -289,7 +313,7 @@ while [ $# -gt 0 ]; do
     # reader wants when editing the script and not when running it. Keep the
     # number in step with the header — a range that has slipped prints half a
     # flag's description and silently omits the newest one.
-    -h|--help) sed -n '2,51p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,57p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -486,6 +510,8 @@ PROTO_MAX="$(jq_path "$BODY" protocol.max)"
 # the mode the revision came up in against the door it describes to clients.
 VERSION_AUTH_MODE="$(jq_path "$BODY" posture.auth)"
 VERSION_ENTITLEMENT_MODE="$(jq_path "$BODY" posture.entitlement)"
+# Python repr of a JSON boolean — `True`/`False` — or empty from an older build.
+VERSION_CALLER_UPSTREAM="$(jq_path "$BODY" posture.require_caller_upstream)"
 # The third axis, and the only one derived from a secret. Exactly three facts are
 # published and exactly three are read: whether the gate decides anything, how
 # many subjects it admits, and the label naming that membership. `enabled` prints
@@ -850,6 +876,48 @@ if [ -n "$EXPECT_ENTITLEMENT" ]; then
   fi
 fi
 
+# Bring-your-own-key only. Decides which /auth/verify answer is correct below, so
+# a revision that came up in the other posture must fail here by name rather
+# than as a confusing verify failure.
+case "$VERSION_CALLER_UPSTREAM" in
+  True)  CALLER_UPSTREAM=true ;;
+  False) CALLER_UPSTREAM=false ;;
+  *)     CALLER_UPSTREAM="" ;;
+esac
+if [ -n "$EXPECT_CALLER_UPSTREAM" ]; then
+  if [ "$CALLER_UPSTREAM" = "$EXPECT_CALLER_UPSTREAM" ]; then
+    pass "REQUIRE_CALLER_UPSTREAM is $CALLER_UPSTREAM, as expected"
+  else
+    fail "expected REQUIRE_CALLER_UPSTREAM '$EXPECT_CALLER_UPSTREAM', /version reports '${CALLER_UPSTREAM:-<absent>}'" ""
+  fi
+fi
+
+# The upstream headers the funded probes carry on a BYOK-only deployment. Two
+# sets, and neither is ever printed. PLACEHOLDER names a well-formed route whose
+# key is not a key: it rides only the probes that are refused BEFORE any provider
+# call (426 protocol, 404 unknown task), which would otherwise be refused one
+# step earlier as upstream_required and prove nothing about the thing they test.
+# CALLER is the operator's real key for --full, written to a 0600 file and passed
+# as `-H @file` so it never appears in argv either.
+UPSTREAM_PLACEHOLDER=()
+UPSTREAM_CALLER=()
+UPSTREAM_HDR_FILE=""
+if [ "$CALLER_UPSTREAM" = "true" ]; then
+  UPSTREAM_PLACEHOLDER=(-H 'X-Daintree-Upstream-Provider: openrouter'
+                        -H 'X-Daintree-Upstream-Key: smoke-placeholder-not-a-key')
+  if [ -n "${SMOKE_UPSTREAM_PROVIDER:-}" ] && [ -n "${SMOKE_UPSTREAM_KEY:-}" ]; then
+    UPSTREAM_HDR_FILE="$(umask 077; mktemp)"
+    {
+      printf 'X-Daintree-Upstream-Provider: %s\n' "${SMOKE_UPSTREAM_PROVIDER:-}"
+      printf 'X-Daintree-Upstream-Key: %s\n' "${SMOKE_UPSTREAM_KEY:-}"
+      [ -n "${SMOKE_UPSTREAM_MODEL:-}" ] \
+        && printf 'X-Daintree-Upstream-Model: %s\n' "${SMOKE_UPSTREAM_MODEL:-}"
+    } > "$UPSTREAM_HDR_FILE"
+    UPSTREAM_CALLER=(-H "@$UPSTREAM_HDR_FILE")
+  fi
+fi
+trap 'rm -f "$BODY_FILE" "$HDR_FILE" ${UPSTREAM_HDR_FILE:+"$UPSTREAM_HDR_FILE"}' EXIT
+
 # The subject gate, checked from the safe projection and nothing else. Three
 # facts, and each one is a different release accident:
 #
@@ -1104,7 +1172,18 @@ print(len(json.load(sys.stdin).get('data', [])))" 2>/dev/null)"
   # once. `valid` and `usable` are DIFFERENT questions and the CLI branches on
   # `reason`, so all three are asserted rather than just the status code.
   code="$(req ${AUTH[@]+"${AUTH[@]}"} -X POST "$URL/v1/daintree/auth/verify")"; load_body
-  if [ "$code" = "200" ]; then
+  if [ "$CALLER_UPSTREAM" = "true" ]; then
+    # BYOK-only: there is no server key to give a verdict about, and a caller
+    # that names no key of its own must be told so in the typed envelope the CLI
+    # branches on — not handed a verdict, and not a 500.
+    err_code="$(printf '%s' "$BODY" | python3 -c "import json,sys
+print((json.load(sys.stdin).get('error') or {}).get('code',''))" 2>/dev/null)"
+    if [ "$code" = "400" ] && [ "$err_code" = "upstream_required" ]; then
+      pass "/v1/daintree/auth/verify without upstream headers: 400 upstream_required (BYOK-only)"
+    else
+      fail "/v1/daintree/auth/verify returned $code / code='$err_code' on a BYOK-only deployment (expected 400 / upstream_required)" "$BODY"
+    fi
+  elif [ "$code" = "200" ]; then
     # Checked as a TUPLE against the verdicts the contract defines, not field by
     # field. Any-non-empty-reason would accept `{"reason":"ok"}` with no verdict
     # at all, which is precisely the shape a half-implemented route returns.
@@ -1154,7 +1233,8 @@ else:
       respond) payload='{"protocol_version":3,"session":{"id":"smoke-426","turn_id":"t"},"startup":{},"input":{"messages":[{"role":"user","content":"hi"}]}}' ;;
       tasks)   payload='{"task":"terminal_judge","input":{"question":"q","tail":"t"}}' ;;
     esac
-    code="$(req ${AUTH[@]+"${AUTH[@]}"} -X POST "$URL/v1/daintree/$path" \
+    code="$(req ${AUTH[@]+"${AUTH[@]}"} ${UPSTREAM_PLACEHOLDER[@]+"${UPSTREAM_PLACEHOLDER[@]}"} \
+      -X POST "$URL/v1/daintree/$path" \
       -H 'content-type: application/json' -H 'X-Daintree-Protocol: 999' -d "$payload")"
     load_body
     if [ "$code" = "426" ]; then
@@ -1181,7 +1261,8 @@ else:
   # framework error — that envelope is what the CLI branches on to tell a user
   # whose problem it is. (The request-id check above covers the header; this one
   # is about the body shape.)
-  code="$(req ${AUTH[@]+"${AUTH[@]}"} -X POST "$URL/v1/daintree/tasks" \
+  code="$(req ${AUTH[@]+"${AUTH[@]}"} ${UPSTREAM_PLACEHOLDER[@]+"${UPSTREAM_PLACEHOLDER[@]}"} \
+    -X POST "$URL/v1/daintree/tasks" \
     -H 'content-type: application/json' -d '{"task":"no-such-task","input":{}}')"
   load_body
   err_code="$(printf '%s' "$BODY" | python3 -c "import json,sys
@@ -1192,7 +1273,12 @@ print((json.load(sys.stdin).get('error') or {}).get('code',''))" 2>/dev/null)"
     fail "unknown task returned $code / code='$err_code' (expected 404 / unknown_task)" "$BODY"
   fi
 
-  if [ "$FULL" = "1" ]; then
+  if [ "$FULL" = "1" ] && [ "$CALLER_UPSTREAM" = "true" ] && [ "${#UPSTREAM_CALLER[@]}" -eq 0 ]; then
+    head_ "Real model turns"
+    # Refused rather than skipped: --full was asked for, and a BYOK-only
+    # deployment answers every header-less turn with 400 upstream_required.
+    fail "--full on a BYOK-only deployment needs SMOKE_UPSTREAM_PROVIDER and SMOKE_UPSTREAM_KEY (optionally SMOKE_UPSTREAM_MODEL) to fund the turns" ""
+  elif [ "$FULL" = "1" ]; then
     head_ "Real model turns (these spend money on your key)"
 
     read -r -d '' PAYLOAD <<'JSON'
@@ -1202,7 +1288,8 @@ print((json.load(sys.stdin).get('error') or {}).get('code',''))" 2>/dev/null)"
  "input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}
 JSON
 
-    TIMEOUT=180 code="$(req ${AUTH[@]+"${AUTH[@]}"} -X POST "$URL/v1/daintree/respond" \
+    TIMEOUT=180 code="$(req ${AUTH[@]+"${AUTH[@]}"} ${UPSTREAM_CALLER[@]+"${UPSTREAM_CALLER[@]}"} \
+      -X POST "$URL/v1/daintree/respond" \
       -H 'content-type: application/json' -d "$PAYLOAD")"; load_body
     if [ "$code" = "200" ]; then
       reply="$(printf '%s' "$BODY" | python3 -c "import json,sys
@@ -1225,7 +1312,8 @@ print(','.join(s.get('id','') for s in (d.get('runbooks') or {}).get('active', [
     # while the model is still generating.
     stream_out="$(mktemp)"
     TIMEOUT=180
-    curl -sS --max-time 180 ${AUTH[@]+"${AUTH[@]}"} -X POST "$URL/v1/daintree/respond" \
+    curl -sS --max-time 180 ${AUTH[@]+"${AUTH[@]}"} ${UPSTREAM_CALLER[@]+"${UPSTREAM_CALLER[@]}"} \
+      -X POST "$URL/v1/daintree/respond" \
       -H 'content-type: application/json' \
       -d '{"protocol_version":3,"session":{"id":"smoke-test","turn_id":"turn-2"},"startup":{},"generation":{"stream":true},"input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}' \
       > "$stream_out" 2>/dev/null

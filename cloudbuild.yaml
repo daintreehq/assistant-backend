@@ -1796,6 +1796,7 @@ steps:
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
+      - 'REQUIRE_CALLER_UPSTREAM=${_REQUIRE_CALLER_UPSTREAM}'
       - 'SUPABASE_OAUTH_CLIENT_ID=${_SUPABASE_OAUTH_CLIENT_ID}'
       # The rest of the manifest this release is supposed to publish. Same
       # values the deploy step sent, asserted back out of the running revision:
@@ -1935,7 +1936,8 @@ steps:
                --expect-build-sha "$$RELEASE_SHA" \
                --expect-env "$$ENVIRONMENT" \
                --expect-posture "$$AUTH_MODE" \
-               --expect-entitlement "$$ENTITLEMENT_MODE"
+               --expect-entitlement "$$ENTITLEMENT_MODE" \
+               --expect-caller-upstream "$$REQUIRE_CALLER_UPSTREAM"
         # Passed only when this deployment configures OAuth at all. Empty is the
         # shipped default and the state production is in, and the flag refuses a
         # blank value on purpose — an assertion that silently does not run is

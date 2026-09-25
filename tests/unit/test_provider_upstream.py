@@ -327,12 +327,22 @@ def test_an_in_band_quota_429_is_a_credit_error() -> None:
     assert map_stream_error({"code": 429, "message": "slow down"}).code == "upstream_rate_limited"
 
 
-@pytest.mark.parametrize("model", ["sk-secret-zz", "prefix-sk-secret-zz", "secret"])
+@pytest.mark.parametrize("model", ["sk-secret-zz", "prefix-sk-secret-zz"])
 def test_a_key_pasted_into_the_model_field_is_refused_without_quoting_it(model: str) -> None:
     with pytest.raises(DaintreeError) as info:
         UpstreamRoute.parse("openai", model, "sk-secret-zz")
     assert info.value.code == "invalid_upstream"
     assert "secret" not in info.value.message
+
+
+@pytest.mark.parametrize("model", ["o3", "o1", "o4-mini"])
+def test_a_short_model_id_that_happens_to_occur_in_the_key_is_accepted(model: str) -> None:
+    """A random key contains a two-character id like `o3` a few percent of the
+    time; that coincidence must not refuse a real model."""
+    key = f"sk-proj-abc{model}xyz"
+    route = UpstreamRoute.parse("openai", model, key)
+    assert route is not None
+    assert route.model == model
 
 
 def test_openrouter_routing_preferences_reach_the_provider_block() -> None:

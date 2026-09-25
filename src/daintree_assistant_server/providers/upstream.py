@@ -125,9 +125,11 @@ class UpstreamRoute:
                 param=KEY_HEADER,
                 code="invalid_upstream",
             )
-        if model and (model == key or key in model or model in key):
+        if model and key in model:
             # A key pasted into the model field would be logged on an upstream
             # failure and echoed by /auth/verify. The message never quotes either.
+            # One direction only: a short model id such as `o3` is a substring of
+            # a random key often enough that the reverse test refuses real ids.
             raise invalid_request(
                 "The model field holds the API key. Put the key in the key field.",
                 param=MODEL_HEADER,

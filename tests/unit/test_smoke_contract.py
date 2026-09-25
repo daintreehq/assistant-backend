@@ -94,6 +94,14 @@ def _healthy_deployment() -> dict[str, Any]:
         # rejected the body, which is what makes a naive "not 200" assertion
         # vacuous: it would pass against a deployment with no door at all.
         "anonymous_refusal_code": "auth_required",
+        # REQUIRE_CALLER_UPSTREAM. When true, every funded route and
+        # /auth/verify refuse a request naming no upstream with 400
+        # upstream_required, BEFORE the protocol check — the real dependency
+        # order — so a probe that forgot the headers fails the 426 check too.
+        "require_caller_upstream": False,
+        # Whether that refusal actually happens. A BYOK revision that still
+        # answers a header-less verify with a server-key verdict is the mutation.
+        "refuses_without_upstream": True,
     }
 
 
@@ -168,6 +176,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "posture": {
                         "auth": d["auth_mode"],
                         "entitlement": d["entitlement_mode"],
+                        "require_caller_upstream": d["require_caller_upstream"],
                         "subject_gate": {
                             "enabled": d["gate_enabled"],
                             "entries": d["gate_entries"],
@@ -202,6 +211,19 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         length = int(self.headers.get("content-length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
+        gated = path in (
+            "/v1/daintree/respond",
+            "/v1/daintree/tasks",
+            "/v1/daintree/auth/verify",
+        )
+        if (
+            gated
+            and d["require_caller_upstream"]
+            and d["refuses_without_upstream"]
+            and not self.headers.get("X-Daintree-Upstream-Provider")
+        ):
+            self._send(400, {"error": {"code": "upstream_required"}})
+            return
         if self.headers.get("X-Daintree-Protocol") == "999":
             self._send(426, {"error": {"code": "unsupported_daintree_protocol"}})
             return
@@ -271,6 +293,7 @@ def _expectation_args(intended: dict[str, Any]) -> list[str]:
         "--expect-env", intended["environment"],
         "--expect-posture", intended["auth_mode"],
         "--expect-entitlement", intended["entitlement_mode"],
+        "--expect-caller-upstream", "true" if intended["require_caller_upstream"] else "false",
     ]
     if intended["configured"]:
         args += [
@@ -541,3 +564,54 @@ def test_an_unexpected_gate_on_an_anonymous_deployment_is_refused() -> None:
     result = _run_smoke_against(deployment)
     assert result.returncode != 0
     assert "FAIL" in result.stdout
+
+
+def _byok_deployment() -> dict[str, Any]:
+    deployment = _healthy_deployment()
+    deployment["require_caller_upstream"] = True
+    return deployment
+
+
+def test_a_byok_only_deployment_passes_the_whole_gate() -> None:
+    """What cloudbuild.yaml ships: REQUIRE_CALLER_UPSTREAM=true under `open`.
+
+    A header-less /auth/verify is correctly a 400 upstream_required there, and
+    the 426 and unknown-task probes must carry an upstream route or they are
+    refused one step before the check they exist for.
+    """
+    result = _run_smoke_against(_byok_deployment(), intended=_byok_deployment())
+    assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    assert "FAIL" not in result.stdout, result.stdout
+    assert "upstream_required" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("served", "intended"),
+    [
+        pytest.param(
+            _healthy_deployment(), _byok_deployment(), id="the_revision_came_up_server_funded"
+        ),
+        pytest.param(
+            _byok_deployment(), _healthy_deployment(), id="the_revision_came_up_byok_only"
+        ),
+        pytest.param(
+            {**_byok_deployment(), "refuses_without_upstream": False},
+            _byok_deployment(),
+            id="a_byok_revision_that_does_not_refuse_a_headerless_verify",
+        ),
+    ],
+)
+def test_the_gate_refuses_the_wrong_upstream_posture(
+    served: dict[str, Any], intended: dict[str, Any]
+) -> None:
+    result = _run_smoke_against(served, intended=intended)
+    assert result.returncode != 0, f"stdout:\n{result.stdout}"
+    assert "FAIL" in result.stdout
+
+
+def test_full_on_a_byok_only_deployment_needs_a_caller_key() -> None:
+    """--full was asked for; skipping it silently would report a green run that
+    sent no turns. No request is made on this path, so nothing is spent."""
+    result = _run_smoke_against(_byok_deployment(), "--full", intended=_byok_deployment())
+    assert result.returncode != 0
+    assert "SMOKE_UPSTREAM_KEY" in result.stdout

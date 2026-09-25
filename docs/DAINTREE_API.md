@@ -1595,6 +1595,7 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
   "posture": {
     "auth": "open",
     "entitlement": "off",
+    "require_caller_upstream": false,
     "subject_gate": { "enabled": false, "entries": 0, "revision": "" }
   }
 }
@@ -1614,6 +1615,12 @@ fetches it: asserting that a candidate came up in the mode the release asked for
 extra request. Before this field, `AUTH_MODE=open` and `AUTH_MODE=observe` were
 indistinguishable from outside and `ENTITLEMENT_MODE` was reported by no endpoint at all,
 so a billing rollout could only be confirmed by reading the Cloud Run control plane.
+
+`require_caller_upstream` is `REQUIRE_CALLER_UPSTREAM`: `true` means every funded
+request must name the caller's own provider and key (the `X-Daintree-Upstream-*`
+headers), and one that does not — including a header-less `/auth/verify` — is refused
+400 `upstream_required`. The smoke reads it to assert that refusal rather than a verdict
+about a server key.
 
 `subject_gate` describes the private-staging subject allowlist (see
 [`auth_permission_denied`](#your-daintree-account)) and publishes exactly three facts:
