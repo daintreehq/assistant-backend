@@ -62,6 +62,7 @@ from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
 from ..providers.retry import retry_upstream
+from ..providers.upstream import UpstreamRoute
 from ..runbooks.catalog import CatalogManager
 from ..text_utils import cap_bytes, frame_data_block, frame_value, sanitize_line, utf8_len
 from .account_context import AccountContext
@@ -1053,6 +1054,8 @@ class TaskRunner:
         request: TaskRequest,
         *,
         api_key: SecretStr | None = None,
+        # The caller's own host, model and key (providers/upstream.py).
+        upstream: UpstreamRoute | None = None,
         # Who this task is attributed to, resolved at the route boundary after
         # identity and entitlement. A task spends the server's key like any turn,
         # so it earns the same attribution. `None` on every unattributed path —
@@ -1076,7 +1079,11 @@ class TaskRunner:
         try:
             async with asyncio.timeout(budget.remaining_total()):
                 return await self._run_inner(
-                    request, api_key=api_key, budget=budget, account=account
+                    request,
+                    api_key=api_key,
+                    upstream=upstream,
+                    budget=budget,
+                    account=account,
                 )
         except TimeoutError as exc:
             logger.warning(
@@ -1123,6 +1130,7 @@ class TaskRunner:
         *,
         api_key: SecretStr | None,
         budget: RequestBudget,
+        upstream: UpstreamRoute | None = None,
         account: AccountContext | None = None,
     ) -> TaskResult:
         profile = self.profiles.get(request.task)
@@ -1228,6 +1236,19 @@ class TaskRunner:
             cache_session_id=_affinity_key(profile.id),
         )
 
+        # A caller-selected upstream carries the SERVING profiles only, for the
+        # same reason the key above does: it names the caller's host, and a
+        # profile pinned to another vendor must not receive it.
+        if upstream is not None and profile.provider_id != "serving":
+            # No shipped profile is pinned elsewhere today. One that is must not
+            # quietly spend a SERVER key for a caller who brought their own.
+            raise invalid_request(
+                f"Task {profile.id!r} cannot run on a caller-selected provider.",
+                code="invalid_upstream",
+            )
+        routed = upstream if profile.provider_id == "serving" else None
+        if routed is not None:
+            provider_request = routed.apply(provider_request)
         result = await self._complete_with_retry(provider_request, provider, budget=budget)
         usage = result.usage
         finish = result.finish_reason or "stop"
@@ -1289,6 +1310,8 @@ class TaskRunner:
             # that fell back to the default provider would replay the prompt
             # against a model that never produced the malformed output, and bill
             # a second account for it.
+            if routed is not None:
+                repair_request = routed.apply(repair_request)
             repair = await self._complete_with_retry(repair_request, provider, budget=budget)
             usage = _sum_usage(usage, repair.usage)
             finish = repair.finish_reason or "stop"
@@ -1352,7 +1375,7 @@ class TaskRunner:
         return TaskResult(
             id=new_task_run_id(),
             task=profile.id,
-            model=model,
+            model=routed.model if routed is not None else model,
             output=output,
             finish_reason=finish,
             usage=TaskUsage(

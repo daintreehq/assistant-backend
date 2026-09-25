@@ -590,6 +590,9 @@ def _run_smoke(*args: str) -> subprocess.CompletedProcess[str]:
         pytest.param(["--expect-entitlement"], id="entitlement_missing_value"),
         pytest.param(["--expect-entitlement", "on"], id="entitlement_not_a_mode"),
         pytest.param(["--expect-posture", "yes"], id="posture_not_a_mode"),
+        pytest.param(["--expect-caller-upstream"], id="caller_upstream_missing_value"),
+        pytest.param(["--expect-caller-upstream", ""], id="caller_upstream_blank"),
+        pytest.param(["--expect-caller-upstream", "yes"], id="caller_upstream_not_a_bool"),
         pytest.param(["--account-token-var", "TOK"], id="the_removed_token_flag"),
     ],
 )

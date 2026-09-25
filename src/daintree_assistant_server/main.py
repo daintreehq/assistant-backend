@@ -55,14 +55,16 @@ from .providers.base import ChatProvider
 from .providers.baseten import BasetenProvider
 from .providers.cerebras import CerebrasProvider
 from .providers.failover import FailoverProvider
+from .providers.openai import OpenAIProvider
 from .providers.openrouter import OpenRouterProvider
-from .providers.openrouter_fallback import OpenRouterFallbackProvider
+from .providers.openrouter_fallback import OpenRouterByokProvider, OpenRouterFallbackProvider
+from .providers.upstream import UPSTREAMS, UpstreamRouter
 from .runbooks.catalog import Catalog, CatalogManager, default_runbooks_dir, load_catalog
 from .runbooks.local.paths_local import selector_artifact_dir
 from .runbooks.local.runtime import InferencePool
 from .runbooks.local.selector import LocalSelector, RunbookSelector
 from .runbooks.local.setwise import SetwiseClassifier
-from .services.bearer import authorization_values, credential_candidates
+from .services.bearer import credential_candidates, credential_header_values
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
@@ -170,7 +172,7 @@ class BodySizeLimitMiddleware:
         except UnicodeDecodeError:  # pragma: no cover - defensive
             inbound = ""
         response.headers.setdefault(
-            "X-Request-Id", _safe_request_id(inbound, authorization_values(raw_headers))
+            "X-Request-Id", _safe_request_id(inbound, credential_header_values(raw_headers))
         )
         await response(scope, _eat, send)
 
@@ -252,7 +254,7 @@ class Container:
     settings: Settings
     prompt_loader: PromptLoader
     catalog_manager: CatalogManager
-    provider: ChatProvider
+    provider: UpstreamRouter
     state_codec: StateCodec
     selector: RunbookSelector
     assembler: PromptAssembler
@@ -539,6 +541,38 @@ def _build_provider(settings: Settings) -> ChatProvider:
     )
 
 
+def _build_upstream_providers(settings: Settings) -> dict[str, ChatProvider]:
+    """One KEYLESS adapter per bring-your-own-key host (providers/upstream.py).
+
+    Keyless is the safety property: a routed request that somehow lost the
+    caller's key fails with "no credential" instead of spending the server's.
+    They share one client sized like the serving one, because on a BYOK
+    deployment these adapters carry the serving traffic.
+    """
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            connect=settings.upstream_connect_timeout_seconds,
+            read=settings.main_timeout_seconds,
+            write=_UPSTREAM_WRITE_TIMEOUT_SECONDS,
+            pool=_UPSTREAM_POOL_TIMEOUT_SECONDS,
+        ),
+        limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+    )
+    common: dict[str, Any] = {
+        "default_timeout": settings.main_timeout_seconds,
+        "dump_dir": settings.dump_upstream_dir,
+    }
+    return {
+        "baseten": BasetenProvider(
+            client, reasoning_effort=EXECUTOR_REASONING_EFFORT, **common
+        ),
+        "openrouter": OpenRouterByokProvider(
+            client, reasoning_effort=EXECUTOR_REASONING_EFFORT, **common
+        ),
+        "openai": OpenAIProvider(client, **common),
+    }
+
+
 def _build_openrouter_provider(settings: Settings) -> ChatProvider | None:
     """The second adapter, or ``None`` when its credential is not configured.
 
@@ -600,6 +634,7 @@ def build_container(
     provider: ChatProvider | None = None,
     selector: RunbookSelector | None = None,
     compactor: Compactor | None = None,
+    upstreams: dict[str, ChatProvider] | None = None,
 ) -> Container:
     """Construct and validate all service components.
 
@@ -642,7 +677,17 @@ def build_container(
         classifier.sync(catalog_manager.catalog)
         inference_pool = InferencePool()
         selector = LocalSelector(classifier, inference_pool, catalog_manager, settings)
-    chat_provider = provider if provider is not None else _build_provider(settings)
+    if upstreams is None:
+        # An injected provider (tests, deterministic benchmarks) answers for every
+        # caller-selected host too, so nothing in a test can reach a real vendor.
+        upstreams = (
+            dict.fromkeys(UPSTREAMS, provider)
+            if provider is not None
+            else _build_upstream_providers(settings)
+        )
+    chat_provider = UpstreamRouter(
+        provider if provider is not None else _build_provider(settings), upstreams
+    )
     # Never substituted by the `provider` override: that argument exists so tests
     # and deterministic benchmarks can replace the SERVING provider, and silently
     # pointing the compaction task at the same fake would hide the fact that it
@@ -955,7 +1000,10 @@ def create_app(
             # `getlist`, not `get`: the latter returns only the first of two
             # `Authorization` headers, and a token in the second would then be
             # invisible to the credential-overlap check.
-            request.headers.getlist("authorization"),
+            [
+                *request.headers.getlist("authorization"),
+                *request.headers.getlist("x-daintree-upstream-key"),
+            ],
         )
         # One request identity for the whole turn: handlers read it back through
         # api.deps.request_id() so logs, response headers, SSE meta and SSE error

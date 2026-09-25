@@ -7,6 +7,10 @@ and everywhere it must never appear.
 
 ## 1. Every key is the SERVER's, and callers hold none
 
+> A caller may now supply its own **upstream** key in a dedicated header — see
+> §1b. Everything in this section still describes the `Authorization` header and
+> the server-funded path, which is what runs when those headers are absent.
+
 **This inverted when callers stopped supplying keys**, and it inverted in the direction
 that costs money if a reader remembers the old rule. It used to be that a
 Daintree credential *was* the caller's own OpenRouter key, playing two roles at
@@ -87,6 +91,54 @@ code enforces:
   as the field a per-account credential would occupy, so "never" would
   contradict a seam this codebase maintains on purpose. What is true today is
   that nothing on the serving path fills it.
+
+## 1b. Bring your own key — the caller's upstream
+
+A caller MAY now fund its own turns. Daintree's assistant settings let a user
+pick a host (Baseten, OpenRouter or OpenAI), a model, and paste that host's API
+key; the CLI forwards the three as request headers on `/respond`, `/tasks` and
+`/auth/verify`:
+
+| Header | Value |
+|---|---|
+| `X-Daintree-Upstream-Provider` | `baseten` \| `openrouter` \| `openai` |
+| `X-Daintree-Upstream-Model` | any model id on that host; omitted means the recommended one |
+| `X-Daintree-Upstream-Key` | the caller's key for that host |
+| `X-Daintree-Upstream-Sort` / `-Data-Collection` / `-Zdr` | OpenRouter only: rank by latency, price or throughput; pass OpenRouter's `data_collection: deny` and `zdr` endpoint filters through. These are OpenRouter's own listings, not a retention promise of Daintree's. Merged into the `provider` block by `OpenRouterByokProvider`, and refused on any other host rather than silently dropped |
+
+This is NOT the `Authorization` header coming back. §1's rule stands: the
+`Authorization` header is identity and never a provider credential. The upstream
+key has its own header precisely so the two can never be confused, and so an old
+client still sending a stale bearer is unaffected.
+
+What the code guarantees (`providers/upstream.py`, `api/deps.py`):
+
+- **Selection, runbooks, assembly and tasks run exactly as on the server's key.**
+  Only the final provider call moves: `UpstreamRoute.apply` rewrites `model`,
+  `api_key` and `upstream` on the assembled `ProviderChatRequest`, and
+  `UpstreamRouter` dispatches on `upstream`.
+- **A routed call never reaches a server key.** The per-host adapters are built
+  with no default credential, so a routed request that lost its key fails with
+  "no credential" instead of spending the server's. It never enters
+  `FailoverProvider` either: an outage on the caller's host is reported as
+  itself rather than answered on the server's OpenRouter key.
+- **An ambiguous route is refused, not guessed.** A key without a host, a host we
+  do not serve, or a host without a key is a 400 `invalid_upstream` before any
+  work — silently spending the server's key for a caller who meant to spend
+  their own is the worst reading of that request. No message quotes a value.
+- **No entitlement check.** A caller spending its own key is not spending
+  Daintree's, so `require_paid_access` skips the plan lookup. Identity under
+  `AUTH_MODE` still applies.
+- **Provider-credential errors blame the right key.** On a routed call,
+  `provider_invalid_api_key`, `provider_insufficient_credits` and
+  `provider_key_forbidden` keep their code and status but say it was the
+  caller's key.
+- **`REQUIRE_CALLER_UPSTREAM=true` makes a deployment BYOK-only.** Requests
+  without the headers get 400 `upstream_required`, and `BASETEN_API_KEY` leaves
+  `missing_secrets()` because nothing can spend it.
+
+The upstream key is subject to everything in §3: it is never logged, echoed,
+traced or returned. `UpstreamRoute` holds it as a `SecretStr` with `repr=False`.
 
 ## 2a. The ACCOUNT credential
 

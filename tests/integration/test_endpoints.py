@@ -134,6 +134,7 @@ def test_version_reports_the_deployment_posture(client) -> None:
     assert r.json()["posture"] == {
         "auth": settings.auth_mode,
         "entitlement": settings.entitlement_mode,
+        "require_caller_upstream": settings.require_caller_upstream,
         "subject_gate": {
             "enabled": settings.staging_subject_gate_enabled,
             "entries": len(settings.allowed_subject_digests()),
@@ -160,9 +161,15 @@ def test_version_never_reports_a_configured_value_beyond_the_posture(client) -> 
     """
     body = client.get("/version").json()
     assert set(body) == {"server_version", "build_sha", "protocol", "posture"}
-    assert set(body["posture"]) == {"auth", "entitlement", "subject_gate"}
+    assert set(body["posture"]) == {
+        "auth",
+        "entitlement",
+        "require_caller_upstream",
+        "subject_gate",
+    }
     for key in ("auth", "entitlement"):
         assert body["posture"][key] in {"open", "observe", "enforce", "off"}
+    assert isinstance(body["posture"]["require_caller_upstream"], bool)
     gate = body["posture"]["subject_gate"]
     assert set(gate) == {"enabled", "entries", "revision"}
     assert isinstance(gate["enabled"], bool)

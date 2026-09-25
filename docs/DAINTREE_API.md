@@ -93,6 +93,37 @@ initial posture:               open, or observe
 later posture:                 enforce, after an end-to-end sign-in is validated
 ```
 
+## Bring your own key
+
+`/respond`, `/tasks` and `/auth/verify` accept three optional headers that name
+the caller's own model host, model and key:
+
+| Header | Value |
+|---|---|
+| `X-Daintree-Upstream-Provider` | `baseten`, `openrouter` or `openai` |
+| `X-Daintree-Upstream-Model` | any model id on that host; omitted → the recommendation below |
+| `X-Daintree-Upstream-Key` | the caller's API key for that host |
+| `X-Daintree-Upstream-Sort` | OpenRouter only: `latency` (default), `price` or `throughput` — how the endpoints serving the model are ranked |
+| `X-Daintree-Upstream-Data-Collection` | OpenRouter only: `deny` passes OpenRouter's `data_collection: deny` filter, restricting routing to endpoints it lists as not collecting or training on prompts; `allow` is OpenRouter's default |
+| `X-Daintree-Upstream-Zdr` | OpenRouter only: `true` passes OpenRouter's `zdr` endpoint filter. It is OpenRouter's listing, not a retention promise of Daintree's |
+
+| Provider | Recommended model |
+|---|---|
+| `baseten` | `zai-org/GLM-5.3-Flash` |
+| `openrouter` | `z-ai/glm-5.3-flash` |
+| `openai` | `gpt-6-luna` |
+
+With them, runbook selection, prompt assembly, tools and utility tasks run
+unchanged, and the model calls go to the named host on the caller's key. There
+is no failover to the server's hosts and no entitlement check. Without them the
+turn is funded by the server, unless the deployment sets
+`REQUIRE_CALLER_UPSTREAM=true`, which refuses such a request with 400
+`upstream_required`. A key without a host, a host without a key, an unknown host
+a malformed model id, a routing header on a host other than OpenRouter, or an
+unknown routing value is 400 `invalid_upstream`. A rejected caller key keeps
+the `provider_*` code the server-key case uses, with a message naming the
+caller's key. See [KEY_HANDLING.md §1b](KEY_HANDLING.md#1b-bring-your-own-key--the-callers-upstream).
+
 ## Account entitlement
 
 Identity says the token is genuine. **Entitlement says the account behind it has
@@ -388,8 +419,12 @@ only value that can be right for the token in its hand.
 
 ### POST /v1/daintree/auth/verify
 
-A readiness probe for the SERVER's own upstream credential, not the caller's — no caller
-key exists to check. It asks the provider directly whether the credential this deployment
+With the [bring-your-own-key headers](#bring-your-own-key), this checks the
+CALLER's key on the host they named, and the answer carries
+`server_holds_credential: false`, `provider` and `model`. It never echoes a
+`label`. Otherwise it is:
+
+A readiness probe for the SERVER's own upstream credential. It asks the provider directly whether the credential this deployment
 holds is usable, which is otherwise only discovered on the first real turn. It is a
 tokenless introspection call (not a model call) that spends no tokens, and takes **no
 request body**. It is subject to the deployment's `AUTH_MODE` like any other
@@ -1560,6 +1595,7 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
   "posture": {
     "auth": "open",
     "entitlement": "off",
+    "require_caller_upstream": false,
     "subject_gate": { "enabled": false, "entries": 0, "revision": "" }
   }
 }
@@ -1579,6 +1615,12 @@ fetches it: asserting that a candidate came up in the mode the release asked for
 extra request. Before this field, `AUTH_MODE=open` and `AUTH_MODE=observe` were
 indistinguishable from outside and `ENTITLEMENT_MODE` was reported by no endpoint at all,
 so a billing rollout could only be confirmed by reading the Cloud Run control plane.
+
+`require_caller_upstream` is `REQUIRE_CALLER_UPSTREAM`: `true` means every funded
+request must name the caller's own provider and key (the `X-Daintree-Upstream-*`
+headers), and one that does not — including a header-less `/auth/verify` — is refused
+400 `upstream_required`. The smoke reads it to assert that refusal rather than a verdict
+about a server key.
 
 `subject_gate` describes the private-staging subject allowlist (see
 [`auth_permission_denied`](#your-daintree-account)) and publishes exactly three facts:

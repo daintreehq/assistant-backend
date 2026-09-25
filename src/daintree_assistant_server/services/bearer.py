@@ -132,6 +132,22 @@ def authorization_values(raw_headers: Iterable[tuple[bytes, bytes]]) -> list[str
     ]
 
 
+def credential_header_values(raw_headers: Iterable[tuple[bytes, bytes]]) -> list[str]:
+    """Every value that must never be adopted as a request id or logged.
+
+    ``Authorization`` plus the caller's own provider key (bring your own key,
+    ``X-Daintree-Upstream-Key``), which is as easily pasted into the wrong
+    variable. Deliberately NOT ``authorization_values``: that one feeds
+    ``parse_bearer``, which refuses more than one value, so widening it would
+    reject every signed-in request that also brought its own key.
+    """
+    return [
+        value.decode(_HEADER_ENCODING, errors="replace")
+        for name, value in raw_headers
+        if name.lower() in (b"authorization", b"x-daintree-upstream-key")
+    ]
+
+
 def credential_candidates(values: Sequence[str]) -> list[str]:
     """Substrings of the header that might be credential material. Never raises.
 

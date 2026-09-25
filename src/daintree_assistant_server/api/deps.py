@@ -5,7 +5,16 @@ from __future__ import annotations
 from fastapi import Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN
-from ..errors import DaintreeError, unsupported_protocol
+from ..errors import DaintreeError, invalid_request, unsupported_protocol
+from ..providers.upstream import (
+    DATA_COLLECTION_HEADER,
+    KEY_HEADER,
+    MODEL_HEADER,
+    PROVIDER_HEADER,
+    SORT_HEADER,
+    ZDR_HEADER,
+    UpstreamRoute,
+)
 
 
 def check_protocol_header(request: Request) -> None:
@@ -99,3 +108,35 @@ def require_ready(request: Request) -> None:
             code="service_unavailable",
             headers={"Retry-After": "5"},
         )
+
+
+def resolve_upstream(request: Request) -> UpstreamRoute | None:
+    """The caller's own host, model and key, if the request names them.
+
+    Parsed once, by the paid-access guard, and stashed on ``request.state`` so
+    the handler reads the same answer the guard acted on. The key is never
+    logged, echoed or copied into an error: every message ``UpstreamRoute.parse``
+    raises names the header, never its value.
+    """
+    route = UpstreamRoute.parse(
+        request.headers.get(PROVIDER_HEADER),
+        request.headers.get(MODEL_HEADER),
+        request.headers.get(KEY_HEADER),
+        sort=request.headers.get(SORT_HEADER),
+        data_collection=request.headers.get(DATA_COLLECTION_HEADER),
+        zdr=request.headers.get(ZDR_HEADER),
+    )
+    if route is None and request.app.state.settings.require_caller_upstream:
+        raise invalid_request(
+            "This server needs your own model provider and API key. "
+            "Choose a provider in Daintree's assistant settings.",
+            param=PROVIDER_HEADER,
+            code="upstream_required",
+        )
+    return route
+
+
+def upstream_route(request: Request) -> UpstreamRoute | None:
+    """The route ``resolve_upstream`` stashed, or ``None`` outside the guard."""
+    route: UpstreamRoute | None = getattr(request.state, "upstream", None)
+    return route

@@ -94,6 +94,14 @@ substitutions:
   _ENVIRONMENT: production
   _AUTH_MODE: open
 
+  # Bring your own key. `true` makes the deployment serve ONLY turns that name the
+  # caller's own model host and key (X-Daintree-Upstream-* headers, sent by the CLI
+  # from Daintree's assistant settings) — so the hosted assistant is free to run and
+  # never spends this deployment's BASETEN_API_KEY. A request without them is 400
+  # `upstream_required`. `false` restores the server-funded path for callers that
+  # bring no key. See docs/KEY_HANDLING.md §1b.
+  _REQUIRE_CALLER_UPSTREAM: 'true'
+
   # Account entitlement: does this account have a paid plan? Staged on its own
   # axis, and `observe`/`enforce` are refused at readiness unless _AUTH_MODE is
   # already `enforce` AND the URL below is set — there is nobody to ask about
@@ -474,6 +482,7 @@ steps:
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
+      - 'REQUIRE_CALLER_UPSTREAM=${_REQUIRE_CALLER_UPSTREAM}'
       - 'DAINTREE_ENTITLEMENT_URL=${_DAINTREE_ENTITLEMENT_URL}'
       - 'STAGING_SUBJECT_GATE_REVISION=${_STAGING_SUBJECT_GATE_REVISION}'
       - 'INGRESS=${_INGRESS}'
@@ -621,6 +630,11 @@ steps:
         case "$$ENTITLEMENT_MODE" in
           off|observe|enforce) ;;
           *) echo "ERROR: _ENTITLEMENT_MODE must be off|observe|enforce, got '$$ENTITLEMENT_MODE'." >&2
+             exit 1 ;;
+        esac
+        case "$$REQUIRE_CALLER_UPSTREAM" in
+          true|false) ;;
+          *) echo "ERROR: _REQUIRE_CALLER_UPSTREAM must be true|false, got '$$REQUIRE_CALLER_UPSTREAM'." >&2
              exit 1 ;;
         esac
         # The two values the subject gate added, checked with the enums rather
@@ -981,6 +995,7 @@ steps:
         NAMES = (
             "ENVIRONMENT", "AUTH_MODE", "LOG_LEVEL",
             "ENTITLEMENT_MODE", "DAINTREE_ENTITLEMENT_URL",
+            "REQUIRE_CALLER_UPSTREAM",
             "STAGING_SUBJECT_GATE_REVISION",
             "STATE_SIGNING_KID", "STATE_SIGNING_KID_PREVIOUS",
             "SUPABASE_AUTH_ISSUER", "SUPABASE_JWKS_URL",
@@ -1781,6 +1796,7 @@ steps:
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
+      - 'REQUIRE_CALLER_UPSTREAM=${_REQUIRE_CALLER_UPSTREAM}'
       - 'SUPABASE_OAUTH_CLIENT_ID=${_SUPABASE_OAUTH_CLIENT_ID}'
       # The rest of the manifest this release is supposed to publish. Same
       # values the deploy step sent, asserted back out of the running revision:
@@ -1920,7 +1936,8 @@ steps:
                --expect-build-sha "$$RELEASE_SHA" \
                --expect-env "$$ENVIRONMENT" \
                --expect-posture "$$AUTH_MODE" \
-               --expect-entitlement "$$ENTITLEMENT_MODE"
+               --expect-entitlement "$$ENTITLEMENT_MODE" \
+               --expect-caller-upstream "$$REQUIRE_CALLER_UPSTREAM"
         # Passed only when this deployment configures OAuth at all. Empty is the
         # shipped default and the state production is in, and the flag refuses a
         # blank value on purpose — an assertion that silently does not run is

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from ..auth import PERMISSION_TASKS, Principal
 from ..contracts.tasks import TaskRequest
 from ..services.validation import reject_forbidden_prompt_keys
-from .deps import check_protocol_header, request_id, require_ready
+from .deps import check_protocol_header, request_id, require_ready, upstream_route
 from .paid_access import account_context, require_paid_access
 
 router = APIRouter()
@@ -32,7 +32,9 @@ async def run_task(
 ) -> JSONResponse:
     reject_forbidden_prompt_keys(body.input, param="input")
     container = request.app.state.container
-    result = await container.task_runner.run(body, account=account_context(request))
+    result = await container.task_runner.run(
+        body, upstream=upstream_route(request), account=account_context(request)
+    )
     # exclude_none, matching /respond: an unreported `usage.cost` must be ABSENT
     # rather than null, or a client testing key presence to distinguish "unknown"
     # from "free" gets a different answer per endpoint.

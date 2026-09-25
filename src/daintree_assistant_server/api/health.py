@@ -94,6 +94,13 @@ async def version(request: Request) -> dict[str, object]:
     here, and a digest typed into the wrong variable would otherwise be published
     by the mistake that made it unsafe.
 
+    ``require_caller_upstream`` says whether this revision refuses a funded
+    request that does not name the caller's own provider and key
+    (``REQUIRE_CALLER_UPSTREAM``). A boolean about the deployment, never about a
+    caller, and the smoke needs it: on a BYOK-only revision a header-less
+    ``/auth/verify`` is correctly a 400 ``upstream_required`` rather than a
+    verdict about a server key there may not be.
+
     Additive on the wire: the CLI decodes ``/version`` through ``doJSON`` with no
     ``DisallowUnknownFields``, so an unknown field is ignored rather than an error.
     """
@@ -105,6 +112,7 @@ async def version(request: Request) -> dict[str, object]:
         "posture": {
             "auth": settings.auth_mode,
             "entitlement": settings.entitlement_mode,
+            "require_caller_upstream": settings.require_caller_upstream,
             "subject_gate": {
                 "enabled": settings.staging_subject_gate_enabled,
                 "entries": len(settings.allowed_subject_digests()),

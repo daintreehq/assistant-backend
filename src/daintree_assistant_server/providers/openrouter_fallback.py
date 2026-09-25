@@ -132,3 +132,39 @@ class OpenRouterFallbackProvider(OpenRouterProvider):
             routing["ignore"] = list(self._ignore_providers)
         body["provider"] = routing
         return body
+
+
+class OpenRouterByokProvider(OpenRouterFallbackProvider):
+    """OpenRouter on the CALLER's key, for any model they choose (providers/upstream.py).
+
+    The fallback's body minus the two things that only made sense beside a Baseten
+    GLM primary: the Baseten exclusion, and a reasoning floor stated for every model.
+    ``require_parameters`` stays, so the pool is filtered to endpoints that honour
+    tools and structured output — which is what an assistant turn needs.
+
+    **The reasoning object is sent only to GLM.** With ``require_parameters`` on, a
+    ``reasoning`` object makes OpenRouter drop every endpoint that does not accept
+    it, and for a non-reasoning model that is all of them: measured, ``reasoning:
+    {effort: low}`` answered 404 "No endpoints found" for ``openai/gpt-4.1-mini``,
+    ``meta-llama/llama-4-maverick`` and ``qwen/qwen3-coder``, all of which serve
+    tools fine without it. GLM keeps the floor because it reasons unconditionally
+    and its default is expensive (see providers/baseten.py). Every other model runs
+    at its own default.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("ignore_providers", ())
+        super().__init__(*args, **kwargs)
+
+    def _build_body(self, request: ProviderChatRequest, *, stream: bool) -> dict[str, Any]:
+        body = super()._build_body(request, stream=stream)
+        if not request.model.lower().startswith("z-ai/glm"):
+            body.pop("reasoning", None)
+        # The caller's own routing preferences, over the fallback's defaults
+        # (latency sort, fallbacks allowed, `require_parameters`). All three are
+        # OpenRouter's documented `provider` fields; measured live, `price`
+        # moves GLM-5.3 Flash to a cheaper host, and `deny` + `zdr` still leave
+        # it, Claude and GPT-4.1 mini a pool to route to.
+        if request.upstream_routing:
+            body["provider"] = {**body["provider"], **request.upstream_routing}
+        return body

@@ -24,6 +24,7 @@ import httpx
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from fakes import make_result
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
@@ -1014,3 +1015,31 @@ def test_two_accounts_are_attributed_separately(
     assert usage[1]["account_subject_hash"] == subject_hash(str(other))
     assert usage[1]["account_plan_id"] == "pro"
     assert usage[0]["account_subject_hash"] != usage[1]["account_subject_hash"]
+
+
+def test_a_caller_spending_their_own_key_needs_no_plan(
+    make_client: Any, signing_key: Any, fake_provider: Any
+) -> None:
+    """Bring your own key is free: the entitlement check is not even asked.
+
+    The identity half still runs — the caller must still be signed in under
+    `enforce` — but no plan is needed to spend a key the caller pays for.
+    """
+    private, jwk = signing_key
+    website = _Website(
+        httpx.Response(200, json=_entitlement_body(access="subscription_required", plan_id=None))
+    )
+    client, _ = make_client("enforce", jwk, website)
+    fake_provider.complete_result = make_result(content="done")
+    response = client.post(
+        "/v1/daintree/respond",
+        json=_respond_body(),
+        headers={
+            "Authorization": f"Bearer {_token(private)}",
+            "X-Daintree-Upstream-Provider": "openrouter",
+            "X-Daintree-Upstream-Key": "sk-or-caller",
+        },
+    )
+    assert response.status_code == 200
+    assert website.calls == 0
+    assert fake_provider.requests[-1].upstream == "openrouter"

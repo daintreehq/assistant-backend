@@ -217,6 +217,14 @@ class ProviderChatRequest:
     # plain dataclass that coerces nothing and untyped callers (benchmarks)
     # could put a bare string here without mypy objecting.
     api_key: SecretStr | None = field(default=None, repr=False)
+    # The caller-selected host for THIS call (``providers/upstream.py``), or
+    # ``None`` for the server's own serving provider. Set together with
+    # ``model`` and ``api_key`` by ``UpstreamRoute.apply`` and read only by
+    # ``UpstreamRouter``; an adapter never looks at it.
+    upstream: str | None = None
+    # OpenRouter's endpoint-routing preferences for a caller-routed call (sort,
+    # data_collection, zdr), or ``None``. Read only by `OpenRouterByokProvider`.
+    upstream_routing: dict[str, Any] | None = None
     # An OPAQUE cache-affinity key for this call, or ``None`` to say nothing.
     #
     # A ROUTER that fronts many hosts for the same weights needs this to send a

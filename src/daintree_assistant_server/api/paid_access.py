@@ -44,7 +44,7 @@ from ..observability import get_logger
 from ..services.account_context import AccountContext
 from ..services.bearer import authorization_values, parse_bearer
 from ..services.entitlement import Entitlement, EntitlementService
-from .deps import request_id
+from .deps import request_id, resolve_upstream
 
 logger = get_logger("daintree.paid_access")
 
@@ -70,7 +70,12 @@ def require_paid_access(permission: str) -> Callable[[Request], Awaitable[Princi
 
     async def dependency(request: Request) -> Principal:
         principal = await identity(request)
-        verdict = await _check(request, principal)
+        # A caller spending its OWN provider key is not spending Daintree's, so
+        # there is no plan to check. Resolved here, beside the entitlement
+        # verdict, so malformed upstream headers are refused before any work.
+        route = resolve_upstream(request)
+        request.state.upstream = route
+        verdict = None if route is not None else await _check(request, principal)
         # Stashed rather than returned, because a FastAPI dependency has exactly
         # one return value and the route already needs the principal. Attached
         # HERE because this is the only place that holds both halves — who the
