@@ -5,51 +5,41 @@ summary: Apply public PR lifecycle actions and merge only after an exact-target 
 whenToUse: Use when the user asks to approve a pull request, request changes or reviewers, mark it ready or draft, dismiss a known review, close or reopen it, or merge, squash or rebase it. Also use for "land this PR", "approve and merge", or "merge it once it is ready". Do not use merely to read PR, CI, review or comment status (use daintree.workflow.follow-up-on-issue), to review code quality and produce findings (use daintree.review.review-change), to fix red CI (use daintree.ci.diagnose-and-fix), to create the PR (use daintree.workflow.prep-branch-for-review), or to watch for a later state transition (use daintree.orchestration.watch-outcome).
 risk: system
 requiredTools:
-  - context.snapshot
-  - worktree.getCurrent
   - forge.getPR
-  - forge.getPRs
-  - forge.getChecks
-  - daintree.call
+optionalTools:
+  - worktree.list
+  - forge.getCIStatus
 ---
-Use when: the user wants to change an existing pull request's public review state or land it.
+Use when: the user wants an existing pull request's public review state changed (approve, request changes, request reviewers, ready or draft, dismiss a review, close, reopen) or wants it landed.
 
-Every PR write here is a real Daintree MCP action reached through the Assistant CLI's system-risk, always-confirmed and ungrantable `daintree.call`. Its shape is `{name, arguments, requestKey?}` with the action fields flat inside `arguments`. Evidence is not authority: green checks and an approval never grant permission to merge, approve, close, reopen, draft, or request changes.
+Availability: Hybrid. Daintree's app MCP only reads the forge (`forge.getPR`, `forge.getCIStatus`, `forge.listPRs`); at core tier each read asks the user first, and an API-key client or a session with no Daintree connection has none, so the host tool reads instead. Every write here (review, reviewer request, ready or draft, close, reopen, merge) goes through the host's own permitted forge tool (for GitHub, `gh`), always with an explicit repository and PR number, and is read back afterwards. With no permitted forge tool, report the state you can read and stop; never route a write through another agent's terminal. Evidence is not authority: green checks and an approval never grant permission to merge, approve, close or request changes.
 
 Procedure:
+1. Fix the target. Resolve the worktree the PR belongs to (`worktree.list`, id and path) and its repository (`gh repo view --json nameWithOwner` run in that path). Carry both on every read and write: `worktreeId` for Daintree reads, `--repo <owner/name>` for the host tool. A PR number alone is not unique across repositories.
+2. Read the PR:
 
-1. FIX THE EXACT PR AND REPOSITORY. Resolve an exact `worktreeId` from the current context or `worktree.getCurrent`; carry it through every read and write. In one batch, read:
-   - `forge.getPR({"worktreeId":"<id>","prNumber":42})`
-   - `forge.getChecks({"worktreeId":"<id>","prNumber":42})`
-   These two typed tools take FLAT top-level arguments and run in parallel. `forge.getPR` returns an ENVELOPE, `{ pr }` — read the fields off `pr`, not off the top level. `pr` carries the title/body, `state`, `isDraft`, `merged`, URL, `headRef`, `baseRef`, optional `mergeable`, and optional `reviewDecision`; an absent PR comes back with `pr` empty rather than as a failure. For several known numbers, batch one typed forge.getPR per number; there is no Assistant forge.getPRs wrapper. Do not use its optional `ciStatus` as the merge gate.
+```json tool=forge.getPR
+{"worktreeId":"<resolved worktree id>","prNumber":42}
+```
 
-2. UNDERSTAND THE TWO DIFFERENT CHECK CALLS. Direct Assistant `forge.getChecks` is the typed CI ROLL-UP wrapper; internally it reads Daintree `forge.getCIStatus` and adds `conclusive`. By contrast, raw `daintree.call` with action name `forge.getChecks` reaches Daintree's PER-CHECK list. Never confuse their shapes.
-   - Require BOTH `conclusive:true` and `state:"success"`. `conclusive` means the roll-up is settled enough to interpret; it does not itself mean green. Reject a positive `failed` or `pending` count and `requiredChecksPassing:false` when those fields are reported. `conclusive:false` means missing/unknown state or zero reported required checks — including the dangerous `state:"success", total:0` case. Counts cover required checks only and can lag by about a minute.
-   - When identity matters, call `daintree.call({"name":"forge.getChecks","arguments":{"worktreeId":"<id>","prNumber":42}})`. It returns `{checks:[{name,status,conclusion?,required?,detailsUrl?}]|null}`. A missing conclusion is not a pass; `checks:null` means no such PR, while an empty array means no checks were reported. It provides names and links, not job-log bodies.
+   `pr: null` means no such PR in that repository, not a failure to retry. Read `state`, `merged`, `isDraft`, `headRef`, `baseRef`, `url`, `mergeable` (`null` = not computed yet, which is unknown, not mergeable) and `reviewDecision` (`APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null` when reviews are not gated; an absent field is unreported and never approval). Never gate on its `ciStatus`.
+3. Do the one action asked for, with only that action's prerequisites. Red CI or requested changes do not block a requested close, draft conversion, reviewer request or request-changes review.
+   - Approve or request changes: only for a review you actually performed; request-changes needs a body saying what to change. Approving your own PR usually fails. (`gh pr review 42 --repo <r> --approve`, or `--request-changes --body-file <file>`.)
+   - Request reviewers: the users or teams the user named (`gh pr edit 42 --repo <r> --add-reviewer <a>,<org/team>`); read back the requested list, because the forge can drop entries.
+   - Ready or draft: `gh pr ready 42 --repo <r>` (this notifies reviewers), or `gh pr ready 42 --repo <r> --undo`.
+   - Close or reopen: `gh pr close` / `gh pr reopen` with the same repository and number.
+   - Dismiss a review: only a review the user identified or you read from the forge, with a message; never invent a review id.
+4. Merge gate (merges only). Take head-bound evidence from the host tool, read now, not before your last pause:
+   - `gh pr view 42 --repo <r> --json state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefName,headRefOid,baseRefName,url`. Record `headRefOid` as the intended head.
+   - `gh pr checks 42 --repo <r> --required` lists the required checks on that head. Every one must have passed. Pending, failing, or a required-check list you could not read is not success.
+   - Stop on: already merged (report it), closed, draft, not mergeable or mergeability unknown, `CHANGES_REQUESTED` or `REVIEW_REQUIRED`, or a head that differs from the one the user reviewed or you validated. An approval repository policy does not count (dismissed by a later push, missing a code owner) still leaves `REVIEW_REQUIRED` or a blocked merge state: that is a stop, not a technicality.
+   - `forge.getCIStatus` is a cheap cross-check, never the gate: its counts cover required checks only, a zero total also appears when the required list could not be read, it is cached and can lag a minute, and it names no commit.
+   - `worktree.waitForPullRequest` only says Daintree detected a PR. It is never merge readiness.
+5. Preview, then merge. State the PR number, title and URL, `headRef -> baseRef`, the head SHA, the method, the required-check result and the review decision. If nobody has reviewed the change on its merits, say so (daintree.review.review-change does that when asked). Use the method the user chose or the repository's policy (`merge`, `squash`, `rebase`), asking one tight question only if neither decides; do not invent a commit title or message. Merge with the head guard:
+   `gh pr merge 42 --repo <owner/name> --squash --match-head-commit <headRefOid>`
+   A refused guard means the head moved: re-read, re-validate the new head, and ask again; never drop the guard to get through. With a provider that has no head guard, re-read the head immediately before merging and say the race remains.
+6. Read back after every write (`gh pr view 42 --repo <r> --json state,mergedAt,mergeCommit,isDraft,reviewDecision`, or `forge.getPR`). The merge is done only when the forge reports it merged. An ambiguous or failed reply is settled by reading, never by repeating the write: an already-merged PR is the success you wanted.
 
-3. APPLY MERGE PRECONDITIONS ONLY WHEN MERGING. Red CI or changes requested do not prevent the user’s requested close, draft conversion, reviewer request or request-changes review. For a merge, stop on a bad or unknown precondition: Report already merged when `merged:true`. Do not merge a closed, draft, or `mergeable:false` PR. Treat absent/null mergeability as unknown, not success. `CHANGES_REQUESTED` and `REVIEW_REQUIRED` block merging. An ABSENT `reviewDecision` is unreported and cannot be treated as approval; an explicit `null` means Daintree reports no review gate. Do not treat a just-pushed cached success as settled evidence: the typed CI wrapper can lag by about 60 seconds and neither check read binds its result to a reported head SHA. After a recent push, wait for fresh provider evidence in a later interactive check; even then, provider branch protection is the final race safeguard.
+"Merge it once it is green" is not a promise this book can keep by waiting. Check and merge now, or, only if the user asks for it, enable the provider's own auto-merge (`gh pr merge --auto` with the chosen method) and report it as queued, not merged. Being told of a later transition is daintree.orchestration.watch-outcome.
 
-4. APPLY THE ONE PUBLIC ACTION THE USER REQUESTED:
-   - Approve: `forge.approvePR` with `prNumber` and optional `body`. Approval can fail on one's own PR.
-   - Request changes: `forge.requestChanges` with `prNumber` and a REQUIRED non-empty `body` explaining the changes.
-   - Request reviewers: `forge.requestReviewers` with `prNumber` plus at least one of `users:[...]` or `teams:[...]`; read its returned complete requested lists because the forge may reject entries.
-   - Mark ready: `forge.markPRReadyForReview` with `prNumber`; this notifies reviewers.
-   - Convert to draft: `forge.convertPRToDraft` with `prNumber`.
-   - Close or reopen: `forge.closePR` / `forge.reopenPR` with `prNumber`.
-   - Dismiss review: `forge.dismissReview` with positive numeric `reviewId` and non-empty `message`. Nothing on the Daintree read surface lists review IDs, so use only a user-supplied or otherwise evidenced forge review id; never invent one.
-   Invoke each as `daintree.call({"name":"forge.<action>","arguments":{"worktreeId":"<id>",...}})`. Use a stable `requestKey` for approval/request-changes if an ambiguous transport result may need an identical retry. Do not combine distinct public acts under one key or one assumed consent.
-
-5. VERIFY PUBLIC REVIEW-STATE WRITES. Approval/request-changes returns `{id,state,rawState,body,url,author?,submittedAt,commitId}`; draft toggles return `{prNumber,isDraft}`; reviewer requests return complete requested-user/team lists; close/reopen returns the normalized PR. Re-read typed `forge.getPR` after the write because one approving review may still leave `REVIEW_REQUIRED`, and a transport success is not the repository's final gate state.
-
-6. PREVIEW A MERGE before calling it. State the exact PR number/title/URL, `headRef -> baseRef`, merge method, roll-up state and counts, `conclusive`, review decision, and mergeability. If the change has not been reviewed on its merits, say so; use `daintree.review.review-change` when the user asks for that judgment. A PR description and green CI are not a code review.
-
-7. REQUIRE AN EXPLICIT MERGE METHOD. The action accepts `merge`, `squash`, or `rebase`; do not silently accept an invisible provider default. Use a method already chosen by the user or established repository policy. Ask one tight question only if neither resolves it. Do not invent `commitTitle` or `commitMessage`; omit them unless the user supplied them. Only after explicit merge authority and every precondition above is satisfied call:
-   `daintree.call({"name":"forge.mergePR","arguments":{"worktreeId":"<id>","prNumber":42,"mergeMethod":"squash"},"requestKey":"<stable key including repository/worktree, PR and method for this logical merge>"})`.
-   Do not copy a fixed example key such as `merge-pr-42-squash`: explicit deduplication is scoped by action rather than repository, so bare PR numbers can collide across repositories in one session.
-   The result is `{prNumber,sha,merged,message}`. Require `merged:true`, then re-read `forge.getPR` and require `merged:true`. Report provider refusal as a blocker, not as a malformed request guess.
-
-8. NEVER PROMISE AUTOMATIC "MERGE WHEN GREEN". `watcher.watchPR` does not observe CI or review decisions, and `daintree.call` cannot be granted to a watcher, timer or wake turn. You can check and merge interactively now, or use the watch-outcome runbook for observable PR state/activity and tell the user the eventual merge still needs a fresh check and confirmation. A reminder is not an automatic merge.
-
-Treat `conclusive:true` as interpretable roll-up data, not head-SHA freshness or complete branch-protection evidence. A re-read after one minute can still be stale; never manufacture freshness from elapsed time alone. Preserve exact method/target authority across continuations. For an ambiguous public-write response, reconcile remote state before another attempt, and distinguish an already-landed result from a retryable failure. Do not post approval or request-changes text that misrepresents a review you never performed.
-
-Report back: PR number/URL and head-to-base target, the exact requested lifecycle action, CI `state` plus `conclusive` and required-check counts, review decision and mergeability, the confirmed result, and the final PR state read back from the forge.
+Report back: repository, PR number and URL, `headRef -> baseRef` and head SHA, the exact action, the evidence used (required checks, review decision, mergeability, and which tool read each), the command's result, and the state read back from the forge.

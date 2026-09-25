@@ -72,3 +72,36 @@ def test_runbooks_have_no_pipe_tables() -> None:
 def test_runbooks_end_with_report_back() -> None:
     for runbook in load_catalog().runbooks:
         assert "report back" in runbook.body.lower(), f"{runbook.id} has no Report-back template"
+
+
+# The foundation rides along with every search and every retrieval, as a supporting
+# runbook, so it is paid for on EVERY response rather than only on a hit. Measured at
+# the migration to the app MCP (2026-09-25): 14.0KB.
+FOUNDATION_BODY_CEILING = 15 * 1024
+# What following one runbook costs: its body plus everything `supporting_for` sends
+# with it. Measured at the same point: 28.1KB at the largest (fan-out-work).
+RUNBOOK_BUNDLE_CEILING = 32 * 1024
+
+
+def test_foundations_stay_compact() -> None:
+    for runbook in load_catalog().runbooks:
+        if not runbook.meta.foundation:
+            continue
+        size = len(runbook.body.encode("utf-8"))
+        assert size <= FOUNDATION_BODY_CEILING, (
+            f"{runbook.id} body is {size}B, over {FOUNDATION_BODY_CEILING}B; it is sent "
+            "with every response, so move task-specific rules into the runbooks that need them"
+        )
+
+
+def test_a_runbook_with_its_supporting_runbooks_stays_bounded() -> None:
+    catalog = load_catalog()
+    for runbook in catalog.runbooks:
+        if runbook.id not in catalog.selectable_ids:
+            continue
+        bundle = [runbook, *catalog.supporting_for([runbook.id])]
+        size = sum(len(r.body.encode("utf-8")) for r in bundle)
+        assert size <= RUNBOOK_BUNDLE_CEILING, (
+            f"{runbook.id} with its supporting runbooks is {size}B, over "
+            f"{RUNBOOK_BUNDLE_CEILING}B: {[r.id for r in bundle]}"
+        )

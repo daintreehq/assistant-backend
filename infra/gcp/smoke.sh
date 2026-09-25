@@ -151,8 +151,8 @@ fi
 
 STATUS="$(rpc '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')"
 if [ "$STATUS" = "200" ]; then
-  VERDICT="$(check '[t["name"] for t in body["result"]["tools"]] == ["search_runbooks"] or body')"
-  [ "$VERDICT" = "ok" ] && pass "MCP tools/list offers search_runbooks" \
+  VERDICT="$(check '[t["name"] for t in body["result"]["tools"]] == ["search_runbooks", "get_runbook"] or body')"
+  [ "$VERDICT" = "ok" ] && pass "MCP tools/list offers search_runbooks and get_runbook" \
                         || fail "MCP tools/list body is wrong" "$VERDICT"
 else
   fail "MCP tools/list answered $STATUS"
@@ -177,6 +177,17 @@ if [ "$STATUS" = "200" ]; then
   fi
 else
   fail "MCP tools/call answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
+fi
+
+# Exact retrieval, and the dependency delivery both tools share: a specific
+# runbook must arrive with its foundation, which search alone never paired.
+STATUS="$(rpc '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_runbook","arguments":{"id":"daintree.terminals.rename"}}}')"
+if [ "$STATUS" = "200" ]; then
+  VERDICT="$(check '(lambda r: r["isError"] is False and r["structuredContent"]["runbook"]["id"] == expected and r["structuredContent"]["runbook"]["instructions"] and [x["id"] for x in r["structuredContent"]["supporting_runbooks"]] == ["daintree.foundation"] or r)(body["result"])' daintree.terminals.rename)"
+  [ "$VERDICT" = "ok" ] && pass "get_runbook returns daintree.terminals.rename with its foundation" \
+                        || fail "get_runbook result is wrong" "$VERDICT"
+else
+  fail "MCP get_runbook answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
 fi
 
 STATUS="$(get /v1/daintree/mcp)"

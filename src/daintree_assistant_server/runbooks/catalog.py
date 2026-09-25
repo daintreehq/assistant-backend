@@ -27,6 +27,12 @@ def default_runbooks_dir() -> Path:
 DOCS_RUNBOOK_ID = "daintree.docs.answer-usage-question"
 _HIDDEN_FROM_SELECTOR = frozenset({DOCS_RUNBOOK_ID})
 
+#: The most supporting runbooks one runbook's instructions may pull in (its
+#: foundation plus everything `requires` reaches). Checked at load, so a runaway
+#: dependency chain fails readiness instead of a response silently dropping part
+#: of a procedure's prerequisites at serving time.
+MAX_SUPPORTING_RUNBOOKS = 6
+
 
 class Catalog:
     """An immutable collection of validated runbooks."""
@@ -65,6 +71,91 @@ class Catalog:
         self._selectable_ids = frozenset(
             s.id for s in self._runbooks if s.id not in _HIDDEN_FROM_SELECTOR
         )
+        self._supporting = self._resolve_dependencies()
+
+    # ---- instruction dependencies -----------------------------------------
+
+    def _direct_dependencies(self, runbook_id: str) -> list[str]:
+        """What must be read before ``runbook_id``: its nearest foundation, then its
+        declared ``requires`` in order.
+
+        The foundation edge is implicit because every specific relies on its domain's
+        base judgment; a foundation has no implicit edge to an ANCESTOR foundation,
+        so a nested foundation that builds on ``daintree.foundation`` must say so in
+        ``requires``.
+        """
+        deps: list[str] = []
+        foundation = self.domain_foundation(runbook_id)
+        if foundation is not None and foundation != runbook_id:
+            deps.append(foundation)
+        for ref in self._by_id[runbook_id].meta.requires:
+            if ref not in deps:
+                deps.append(ref)
+        return deps
+
+    def _resolve_dependencies(self) -> dict[str, tuple[str, ...]]:
+        """Validate the dependency graph and precompute each runbook's closure.
+
+        Fails closed, like any other malformed runbook: an unknown or hidden
+        ``requires`` target, a cycle through explicit OR implicit foundation edges
+        (a foundation requiring one of its own specifics is the easy one to write),
+        or a closure over the bound. Closure order is dependencies first, each
+        exactly once, so the general foundation leads and the specific procedures a
+        runbook builds on follow.
+        """
+        for runbook in self._runbooks:
+            for ref in runbook.meta.requires:
+                if ref not in self._by_id:
+                    raise RunbookLoadError(f"{runbook.id!r} requires unknown runbook {ref!r}")
+                if ref in _HIDDEN_FROM_SELECTOR:
+                    raise RunbookLoadError(
+                        f"{runbook.id!r} requires {ref!r}, which is never served"
+                    )
+
+        closures: dict[str, tuple[str, ...]] = {}
+        visiting: list[str] = []
+
+        def visit(runbook_id: str) -> tuple[str, ...]:
+            done = closures.get(runbook_id)
+            if done is not None:
+                return done
+            if runbook_id in visiting:
+                cycle = visiting[visiting.index(runbook_id) :] + [runbook_id]
+                raise RunbookLoadError(
+                    "runbook instruction dependencies form a cycle: " + " -> ".join(cycle)
+                )
+            visiting.append(runbook_id)
+            ordered: list[str] = []
+            for dep in self._direct_dependencies(runbook_id):
+                for inherited in (*visit(dep), dep):
+                    if inherited not in ordered:
+                        ordered.append(inherited)
+            visiting.pop()
+            closures[runbook_id] = tuple(ordered)
+            return closures[runbook_id]
+
+        for runbook in self._runbooks:
+            closure = visit(runbook.id)
+            if len(closure) > MAX_SUPPORTING_RUNBOOKS:
+                raise RunbookLoadError(
+                    f"{runbook.id!r} pulls in {len(closure)} supporting runbooks, over the "
+                    f"bound of {MAX_SUPPORTING_RUNBOOKS}: {list(closure)}"
+                )
+        return closures
+
+    def supporting_for(self, runbook_ids: Sequence[str]) -> list[Runbook]:
+        """The instruction dependencies of ``runbook_ids``, each once, in order.
+
+        Anything already among ``runbook_ids`` is left out: a foundation that is
+        itself a search hit is not sent twice. Unknown ids contribute nothing.
+        """
+        primary = set(runbook_ids)
+        ordered: list[str] = []
+        for runbook_id in runbook_ids:
+            for dep in self._supporting.get(runbook_id, ()):
+                if dep not in primary and dep not in ordered:
+                    ordered.append(dep)
+        return [self._by_id[dep] for dep in ordered]
 
     @staticmethod
     def _domain_of(runbook_id: str) -> str:
@@ -80,10 +171,11 @@ class Catalog:
     def domain_foundation(self, runbook_id: str) -> str | None:
         """The nearest foundation runbook id above ``runbook_id``, if any.
 
-        Used to auto-pair a domain's foundation with a selected specific so the
-        foundation loads on the SAME turn its specific is selected rather than a
-        turn late. Returns the id (possibly ``runbook_id`` itself, when it is the
-        foundation) or ``None`` when no ancestor namespace has a foundation.
+        Serving uses it to deliver a specific's foundation alongside it (see
+        ``supporting_for``), and the classifier's training and benchmark replay use
+        it to pair the two in an active set. Returns the id (possibly
+        ``runbook_id`` itself, when it is the foundation) or ``None`` when no
+        ancestor namespace has a foundation.
 
         The lookup walks UP the dotted id namespace, NEAREST-FIRST: the runbook's
         own domain key, then each successively shorter prefix. So a top-level
@@ -128,6 +220,15 @@ class Catalog:
 
     def get(self, runbook_id: str) -> Runbook | None:
         return self._by_id.get(runbook_id)
+
+    def get_public(self, runbook_id: str) -> Runbook | None:
+        """A runbook a caller may be served by id — never a hidden one.
+
+        ``get`` answers "is it loaded"; this answers "may it leave the server". The
+        hidden docs runbook is loaded for the corpus and benchmark, and exact
+        retrieval must not become a second road to it.
+        """
+        return self._by_id.get(runbook_id) if runbook_id in self._selectable_ids else None
 
     def get_many(self, runbook_ids: Iterable[str]) -> list[Runbook]:
         """Return runbooks for the given ids in order, silently skipping unknown ids."""

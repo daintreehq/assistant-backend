@@ -1,0 +1,441 @@
+# Serving-shaped queries: one bare task description, the way Claude Code or Codex
+# writes a `search_runbooks` query after reading the user's request (guide section
+# 13.3). No prior active set and no conversation: exactly what the MCP search sends.
+# Written for the MCP-era catalog without copying any runbook's whenToUse wording.
+# Development cases, not a holdout: they informed the migration.
+
+cases:
+- id: host-ask-one-codex-flaw
+  category: host-query
+  note: 'Guide 13.2: an answer, not work; waits for a notice internally.'
+  messages:
+  - role: user
+    content: Ask one Codex agent whether this retry design has a flaw and bring back its answer.
+  expect:
+    required:
+    - daintree.agents.ask-and-relay
+    optional:
+    - daintree.foundation
+- id: host-visible-agent-implement
+  category: host-query
+  note: 'Guide 13.2: visible work, not a question.'
+  messages:
+  - role: user
+    content: Start a visible agent to implement the retry fix; the user wants to watch it work.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: host-answer-stopped-agent
+  category: host-query
+  note: Guide 13.2.
+  messages:
+  - role: user
+    content: An agent pane stopped and is asking which behaviour to preserve; answer it from the user's
+      original brief.
+  expect:
+    required:
+    - daintree.agents.answer-waiting-agent
+    optional:
+    - daintree.foundation
+- id: host-notice-then-verify
+  category: host-query
+  note: 'Guide 13.2: the deliverable is verification; the wait is a phase of it, so watch-outcome is allowed
+    but not owed.'
+  messages:
+  - role: user
+    content: Get told when an already-running agent finishes, then check its changes actually do what
+      was asked before reporting.
+  expect:
+    required:
+    - daintree.orchestration.verify-agent-work
+    optional:
+    - daintree.orchestration.watch-outcome
+    - daintree.foundation
+- id: host-relay-notes-no-wait
+  category: host-query
+  note: 'Guide 13.2: a relay-only request.'
+  messages:
+  - role: user
+    content: Send the reviewer agent's notes to the implementer agent; no need to wait for its reply.
+  expect:
+    required:
+    - daintree.agents.relay-review-feedback
+    optional:
+    - daintree.foundation
+- id: host-rolling-cap-three
+  category: host-query
+  note: 'Guide 13.2: a rolling queue under a concurrency cap.'
+  messages:
+  - role: user
+    content: Work through the remaining backlog issues with agents, never more than three running at once.
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+- id: host-status-no-changes
+  category: host-query
+  note: 'Guide 13.2: a status-only sweep.'
+  messages:
+  - role: user
+    content: Show which agents are still running and what each is doing; do not start or change anything.
+  expect:
+    required:
+    - daintree.orchestration.supervise-fleet
+    optional:
+    - daintree.foundation
+- id: host-issue-agent-worktree
+  category: host-query
+  messages:
+  - role: user
+    content: Launch a Claude Code agent in a new worktree for GitHub issue 214 and have it implement the
+      fix.
+  expect:
+    required:
+    - daintree.workflow.start-work-on-issue
+    optional:
+    - daintree.foundation
+- id: host-rename-tabs
+  category: host-query
+  messages:
+  - role: user
+    content: Rename the Daintree terminal tabs so each says what its agent is working on.
+  expect:
+    required:
+    - daintree.terminals.rename
+    optional:
+    - daintree.foundation
+- id: host-launch-no-terminal-id
+  category: host-query
+  messages:
+  - role: user
+    content: The agent launch returned no terminal id; find out whether the agent actually started.
+  expect:
+    required:
+    - daintree.agents.recover-agent
+    optional:
+    - daintree.foundation
+- id: host-poll-pinned-migration
+  category: host-query
+  messages:
+  - role: user
+    content: Poll the pinned agents for which database migration strategy they prefer and summarise the
+      consensus.
+  expect:
+    required:
+    - daintree.agents.poll-pinned-agents
+    optional:
+    - daintree.foundation
+- id: host-plain-worktree
+  category: host-query
+  messages:
+  - role: user
+    content: Create a worktree for branch feature/search-cache without launching any agent.
+  expect:
+    required:
+    - daintree.worktree.create-plain-worktree
+    optional:
+    - daintree.foundation
+- id: host-run-recipe
+  category: host-query
+  messages:
+  - role: user
+    content: Run the saved full-stack recipe in a fresh worktree.
+  expect:
+    required:
+    - daintree.recipe.run-or-create
+    optional:
+    - daintree.foundation
+- id: host-merge-when-green
+  category: host-query
+  messages:
+  - role: user
+    content: Merge PR 318 once its required checks pass.
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    optional:
+    - daintree.foundation
+- id: host-pr-status-read
+  category: host-query
+  messages:
+  - role: user
+    content: Is CI green on PR 318, and has the reviewer replied yet?
+  expect:
+    required:
+    - daintree.workflow.follow-up-on-issue
+    optional:
+    - daintree.foundation
+- id: host-file-flaky-issue
+  category: host-query
+  messages:
+  - role: user
+    content: File an issue for the flaky websocket reconnect test and label it bug.
+  expect:
+    required:
+    - daintree.forge.manage-issue
+    optional:
+    - daintree.foundation
+- id: host-find-unclaimed-bugs
+  category: host-query
+  messages:
+  - role: user
+    content: Find small unassigned bugs in the backlog that nobody has picked up yet.
+  expect:
+    required:
+    - daintree.workflow.find-issue-work
+    optional:
+    - daintree.foundation
+- id: host-cleanup-after-fanout
+  category: host-query
+  messages:
+  - role: user
+    content: Close the agent terminals and delete the worktrees left over from the finished fan-out.
+  expect:
+    required:
+    - daintree.orchestration.workspace-cleanup
+    optional:
+    - daintree.foundation
+- id: host-resume-yesterday
+  category: host-query
+  messages:
+  - role: user
+    content: Catch the user up on where the refactor stood before yesterday's session ended, and pick
+      it back up.
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+- id: host-two-reviewers
+  category: host-query
+  messages:
+  - role: user
+    content: Have two agents review the same diff independently and merge their findings by severity.
+  expect:
+    required:
+    - daintree.review.review-change
+    optional:
+    - daintree.foundation
+- id: host-ci-failing-parser
+  category: host-query
+  messages:
+  - role: user
+    content: CI fails for the parser package; reproduce it locally and fix it.
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: host-explain-token-refresh
+  category: host-query
+  messages:
+  - role: user
+    content: Explain how the auth token refresh flow works in this repository, with file references.
+  expect:
+    required:
+    - daintree.explore.repository
+    optional:
+    - daintree.foundation
+- id: host-daintree-tools-missing
+  category: host-query
+  messages:
+  - role: user
+    content: The Daintree MCP tools disappeared from this session; work out why.
+  expect:
+    required:
+    - daintree.diagnostics
+    optional:
+    - daintree.foundation
+- id: host-weekly-allowance
+  category: host-query
+  messages:
+  - role: user
+    content: How much of the weekly Claude Code usage allowance is left?
+  expect:
+    required:
+    - daintree.agents.check-usage-limits
+    optional:
+    - daintree.foundation
+- id: host-separate-shared-worktree
+  category: host-query
+  messages:
+  - role: user
+    content: Three agents are sharing one worktree; move each into its own worktree.
+  expect:
+    required:
+    - daintree.worktree.relocate-agents
+    optional:
+    - daintree.foundation
+- id: host-debate-vote-off
+  category: host-query
+  messages:
+  - role: user
+    content: Have the agents debate the caching approach and vote off the weakest position each round.
+  expect:
+    required:
+    - daintree.orchestration.debate-elimination
+    optional:
+    - daintree.foundation
+- id: host-planner-implementer-talk
+  category: host-query
+  messages:
+  - role: user
+    content: Get the planner agent and the implementer agent talking to each other about the API shape
+      and keep it going.
+  expect:
+    required:
+    - daintree.orchestration.conversation
+    optional:
+    - daintree.foundation
+- id: host-interview-pair
+  category: host-query
+  messages:
+  - role: user
+    content: Have one agent interview the other three about async Rust and pick the best pair programmer.
+  expect:
+    required:
+    - daintree.orchestration.interview
+    optional:
+    - daintree.foundation
+- id: host-runoff-after-tie
+  category: host-query
+  messages:
+  - role: user
+    content: The tagline competition tied between two agents; run a runoff with the same voters.
+  expect:
+    required:
+    - daintree.orchestration.runoff-tiebreaker
+    optional:
+    - daintree.foundation
+- id: host-tagline-competition
+  category: host-query
+  messages:
+  - role: user
+    content: Each of the four agents proposes a tagline, then they vote on the best one and we declare
+      a winner.
+  expect:
+    required:
+    - daintree.orchestration.competition
+    optional:
+    - daintree.foundation
+- id: host-converge-cache-design
+  category: host-query
+  messages:
+  - role: user
+    content: Three agents should collaborate until they converge on a single design for the cache layer.
+  expect:
+    required:
+    - daintree.orchestration.multi-agent
+    optional:
+    - daintree.foundation
+- id: host-copytree-billing
+  category: host-query
+  messages:
+  - role: user
+    content: Bundle the files relevant to the billing module into a CopyTree context file.
+  expect:
+    required:
+    - daintree.context.curate-copytree-bundle
+    optional:
+    - daintree.foundation
+- id: host-preview-blank-page
+  category: host-query
+  messages:
+  - role: user
+    content: The dev preview shows a blank page; check the console errors and fix it.
+  expect:
+    required:
+    - daintree.runtime.debug-web-app
+    optional:
+    - daintree.foundation
+- id: host-tell-me-when-done
+  category: host-query
+  messages:
+  - role: user
+    content: Let the user know when the long test run in that agent's terminal finishes.
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+- id: host-db-per-worktree
+  category: host-query
+  messages:
+  - role: user
+    content: Give each worktree its own database so branches stop clobbering each other.
+  expect:
+    required:
+    - daintree.worktree.provision-local-environment
+    optional:
+    - daintree.foundation
+- id: host-pause-devbox
+  category: host-query
+  messages:
+  - role: user
+    content: Pause the cloud devbox for this worktree to save cost.
+  expect:
+    required:
+    - daintree.worktree.manage-resource
+    optional:
+    - daintree.foundation
+- id: host-remember-pnpm
+  category: host-query
+  messages:
+  - role: user
+    content: Remember that this project uses pnpm, not npm.
+  expect:
+    required:
+    - daintree.memory.manage-project-memory
+    optional:
+    - daintree.foundation
+- id: host-prep-draft-pr
+  category: host-query
+  messages:
+  - role: user
+    content: Prepare this branch for review and open a draft PR.
+  expect:
+    required:
+    - daintree.workflow.prep-branch-for-review
+    optional:
+    - daintree.foundation
+- id: host-durable-migration-plan
+  category: host-query
+  messages:
+  - role: user
+    content: Plan a multi-step database migration with dependent phases, tracked so it can be resumed
+      after a restart.
+  expect:
+    required:
+    - daintree.orchestration.execute-durable-workflow
+    optional:
+    - daintree.foundation
+- id: host-confirm-tests-claim
+  category: host-query
+  messages:
+  - role: user
+    content: The agent says all tests pass; confirm that before the user merges.
+  expect:
+    required:
+    - daintree.orchestration.verify-agent-work
+    optional:
+    - daintree.foundation
+- id: host-what-exists-now
+  category: host-query
+  note: 'A plain state read: the foundation alone.'
+  messages:
+  - role: user
+    content: List the terminals, agents and worktrees that exist in Daintree right now.
+  expect:
+    required:
+    - daintree.foundation
+- id: host-no-task-install-question
+  category: host-query
+  note: 'A question about installing the runbook server itself: no runbook applies.'
+  messages:
+  - role: user
+    content: What's the command to add an HTTP MCP server to Codex?
+  expect:
+    required: []

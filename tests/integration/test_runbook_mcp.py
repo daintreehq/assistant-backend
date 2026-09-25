@@ -12,12 +12,18 @@ import json
 from typing import Any
 
 from fastapi.testclient import TestClient
+from jsonschema import Draft202012Validator
 
 from daintree_assistant_server.runbook_mcp import (
+    DEFAULT_MAX_RESULTS,
+    GET_TOOL_DEFINITION,
+    GET_TOOL_NAME,
     MAX_RESULTS_CAP,
     SUPPORTED_PROTOCOL_VERSIONS,
+    TOOL_DEFINITION,
     TOOL_NAME,
 )
+from daintree_assistant_server.runbooks.catalog import DOCS_RUNBOOK_ID
 
 URL = "/v1/daintree/mcp"
 HEADERS = {"Accept": "application/json, text/event-stream"}
@@ -41,6 +47,17 @@ def _rpc(
 
 def _call(client: TestClient, arguments: dict[str, Any], **kwargs: Any) -> Any:
     return _rpc(client, "tools/call", {"name": TOOL_NAME, "arguments": arguments}, **kwargs)
+
+
+def _get(client: TestClient, arguments: dict[str, Any], **kwargs: Any) -> Any:
+    return _rpc(client, "tools/call", {"name": GET_TOOL_NAME, "arguments": arguments}, **kwargs)
+
+
+def _assert_schema(definition: dict[str, Any], structured: dict[str, Any]) -> None:
+    errors = [e.message for e in Draft202012Validator(definition["outputSchema"]).iter_errors(
+        structured
+    )]
+    assert not errors, errors
 
 
 def test_legacy_handshake_then_search_without_any_session(client: TestClient) -> None:
@@ -69,9 +86,10 @@ def test_legacy_handshake_then_search_without_any_session(client: TestClient) ->
 
     listed = _rpc(client, "tools/list", headers={"MCP-Protocol-Version": "2025-06-18"})
     tools = listed.json()["result"]["tools"]
-    assert [t["name"] for t in tools] == [TOOL_NAME]
+    assert [t["name"] for t in tools] == [TOOL_NAME, GET_TOOL_NAME]
     assert tools[0]["inputSchema"]["required"] == ["query"]
-    assert tools[0]["annotations"]["readOnlyHint"] is True
+    assert tools[1]["inputSchema"]["required"] == ["id"]
+    assert all(t["annotations"]["readOnlyHint"] is True for t in tools)
 
 
 def test_initialize_with_an_unknown_version_is_answered_with_the_newest_handshake_one(
@@ -126,16 +144,106 @@ def test_search_returns_full_runbooks_as_structured_json(client: TestClient, app
     assert top["title"] == runbook.title
     assert top["when_to_use"] == runbook.when_to_use
     assert (top["score"], top["selected"]) == (0.97, True)
+    assert top["content_hash"] == runbook.content_hash
     # The text block carries the same JSON, for clients predating structuredContent.
     assert json.loads(result["content"][0]["text"]) == structured
+    _assert_schema(TOOL_DEFINITION, structured)
     # The query reaches the search trimmed, with the caller's limit.
     assert selector.search_requests == [("do the thing", 2)]
 
 
-def test_max_results_defaults_to_five(client: TestClient, app: Any) -> None:
+def test_search_delivers_each_prerequisite_once_outside_the_ranking(
+    client: TestClient, app: Any
+) -> None:
+    """Two specifics sharing a foundation bring it once, in `supporting_runbooks`,
+    and it does not count against `max_results`."""
+    catalog = app.state.container.catalog
+    app.state.container.selector.search_hits = [
+        ("daintree.terminals.rename", 0.9, True),
+        ("daintree.agents.ask-and-relay", 0.2, False),
+    ]
+    structured = _call(client, {"query": "x", "max_results": 2}).json()["result"][
+        "structuredContent"
+    ]
+    assert [r["id"] for r in structured["runbooks"]] == [
+        "daintree.terminals.rename",
+        "daintree.agents.ask-and-relay",
+    ]
+    supporting = [r["id"] for r in structured["supporting_runbooks"]]
+    assert supporting == ["daintree.foundation"]
+    foundation = catalog.get("daintree.foundation")
+    assert structured["supporting_runbooks"][0]["instructions"] == foundation.body
+    _assert_schema(TOOL_DEFINITION, structured)
+
+
+def test_a_foundation_that_is_itself_a_hit_is_not_sent_twice(
+    client: TestClient, app: Any
+) -> None:
+    app.state.container.selector.search_hits = [
+        ("daintree.foundation", 0.9, True),
+        ("daintree.terminals.rename", 0.5, True),
+    ]
+    structured = _call(client, {"query": "x", "max_results": 2}).json()["result"][
+        "structuredContent"
+    ]
+    assert [r["id"] for r in structured["runbooks"]][0] == "daintree.foundation"
+    assert structured["supporting_runbooks"] == []
+
+
+def test_max_results_defaults_to_three(client: TestClient, app: Any) -> None:
     response = _call(client, {"query": "anything"})
-    assert len(response.json()["result"]["structuredContent"]["runbooks"]) == 5
-    assert app.state.container.selector.search_requests == [("anything", 5)]
+    assert DEFAULT_MAX_RESULTS == 3
+    assert len(response.json()["result"]["structuredContent"]["runbooks"]) == 3
+    assert app.state.container.selector.search_requests == [("anything", 3)]
+
+
+def test_get_runbook_returns_the_exact_runbook_and_its_foundation(
+    client: TestClient, app: Any
+) -> None:
+    catalog = app.state.container.catalog
+    result = _get(client, {"id": "daintree.terminals.rename"}).json()["result"]
+    assert result["isError"] is False
+    structured = result["structuredContent"]
+    runbook = catalog.get("daintree.terminals.rename")
+    assert structured["catalog_revision"] == catalog.revision
+    assert structured["runbook"]["id"] == runbook.id
+    assert structured["runbook"]["instructions"] == runbook.body
+    assert structured["runbook"]["content_hash"] == runbook.content_hash
+    # Exact retrieval ranks nothing, so it claims no confidence.
+    assert "score" not in structured["runbook"] and "selected" not in structured["runbook"]
+    assert [r["id"] for r in structured["supporting_runbooks"]] == ["daintree.foundation"]
+    assert json.loads(result["content"][0]["text"]) == structured
+    _assert_schema(GET_TOOL_DEFINITION, structured)
+    # No classifier involved.
+    assert app.state.container.selector.search_requests == []
+
+
+def test_get_runbook_of_the_foundation_has_no_supporting_runbooks(client: TestClient) -> None:
+    structured = _get(client, {"id": "daintree.foundation"}).json()["result"][
+        "structuredContent"
+    ]
+    assert structured["runbook"]["foundation"] is True
+    assert structured["supporting_runbooks"] == []
+
+
+def test_get_runbook_refuses_unknown_and_hidden_ids_alike(client: TestClient) -> None:
+    """The retired docs runbook is loaded for the corpus, and exact retrieval
+    must not become a second road to it."""
+    answers = []
+    for runbook_id in ("daintree.nope", DOCS_RUNBOOK_ID, "x" * 300):
+        result = _get(client, {"id": runbook_id}).json()["result"]
+        assert result["isError"] is True, runbook_id
+        assert "structuredContent" not in result, runbook_id
+        answers.append(result["content"][0]["text"])
+    assert len(set(answers)) == 1
+    assert DOCS_RUNBOOK_ID not in answers[0]
+
+
+def test_get_runbook_argument_problems_are_tool_errors(client: TestClient) -> None:
+    for arguments in ({}, {"id": ""}, {"id": "   "}, {"id": 7}, {"id": "a.b", "extra": 1}):
+        result = _get(client, arguments).json()["result"]
+        assert result["isError"] is True, arguments
+        assert result["content"][0]["text"], arguments
 
 
 def test_bad_arguments_are_tool_errors_the_model_can_read(client: TestClient) -> None:

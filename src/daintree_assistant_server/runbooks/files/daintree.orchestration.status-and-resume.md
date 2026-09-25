@@ -1,67 +1,47 @@
 ---
 id: daintree.orchestration.status-and-resume
 title: Status sweep, ledger hygiene and session resume
-summary: Reconstruct what is in flight across turns and sessions from the workflow ledger, live supervisors and session history — then close the stale ledger rows nothing else will.
-whenToUse: Use when the user asks where were we, what was I working on, catch me up, what is still open or in flight, what happened while I was away, or to pick up / resume something from an earlier session. Also for the workflow list or ledger itself — why it still shows finished work as active, tidying stale rows, recording a PR onto a row — and for after-the-fact forensics over the audit log. Do not use for a plain what-exists-now read of terminals, worktrees or queues (daintree.foundation), to triage the agents running this minute (daintree.orchestration.supervise-fleet), to set up a watcher or timer that wakes you later (daintree.orchestration.watch-outcome), to verify one agent's output (daintree.orchestration.verify-agent-work), to close terminals or delete worktrees (daintree.orchestration.workspace-cleanup), or to start an issue (daintree.workflow.start-work-on-issue).
+summary: Reconstruct what is in flight across turns and sessions from run checkpoints, live Daintree state and closed-session history — then correct the stale checkpoint entries nothing else will.
+whenToUse: Use when the user asks where were we, what was I working on, catch me up, what is still open or in flight, what happened while I was away, or to pick up / resume something from an earlier session. Also for the workflow list or saved run checkpoint itself — why it still shows finished work as active, tidying stale entries, recording a PR onto an entry — and for after-the-fact forensics over Daintree's recent notifications. Do not use for a plain what-exists-now read of terminals, worktrees or queues (daintree.foundation), to triage the agents running this minute (daintree.orchestration.supervise-fleet), to be told later when something finishes (daintree.orchestration.watch-outcome), to verify one agent's output (daintree.orchestration.verify-agent-work), to close terminals or delete worktrees (daintree.orchestration.workspace-cleanup), or to start an issue (daintree.workflow.start-work-on-issue).
 risk: project
 requiredTools:
-  - context.snapshot
-  - workflow.list
-  - workflow.get
-  - workflow.update
-  - terminal.focus
-  - terminal.revealOwned
-  - watcher.list
-  - async.list
-  - timer.list
-  - queue.digest
-  - queue.resolve
-  - agentTask.list
+  - terminal.list
+  - terminal.getStatus
+  - worktree.list
+optionalTools:
+  - terminal.getOutput
+  - terminal.readLastMessageOwned
   - agentSessionHistory.list
-  - agentTask.spawnForEdits
-  - agentTask.superviseTerminal
-  - git.getProjectPulse
-  - forge.listPRs
-  - terminal.extract
-  - terminal.extract.json
-  - artifact.read
-  - audit.export
-  - daintree.call
+  - agentSessionHistory.resume
+  - notifications.recent
 ---
-Use when: the user wants the cross-turn, cross-session picture — where were we, what is still in flight, resume that session — or when the workflow ledger needs reconciling against reality.
+Use when: the user wants the cross-turn or cross-session picture (where were we, what is still open, what happened while I was away), wants a closed agent session back, or a saved run checkpoint needs reconciling with reality.
 
-Two jobs, one loop: reconstruct the durable record, and repair it. The ledger can outlive its resources. A sweep reports observed state and corrects a row only when the evidence supports a specific transition. This is a read-and-reconcile sweep: if it surfaces work, spawn an agent for it (foundation) rather than doing it here. Remote state is reportable only once you have actually read it, and that is a per-PR read: keep the sweep BROAD, so do not pull a CI roll-up or review decision for every row — report the ledger, and offer a focused check on the one row that matters (daintree.workflow.follow-up-on-issue). Job-log bodies and formal/inline PR review bodies are not in the Assistant forge reads. Per-check names/status/links can be read through the raw forge.getChecks action in a focused follow-up; report only what was actually retrieved.
+Availability: Core for live reads. `agentSessionHistory.list`, `agentSessionHistory.resume` and `notifications.recent` raise an approval in a core pane. Branch and PR state come from your host's `git` and `gh` (Hybrid). The app keeps no workflow ledger, launch history or audit log. The record is the run checkpoints under `.daintree/runbook-runs/`, live Daintree state, Daintree's closed-session journal, and git and the forge. This is a read-and-reconcile sweep: continuing a piece of work happens under the runbook that started it.
 
 Procedure:
+1. Find the record. Read the run checkpoints in the coordinator checkout (usually the project root) that are not closed. If there are none, say so: rebuild the picture from live evidence only, label earlier decisions unknown, and never replay a write from memory. Your own compacted or resumed context is not a record you can read back; the checkpoint and live reads are.
+2. Read live state in one pass: `terminal.list`; `worktree.list` for branches and its `issueNumber`, `prNumber` and `setupState` hints; and one `terminal.getStatus` over the checkpoint's terminal ids plus any listed agents, with `includeOutput`. For branch and PR state use `git -C <worktree path>` and `gh pr list --repo <owner/repo> --head <branch>`. Keep the sweep broad: offer a focused CI or review read (daintree.workflow.follow-up-on-issue) rather than pulling one per unit.
+3. Reconcile each checkpoint unit on evidence, never on its recorded status or its age:
+   - Terminal present and working: live. Whether anything will wake you is a separate question. Notices belong to the pane that armed them and end with it: after that pane relaunched or Daintree restarted, none is pending; after a compaction in the same pane, the ones your checkpoint records still are.
+   - Terminal present and stopped: a candidate result, verified against the recorded acceptance before it becomes done.
+   - Terminal absent from a successful listing: gone. How it ended comes from the branch, commits and PR, or stays unknown. A failed or partial listing is unknown, not gone.
+   - A public write recorded as intended but not confirmed: uncertain until you read it back from the forge or repository.
+   Correct the checkpoint only where evidence supports the change: `done` needs verified acceptance, `failed` a confirmed failure, `cancelled` the user's word. Otherwise leave the status and note the gap. Record confirmed PR numbers and branches onto their units. Write atomically, as the only writer.
+4. Ownership after an interruption. A relaunched pane, a new session and an app restart own nothing the old connection created. `terminal.list` with `owned:true` shows what this connection holds. Status reads and notices still work on any agent terminal in the project. Sending or interrupting needs the user to hand the terminal over in Daintree; closing and worktree deletion are never handed over and stay with the user. Report which resources are no longer yours instead of trying them.
+5. Closed agent sessions. List them per worktree or project, newest first, paging with `offset` while `hasMore`:
 
-1. Sweep the durable record in ONE batch of reads — they dispatch concurrently and are all read-only: `workflow.list({"status":"active"})` (repeat for "blocked"/"pending" when the user asked broadly), `context.snapshot` for live worktrees / terminals / attention queue, `watcher.list`, `async.list` and `timer.list` for live supervision, `queue.digest` for what still needs the user, and `agentTask.list` for spawn sagas (defaults to THIS session; pass `{"scope":"all"}` for older history). Use current tool evidence; reuse results already supplied for this assessment. If the roster is unavailable, at most one targeted alternative read may resolve the missing evidence. A repeated `context.snapshot` against the same failure is not progress: do not retry it again in this turn. Report the evidence gap and preserve the row instead of looping until a roster appears.
+```json tool=agentSessionHistory.list
+{"worktreeId":"<exact worktree id>","limit":20,"offset":0}
+```
 
-2. Reconcile every interesting row against current evidence; the ledger may be stale. `workflow.get({"id":"<row id>"})` returns the full record — terminalIds, watcherIds, worktreeId, branch, issue/PR fields, notes, nextAction. Classify each row by evidence — not by its `status` field, and not by an agent state:
-   - its terminalIds are still in the roster AND one of its watcherIds is still in `watcher.list` (or an async handle covers it) — LIVE and supervised. Leave it be; its supervisor will wake you.
-   - its terminalIds are absent from a SUCCESSFUL, complete roster for the right project — no listed terminal remains. A missing section, transport failure, filtered page or incomplete snapshot is UNKNOWN, not closed; HOW it ended is a separate question (step 3).
-   - the terminal is still in the roster but no watcher and no async handle covers it — LIVE-UNSUPERVISED, outcome UNKNOWN. A gone watcher is not a gone terminal, so this row has NOT ended. Never read an idle terminal as "done and nobody closed the row": idle is not a finish (foundation, finish detection), and the agent may be mid-startup, paused or backgrounded.
-   To learn what a terminal actually did — the evidence step 3 runs on — take one bounded `terminal.extract` per terminal id, batched in a single turn (they run concurrently). Do not put several ids in one text extract expecting one answer each — a multi-id text extract MERGES every tail into ONE answer; use `terminal.extract.json` with an array schema keyed by terminalId if you want them attributed in a single call.
+   The journal names sessions but holds no transcript text, and old entries are pruned, so absence does not prove a session never existed. To bring one back, only when the user asks:
 
-3. Close the rows the runtime cannot — on evidence, never on a hunch. This is the load-bearing half. Daintree inserts a ledger row with status "active" on every `agentTask.spawnForEdits` and every `workflow.startWorkOnIssue`. The only things that ever close one are a watcher completion, a `watcher.cancel`, and a startup reconcile that skips any row with a live terminal — yet in-turn polls and competitions can spawn without watchers and leave their terminals open; edit fan-outs normally retain background watchers. So a five-agent poll leaves five rows "active" forever, and the injected turn state replays them to you every subsequent turn as work in flight. Close them yourself:
+```json tool=agentSessionHistory.resume
+{"worktreeId":"<worktree the session was recorded in>","sessionId":"<exact sessionId from the listing>"}
+```
 
-       workflow.update({"id":"<row id>", "status":"done"})
+   It relaunches that agent on its own saved conversation, in the worktree it was recorded in (another worktree is refused); a second call brings the same pane forward rather than starting a second agent. It restores the agent's conversation as its CLI saved it, and nothing of yours: not your checkpoint, your notices or your ownership, since this connection did not launch that pane. Say exactly that. It opens off-screen unless its worktree is active.
+6. "What happened while I was away": `notifications.recent` lists the completion, waiting and error messages Daintree raised for the user. Combine it with the reconciled units. No record of past MCP calls exists to read.
 
-   "done" asserts the work FINISHED, so it needs proof: a watcher's confirmed completion for that row, the step-2 tail read showing the work actually landed, or a finish you drove and read yourself earlier in this session. An idle terminal is not proof (foundation, finish detection) — and neither is the row's own age. Without completion proof, update only from established evidence: "cancelled" requires explicit abandonment/cancellation or a known superseding task; "failed" requires a confirmed launch/task failure; "blocked" requires an actual unresolved blocker. A missing terminal with no surviving outcome leaves TASK STATUS UNKNOWN. Preserve the existing status and add a supported note/nextAction describing the evidence gap; do not invent an unknown enum or turn absent output into cancellation. A LIVE-UNSUPERVISED row with no completion evidence does not close — offer to adopt it with `agentTask.superviseTerminal({"terminalId":"<id>","goal":"<what completion looks like>","spawnMode":"edit"})` (use "explore" for a read-only run so the supervisor does not expect file changes), or report it as needing a look (step 6c). WARNING — provided array fields REPLACE the stored arrays: if you touch `notes`, `terminalIds`, `watcherIds` or `queueEventIds`, send the FULL intended list read back from `workflow.get`, never a fragment. Safest edit is `status` alone. Do this as the closing act of any fan-out, poll or competition too, not only during a sweep — there you already hold the evidence, having just read those agents' output.
-
-4. Back-fill so the ledger is an end-to-end record. When a row's branch has a PR, put it on the row: `workflow.update({"id":"<row id>","prNumber":<int>,"prUrl":"<url>"})`. Find the number with `forge.listPRs({"arguments":{"state":"open"}})` and match on branch — that wrapper is a passthrough that accepts ONLY `arguments` at the top level (pass `{}` for none); nest every query field inside it, since a top-level `state` or any other stray key is rejected outright; match on the item's `headRef`, which is the source branch (there is no `head` field on a listing item). Set `branch`, `worktreeId`, `issueTitle`/`issueUrl` when the row was created bare, and `git.getProjectPulse` on the worktree if you need branch state to describe it. Report the PR as this listing gives it (number, url, and at most open/merged/draft/closed); a summary row carries no check or review verdict, and reading one per row is a focused job this sweep hands off (daintree.workflow.follow-up-on-issue).
-
-5. Resumable sessions live outside the ledger. `agentSessionHistory.list({"worktreeId":"<exact id>","limit":20,"offset":0})` is a typed read wrapper — call it directly, never through `daintree.call`. The action MUST resolve a `worktreeId` or `projectId`; without an explicit selector it uses the active action context, and without either scope it FAILS rather than listing every project. Explicit worktree and project ids combine to narrow the result. Records are newest-first and return under `{sessions,total,hasMore}`; page with increasing `offset` while `hasMore`, up to `limit:100`. Records carry sessionId, agentId, worktreeId, title, projectId, savedAt, and sometimes agentLaunchFlags / agentModelId / cwd / branch. CRITICAL and easy to get wrong: there is NO Assistant restore tool and you CANNOT read a closed session's transcript. To bring one back you spawn a FRESH agent in that worktree with `agentTask.spawnForEdits`, reusing the record's `worktreeId` and `agentId` and writing a `taskPrompt` that states what to continue (rebuild that context from the ledger row, the branch state and the user — not from the dead session). Tell the user plainly that this is a new agent in the old worktree, not a faithful resume: its prior conversation is gone. Never present it as "resuming session X".
-
-6. Report ONE ranked picture, not five tool dumps. Order it: (a) needs you now — open queue items, agents asking a question, blocked rows; (b) live and supervised — terminal id, watcher or async handle, and what will wake you; (c) live but UNsupervised — say the outcome is unknown and offer to adopt it (step 3) or wait; (d) closed — which rows you closed, to what status, and on what evidence; (e) resumable from history, newest first. Give real ids verbatim. Then `queue.resolve {"id":"<id>"}` per the foundation's inbox rule — only what you actually relayed here. If the user then wants to LOOK at one of these, use `terminal.revealOwned({"terminalId":"<id>"})` for a terminal this MCP connection created; it can switch workspace and raise the window. For a user-targeted terminal you do not own, `terminal.focus({"terminalId":"<id>"})` only selects it inside this session's project view. Never claim that local focus revealed a hidden workspace, or that a reveal acceptance proves focus finished. A restored ledger row does not restore MCP ownership; report an ownership refusal without retrying through another navigation tool.
-
-7. Optional forensics for "what happened while I was away". `audit.export({"format":"json","tsFrom":<epoch ms>,"tsTo":<epoch ms>,"limit":200})` with optional `actor` (main, watcher, timer, workflow, system), `toolName` (exact dotted name), and `outcome` (ok, error, denied, dedup, grant_ok). Filters AND-combine and rows return newest-first, so one filtered read answers the question — narrow it with `outcome:"error"` or a single toolName rather than exporting everything. Summarize what it shows; never paste raw rows back.
-
-Confirmation: the sweep and its reads are free. `workflow.update` rewrites durable state — say which rows you are closing and why as you report it, and ask first if a row's outcome is genuinely ambiguous rather than guessing "done". `daintree.call` is the system-risk escape hatch and is confirmed per the active tier. Spawning a resume agent mutates a real worktree — confirm it like any spawn.
-
-## Recovering detail the checkpoint rounded off
-
-Auto-compaction replaces a long transcript with a lossy summary, but it preserves the FULL discarded transcript as an artifact, and the CURRENT [checkpoint] note carries its breadcrumb. When resuming needs an exact detail the checkpoint generalized — the literal id that was spawned, the exact wording of a user decision, which of two branches was chosen — page that artifact surgically: `artifact.read` a few pages from the relevant offset, following `nextOffset`, never a full replay of the transcript you just compacted away. Start ONLY from an artifactId in the current checkpoint note or your latest results; an id remembered from an earlier turn may be pruned, and if it is not found the content is gone — say so and resume from what the checkpoint does carry.
-
-Keep flat workflow rows separate from execution graphs: workflow.list/get/update use wfr_ records; graph digests require workflow.getGraph and workflow.reconcile with reason resume. Do not mark a graph complete by closing one spawn row. A watcher cancellation can leave its agent running, so ledger status never substitutes for resource inspection. History and list results are bounded; page session history with unchanged project/worktree scope. Restoring scratch from memory is impossible after restart: reconstruct only from durable evidence and label missing prior decisions rather than replaying public writes.
-
-Report back: the ranked standing picture with real ids (what needs the user, what is live and how it is supervised, what is unsupervised and therefore unknown), which ledger rows you closed or back-filled — to what status and on what evidence, which sessions are resumable and the honest caveat that resuming means a fresh agent, and the next checkpoint — what will wake you or what you need from the user.
+Report back: one ranked picture with real ids: (a) needs the user now (questions, approvals, errors, uncertain writes); (b) live, and whether anything will wake you; (c) stopped and awaiting verification; (d) done on evidence, gone, or unknown; (e) resumable sessions, newest first. Then what you corrected in which checkpoint and on what evidence, which resources this session no longer owns, and what continuing needs: the recorded runbook's resume steps and the user's go-ahead.

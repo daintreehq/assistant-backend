@@ -1,84 +1,62 @@
 ---
 id: daintree.orchestration.multi-agent
 title: Orchestrate multiple agents on one problem
-summary: Spawn or use explicitly named open agents, relay their work between them with terminal.sendCommand, and synthesize ONE answer — collaborative multi-agent work driven until the cohort converges.
+summary: Spawn or use explicitly named open agents, relay their work between them with terminal.sendCommandOwned, and synthesize ONE answer — collaborative multi-agent work driven until the cohort converges.
 whenToUse: 'Use when several agents must work ONE problem together and you relay between them until they CONVERGE on a single synthesized answer — debate until they converge, collaborate, cross-check, iterate toward one merged result. The signal is a synthesis target: the deliverable is the ONE answer you assemble, not a dialogue. Do not use when each agent gets its OWN independent unit of work with no shared deliverable (use daintree.orchestration.fan-out-work); for an open-ended visible dialogue — let them talk, see where it goes (use daintree.orchestration.conversation); a debate that ends by voting a position off (use daintree.orchestration.debate-elimination); independent submissions scored or peer-voted to pick a winner (use daintree.orchestration.competition); a one-shot independent poll (use daintree.agents.poll-pinned-agents); or forwarding one agent''s review to another (use daintree.agents.relay-review-feedback).'
 risk: project
 requiredTools:
-  - context.snapshot
-  - agentTask.spawnForEdits
-  - agentTask.status
-  - agentTask.list
+  - agent.listAvailable
+  - agent.launch
+  - terminal.sendCommandOwned
+  - terminal.getStatus
+  - terminal.getOutput
+optionalTools:
+  - agent.listPresets
+  - worktree.list
+  - terminal.list
+  - terminal.readLastMessageOwned
+  - terminal.notifyWhenIdle
+  - terminal.waitUntilIdle
+  - terminal.waitUntilIdleBatch
   - terminal.sendCommand
-  - terminal.summarize
-  - terminal.extract
-  - terminal.read
-  - artifact.read
-  - terminal.awaitAll
-  - terminal.await.async
-  - terminal.focus
-  - terminal.revealOwned
+  - terminal.closeOwned
   - terminal.close
-  - watcher.terminal.create
-  - queue.publish
-  - queue.digest
-  - queue.resolve
-  - scratch.create
-  - scratch.set
-  - scratch.get
-  - scratch.drop
-  - watcher.list
-  - async.list
-  - workflow.update
 ---
-Use when: the user wants several agents to collaborate, cross-check, or debate a single problem until they converge, and you are the conductor relaying between them toward ONE synthesized answer.
+Use when: several agents work one problem together and you relay between them until they converge on ONE answer you synthesize. The deliverable is that answer, or the named residual disagreement, not a transcript.
 
-The pattern is a loop: spawn or identify a cohort → collect each one's output → relay the others' output back to each → ask for the next step → repeat until they converge → synthesize one answer. The deliverable is that answer, not a transcript. terminal.sendCommand is how you relay; use the offered typed wrapper directly. On an unattended wake it still needs appropriate authority; availability does not bypass confirmation or grant policy.
+Availability: Core. In an agent pane, `notify` on every launch and send brings each participant's reply back as it lands. An API-key client has no `notify`: run each round with one `terminal.waitUntilIdleBatch` (`mode:"all"`), and tell the user that a round still running needs their continuation. The sidebar assistant uses `terminal.sendCommand` for the send. Participants are visible Daintree panes; do not assume your host has native team tools, and a native subagent never stands in for a requested visible agent.
 
-You are the ONLY conduit — the foundation's relay rule is this runbook's whole spine. Its operational edge: never write a taskPrompt or relay that tells an agent to contact, send its answer to, reply to, or coordinate directly with another agent or terminal. It has no way to, and the instruction silently does nothing. Tell each agent only to produce its output in its OWN terminal; YOU route everything.
-
-Convergence relay is a FIRST-CLASS case, including after an interview, competition, poll, or other run where the user names agents that are already open. If the user asks the cohort to compare, cross-check, reconcile, or debate until they agree, do NOT answer by summarizing prior outputs or by accepting one agent's claimed direct contact as completion. Run the relay yourself: collect each side's current position, send each the others' condensed positions plus the next round's question, await/read, and continue until the positions stop moving — then synthesize. Two to four rounds is usually enough; if they will clearly not agree, report the residual disagreement as the result rather than looping.
-
-Tool-round discipline: scratch.create and spawns return ids only AFTER their batch completes. Read those results, then use exact ids in a subsequent tool round of the SAME user turn. Do not end the user-facing turn merely to obtain an id. A batch can reuse ids already known, but cannot consume one minted by a sibling call. Preserve the cohort map before waiting or relaying.
+You are the only conduit. Participants cannot see or message each other. Never tell one to contact, reply to or coordinate with another; each writes in its own terminal and you route everything. A participant's claim that it reached the others is not a relay.
 
 Procedure:
-1. Scope it. Decide the cohort (which agents; resolve any user-spoken name against the roster or existing terminal titles) and the rounds. Don't over-plan — the loop is the same regardless of round count.
-   - Create ONE scratch store up front as compaction-safe state: `scratch.create({"name":"multi-agent-orchestration"})`; hold the returned `scr_…` storeId. Keep the evolving state — terminalId→role map, round counter, slow counts, dropped ids, and any one-line gists needed next round — in ONE key (`orchestration_state`) that you OVERWRITE each round. Pass `value` as a real JSON object, not a string.
-   - If this is a follow-on round between named agents that are already open, do NOT spawn replacements. Confirm their full terminalIds from your recorded map or context.snapshot, write them into scratch as the cohort, and proceed to the relay loop. The user named them, so they are the cohort; your job is to relay, not to summarize what they already said.
+1. Scope: the problem, the cohort, a round bound (default: an opening round plus up to three relay rounds), the convergence test (positions stop moving, or the user's own), and any judge the user appointed. Participants are read-only unless the user wants files changed; several editors need disjoint files or serialized edits, even on one shared problem.
+2. Cohort. Agents the user named that are already open ARE the cohort: do not spawn replacements, and do not summarize what they already said instead of relaying. The owned send reaches only panels you launched or the user handed you (`terminal.list` with `owned:true`); for any other, ask the user to hand it over. Otherwise resolve each requested agent to its real `agentId` (distinct agents, not copies of the default unless asked) and put the whole cohort in one worktree.
+3. Start the checkpoint (the foundation's) with the problem, convergence test, round bound, judge, and per participant: role, agent id, terminal id, status (active or dropped), the round its current prompt belongs to, that prompt's `submissionToken`, whether its reply is pending, and a one-line gist per round.
+4. Open round 1. Launch new participants with the opening question as `prompt`:
 
-2. Spawn the cohort only when you do not already have explicit live terminals. Use ONE BATCH — one agentTask.spawnForEdits per agent (groups of ~4 per turn), each with a distinct `title` and a SHORT, self-contained taskPrompt. Build the cohort from your OWN fresh spawns: per the foundation an already-open terminal is not yours to commandeer, so never fold one in — or send it a round prompt — unless the user explicitly named it. The title becomes the tab name the instant the agent launches, so name it right at spawn — do NOT follow the spawn batch with terminal.rename calls. Pick `mode:"explore"` for thinking/answering/analysis that touches NO files, `mode:"edit"` only when they must change files in a worktree. Keep each prompt MINIMAL. Do NOT attach a watcher (`watch`/`watchGoal`) when you are driving in-turn; terminal.awaitAll is INTERRUPTIBLE, so you never need a watcher as an unblock net.
-   - Let the WORKTREE default. Omitting `worktreeId` puts every agent in the worktree this turn started in, and that binding is fixed for the whole turn — so a user switching worktrees while your batch is launching cannot scatter the cohort across two of them. Pass a `worktreeId` only when the user named a specific worktree, branch, or path for the work; resolve it from context.snapshot first, and if several plausibly match and none was named, ask rather than guess. Never pass a DIFFERENT worktree per cohort member unless the user asked for that: a cohort converging on one answer belongs in one place.
-   - After the spawns RETURN their ids, in the next tool round, and before you wait or relay, write the initial state to scratch with full terminalIds.
+```json tool=agent.launch
+{"agentId":"<id from agent.listAvailable>","name":"Cohort: <role> on <problem>","worktreeId":"<resolved worktree id>","prompt":"Round 1 of up to <n>. <problem and context>. State your position with evidence and say what you are unsure of. Read-only: change no files. Answer here; you cannot reach the other participants and must not try.","notify":true,"handback":true}
+```
 
-3. Re-anchor, then wait for the relevant cohort. At the top of every round, FIRST `scratch.get({"storeId":"scr_…","key":"orchestration_state"})` and restore terminalRoles / activeTerminalIds / slowCounts / round. When you already hold the ids, the get and awaitAll can share one batch. Use ONE `terminal.awaitAll({terminalIds:[...]})`; it polls every agent concurrently and resolves when each has gone working→idle (or completed/exited). Start a multi-round cohort with `maxAttempts:60`; raise only for genuinely slow agents. Do NOT issue one terminal.extract wait per agent.
-   - READ + SELF-HEAL after awaitAll reports finished. Read every agent's DISTINCT answer in free-form: one bounded `terminal.read` per terminal, all batched in one turn. Do NOT ask agents to emit JSON, and do NOT run a structured `terminal.extract.json` over the cohort. terminal.read returns a bounded tail (default 200 lines, maximum 1000), not full scrollback. Page only a raw result actually archived with an artifactId; if necessary ask for one concise recap rather than claiming unseen history. `terminal.summarize` is only a fallback for garbled multi-screen TUI output; if its verdict contradicts visible terminal text, trust the text and re-read.
-   - Plain-text terminal.extract is fine for pulling one specific detail from a SINGLE terminal, and no-wait extracts can be batched in parallel, but extract sees ONLY the visible tail. A sparse or partial extract means fall back to terminal.read, not a re-extract. Once you hold a real answer per agent, go straight to relay/synthesis and do NOT re-read the same agents afterward in the same round.
-   - If a terminal reported finished but its tail shows it is still working, do NOT relay it — re-await just that one, watch it, or read closer. Never relay a half-done or dead screen.
-   - When the foundation's bad-id check fires (a whole cohort still-working, or 'Terminal not found'), fix the mismatch in your scratch map too, not just in the next call.
-   - Handle non-finished cases. An agent ASKING a question → answer those ids with sendCommand and await again. FAILED → drop it and note it; do NOT respawn in a loop. STILL WORKING → re-await only those ids within the foundation’s shared budget. On budgetExhausted:true, do not re-await this turn; preserve the round and hand uncovered stragglers to one terminal.await.async, or report the missing contribution.
-   - If the SAME terminal is the lone straggler in two consecutive rounds, stop awaiting it inside the cohort: read the fast agents immediately, then await ONLY the straggler at a higher bounded budget.
+   Start same-kind agents one at a time: launch the next one with the same `agentId` only after the previous call has returned. Different kinds may launch together. Record each `terminalId` as it returns. Existing participants get round 1 through the send in step 5. Then end your turn.
+5. Relay rounds are simultaneous: every active participant answers the same round question. Once every active participant's reply to round N is in or recorded missing, build round N+1 for each one: the others' actual claims, drafts and objections, condensed and labelled by name, plus this round's one question. Relay content, never just "the others responded". Send only to a participant sitting at its prompt:
 
-4. Relay with `terminal.sendCommand({terminalId, command})`. Send each agent ONLY what it needs from the OTHERS — their facts/drafts/votes/messages — plus this round's one question. Condense first: the outputs from step 3 are raw material. Relay the GIST, labeled by agent, never raw scrollback unless the task specifically requires exact wording. Convergent work is SIMULTANEOUS by default: every agent answers the SAME round-question and none of them needs to hear a specific other one first, so send one sendCommand per agent, all in ONE BATCH, with the round's terminal.awaitAll as the LAST call in that same batch; dispatch is sequential, so every send completes and then polling begins in one model turn. That is the normal mode here — a draft round, a cross-check round, a reconcile round, a vote. Take the floor away from the batch and give it to ONE agent at a time only when this round genuinely depends on a specific agent reacting to a specific other agent's words (say, one agent must answer a challenge before the rest can move). Each sendCommand forces that agent to take a turn, so a stray fan-out to bystanders makes them all speak at once.
-   - Relay actual content, not the fact that content exists. Send each agent the others' real claims, drafts, and objections — a summary saying "the others responded" gives them nothing to converge on. If a participant drafts something and asks whether to proceed, forward it unless it needs a real user decision or a safety confirmation. Keep going for 2–4 rounds or until the positions stop moving; do not stop after one round just because an agent claims it already reached the others by some private bridge.
-   - If the user sends feedback MID-ORCHESTRATION (via interruptedByUser:true or a message between rounds), fold it into the NEXT relay — do NOT restart the orchestration.
-   - Before closing each round, OVERWRITE the `orchestration_state` checkpoint with the new round / slowCounts / droppedTerminalIds and any gist you'll need next round. Keep the value compact — ids, counts, one-line gists, never raw scrollback or whole answers.
+```json tool=terminal.sendCommandOwned
+{"terminalId":"<participant terminal id>","command":"Round <N+1> of up to <n>. <the other participants' positions, by name>. <this round's question>. Answer here; do not contact the others.","notify":true,"handback":true}
+```
 
-5. Synthesize and report ONE clean answer — the merged result, the agreed position, or the named residual disagreement — not a transcript of every terminal unless the user asked for the transcript. Quote real terminalIds where useful.
+   Record its `submissionToken` and round, mark it pending, then end your turn. Give one participant the floor alone only when the round truly depends on it answering a specific challenge first.
 
-6. Close out. Driving in-turn you attached no watchers, so there is usually nothing to cancel. Leave the cohort's terminals open and idle; if the user DOES ask you to close them, close ONLY the exact cohort ids you recorded this run — and for a competitive workflow they may ask to close only LOSERS and keep the winner(s) and any judge open, so close only those. Drop your scratch store in the same cleanup with `scratch.drop({"storeId":"scr_…"})` so the per-session store budget is not exhausted; keep it while a task, relay round or async handoff is pending, not merely because the tabs remain open.
+On notice or resume:
+1. Follow the foundation's resume procedure. One notice line may name several terminals: handle each terminal it names, not the whole cohort.
+2. Correlate before recording. A reply counts for round N only when the participant is active, the checkpoint shows its round-N prompt pending, and the settle follows that send (`terminal.getStatus` with its `submissionToken`; a `lastHandback.submissionToken` equal to it confirms). A reply to an earlier round that lands after later prompts went out is late: file it under its own round and relay it next only as labelled late material, never as that participant's current position. A reply from a dropped participant is not a position at all.
+3. Read the reply itself (`terminal.readLastMessageOwned` for a Claude Code pane, otherwise `terminal.getOutput`), record its gist and clear pending. A routine question within scope gets one answer with `notify` again; an approval, trust or login screen is the user's; an error is reported, not waited out.
+4. One reply never stalls the others: record it and handle its questions now. The next round still goes out only when the replies it depends on are in. If one participant is still working after the rest have replied, do at most one bounded `terminal.waitUntilIdle`, then end your turn (its notice is still pending) and tell the user which participant holds the round. Proceed without it only if it failed or exited, or the user says so; record it missing for that round and never respawn it in a loop. If it later answers while the next round is still open, send it that round's prompt; its old reply stays late material.
+5. User feedback between rounds goes into the next relay. Do not restart.
+6. Stop when positions stop moving, the round bound is reached, or they clearly will not agree. Then synthesize.
 
-Anti-patterns (the non-obvious traps):
-- One-shot batching the whole orchestration — putting scratch.set/get, awaitAll, extract, or sendCommand in the SAME batch as the scratch.create/spawns that mint the ids they need.
-- Skipping the relay — the user asked the cohort to cross-check, reconcile, or debate until they agree, and you merely summarize the outputs they already produced. Run the sendCommand/read rounds first, THEN synthesize.
-- Treating a claimed direct agent-to-agent call as a completed round. The user asked YOU to relay; summarize only after you have actually run the loop, or if the user asked only for a summary.
-- Running an open-ended visible dialogue here — if there is no synthesis target and the user wants to watch them talk, that is the conversation runbook; if the round ends by voting a position off, that is the debate-elimination runbook.
-- Ignoring an awaitAll that returned `interruptedByUser:true` — the user typed mid-wait and their message is ALREADY in the conversation.
-- Trusting a sparse or partial extract as the complete answer — extract sees only the visible tail, so fall back to terminal.read.
-- Asking agents for JSON or schema-shaped output, or reading the cohort through terminal.extract.json.
-- Hunting agent output through artifact.read instead of reading terminals; use artifact.read only to page terminal.read content archived as an artifact.
-- Padding agent prompts — each taskPrompt and each relay carries only what that agent needs this round.
-- Telling an agent to communicate DIRECTLY with another agent or terminal — 'send your answer to the other model', 'coordinate with the other agent', 'reply in the other terminal'. Relay every hand-off yourself with terminal.sendCommand.
+Synthesis: you may apply your own technical judgment and check claims against the code yourself; keep what you verified separate from what participants claimed. If the user appointed a judge, whether an agent or themselves, the judge settles disagreements; you relay and report, not overrule. Residual disagreement is a valid result.
 
-Round integrity: include a round number and the exact common question in every relay, then collect only the reply to that round. Read actual blocking questions/approvals instead of answering from a coarse state. Before relaying to an existing cohort, check watcher/async coverage and intentionally transfer supervision rather than silently retiring a watcher through awaitAll. Explore mode is a prompt constraint; multiple editors require disjoint ownership or serialized edits even when the cohort shares a discussion target. Record unresolved disagreement as a valid result, close completed flat workflow rows on evidence, and never report convergence merely because one participant claimed to contact the others.
+Stop and recovery: finite rounds only. Never report convergence because a participant says it reached the others. Never resend a round prompt to a participant already pending: a queued send is not a lost one, so check its token first. A lost launch reply is reconciled with `terminal.list`, never answered with a second launch. On cancellation keep a tombstone, send nothing more, and report which participants are still working. Leave terminals open; close only the exact recorded cohort ids on request, with `terminal.closeOwned`.
 
-Report back: the synthesized result — the converged answer or the residual disagreement — which agents participated (real terminalIds), and any inbox/terminal cleanup you did.
+Report back: the synthesized answer or the residual disagreement, each participant (name and terminal id) with what it contributed per round and any late or missing replies, what you verified versus what participants claimed, anything still pending and the continuation arranged, and any cleanup performed.

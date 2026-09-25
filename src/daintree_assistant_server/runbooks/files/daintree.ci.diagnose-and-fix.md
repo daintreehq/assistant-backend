@@ -5,54 +5,53 @@ summary: Take a red test, build or PR check from symptom to verified green — e
 whenToUse: Use when something is FAILING and the user wants it working — "the tests are failing", "why is CI red", "the build broke", "this check won't pass", "fix the failing test", "is this flaky?" — including the fix-and-verify loop that follows. Do not use to judge the quality of a change that already passes (use daintree.review.review-change), to confirm an agent did what it claimed (use daintree.orchestration.verify-agent-work), to read a PR's review state or comment on its issue without a failure to fix (use daintree.workflow.follow-up-on-issue), to ready a branch for review (use daintree.workflow.prep-branch-for-review), or when the "failure" is Daintree itself misbehaving rather than the project (use daintree.diagnostics).
 risk: project
 requiredTools:
-  - context.snapshot
-  - worktree.getCurrent
-  - git.getProjectPulse
+  - worktree.list
+optionalTools:
+  - forge.getCIStatus
   - forge.getPR
-  - forge.getChecks
-  - daintree.call
-  - agentTask.spawnForEdits
-  - terminal.awaitAll
-  - terminal.await.async
-  - terminal.extract
-  - terminal.summarize
-  - artifact.read
   - project.detectRunners
   - project.runCheck
+  - agent.listAvailable
+  - agent.launch
+  - terminal.getStatus
+  - terminal.getOutput
+  - terminal.readLastMessageOwned
+  - terminal.sendCommandOwned
 ---
-Use when: a test, build or PR check is failing and the user wants it fixed.
+Use when: a test, build or PR check is failing and the user wants it working.
 
-The discipline is evidence before hypothesis. A failing check has an exact command and an exact error somewhere; a fix written from the check's NAME is a guess, and a guess that makes the symptom disappear without addressing the cause is worse than the original failure.
+Availability: Hybrid. You read logs, reproduce, edit and re-run checks yourself with your own shell and file tools, in the verified checkout, when the user asked for a fix. From the app: `worktree.list` for the target, the PR roll-up (`forge.getCIStatus`, `forge.getPR`) and detected project commands (`project.detectRunners`, `project.runCheck`). In a core pane each of those except `worktree.list` raises an approval to the user, and an API-key client has none of them. The app gives no per-check list, no job log and no head commit SHA: get those from the host's permitted forge CLI (for GitHub: `gh pr checks`, `gh run view --log-failed`, `gh pr view --json headRefOid`). Without one, say which evidence you could not read. A visible Daintree agent is optional: use one when the user asked for it or wants the fix run separately.
 
-Never call this done because an agent said it fixed it. "Tests pass now" from the agent that wrote the fix is the single least reliable sentence in this workflow.
+Evidence comes before hypothesis. A fix written from a check's name is a guess, and a guess that makes the symptom vanish without fixing the cause is worse than the failure. "Tests pass now" from whoever wrote the fix is a claim, not evidence.
 
 Procedure:
+1. Fix the target. Resolve the worktree id and path with `worktree.list` (it also shows a linked PR), then in that path read the branch, `git rev-parse HEAD` and whether the tree is dirty. Record this starting revision. Run every command there, never in your own checkout if it differs.
+2. For a red PR check, read the roll-up with `worktreeId` and the PR number, then bind it to a commit. `state` is the answer (`success`, `failure`, `pending`, `neutral`, `unknown`), and `ciStatus:null` is no reading. Counts cover required checks only, and a zero total also appears when the required list could not be read, so it never means nothing gates the merge. Readings are cached for about a minute. The roll-up does not say which commit it describes: read the PR's head SHA with the forge CLI and compare it with the revision in question. A result for another commit, a green one included, says nothing about this code.
+3. Get the actual failure: the failing command and its output, from the failed job's log, the terminal that ran it, or your own reproduction. A check name is not evidence. If the failure exists only in a log you could not read, say so and never invent its content. A check that timed out or was cancelled failed to finish; it is not a code failure until its log shows one, and re-running it is the user's decision.
+4. Reproduce with the narrowest command that shows the failure, in the target path. Your shell is fine. `project.runCheck` is the app alternative: take `runnerId` from `project.detectRunners` and check what it runs first (detection lists publish, deploy and server scripts too), take `projectId` from `actions.getContext`, always pass `cwd`, and never point it at a long-lived server.
 
-1. READ THE STATE. `git.getProjectPulse` for branch and uncommitted changes; `worktree.getCurrent` for the `worktreeId`. For a PR: `forge.getPR({"prNumber":<int>})` gives `reviewDecision` but NOT CI. CI comes from direct Assistant `forge.getChecks({"prNumber":<int>})` — an ordinary typed roll-up read like the rest of this step, not a confirmation-gated escape hatch. Gate on `conclusive`, NOT on `state`: `conclusive:false` means the state could not be determined — the forge returned nothing, or reported ZERO required checks, which is also what it reports when it could not read the required list. That is never evidence a merge is safe, *even when `state` is `"success"`*. Counts cover REQUIRED checks only. Readings are provider-cached (~1m), so an immediate re-read may hand back the same value and one `success` is not a settled verdict. When you need the failing check NAMES, use the different raw Daintree action with the same name: `daintree.call({"name":"forge.getChecks","arguments":{"worktreeId":"<id>","prNumber":<int>}})` returns `{checks:[{name,status,conclusion?,required?,detailsUrl?}]|null}`. It still carries no job-log body.
+```json tool=project.runCheck
+{"projectId":"<project id>","runnerId":"<runner id from project.detectRunners>","cwd":"<target worktree path>"}
+```
 
-2. GET THE ACTUAL FAILURE. A check name is not evidence. You need the failing command and its output. If a terminal already ran it, `terminal.extract` the exact error and the command that produced it. The raw per-check action can name the failed check and give `detailsUrl`, but it does not return the log body. If nothing has run it here, have an agent run it or fetch the provider log with provider tooling (step 3) — if the failure only exists in an unread log, say so plainly rather than inventing its content.
+   Read `passed`, not the call's success. `timedOut` or `aborted` is incomplete execution, not a defect, and `outputTruncated` means the output is partial. Report the returned `command`: it is what actually ran.
+5. Diagnose to a root cause with `file:line` evidence; skip a deep investigation when the error already names the cause. If the same command passes and fails on unchanged code, it is flaky: do not "fix" it. Report the runs and their outcomes and ask whether to stabilise or quarantine it. One intermittent failure is not permission to quarantine anything.
+6. Fix narrowly, bound to the command and the behaviour it asserts, not to the symptom. Never delete, skip or weaken a test, loosen an assertion, lower a coverage threshold or exclude code from coverage to get green unless the user asked for exactly that. If the real question is whether the test or the behaviour is wrong, stop and ask: picking one commits the user to a position. One cause is one fix; unrelated failures get separate fixes.
+7. Verify yourself: re-run the narrow failing command and the relevant broader suite in the same path, and record the revision they ran against. That proves the local change. Provider CI proves it only after the fix is pushed (only when the user authorized committing and pushing) and a completed run is read for that exact head SHA. Until then, say CI has not run on the fix. Never report green from a single cached reading.
 
-3. DIAGNOSE when the cause is not obvious from the error. Spawn an explore agent — instructed not to edit, so it should not "fix" something while looking (a prompt constraint, not a sandbox: if files change, that is a failure to report): `agentTask.spawnForEdits({"mode":"explore","worktreeId":"<id>","title":"diagnose: <check>","taskPrompt":"Reproduce <exact bounded command> only when it is safe for this worktree. Report the command, exact failure, evidenced root cause and minimal fix. Cite file:line. Do not edit source or publish anything; report any generated files."})`.
-   Pick the agent deliberately: `agentId` is OPTIONAL and defaults to one particular agent, so omitting it silently chooses for the user. Resolve the best fit from the available-agent registry in your startup context and pass it — a name the user SPOKE is only a hint, since transcription drops letters; an unknown id is rejected with the real roster and a suggestion, so re-spawn with the right id rather than the typo.
-   Skip this when the error already names the cause — a missing import does not need an investigation.
+Delegating: record the checkpoint, then launch one agent in the target worktree. Its prompt carries the exact failing command and error, your diagnosis if any, the scope ("fix the cause; do not delete, skip or weaken tests or coverage"), acceptance ("<command> passes, the broader suite still passes, the asserted behaviour is still enforced"), reporting (files changed, commands run with results) and boundaries (no commit or push unless the user asked).
 
-4. FIX with an edit agent, bound to the check. `agentTask.spawnForEdits({"mode":"edit","worktreeId":"<id>","title":"fix: <check>","taskPrompt":"<the diagnosis and the exact failing command>","acceptanceCriteria":"<command> passes, and the broader suite is not broken by the change"})`.
-   Tie the criteria to the COMMAND, not the symptom. "Make the test pass" invites deleting the assertion; "the command passes and the behaviour it asserts is still enforced" does not.
-   Require the agent to run BOTH the narrow failing command and the relevant broader suite. A fix that greens one test and reds four is not a fix, and you will not know unless it ran them.
+```json tool=agent.launch
+{"agentId":"<id from agent.listAvailable>","name":"fix: <check name>","worktreeId":"<target worktree id>","prompt":"<failing command, error, diagnosis, scope, acceptance, reporting, boundaries>","handback":true,"notify":true}
+```
 
-5. SUPERVISE with ONE mode. Every `terminal.awaitAll` in a turn draws on one ENFORCED cumulative 120-second budget, so wait in-turn only for a fix expected to settle in a minute or two; a full-suite run goes to `terminal.await.async` and you end the turn. On `budgetExhausted`, do NOT re-await. A state read is never proof of finishing: after an await, read each settled agent's last lines before believing it.
+Then end the turn. The notice means the agent stopped, not that the check passes.
 
-6. VERIFY INDEPENDENTLY, and verify the RIGHT THING. Not optional, and not delegable to the author — an agent asked to confirm its own work confirms it. Prefer `project.runCheck` for a detected bounded command in the exact worktree: it gives a direct command/exit verdict without the author judging itself. Spawn a fresh explore agent when reproduction or provider-log retrieval requires investigation or commands unavailable through that wrapper.
-   Provider CI is NOT a substitute here unless the fix was actually pushed AND you can tie the check result to that exact revision. A green check on the previously-pushed commit says nothing about an uncommitted local fix, and reporting it as success is the most damaging outcome in this runbook: a confident green for code nobody ran.
+On notice or resume:
+1. Follow the foundation's resume procedure. Read the report with `terminal.readLastMessageOwned` for a Claude Code pane, otherwise `terminal.getOutput`. Answer a routine question within scope once with `terminal.sendCommandOwned`, asking for `notify` again; a question about changing the test versus the behaviour goes to the user.
+2. Treat "fixed, tests pass" as a claim. Read the diff in the agent's worktree path and re-run the narrow and broader commands there yourself (step 7).
+3. A diff that deletes, skips or weakens tests or cuts coverage without the user's say-so is not a fix. Report it with the files involved and do not accept it.
 
-7. FLAKY IS A DIFFERENT DIAGNOSIS. If the same command passes and fails without the code changing, do not "fix" it — say it is flaky, give the evidence (which runs, which outcomes), and ask whether they want it stabilised or quarantined. Re-running until green and declaring victory hides a real defect.
+Stop and recovery: one corrective round per failure unless the user asks for more; a second failed round goes back to the user with the evidence. An ambiguous launch is reconciled with `terminal.list`, never relaunched. Do not re-run a CI job, push, or quarantine a test on your own initiative.
 
-Notes:
-- Never report green from a single cached `success`. Say what you checked and when.
-- If the fix needs a decision — change the test or change the behaviour — stop and ask. Picking one silently commits the user to a position they did not take.
-- Say what is still red. A partial fix reported as complete costs more than no fix, because the user stops looking.
-- Two failing checks with one cause is one fix; two failing checks with two causes is two rounds. Do not bundle unrelated failures into one agent brief.
-
-Keep the exact worktree locator on all PR/check reads. Record the baseline revision and verification revision; a clean tree or current timestamp does not bind CI to a commit. `project.detectRunners` can expose publish/deploy/server scripts, so inspect command intent before running. For project.runCheck, `passed:false` with timedOut/aborted is incomplete execution, not proof of a code defect, and outputTruncated means the log is partial. A claimed flaky test needs repeat results on unchanged code; diagnosis/fixing stays within the original request rather than treating one intermittent failure as permission to quarantine it.
-
-Report back: what was failing and the exact evidence, the root cause, what changed, the command you verified with and its result, anything still failing, and the terminal ids you spawned.
+Report back: what was failing and the evidence (command, error, where the log came from), the root cause, what changed, the commands you verified with and their results against which revision, what CI shows and for which commit (or that it has not run on the fix), anything still red, and any agent's terminal id.

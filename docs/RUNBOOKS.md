@@ -1,73 +1,135 @@
 # Writing runbooks
 
-A runbook is a step-by-step procedure an agent can follow to do one kind of work in
-Daintree. Agents find them through the [runbook-search MCP server](MCP.md): they
-describe a task, get the best-matching runbooks back, and follow the one that fits.
-A runbook is only as useful as two things — whether search **finds** it for the
-right request, and whether an agent that reads it can **carry it out** correctly.
+A runbook is a procedure that Claude Code or Codex follows to do one kind of work in
+Daintree. Agents find them through the [runbook MCP server](MCP.md): they describe a
+task, get the best-matching runbooks back with the foundation, and follow the one
+that fits. A runbook is only useful if search **finds** it for the right request,
+and an agent that reads it can **carry it out** correctly.
 
 The catalog lives in [`src/daintree_assistant_server/runbooks/files`](../src/daintree_assistant_server/runbooks/files),
 one Markdown file per runbook. Growing it is the main work in this repository.
 
+## Who reads a runbook
+
+The reader is an **engineering agent** with its own shell, file tools and judgment,
+connected to two separate things:
+
+- **This server**, which supplies the procedure and nothing else.
+- **The Daintree app's MCP**, which supplies the actions: `agent.launch`,
+  `terminal.getStatus`, `terminal.getOutput`, `terminal.sendCommandOwned`,
+  `terminal.notifyWhenIdle`, `worktree.createWithRecipe`, and so on.
+
+So a runbook never says "you have no shell" or "never edit files yourself". It says
+when to do the work directly and when the user wants a visible Daintree agent. It
+never invents an app action or argument. It never assumes a background supervisor,
+timer, queue or scratch store: those belonged to the retired Daintree Assistant
+CLI, and `tests/unit/test_runbook_migration.py` fails any runbook that names one.
+
+## The app contract
+
+`tests/fixtures/daintree_mcp/` holds the tool surfaces the Daintree app actually
+lists to each kind of caller, captured from one app build. Its README gives the
+commit and how to refresh it. It is the authority on which actions exist and what
+they accept. Read an action's `description` there before teaching it; the
+maintainers wrote the traps into it.
+
+- `pane-core` / `pane-full`: Claude Code or Codex in a Daintree agent pane. A pane
+  is listed the whole pane surface; its tier decides only what runs without asking,
+  the rest raises an approval. Owned tools: `terminal.sendCommandOwned`,
+  `terminal.closeOwned`, `terminal.injectOwned`.
+- `help-core` / `help-full`: Daintree's sidebar assistant, which gets the unscoped
+  `terminal.sendCommand` and `terminal.close`.
+- `external`: an API-key client. It gets a curated subset, and **no `notify`** on
+  `agent.launch` or the send, and no `terminal.notifyWhenIdle`.
+
+The capture proves what is listed, not what happens when an action is called. Notice
+delivery in particular is only proven by a live trial in a Daintree pane.
+
 ## Being found: the routing text
 
-Search ranks a runbook by its **title, `summary` and `whenToUse`** — never the body.
+Search ranks a runbook by its **title, `summary` and `whenToUse`**, never the body.
 
 - **`whenToUse` is the primary signal.** Open with when it applies, in the words a
-  user or agent would actually use ("rename my terminals", "figure out what each
-  agent is doing"), not internal jargon.
+  user or agent would use ("rename my terminals", "ask one agent and bring back its
+  answer"), and state the deliverable.
 - **Fence off the neighbours.** Follow with when *not* to use it, naming the right
   runbook by fully-qualified id: "Do not use for X (use `daintree.other.runbook`)".
-  Never a bare leaf or prose — the coverage tooling parses these ids, and a
-  reference that resolves to nothing fails the hygiene test. `bench lint` lists the
-  most confusable pairs, which are the fences worth writing first.
+  The coverage tooling parses these ids, and a reference that resolves to nothing
+  fails the hygiene test. `bench lint` lists the most confusable pairs.
+- **Route by deliverable and ownership, not by mechanism.** Waiting for an agent is
+  usually a phase inside a runbook, not a task of its own. "Ask one agent and relay
+  its answer" belongs to ask-and-relay even though it waits for a notice.
 - **`summary`** is one line saying what the runbook achieves.
-- Changing routing text re-embeds the runbook. Measure it with `bench local`.
-
-A new runbook is searchable as soon as it is added. It competes best against
-established neighbours after a selector retrain (`.claude/skills/retrain-selector`),
-so a runbook that shares vocabulary with an existing one needs training data too.
+- Changing routing text re-embeds the runbook. Measure it with `bench local`; a
+  body-only edit needs no routing measurement and no retrain.
 
 ## Being followable: the body
 
-The body is returned to the agent in full, so every byte is paid in its context.
-House style: a when-to-use line, a numbered procedure, and a "Report back" line.
+The body is returned in full, and the foundation comes with it on every response,
+so every byte is paid for in the caller's context. **Put shared rules in
+`daintree.foundation`**: preflight, caller differences, ownership, the notice and
+resume procedure, the checkpoint, proving a finish, even-handed judging. Do not
+repeat them. Put what is specific to this task beside the step it affects: vote
+mapping, PR head binding, setup readiness, question protocols.
+
+A runbook that waits for an agent follows this shape:
+
+```markdown
+Use when: <one concrete task boundary>.
+
+Availability: <the baseline app actions; what changes with no `notify` (API-key
+client) or when a full-surface action raises an approval; any native host alternative>.
+
+Procedure:
+1. Resolve and preflight.
+2. Observe the relevant starting state.
+3. Dispatch the smallest authorized action (brief, `name`, `worktreeId`, `notify`).
+4. Inspect the result and record the checkpoint.
+5. Arrange the supported continuation and end the turn when nothing else is left.
+
+On notice or resume:
+1. Restore the checkpoint and apply user changes.
+2. Read current state and correlate the response with this step.
+3. Handle questions, approvals, errors, missing evidence and duplicate notices.
+4. Verify, then finish or advance one eligible step.
+
+Stop and recovery: <finite bounds; what is never replayed>.
+
+Report back: <evidence, outcome, pending work, the real continuation>.
+```
+
+A synchronous runbook (rename, a status read, a relay that stops at submission) is
+shorter. It gets no empty notice or checkpoint sections.
 
 1. **State the whole contract.** Target scope, concrete arguments, what the result
-   looks like, what success looks like, how partial failure and retry work, and when
-   to stop. Preserve returned ids. A successful tool envelope can contain a failed
-   check; a missing result section is not an empty workspace; a wait is not
-   verification.
+   looks like, what success looks like, partial failure and retry, and when to stop.
+   Preserve returned ids. A launch is a panel, not a ready agent; a send is queued,
+   not delivered; a notice is a stop, not a success; a timeout is not a failure.
 2. **Stay inside the requested outcome.** A runbook does not authorize extra writes,
-   terminal closure or public messages — and it should not demand a second approval
-   for work already authorized.
-3. **Separate tool rounds from turns.** A dependent call waits for its producer's
-   result. End the turn after establishing async supervision, not merely because a
-   spawn returned an id.
-4. **Recover state before replaying a write.** Session scratch, workflow rows and
-   step checkpoints are different records; read the real state first.
-5. **Keep shared judgment in the foundation.** A domain's foundation runbook
-   (`foundation: true`, e.g. `daintree.foundation`) carries rules every specific in
-   that namespace relies on. Put failure handling next to the step it affects.
-6. **Give complete tool examples** in a tagged fence — the tool name in the fence
-   metadata, only its arguments in the JSON:
+   terminal closure or public messages, and it should not demand a second approval
+   for work already authorized. App confirmations and approvals still apply.
+3. **Make asynchronous work re-entrant.** Record the dispatch, arrange a real
+   continuation (a `notify` on the launch or send, or `terminal.notifyWhenIdle`),
+   end the turn, and on the next activation recover state without repeating a
+   launch or a public write. Give a no-notice path: one bounded wait of at most 60
+   seconds, or an honest "this needs your continuation".
+4. **Never replay an ambiguous write.** Read the real state first: the listing, the
+   submission receipt, the forge.
+5. **Give complete examples** in a tagged fence. Put the action id in the fence
+   metadata, only its arguments in the JSON, and angle-bracketed runtime
+   substitutions for ids:
 
    ````markdown
-   ```json tool=forge.getPR
-   {"worktreeId":"<resolved worktree id>","prNumber":42}
+   ```json tool=agent.launch
+   {"agentId":"<id from agent.listAvailable>","name":"Review: retry","worktreeId":"<worktree id>","prompt":"…","notify":true}
    ```
    ````
 
-   `tests/unit/test_runbook_examples.py` validates these against the captured CLI
-   schemas.
-7. **Stay under the size budgets** (`tests/unit/test_runbook_budgets.py`). Remove
+   Add `surface=external` (or another capture name) for an example written for that
+   caller; `tests/unit/test_runbook_examples.py` validates each example against its
+   caller's captured schema, so an external example carrying `notify` fails.
+6. **Stay under the size budgets** (`tests/unit/test_runbook_budgets.py`). Remove
    duplication before adding a rule.
-
-Runbooks call Daintree CLI tools. The pinned CLI source in `cli/` is the authority on
-which tools exist and what they accept; `tests/fixtures/cli_tool_inventory.json` is
-its captured schema (refresh recipe in [`tests/fixtures/README.md`](../tests/fixtures/README.md)).
-Read the tool's handler before teaching an operation, and for a forwarded Daintree
-action read the action itself, not a similarly named wrapper.
 
 ## Frontmatter
 
@@ -78,10 +140,17 @@ action read the action itself, not a similarly named wrapper.
 | `summary` | yes | one line |
 | `whenToUse` | yes | the routing text above |
 | `foundation` | no | `true` for a domain's base-judgment runbook |
-| `risk` | no | `read local ui terminal project external git system` — descriptive only |
-| `requiredTools` | no | the CLI tools the steps use, dotted |
+| `risk` | no | `read local ui terminal project external git system`, descriptive only, not a permission |
+| `requiredTools` | no | app action ids the baseline path calls; must be on the agent-pane surface |
+| `optionalTools` | no | app action ids a conditional branch, caller variant or enhancement calls |
+| `requires` | no | other runbook ids whose instructions must be read first |
 
-Unknown keys are rejected (`runbooks/models.py`).
+Unknown keys are rejected (`runbooks/models.py`). A tool may not be both required and
+optional. The nearest domain foundation is delivered automatically and needs no
+`requires` entry. `requires` targets must exist, must be public, and must not form a
+cycle, including through the implicit foundation edge; a violation fails readiness.
+Native host tools (a shell, `gh`, file edits) never go in either tool list. Name them
+in the body's Availability line.
 
 ## Adding one
 
@@ -96,14 +165,25 @@ Unknown keys are rejected (`runbooks/models.py`).
 .venv/bin/python -m benchmarks.runbook_selection.bench local      # routing quality gate
 ```
 
-Passing the routing gate says search finds the runbook; it does not say an agent
-executes it well. Only a live trial against a connected Daintree instance shows
-that — don't claim it from offline checks.
+Passing the routing gate says search finds the runbook. Passing the example and
+migration tests says it names real actions with valid arguments. Neither says an
+agent executes it well, or that a Daintree notice actually wakes the pane. Only a
+live trial in a Daintree pane shows that, so don't claim it from offline checks.
 
 ## Learning from real sessions
 
-A transcript of an agent doing the work is the best evidence of both halves: the
-query it actually sent, what came back, and whether it could follow the procedure.
+A transcript of an agent doing the work is the best evidence. It shows the query
+the agent actually sent, what came back, and whether it could follow the procedure.
 `/learn-from-transcript <path>` (`.claude/skills/learn-from-transcript`) turns one
-Claude Code or Codex session into measured catalog changes. Cases it adds live in
-`benchmarks/runbook_selection/cases/19-from-transcripts.yaml` with `tx-` ids.
+Claude Code or Codex session into measured catalog changes. Beyond routing, read the
+session for:
+
+- whether it called real surfaced actions with correct arguments;
+- whether it arranged a real continuation before ending its turn, and whether that
+  continuation arrived;
+- whether it told questions, errors and completion apart, and avoided duplicate
+  actions on resume;
+- whether it verified the outcome and stayed in scope.
+
+Cases it adds live in `benchmarks/runbook_selection/cases/19-from-transcripts.yaml`
+with `tx-` ids.

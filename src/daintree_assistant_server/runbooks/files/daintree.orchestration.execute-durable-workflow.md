@@ -1,57 +1,40 @@
 ---
 id: daintree.orchestration.execute-durable-workflow
 title: Execute a durable workflow graph
-summary: Plan and advance dependency-aware work across turns using the optional workflow graph tools, with exact resource links, evidence and reconcile checkpoints.
-whenToUse: Use for a substantial multi-step goal with dependent phases that must survive turns, restarts or asynchronous waits — migrations, delegate-then-verify work, several ordered changes, or "track this plan and resume it later". Use when the user explicitly asks for a durable plan, dependencies, progress tracking, reconciliation or a workflow graph. Do not use for a one-step action, independent parallel fan-out (use daintree.orchestration.fan-out-work), a status-only "where were we" sweep of the flat workflow ledger (use daintree.orchestration.status-and-resume), simple agent supervision (use daintree.orchestration.supervise-fleet), or a single future notification (use daintree.orchestration.watch-outcome).
+summary: Plan and advance dependency-aware work across turns with a caller-owned dependency plan, exact resource links, evidence and resume-time reconciliation.
+whenToUse: Use for a substantial multi-step goal with dependent phases that must survive turns, restarts or asynchronous waits — migrations, delegate-then-verify work, several ordered changes, or "track this plan and resume it later". Use when the user explicitly asks for a durable plan, dependencies, progress tracking, reconciliation or a workflow graph. Do not use for a one-step action, independent parallel fan-out (use daintree.orchestration.fan-out-work), a status-only "where were we" sweep (use daintree.orchestration.status-and-resume), simple agent supervision (use daintree.orchestration.supervise-fleet), or a single future notification (use daintree.orchestration.watch-outcome).
 risk: project
 requiredTools:
-  - context.snapshot
-  - workflow.list
-  - workflow.get
-  - workflow.plan
-  - workflow.getGraph
-  - workflow.next
-  - workflow.attachResource
-  - workflow.recordEvidence
-  - workflow.reconcile
-  - workflow.cancel
-  - user.askMultipleChoice
-  - timer.schedule
+  - terminal.list
+  - terminal.getStatus
+optionalTools:
+  - terminal.getOutput
+  - terminal.readLastMessageOwned
 ---
-Use when: several dependent phases need a durable execution graph rather than an in-memory plan.
+Use when: a goal has dependent phases that must survive turns, compaction or restarts: a migration, delegate-then-verify work, several ordered changes, "track this plan and resume it later".
 
-The seven graph tools are REAL Assistant CLI tools and they are registered by DEFAULT; the trusted environment flag `DAINTREE_WORKFLOW_INTELLIGENCE=0` is what turns them off. Feature-detect anyway: an operator who has turned them off leaves you naming tools that are not offered, and withholding is final for the turn. `wfg_...` graph ids are NOT the older flat-ledger `wfr_...` ids; never send one family to the other's tools.
+Availability: Hybrid. The Daintree app has no workflow graph or plan service. The plan is a file you own, and every node runs through the normal tools of its own runbook: app actions, your shell, `git`, `gh`. A saved plan executes nothing and wakes nobody. The next activation comes from a Daintree notice on a delegated node, a host mechanism you have verified will resume you, or the user.
 
 Procedure:
+1. Reuse before creating. Look in `.daintree/runbook-runs/` in the coordinator checkout for an open plan with the same goal, and continue it (On notice or resume) rather than planning a duplicate.
+2. Plan once, when the goal, target and scope are concrete. Extend the foundation's checkpoint with a node list, about twenty nodes at most; split larger work into phases. Per node: id; what it does and under which runbook; `dependsOn`; the authority it uses (which writes it may make); the evidence that proves it; status (`pending`, `dispatching`, `running`, `done`, `failed`, `blocked`, `cancelled`, `uncertain`); linked resources (worktree id and path, terminal id, `requestedId`, branch, commit, PR, issue); and the evidence recorded. Show a plan you derived to the user before its first mutation.
+3. A node is ready only when every dependency is `done` with evidence. A dependency that is `running`, `uncertain` or merely idle does not count. Ready nodes run together only when they share no files or artifacts (the disjointness gate of daintree.orchestration.fan-out-work).
+4. Execute one ready node through its runbook. Before a mutation, mark it `dispatching` with its intent and any id you choose yourself (a launch's `requestedId`, a branch name) and save. After the call, save every returned id at once, verify, record the evidence, then mark it `done`. Resolve arguments from live state at dispatch; never replay them from an old plan.
+5. A node that waits on an agent is launched or prompted with `notify` per its runbook and marked `running`. Then end your turn.
+6. Replan only when the goal or scope changes: mark the old plan superseded and keep its completed evidence. Never replan to hide a failed node. A failed node is retried within its limit and blocks only its dependents.
+7. Cancel honestly. Marking the plan or a node `cancelled` stops progression and leaves a tombstone. It stops nothing the plan started: agents keep running, and worktrees, branches and PRs stay. Stopping those is a separate request (daintree.orchestration.workspace-cleanup).
 
-1. FEATURE-DETECT FIRST. Require the currently offered tool surface to contain at least `workflow.plan`, `workflow.getGraph` and `workflow.next`. If absent, say Workflow Intelligence is unavailable in this session (disabled, unsupported or withheld) and continue phase-by-phase with the applicable domain runbook; do not claim a durable graph exists. Do not route graph operations through `daintree.call`: these are CLI-local tools, not Daintree MCP actions. `workflow.plan` and `workflow.reconcile` also require a compatible Assistant backend; the other five graph operations are local.
+On notice or resume:
+1. Follow the foundation's resume procedure, then map the terminal to its node. A terminal no node links is not this plan's.
+2. A node found `dispatching` is uncertain: the call may have happened after the last save. Look for its effect before anything else: the panel by its `requestedId`, the branch or commit in git, the PR with `gh pr list --head`, the file on disk. Adopt what you find; redo only what is proven absent.
 
-2. REUSE BEFORE CREATING. Read the durable workflow digests already injected into the turn. If an open graph covers this same goal, call `workflow.getGraph({"id":"wfg_...","view":"compact"})` and reconcile it rather than planning a duplicate. Use `view:"full"` only when exact nodes, edges, resources or evidence are needed.
+```json tool=terminal.list
+{"terminalId":"<requestedId recorded for the node>"}
+```
 
-3. PLAN ONCE after the goal, target and scope are concrete:
-   `workflow.plan({"goal":"<user goal, verbatim or lightly summarized>","scope":"<bounds>","activeRunbookIds":["<actually loaded ids>"],"notes":["<constraints>"]})`.
-   Optional fields are `existingWorkflowId` and `forceReplan`. Capture the returned `workflowId`, status, nodes, active ids, warnings and next action. A returned `userQuestion` means the graph was ALREADY stored. In an interactive turn, use `user.askMultipleChoice` only when the returned options fully represent the choice. When `allow_other:true` or a free-form answer is needed, ask one concise ordinary question and stop the turn; after the user's answer, call `workflow.reconcile` with reason `user_interjection` and `latestUserMessage`. On an unattended wake, report the question as a blocker instead of invoking an interactive prompt.
+3. Verify the node's evidence and record it, then recompute the ready nodes and dispatch within the original authority.
+4. Resumed with no wake mechanism (an API-key client, a relaunched pane, or the user simply returning): nothing advanced while you were away. Reconcile from live state, then continue, or tell the user where the plan is saved and that the next step needs their go-ahead.
 
-4. READ WHAT CAN RUN NOW with `workflow.next({"id":"wfg_..."})`. It returns ready nodes, waiting nodes, open blockers and an advisory next action. Never execute a dependency-waiting node. A next action is advice, not authority: confirm its tool is currently offered, resolve exact live arguments, and respect the tool's normal risk confirmation and the user's scope. If a ready node lacks enough detail, read the full graph.
+Stop and recovery: each node has a retry limit (default one). A node that exhausts it is `failed` and its dependents `blocked`. Never re-execute a `done` node, and never replay a write whose result is uncertain; read its system of record first. A corrupt plan is a recovery problem, not permission to start over.
 
-5. EXECUTE THROUGH NORMAL DOMAIN TOOLS. The graph records and recommends; it never commits, spawns, merges, edits or waits by itself. Follow the loaded domain runbook for each node. Do NOT add `workflowId` or `workflowNodeId` to strict domain-tool calls — current non-workflow schemas do not accept them. After a tool returns a real id, link it separately on the next continuation:
-   `workflow.attachResource({"workflowId":"wfg_...","nodeId":"<node>","type":"terminal","ref":"<exact id>","label":"<short label>","status":"active"})`.
-   Valid types are `terminal`, `agent`, `worktree`, `branch`, `pr`, `issue`, `watcher`, `timer`, `async`, `queue_event`, `artifact`, `memory`, and `grant`. Manually attach terminal/watcher/timer/async/worktree/PR resources whenever node attribution matters. Automatic capture is only reliable when exactly one open graph and one active node make attribution unambiguous; current timer/watcher naming can also evade automatic capture.
-
-6. RECORD ONLY MISSING EVIDENCE. Use `workflow.recordEvidence({"workflowId":"wfg_...","nodeId":"<node>","kind":"manual_note","summary":"<one bounded sentence>","refId":"<source id>"})` for facts the observer cannot see. Valid kinds are `tool_call`, `tool_result`, `queue_event`, `watcher_event`, `async_completion`, `user_message`, `assistant_message`, and `manual_note`. Do not narrate every read or duplicate automatically captured mutation results.
-
-7. RECONCILE AFTER MATERIAL CHANGE, not after every read:
-   `workflow.reconcile({"workflowId":"wfg_...","reason":"tool_result","recentEventLimit":20,"apply":true})`.
-   Reasons are `tool_result`, `queue_event`, `wake`, `manual`, `resume`, `failure`, and `user_interjection`. Use `failure` after a failed action, `wake` after async/watcher wake, `resume` on returning to stale work, and `user_interjection` when the user's new message changes execution. `apply:false` previews a patch; normal operation applies it. Reconcile PATCHES progress and blockers; it never replans or executes.
-
-8. REPLAN ONLY FOR A CHANGED GOAL OR SCOPE. Call `workflow.plan` with the live `existingWorkflowId` and `forceReplan:true`; without force, planning over live work is refused. Do not use replan to paper over a failed node — reconcile can transition a failed node back to ready for retry. Preserve the returned `supersededWorkflowId` in the report.
-
-9. USE NORMAL ASYNC SUPERVISION for long work. Spawn/watch/await using the relevant orchestration runbook, then attach the returned ids. Linked async settlement can update the linked node, but the wake still needs `workflow.reconcile({"workflowId":"wfg_...","reason":"wake","recentEventLimit":20,"apply":true})` to advance/finalize the plan. Never hand-poll just because a graph exists.
-
-   Graph persistence means the work is AVAILABLE to resume in a later turn; it does not schedule or autonomously resume execution by itself. To resume later, schedule a `timer.schedule` `message` payload (daintree.orchestration.watch-outcome) naming the persisted wfg_ id: when due it starts an assistant turn that reconciles and advances the graph with normal tools and authority. A `call_safe_tool` timer runs one fixed tool and wakes nobody, so a scheduled reconcile only updates the graph. Only the interactive user turn can schedule; a wake cannot re-arm a timer.
-
-10. CANCEL HONESTLY. `workflow.cancel({"workflowId":"wfg_...","nodeId":"<optional>","reason":"..."})` changes graph/node state only. It does NOT close terminals, cancel external work, remove worktrees, revoke grants or stop async handles. Those are separate explicit cleanup operations with their own authorization.
-
-Validate every proposed next action against observed state and original authority; backend plan/reconcile output is advisory. After a failed resource attachment or reconcile, preserve the action’s actual result and ids and repair the bookkeeping rather than executing the domain action again. A “done” node without acceptance evidence is not a verified user outcome. On cancellation, report live linked resources separately and stop them only if that cleanup is requested.
-
-Report back: the `wfg_` id, completed/total progress, active or blocked nodes, exact resources still live, evidence behind the current verdict, and the next action or wake checkpoint. If graph tools were unavailable, state that no durable graph was created.
+Report back: the plan's path, done out of total, running and blocked nodes, live resources with exact ids, the evidence behind the current state, and what will bring the next step (a notice on a named terminal, or the user).

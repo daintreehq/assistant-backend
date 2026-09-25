@@ -171,14 +171,13 @@ every step the transcript exercised. Two authorities:
   `resultSchema`, and the `description` string, which is where the maintainers
   wrote down the traps. Never a second-hand summary.
 
-Keep two contracts apart. For what the transcript's agent *could* do, the
-Daintree action is the contract: a standard assistant calls it directly through the
-Daintree MCP. For what this repository will *accept* in a runbook, the CLI fixtures
-are (`tests/fixtures/`): `requiredTools` and tagged examples are validated against
-the retired CLI's inventory, whose typed wrappers can be narrower than the action
-behind them (`cli/internal/tools/mcpx/wrappers.go` rejects fields the action
-accepts). Where the two disagree, or the tool the agent really had is not in the
-inventory, record the row as blocked on the fixture rather than weakening the test.
+What this repository will *accept* in a runbook is the captured app surface
+(`tests/fixtures/daintree_mcp/`): `requiredTools`, `optionalTools` and tagged
+examples are validated against the schemas each kind of caller is actually listed,
+and an API-key client's schemas carry no `notify`. Where the action source and the
+capture disagree, the capture is stale: refresh it (its README has the recipe)
+rather than weakening the test, and record the row as blocked on the refresh until
+then.
 
 **A gap.** The transcript is the first draft. If the agent reached a verified good
 outcome, its steps with the dead ends removed are the procedure. If it failed,

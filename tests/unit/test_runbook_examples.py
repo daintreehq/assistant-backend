@@ -1,30 +1,39 @@
-"""Validate executable argument examples, without guessing tool names from prose.
+"""Validate runbook argument examples against the Daintree app's captured MCP schemas.
 
-Only fences explicitly tagged ``json tool=<CLI dotted name>`` opt in. Raw MCP
-arguments are not validated against a similarly named CLI wrapper: the captured
-inventory describes the outer CLI contract, not the live host's nested schema.
+Only fences explicitly tagged ``json tool=<action id>`` opt in; the JSON is the
+action's arguments alone. An optional ``surface=<name>`` annotation (a test
+annotation, never an MCP argument) says which caller the example is written for —
+``pane-core``, ``pane-full``, ``help-core``, ``help-full`` or ``external`` —
+and it is validated against THAT caller's schema. Without one, the example is validated against the
+first surface offering the action, in that order, so the ordinary pane path is
+the default reading.
+
+The surfaces differ at the property level, which is the point of validating per
+caller: an API-key ``external`` client is not offered ``notify`` at all, so an
+example annotated for it that sends ``notify`` fails here exactly as it would
+fail there. Schema validity proves structure only — the angle-bracket values in
+examples are runtime substitutions, and nothing here proves they were resolved.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 
 import pytest
+from daintree_mcp_surfaces import SURFACES, input_schemas
 from jsonschema import Draft202012Validator
 
 from daintree_assistant_server.runbooks.catalog import load_catalog
 
-INVENTORY = Path(__file__).resolve().parents[1] / "fixtures" / "cli_tool_inventory.json"
-EXAMPLE = re.compile(r"^```json tool=([\w.]+)\n(.*?)\n```$", re.M | re.S)
+EXAMPLE = re.compile(r"^```json tool=([\w.]+)(?: surface=([\w-]+))?\n(.*?)\n```$", re.M | re.S)
 
 
-def _examples() -> list[tuple[str, str, str]]:
+def _examples() -> list[tuple[str, str, str | None, str]]:
     return [
-        (runbook.id, tool, text)
+        (runbook.id, tool, surface or None, text)
         for runbook in load_catalog().runbooks
-        for tool, text in EXAMPLE.findall(runbook.body)
+        for tool, surface, text in EXAMPLE.findall(runbook.body)
     ]
 
 
@@ -38,28 +47,23 @@ def test_tagged_examples_are_present_and_well_formed() -> None:
 
 
 @pytest.mark.parametrize(
-    ("runbook_id", "tool", "text"),
+    ("runbook_id", "tool", "surface", "text"),
     _examples(),
-    ids=[f"{rid}:{tool}:{i}" for i, (rid, tool, _) in enumerate(_examples())],
+    ids=[f"{rid}:{tool}:{i}" for i, (rid, tool, _, _) in enumerate(_examples())],
 )
-def test_executable_example_matches_captured_cli_schema(
-    runbook_id: str, tool: str, text: str
+def test_example_matches_the_callers_captured_schema(
+    runbook_id: str, tool: str, surface: str | None, text: str
 ) -> None:
-    schemas = {
-        entry["function"]["name"].replace("__", "."): entry["function"]["parameters"]
-        for entry in json.loads(INVENTORY.read_text(encoding="utf-8"))
-    }
-    assert tool in schemas, f"{runbook_id}: {tool} is not a captured CLI tool"
+    if surface is not None:
+        assert surface in SURFACES, f"{runbook_id}: unknown surface annotation {surface!r}"
+        schemas = input_schemas(surface)
+        assert tool in schemas, f"{runbook_id}: {tool} is not offered to {surface}"
+    else:
+        offering = [s for s in SURFACES if tool in input_schemas(s)]
+        assert offering, f"{runbook_id}: {tool} is not an action any captured caller is offered"
+        surface = offering[0]
+        schemas = input_schemas(surface)
     arguments = json.loads(text)
     assert isinstance(arguments, dict), f"{runbook_id}: tool arguments must be an object"
-    validator = Draft202012Validator(schemas[tool])
-    errors = [error.message for error in validator.iter_errors(arguments)]
-    assert not errors, f"{runbook_id}: invalid {tool} example: {errors}"
-
-    if tool == "timer.schedule" and arguments["payload"]["type"] == "call_safe_tool":
-        call = arguments["payload"]["toolCall"]
-        target = call["toolName"]
-        assert target in schemas, f"{runbook_id}: unknown timer target {target}"
-        nested = Draft202012Validator(schemas[target])
-        errors = [error.message for error in nested.iter_errors(call.get("args", {}))]
-        assert not errors, f"{runbook_id}: invalid deferred {target} arguments: {errors}"
+    errors = [e.message for e in Draft202012Validator(schemas[tool]).iter_errors(arguments)]
+    assert not errors, f"{runbook_id}: invalid {tool} example for {surface}: {errors}"

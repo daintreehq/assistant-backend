@@ -1,75 +1,71 @@
 ---
 id: daintree.recipe.run-or-create
 title: Run a Daintree workspace recipe, or create a worktree with one
-summary: List, inspect and run an EXISTING Daintree workspace recipe — or create a worktree with one as its startup recipe — then supervise any LIVE agent it spawns. Nothing here authors or edits a recipe.
-whenToUse: Use when the user asks to list, inspect, load, run or apply an existing Daintree workspace recipe, or to create a worktree with a startup recipe. Also use when they ask to CREATE or edit a recipe — only so you can say plainly that no tool can author one and offer what you can actually do. Do not use to create worktrees for agents that are already running (use daintree.worktree.relocate-agents), to create a worktree for a forge issue, which has its own typed workflow (use daintree.workflow.start-work-on-issue), to launch a single agent with no recipe involved (use daintree.edits.spawn-visible-agent), or to delete a worktree and tear the workspace down (use daintree.orchestration.workspace-cleanup).
+summary: List, inspect and run an EXISTING Daintree workspace recipe — or create a worktree with one as its startup recipe — then check which terminals started, including any LIVE agent. Nothing here authors or edits a recipe.
+whenToUse: Use when the user asks to list, inspect, load, run or apply an existing Daintree workspace recipe, or to create a worktree with a startup recipe. Also use when they ask to CREATE or edit a recipe — only so you can say plainly that no Daintree action authors one and offer what you can actually do. Do not use to create worktrees for agents that are already running (use daintree.worktree.relocate-agents), to create a worktree for a forge issue, which has its own typed workflow (use daintree.workflow.start-work-on-issue), to launch a single agent with no recipe involved (use daintree.edits.spawn-visible-agent), or to delete a worktree and tear the workspace down (use daintree.orchestration.workspace-cleanup).
 risk: project
 requiredTools:
-  - context.snapshot
-  - worktree.getCurrent
   - worktree.list
   - recipe.list
-  - recipe.run
   - worktree.createWithRecipe
-  - daintree.call
-  - terminal.awaitAll
-  - terminal.extract
-  - terminal.summarize
-  - terminal.read
-  - terminal.sendCommand
-  - terminal.await.async
-  - queue.publish
-  - watcher.terminal.create
-  - agentTask.superviseTerminal
-  - agentTask.spawnForEdits
-  - workflow.startWorkOnIssue
-  - watcher.list
-  - async.list
+  - worktree.waitUntilReady
+  - terminal.list
+  - terminal.getStatus
+optionalTools:
+  - recipe.run
+  - terminal.getOutput
+  - terminal.notifyWhenIdle
+  - terminal.waitUntilIdleBatch
+  - terminal.closeOwned
 ---
-Use when: the user asks about Daintree workspace recipes or creating a worktree with one.
+Use when: the user wants a saved Daintree recipe listed, run in a worktree, or used as the startup recipe of a new worktree.
 
-First check that the request is actually for a saved setup. A plain worktree request belongs to daintree.worktree.create-plain-worktree; custom tasks for several new agents belong to daintree.orchestration.fan-out-work. A slash command such as `/design-review` names an agent command, not a workspace recipe. Discovering a recipe with a matching name does not authorize substituting its startup behavior for the user's full command and brief. If this runbook was loaded for such a request, take the plain creation/custom-agent path instead. A question about which commands an agent CLI offers, or the syntax to invoke one, is not a recipe question either: answer it with the capability lookup in daintree.foundation.
+Availability: Core for a new worktree with a recipe: `worktree.createWithRecipe` with `recipeId`, which asks the user to confirm. Running a recipe in an EXISTING worktree needs `recipe.run`. An agent pane is offered it, but it asks the user first: approving that prompt starts every terminal the recipe lists, while a call already pre-authorized (for example after "Allow for this session") starts at most three. The sidebar assistant at core is not offered it: say so, and offer a new worktree with the recipe as the different outcome it is, rather than substituting it. `USER_REJECTED` means the user declined: nothing ran; do not retry. Tracking a recipe's agents afterwards uses `terminal.notifyWhenIdle`, which an API-key client does not have.
 
-You cannot author a recipe. The whole recipe surface is `recipe.list`, `recipe.run` and `worktree.createWithRecipe` — read and run, nothing more. There is no `recipe.get`, no `recipe.getDefinition` and no `recipe.schema`: those are not offered recipe-definition tools; a generic not-permitted response alone cannot distinguish a missing action from a hidden/tier-restricted one, so do not answer it by trying another spelling. The argument shapes you would have wanted from a schema call are written out in step 2 below. No tool creates, edits, renames or deletes a recipe either, and `daintree.call` will not conjure the capability. If the user asks for a NEW recipe, say that plainly instead of improvising: recipes are defined in Daintree itself and only they can add one there. Then offer what you CAN do — run an existing recipe, or stand the layout up by hand this once (`worktree.createWithRecipe` for the worktree, `agentTask.spawnForEdits` for each agent it needs; a bare shell terminal is theirs to open, since no tool creates one) — and leave saving it as a recipe to them.
+A recipe is a saved set of terminals: plain shells, dev previews, or agents that start their CLI the moment they spawn, often with a saved prompt. It sets up a workspace and supervises nothing. A slash command such as `/design-review` is an agent command, not a recipe, and a recipe whose name matches the user's words does not license swapping its saved behaviour for the user's own brief: a plain worktree is daintree.worktree.create-plain-worktree, and custom agents for custom tasks are daintree.orchestration.fan-out-work.
 
-Note: "Daintree workspace recipes" (MCP actions) are distinct from the assistant runbooks loaded into your context. A recipe is a SAVED SET of terminal definitions — and a recipe terminal can be a plain shell, a dev-preview, OR a LIVE agent that starts running its CLI the moment it spawns, with NO watcher attached. So a recipe SETS UP a workspace; it never supervises. If a recipe launches an agent whose work you must track, you supervise that terminal SEPARATELY (see step 6). Do not assume "recipe = just shells."
+No Daintree action creates, edits or deletes a recipe, and none returns a recipe's definition. Asked for a new or changed recipe, say so plainly, point the user to Daintree's recipe editor, and offer what you can do: run an existing recipe, or build the layout once by hand (a worktree, then `agent.launch` per agent). Project recipes can live in the repository under `.daintree/recipes/`; editing one is not this procedure, so do it only on an explicit request and in the format an existing file there shows.
 
 Procedure:
+1. Pin the target. `recipe.run` otherwise lands in the user's active worktree, which can change under you, so resolve an explicit `worktreeId` from `worktree.list` or the user's words. For a new worktree, settle its `source`: `newBranch` with `branchName`, `baseBranch` and `collisionPolicy:"error"` for an exact new name; `existingBranch` for a local branch checked out verbatim; or `pullRequest` with `pullRequestNumber` alone.
+2. Discover with `recipe.list`, passing `worktreeId` for the recipes available there. Entries carry `id`, `name`, `terminalCount` and `origin`. An empty list with `isLoading:true` means not read yet, not "no recipes": list once more, and if it is still loading report that instead of an empty catalog. Resolve the recipe the user named; ask only if two plausibly match. `terminalCount` says how many terminals will start, not what they are or what their agents will do. Agents with a saved prompt begin work immediately, so do not plan to brief them afterwards.
+3. For an existing worktree, note which terminals are already there (`terminal.list` with its `worktreeId`), so this run's terminals are never confused with earlier ones.
+4. Run once in an existing worktree:
 
-1. Orient if the target is ambiguous. recipe.run lands in the focused/active worktree by default, so before mutating anything pin WHERE the recipe should go: context.snapshot (its terminals digest shows what is already running), then worktree.getCurrent / worktree.list for the worktree set. Skip this only when the user already named the worktree (or you're creating a fresh one in step 3).
+```json tool=recipe.run
+{"recipeId":"<id from recipe.list>","worktreeId":"<resolved worktree id>"}
+```
 
-2. Discover recipes when needed. recipe.list({ arguments: { worktreeId? } }) ->
-   { recipes: [{ id, name, worktreeId, terminalCount, showInEmptyState }], isLoading }.
-   Argument shape (these are strict — a stray top-level key is rejected outright): `recipe.list` takes ONLY `arguments`; `worktree.createWithRecipe` takes a required `arguments` plus an optional top-level `requestKey`; `recipe.run` takes a required top-level `recipeId` (merged last, so it always wins) plus optional top-level `arguments` and `requestKey`. Host action fields nest inside `arguments`; recipe.list does not return their schemas or recipe-specific argument slots.
-   Resolve the recipe the user requested by name/id. LOOK AHEAD: terminalCount tells you HOW MANY terminals will spawn, but recipe.list gives NO per-terminal kind, startup prompt or required template variables. A generic action schema does not reveal those saved definitions either. Configured agent prompts can run immediately when the recipe launches. Do not assume the terminals start empty or plan to fill in a custom brief afterward. Inspect spawned terminals in step 5 before reporting their behavior.
+   or create a new worktree with it:
 
-3. Run or create. Both are mutating and will confirm; pass a requestKey when you can (Daintree dedupes on it and strips it before validation).
-   - Apply a recipe to an EXISTING worktree -> recipe.run({ recipeId, arguments: { worktreeId? } }) ->
-     { spawnedCount, failedCount, failedTerminals: [{ index, reason }] }.
-   - Create a NEW worktree AND run a startup recipe -> worktree.createWithRecipe({ arguments: { source: {…}, recipeId? } }) ->
-     `source` is a DISCRIMINATED UNION on `kind` and names the creation mode; pick exactly one, and note each arm is strict, so a field borrowed from another arm is rejected outright rather than ignored:
-       `{"kind":"newBranch","branchName":"…"}` plus optional `baseBranch`, `fromRemote` (true when baseBranch names a remote like origin/develop), `collisionPolicy` ("suffix" default, or "error"), `issueNumber`, `assignToSelf`.
-       `{"kind":"existingBranch","branchName":"…"}` plus optional `issueNumber`, `assignToSelf` — checked out verbatim, never suffixed.
-       `{"kind":"pullRequest","pullRequestNumber":N}` — nothing else, and never a branch name beside it.
-     `recipeId` stays a TOP-LEVEL sibling of `source` inside `arguments`. The flat spelling (`branchName`/`baseBranch`/`useExistingBranch` at the top of `arguments`) is GONE; `useExistingBranch` no longer exists at all. ->
-     { worktreeId, worktreePath, branch, recipeLaunched, spawnedTerminalCount, failedTerminalCount, assignedToSelf, assignedUsername, assignmentError }.
-     (issueNumber and pullRequestNumber are mutually exclusive.) recipeLaunched is true iff ≥1 terminal spawned.
+```json tool=worktree.createWithRecipe
+{"source":{"kind":"newBranch","branchName":"<branch>","baseBranch":"<verified base>","collisionPolicy":"error"},"recipeId":"<id from recipe.list>"}
+```
 
-4. Read the result. The recipe spawns ALL terminals synchronously and reports partial failure INLINE — check failedCount / failedTerminalCount. If nonzero, surface which indices failed and why (failedTerminals[].reason); a partial spawn is normal to report, not a hard error. NOTE the cap: agent-sourced recipe runs are limited to 3 agent terminals — overflow shows up as failed entries, not a thrown error.
+5. Read the outcome terminal by terminal. `recipe.run` returns `spawnedCount`, `failedCount`, `spawnedTerminalIds` and `failedTerminals` (`index`, `reason`). `worktree.createWithRecipe` returns `worktreeId`, `worktreePath`, `branch`, `recipeLaunched`, `spawnedTerminalIds`, `spawnedTerminalCount` and `failedTerminalCount`; a `PARTIAL_SUCCESS` error means the worktree exists and the recipe failed partway, so keep and report the worktree. Compare what started with `terminalCount` and report any shortfall, including the three-terminal cap on a pre-authorized run. A partial run is a normal result. Never re-run the recipe to fill a gap: that duplicates every terminal that did start. An ambiguous reply is reconciled with `terminal.list` and `worktree.list` first; identical arguments within 120 seconds only return the cached earlier result.
+6. Classify only this run's terminals, in one call:
 
-5. Detect whether the recipe spawned a LIVE agent. Inspect the worktree's terminals via context.snapshot (its terminals digest lists each terminal with its agentId / agentState / kind); for a precise per-worktree read use daintree.call terminal.list({ worktreeId }) ->
-   { terminals: [{ id, kind, type, worktreeId, title, agentId, agentState, isInputLocked, isFocused }] }.
-   An entry with agentId / agentState is an agent candidate, not proof of a healthy CLI; confirm startup from its bounded tail before treating it as live. Entries that are plain shells or dev-previews need nothing from you. A freshly spawned agent prints NOTHING for several seconds — empty output right after the run means "starting up," never "it died."
+```json tool=terminal.getStatus
+{"terminalIds":["<spawned id 1>","<spawned id 2>"],"includeOutput":{"lines":20}}
+```
 
-6. Supervise any live agent you must TRACK. Pick ONE mode per terminal (foundation) — the recipe attached nothing, so whatever you choose is that terminal's only supervisor:
-   - IN-TURN (you drive it to completion right now): attach NO watcher. Wait for the whole cohort with ONE terminal.awaitAll({ terminalIds: [...] }) ->
-     { allFinished, perTerminal: [{ terminalId, status }], stillWorking: [...], askingQuestion: [...] } where status is one of "finished" | "failed" | "question" | "working", and the top-level stillWorking/askingQuestion arrays name the straggler ids so you can target them without scanning perTerminal. It returns NO content, so settle the finish the foundation's way — awaitAll plus a bounded tail read of the same ids (terminal.extract for a field, terminal.summarize for the gist of a noisy TUI, terminal.read for short verbatim) — and re-await or watch one that reported finished yet still looks busy. For a SINGLE agent, use terminal.extract wait:{} instead of awaitAll. Answer any askingQuestion ids with terminal.sendCommand and await again; if "failed", note it and don't respawn in a loop. Respect the shared 120-second foreground sleep budget regardless of maxAttempts (default 30, max 240). When the foundation's re-await bound runs out, completion remains unconfirmed: if others finished, report them and note the pending one; if it is the only work left, hand it to ONE `terminal.await.async({ terminalIds: ["<id>"] })` and end the turn. Publish a blocked inbox item alongside it when the user should see the stall in their queue — `queue.publish` with `source:"model_worker"`, `severity:"blocked"`, `title`, `summary`, `target:{terminalId}`, `dedupeKey:"hung-<terminalId>"` — but do NOT also attach a watcher; the async wait is already that terminal's one supervisor.
-   - BACKGROUND ("set it up and wake me later"): adopt the running terminal with agentTask.superviseTerminal({ terminalId: "<id>", goal: "...", spawnMode: "edit"|"explore", acceptanceCriteria? }) — the purpose-built way to attach a supervisor watcher to an ALREADY-running terminal (check watcher.list AND async.list first; adoption dedupes active spawn supervisors but does not update an existing watcher's scope). Pass the resolved worktreeId for verification. A generic watcher.terminal.create is an output-condition watcher, not an equivalent acceptance-checking supervisor. Then END your turn. The watcher confirms completion with the same finished check and publishes a completed_* event to the attention queue — react on that wake, don't poll.
+   Take each one's `kind` and `agentId` from `terminal.list`. A shell or dev preview needs nothing more. An entry with an `agentId` is an agent candidate, not proof of a healthy CLI; an agent prints nothing for its first seconds, so empty output right after the run means starting, not dead. A trust, login or approval screen is the user's to answer, and an error is reported as seen. Only the ids in `spawnedTerminalIds` are yours: other terminals in that worktree are not, and owned tools refuse them.
+7. For a new worktree, check setup with `worktree.waitUntilReady` (`timeoutMs` 0 to 25000; only `ready` is success). Recipe terminals do not wait for setup: if it is still running, or `failed`, while an agent is already working, tell the user that agent's early work may have run against an incomplete tree. Do not restart the agent yourself.
+8. Stop here unless the user asked to hear when the recipe's agents finish. A recipe run authorizes no further prompts to its agents.
+9. Tracking, when asked. For each agent that is `working`, arm one notice with a note naming the run, record a checkpoint (recipe, worktree id and path, terminal ids, what the user wants reported), and end your turn:
 
-7. If the recipe spawned no live agent — or its agents are dev tooling the user watches themselves — there is nothing for you to supervise. Just report what was set up.
+```json tool=terminal.notifyWhenIdle
+{"terminalId":"<agent id from spawnedTerminalIds>","note":"recipe <name>, run <run id>: report its result"}
+```
 
-8. Scope check. A recipe is workspace setup, not issue work. If the user's real goal is "have an agent IMPLEMENT or INVESTIGATE something in this worktree," that is a separate task: agentTask.spawnForEdits (mode:"edit" or "explore", with its own supervision) or workflow.startWorkOnIssue (which spawns the agent AND the assistant auto-attaches a background watcher — report the terminalId + watcherId and end your turn, reacting on the completed_* event). Don't bend a recipe into an agent-work spawn.
+   `armed:false` comes back with the terminal's current state instead: report that state now rather than waiting. Without `terminal.notifyWhenIdle` (an API-key client), use one `terminal.waitUntilIdleBatch` over those ids, then report what is still working and that checking again needs the user's continuation.
 
-If recipe.list reports isLoading:true, do not infer that no recipes exist; re-read once after loading or report the unresolved state. Pin the requested worktree through every call. Snapshot the pre-run terminal set, then associate returned/new ids with this run; do not adopt pre-existing agents that merely share the worktree. A partially successful run must not be replayed wholesale: reconcile successful terminals and recover only missing work. Check existing watcher/async coverage before adoption, and require a working scheduler before promising after-close checks.
+On notice or resume:
+1. Follow the foundation's resume procedure, correlating by terminal id and the note. The notice says a terminal stopped, not that its work succeeded.
+2. Read that agent's state and output. Its task came from the recipe's saved prompt, not from you: report what it did and any question, approval or error it stopped on, and judge success only against criteria the user gave.
+3. A question beyond what the user authorized goes to the user; never answer it just to keep the agent moving.
+4. Mark each terminal reported so a duplicate notice adds nothing. The run is finished when every tracked agent has been reported.
 
-Report back: which recipe ran, the worktree/branch ids created, spawnedCount and any failed terminals, which terminals are live agents, and — if you attached supervision — the mode you chose and the next checkpoint (an in-turn await you're driving now, or a background watcher's completed_* event you'll react to). Watchers are durable — the background supervisor keeps them running if the user closes the assistant.
+Stop and recovery: never re-run a recipe after a partial or ambiguous result; recover a missing terminal only on request. A failed recipe agent is not relaunched in a loop. One notice per terminal. A declined approval ends the request. Close nothing unless asked, and then only this run's terminals, with `terminal.closeOwned`.
+
+Report back: the recipe and where it ran (worktree id, path and branch, new or existing), terminals started against expected, each terminal's id, kind and state (live agent, shell, starting, blocked, or failed with its reason), the setup state of a new worktree, and whether tracking was arranged (a notice on which terminals, or none and why).

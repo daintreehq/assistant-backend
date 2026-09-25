@@ -5,44 +5,40 @@ summary: Inspect and interactively provision, pause or resume a worktree's confi
 whenToUse: Use when the user asks about a worktree's cloud devbox or remote resource status, wants to provision, pause or resume it, asks to save resource cost, or asks for a future pause/resume. Also use for teardown or connect requests so the assistant can route those unsupported-safe paths honestly. Do not use for creating or deleting an ordinary git worktree (use daintree.worktree.create-plain-worktree or daintree.orchestration.workspace-cleanup), Daintree's own CPU/memory resource profile, or starting a local dev server.
 risk: system
 requiredTools:
-  - context.snapshot
   - worktree.list
-  - worktree.getCurrent
-  - user.askMultipleChoice
-  - timer.schedule
   - worktree.resource.status
-  - daintree.call
+optionalTools:
+  - worktree.resource.provision
+  - worktree.resource.pause
+  - worktree.resource.resume
+  - worktree.resource.teardown
+  - actions.getSchema
 ---
-Use when: the user wants status or lifecycle control for a worktree's project-configured remote resource.
+Use when: the user wants the status of, or lifecycle control over, a worktree's project-configured remote resource, such as a cloud devbox.
 
-The actual MCP actions are `worktree.resource.status`, `worktree.resource.provision`, `worktree.resource.pause`, `worktree.resource.resume`, and `worktree.resource.teardown`. The STATUS read has a typed Assistant wrapper, `worktree.resource.status` — call it directly; sending it through `daintree.call` returns USE_TYPED_WRAPPER and does nothing. The four LIFECYCLE actions have no wrapper and still go through system-risk, always-confirmed and ungrantable `daintree.call`, which is the right gate for them: each one executes a project-configured command. All accept optional `{worktreeId}`, but this runbook ALWAYS supplies the exact id.
+Availability: Full-dependent. `worktree.resource.status`, `worktree.resource.provision`, `worktree.resource.pause`, `worktree.resource.resume` and `worktree.resource.teardown` are on an agent pane's surface, but at core each one asks the user first, and teardown also carries Daintree's own confirmation. The sidebar assistant at core and API-key clients are not offered them: say so and point the user to the worktree card. Each call runs the project's configured commands for real, with real cost and effect. Nothing here schedules: a pause "at 6pm" or "when I'm done" cannot be arranged, and an unattended call would stop at the approval anyway, so say so rather than promising it. Reading the configuration is native file work.
 
 Procedure:
+1. Resolve ONE exact worktree id from `worktree.list`: the worktree the user named, never a branch name standing in for an id. Always pass `worktreeId`; left out, these actions fall back to the focused or active worktree. If several match, ask.
+2. Read fresh status first:
 
-1. RESOLVE ONE EXACT WORKTREE from the injected roster, `worktree.getCurrent`, or `worktree.list`. A worktree id is the exact id returned by Daintree, not a branch name. If several match, use `user.askMultipleChoice`. Never rely on focused/active fallback for infrastructure actions.
+```json tool=worktree.resource.status
+{"worktreeId":"<exact worktree id>"}
+```
 
-2. READ FRESH STATUS first:
-   `worktree.resource.status({"worktreeId":"<exact id>"})`.
-   Inspect `structuredContent`: `{configured:boolean,status:null|{lastStatus?,lastOutput?,error?,lastCheckedAt?,endpoint?,meta?,provider?,resumedAt?,pausedAt?}}`. `configured:false,status:null` means no status command is configured. The action runs a real command and fails instead of returning stale cached state. Treat `unknown` as unknown, never healthy. Do not echo raw `lastOutput`, `meta`, or credential-shaped endpoints unless needed and demonstrably safe.
+   `configured:false` with `status:null` means no status command is configured: verification is unavailable, which is not proof that no resource exists. A failing command fails the call rather than returning a stale answer. Treat an `error` or an unknown `lastStatus` as not healthy. Report `lastStatus`, `error` and `lastCheckedAt`; repeat `lastOutput`, `meta` or `endpoint` only when needed and plainly safe, because they can carry credentials or tokens.
+3. Know what will run before running it. The commands come from the `resource` block, or a named entry under `resources`, of the first valid `config.json` Daintree finds: the user-level project config under `~/.daintree/projects/`, else the worktree's `.daintree/config.json`, else the main checkout's; with none there, a project settings file can supply resource environments. Read the one that applies when you can, and tell the user which commands will run. Repository commands run only once the user has approved them on the worktree card: an error saying they "haven't been approved" is theirs to resolve there, never yours to work around.
+4. Provision, pause or resume only on the user's explicit request, one call, exact id:
 
-3. REQUIRE AN EXPLICIT INTERACTIVE REQUEST for provision, pause or resume. These execute arbitrary project-configured commands; provision/resume may incur cost, and pause is not guaranteed to be the inverse of resume. Call exactly one:
-   - `daintree.call({"name":"worktree.resource.provision","arguments":{"worktreeId":"<id>"},"requestKey":"<stable key for this provision>"})`
-   - `daintree.call({"name":"worktree.resource.pause","arguments":{"worktreeId":"<id>"}})`
-   - `daintree.call({"name":"worktree.resource.resume","arguments":{"worktreeId":"<id>"}})`
-   A stable request key protects an ambiguous PROVISION retry for 120 seconds; do not reuse it with changed arguments. Pause and resume are intentionally not deduplicated.
+```json tool=worktree.resource.provision
+{"worktreeId":"<exact worktree id>"}
+```
 
-4. HANDLE AMBIGUOUS FAILURES WITHOUT REPLAY. A transport timeout does not prove the project command did nothing. Re-run fresh status before considering an identical provision retry. Lifecycle actions return only an acknowledgement, not a resulting resource object. For pause/resume the acknowledgement means the selected configured command returned successfully; provision may instead no-op when cached state is already ready/running/healthy/up, or route a paused/stopped resource through the resume command. None of these acknowledgements proves the external resource reached the desired state.
+   Pause and resume take the same argument. Provision creates real infrastructure and may incur cost; it does nothing when the resource already reports running, and routes a paused one through the resume commands. Resume may incur cost from the moment it returns. Pause is not guaranteed to be undone by resume: read the commands before calling it reversible.
+5. Handle ambiguity without replay. A timeout or a lost reply does not mean the command did nothing: read status again before considering an identical call. A lifecycle call returns an acknowledgment, not the resource's new state.
+6. Verify with a fresh `worktree.resource.status` after a successful call when a status command exists, and report the new `lastStatus`, `error` and `lastCheckedAt`. Pause and resume record their own timestamps, but only a status read shows the external result. Without a status command, say verification is unavailable instead of reporting the resource ready or paused.
+7. A refusal as disabled or "no … command configured" for a worktree you know has that command: the availability check follows the context worktree (the user's focused or active one, or your pane's launch context), not the id you passed. `actions.getSchema` shows it as `callable:false` with `unavailableReason:"DISABLED"`. Do not retarget through another path; point the user to that worktree's card, where the action targets the right worktree.
+8. Teardown destroys whatever the project's commands destroy. Prefer the worktree card's Teardown Resource dialog, which shows the commands before it asks. Call `worktree.resource.teardown` only on an explicit request here, after showing the user the exact teardown commands from the configuration that applies and offering pause as the lighter path; if you cannot establish those commands with confidence, leave teardown to the dialog. Daintree's confirmation still appears, and a declined confirmation is final. Deleting the worktree also runs the project's teardown: that is daintree.orchestration.workspace-cleanup.
+9. Connecting has no app action: send the user to the worktree card's connect control, and do not assemble an SSH command from status metadata.
 
-5. VERIFY WITH STATUS after a successful lifecycle call when a status command exists. Report fresh `lastStatus`, error, and `lastCheckedAt`. Pause/resume update their timestamps but do not themselves rewrite `lastStatus`; only the follow-up status can verify the external postcondition. If no status command exists, say verification is unavailable rather than reporting ready/paused from the acknowledgement.
-
-6. DO NOT TEARDOWN THROUGH THIS ASSISTANT. `worktree.resource.teardown` is real and MCP-allowlisted, but its project-defined commands can destroy unrecoverable infrastructure. The assistant-visible project settings intentionally withhold those commands, so this path cannot preview the actual destructive content. Direct the user to the Daintree worktree card's **Teardown Resource** dialog, which shows the exact commands before confirmation. Do not substitute `pause` unless the user chooses it.
-
-7. DO NOT PROMISE SCHEDULED LIFECYCLE ACTIONS. `daintree.call` cannot be authorized by an automation grant, so a timer/watcher/wake cannot provision, pause or resume later. Never schedule `call_safe_tool` targeting `daintree.call` and never offer `grant.create` for it. With the user's agreement, `timer.schedule` may create an `enqueue` REMINDER only; it runs nothing and does not wake the assistant. State that distinction before creating it and report the returned timer id.
-
-8. ROUTE CONNECT REQUESTS TO THE UI. `worktree.resource.connect` exists only as a renderer action and is not exposed to the Assistant MCP. Tell the user to use the worktree card's connect control; do not invent an SSH command from status metadata.
-
-9. HANDLE THE NONFOCUSED-TARGET EDGE CASE. The provision, pause, resume and teardown availability checks currently examine the focused/active worktree even when `arguments.worktreeId` names another one; status itself does not have this gate. If a valid explicit mutation target is refused as not configured, do not silently switch worktrees through another raw call. Ask the user to select/focus the target worktree or use its worktree-card action.
-
-Do not treat configured:false as proof no remote resource exists: it means the status command is absent, so verification is unavailable. Existing status can include sensitive endpoints/output; report only safe status evidence. Cancellation or timeout is an unknown outcome of an external command, not rollback. Preserve the original target through remediation and distinguish a Daintree availability-gate refusal from failure of the remote resource itself.
-
-Report back: exact worktree id/branch, requested action, pre-action status, acknowledgement, post-action status or why verification was unavailable, and any reminder timer id. For teardown/connect, name the Daintree UI path required instead of claiming the MCP action ran.
+Report back: the exact worktree id and branch, the action requested, the commands that ran or would run, the status before, the acknowledgment, the status after or why verification is unavailable; for teardown or connect, the Daintree card path when the action did not run here.

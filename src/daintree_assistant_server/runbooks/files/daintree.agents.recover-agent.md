@@ -1,52 +1,55 @@
 ---
 id: daintree.agents.recover-agent
 title: Recover a broken agent or spawn
-summary: Triage an agent that went wrong — read the durable spawn saga, tell a hang from a bad id, and adopt an unsupervised agent instead of restarting it.
+summary: Triage an agent that went wrong — reconcile the launch from what Daintree lists, tell a hang from a bad id, and re-arm observation of an unwatched agent instead of restarting it.
 whenToUse: Use when something has gone WRONG with an agent or its spawn — "my agent is stuck", "it has been sitting there for ages", "did that agent even start?", "the spawn failed", "nothing happened when you launched it", "that terminal id does not work", "this agent has no watcher on it", "there is an agent running from earlier that nobody is watching", "is it hung or just slow?". Covers a launch that returned no terminalId or an ambiguous result, a hung or unresponsive agent, a stale or mistyped terminal id, and adopting an orphaned or unsupervised agent. Do not use when the agent is healthy and merely ASKING something — answer it with daintree.agents.answer-waiting-agent; for routine triage of a fleet where nothing is broken use daintree.orchestration.supervise-fleet or daintree.orchestration.status-and-resume; to start fresh work use daintree.edits.spawn-visible-agent. Do NOT use when the agent and its launch are both healthy and the user is questioning something YOU did — "why did you not wait", "why did you spawn that" — a complaint about your own handling is not a broken agent, so answer it directly rather than opening a recovery.
 risk: terminal
 requiredTools:
-  - context.snapshot
-  - agentTask.status
-  - agentTask.list
-  - agentTask.superviseTerminal
-  - agentTask.spawnForEdits
-  - watcher.list
-  - async.list
-  - watcher.cancel
-  - terminal.awaitAll
-  - terminal.await.async
-  - terminal.summarize
-  - terminal.read
-  - queue.resolve
+  - terminal.list
+  - terminal.getStatus
+  - terminal.getOutput
+optionalTools:
+  - agent.listAvailable
+  - agent.launch
+  - worktree.list
+  - terminal.readLastMessageOwned
+  - terminal.waitUntilIdle
+  - terminal.notifyWhenIdle
+  - terminal.interruptOwned
 ---
-Use when: an agent or its spawn has gone wrong — the launch returned no terminalId, an agent has stopped responding, a terminalId no longer resolves, or a running agent has nobody supervising it. Four failure shapes, one triage.
+Use when: an agent or its launch has gone wrong. The launch returned no terminal or an ambiguous result, an agent stopped responding, a terminal id no longer resolves, or a running agent has nothing arranged to bring you back when it stops.
 
-You are recovering the SUPERVISION, not the work — restore the loop and let an agent do the engineering.
+You are recovering observation and the task, not replacing the work. Never replace a terminal unless the user asked; never resend the original prompt into a terminal you do not understand; make one corrective action, then hand it to the user.
 
-Non-goals, absolute: never replace a terminal unless the user explicitly asked; never blindly resend the original command into a terminal you do not understand; never respawn in a loop — one corrective action, then hand it to the user.
+Availability: Core. Diagnosis uses status reads, which work on any terminal. Interrupting and sending need ownership (`terminal.interruptOwned`, `terminal.sendCommandOwned`). `terminal.notifyWhenIdle` is offered to panes and the sidebar assistant, not API-key clients, which get one bounded wait instead.
 
 Procedure:
-1. Name the shape before you act. Read live state first, then two cheap reads that settle most cases: `agentTask.list({})` (this session's spawn sagas, newest first, each with its stage, bound terminal/watcher and any error; add `{"scope":"all"}` only when the user asks about earlier sessions — prior-session in-flight sagas can be marked failed on open, so reconcile bound live resources instead of treating their stored failure as proof the agent never started) and `watcher.list({})` / `async.list({})` (which terminals already have supervision). Then branch: no terminal ever appeared → step 2; the terminal exists but is unresponsive → step 3; a read says "Terminal not found" or a whole cohort looks frozen seconds after spawn → step 4; it is running but unsupervised → step 5.
+1. Gather evidence before naming the shape: your checkpoint (the recorded launch intent: agent, `name`, worktree, `requestedId`, time), the launch result if you have it, `terminal.list` (`owned:true` for yours; `location:"trash"` or `"background"` for panels that left the grid), and one `terminal.getStatus` over the candidates with `includeOutput`.
+2. Name the shape, then act on it:
+   - Launch reply lost, timed out or ambiguous. The panel may well exist: a timeout after the panel was created is common. Look for it by `requestedId`, or by worktree, agent, title and a recent `spawnedAt`. Found: that is your agent; observe it (step 5). Not found: read once more, since a panel can take a moment to appear. Still nothing means the outcome is unknown; relaunch only when a refusal or error establishes nothing was created, or the user agrees. Two agents in one worktree is worse than none.
+   - `launched:false` with the other fields null: the launcher declined and nothing exists, usually because a same-kind launch was still starting. An identical launch within two minutes returns the same refusal, so retry once, after that launch has started, with a changed `name`.
+   - A tool error naming an unknown agent or worktree: nothing launched. Correct exactly what it names from `agent.listAvailable` or `worktree.list`, and retry once.
+   - `spawnStatus:"missing-cli"`: the CLI is not installed and the terminal is a setup panel. Report it and leave it with the user.
+   - A startup screen: a trust, login, update or permission prompt before the first turn. The prompt has not been consumed; the user must clear the screen. Afterwards, check the screen for whether the prompt ran before sending anything.
+   - Exited: `agentState` exited with an `exitCode` (null means killed by a signal), or a CLI that failed at startup and left a shell prompt with an error. That is a failed launch: report the error with any credentials removed. A bare prompt with no error is ambiguous, not grounds to relaunch.
+   - Slow: `working` with recent output. `lastOutputChangeAt` is not a hang verdict either way.
+   - Asking a question or waiting on an approval: not hung. Use daintree.agents.answer-waiting-agent.
+   - Provider error: `waitingReason:"error"`, or output showing a rate limit, auth or network failure. Report the concrete error; waiting longer fixes nothing.
+   - Wrong locator: a per-entry `error` from `terminal.getStatus`, or an id missing from `terminal.list`. Check it against the listing (truncated or mistyped id, a worktree filter, the trash) before concluding anything, then correct it and resume the same observation. Never relaunch a healthy agent because an id was wrong.
+   - Lost ownership: `RESOURCE_NOT_OWNED` from an owned tool. That is not evidence the terminal is missing; the code covers missing, foreign and user-owned alike. Status reads are not ownership-scoped, so use them to see whether it exists. A pane's ownership survives an MCP reconnect, but not the pane relaunching or an app restart. Ask the user to hand the terminal over through Daintree, or leave the action to them.
+   - Unknown: `source:"pty"` or `unavailableFields` in the status, or unreadable output. Say exactly what is unknown.
+3. Hung or just slow: take one bounded observation (`terminal.waitUntilIdle`, at most 60 seconds, or the status tail) and report the terminal id, what the screen shows and how long since its output changed. Do not hold finished agents hostage: report their results now and the stuck one separately. For a disputed send, check its `submissionToken` phase first; never resend from `unknown`, `failed` or `cancelled` alone.
+4. Interrupt only when the user authorized stopping this agent's turn: `terminal.interruptOwned` with its `terminalId`. `requested` or `requested-unverified` confirms a request, not a stop; read the terminal afterwards. Respect a refusal (idle agent, a different cancel key, not owned): no raw keystrokes, kill or close instead.
+5. Unobserved but healthy: do not restart it. If it is working, arm one notice and put your run and step in the note:
 
-2. SPAWN DID NOT LAND — read the saga, do not guess. `agentTask.status({"launchId":"<agt_...>"})` returns the durable record for one launch: its stage — launch_requested, agent_started, terminal_bound, watcher_attached, confirmed, or failed / ambiguous — plus the bound terminalId/watcherId and any error detail. Act on the stage:
-   - terminal_bound, watcher_attached or confirmed — the spawn LANDED. Take the bound ids from the saga, use them verbatim, carry on. The launch call's return was merely uninformative. Do not respawn.
-   - launch_requested or agent_started on a fresh launch — still in flight, not failed. Say so, re-read once, give it a moment.
-   - failed — report the relevant error detail with credentials removed, inspect any bound terminal/worktree, then respawn AT MOST ONCE only when launch failure is established with agentTask.spawnForEdits, correcting exactly what the error names (an unknown agentId, resolved against the available-agent registry in your startup context, or a wrong worktreeId). The same failure twice is not a retry problem: stop and hand it over.
-   - ambiguous — do NOT respawn. Two agents in one worktree is worse than none. Identify the real terminal from the roster by title/worktree, confirm with a bounded tail read, then adopt it per step 5.
-   Never "fix" a failed spawn by closing terminals. A failed launch did not create the terminal you would be closing, so closing one destroys somebody else's work.
+```json tool=terminal.notifyWhenIdle
+{"terminalId":"<terminal id>","note":"<run id>: recovered, verify step <n>"}
+```
 
-3. HUNG — bound it under the foundation's wait rule, then be honest. What that rule does not cover is the rest of the fleet and the wording of your report. First rule out the two look-alikes: an agent in `askingQuestion`, or at waitingReason "question" or "approval", is not hung, it is blocked on you — answer or approve it (answer-waiting-agent); one at waitingReason "error" is not hung either, it stopped on a blocking error (rate limit, auth, network) and needs that fixed, not a longer wait; a cohort still working immediately after spawn may simply be starting; check ids in step 4 only when they mismatch or a read fails. Then do not hold the finished agents hostage: relay their results in THIS turn and report the hung one separately, so one straggler does not stall five completed jobs. Take ONE bounded read of the stuck terminal for evidence (terminal.summarize, or terminal.read when you need the literal last lines) and report what it actually shows, the terminalId, roughly how long it has been silent, and the async handle now watching it. Never dress up awaitAll's `working` as progress — it is a state, not evidence that anything is happening.
+   `armed:false` means it was not working; classify its returned `state` now instead. Arming again from this pane replaces your earlier notice for that terminal. Another coordinator's notices are invisible to you, so never call an agent unsupervised just because you hold none for it. Record the notice in the checkpoint and end your turn.
 
-   When the user has authorized interrupting this busy agent, use the co-loaded foundation's discovery/schema/invoke path for `terminal.interruptOwned` with only `{terminalId:"<exact id>"}`. It requires this MCP connection's launch ownership; a roster, restored saga or client metadata cannot grant it, and reconnect loses that authority. A `requested` or `requested-unverified` result confirms a request, not that the agent stopped: read state/output afterward. Respect a refusal, including unsupported interrupt strategy, idle/exited state or lost ownership; never bypass it with raw terminal input, repeated calls, kill or close. This action does not accept arbitrary signals. For a queued or disputed command, check its receipt per the foundation before diagnosing an agent hang; never resend from `unknown`, `failed` or `cancelled` alone.
+On notice or resume: follow the foundation's resume procedure, then classify again with the shapes above. A recovered agent's result is still a claim, checked against the original task's acceptance.
 
-4. BAD ID vs SLOW AGENT — the cheapest fix, always try it before escalating. Run the foundation's id check before you conclude anything about the agent, correct any mismatch, and resume the SAME wait. Never respawn a healthy agent because you mistyped its id.
+Stop and recovery: one corrective action (a retry, an id fix, a re-armed notice); if it does not hold, stop and report the ids and evidence. A second relaunch is a loop. Never close a terminal to fix a failed launch: the failed launch did not create it. Keep any terminal or worktree a partial launch created, and reconcile before retrying.
 
-5. ORPHANED or UNSUPERVISED — adopt, do not restart. Before calling `agentTask.superviseTerminal`, obtain current results from BOTH `watcher.list` and `async.list`, even when the launch reported a watcher-storage failure. That failure does not rule out another supervisor or async handle. If current results for both are already present, reuse them. If either read fails, supervision coverage is unknown: report that blocker rather than attach a duplicate. If an active watcher or async handle already covers this task, retain it rather than adding another. A terminal listed by a stale or unrelated watcher still needs its goal/scope checked. Otherwise confirm it is a live agent and not a corpse: a CLI that errored on startup sits at a shell prompt and reports `waiting`, indistinguishable from an idle agent. Take one bounded tail read; if it shows a startup error or usage failure, treat the launch as failed. A bare prompt with no error is ambiguous, not enough to relaunch. Report the evidence and use one authorized corrective spawn only when failure is established. Never attach a supervisor to a dead shell; it would wait forever. For a genuinely live agent, adopt it with `agentTask.superviseTerminal({"terminalId":"<id>","goal":"<what completion looks like>","acceptanceCriteria":"<concrete definition of done>","spawnMode":"edit","worktreeId":"<id>"})` — terminalId is the only required field, spawnMode is "edit" or "explore" (use "explore" so the supervisor does not expect file changes), and worktreeId scopes its post-completion git check. It launches nothing and edits nothing, and it normally reuses an existing active spawn supervisor. A deduped response does NOT update its goal, mode, acceptance criteria or worktree; check those before accepting it. Then END the turn and react when the watcher wakes you.
-
-6. Close the loop honestly. Say plainly which watcher you adopted, which you cancelled with watcher.cancel, and what remains unsupervised. If your one corrective action — respawn, adopt, or id fix — did not hold, STOP: report the ids and the error and let the user decide. A second respawn is a loop.
-
-Confirmation: adopting a supervisor is cheap and reversible, but respawning an agent or sending input into a live terminal mutates real project state — confirm per the active tier before either.
-
-A failed saga can still contain a terminalId or worktreeId from a partial launch; preserve those resources and reconcile before retrying. The launch idempotency key depends on the effective title/prompt/agent/worktree, so changing the title to force a retry can create a second worker. Use status/list to recover the original result. A read timeout or an exhausted foreground budget is not proof of a dead agent; distinguish slow, blocked, failed, disappeared and unknown. Never expose raw environment/configuration fields in a recovery report.
-
-Report back: which failure shape it was and the evidence for it (the saga stage or relevant safe error detail); the launchId, terminalId and watcherId involved; what you recovered and what you deliberately did NOT do (no terminal closed, no blind resend, at most one respawn); what is still running, and what will wake you or what you need from the user.
+Report back: the shape and the evidence for it; the terminal, worktree and launch details involved; what you recovered and what you deliberately did not do (nothing closed, no blind resend, at most one relaunch); what is still running and what will bring you back, or what you need from the user.

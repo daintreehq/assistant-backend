@@ -4,11 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this service is
 
-**Daintree runbook search**: a stateless MCP server with one tool, `search_runbooks`, at
-`POST /v1/daintree/mcp`. A caller describes a task; the server ranks the runbook catalog
-against it and returns the top runbooks as JSON, full procedures included. That is all it
-does. Anyone can add it — there is no authentication, no account, no session, no
-credential held, and no upstream call. The wire contract is `docs/MCP.md`.
+**Daintree runbooks**: a stateless MCP server at `POST /v1/daintree/mcp` with two read-only
+tools. `search_runbooks` ranks the runbook catalog against a described task and returns the
+top runbooks as JSON, full procedures included; `get_runbook` returns one by id. Both add
+each returned runbook's prerequisite instructions (its domain foundation, plus `requires`)
+once, as `supporting_runbooks`. That is all it does. Anyone can add it — there is no
+authentication, no account, no session, no credential held, and no upstream call. The wire
+contract is `docs/MCP.md`.
+
+**Who follows the runbooks:** Claude Code and Codex, acting through the **Daintree app's own
+MCP** (`agent.launch`, `terminal.getStatus`, `terminal.notifyWhenIdle`, …) and their native
+tools. This server supplies instructions only; it never touches a workspace. Asynchronous
+runbooks launch or prompt an agent with `notify`, end the turn, and resume on the notice
+Daintree types into the caller's pane. `docs/agents/DAINTREE_RUNBOOK_CLIENT.md` is the
+host-side setup.
 
 This repository used to be the Daintree Assistant Server (model orchestration, prompt
 assembly, accounts, entitlement, bring-your-own-key, utility tasks). All of that was
@@ -25,15 +34,15 @@ runbooks, cases and training rows on the current branch. It replaced the retired
 
 | path | what |
 |---|---|
-| `src/daintree_assistant_server/runbook_mcp.py` | JSON-RPC dispatch: both MCP protocol eras, the tool definition, argument validation, result rendering. Transport-agnostic. |
+| `src/daintree_assistant_server/runbook_mcp.py` | JSON-RPC dispatch: both MCP protocol eras, the two tool definitions, argument validation, result rendering. Transport-agnostic. |
 | `src/daintree_assistant_server/api/mcp.py` | The HTTP transport: Origin check, content negotiation, parse errors, 405 for GET/DELETE. |
 | `src/daintree_assistant_server/api/health.py`, `api/root.py` | `/health`, `/healthz`, `/readyz`, `/version`, `/` redirect. |
 | `src/daintree_assistant_server/main.py` | App factory and lifespan: loads the catalog and selector; body-size limit; request ids. |
 | `src/daintree_assistant_server/config.py` | Tiny `Settings`: environment, log level, build sha, bind address, body cap. |
-| `src/daintree_assistant_server/runbooks/` | Catalog, loader, frontmatter model, and `local/` — the selector. |
+| `src/daintree_assistant_server/runbooks/` | Catalog (incl. dependency validation and `supporting_for`), loader, frontmatter model, and `local/` — the selector. |
 | `training/` | The selector's training pipeline, corpus and experiment log. |
 | `benchmarks/runbook_selection/` | The routing benchmark and its quality gate. |
-| `cli/` | Vendored Daintree CLI source (submodule), read by runbook hygiene tests. |
+| `tests/fixtures/daintree_mcp/` | The Daintree app's MCP surfaces per caller (pane, sidebar, API-key), captured from one app commit: the authority on which actions runbooks may name. |
 | `infra/gcp/`, `cloudbuild.yaml`, `Dockerfile` | The Cloud Run deployment. |
 
 ## Commands
@@ -41,7 +50,6 @@ runbooks, cases and training rows on the current branch. It replaced the retired
 ```bash
 # Setup
 git lfs pull                             # the selector artifact is Git LFS
-git submodule update --init cli
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" -c requirements.lock
 
@@ -108,7 +116,11 @@ runbook, **filename stem must equal the `id`** (enforced at load). Auto-discover
 registration. `docs/RUNBOOKS.md` is the authoring guide.
 
 **Format** — YAML frontmatter + Markdown body. The body is operational prose in the house
-style (when-to-use line, numbered procedure, "Report back" line). Frontmatter is validated
+style: a `Use when:` line, an `Availability:` line, a numbered procedure, and for a
+runbook that waits on an agent `On notice or resume:` and `Stop and recovery:` sections,
+ending with a "Report back" line. Shared rules (preflight, caller differences, ownership,
+the notice/resume procedure, the checkpoint, proving a finish) live once, in
+`daintree.foundation`, which both tools deliver with every runbook. Frontmatter is validated
 by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are rejected):
 
 | key | required | notes |
@@ -119,7 +131,9 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 | `whenToUse` | yes | the *primary* routing signal (→ `when_to_use`) |
 | `foundation` | no | `true` marks a domain foundation (base judgment for a dotted namespace) |
 | `risk` | no | enum `read local ui terminal project external git system` — descriptive only |
-| `requiredTools` | no | Daintree CLI tools the steps use (→ `required_tools`) |
+| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the agent-pane surface (→ `required_tools`) |
+| `optionalTools` | no | action ids a conditional branch or caller variant calls (→ `optional_tools`); never also required |
+| `requires` | no | other runbook ids whose instructions must be read first; validated for existence, visibility and cycles (the implicit foundation edge included), and delivered as `supporting_runbooks` |
 
 The routing document the ranker embeds is title + summary + `whenToUse`, **not the body**.
 Editing routing text re-embeds that runbook and must be measured with `bench local`.
@@ -127,13 +141,17 @@ Every result carries the full body under `instructions`, so body size is paid in
 calling agent's context on every hit (`tests/unit/test_runbook_budgets.py` holds the
 ceilings).
 
-**Runbooks name Daintree CLI tools**, and the vendored `cli/` is the authority on which
-exist: `tests/unit/test_runbook_catalog_hygiene.py` checks every `requiredTools` name
-against `tests/fixtures/cli_tool_names.txt`, and `test_runbook_examples.py` validates
-tagged ```` ```json tool=<name> ```` examples against `tests/fixtures/cli_tool_inventory.json`.
-The two fixtures are one capture; refresh them together (`tests/fixtures/README.md`).
-The submodule tracks the CLI's `develop` and does not float — refresh the fixtures when
-you move the pin.
+**Runbooks name Daintree app MCP actions**, and `tests/fixtures/daintree_mcp/` is the
+authority on which exist and what each caller is offered: an agent pane (owned tools such as
+`terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand`),
+and an API-key client (no `notify`, no `terminal.notifyWhenIdle`). The hygiene test checks
+every declared tool against them, `test_runbook_examples.py` validates tagged
+```` ```json tool=<action> [surface=<caller>] ```` examples against that caller's schema, and
+`test_runbook_migration.py` fails any action-shaped name no caller is offered — which is
+what keeps the retired Assistant CLI's tools (`agentTask.*`, `terminal.awaitAll`,
+`queue.*`, `timer.*`, …) out. The five captures come from one app commit; refresh them
+together with `tests/fixtures/daintree_mcp/capture/capture.sh`. They prove what is listed,
+not that a notice is delivered: only a live trial in a Daintree pane shows that.
 
 **To add a runbook:**
 1. Create `runbooks/files/<id>.md`.
@@ -168,8 +186,8 @@ MCP spec rather than frozen.
 ## CI
 
 `.github/workflows/ci.yml`: install from lock, ruff, `mypy --strict src`, pytest with
-coverage (`fail_under = 90`), `bench coverage`, `bench local`. CI checks out the `cli/`
-submodule and the LFS artifact. `bench local` is the routing verdict: it attributes every
+coverage (`fail_under = 90`), `bench coverage`, `bench local`. CI checks out the LFS
+artifact. `bench local` is the routing verdict: it attributes every
 miss to the stage that lost it, and `candidate_miss` (a required runbook that never
 reached the head) is gated at zero — it is the first number to move as the catalog
 grows, and `bench scale` measures when.

@@ -5,32 +5,47 @@ summary: Break a tie in an agent voting competition by getting new submissions f
 whenToUse: Use when an agent competition, poll, or peer-vote ends in a tie and the user asks for a tie-breaking round or runoff using the same cohort. Do not use to start a fresh competition or poll (use daintree.orchestration.competition or daintree.agents.poll-pinned-agents), and do not spawn new agents unless the user explicitly changes the electorate.
 risk: project
 requiredTools:
-  - context.snapshot
-  - scratch.create
-  - scratch.set
-  - scratch.get
-  - scratch.drop
+  - terminal.sendCommandOwned
+  - terminal.getStatus
+  - terminal.getOutput
+optionalTools:
+  - agent.listAvailable
+  - agent.launch
+  - terminal.list
+  - terminal.readLastMessageOwned
+  - terminal.waitUntilIdleBatch
   - terminal.sendCommand
-  - terminal.awaitAll
-  - terminal.read
+  - terminal.closeOwned
   - terminal.close
-  - terminal.await.async
 ---
-Use when: an agent competition, poll, or peer-vote has a tied top score and the user asks to break the tie with a runoff among the tied agents or tied submissions.
+Use when: a competition, poll or peer vote ended with a tied top score and the user wants a runoff with the same cohort.
+
+Availability: Core. In an agent pane, `notify` on each send brings every runoff entry and vote back as it lands. An API-key client has no `notify`: close each phase with one bounded `terminal.waitUntilIdleBatch` (`mode:"all"`) and tell the user what remains pending for their continuation. The sidebar assistant uses `terminal.sendCommand` and `terminal.close`.
+
+Ballots follow the foundation's "Judging even-handedly"; below is what a runoff adds.
 
 Procedure:
-1. Restore the competition state. If you have a scratch store, `scratch.get` the saved state; if not, create one with `scratch.create({"name":"runoff-tiebreaker"})` and reconstruct from the transcript/current terminals. Build a compact map of full `terminalId` → entrant name, the tied entrants, all original voter terminalIds, prior submissions, and prior scores. Save it as one `runoff_state` key with `scratch.set`. Use full terminal IDs exactly; do not include unrelated open terminals unless the user explicitly named them.
-2. Set the runoff rule before sending prompts. Reuse the existing cohort — do not spawn new agents for a tie-breaker unless the user explicitly changes the electorate. Default: ask ONLY the tied entrants for one new short submission, then ask ALL original voters to choose the best among those tied entrants. The runoff vote is BLIND, same as the original (step 5): a voter may unknowingly pick its own entry — a vote counted according to the stated self-vote rule — and you enforce a no-self-vote rule yourself via the map only if the user set one. If the user wants a runoff on the original tied submissions instead, skip the new-submission step.
-3. Ask tied entrants for new submissions with `terminal.sendCommand`, one command per tied terminal, batched together. Prompt for one short, quick, unique, task-specific answer; if the original task excluded the project/codebase, restate that exclusion. End the same batch with `terminal.awaitAll({"terminalIds":[...],"maxAttempts":60})` for only the tied entrant IDs. Do not ask non-tied agents for new entries.
-4. Collect the tied entries. If `awaitAll` reports an `askingQuestion` terminal, `terminal.read` it before re-prompting; a terminal may be classified as asking even when its answer is already visible. If the answer is visible, proceed. If it is genuinely blocked, read the actual question or approval prompt and answer only within existing authority. Do not send “choose anyway” to a permission/error screen; resolve the blocker or report the missing entry. Collect the entries in free-form — one `terminal.read` per tied terminal, batched in one turn. Each submission is the entrant's own prose; do not ask entrants for JSON or run a structured extraction. Map each entry to its entrant by terminalId.
-5. Build a BLIND runoff ballot so the tie breaks on merit, not on who wrote what: the tied entries only, each stripped of its author and any characterization, given equal detail, and labeled with neutral tags (Entry 1/2 or A/B). VARY the tag order across voters (rotate or shuffle) and record each voter's tag→entrant map in scratch. Send it to every original voter terminal with `terminal.sendCommand`, asking for exactly ONE winner by its label plus a one-line reason; no rankings or abstentions. Do NOT reveal who wrote any entry or mark the voter's own as `(YOU)` — a voter may recognize or pick its own entry despite neutral labels; enforce a no-self-vote rule only if the rules set one, detecting it yourself via the map and quietly asking that voter for its next pick without disclosing authorship. Never silently drop the ballot — a discarded vote changes the denominator and can flip the runoff. Batch all vote prompts and put `terminal.awaitAll({"terminalIds":[all voter ids],"maxAttempts":60})` as the last call in that same batch.
-6. Collect votes in free-form — one `terminal.read` per voter terminal, batched. Each vote should name exactly ONE tag plus a one-line reason; take it from the voter's own prose, map the chosen tag back to the entrant via that voter's scratch map, and normalize only to the tied entrants. If a vote is ambiguous or names an out-of-ballot label, re-read that terminal; if still unclear, send one clarification prompt and await only that voter.
-7. Tally mechanically. Start runoff scores at zero and add one per valid vote. Report per-voter choices. If you also present a combined leaderboard, compute it from stored prior scores plus runoff votes in a small explicit pass; do not improvise combined totals from memory.
-8. Declare the result. If one entrant leads the runoff, name the winner. If the runoff is still tied, do not invent a winner; ask the user whether to run another runoff, accept co-winners, or apply a stated secondary criterion. Update `runoff_state` with final scores and winner/tie.
-9. Drop scratch when the runoff is complete; retain it while a next round or async result is pending. Close terminals only on request, using ONLY the exact recorded eligible cohort IDs with `terminal.close({"terminalIds":[...]})`. Never close unrelated pre-existing terminals as cleanup.
+1. Restore the contest from its checkpoint, not from memory alone. daintree.orchestration.competition hands it over intact: rules, entrants and terminal ids, the tied entrants, the original electorate (every voter's terminal id), prior entries and scores, and anyone removed or disqualified. With no checkpoint, reconstruct from this conversation and the current terminals, write a new one, and tell the user which parts were reconstructed.
+2. Revalidate the electorate with one `terminal.getStatus` over every original voter. Reuse only participants still live and still yours or handed over. An original voter that is gone, not reachable by your owned send, or removed or disqualified in the earlier round stays explicitly absent: never replaced by a fresh agent and never counted. Launch new voters only if the user explicitly changes the electorate.
+3. Fix the runoff rule and record it. Default: one new short entry from each tied entrant only, then every eligible original voter picks among those. If the user wants the original tied submissions, skip new entries. A tie between options you supplied (a poll) keeps those options and asks for no new entries: voters are not their authors. The self-vote rule carries over unless the user changes it. A further tie is broken only by a rule agreed in advance.
+4. Open a runoff generation in the checkpoint: its id, runoff scores reset to zero and kept apart from the original scores, and per participant its pending runoff prompt and `submissionToken`.
+5. New entries: send to each tied entrant, and nobody else, only while it sits at its prompt. Restate the original task and any exclusion it carried (for example "do not use the codebase"):
 
-Confirmation: Closing terminals requires an explicit user request; after closing, confirm the count and scratch cleanup.
+```json tool=terminal.sendCommandOwned
+{"terminalId":"<tied entrant terminal id>","command":"Runoff <runoff id>: new entry. Task: <original task, with its exclusions>. Give ONE new short <entry>, different from your earlier one, here. Do not contact other agents.","notify":true,"handback":true}
+```
 
-For a tie in a poll of externally supplied options, retain those tied OPTIONS and skip new entrant submissions: voters are not necessarily the authors. Restore only original voters still live and eligible; do not message a terminal removed or disqualified in the preceding round. Report the eligible/received/valid vote counts and any resulting change in electorate. Blinded labels reduce presentation bias but do not erase existing peers’ memory. Apply the foundation’s wait budget; keep runoff state while any async result or requested next round is pending, and drop scratch when the runoff is complete even if terminals remain open.
+   Record tokens and end your turn.
+6. Runoff ballot: once each tied entrant's new entry is in or recorded missing, build every eligible voter a fresh ballot of only the tied entries, with a new tag rotation and a new private map for this runoff (never reuse the original round's map). Ask for exactly one label and a one-line reason; no rankings, no abstentions. Send with `notify` and `handback`, record each token, and end your turn.
 
-Report back: the runoff submissions, each voter’s choice and reason, the runoff tally, the winner or remaining tie/options, and any terminal closure or scratch cleanup performed.
+On notice or resume:
+1. Follow the foundation's resume procedure, for each terminal the notice names.
+2. Correlate: a runoff entry counts only from a tied entrant whose runoff-entry prompt is pending; a runoff vote only from an eligible voter whose runoff ballot is pending and settled after that send (`terminal.getStatus` with its `submissionToken`; a matching `lastHandback.submissionToken` confirms). A reply to the original ballot, whether late or re-read, is stale and never a runoff vote, and an old label is never mapped through the runoff map.
+3. A terminal reported as waiting may already show its answer: read it before re-prompting. A genuine approval, trust or error screen is never answered with "choose anyway"; take it to the user or record that entry or vote missing.
+4. Read each vote in the voter's own words (`terminal.readLastMessageOwned` for Claude Code, otherwise `terminal.getOutput`), map it through that voter's runoff map, and accept only the tied entries. An ambiguous or off-ballot answer gets one clarification to that voter alone; still unclear, it is invalid. Enforce a no-self-vote rule only if the rules set one, by quietly asking that voter for its next pick. Never silently drop a ballot: a discarded vote changes the denominator and can flip the result.
+5. Tally the runoff from zero, one point per valid vote. Show a combined leaderboard only if it helps, computed explicitly from the stored prior scores plus the runoff votes and labelled as combined.
+6. One leader wins. Still tied: report the tie, or apply only the tie-break agreed in advance; otherwise the user chooses another runoff, co-winners or a stated secondary criterion. Record the final state.
+
+Stop and recovery: one runoff per request. Never resend a prompt to a participant already pending; check its token first. An unavailable original voter stays absent, never substituted. Close terminals only on request, with `terminal.closeOwned` on exact recorded cohort ids, confirmed from `closedIds`; never close unrelated terminals as cleanup. On cancellation keep a tombstone so a late vote cannot change the recorded result.
+
+Report back: the runoff entries, each voter's de-blinded choice and reason, eligible, received and valid counts with any absent original voter named, the runoff tally (and the combined leaderboard, labelled, if shown), the winner or the remaining tie and the options put to the user, and any cleanup performed.

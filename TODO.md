@@ -38,15 +38,15 @@ revoke. The provider keys should also be revoked at the providers.
 
 ---
 
-## A `get_runbook` tool
+## Metadata-only search
 
-**Trigger: the first caller that needs a runbook it already knows the id of —
-most likely a domain foundation, which search does not pair with a specific.**
+**Trigger: measured context cost — callers routinely receiving several full procedures
+they never follow, now that every response also carries the foundation.**
 
-One more tool on the same server: `get_runbook(id)` returning the same result
-shape without a score. Cheap, and it closes the one gap in a search-only server:
-a result's `foundation` flag tells a caller a foundation exists, not how to fetch
-it.
+`get_runbook` (exact retrieval, with `supporting_runbooks`) has landed, which makes a
+two-step read possible: search returning metadata only, then one `get_runbook` for the
+selected id. Only worth adding once real sessions show the full-body search is paying
+for neighbours; the default `max_results` of 3 is the cheaper lever first.
 
 ---
 
@@ -125,6 +125,29 @@ meaningless. `.claude/skills/retrain-selector` is the mechanism.
 
 What to check afterwards: that both cases come back, and that nothing in the
 `foundation-only` or `routing-trap` categories pays for it.
+
+**2026-09-25, the move to Claude Code/Codex and the Daintree app MCP** rewrote every
+body and touched the routing text of 21 runbooks. Where the old text only named retired
+machinery (watchers, timers, queues, the workflow ledger, "relayed this turn"), the edit
+removed that claim and kept the user's own vocabulary. Where a first rewrite cost cases,
+the pre-migration wording was restored rather than new wording tuned: the foundation's
+`whenToUse`, and `status-and-resume`'s title and "workflow list" phrasing. Measured
+against the pre-migration text, with the same artifact and the same decision procedure:
+
+    benchmark (259 cases, incl. 42 new host-query)  240 -> 242
+    holdout round1 (100)                              98 ->  98
+    holdout round2 (189)                             174 -> 172
+    holdout round3 (197)                             185 -> 185
+
+Net zero across 745 cases, inside the retrain lottery's ~7-case seed swing, so no
+retrain was run for it. The two round-2 losses are `hD-foundation-cancel-one-watcher`
+(a label about a watcher, which no longer exists) and `hE-manage-file-from-paste`
+(sitting on a knife-edge: no summary variant of the competing runbook moves it). One
+standing weakness predates the migration and is the best target for the next retrain's
+data: a request phrased "launch an agent in a new worktree for issue N and implement
+it" (`host-issue-agent-worktree`) goes to `daintree.edits.spawn-visible-agent` at
+0.9999 instead of `daintree.workflow.start-work-on-issue`. It needs reverse-direction
+boundary rows, not text.
 
 
 ---

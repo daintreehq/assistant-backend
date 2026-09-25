@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "daintree-assistant-server"
 version = "1.0.0"
-description = "Daintree runbook search - a stateless MCP server"
+description = "Daintree runbooks - a stateless MCP server of procedures for Claude Code and Codex"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
@@ -73,9 +73,6 @@ daintree_assistant_server = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# The CLI submodule (Go project) is not part of this package; keep its vendored
-# files — including a stray .claude skill .py — out of our lint scope.
-extend-exclude = ["cli"]
 
 [tool.ruff.lint]
 select = [

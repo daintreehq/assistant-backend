@@ -5,52 +5,60 @@ summary: Relay a live back-and-forth conversation among two or more agents, givi
 whenToUse: Use when the user asks you to facilitate, host, relay, moderate, or keep going a live back-and-forth conversation between TWO OR MORE agents — “get them talking,” “let them talk to each other,” “facilitate a conversation,” “have a group chat/roundtable/panel discussion,” “have the three of them hash it out,” or “see where it goes.” Participant count is just a parameter of this runbook. Do not use for a one-shot question to one agent (use daintree.agents.ask-and-relay), an independent poll with no cross-talk (use daintree.agents.poll-pinned-agents), a judged interview that names a winner (use daintree.orchestration.interview), a scored competition or vote (use daintree.orchestration.competition), a post-tie runoff (use daintree.orchestration.runoff-tiebreaker), a debate that ends by voting a position off (use daintree.orchestration.debate-elimination), or several agents collaborating toward ONE synthesized answer or convergence rather than an open-ended visible dialogue (use daintree.orchestration.multi-agent).
 risk: project
 requiredTools:
-  - context.snapshot
-  - agentTask.spawnForEdits
-  - agentTask.list
+  - agent.listAvailable
+  - agent.launch
+  - terminal.sendCommandOwned
+  - terminal.getStatus
+  - terminal.getOutput
+optionalTools:
+  - agent.listPresets
+  - worktree.list
+  - terminal.list
+  - terminal.readLastMessageOwned
+  - terminal.waitUntilIdle
+  - terminal.interruptOwned
   - terminal.sendCommand
-  - terminal.awaitAll
-  - terminal.extract
-  - terminal.read
-  - terminal.summarize
-  - terminal.await.async
-  - artifact.read
-  - scratch.create
-  - scratch.set
-  - scratch.get
-  - scratch.drop
+  - terminal.closeOwned
   - terminal.close
-  - queue.resolve
 ---
-Use when: the user wants two or more agents to have a live, open-ended conversation — a 1-on-1 back-and-forth, a roundtable, a panel, or a group chat — and wants you to facilitate the turns by relaying messages between their terminals so everyone stays in the discussion.
+Use when: the user wants two or more agents to hold a live, open-ended conversation (a back-and-forth, roundtable, panel or group chat) and wants you to facilitate the turns by relaying between their terminals.
 
-You are the ONLY conduit. The agents have no Daintree MCP and no way to see, hear, or message each other — every hand-off flows through you. And each terminal.sendCommand makes that agent take a turn, so you cannot silently "update" bystanders in the background: an agent only hears what the others said when you give it the floor and catch it up. So the loop is one speaker at a time — catch the current speaker up on everything said since its last turn, let it respond, then pass the floor on. Never fan an "here's an update" sendCommand out to agents you are not asking to respond; you would force them all to speak out of order. You facilitate only — relay, condense, report; never join with a position of your own and never do a participant's work for it.
+Availability: Core. In an agent pane, `notify` on each turn's send brings the speaker's reply back to you. An API-key client has no `notify`: give each turn one bounded `terminal.waitUntilIdle`, and tell the user a turn still running needs their continuation. The sidebar assistant uses `terminal.sendCommand` for the send.
+
+You are the only conduit and a facilitator, not a participant: relay, condense, report. Never add a position of your own or do a participant's work. Every send makes that agent take a turn, so the floor goes to ONE speaker at a time. Never send an "update" to an agent you are not asking to speak.
 
 Procedure:
-1. Scope the conversation. Identify the participants, the topic/opening prompt, desired tone, the speaking dynamic, and any stop condition such as "a couple of rounds," "until they agree," or "keep going until I stop you." Participant count is a parameter, not a different procedure: with exactly TWO participants the round-robin degenerates to a simple alternation and each relay carries only the other agent's last message; with THREE OR MORE, default to round-robin and catch each speaker up on everything said since its last turn (the user may instead want a fixed sequence, an order you moderate, or "whoever was addressed answers next"). If the user names existing terminals, use those exact terminals after confirming their full terminalIds from context.snapshot or prior tool results. Do not spawn replacements for agents that are already open unless the user asks.
+1. Scope: participants, topic or opener, tone, the speaking order and a stop condition. Two participants simply alternate. Three or more go round-robin by default; the user may want a fixed sequence, an order you moderate, or "whoever was addressed answers next". With no stop condition given, set one (two full laps, then a progress report); "keep going until I stop you" still gets periodic reports.
+2. Participants. Named open agents are used as they are, with no replacements; the owned send reaches only panels you launched or the user handed you, so ask for a hand-over otherwise. New participants are resolved to real, distinct `agentId`s in one worktree.
+3. Checkpoint (the foundation's), adding: the speaking order and current speaker, the turn number, the stop condition, a compact public log (speaker, turn, message or condensed message), and per participant its terminal id, the last log entry it has seen, and the turn and `submissionToken` of any pending reply. Keep each speaker's `[Operator]` notes apart from the public log.
+4. Launch without a duplicate opener. Only the first speaker gets a `prompt`: its role brief plus the opener. Every other participant launches with no `prompt`, so it waits silently, and its brief rides on its first turn. (If the user wants simultaneous opening statements, every participant gets brief and opener at launch instead.) Start same-kind agents one at a time: the next launch of the same `agentId` only after the previous call returned.
 
-2. Create compact state for the run: scratch.create({"name":"agent-conversation"}). In one key such as conversation_state, store the full terminalIds, each agent's name/role, the speaking order, the current-speaker index, the round/turn count, any max-turn limit, and a short running history (or at least each agent's last message so you can catch stragglers up). Keep this in scratch: compaction must not lose the terminalIds, the speaking order, or the thread, and the more participants there are the easier the thread is to lose.
+```json tool=agent.launch
+{"agentId":"<first speaker's id>","name":"Conversation: <name>","worktreeId":"<resolved worktree id>","prompt":"You are <name>, one of <N> participants in a facilitated conversation with <the others, by name> about <topic>. You cannot contact them; the facilitator relays every message. Write only the message you want the others to read, addressing them by name. Put private notes for the facilitator under [Operator]. Change no files. <opener>","notify":true,"handback":true}
+```
 
-3. Prepare participants. If any participant is not already running, spawn whichever configured agents best fit with agentTask.spawnForEdits in mode:"explore" (mode:"edit" only if they must change files), passing each participant's resolved id as `agentId` — omitting it silently launches the default agent, so a "conversation" spawned without it is N copies of the same agent talking to itself. Spawn all missing agents in ONE batch, each with a distinct title and a short taskPrompt like: "You are one of <N> participants in a facilitated conversation with <the others, by name>. You cannot contact the other participants directly; the facilitator relays every message. When it is your turn, write the exact message you want sent, addressing people by name where useful. Put private notes for the facilitator under a clearly labeled [Operator] section. Do not call, bridge, message, or coordinate with any other agent yourself." Do not attach watchers — you are driving in-turn. Record every full terminalId exactly as returned; an id you spawn is usable only AFTER the spawn batch returns, in the next tool round, so never await, relay, or scratch.set against ids in the same batch that mints them.
-   - If using existing terminals, send a setup message only if needed. Do not tell agents they can literally see each other's terminal; they see only what you relay.
+```json tool=agent.launch
+{"agentId":"<next participant's id>","name":"Conversation: <name>","worktreeId":"<resolved worktree id>"}
+```
 
-4. Open the conversation. If the user supplied an opener, send it to the chosen first speaker; otherwise ask the first speaker for an opening message. With three or more participants a natural start is one lap around the circle — give each agent the floor in order for an opening statement, catching each new speaker up on what the earlier ones just said. Use terminal.sendCommand({terminalId, command}) for the current speaker, and put terminal.awaitAll({terminalIds:[speakerId]}) as the LAST call in the same reply — that saves a round trip. Give one agent the floor at a time; do not prompt several agents to speak at once unless the user explicitly wants simultaneous opening statements.
+   Record every terminal id, then end your turn.
+5. Pass the floor. Before a participant's first turn, confirm it has started and sits at its own input: `terminal.getStatus` with output shows `idle` (no turn yet) or `waiting` at its prompt, and the screen is its input box, not a trust or login screen (those are the user's to clear). Send the current speaker, and only them, everything public it has not seen since its last turn, labelled by name, plus the ask:
 
-5. Collect the current speaker's message. After awaitAll, read that speaker's output. Prefer terminal.extract with an instruction such as "Extract the latest message intended for the other participants; include any [Operator] note separately." Its `terminalIds` is an ARRAY — pass ONLY the current speaker's id: an extract spanning several terminals merges their tails into one blended answer and destroys per-speaker attribution. If extract returns empty, partial, or only old scrollback, fall back to terminal.read({terminalId}); if the read is archived, page it with artifact.read. Use terminal.summarize only for garbled TUI output, never as the source for exact relay text. Append the message to the running history in scratch.
-   - Guardrail: if an agent says it will "call," "message," or "reach" another participant directly, do not accept that as facilitation — it has no way to do it. Correct it, extract the actual message it wants sent (or ask it to write that message), and relay it yourself. You stay the only relay.
-   - Keep [Operator] notes private unless the agent clearly marked them as part of the message to the others.
+```json tool=terminal.sendCommandOwned
+{"terminalId":"<speaker terminal id>","command":"Turn <t>. Since your last turn: <Name> said …; <Name> said …. Respond to the group, addressing people by name if you like. Private notes for the facilitator go under [Operator].","notify":true,"handback":true}
+```
 
-6. Pass the floor to the next speaker and catch them up. Pick the next speaker — round-robin by default, which with two participants is simply the other one, or per the user's dynamic. Send them a clearly framed command carrying only what they missed since their last turn, labeled by name, plus this round's ask: "Since your last turn: <Name> said …; <Name> said …. Respond to the group; address people by name if you like, and put any private facilitator notes under [Operator]." With exactly two participants this collapses to "Message from <speaker>: … Respond directly to <speaker>." Preserve each speaker's voice and meaning: quote when short, condense long messages and label them as a condensed relay. Do not add your own opinions unless the user gave a moderation instruction. Send with terminal.sendCommand and put the next speaker's terminal.awaitAll as the last call in that same batch. Address only the ONE agent whose turn it is.
+   Quote short messages; label a condensed one as condensed. With two participants this is simply "Message from <name>: …". Record the token and pending turn, then end your turn.
 
-7. Keep the rounds going. Repeat collect → advance the speaker → catch up → await. At the top of each turn, scratch.get the conversation_state if you need it, then scratch.set it back after the turn with the new current-speaker index, round/turn count, compact history, and any unresolved operator notes. If the user interjects mid-conversation — a message between turns, or an awaitAll that returned interruptedByUser:true — fold the instruction into the next relay; do not restart the conversation.
-   - If an agent asks the facilitator an operational question and the user's intent already answers it, answer and continue. Example: if it asks whether to send its reply and the user asked you to facilitate, relay the reply without asking the user again. Ask the user only for new scope, unsafe actions, file edits, spawning/closing terminals, or genuinely ambiguous permission.
+On notice or resume:
+1. Follow the foundation's resume procedure, and apply any user interjection before the next relay: fold it into the next speaker's message, never restart the conversation.
+2. Correlate: accept the reply only from the current speaker, for the pending turn, settled after that turn's send (`terminal.getStatus` with its `submissionToken`). A reply that does not match is late or stale: log it as such, never as the current turn.
+3. Read the reply (`terminal.readLastMessageOwned` for Claude Code, otherwise `terminal.getOutput`), append its public message to the log, keep `[Operator]` notes private, and advance that speaker's last-seen position.
+4. If it says it will "call" or "message" another participant directly, correct it: it cannot. Take the message it wants sent and relay it yourself.
+5. A question within the user's intent (for instance "should I send this?") gets answered and the turn goes on. New scope, file edits, spawning or closing terminals, or an approval screen go to the user.
+6. Only then advance to the next speaker and send its catch-up (step 5).
+7. A speaker still working after other activity: at most one bounded wait, then tell the user who holds the floor. With three or more, the user may have you skip it for this lap; log the skip, and when it does answer, relay that reply to later speakers as a late message. With two, offer to wrap up from the completed turns.
 
-8. End at a natural stopping point. Stop when the participants reach agreement, the requested number of rounds is complete, the conversation clearly wraps, or the user stops it. Do not force another lap after it has clearly concluded, or a final turn after an empty extract when the previous message already wrapped up. If an agent hangs on its turn, re-await that terminal at most twice, then take the exit that fits the size of the table: with THREE OR MORE participants, skip that speaker for this round and pass the floor on with a noted skip — one slow participant must not stall the whole table. With exactly TWO there is nobody to pass the floor to, so summarize the conversation from the completed turns instead. In either case you may hand the straggler off with terminal.await.async({"terminalIds":["<terminalId>"],"title":"conversation straggler"}) and tell the user you will report when it finishes; once that wake arrives and you have reported it, clear the inbox item with queue.resolve.
+Stop and recovery: end at a natural stop: agreement, the bound reached, a clear wrap-up, or the user stopping it. Never force another lap, or a final turn after a reply that already closed the conversation. On cancellation while a speaker is responding, record a tombstone, relay nothing more, and when its reply lands report it rather than passing the floor; interrupt it (`terminal.interruptOwned`) only if the user asks. Never resend a turn to a speaker already pending. Leave terminals open; close only the recorded participant ids on request.
 
-9. Clean up only what the user requested. Leave all terminals open unless the user explicitly asks to close some or all of them. If the user asked for cleanup, close only the exact terminalIds you recorded for this conversation. Drop the scratch store with scratch.drop once the conversation is done and no follow-up turn is expected.
-
-Confirmation: Ask before spawning new visible agents or closing terminals unless the user already explicitly requested that action.
-
-Set a concrete round/turn bound when the user gave none (for example two full rounds, then a progress report); “open-ended” does not require an unbounded blocking turn. A speaker’s spawn prompt already starts a turn: put the opener in that prompt or wait for setup to settle before a second send. Track a per-speaker last-relayed position, not only each participant’s latest message, so a skipped speaker receives everything relevant it missed. Do not relay private [Operator] notes as group discussion. Preserve scratch while waiting; on restart reconstruct from durable evidence and report any missing history. Follow the shared foreground budget and read actual blocking prompts before responding.
-
-Report back: the participants and their terminalIds, a concise synthesis of the conversation — key points, agreements, and notable disagreements — any private operator notes worth surfacing, whether it ended naturally or is awaiting a follow-up, and any terminal cleanup performed.
+Report back: participants with terminal ids, a concise synthesis (key points, agreements, disagreements), operator notes worth surfacing, turns taken and any skipped or late speakers, whether it ended naturally, was cancelled or is awaiting a reply (and which terminal's notice is pending), and any cleanup performed.

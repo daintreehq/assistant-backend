@@ -52,7 +52,7 @@ def _healthy_deployment() -> dict[str, Any]:
         "version_status": 200,
         "build_sha": BUILD_SHA,
         "protocol_version": "2025-06-18",
-        "tools": ["search_runbooks"],
+        "tools": ["search_runbooks", "get_runbook"],
         "search_is_error": False,
         "search_results": [
             {
@@ -63,6 +63,9 @@ def _healthy_deployment() -> dict[str, Any]:
             {"id": "daintree.foundation", "selected": False, "instructions": "Shared judgement."},
         ],
         "search_revision": REVISION,
+        "get_is_error": False,
+        "get_runbook": {"id": "daintree.terminals.rename", "instructions": "1. List them."},
+        "get_supporting": [{"id": "daintree.foundation", "instructions": "Shared judgement."}],
         "mcp_get_status": 405,
     }
 
@@ -124,8 +127,19 @@ class _Handler(BaseHTTPRequestHandler):
             }
         elif method == "tools/list":
             result = {"tools": [{"name": name} for name in d["tools"]]}
+        elif method == "tools/call" and message["params"]["name"] == "get_runbook":
+            structured = {
+                "catalog_revision": d["search_revision"],
+                "runbook": d["get_runbook"],
+                "supporting_runbooks": d["get_supporting"],
+            }
+            result = {
+                "content": [{"type": "text", "text": json.dumps(structured)}],
+                "structuredContent": structured,
+                "isError": d["get_is_error"],
+            }
         elif method == "tools/call":
-            limit = message["params"]["arguments"].get("max_results", 5)
+            limit = message["params"]["arguments"].get("max_results", 3)
             runbooks = d["search_results"]
             # Honours the limit the way the real tool does, unless a mutation
             # has put more results in than any limit allows.
@@ -186,7 +200,7 @@ def test_a_coherent_deployment_passes_the_whole_gate() -> None:
     result = _run_against(_healthy_deployment())
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     assert "FAIL" not in result.stdout, result.stdout
-    assert "9 passed, 0 failed" in result.stdout, result.stdout
+    assert "10 passed, 0 failed" in result.stdout, result.stdout
 
 
 def test_a_trailing_slash_on_the_url_is_not_a_second_route() -> None:
@@ -218,7 +232,21 @@ _MUTATIONS = [
     ("/version is broken", {"version_status": 500}),
     ("the MCP protocol version moved", {"protocol_version": "2024-11-05"}),
     ("the tool was renamed", {"tools": ["runbook_search"]}),
-    ("a second tool appeared", {"tools": ["search_runbooks", "load_runbook"]}),
+    ("exact retrieval is missing", {"tools": ["search_runbooks"]}),
+    (
+        "a third tool appeared",
+        {"tools": ["search_runbooks", "get_runbook", "load_runbook"]},
+    ),
+    ("exact retrieval reports an error", {"get_is_error": True}),
+    (
+        "exact retrieval returns another runbook",
+        {"get_runbook": {"id": "daintree.foundation", "instructions": "x"}},
+    ),
+    (
+        "exact retrieval returns an empty procedure",
+        {"get_runbook": {"id": "daintree.terminals.rename", "instructions": ""}},
+    ),
+    ("exact retrieval drops the foundation", {"get_supporting": []}),
     ("the search reports an error", {"search_is_error": True}),
     ("the search finds nothing", {"search_results": []}),
     (

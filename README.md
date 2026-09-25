@@ -1,9 +1,17 @@
-# Daintree runbook search
+# Daintree runbooks
 
-A stateless MCP server with one tool, `search_runbooks`. Describe a task in plain
-language and it returns the Daintree runbooks that fit — step-by-step procedures for
-work in Daintree and its agent workspace — ranked, with their full instructions.
-Anyone can add it: no credential, no account, no session.
+A stateless MCP server that supplies Daintree runbooks: procedures that Claude Code
+and Codex follow to orchestrate work in Daintree. They cover launching visible agents
+and waiting on them through Daintree notices, worktrees, reviews, and issue and PR
+workflows. `search_runbooks` takes a plain-language task and returns the runbooks
+that fit, ranked, with their full instructions. `get_runbook` fetches one by id.
+Both return the foundation runbook each procedure builds on. Anyone can add it: no
+credential, no account, no session.
+
+The server supplies instructions only. The actions the runbooks call
+(`agent.launch`, `terminal.getStatus`, `terminal.notifyWhenIdle`, …) come from the
+Daintree app's own MCP connection. See
+[docs/agents/DAINTREE_RUNBOOK_CLIENT.md](docs/agents/DAINTREE_RUNBOOK_CLIENT.md).
 
 ```json
 {
@@ -13,7 +21,7 @@ Anyone can add it: no credential, no account, no session.
 }
 ```
 
-The tool, its result shape and the protocol details are in [docs/MCP.md](docs/MCP.md).
+The tools, their result shapes and the protocol details are in [docs/MCP.md](docs/MCP.md).
 
 ## How search works
 
@@ -49,7 +57,6 @@ python -m benchmarks.runbook_selection.bench local      # routing quality gate
 
 ```bash
 git lfs pull                              # the selector artifact is Git LFS
-git submodule update --init cli           # the CLI source the runbook hygiene tests read
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" -c requirements.lock
 

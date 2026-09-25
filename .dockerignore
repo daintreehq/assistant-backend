@@ -19,8 +19,6 @@ infra/
 
 # The Dockerfile only copies pyproject.toml, README.md, requirements.lock and
 # src/, so everything below is context the daemon transfers and never reads.
-# cli/ is the vendored Go submodule and by far the largest of them (~38 MB).
-cli/
 benchmarks/
 docs/
 build/

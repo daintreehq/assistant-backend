@@ -2,48 +2,41 @@
 id: daintree.orchestration.supervise-fleet
 title: Supervise a running agent fleet
 summary: Triage every agent already running — finished, working, waiting, failed, unsupervised — in one state-only sweep, act on each class, and report what still needs the user.
-whenToUse: Use when agents are ALREADY running and the user wants the fleet swept and acted on — "how's everyone doing?", "anything need me?", "is anyone stuck?", "catch me up on the agents". Also for adopting a running-but-unsupervised agent, "show me the next one" navigation, and arming terminals for the user's typed input. Do not use for a plain state read with no action (daintree.foundation), for answering agents that are ASKING (daintree.agents.answer-waiting-agent), for rescuing one broken or hung agent (daintree.agents.recover-agent), for handing out new work (daintree.orchestration.fan-out-work), for "where were we" across sessions (daintree.orchestration.status-and-resume), for proving one agent's work landed (daintree.orchestration.verify-agent-work), for watching past this turn (daintree.orchestration.watch-outcome), or for retitling tabs (daintree.terminals.rename).
+whenToUse: Use when agents are ALREADY running and the user wants the fleet swept and acted on — "how's everyone doing?", "anything need me?", "is anyone stuck?", "catch me up on the agents". Also for adopting a running-but-unsupervised agent, "show me the next one" navigation, and reporting which terminals are armed for the user's typed input. Do not use for a plain state read with no action (daintree.foundation), for answering agents that are ASKING (daintree.agents.answer-waiting-agent), for rescuing one broken or hung agent (daintree.agents.recover-agent), for handing out new work (daintree.orchestration.fan-out-work), for "where were we" across sessions (daintree.orchestration.status-and-resume), for proving one agent's work landed (daintree.orchestration.verify-agent-work), for watching past this turn (daintree.orchestration.watch-outcome), or for retitling tabs (daintree.terminals.rename).
 risk: terminal
 requiredTools:
-  - context.snapshot
-  - terminal.awaitAll
-  - terminal.summarize
-  - terminal.read
-  - terminal.await.async
-  - agentTask.superviseTerminal
-  - agentTask.list
-  - agentTask.status
-  - watcher.list
-  - async.list
-  - timer.list
-  - workflow.list
-  - queue.digest
-  - queue.resolve
-  - queue.publish
-  - terminal.focus
+  - terminal.list
+  - terminal.getStatus
+optionalTools:
+  - terminal.getOutput
+  - terminal.readLastMessageOwned
   - terminal.revealOwned
-  - terminal.arm
-  - terminal.disarm
-  - terminal.disarmAll
+  - fleet.getRunStatus
 ---
-Use when: agents are already running and the user wants a fleet status sweep or specific unblocking actions.
+Use when: agents are already running and the user wants the fleet swept, classified and, where they ask, acted on.
 
-Report observed state and agent outcomes; delegate engineering review. A status request does not authorize starting new work, renaming every tab, closing terminals or rerouting the user's keyboard.
+This is a synchronous sweep: no launch and no checkpoint of its own. A status request authorizes reading. It does not authorize launching, renaming, answering, interrupting, closing, arranging notices or moving the user's view; each of those needs the user to ask for it.
+
+Availability: Core. `fleet.getRunStatus`, for a broadcast the user is running from Daintree, raises an approval in a core pane.
 
 Procedure:
-1. Start with the fresh injected roster, scoped to the agents/worktree the user named. Call `context.snapshot` only for missing detail, ambiguous ids or revalidation before a mutation. A partial/unavailable roster is not evidence that a terminal is gone.
-2. Read existing supervision BEFORE adopting or waiting: `watcher.list`, `async.list`, `timer.list`, `queue.digest`, `workflow.list({"status":"active"})`, and `agentTask.list` for launches that failed before binding a terminal. Use `scope:"all"` for earlier sessions. These are status reads, not a completion-poll loop. Account for list limits and scope.
-3. Classify from the roster and bounded output: working/directing; waiting on question/approval; stopped on error; settled with completion evidence; exited/failed; or unknown. Separately mark whether a watcher/async handle covers the task. Unsupervised is an attribute, not proof of failure or unfinished work. Missing exitCode is unknown, never zero. A `working` roster state alone does not prove healthy progress or absence of blockers; say “reported working” when no output evidence establishes more.
-4. Keep a passive sweep passive. Do NOT call `terminal.awaitAll` merely to classify a watched fleet: it retires spawn supervisors for members it settles finished/failed. If the user explicitly wants you to wait and take over completion reporting, use it for that cohort only (at most 16 unique ids, shared 120-second budget). Inspect `watchersRetired`, read those tails yourself, and expect no later notification from retired supervisors. Working/question members can retain watchers; exclude them from a new async wait unless deliberately transferring supervision.
-5. Read results with one bounded per-terminal read or `terminal.summarize` per relevant agent, batching independent calls. No-wait multi-id text extraction merges outputs; it cannot assign one result to each agent. If a settled tail still shows work or an approval/error prompt, classify from that evidence and restore one suitable supervision mode if your wait retired it.
-6. Act only on the requested classes:
-   - Completed: relay the actual result and any test/verification limits. Update the matching flat workflow row after evidence, then resolve an inbox item you have reported. For proof of correctness, use verify-agent-work.
-   - Question/approval: read the exact prompt and use answer-waiting-agent. Existing authority can answer routine scope questions; collect decisions still needing the user into one request.
-   - Error/failed: report the safe error and terminal/launch id. Use recover-agent for an authorized recovery; never relaunch a fleet because one member failed.
-   - Working and supervised: leave its current supervisor in place.
-   - Working and unsupervised: when continued supervision is requested, adopt with `agentTask.superviseTerminal`, supplying mode, worktree and acceptance criteria, OR create one `terminal.await.async` over uncovered terminals for plain finish detection. Do not attach either to a shell that failed startup. Confirm a returned or listed watcher id before promising a wake.
-7. Navigation is separate, and the two calls are not interchangeable: `terminal.revealOwned({"terminalId":"<id>"})` requests a workspace switch and window raise for a terminal this MCP connection created, while `terminal.focus({"terminalId":"<id>"})` only selects a terminal inside this session's project view, including one you do not own. Follow the foundation's navigation and ownership rules. Neither answers the agent. For requested tab titles, use the rename runbook; similar titles alone are not permission to retitle unrelated work.
-8. Arming changes where the HUMAN'S broadcast input goes. Use `terminal.arm` / `terminal.disarm` for each requested id, or `terminal.disarmAll` only when the whole set is in scope. These calls confirm and return the resulting armed set. Report the actual set, not the intended one; there is no list-armed tool. Never clear the whole broadcast set merely to discover it.
-9. Report promptly. A running task with no observed progress is uncertain, not automatically hung. If all requested work is now under existing or newly established supervision, end the turn and respond to its event rather than polling.
+1. Scope: the agents or worktree the user named, otherwise every agent terminal in the project. `terminal.list` gives ids, titles, worktrees and `agentState`; ask for `location:"background"` only if agents live there. Add any run checkpoints of yours (`.daintree/runbook-runs/`) for what each terminal was asked to do.
+2. Read the cohort in one batched call, not one read per terminal:
 
-Report back: one line per relevant agent with title, exact id, observed status, outcome/blocker and supervision. Include actions actually taken, launch failures with no tab, and the next supported wake or user decision.
+```json tool=terminal.getStatus
+{"terminalIds":["<id 1>","<id 2>","<id 3>"],"includeOutput":{"lines":30}}
+```
+
+   Use `terminal.getOutput` (or `terminal.readLastMessageOwned` for a Claude Code pane you own) only where a tail was not enough.
+3. Classify each terminal from its own entry and output:
+   - `working` or `directing`: "reported working" unless the output shows progress. An old `lastOutputChangeAt` is "possibly stalled", not a hang verdict.
+   - `waiting` with `waitingReason` `question`, `approval` or `error`: needs someone. Quote the actual prompt or error from the output.
+   - `waiting` at its prompt with a coherent final message or a `lastHandback`: a candidate completion, unverified.
+   - `idle` before any turn: started but given no work, or its prompt never landed.
+   - Exited: report `exitCode` (null means killed by a signal). Success is still unproven.
+   - Unknown: an entry with `error`, a reduced `source:"pty"` reading with `unavailableFields`, or a terminal missing from a listing that failed or was filtered. Unknown is neither gone nor done.
+   A mixed fleet gets a mixed report; never let one terminal's state stand for another's. Do not call a terminal "unsupervised" because your records hold no notice for it: another pane may be waiting on it, and notices cannot be listed.
+4. Act only on the classes the user asked about, each through its own runbook: questions and approvals through daintree.agents.answer-waiting-agent, a broken or hung agent through daintree.agents.recover-agent, proof that work landed through daintree.orchestration.verify-agent-work, and "tell me when it finishes" (adopting an agent nobody is waiting on) through daintree.orchestration.watch-outcome. Never relaunch the fleet because one member failed.
+5. Navigation is separate and only on request. `terminal.revealOwned` switches the workspace and raises the window for a panel you created or were handed; for any other panel, give the user its title and worktree. Broadcast arming is read from each entry's `armed` field; changing it is the user's, in Daintree. Retitling is daintree.terminals.rename.
+
+Report back: one line per agent (title, terminal id, worktree, observed state and the evidence for it, outcome or blocker), what needs the user and why, any action taken because the user asked, and what remains unknown.

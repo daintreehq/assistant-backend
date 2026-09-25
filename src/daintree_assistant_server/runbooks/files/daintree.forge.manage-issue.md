@@ -5,53 +5,38 @@ summary: Create, edit, reopen, label or assign an issue against the exact reposi
 whenToUse: Use when the user asks to file or create an issue, change an issue title or body, reopen an issue, add or remove labels, or assign or unassign an account. Also use for issue intake such as "turn this bug into an issue" or "label and assign this ticket". Do not use to search the backlog for work (use daintree.workflow.find-issue-work), start implementation (use daintree.workflow.start-work-on-issue), read an issue or PR's current status or add a closing comment and close it (use daintree.workflow.follow-up-on-issue), or create a pull request (use daintree.workflow.prep-branch-for-review).
 risk: system
 requiredTools:
-  - context.snapshot
-  - worktree.getCurrent
-  - forge.listIssues
   - forge.getIssue
-  - daintree.call
+optionalTools:
+  - worktree.list
+  - forge.listIssues
 ---
-Use when: the user wants to create or maintain public issue state on the configured forge.
+Use when: the user wants an issue created, edited, reopened, labelled, assigned or unassigned in a specific repository.
 
-All issue writes are real Daintree MCP actions, but the Assistant CLI has no typed forge-write wrappers. Invoke them through `daintree.call`, whose envelope is `{name, arguments, requestKey?}`. Put the forge action's fields FLAT inside `arguments`; do not wrap them in another `arguments` object. `daintree.call` is system-risk, always confirmed and never grantable, even when the underlying Daintree action is marked safe.
+Availability: Hybrid. Daintree's app MCP only reads issues (`forge.getIssue`, `forge.listIssues`); at core tier each read asks the user first, and an API-key client or a session with no Daintree connection has none, so the host tool reads instead. Creating, editing, reopening, labelling and assigning go through the host's own permitted forge tool (for GitHub, `gh`), always with an explicit repository (`--repo <owner/name>`) and issue number, and every write is read back. With no permitted forge tool, give the user the drafted issue instead of implying it was filed.
 
 Procedure:
+1. Fix the repository. Resolve the worktree the user means (`worktree.list`) and its repository, and use that same pair for the duplicate check, the write and the read-back. Never let a public write default to whichever checkout or worktree happens to be active.
+2. Build the content from the user's report and evidence you inspected. A title is required; the body is Markdown. Do not turn a guess about cause or severity into issue fact. Resolve every prerequisite of the whole request (label names, the assignee) before the first write, so you do not create an issue and only then find the assignment blocked.
+3. Check for a likely duplicate when the issue describes a defect and a quick search is cheap:
 
-1. FIX THE REPOSITORY. Read the injected worktree context or call `worktree.getCurrent`. Carry one exact locator through every operation, preferably `worktreeId` exactly as returned. Never rely on the active-worktree default for a public write: focus can change between calls. `forge.getIssue` and `forge.listIssues` are CLI passthrough wrappers, so their forge fields go under their TOP-LEVEL `arguments` object:
-   `forge.getIssue({"arguments":{"worktreeId":"<id>","issueNumber":42}})`.
+```json tool=forge.listIssues
+{"worktreeId":"<resolved worktree id>","state":"open","search":"in:title <distinctive phrase>","perPage":20}
+```
 
-2. BUILD THE PUBLIC CONTENT before writing. Require a non-empty title. Use Markdown for the optional body and include only facts supported by the user's report or inspected evidence; never turn a guess about cause or severity into issue fact. If the user asked for an edit, read the issue first because `title` and `body` REPLACE the old values wholesale. Omitted fields stay unchanged; an explicit empty body clears it. Use the follow-up runbook for an additive comment rather than overwriting the body.
+   `search` is the provider's own query syntax and its depth is capped: a miss is not proof there is no duplicate. The schema is strict, so keys such as `labels` or `limit` are rejected. If a likely duplicate appears, show it and ask whether to use it or create another; never silently switch targets. Do not make a small issue wait on exhaustive paging.
+4. Create only on request: `gh issue create --repo <owner/name> --title <title> --body-file <file>`, plus `--label`/`--assignee` when asked. Labels must already exist in the repository. Capture the returned number and URL.
+5. Edit or reopen from a fresh read:
 
-   Resolve every prerequisite for the whole requested mutation before the first public write. In particular, if the user says "assign it to me", obtain their concrete forge login from trustworthy context or ask one tight question NOW. Do not create a partially fulfilled issue first and discover only afterward that assignment is blocked.
+```json tool=forge.getIssue
+{"worktreeId":"<resolved worktree id>","issueNumber":42}
+```
 
-3. CHECK LIKELY DUPLICATES when the title describes an existing defect and a cheap search is useful:
-   `forge.listIssues({"arguments":{"worktreeId":"<id>","state":"open","search":"in:title <distinctive phrase>","perPage":20}})`.
-   `search` is provider-native, not a guaranteed substring search, and may cap result depth. A miss is evidence only that this query found no match, never proof no duplicate exists. Do not make every small issue wait on exhaustive pagination.
-   If a likely duplicate does appear, show the candidate and ask whether the user wants to update/use it or create another; do not silently create or silently switch targets.
+   An empty result means no such issue: stop. A title or body edit replaces the old value, so re-read right before replacing and keep whatever someone added since your first read. An additive note is a comment (daintree.workflow.follow-up-on-issue), not a body rewrite. Reopen only an issue the read shows closed.
+6. Labels and assignees: `gh issue edit 42 --repo <r> --add-label <l> --remove-label <l>`, and `--add-assignee`/`--remove-assignee`. Removing a label the issue does not carry fails, so check first. With `gh`, `@me` resolves to the authenticated account; with another tool, use a concrete login grounded in context or ask. A forge can silently drop an assignee without repository access: the resulting list, not the call's success, is the answer.
+7. Read back every requested field (title, body, state, the complete label set, assignees) with `gh issue view 42 --repo <r> --json title,body,state,labels,assignees,url` or `forge.getIssue`. Daintree's listings can serve a cached page after a change made outside the app; pass `bypassCache:true` to `forge.listIssues` when re-searching. Report each field as confirmed, not applied, or unknown: a multi-field request can partly land.
 
-4. CREATE only on the user's request:
-   `daintree.call({"name":"forge.createIssue","arguments":{"worktreeId":"<id>","title":"<title>","body":"<markdown>","labels":["bug"]},"requestKey":"<stable key for this one logical create>"})`.
-   `body` and `labels` are optional. Labels must already exist; there is no assistant-visible action that lists the repository's complete label catalog, so never claim a name was validated merely because another issue used it. Reuse a `requestKey` only for an ambiguous retry of the SAME logical call with byte-equivalent arguments; a key reused with different arguments is rejected.
+Uncertain create: when the create's reply is lost or ambiguous, search the same repository for the exact title, including closed issues and with `bypassCache:true`, before any retry. A second create after a timeout is how duplicates happen, and the host tool offers no idempotency key to lean on.
 
-5. CAPTURE AND VERIFY THE CREATED ISSUE. The create result is JSON text rather than guaranteed `structuredContent`; read the returned `text` for `number` and `url`. Then call typed `forge.getIssue` with that number and the same locator. Require the returned issue's title and state to match, and verify every requested creation label and assignee. If a requested label is absent, the requested state is incomplete; add it only after reporting the discrepancy and with the write still within the user's original authority. A null result means no such issue was found, not success. If the create transport outcome is ambiguous, search/read before retrying with the same request key so a timeout cannot create a duplicate.
+Scope: closing an issue and its closing comment belong to daintree.workflow.follow-up-on-issue. Filing or labelling an issue is not a request to start work on it; that happens only when the user asks, through daintree.workflow.start-work-on-issue.
 
-6. EDIT OR REOPEN from a current read:
-   - Edit: `daintree.call({"name":"forge.editIssue","arguments":{"worktreeId":"<id>","issueNumber":42,"title":"<replacement>","body":"<replacement>"}})`. At least one replacement field is required.
-   - Reopen: `daintree.call({"name":"forge.reopenIssue","arguments":{"worktreeId":"<id>","issueNumber":42}})`. Call it only for a read-confirmed closed issue.
-   Re-read with `forge.getIssue` after either mutation. Raw success alone is not proof the remote state landed.
-
-7. CHANGE LABELS one at a time. Add is additive and preserves the rest:
-   `daintree.call({"name":"forge.addIssueLabel","arguments":{"worktreeId":"<id>","issueNumber":42,"label":"bug"}})`.
-   Remove fails if the issue does not currently carry the label, so inspect the issue first:
-   `daintree.call({"name":"forge.removeIssueLabel","arguments":{"worktreeId":"<id>","issueNumber":42,"label":"triage"}})`.
-   Both actions return the resulting label array as JSON text, not guaranteed structured content. Re-read the issue after a batch and compare the COMPLETE set, not just the requested delta.
-
-8. ASSIGN only a concrete forge login:
-   `daintree.call({"name":"forge.assignIssue","arguments":{"worktreeId":"<id>","issueNumber":42,"username":"octocat"}})` or the same shape with `forge.unassignIssue`.
-   The result `{issueNumber, assignees:[{login,avatarUrl?}]}` is authoritative: a forge may silently decline an account without repository access. Require the requested login to appear after assignment; after unassignment require it to be absent. No assistant-visible action resolves the authenticated user's forge login, so "assign it to me" needs a grounded login from trustworthy context or one tight question. Never send literal `me` or `@me` as the username.
-
-9. KEEP THE SCOPE BOUNDARY. Closing an issue and posting its final comment belong to `daintree.workflow.follow-up-on-issue`, which sequences those two writes safely. Creating an issue is not permission to start an agent or implementation; do that only on a separate user request through the start-work runbook.
-
-Use the same repository locator through dedupe, mutation and verification; issue numbers alone are not globally unique. If the issue changes between your initial read and a replacement edit, re-read and preserve intervening content rather than overwriting it. The idempotency window is finite and process/session dependent: after an uncertain create or expiration, search and compare the actual issue before retrying. When the user requested several field changes, report each field’s confirmed state so partial success is visible.
-
-Report back: repository/worktree, issue number and URL, exactly which public fields changed, the state read back after the write, and any requested label or assignee the forge did not accept.
+Report back: repository, issue number and URL, each requested field with its read-back state, anything the forge declined (a missing label, a dropped assignee), and any uncertainty left, such as a create whose outcome could not be confirmed.

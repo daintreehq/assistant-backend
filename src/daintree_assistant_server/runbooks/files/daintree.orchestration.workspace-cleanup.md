@@ -1,76 +1,61 @@
 ---
 id: daintree.orchestration.workspace-cleanup
 title: Tear down a workspace safely
-summary: The confirmation gate for teardown — inventory, classify safe/unsafe/unknown, get an explicit go-ahead, then cancel supervision, close terminals, delete worktrees and settle the ledger in dependency order.
-whenToUse: Use ONLY when the user explicitly asks to tear down workspace state after a fan-out, competition or long session — "close these", "clean up", "tidy up the terminals", "shut it all down", "disarm everything", "delete that worktree", "mark those workflows done". A cleanup request in the user's own words is required; never select this for a status question, and never treat it as permission to close anything on your own initiative. Do not use for closing ONE named terminal or cancelling ONE watcher (daintree.foundation covers that), to cancel or revoke supervision with nothing else torn down (daintree.orchestration.watch-outcome), to triage or check on a running fleet (daintree.orchestration.supervise-fleet), to answer "what is running" or "where were we" (daintree.orchestration.status-and-resume), or to judge whether an agent's work is good (daintree.orchestration.verify-agent-work).
+summary: The confirmation gate for teardown — inventory, classify safe/unsafe/unknown, get an explicit go-ahead, then retire observation, close terminals, delete worktrees and close the run's checkpoint in dependency order.
+whenToUse: Use ONLY when the user explicitly asks to tear down workspace state after a fan-out, competition or long session — "close these", "clean up", "tidy up the terminals", "shut it all down", "disarm everything", "delete that worktree", "mark those workflows done". A cleanup request in the user's own words is required; never select this for a status question, and never treat it as permission to close anything on your own initiative. Do not use for closing ONE named terminal (daintree.foundation covers that), to stop waiting on a notice with nothing else torn down (daintree.orchestration.watch-outcome), to triage or check on a running fleet (daintree.orchestration.supervise-fleet), to answer "what is running" or "where were we" (daintree.orchestration.status-and-resume), or to judge whether an agent's work is good (daintree.orchestration.verify-agent-work).
 risk: system
 requiredTools:
-  - context.snapshot
-  - agentTask.list
-  - agentTask.spawnForEdits
+  - terminal.list
+  - terminal.getStatus
   - worktree.list
-  - worktree.getCurrent
-  - watcher.list
-  - watcher.cancel
-  - async.list
-  - async.cancel
-  - timer.list
-  - timer.cancel
-  - workflow.list
-  - workflow.update
-  - queue.digest
-  - queue.resolve
-  - user.askMultipleChoice
+  - terminal.closeOwned
+  - worktree.deleteOwned
+optionalTools:
+  - terminal.interruptOwned
   - terminal.close
-  - terminal.disarm
-  - terminal.disarmAll
-  - scratch.drop
-  - tool.search
-  - daintree.call
-  - grant.list
-  - grant.create
-  - grant.revoke
+  - worktree.delete
+  - worktree.resource.status
 ---
-Use when: the user has EXPLICITLY asked to tear workspace state down — close a set of terminals, cancel watchers or async waits, disarm the fleet, delete a worktree, settle stale ledger rows.
+Use when: the user has explicitly asked to tear workspace state down: close a set of terminals, stop waiting on agents, delete worktrees or branches, close out a finished run.
 
-This is a CONFIRMATION GATE, not permission to tidy up. It does not soften the rule the rest of the catalog leans on: CLOSING IS NEVER YOUR INITIATIVE. terminal.close irreversibly ends the agent or process inside the terminal, and worktree deletion removes a working tree — both are reachable only through a request the user actually made. If you arrived here without one, because a fan-out finished and the workspace looks messy, the correct action is to report what is running and STOP. Never offer cleanup as a favour, and never widen a narrow request ("close the two that failed") into a general sweep.
+This is a confirmation gate, not permission to tidy up. Closing is never your initiative: if you are here because a fan-out finished and the workspace looks busy, report what is running and stop. Never widen a narrow request ("close the two that failed") into a sweep. Showing evidence so the user can decide (a worktree's `git status`, unpushed commits) is fine; judging whether their work is finished is not yours.
 
-Non-goals: you are not an engineer here. Do not merge, commit, rebase, or read a diff to decide whether work is finished — that judgment belongs to the user. You may SHOW evidence so they can decide (worktree status, `daintree.call worktree.compareDiff`); you may not form the opinion for them. If work must land before a worktree can go, spawn an agent with agentTask.spawnForEdits, verify the outcome, and come back to teardown afterwards.
+Availability: Core for closing and deleting what this connection created; Daintree itself asks the user to confirm every worktree deletion. Branch deletion is your host's `git` (Hybrid). Reading a remote resource's status (`worktree.resource.status`) raises an approval; tearing a resource down on its own is daintree.worktree.manage-resource. Broadcast arming of the user's typed input is not reachable over MCP: report `armed` from `terminal.getStatus` and leave changes to the user. The sidebar assistant has the unscoped `terminal.close` and `worktree.delete` instead of the owned tools; it never passes `force`.
+
+Five different actions, each needing its own request:
+- Stop observing. There is no notice cancel: mark the run cancelled in its checkpoint so a late notice does nothing, and tell the user their pane's Stop on the notice chip clears all of its pending notices. Nothing stops running.
+- Interrupt a turn. `terminal.interruptOwned` stops the current turn and keeps the panel and its conversation. It is refused on an idle agent.
+- Close a panel. `terminal.closeOwned` ends its process; the panel goes to the trash, briefly recoverable. An empty `closedIds` is a failed close.
+- Delete a worktree. `worktree.deleteOwned` removes the directory after the user confirms in Daintree. It works only on a worktree this connection created with `worktree.createWithRecipe`: not one from `workflow.startWorkOnIssue`, a launch, the user or an earlier pane. It refuses uncommitted or untracked changes, never deletes the branch, never closes terminals, and runs the project's teardown commands, which can destroy a remote resource.
+- Delete a branch. `git branch -d <branch>` from the main checkout, only when asked. It refuses an unmerged branch; force-deleting one, or deleting a remote branch, needs the user's explicit instruction after they have seen what would be lost.
 
 Procedure:
+1. Honor prerequisites. "Once those finish, close their terminals" authorizes later cleanup; it does not stop, hurry or replace the work. Record the cohort and the condition in the run's checkpoint, arrange a notice on those terminals (daintree.orchestration.watch-outcome), and close them on a later activation only after their finish is verified. A unit waiting for a planned next step is unfinished, not idle.
+2. Inventory fresh, never from memory: `terminal.list`, `terminal.list` with `owned:true` (what this connection can close), one `terminal.getStatus` with `includeOutput` over the candidates, `worktree.list`, and the run's checkpoint for what this task created. For each candidate worktree, read `git -C <path> status --porcelain`, whether its branch is pushed or merged, and its resource status if one is configured.
+3. Classify each item:
+   - Authorized: the request covers it. The user's own word ("close the lint runner, it's finished") settles that terminal; a `waiting` prompt there is the normal look of finished work.
+   - Consequences to resolve: still `working` or waiting on a question or approval; uncommitted or untracked files; teardown commands or a remote resource; the active worktree; anything else the user could not have known.
+   - Not yours: absent from the owned listing. The owned tools will refuse it, so it stays with the user.
+   - Unknown: cannot be attributed. It is left running and reported, and joins a "close everything" set only if the user names it after seeing it listed.
+4. Present, then act. Act on a precise request as given: Daintree's delete confirmation is the only confirmation, so put no question in front of it. A broad request gets the proposed set, each item's action and consequences, and what you are leaving and why, then one question. Surface newly discovered consequences and settle them before touching those items. Never ask twice for the same fully specified action.
+5. Execute in this order, skipping empty phases: record the cleanup and tombstone in the checkpoint; interrupt only where the user asked for work to be stopped; close the approved panels, one call each; delete a worktree only after every panel in it is closed and the user called it merged or abandoned; delete branches if asked; close the run's checkpoint.
 
-0. HONOR PREREQUISITES. "Once those posts finish, close their terminals" authorizes later cleanup; it does not cancel, accelerate, or replace the existing work. Preserve user-requested delays, stagger intervals, pending timers and their grants until that work runs on schedule and its outcome is verified. An agent waiting for its scheduled "post" instruction is unfinished work, not a disposable idle terminal. Record the authorized cleanup cohort and condition for the existing continuation. If cleanup must run unattended, inspect `grant.list` and use `grant.create` to authorize the required close for that continuation with bounded TTL/use count and tool names; a send-only grant does not authorize closing. Then end this turn while a future timer remains pending. Do not send a scheduled command early to make its timer redundant. A cleanup request changes timing only if the user explicitly asks to change timing or abandon the remaining work.
+```json tool=terminal.closeOwned
+{"terminalId":"<approved terminal id>"}
+```
 
-1. INVENTORY FIRST — never propose from memory or from last turn's roster. In one batch: `context.snapshot` (terminals, worktrees, open attention queue), `worktree.list({})` and `worktree.getCurrent({})`, `watcher.list({})`, `async.list({})`, `timer.list({})`, `workflow.list({"status":"active"})`, `queue.digest({})`. Add `agentTask.list({"scope":"session"})`: the spawn sagas record which terminalIds and watcherIds THIS session actually created, and that is your only reliable attribution evidence. Copy every id verbatim.
+```json tool=worktree.deleteOwned
+{"worktreeId":"<worktree id this session created>"}
+```
 
-2. Record target identity, existing authorization and consequences SEPARATELY for every item.
-   - AUTHORIZED TARGET: the user’s request covers it. Separately assess whether closing it loses ongoing work; an explicitly named id resolves target authority but does not make deletion lossless. An exited terminal still needs task/worktree evidence before deleting its checkout.
-   - CONSEQUENCES TO RESOLVE: agentState `working` or `waiting`, or any terminal you did not spawn and the user did not name. IDLE IS NEVER PROOF A TERMINAL IS DISPOSABLE: an agent reads waiting before it starts, while paused, and when its window is backgrounded, and a quiet tab may be the user's own shell, a dev server, or a live session. Also inspect: the current worktree, a worktree with uncommitted work, and a watcher attached to a workflow row still `active`.
-   - THE USER'S OWN WORD SETTLES IT: when the user names the terminal and says its work is done or no longer needed ("close the lint-runner, it's finished"), that is the consequence resolved for that terminal. A `waiting` state with a ready prompt on the terminal they named is the normal look of finished work, not a reason to ask again. Consequences still to resolve are the ones the user could not have known: work you can see is still running in it (`working`, or `waitingReason` "question"/"approval"), or a different terminal than the one they named.
-   - UNKNOWN: anything you cannot attribute. Unknown DEFAULTS TO LEAVE RUNNING and is reported as such. It never rides along inside a "close everything" set unless the user names it after seeing it listed.
+6. Refusals are answers, not retry signals:
+   - Foreign panel (`RESOURCE_NOT_OWNED`): leave it and report it by title; the user can close or delete it in Daintree. Never route around it through the shell, a kill, another agent or another surface.
+   - Untracked or uncommitted files refuse the delete: list them from `git status` and let the user commit, stash, or delete it themselves. Never `git clean`, `rm`, `git worktree remove --force`, or a forced delete from another surface.
+   - A declined confirmation leaves the worktree standing. `CONFIRMATION_TIMEOUT` is neither yes nor no. Do not reissue the same delete in a loop; ask the user.
+   - A failed teardown: report its error, leave that worktree and resource as they are, and carry on with independent items. Unrelated work is never touched to make cleanup succeed.
+   - A panel you could not close keeps its worktree standing: never remove a directory under a running process.
+7. Verify from state: re-read `terminal.list` and `worktree.list` and confirm each id is gone. A call that returned while the item is still listed is a real result; report it.
 
-3. PRESENT, THEN GET AN EXPLICIT GO-AHEAD. Before touching anything, show the proposed teardown set — each id, the action authorized and its known consequences — plus the items you are deliberately leaving and why. For a finite decision use `user.askMultipleChoice({"question":"How much of this should I tear down?","options":["Everything listed","Only the terminals I spawned this session","Cancel supervision but leave the terminals open","Nothing — leave it all"]})`. Call it ALONE, never in the same batch as another tool, and write options as plain text with no A/B/C prefixes (the client assigns letters). If the request is already precise ("close t-1 and t-2", or one terminal named by what it was doing), skip the question and act on exactly those ids — `terminal.close`'s own confirmation, where the session has one, is the only confirmation; do not add a question in front of it. If newly discovered consequences materially exceed the original request, explain them and resolve that decision before including the item. Do not ask again when those consequences and the exact action were already authorized.
+Partial requests stay partial: "stop watching those" is observation only, and "disarm everything" is the user's to do in Daintree. If there is nothing to clean, say so and stop.
 
-4. EXECUTE IN DEPENDENCY ORDER. The order is the substance of this runbook — teardown out of order leaves the workspace worse than it was.
-   a. RETIRE SUPERVISION FOR FINISHED OR EXPLICITLY ABANDONED WORK FIRST. `watcher.cancel({"id":"<watcherId>"})` for obsolete watches, `async.cancel({"asyncId":"asy_…"})` for stale waits, `timer.cancel({"id":"<timerId>"})` only for timers whose work is verified complete or explicitly cancelled by the user. A timer that will perform a remaining required action is a prerequisite, not obsolete supervision: leave it and its grant active. Why first AFTER prerequisites: an async wait is pinned to the EXACT terminalIds it was issued with — a frozen list, not a live set — so closing a watched terminal first leaves a wait that may not fire until its deadline expires and then wakes you about terminals that no longer exist; a live watcher over a closed terminal can post a spurious completion or failure into the attention queue. `async.cancel` only stops the runtime polling: it kills nothing and closes nothing, which makes "stop tracking that" satisfiable without any destruction at all.
-   b. ARMING, if the fleet was left armed. `terminal.disarmAll({})` clears the whole broadcast set ONLY when that entire set was requested; for a partial cleanup use individual disarm calls; `terminal.disarm({"terminalId":"…"})` drops one. Both confirm and report the resulting armed set, so the change is never silent. Do this before closing, so the user's keystrokes stop being routed at a terminal you are about to trash.
-   c. TERMINALS. ONE `terminal.close({"terminalIds":["…","…"]})` over the approved cohort, not a call per id — a single confirmation for a set the user already approved. Only approved ids. Never reach for `terminal.kill` through the escape hatch: it deletes permanently instead of trashing.
-   d. WORKTREES. There is no typed wrapper — use `daintree.call {"name":"worktree.delete","arguments":{"worktreeId":"…"}}`, the system-tier escape hatch. The other three arguments are `force`, `deleteBranch` and `closeTerminals`, all optional booleans. `force` is the one to be careful with: the delete REFUSES by default when the tree has uncommitted or untracked changes, and forcing it past that destroys them irreversibly with no copy anywhere — so send `force` only when the user has been shown what is uncommitted and asked for it anyway, never to clear a refusal you hit. A worktree delete is also NOT purely machine-local, which is easy to assume from the name: it runs the project's own lifecycle teardown commands from `.daintree/config.json` and tears down any provisioned resource, which can destroy a remote devbox. Before any delete, establish whether lifecycle hooks or provisioned resources add external destruction. Deletion must meet the same consequence-disclosure boundary as direct resource teardown. A generic confirmation is not proof those commands were disclosed: if the actual effects cannot be inspected or a native preview’s coverage cannot be established, leave the checkout standing and report which hook effects remain unknown. The user can inspect lifecycle configuration and resource settings in Daintree, but do not promise that its delete dialog previews hook commands. Do not offer “accept the risk anyway” as a substitute for disclosing those effects. Do not use worktree deletion to bypass an unavailable resource teardown action. The main worktree cannot be deleted at all. Pass the identifier exactly as `worktree.list` reported it. Delete only worktrees the USER called merged or abandoned, and only after the terminals living in them are closed: removing a directory out from under a running shell corrupts that session and can fail outright.
-      This action is confirmation-gated in Daintree itself: unless a native automation grant pre-authorizes the ORDINARY confirmation, a dialog opens in the app and the turn waits for a human. That gate is NOT yours to skip: it is enforced before the action runs, an auto-approve setting on the client side does not reach it, and a timeout or a decline is a real answer. Report a declined or timed-out delete as left standing and move on — never re-issue the same delete to try for a different outcome.
-      DO NOT PROMISE THAT AN AUTOMATION GRANT COVERS THIS. A grant in Daintree's settings pre-authorizes the ORDINARY confirmation and nothing above it. A forced delete whose live target is a protected branch, a tree with tracked changes, or at-risk submodule content escalates to a TYPED-NAME confirmation — the user types the branch or worktree name — and a grant does not waive it: a granted force delete that escalates gives up its pre-authorization and raises the dialog anyway. So the grant is worth offering for routine cleanup and is never an answer to "can you do this while I am away" about a forced delete.
-      The gate is re-checked immediately BEFORE the delete runs, not only when it was approved. If the worktree turned dirty or its branch was renamed in between, the call is refused with `CONFIRMATION_REQUIRED` even though the user already said yes. That refusal is not a retry signal — it means the thing you got permission for is no longer the thing in front of you. Re-inventory that worktree, show the user what changed, and get approval again from there — a fresh, newly-approved delete is fine. What is never fine is bouncing the identical call straight back at it, which is the one response that treats a changed workspace as a transient error.
-   e. LEDGER. `workflow.update({"id":"<id>","status":"done"})` — or `"cancelled"` — for rows whose real work is over. Pass ONLY `id` plus `status`: provided array fields REPLACE the stored arrays, so a stray `notes` or `terminalIds` silently wipes that part of the record.
-   f. INBOX. `queue.resolve({"id":"<eventId>"})` for items you have actually reported to the user, not merely read. Leave open anything still awaiting them.
-   g. SCRATCH. `scratch.drop({"storeId":"…"})` for stores whose task is finished, freeing session slots. Never drop a store an in-flight step still reads.
-   Skip any phase with nothing in it. A confirmation the user declines is not an error: record it as left running and continue with the rest.
-
-5. VERIFY FROM STATE, NOT ASSUMPTION. Re-read `context.snapshot`, plus `watcher.list` / `async.list` / `timer.list` and `worktree.list({})` for whatever you touched, and confirm each id is genuinely gone. A call that returned without error while the item is still listed is a real result — report it instead of claiming success.
-
-Notes:
-- Never tear down something you are still using. If a terminal belongs to a wait you are about to issue, or a worktree hosts work you have not verified yet, teardown comes after the report, on a later, fresh request.
-- Partial requests stay partial. "Stop tracking those" means step 4a only; "disarm everything" means step 4b only. Do not escalate a supervision request into closing terminals.
-- If the inventory turns up nothing to clean, say so and stop. Do not manufacture a teardown set to look useful.
-
-A watcher/async cohort can cover both requested and retained terminals: cancelling its shared handle stops tracking ALL members. Preserve or re-establish one supervisor for retained work before claiming it remains watched. Revoke only grants dedicated to the retired task; keep unrelated live authority. Cancelling a watcher may update its workflow row even while the terminal survives, so set final ledger status from actual work evidence. In verification, list APIs may retain cancelled/fired records: confirm inactive status rather than demanding every id disappear. Never delete a worktree while any target close failed or a retained process still uses its directory.
-
-Report back: what was torn down (terminal ids closed, watchers/async waits/timers cancelled, worktrees deleted, ledger rows settled, queue items resolved), what was deliberately LEFT running and why (still working, unattributed, or the user's own), anything the user declined at a confirmation, and the verified end state read back from the refreshed roster.
+Report back: what was closed, deleted or stopped (with ids), what was deliberately left and why (still working, not yours, unknown, dirty, the user's own), what the user declined or what timed out, any teardown failure, and the end state read back from the listings.

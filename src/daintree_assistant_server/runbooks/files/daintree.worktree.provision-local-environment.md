@@ -5,42 +5,31 @@ summary: Diagnose checkouts colliding over one shared database, schema, port, do
 whenToUse: 'Use for TWO related asks. First, a shared runtime resource that several worktrees collide over so branches cannot run side by side — "my worktrees all share one local site", "each branch needs its own database", "give every worktree its own URL", "two worktrees fight over port 3000". Second, configuring the project''s worktree lifecycle scripts themselves — "add a setup script that runs when a worktree is created", "a teardown script to drop the database when I delete a worktree", "provision new worktrees automatically". The tell is a per-worktree RESOURCE (database, port, hostname, docroot, container) or the setup/teardown configuration that creates it. Do not use to move agents that are already running into separate worktrees (use daintree.worktree.relocate-agents), to create a worktree (use daintree.worktree.create-plain-worktree), to launch a worktree''s startup terminals or dev server (use daintree.recipe.run-or-create), for a cloud devbox or remote resource (use daintree.worktree.manage-resource), or to RUN a test suite, check or command in a worktree that already works (that is an ordinary check run, not a provisioning problem).'
 risk: project
 requiredTools:
-  - context.snapshot
   - worktree.list
-  - worktree.getCurrent
-  - fs.read
-  - fs.list
-  - fs.search
-  - user.askMultipleChoice
-  - daintree.call
+optionalTools:
+  - actions.getContext
+  - worktree.createWithRecipe
+  - worktree.waitUntilReady
 ---
-Use when: the user has several worktrees and one of something they all need — a database, a docroot, a port, a dev server — so only one branch can actually be run or tested at a time.
+Use when: several worktrees of one project need one runtime resource each (a database, port, hostname, docroot, container or dev server) and only one branch can run at a time, or the user wants the project's worktree setup and teardown commands configured.
 
-Worktrees isolate CODE. They isolate nothing else. A second checkout does not bring a second database, a second hostname or a second free port, and this is the point at which parallel agents stop being useful: every agent can edit its own branch, but only one of them can look at the result. Daintree's answer is the project's own worktree lifecycle scripts — a `setup` command run when a worktree is created and a `teardown` command run when it is deleted — so a new worktree arrives already runnable and removing it takes its resources with it.
+Availability: Hybrid. The Daintree app MCP supplies the worktree inventory and each worktree's setup state; no app action reads or writes project settings. The rest is native: read the repository and configuration with your file tools, write scripts and configuration when the user asked for that, and run and check commands in each worktree's own path. When the user wants a visible agent to do the writing, use daintree.edits.spawn-visible-agent, and still verify its result yourself.
 
-**You cannot write those files yourself.** `fs.read`, `fs.list` and `fs.search` are read-only; there is no write tool. Everything below either hands the user exact content, or delegates the writing to an agent — never pretends a file appeared.
+Worktrees isolate code, nothing else. A second checkout brings no second database, hostname or free port, so parallel agents can each edit a branch while only one can see its result running. Daintree's answer is lifecycle commands: `setup` runs when a worktree is created and `teardown` when it is deleted, so each worktree arrives runnable and takes its resources with it.
+
+How Daintree reads them: a `config.json` holding `setup` and `teardown` as arrays of shell commands, plus an optional `resource` block for remote resources (daintree.worktree.manage-resource). Daintree takes the FIRST valid file it finds, whole, in this order: the user-level project config under `~/.daintree/projects/`, then the worktree's own `.daintree/config.json`, then the main checkout's `.daintree/config.json`. Nothing is merged, an invalid file is skipped without an error, and unknown keys are ignored. Commands from the repository run only after the user approves those exact commands in Daintree (setup reports `needs-approval` until then), and changing them asks again; user-level commands run without approval. The commands get `DAINTREE_WORKTREE_PATH`, `DAINTREE_WORKTREE_NAME`, `DAINTREE_PROJECT_ROOT` and, when known, `DAINTREE_BRANCH`.
 
 Procedure:
+1. Confirm the shape. Read `worktree.list` (paths, branches, `setupState`). One worktree, or a clash between two projects rather than two branches, is not this problem: say so.
+2. Find what is configured before designing anything. Check every candidate config location above and note which file wins for which worktree: a user-level file silently overrides the repository's. Look for compose files, env templates and existing provisioning scripts. A project that already has `setup` and a failing worktree needs the failure read (`setupState`, `stage` and `error`, then the command's own output when you run it by hand), not a new design.
+3. Split per-worktree from shared, with a reason for each:
+   - Per worktree, because they collide: the database or schema, hostname or port, docroot or served directory, cache keyspace or prefix, lockfiles and pidfiles.
+   - Shared, because copies are waste: large read-mostly assets, dependency caches, base images.
+   - Derive per-worktree names from `DAINTREE_WORKTREE_NAME`, the path or the branch, so nothing is edited by hand per worktree. Ask for what you cannot read: which local stack serves the project, and what the user considers safe to share.
+   Shared mutable state is a real cost: a branch that rewrites shared uploads or fixtures changes every other worktree. Say so when you propose sharing anything writable.
+4. Write the scripts and configuration, or hand them over. With the user's go-ahead, write them where they chose: the repository's `.daintree/config.json` reaches the team through git, and the user-level file stays on this machine. Otherwise give the exact commands, file content and location. Teardown is not optional: a setup that creates a database with no teardown dropping it leaves litter behind every deleted worktree. Tell the user that repository commands must be approved in Daintree before they run.
+5. Prove it on ONE worktree first. Run its setup by hand in its path with the variables above, or, if the user agreed to a new worktree, create one and wait for `setupState:"ready"` with `worktree.waitUntilReady`. Then check end to end that the resource exists, that the app answers on its own address, and that it serves THAT worktree's code: resolve what the running process actually loaded (its working directory, the docroot's target, or a branch-specific marker), not merely that the script exited 0. A half-provisioned worktree that serves another branch is worse than one that failed outright.
+6. Never make room by switching the shared environment over. Re-pointing the shared docroot, symlink or active copy at one branch silently breaks every other agent's results: their tests then exercise the switched-in code. If a worktree cannot be provisioned yet, say it cannot be tested yet. If you find the shared environment already switched, report it before anyone trusts a test result, and name the results now suspect.
+7. Close the loop. Worktrees created before the scripts existed are not provisioned retroactively; each needs its setup run once. List which are provisioned and which are not.
 
-1. CONFIRM THE SHAPE before proposing anything. The symptom is several worktrees and one runnable thing. Read `worktree.list` for what exists and each entry's setup/lifecycle state, and `worktree.getCurrent` or `context.snapshot` when the project is ambiguous. If there is only one worktree, or the collision is between two projects rather than two branches, this is not that problem — say so.
-
-2. FIND WHAT IS ALREADY CONFIGURED rather than assuming nothing is. `fs.list` the project root for a `.daintree/` directory and `fs.read` its `config.json` if present; `fs.search` finds a compose file, an env template or an existing provisioning script. A project can also carry user-level configuration outside the repo. Project settings themselves have no typed tool — reach them through the foundation's discovery/schema/invoke path rather than assuming a wrapper exists. Report what you found. A project that already has a `setup` command and a failing worktree is a different problem from a project that has none — the first needs the failure read, not a new design.
-
-3. NAME WHAT MUST BE PER-WORKTREE AND WHAT SHOULD STAY SHARED, and say why for each. This is the whole design and it is cheap to get wrong in both directions:
-   - Per-worktree, because they collide: the database or schema, the hostname or port, the docroot or served directory, any cache keyspace or prefix, any lockfile or pidfile.
-   - Shared, because copying is waste: large read-mostly assets, upload or media directories, dependency caches, base images.
-   - Derive per-worktree names from the worktree's own path or branch so nothing has to be edited per worktree. Ask the user for the one or two facts you cannot read — which local stack serves the project, and which resources they consider safe to share.
-   Shared mutable state is a real cost, not a free win: a branch that rewrites shared uploads or shared fixtures affects every other worktree. Say that plainly when you propose sharing something writable.
-
-4. HAND OVER THE SCRIPTS, or get an agent to write them. Two honest routes; offer the one that fits and let the user choose with `user.askMultipleChoice` when both do:
-   - Give the user the exact `setup` and `teardown` command lines and the script bodies, and say where they go — the project's `.daintree/config.json` for settings the whole team should get, or the user-level project config for a machine-specific one.
-   - Or spawn an agent to write them in the project worktree with `daintree.edits.spawn-visible-agent`, briefed with the design from step 3. That is the route when the scripts need to discover the local stack themselves. The agent writes; you still verify.
-   Teardown is not optional. A setup script that creates a database and a teardown that does not drop it turns every deleted worktree into litter the user finds months later.
-
-5. PROVE IT ON ONE WORKTREE BEFORE FANNING OUT. Run the setup path for a single worktree and check the result end to end: the resource exists, the app answers on its own address, and it is serving THAT worktree's code rather than another one's. Resolve the path the running app actually loaded; do not infer it from the script having exited zero. A setup script that half-succeeds leaves a worktree that looks provisioned and serves the wrong branch, which is worse than one that failed outright.
-
-6. NEVER MAKE ROOM BY SWITCHING THE SHARED ONE OVER. Deactivating the shared app's copy and pointing it at one branch is the reflex, and it silently breaks every other agent: their tests then exercise the switched-in code and pass or fail for reasons that have nothing to do with their branch. If a worktree cannot be provisioned yet, say it cannot be tested yet. If you find the shared environment already switched over — a swapped symlink, a re-pointed docroot, an activated variant — report it before anyone reads a test result, and say which agents' results are now suspect.
-
-7. CLOSE THE LOOP ON THE EXISTING WORKTREES. Worktrees created before the scripts existed do not retro-provision themselves; each one needs the setup path run once, by hand or by whatever the project now offers. List which are provisioned and which are not rather than implying the fix reached all of them.
-
-Report back: the collision you found and which worktrees it affected; the per-worktree and shared split with the reason for each; where the scripts and configuration were written and BY WHOM (the user, or a named agent and its terminal id); the single worktree you verified and the evidence you verified it with; which existing worktrees are still unprovisioned; and anything the user must still create themselves.
+Report back: the collision and the worktrees it affected; the per-worktree and shared split with reasons; which config file now wins, what was written where and by whom (you, the user, or a named agent with its terminal id); any approval the user still has to give in Daintree; the one worktree verified and the evidence; the existing worktrees still unprovisioned.

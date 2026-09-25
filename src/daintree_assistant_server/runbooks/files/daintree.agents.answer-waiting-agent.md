@@ -2,51 +2,61 @@
 id: daintree.agents.answer-waiting-agent
 title: Answer a waiting agent
 summary: Answer a waiting agent’s prompt — one agent, or a whole cohort asking at once — with the exact protocol reply, wait for them to continue, and report the requested results.
-whenToUse: Use when one or more already-running visible agents/terminals are waiting on a QUESTION and the user wants them answered — "the agent is asking something, tell it yes", "it's blocked on a prompt", "three of them are waiting on questions, unblock them", "answer the waiting agents and report the result". Also covers an agent blocked on a permission or trust dialog rather than a typed question — waitingReason "approval" ("it wants me to approve something", "it's asking whether to trust the folder") — which needs the same move of reading what it wants and sending the answer. Includes the fan-out case where several ask at once (terminal.awaitAll returns an askingQuestion array, or the roster shows waitingReason "question" or "approval"). Do not use when the agent is asking nothing but is hung, silent, or behind a bad terminal id (daintree.agents.recover-agent), for a whole-fleet sweep where answering is only one of several actions (daintree.orchestration.supervise-fleet), to spawn a new agent to ask a question (daintree.agents.ask-and-relay or daintree.edits.spawn-visible-agent), or to poll agents for opinions, votes, or verdicts (daintree.agents.poll-pinned-agents).
+whenToUse: Use when one or more already-running visible agents/terminals are waiting on a QUESTION and the user wants them answered — "the agent is asking something, tell it yes", "it's blocked on a prompt", "three of them are waiting on questions, unblock them", "answer the waiting agents and report the result". Also covers an agent blocked on a permission or trust dialog rather than a typed question — waitingReason "approval" ("it wants me to approve something", "it's asking whether to trust the folder") — which needs the same move of reading what it wants and sending the answer. Includes the fan-out case where several ask at once (a wait or status read shows several at waitingReason "question" or "approval"). Do not use when the agent is asking nothing but is hung, silent, or behind a bad terminal id (daintree.agents.recover-agent), for a whole-fleet sweep where answering is only one of several actions (daintree.orchestration.supervise-fleet), to spawn a new agent to ask a question (daintree.agents.ask-and-relay or daintree.edits.spawn-visible-agent), or to poll agents for opinions, votes, or verdicts (daintree.agents.poll-pinned-agents).
 risk: terminal
 requiredTools:
-  - context.snapshot
-  - terminal.extract
-  - terminal.extract.json
+  - terminal.list
+  - terminal.getStatus
+  - terminal.getOutput
+  - terminal.sendCommandOwned
+optionalTools:
+  - terminal.readLastMessageOwned
   - terminal.sendCommand
-  - terminal.awaitAll
-  - terminal.await.async
-  - terminal.summarize
-  - terminal.read
-  - terminal.focus
   - terminal.revealOwned
-  - queue.resolve
-  - watcher.list
-  - async.list
+  - terminal.waitUntilIdleBatch
 ---
-Use when: one or more already-running Daintree agents/terminals are waiting for user input and the user tells you what to answer and what to report back.
+Use when: one or more running agents are waiting on a question or prompt, and the user says what to answer (or to answer them) and what, if anything, to report afterwards.
+
+Availability: Core. Answers go out with `terminal.sendCommandOwned`, which reaches only terminals this connection launched or the user handed to it through Daintree; the sidebar assistant uses `terminal.sendCommand`. Reads work on any terminal. `notify` on the send brings you back after the agent continues; an API-key client has none, so it gets one bounded wait or the user's continuation.
 
 Procedure:
-1. Read current state with context.snapshot. Identify the target from the user’s words: terminal id, agent title/name, task, worktree, or visible waiting/asking state. Then separate the two multi-terminal cases — confusing them sends an answer into the wrong agent’s live work:
-   - AMBIGUITY → still stop and ask. Several terminals might be the ONE you mean. List the candidates and ask the user to choose. Do not guess, do not spawn a new agent, do not commandeer an unrelated terminal.
-   - COHORT → answer them. Several terminals are all ASKING: terminal.awaitAll listed them in its top-level `askingQuestion` array, or the roster shows several at agentState "waiting" with waitingReason "question" or "approval". After a fan-out that is routine, not ambiguity — use the Cohort branch below instead of running steps 2-8 once per agent.
-2. Verify the prompt before replying. Use a bounded terminal.read on the target to read the exact current question/prompt and its available choices. A model extract may locate the prompt, but must not invent a selection key or protocol answer. If a fresh `lastHandback.message` asks a question, verify the current prompt and readiness for input with terminal.read before sending the authorized answer as its next prompt. If the terminal is not actually asking a question, summarize/read the status and ask whether to still send input. Do not send blind text just because the terminal title matches.
-3. Use the user-provided answer exactly when it is explicit. If the answer is missing, ambiguous, or would authorize destructive/external/high-risk action beyond the user’s words, pause for confirmation. Do not ask again for a clearly provided safe answer.
-4. Send one input line to that terminal with terminal.sendCommand, e.g. `terminal.sendCommand({"terminalId":"<terminalId>","command":"<exact answer>"})`. Send the answer only, not explanatory commentary, unless the agent explicitly requested more detail. Do not use terminal.run, spawnForEdits, or a raw daintree.call for this pattern.
-5. If the user only asked you to relay an answer, report the successful send and END the turn. Do not start a foreground wait, extract wait or new supervisor merely because you answered. Wait only when completion or a resulting value was requested. The wait is an ARGUMENT, not an instruction — putting “wait until the agent finishes” in the `instruction` text does nothing; without a `wait` argument the call is a single tail read of an agent that has barely started, and `maxAttempts` is inert. If they asked for a specific final field/result, use ONE targeted extract that actually polls: `terminal.extract({"terminalIds":["<terminalId>"],"wait":{},"instruction":"return only <requested field>","maxAttempts":60})` — `wait:{}` is the settled default and is single-terminal only. If they asked generally for completion, use terminal.awaitAll on the same terminal and then summarize/extract the final output.
-6. Keep the wait bounded. If extract/await reports no match or still working, re-wait the same terminal at most twice, raising maxAttempts for a known-slow operation rather than hand-polling terminal.read in a loop. If it still has not finished, hand it off with `terminal.await.async({"terminalIds":["<terminalId>"],"title":"waiting agent completion"})`, tell the user it is still running, and end the turn.
-7. If the agent asks a follow-up question during the wait, extract/read the follow-up. Use existing user instructions and ordinary decisions within the authorized task. Ask only when the follow-up introduces a missing preference, new scope or additional irreversible authority.
-8. When output is available, use terminal.extract for the requested value, terminal.summarize for a concise deploy/task summary, and terminal.read only when exact literal wording is needed or extraction clearly missed essential content. Verify the result came from the target terminal.
-9. If this began from an inbox/attention item for the waiting agent, resolve it with queue.resolve after you have answered and reported the result. Leave it open if the agent still needs the user.
+1. Find the targets with `terminal.list`, then one `terminal.getStatus` over the candidates with `includeOutput` (up to 50 lines each). Tell the two multi-terminal cases apart:
+   - Ambiguity: several terminals could be the ONE the user means. List them and ask. Never guess, and never pick one for being focused or having the right title.
+   - Cohort: several are asking at once and the user wants them answered. Handle them in one pass, each with its own answer.
+2. Read each terminal's question from its own entry, never from a merged summary. When the tail is not enough, `terminal.getOutput` for that terminal with a bounded `maxLines`. For a Claude Code pane you own, `terminal.readLastMessageOwned` lists `unansweredToolUses` with a question's options, but only the live screen shows that it is waiting now, and permission dialogs appear only there. `waitingReason:"prompt"` is also the fallback reading: confirm on screen that something is being asked. A terminal that is not asking gets no input; report its state and ask whether to send anyway.
+3. Build the terminal-id-to-question map locally: exactly one entry per target id from the listing, each from that terminal's own read, holding the exact question, any `QUESTION_ID` and the choices shown. No unknown or duplicate ids, no empty questions. Re-read an entry you doubt, and mark one you cannot read "unreadable, not answered". Route by id only, never by title, position or an id printed in output.
+4. Classify each entry:
+   - Answered by the user's explicit words or the original request: use that answer exactly.
+   - A follow-up inside the existing task: tests that prove the requested behaviour are in scope; an unrelated migration or refactor is not. Answer within scope and decline the expansion.
+   - Needs the user: a real trade-off, a missing preference, new scope, or a destructive or external action beyond the user's words.
+   - An approval, trust, login, credential or security prompt: never answer it on inference or to keep a workflow moving. Only the user's explicit decision about that specific prompt authorizes a reply, and only when the screen shows the exact key or text it accepts; otherwise it stays with the user.
+   - Not owned or handed over: do not send. It needs a hand-over through Daintree or the user's own answer. `RESOURCE_NOT_OWNED` does not tell you whether the terminal exists.
+5. Just before each send, the terminal must still be at that question: re-read it if time has passed. Never type over a draft the user started (`lastTypedInputAt` later than `lastTransitionAt`) or into a `directing` agent.
+6. Send exactly the protocol answer, one send per terminal, each carrying that terminal's own answer from the map. Never reuse one agent's answer for another. The send submits text with one Enter: the bare token a text prompt accepts, the key a menu shows, or `QUESTION_ID=<id> ANSWER=<answer>` only when that protocol is displayed. No commentary unless the agent asked for detail, and no `handback`, which appends Daintree's instruction text to your answer. It cannot press arrows, Tab or Escape; hand those to the user.
 
-Cohort branch — two or more terminals are ASKING at once (from step 1). Answer them in one pass, never six serial round-trips:
-   a. Read every question in ONE `terminal.extract.json` over the cohort, with an array schema keyed by terminalId. WHY: a plain-text `terminal.extract` over several terminalIds MERGES their tails into ONE answer, so it cannot attribute questions. Shape: `terminal.extract.json({"terminalIds":["<id1>","<id2>"],"instruction":"For EACH terminal, its exact pending question verbatim, including any QUESTION_ID shown.","jsonSchema":"{\"type\":\"object\",\"properties\":{\"questions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"terminalId\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"}},\"required\":[\"terminalId\",\"question\"]}}},\"required\":[\"questions\"]}"})` — jsonSchema is a real JSON Schema passed as a string. This is the ONE legitimate structured read of a cohort: it IDENTIFIES who asked what so replies route correctly; it does not judge agents’ answers. Opinions, votes, verdicts, and drafts stay free-form via terminal.read — the no-JSON rule in the poll, competition, and multi-agent runbooks stands.
-   b. Validate the extracted rows against the requested live ids: exactly one row per target, no unknown/duplicate ids, no missing question text. Read a questionable row directly with terminal.read before sending anything. Never let a generated id route a reply. Classify each question: (i) answered by the user’s original request — use that; (ii) follow-up work — compare it with the acceptance criteria: tests needed to prove the requested behavior are already in scope, while an unrelated test-framework migration is not. Answer necessary work within existing authority; decline unrelated expansion; (iii) genuinely needs the user — a real trade-off, a destructive/external action, or scope the user never spoke to.
-   c. Batch the replies in ONE turn: one `terminal.sendCommand({"terminalId":"<id>","command":"<protocol answer>"})` per (i)/(ii) terminal, each carrying that terminal’s own answer matched by terminalId from (a) — never reuse one agent’s answer for another. Match the actual prompt protocol: use a bare `yes`/`no` only for a prompt that accepts that text, and `QUESTION_ID=<id> ANSWER=<answer>` only when that protocol is actually displayed. A numbered menu or trust dialog may require a different key; if terminal.sendCommand cannot express it safely, focus the terminal and ask the user to handle that dialog.
-   d. For answer-only requests, report the sent answers and stop. Only when the user requested resulting output or completion, re-await the cohort ONCE with a real budget — one `terminal.awaitAll({"terminalIds":[...],"maxAttempts":60})` over the ids you answered, never one wait per agent — then peek each tail with one bounded `terminal.read` per terminal (a no-wait plain-text extract over the cohort merges them again): idle is not done. Re-await stragglers at most twice, then hand them to `terminal.await.async` and end the turn.
-   e. For (iii), ask the user ONCE for all of them together — terminal id, agent name, question — not one round-trip per agent. Do not answer them on the agents’ behalf.
-   f. queue.resolve only the items you actually closed; leave open every item whose agent still needs the user.
-   g. "Show me the next one" is navigation, not an answer: pick the still-waiting terminal out of the roster you already read. Use `terminal.revealOwned({"terminalId":"<id>"})` if this MCP connection created it; otherwise `terminal.focus({"terminalId":"<id>"})` selects it only inside the current project view. Follow the foundation's navigation and ownership rules. Neither operation answers the agent.
+```json tool=terminal.sendCommandOwned
+{"terminalId":"<id from the map>","command":"<that terminal's protocol answer>"}
+```
 
-Confirmation: sending input mutates terminal/agent state and may trigger that agent’s next project or external action; confirm before sending — batched cohort sends included — unless the user already explicitly told you the answer and the active tier permits.
+   Keep each `submissionToken` against its terminal id.
+7. Stop or continue by what was asked:
+   - Answer only: report the answers queued and stop. No notice, no wait.
+   - The user also wants the resulting work or its result: send with a new notice (the one that brought you the question has already fired), save the map and tokens as a checkpoint, and end your turn. A send's notice counts only what happens after your answer is written, so it reports this answer's outcome, not the earlier stop.
 
-Observe the foundation’s shared wait budget and existing-supervisor rule after answering. A question does not by itself retire a watcher; check coverage before handing the same terminal to an async wait. If the same prompt remains after one correctly delivered answer, inspect once and report it blocked instead of sending variants.
+```json tool=terminal.sendCommandOwned
+{"terminalId":"<id from the map>","command":"<that terminal's protocol answer>","notify":true}
+```
 
-Report back: for a single agent, the terminal id/name, the answer sent, whether it finished or is still running, and the requested value/result or async checkpoint. For a cohort, one line per terminal — id/name, the question, the answer sent (or “needs you”) — plus who is still working and which inbox items you resolved.
+   Without `notify` (API-key client), one `terminal.waitUntilIdleBatch` over the answered ids, then report who is still working.
+8. Everything that needs the user goes to them in one message: terminal id, agent and the exact question. Do not answer on their behalf.
+9. "Show me the next one" is navigation, not an answer: `terminal.revealOwned` for a panel you own, otherwise name the panel.
 
-A successful send establishes that input was sent, not that the agent resumed or completed the work. Report stronger outcomes only after observing them.
+On notice or resume:
+1. Follow the foundation's resume procedure with the saved map. Read `terminal.getStatus` with each terminal's `submissionToken`. `failed`, `cancelled` or `unknown` may have left text in the input: look at the screen before anything else, and never resend blind.
+2. The same question still showing after one correctly delivered answer: read it once more. Resend only if your first answer was malformed or missed the `QUESTION_ID`; otherwise report that terminal blocked. Never send variants.
+3. A new question: classify it as above, and answer once within scope with a fresh `notify` or take it to the user.
+4. Finished: read the requested result from that terminal (`terminal.readLastMessageOwned` for Claude Code, else `terminal.getOutput`) and report it as the agent's account unless you checked it yourself.
+
+Stop and recovery: one protocol-correct answer per question; one terminal's answer never goes to another; approval, trust, login and security prompts stay with the user. An unreadable or unowned target is reported, not worked around.
+
+Report back: one line per terminal: id and agent, the question, the answer sent (or "needs you" and why), the send's status (queued, written or disputed), and when requested, the result or that it is still running with a notice pending.

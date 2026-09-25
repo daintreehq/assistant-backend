@@ -13,11 +13,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # `submodules: true` fetches the pinned `cli/` snapshot, which the runbook
-      # hygiene tests read as the authority on which tools exist.
       - uses: actions/checkout@v4
         with:
-          submodules: true
           # The local runbook selector (two ONNX encoders + head + tokenizers) is
           # Git LFS. The app loads it at startup, so without real bytes every
           # search test would feed ONNX Runtime a 130-byte pointer file.

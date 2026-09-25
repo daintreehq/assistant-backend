@@ -1,8 +1,10 @@
-"""Daintree runbook search.
+"""Daintree runbooks.
 
-A stateless MCP server with one tool, ``search_runbooks``: the local two-stage
-runbook selector run over a query, returning the best-matching runbooks with
-their full procedures.
+A stateless MCP server with two read-only tools: ``search_runbooks`` runs the
+local two-stage runbook selector over a task description, and ``get_runbook``
+returns one runbook by id. Both return full procedures plus the foundation each
+one builds on. Instructions only: the actions they name belong to the Daintree
+app's own MCP.
 """
 
 __version__ = "1.0.0"

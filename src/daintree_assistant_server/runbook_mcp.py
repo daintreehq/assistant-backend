@@ -1,10 +1,14 @@
-"""The runbook-search MCP server: JSON-RPC dispatch, transport-agnostic.
+"""The runbook MCP server: JSON-RPC dispatch, transport-agnostic.
 
-One tool, ``search_runbooks``, which runs the runbook selector's two-stage
-search over a query and returns the top runbooks as JSON — bodies included, since
-the body IS the runbook. Nothing else: no model call, no session, no state.
-The HTTP half (``api/mcp.py``) owns headers and status codes; this
-module owns what a JSON-RPC message means.
+Two read-only tools. ``search_runbooks`` runs the runbook selector's two-stage
+search over a task description and returns the top runbooks as JSON — bodies
+included, since the body IS the runbook. ``get_runbook`` returns one runbook by
+id, with no ranking involved. Both deliver each returned runbook's instruction
+dependencies (its domain foundation and declared ``requires``) once, as
+``supporting_runbooks``. Nothing else: no model call, no session, no state, and
+no workspace action — the runbooks tell a caller which Daintree app actions to
+take; this server takes none. The HTTP half (``api/mcp.py``) owns headers and
+status codes; this module owns what a JSON-RPC message means.
 
 **Stateless, and serving both eras of the protocol from one endpoint.** MCP
 revision 2026-07-28 removed the ``initialize`` handshake and sessions: every
@@ -34,6 +38,7 @@ from typing import Any
 from . import __version__
 from .runbooks.catalog import Catalog
 from .runbooks.local.selector import RunbookSearchHit
+from .runbooks.models import Runbook
 
 #: Newest first. The first entry is what an ``initialize`` naming a version we do
 #: not know is answered with (the spec's rule: reply with one you DO support and
@@ -57,7 +62,12 @@ _META_VERSION_KEY = "io.modelcontextprotocol/protocolVersion"
 _VERSION_SHAPE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 TOOL_NAME = "search_runbooks"
-DEFAULT_MAX_RESULTS = 5
+GET_TOOL_NAME = "get_runbook"
+TOOL_NAMES: tuple[str, ...] = (TOOL_NAME, GET_TOOL_NAME)
+#: Three, not more: every hit carries a full procedure, and the response also
+#: carries the supporting runbooks, so a larger default is context the caller pays
+#: for on neighbours it will not follow.
+DEFAULT_MAX_RESULTS = 3
 #: Bounded by the ballot, not by taste: the ranking is the head's view of the
 #: cosine shortlist (32 candidates today), so a larger number would be a promise
 #: the search cannot keep once the catalog outgrows the shortlist.
@@ -65,28 +75,77 @@ MAX_RESULTS_CAP = 20
 #: The encoder reads 256 tokens and ``fit_query`` shrinks deliberately to that;
 #: this is only a ceiling on what is worth parsing.
 MAX_QUERY_CHARS = 8192
+#: Runbook ids are dotted identifiers; anything longer is not one.
+MAX_ID_CHARS = 256
 
 SERVER_INFO = {"name": "daintree-runbooks", "title": "Daintree Runbooks", "version": __version__}
 
 INSTRUCTIONS = (
-    "Daintree runbooks are step-by-step procedures for work in Daintree and its "
-    "agent workspace. Call search_runbooks with a plain description of the task at "
-    "hand; each result carries the runbook's full procedure under `instructions`. "
-    "Runbooks name Daintree tools in their steps — follow a runbook only where you "
-    "hold the tools it uses."
+    "Daintree runbooks are procedures for orchestrating work in the Daintree app: "
+    "launching and prompting visible agents, waiting for them through Daintree "
+    "notices, worktrees, reviews, issue and PR workflows. Call search_runbooks with a "
+    "short, self-contained description of the outcome wanted (not a transcript, "
+    "terminal output or credentials) and follow a result marked `selected`; call "
+    "get_runbook for a runbook you already know by id. Every response carries the "
+    "runbooks' prerequisite instructions once, in `supporting_runbooks` — read those "
+    "first. This server supplies instructions only: the steps call the separate "
+    "Daintree app MCP, and a runbook grants no permission. Use the tools and "
+    "arguments your Daintree connection actually offers."
 )
+
+_STRING_LIST: dict[str, Any] = {"type": "array", "items": {"type": "string"}}
+
+#: The fields every served runbook carries, whichever tool served it.
+_DOCUMENT_PROPERTIES: dict[str, Any] = {
+    "id": {"type": "string"},
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "when_to_use": {"type": "string"},
+    "foundation": {"type": "boolean"},
+    "risk": {"type": "string"},
+    "required_tools": _STRING_LIST,
+    "optional_tools": _STRING_LIST,
+    "requires": _STRING_LIST,
+    "content_hash": {"type": "string"},
+    "instructions": {"type": "string"},
+}
+_DOCUMENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": _DOCUMENT_PROPERTIES,
+    "required": list(_DOCUMENT_PROPERTIES),
+    "additionalProperties": False,
+}
+_HIT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        **_DOCUMENT_PROPERTIES,
+        "score": {"type": "number"},
+        "selected": {"type": "boolean"},
+    },
+    "required": [*_DOCUMENT_PROPERTIES, "score", "selected"],
+    "additionalProperties": False,
+}
+
+_READ_ONLY_ANNOTATIONS: dict[str, Any] = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
 
 TOOL_DEFINITION: dict[str, Any] = {
     "name": TOOL_NAME,
     "title": "Search Daintree runbooks",
     "description": (
-        "Find the Daintree runbooks that fit a task. Describe the task the way a user "
-        "would ask for it (\"rename my terminals so I can tell the agents apart\"), "
-        "not as keywords. Returns up to max_results runbooks, best first, each with "
-        "its full step-by-step procedure in `instructions`. `score` is the ranker's "
-        "confidence (0-1) and `selected` is true for the runbooks Daintree's own "
-        "automatic selection would load for this request — prefer those, and treat "
-        "an empty `selected` set as \"no runbook really fits\"."
+        "Find the Daintree runbooks that fit a task. Describe the outcome the way a "
+        "user would ask for it (\"ask one agent a question and bring back its "
+        "answer\"), not as keywords, and keep it short: no transcripts, terminal "
+        "output or secrets. Returns up to max_results runbooks, best first, each with "
+        "its full procedure in `instructions`. `selected` is true for the runbooks the "
+        "classifier judges actually fit — follow those; lower hits are neighbours, and "
+        "an empty selected set means no runbook really fits. `score` is the ranker's "
+        "confidence (0-1). `supporting_runbooks` holds the prerequisite instructions "
+        "(the foundation) of the returned runbooks, once each."
     ),
     "inputSchema": {
         "type": "object",
@@ -102,7 +161,7 @@ TOOL_DEFINITION: dict[str, Any] = {
                 "minimum": 1,
                 "maximum": MAX_RESULTS_CAP,
                 "default": DEFAULT_MAX_RESULTS,
-                "description": "The most runbooks to return.",
+                "description": "The most ranked runbooks to return (supporting ones are extra).",
             },
         },
         "required": ["query"],
@@ -112,44 +171,52 @@ TOOL_DEFINITION: dict[str, Any] = {
         "type": "object",
         "properties": {
             "catalog_revision": {"type": "string"},
-            "runbooks": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "string"},
-                        "title": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "when_to_use": {"type": "string"},
-                        "foundation": {"type": "boolean"},
-                        "required_tools": {"type": "array", "items": {"type": "string"}},
-                        "score": {"type": "number"},
-                        "selected": {"type": "boolean"},
-                        "instructions": {"type": "string"},
-                    },
-                    "required": [
-                        "id",
-                        "title",
-                        "summary",
-                        "when_to_use",
-                        "foundation",
-                        "required_tools",
-                        "score",
-                        "selected",
-                        "instructions",
-                    ],
-                },
+            "runbooks": {"type": "array", "items": _HIT_SCHEMA},
+            "supporting_runbooks": {"type": "array", "items": _DOCUMENT_SCHEMA},
+        },
+        "required": ["catalog_revision", "runbooks", "supporting_runbooks"],
+        "additionalProperties": False,
+    },
+    "annotations": _READ_ONLY_ANNOTATIONS,
+}
+
+GET_TOOL_DEFINITION: dict[str, Any] = {
+    "name": GET_TOOL_NAME,
+    "title": "Get a Daintree runbook by id",
+    "description": (
+        "Return one Daintree runbook by its exact id (e.g. \"daintree.foundation\"), "
+        "with its full procedure in `instructions` and its prerequisite instructions in "
+        "`supporting_runbooks`. Use it for a runbook named by another runbook, a search "
+        "result or a checkpoint; compare `content_hash` with the one you recorded to see "
+        "whether the procedure changed. An unknown id is an error — search instead."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_ID_CHARS,
+                "description": "The runbook id, exactly as a runbook or search result gave it.",
             },
         },
-        "required": ["catalog_revision", "runbooks"],
+        "required": ["id"],
+        "additionalProperties": False,
     },
-    "annotations": {
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False,
+    "outputSchema": {
+        "type": "object",
+        "properties": {
+            "catalog_revision": {"type": "string"},
+            "runbook": _DOCUMENT_SCHEMA,
+            "supporting_runbooks": {"type": "array", "items": _DOCUMENT_SCHEMA},
+        },
+        "required": ["catalog_revision", "runbook", "supporting_runbooks"],
+        "additionalProperties": False,
     },
+    "annotations": _READ_ONLY_ANNOTATIONS,
 }
+
+TOOL_DEFINITIONS: tuple[dict[str, Any], ...] = (TOOL_DEFINITION, GET_TOOL_DEFINITION)
 
 _CAPABILITIES: dict[str, Any] = {"tools": {"listChanged": False}}
 
@@ -338,7 +405,7 @@ async def handle_message(
         return _result(request_id, {}, method=method)
     if method == "tools/list":
         return _result(
-            request_id, {"tools": [TOOL_DEFINITION], **_CACHE_HINTS}, method=method
+            request_id, {"tools": list(TOOL_DEFINITIONS), **_CACHE_HINTS}, method=method
         )
     if method == "tools/call":
         return await _call_tool(request_id, params, headers, catalog, search)
@@ -357,7 +424,7 @@ async def _call_tool(
         return error_reply(
             request_id, HEADER_MISMATCH, "Mcp-Name header does not match the body.", status=400
         )
-    if name != TOOL_NAME:
+    if name not in TOOL_NAMES:
         # A protocol error, not a tool error: there is no tool to have failed.
         return error_reply(request_id, INVALID_PARAMS, f"Unknown tool: {name}")
 
@@ -370,6 +437,14 @@ async def _call_tool(
     # Argument problems are TOOL errors (isError), not JSON-RPC errors: the spec
     # routes them back to the model, which can read the message and correct the
     # call — a protocol error would be swallowed by the client instead.
+    if name == GET_TOOL_NAME:
+        return _get_runbook(request_id, arguments, catalog)
+    return await _search_runbooks(request_id, arguments, catalog, search)
+
+
+async def _search_runbooks(
+    request_id: Any, arguments: dict[str, Any], catalog: Catalog, search: SearchFn
+) -> McpReply:
     unknown = sorted(set(arguments) - {"query", "max_results"})
     if unknown:
         return _tool_error(request_id, f"Unknown argument(s): {', '.join(unknown)}.")
@@ -395,26 +470,69 @@ async def _call_tool(
         )
 
     runbooks: list[dict[str, Any]] = []
+    served: list[str] = []
     for hit in hits:
-        runbook = catalog.get(hit.runbook_id)
+        runbook = catalog.get_public(hit.runbook_id)
         if runbook is None:
             # The search ranks the same catalog this renders, so this is a guard
             # against a seam (a scripted selector) naming an id it does not hold.
             continue
         runbooks.append(
-            {
-                "id": runbook.id,
-                "title": runbook.title,
-                "summary": runbook.summary,
-                "when_to_use": runbook.when_to_use,
-                "foundation": runbook.meta.foundation,
-                "required_tools": list(runbook.meta.required_tools),
-                "score": round(hit.score, 4),
-                "selected": hit.selected,
-                "instructions": runbook.body,
-            }
+            {**_document(runbook), "score": round(hit.score, 4), "selected": hit.selected}
         )
-    structured = {"catalog_revision": catalog.revision, "runbooks": runbooks}
+        served.append(runbook.id)
+    structured = {
+        "catalog_revision": catalog.revision,
+        "runbooks": runbooks,
+        "supporting_runbooks": [_document(r) for r in catalog.supporting_for(served)],
+    }
+    return _tool_result(request_id, structured, results=len(runbooks))
+
+
+def _get_runbook(request_id: Any, arguments: dict[str, Any], catalog: Catalog) -> McpReply:
+    unknown = sorted(set(arguments) - {"id"})
+    if unknown:
+        return _tool_error(request_id, f"Unknown argument(s): {', '.join(unknown)}.")
+    runbook_id = arguments.get("id")
+    if not isinstance(runbook_id, str) or not runbook_id.strip():
+        return _tool_error(request_id, "`id` must be a non-empty runbook id.")
+    runbook_id = runbook_id.strip()
+    runbook = catalog.get_public(runbook_id) if len(runbook_id) <= MAX_ID_CHARS else None
+    if runbook is None:
+        # One answer for unknown and hidden alike: a retired runbook is not a thing
+        # a caller can fetch, and saying it exists would invite retries. The id is
+        # not echoed — it is caller-controlled text.
+        return _tool_error(
+            request_id,
+            "No runbook has that id. Use search_runbooks to find one by task.",
+        )
+    structured = {
+        "catalog_revision": catalog.revision,
+        "runbook": _document(runbook),
+        "supporting_runbooks": [_document(r) for r in catalog.supporting_for([runbook.id])],
+    }
+    return _tool_result(request_id, structured, results=1)
+
+
+def _document(runbook: Runbook) -> dict[str, Any]:
+    """The served form of a runbook — identical from either tool."""
+    meta = runbook.meta
+    return {
+        "id": runbook.id,
+        "title": runbook.title,
+        "summary": runbook.summary,
+        "when_to_use": runbook.when_to_use,
+        "foundation": meta.foundation,
+        "risk": meta.risk,
+        "required_tools": list(meta.required_tools),
+        "optional_tools": list(meta.optional_tools),
+        "requires": list(meta.requires),
+        "content_hash": runbook.content_hash,
+        "instructions": runbook.body,
+    }
+
+
+def _tool_result(request_id: Any, structured: dict[str, Any], *, results: int) -> McpReply:
     return _result(
         request_id,
         {
@@ -427,7 +545,7 @@ async def _call_tool(
             "isError": False,
         },
         method="tools/call",
-        results=len(runbooks),
+        results=results,
     )
 
 
