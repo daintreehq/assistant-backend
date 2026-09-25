@@ -16,51 +16,45 @@ optionalTools:
   - terminal.list
   - terminal.waitUntilIdle
   - terminal.closeOwned
-  - terminal.sendCommand
-  - terminal.close
 ---
 Use when: the user asks how much usage, quota, rate limit, premium requests or credits an agent CLI has left, or when it resets.
 
-The figures exist only in each agent CLI's own account view. Asked in prose, a model guesses or searches the web, and web answers about these commands have been wrong for several agents. So the method is always the same: run the agent's read-only usage command at its own prompt, read the screen exactly, report.
+The figures exist only in each CLI's own account view; asked in prose, a model guesses. So: run the agent's read-only usage command at its own prompt, read the screen exactly, report.
 
-Availability: Core, with client-specific screen handling. Needs `agent.launch`, `terminal.sendCommandOwned` and terminal reads; `slashCommands.list` raises an approval at core tier. A usage panel is not a turn: it produces no handback and may produce no working-to-idle change, so read the screen with bounded reads instead of waiting for a notice.
+Availability: Core; `slashCommands.list` raises an approval at core tier. A usage panel is not a turn: it gives no handback and may never produce a stop, so read the screen instead of waiting for a notice.
 
-Known read-only views. "Checked" entries were confirmed against the CLI's own command table in September 2026 builds. Commands move between releases, so every one is revalidated in step 2 before use.
+Known read-only views (September 2026 builds; revalidated in step 2 every time):
 
-- Claude Code (checked): `/usage` (aliases `/cost`, `/stats`). Never `/usage-credits` (formerly `/extra-usage`), which changes billing. Shows % USED per window (current session, current week for all models, current week per model) with reset times. An API-key login shows session cost only, not plan limits.
-- Codex (checked): `/status`. Never `/usage`, a menu that can REDEEM a banked usage-limit reset. Shows % LEFT for the five-hour and weekly limits, reset times and credits.
-- Grok (checked): `/usage` (alias `/cost`) and its Usage limit tab; older builds use `/session-info`. Never `/usage manage`, which is billing. Shows a weekly limit bar whose percentage the screen does not label as used or left.
-- Antigravity (checked): `/usage` (alias `/quota`). Avoid `/credits` inside the TUI, which offers a purchase link. Shows "Remaining" % per model family for the five-hour and weekly windows, with reset times. From a shell, `agy -p "/usage"` or `agy -p "/credits"` print the same figures as plain text: run it in your own shell when that is permitted, or suggest it to the user.
-- Gemini CLI (documented, not checked): `/stats model`, requests against the daily quota for a Google login.
-- Copilot CLI (documented, not checked): `/usage`, premium requests used against the monthly allowance.
-- Kimi Code (present in the CLI, not run): `/usage`, membership quota.
+- Claude Code (checked): `/usage` (aliases `/cost`, `/stats`). Never `/usage-credits` (formerly `/extra-usage`), which changes billing. Shows % USED per window with reset times; an API-key login shows session cost only.
+- Codex (checked): `/status`. Never `/usage`, a menu that can REDEEM a banked limit reset. Shows % LEFT for the five-hour and weekly limits, resets and credits.
+- Grok (checked): `/usage` (alias `/cost`), Usage limit tab; older builds `/session-info`. Never `/usage manage` (billing). Its weekly bar does not say used or left.
+- Antigravity (checked): `/usage` (alias `/quota`). Avoid `/credits` in the TUI (purchase link). Shows "Remaining" % per model family. `agy -p "/usage"` prints the same in a shell, where that is permitted.
+- Gemini CLI (documented, not checked): `/stats model`. Copilot CLI (documented, not checked): `/usage`. Kimi Code (not run): `/usage`.
 
-No known in-CLI allowance view: Cursor (its `/usage` is activity stats), Aider, OpenCode, Goose, Crush, Amp, Kiro, Mistral Vibe, Open Interpreter, Qwen Code. They show session tokens or cost at most, which is not an allowance; say so. Web usage pages Daintree itself links: Claude https://claude.ai/settings/usage, Codex https://chatgpt.com/codex/settings/usage, Grok https://console.x.ai. For any other agent give no URL; point the user at their provider's account page.
+Not known to offer an in-CLI allowance view as of those builds: Cursor (its `/usage` is activity), Aider, OpenCode, Goose, Crush, Amp, Kiro, Mistral Vibe, Open Interpreter, Qwen Code; session tokens or cost are not an allowance. Web pages: Claude https://claude.ai/settings/usage, Codex https://chatgpt.com/codex/settings/usage, Grok https://console.x.ai; otherwise point at the provider's account page, with no invented URL.
 
 Procedure:
-1. Resolve which agents with `agent.listAvailable`. A named agent must map to a real id; "all my agents" means the configured ones. List which you checked and which you skipped and why (not launchable, `availability` not ready, no in-CLI view). `availabilityComplete:false` means some are still unknown, not missing. Ask only when the target is genuinely ambiguous.
-2. Revalidate each agent's view before using it: `slashCommands.list` with that `agentId` shows what this build offers. Take a command only when its description says it shows or views usage, quota, limits or status, and reject any whose description also mentions manage, redeem, reset, buy, purchase, upgrade, top up or billing: a view that doubles as a spend menu is how a banked reset gets used by accident. A known view this build no longer lists is not trusted. The listing is names and descriptions, leads rather than proof, and an empty one is incomplete coverage. If nothing qualifies, report that you found no in-CLI allowance view. Never guess a command, and never substitute a web search for reading the agent.
-3. The command is typed at the agent's own idle prompt, in a terminal the user named for this that you own or were handed, or one you launch for this check: never an agent terminal you merely found idle, and never your own pane: typing into your own prompt is not a way to read your own usage. Launch with the exact `agentId` (a wrong one launches a different agent) and no `prompt`, so the agent starts at its input without spending a turn:
+1. Resolve the agents with `agent.listAvailable`; list which you check and which you skip and why. `availabilityComplete:false` means some are unknown, not missing.
+2. Revalidate each view with `slashCommands.list` for that `agentId`. Take a command only if its description says it shows usage, quota, limits or status, and reject any that also mentions manage, redeem, reset, buy, purchase, upgrade, top up or billing. A known view this build no longer lists is not trusted. If `slashCommands.list` is unavailable or declined, you have no way to confirm the command: send nothing, and give the user the known command to run themselves. If nothing qualifies, report no in-CLI allowance view found on this build. Never guess a command or substitute a web search.
+3. Type only at an idle prompt in a terminal the user named that you own or were handed, or one you launch now with the exact `agentId` and no `prompt` (a prompt can be submitted over a startup screen). Never your own pane.
 
 ```json tool=agent.launch
-{"agentId":"<id of the agent being checked>","name":"Codex: usage check","worktreeId":"<your current worktree id>"}
+{"agentId":"<id of the agent being checked>","name":"Codex: usage check","worktreeId":"<worktree id>","focusPolicy":"preserve"}
 ```
 
-   Never put the command in `prompt`: it can be submitted while the agent is still on a startup screen.
-4. Wait for an empty input prompt: `terminal.getStatus` with `includeOutput`, with at most one `terminal.waitUntilIdle` between reads while the agent starts. The screen must show an empty input line: no question, dialog or half-typed draft. A trust, login, update, permissions or data-sharing prompt goes to the user; do not answer it to get past.
-5. Send exactly the read-only command, one command per send, with no `handback` (it appends Daintree's instruction text to the command) and no `notify` (a panel may never produce the stop it waits for):
+4. Read `terminal.getStatus` with `includeOutput`, with at most one `terminal.waitUntilIdle` while it starts, until an empty input line shows. A trust dialog for this launch directory is answered as the foundation says; a login, update, permissions or data-sharing prompt goes to the user.
+5. Send exactly the verified command, with no `handback` and no `notify`:
 
 ```json tool=terminal.sendCommandOwned
 {"terminalId":"<terminal id>","command":"<verified read-only command>"}
 ```
 
-   The send has no verbatim flag and needs none: it submits the text as given with one Enter. A queued receipt is not proof; confirm on screen that the usage view opened. If the agent treated the command as a chat message, stop; do not resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing and leave it to the user. The send cannot press keys, so when the figures sit behind a tab or need scrolling, tell the user which key to press. `RESOURCE_NOT_OWNED` on a terminal the user named: give them the command to type.
-6. Read the panel exactly with `terminal.getOutput` and a bounded `maxLines` (around 80): never a summary, and not the agent's transcript, which does not hold the panel. A panel still loading ("Loading", "Scanning") gets one more read a few seconds later; then report what is there.
-7. Leave the panel as it is. Offer to close the terminals you launched; close only those (`terminal.closeOwned`), and only when asked or when the request included it.
+   Confirm on screen that the view opened. If the agent took it as a chat message, stop; never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing. The send cannot press keys: tell the user which tab or scroll key shows the figures. `RESOURCE_NOT_OWNED`: give the user the command to type.
+6. Read the panel with `terminal.getOutput` (`maxLines` around 80), exactly, not a summary. Still loading: one more read, then report what is there.
+7. Leave the panel open. Close only terminals you launched, only when asked (`terminal.closeOwned`).
 
 Report back, per agent:
-- Remaining allowance per window (session or five-hour, weekly, per model family), as LEFT. Convert a USED figure (left = 100 − used) and say that you converted it. When the screen does not label its percentage as used or left, report the number as shown and say the direction is unknown; do not convert it or pick a reading. Never present a session token count as an allowance.
-- Reset time exactly as shown, with its timezone; say when the screen gave UTC.
-- Credits or premium requests where shown.
-- The source of every figure, "read from <agent>'s <command> screen", or "not checked: <reason>" for agents skipped or without an in-CLI view. Never report a figure you did not read in this check.
-- Every terminal you launched, by id and agent, including one that launched the wrong agent or was abandoned, and anything left on screen for the user (an unanswered prompt, an open panel).
+- Remaining allowance per window, as LEFT. Convert a USED figure (left = 100 − used) and say so. A percentage not labelled used or left is reported as shown with the direction unknown. A session token count is not an allowance.
+- Reset times exactly as shown, with timezone; credits or premium requests where shown.
+- The source of every figure ("read from <agent>'s <command> screen"), or "not checked: <reason>". Never a figure you did not read now.
+- Every terminal you launched, by id and agent, and anything left on screen for the user.

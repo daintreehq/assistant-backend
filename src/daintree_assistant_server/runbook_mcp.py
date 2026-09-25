@@ -1,14 +1,16 @@
 """The runbook MCP server: JSON-RPC dispatch, transport-agnostic.
 
 Two read-only tools. ``search_runbooks`` runs the runbook selector's two-stage
-search over a task description and returns the top runbooks as JSON — bodies
-included, since the body IS the runbook. ``get_runbook`` returns one runbook by
-id, with no ranking involved. Both deliver each returned runbook's instruction
-dependencies (its domain foundation and declared ``requires``) once, as
-``supporting_runbooks``. Nothing else: no model call, no session, no state, and
-no workspace action — the runbooks tell a caller which Daintree app actions to
-take; this server takes none. The HTTP half (``api/mcp.py``) owns headers and
-status codes; this module owns what a JSON-RPC message means.
+search over a task description and returns the top runbooks as JSON: the
+selected ones with their bodies, since the body IS the runbook, and the
+unselected neighbours by name and summary only. ``get_runbook`` returns one
+runbook by id, with no ranking involved. Both deliver the instruction
+dependencies (domain foundation and declared ``requires``) of each runbook they
+deliver in full, once, as ``supporting_runbooks``. Nothing else: no model call,
+no session, no state, and no workspace action — the runbooks tell a caller which
+Daintree app actions to take; this server takes none. The HTTP half
+(``api/mcp.py``) owns headers and status codes; this module owns what a JSON-RPC
+message means.
 
 **Stateless, and serving both eras of the protocol from one endpoint.** MCP
 revision 2026-07-28 removed the ``initialize`` handshake and sessions: every
@@ -64,9 +66,8 @@ _VERSION_SHAPE = re.compile(r"\d{4}-\d{2}-\d{2}")
 TOOL_NAME = "search_runbooks"
 GET_TOOL_NAME = "get_runbook"
 TOOL_NAMES: tuple[str, ...] = (TOOL_NAME, GET_TOOL_NAME)
-#: Three, not more: every hit carries a full procedure, and the response also
-#: carries the supporting runbooks, so a larger default is context the caller pays
-#: for on neighbours it will not follow.
+#: Three, not more: a selected hit carries its full procedure plus its supporting
+#: runbooks, and even a neighbour's name and summary is context the caller pays for.
 DEFAULT_MAX_RESULTS = 3
 #: Bounded by the ballot, not by taste: the ranking is the head's view of the
 #: cosine shortlist (32 candidates today), so a larger number would be a promise
@@ -115,16 +116,34 @@ _DOCUMENT_SCHEMA: dict[str, Any] = {
     "required": list(_DOCUMENT_PROPERTIES),
     "additionalProperties": False,
 }
-_HIT_SCHEMA: dict[str, Any] = {
+#: A selected hit is the runbook to follow, so it carries the whole document.
+_SELECTED_HIT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         **_DOCUMENT_PROPERTIES,
         "score": {"type": "number"},
-        "selected": {"type": "boolean"},
+        "selected": {"const": True},
     },
     "required": [*_DOCUMENT_PROPERTIES, "score", "selected"],
     "additionalProperties": False,
 }
+#: An unselected hit is a neighbour the caller should not follow, so it is named,
+#: not delivered: its procedure would cost the caller context for nothing, and
+#: ``get_runbook`` fetches it in the rare case it is wanted.
+_NEIGHBOUR_PROPERTIES: dict[str, Any] = {
+    "id": {"type": "string"},
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "score": {"type": "number"},
+    "selected": {"const": False},
+}
+_NEIGHBOUR_HIT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": _NEIGHBOUR_PROPERTIES,
+    "required": list(_NEIGHBOUR_PROPERTIES),
+    "additionalProperties": False,
+}
+_HIT_SCHEMA: dict[str, Any] = {"oneOf": [_SELECTED_HIT_SCHEMA, _NEIGHBOUR_HIT_SCHEMA]}
 
 _READ_ONLY_ANNOTATIONS: dict[str, Any] = {
     "readOnlyHint": True,
@@ -140,12 +159,13 @@ TOOL_DEFINITION: dict[str, Any] = {
         "Find the Daintree runbooks that fit a task. Describe the outcome the way a "
         "user would ask for it (\"ask one agent a question and bring back its "
         "answer\"), not as keywords, and keep it short: no transcripts, terminal "
-        "output or secrets. Returns up to max_results runbooks, best first, each with "
-        "its full procedure in `instructions`. `selected` is true for the runbooks the "
-        "classifier judges actually fit — follow those; lower hits are neighbours, and "
+        "output or secrets. Returns up to max_results runbooks, best first. `selected` is "
+        "true for the runbooks the classifier judges actually fit: those carry their "
+        "full procedure in `instructions`, so follow them. The rest are neighbours, "
+        "named with a summary only (get_runbook fetches one if it is really wanted), and "
         "an empty selected set means no runbook really fits. `score` is the ranker's "
         "confidence (0-1). `supporting_runbooks` holds the prerequisite instructions "
-        "(the foundation) of the returned runbooks, once each."
+        "(the foundation) of the selected runbooks, once each."
     ),
     "inputSchema": {
         "type": "object",
@@ -470,21 +490,25 @@ async def _search_runbooks(
         )
 
     runbooks: list[dict[str, Any]] = []
-    served: list[str] = []
+    selected: list[str] = []
     for hit in hits:
         runbook = catalog.get_public(hit.runbook_id)
         if runbook is None:
             # The search ranks the same catalog this renders, so this is a guard
             # against a seam (a scripted selector) naming an id it does not hold.
             continue
-        runbooks.append(
-            {**_document(runbook), "score": round(hit.score, 4), "selected": hit.selected}
-        )
-        served.append(runbook.id)
+        score = round(hit.score, 4)
+        if hit.selected:
+            runbooks.append({**_document(runbook), "score": score, "selected": True})
+            selected.append(runbook.id)
+        else:
+            runbooks.append(_neighbour(runbook, score))
     structured = {
         "catalog_revision": catalog.revision,
         "runbooks": runbooks,
-        "supporting_runbooks": [_document(r) for r in catalog.supporting_for(served)],
+        # Prerequisites of what the caller will follow. A foundation ranked as an
+        # unselected neighbour still arrives here in full when a selected hit needs it.
+        "supporting_runbooks": [_document(r) for r in catalog.supporting_for(selected)],
     }
     return _tool_result(request_id, structured, results=len(runbooks))
 
@@ -532,14 +556,29 @@ def _document(runbook: Runbook) -> dict[str, Any]:
     }
 
 
+def _neighbour(runbook: Runbook, score: float) -> dict[str, Any]:
+    """An unselected hit: enough to recognise it, nothing to follow."""
+    return {
+        "id": runbook.id,
+        "title": runbook.title,
+        "summary": runbook.summary,
+        "score": score,
+        "selected": False,
+    }
+
+
 def _tool_result(request_id: Any, structured: dict[str, Any], *, results: int) -> McpReply:
     return _result(
         request_id,
         {
             # The text block is the same JSON: clients that predate
             # `structuredContent` read this one, and the spec asks for both.
+            # Compact: a caller that prints the whole result pays for both copies.
             "content": [
-                {"type": "text", "text": json.dumps(structured, ensure_ascii=False)}
+                {
+                    "type": "text",
+                    "text": json.dumps(structured, ensure_ascii=False, separators=(",", ":")),
+                }
             ],
             "structuredContent": structured,
             "isError": False,

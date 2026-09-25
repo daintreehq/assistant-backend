@@ -12,33 +12,29 @@ requiredTools:
   - worktree.deleteOwned
 optionalTools:
   - terminal.interruptOwned
-  - terminal.close
+  - terminal.notifyWhenIdle
   - worktree.delete
   - worktree.resource.status
 ---
 Use when: the user has explicitly asked to tear workspace state down: close a set of terminals, stop waiting on agents, delete worktrees or branches, close out a finished run.
 
-This is a confirmation gate, not permission to tidy up. Closing is never your initiative: if you are here because a fan-out finished and the workspace looks busy, report what is running and stop. Never widen a narrow request ("close the two that failed") into a sweep. Showing evidence so the user can decide (a worktree's `git status`, unpushed commits) is fine; judging whether their work is finished is not yours.
+This is a confirmation gate, not permission to tidy up. Never close on your own initiative, and never widen a narrow request ("close the two that failed") into a sweep. Showing evidence (a worktree's `git status`, unpushed commits) is fine; judging whether the user's work is finished is not.
 
-Availability: Core for closing and deleting what this connection created; Daintree itself asks the user to confirm every worktree deletion. Branch deletion is your host's `git` (Hybrid). Reading a remote resource's status (`worktree.resource.status`) raises an approval; tearing a resource down on its own is daintree.worktree.manage-resource. Broadcast arming of the user's typed input is not reachable over MCP: report `armed` from `terminal.getStatus` and leave changes to the user. The sidebar assistant has the unscoped `terminal.close` and `worktree.delete` instead of the owned tools; it never passes `force`.
+Availability: Core for what this connection created; Daintree asks the user to confirm every worktree deletion. Branch deletion is your host's `git`. `worktree.resource.status` raises an approval; tearing a resource down alone is daintree.worktree.manage-resource. A cleanup never passes `force`.
 
-Five different actions, each needing its own request:
-- Stop observing. There is no notice cancel: mark the run cancelled in its checkpoint so a late notice does nothing, and tell the user their pane's Stop on the notice chip clears all of its pending notices. Nothing stops running.
-- Interrupt a turn. `terminal.interruptOwned` stops the current turn and keeps the panel and its conversation. It is refused on an idle agent.
-- Close a panel. `terminal.closeOwned` ends its process; the panel goes to the trash, briefly recoverable. An empty `closedIds` is a failed close.
-- Delete a worktree. `worktree.deleteOwned` removes the directory after the user confirms in Daintree. It works only on a worktree this connection created with `worktree.createWithRecipe`: not one from `workflow.startWorkOnIssue`, a launch, the user or an earlier pane. It refuses uncommitted or untracked changes, never deletes the branch, never closes terminals, and runs the project's teardown commands, which can destroy a remote resource.
-- Delete a branch. `git branch -d <branch>` from the main checkout, only when asked. It refuses an unmerged branch; force-deleting one, or deleting a remote branch, needs the user's explicit instruction after they have seen what would be lost.
+Five separate actions, each needing its own request:
+- Stop observing: no notice cancel exists. Drop the targeted units' pending steps so a late notice does nothing; the user's Stop on the pane's notice chip clears all of them. Nothing stops running.
+- Interrupt a turn: `terminal.interruptOwned` keeps the panel and conversation; refused on an idle agent.
+- Close a panel: `terminal.closeOwned` ends its process and moves the panel to the trash, briefly recoverable. Only panels you created: a hand-over never grants close, even though `terminal.list` with `owned:true` shows handed-over terminals.
+- Delete a worktree: `worktree.deleteOwned`, only one this connection created with `worktree.createWithRecipe`, after the user confirms. It refuses uncommitted or untracked changes, keeps the branch, closes no terminals, and runs the project's teardown, which can destroy a remote resource.
+- Delete a branch: `git branch -d <branch>` from the main checkout, only when asked; force or remote deletes need explicit instruction after the user sees what would be lost.
 
 Procedure:
-1. Honor prerequisites. "Once those finish, close their terminals" authorizes later cleanup; it does not stop, hurry or replace the work. Record the cohort and the condition in the run's checkpoint, arrange a notice on those terminals (daintree.orchestration.watch-outcome), and close them on a later activation only after their finish is verified. A unit waiting for a planned next step is unfinished, not idle.
-2. Inventory fresh, never from memory: `terminal.list`, `terminal.list` with `owned:true` (what this connection can close), one `terminal.getStatus` with `includeOutput` over the candidates, `worktree.list`, and the run's checkpoint for what this task created. For each candidate worktree, read `git -C <path> status --porcelain`, whether its branch is pushed or merged, and its resource status if one is configured.
-3. Classify each item:
-   - Authorized: the request covers it. The user's own word ("close the lint runner, it's finished") settles that terminal; a `waiting` prompt there is the normal look of finished work.
-   - Consequences to resolve: still `working` or waiting on a question or approval; uncommitted or untracked files; teardown commands or a remote resource; the active worktree; anything else the user could not have known.
-   - Not yours: absent from the owned listing. The owned tools will refuse it, so it stays with the user.
-   - Unknown: cannot be attributed. It is left running and reported, and joins a "close everything" set only if the user names it after seeing it listed.
-4. Present, then act. Act on a precise request as given: Daintree's delete confirmation is the only confirmation, so put no question in front of it. A broad request gets the proposed set, each item's action and consequences, and what you are leaving and why, then one question. Surface newly discovered consequences and settle them before touching those items. Never ask twice for the same fully specified action.
-5. Execute in this order, skipping empty phases: record the cleanup and tombstone in the checkpoint; interrupt only where the user asked for work to be stopped; close the approved panels, one call each; delete a worktree only after every panel in it is closed and the user called it merged or abandoned; delete branches if asked; close the run's checkpoint.
+1. Prerequisites. "Once those finish, close them" authorizes later cleanup, not stopping or hurrying the work: arm `terminal.notifyWhenIdle` on each (unless a notice is already requested), and close on a later activation only after the finish is verified.
+2. Inventory fresh: `terminal.list`, `terminal.list` with `owned:true`, one `terminal.getStatus` with `includeOutput` over the candidates, `worktree.list`, and the run's record of what it created. Per candidate worktree: `git -C <path> status --porcelain`, whether the branch is pushed or merged, and its resource status if configured.
+3. Classify: authorized (the request covers it; a finished agent at its prompt looks `waiting`); consequences to settle first (still working or asking, dirty files, teardown or a remote resource, the active worktree); not yours (you did not create it); unknown (left running and reported, joining a "close everything" set only if the user names it).
+4. Present, then act. A precise request is acted on as given: Daintree's delete confirmation is the only confirmation. A broad one gets the proposed set, each item's action and consequences, and what you leave and why, then one question. Never ask twice for the same action.
+5. Execute in order, skipping empty phases: mark only the targeted units cancelled (tombstone the whole run only when the whole run is being closed, and keep siblings with pending work advancing; a completed unit stays completed even when its panel closes); interrupt where asked; close approved panels, one call each; delete a worktree only after its panels are closed and the user called it merged or abandoned; delete branches if asked.
 
 ```json tool=terminal.closeOwned
 {"terminalId":"<approved terminal id>"}
@@ -48,14 +44,12 @@ Procedure:
 {"worktreeId":"<worktree id this session created>"}
 ```
 
-6. Refusals are answers, not retry signals:
-   - Foreign panel (`RESOURCE_NOT_OWNED`): leave it and report it by title; the user can close or delete it in Daintree. Never route around it through the shell, a kill, another agent or another surface.
-   - Untracked or uncommitted files refuse the delete: list them from `git status` and let the user commit, stash, or delete it themselves. Never `git clean`, `rm`, `git worktree remove --force`, or a forced delete from another surface.
-   - A declined confirmation leaves the worktree standing. `CONFIRMATION_TIMEOUT` is neither yes nor no. Do not reissue the same delete in a loop; ask the user.
-   - A failed teardown: report its error, leave that worktree and resource as they are, and carry on with independent items. Unrelated work is never touched to make cleanup succeed.
-   - A panel you could not close keeps its worktree standing: never remove a directory under a running process.
-7. Verify from state: re-read `terminal.list` and `worktree.list` and confirm each id is gone. A call that returned while the item is still listed is a real result; report it.
+6. Refusals are answers, not retry signals. `RESOURCE_NOT_OWNED`: leave it and report it by title. A dirty worktree: list the files and let the user commit, stash or delete; never `git clean`, `rm` or `git worktree remove --force`. A declined confirmation leaves it standing; `CONFIRMATION_TIMEOUT` is neither yes nor no, so ask rather than loop. A panel you could not close keeps its worktree standing.
+7. A failed teardown may have changed part of a resource: read back what you can (`worktree.resource.status`, `worktree.list`) and report the observed state, not "unchanged"; carry on with independent items.
+8. Verify: a close is proven by its `closedIds`, and the panel may remain in the trash listing (`location:"trash"`), which is not a failed close. A delete is proven by the worktree's absence from a successful `worktree.list`.
 
-Partial requests stay partial: "stop watching those" is observation only, and "disarm everything" is the user's to do in Daintree. If there is nothing to clean, say so and stop.
+On notice or resume: for a deferred cleanup, check each named terminal's quote and state; close only those whose finish is verified, and keep waiting on the rest.
 
-Report back: what was closed, deleted or stopped (with ids), what was deliberately left and why (still working, not yours, unknown, dirty, the user's own), what the user declined or what timed out, any teardown failure, and the end state read back from the listings.
+Stop and recovery: never retry a refused or declined action through another route; a late notice for a cancelled unit does nothing.
+
+Report back: what was closed, deleted, interrupted or no longer observed (with ids); what was left and why (working, not yours, unknown, dirty); what the user declined or what timed out; any partial teardown with its observed state; and which units of the run are still pending.

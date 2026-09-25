@@ -145,6 +145,15 @@ def test_search_returns_full_runbooks_as_structured_json(client: TestClient, app
     assert top["when_to_use"] == runbook.when_to_use
     assert (top["score"], top["selected"]) == (0.97, True)
     assert top["content_hash"] == runbook.content_hash
+    # An unselected neighbour is named, not delivered: the caller will not follow it.
+    neighbour = catalog.get(first)
+    assert structured["runbooks"][1] == {
+        "id": first,
+        "title": neighbour.title,
+        "summary": neighbour.summary,
+        "score": 0.41,
+        "selected": False,
+    }
     # The text block carries the same JSON, for clients predating structuredContent.
     assert json.loads(result["content"][0]["text"]) == structured
     _assert_schema(TOOL_DEFINITION, structured)
@@ -155,12 +164,12 @@ def test_search_returns_full_runbooks_as_structured_json(client: TestClient, app
 def test_search_delivers_each_prerequisite_once_outside_the_ranking(
     client: TestClient, app: Any
 ) -> None:
-    """Two specifics sharing a foundation bring it once, in `supporting_runbooks`,
-    and it does not count against `max_results`."""
+    """Two selected specifics sharing a foundation bring it once, in
+    `supporting_runbooks`, and it does not count against `max_results`."""
     catalog = app.state.container.catalog
     app.state.container.selector.search_hits = [
         ("daintree.terminals.rename", 0.9, True),
-        ("daintree.agents.ask-and-relay", 0.2, False),
+        ("daintree.agents.ask-and-relay", 0.6, True),
     ]
     structured = _call(client, {"query": "x", "max_results": 2}).json()["result"][
         "structuredContent"
@@ -174,6 +183,52 @@ def test_search_delivers_each_prerequisite_once_outside_the_ranking(
     foundation = catalog.get("daintree.foundation")
     assert structured["supporting_runbooks"][0]["instructions"] == foundation.body
     _assert_schema(TOOL_DEFINITION, structured)
+
+
+def test_a_foundation_ranked_as_a_neighbour_still_arrives_in_full_for_a_selected_hit(
+    client: TestClient, app: Any
+) -> None:
+    catalog = app.state.container.catalog
+    app.state.container.selector.search_hits = [
+        ("daintree.terminals.rename", 0.9, True),
+        ("daintree.foundation", 0.1, False),
+    ]
+    structured = _call(client, {"query": "x", "max_results": 2}).json()["result"][
+        "structuredContent"
+    ]
+    assert "instructions" not in structured["runbooks"][1]
+    assert [r["id"] for r in structured["supporting_runbooks"]] == ["daintree.foundation"]
+    assert (
+        structured["supporting_runbooks"][0]["instructions"]
+        == catalog.get("daintree.foundation").body
+    )
+    _assert_schema(TOOL_DEFINITION, structured)
+
+
+def test_nothing_selected_delivers_no_procedures_at_all(client: TestClient, app: Any) -> None:
+    """No runbook fits: the caller carries on, so no procedure is worth its context."""
+    app.state.container.selector.search_hits = [
+        ("daintree.terminals.rename", 0.2, False),
+        ("daintree.agents.ask-and-relay", 0.1, False),
+    ]
+    structured = _call(client, {"query": "x", "max_results": 2}).json()["result"][
+        "structuredContent"
+    ]
+    assert all(not r["selected"] and "instructions" not in r for r in structured["runbooks"])
+    assert structured["supporting_runbooks"] == []
+    _assert_schema(TOOL_DEFINITION, structured)
+
+
+def test_the_output_schema_refuses_a_neighbour_carrying_a_procedure(
+    client: TestClient, app: Any
+) -> None:
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.2, False)]
+    structured = _call(client, {"query": "x", "max_results": 1}).json()["result"][
+        "structuredContent"
+    ]
+    structured["runbooks"][0]["instructions"] = "1. Rename."
+    errors = list(Draft202012Validator(TOOL_DEFINITION["outputSchema"]).iter_errors(structured))
+    assert errors
 
 
 def test_a_foundation_that_is_itself_a_hit_is_not_sent_twice(

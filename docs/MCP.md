@@ -48,6 +48,13 @@ lone user message with nothing loaded. Results come back best first:
       "instructions": "<the full runbook body, Markdown>",
       "score": 0.9998,
       "selected": true
+    },
+    {
+      "id": "daintree.worktree.relocate-agents",
+      "title": "…",
+      "summary": "…",
+      "score": 0.0031,
+      "selected": false
     }
   ],
   "supporting_runbooks": [
@@ -62,9 +69,15 @@ lone user message with nothing loaded. Results come back best first:
   no runbook really fits, and a failed search is an error, never an empty ranking. The
   ranking fills `max_results` when the catalog has that many, so lower hits are
   neighbours rather than answers.
-- `supporting_runbooks` is every returned runbook's instruction dependencies — its
+- Only a selected hit carries the full document. An unselected neighbour is `id`,
+  `title`, `summary`, `score` and `selected: false` and nothing else: its procedure
+  would cost the caller context it will not use (a caller printing the whole result
+  pays for the text block and `structuredContent` alike). `get_runbook` fetches one.
+- `supporting_runbooks` is every selected runbook's instruction dependencies — its
   nearest domain foundation, then anything it declares in `requires`, recursively —
-  once each, dependencies first, and never a runbook already in `runbooks`. Read them
+  once each, dependencies first, and never a runbook already selected (a foundation
+  ranked as a neighbour still arrives here in full). With nothing selected it is
+  empty. Read them
   before following the procedure. They are not ranked hits and do not count against
   `max_results`.
 
@@ -93,7 +106,8 @@ following has changed.
 
 Both tools serve a runbook in the same form: `id`, `title`, `summary`, `when_to_use`,
 `foundation`, `risk`, `required_tools`, `optional_tools`, `requires`, `content_hash`
-and `instructions`; a search hit adds `score` and `selected`.
+and `instructions`; a selected search hit adds `score` and `selected`, and an
+unselected one is only `id`, `title`, `summary`, `score` and `selected`.
 
 - `required_tools` and `optional_tools` are **Daintree app MCP action ids** — the
   baseline path's actions, and those of a conditional branch or caller variant. A

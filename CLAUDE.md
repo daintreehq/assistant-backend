@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Daintree runbooks**: a stateless MCP server at `POST /v1/daintree/mcp` with two read-only
 tools. `search_runbooks` ranks the runbook catalog against a described task and returns the
-top runbooks as JSON, full procedures included; `get_runbook` returns one by id. Both add
-each returned runbook's prerequisite instructions (its domain foundation, plus `requires`)
+top runbooks as JSON: selected ones with their full procedures, unselected neighbours by
+id, title and summary only; `get_runbook` returns one by id. Both add the prerequisite
+instructions (domain foundation, plus `requires`) of each runbook they deliver in full,
 once, as `supporting_runbooks`. That is all it does. Anyone can add it — there is no
 authentication, no account, no session, no credential held, and no upstream call. The wire
 contract is `docs/MCP.md`.
@@ -118,9 +119,10 @@ registration. `docs/RUNBOOKS.md` is the authoring guide.
 **Format** — YAML frontmatter + Markdown body. The body is operational prose in the house
 style: a `Use when:` line, an `Availability:` line, a numbered procedure, and for a
 runbook that waits on an agent `On notice or resume:` and `Stop and recovery:` sections,
-ending with a "Report back" line. Shared rules (preflight, caller differences, ownership,
-the notice/resume procedure, the checkpoint, proving a finish) live once, in
-`daintree.foundation`, which both tools deliver with every runbook. Frontmatter is validated
+ending with a "Report back" line. Shared rules (caller differences, ownership, launching,
+reading replies from the notice's quote, long-run checkpoints, proving a finish) live once,
+in `daintree.foundation`, which both tools deliver with every runbook they deliver in full.
+Anything Daintree's own assistant prompt already says stays out of it. Frontmatter is validated
 by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are rejected):
 
 | key | required | notes |
@@ -137,9 +139,10 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 
 The routing document the ranker embeds is title + summary + `whenToUse`, **not the body**.
 Editing routing text re-embeds that runbook and must be measured with `bench local`.
-Every result carries the full body under `instructions`, so body size is paid in the
-calling agent's context on every hit (`tests/unit/test_runbook_budgets.py` holds the
-ceilings).
+Every selected result carries the full body under `instructions`, plus the foundation, and
+a caller that prints the whole result pays for both the text block and
+`structuredContent`, so body size is paid twice on every hit
+(`tests/unit/test_runbook_budgets.py` holds the ceilings).
 
 **Runbooks name Daintree app MCP actions**, and `tests/fixtures/daintree_mcp/` is the
 authority on which exist and what each caller is offered: an agent pane (owned tools such as

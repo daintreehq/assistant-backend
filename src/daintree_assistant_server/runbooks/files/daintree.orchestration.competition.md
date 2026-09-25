@@ -8,52 +8,43 @@ requiredTools:
   - agent.listAvailable
   - agent.launch
   - terminal.sendCommandOwned
-  - terminal.getStatus
-  - terminal.getOutput
 optionalTools:
-  - agent.listPresets
   - worktree.list
   - terminal.list
-  - terminal.readLastMessageOwned
+  - terminal.getStatus
   - terminal.waitUntilIdleBatch
-  - terminal.sendCommand
   - terminal.closeOwned
-  - terminal.close
+
 ---
-Use when: several agents each produce one independent submission, and those submissions are then judged (peer vote, a neutral judge agent, or a judge the user agreed on) to name a winner or a tie.
+Use when: several agents each produce one independent submission, then the submissions are judged (peer vote, a neutral judge agent, or you only if the user made you judge) to name a winner or a tie.
 
-Availability: Core. In an agent pane, `notify` on each launch and ballot send brings every entry and vote back as it lands. An API-key client has no `notify`: close each phase with one bounded `terminal.waitUntilIdleBatch` (`mode:"all"`) and tell the user what remains pending for their continuation. The sidebar assistant uses `terminal.sendCommand` and `terminal.close`.
-
-Judging follows the foundation's "Judging even-handedly"; the rules below are what this format adds.
+Availability: Core, two rounds of notices. An API-key client has no `notify`: close each round with one `terminal.waitUntilIdleBatch` (`mode:"all"`) and report what is still pending.
 
 Procedure:
-1. Fix the rules before any dispatch and record them: the entry task; the judging method (peer vote by default, a neutral judge agent, or you only when the user made you the judge or agreed to it, which you then state); the scoring rule, applied mechanically exactly as the user gave it; whether a voter's ballot includes its own entry; the self-vote rule; the tie rule (default: report a tie). With no agreed judge, you do not pre-score entries on merit; a shortlist uses only the user's mechanical criterion (meets the constraint, within the length, first N).
-2. Cohort: fresh entrants, so each entry comes from an independent context. Naming agent kinds ("Claude, Codex and Gemini") asks for fresh entrants, not the open terminals of those kinds. Use an existing terminal only if the user picked that one and it is yours or handed over. Resolve each to its real `agentId`; one worktree for all.
-3. Checkpoint (the foundation's), adding: the rules; the phase (entries, ballots, result); per entrant its agent, terminal id, status (active, removed, disqualified) and entry; per voter its ballot generation, `submissionToken`, private tag-to-entrant map, vote and validity.
-4. Entry phase. Launch each entrant with the entry task as its `prompt`, same-kind agents one at a time (the next launch of an `agentId` only after the previous call returned):
+1. Fix the rules before launching: the entry task; the judge (peer vote by default); the scoring rule, applied exactly as the user gave it; whether voters may pick their own entry (default no, and ballots then omit it); the tie rule (default: report the tie). Without an agreed judge you never score entries on merit yourself.
+2. Cohort: one fresh entrant per agent named ("Claude, Codex and Gemini" means new launches, not open terminals of those kinds). Resolve each `agentId` from `agent.listAvailable`; use one worktree for all. Track per entrant: agent, terminal id, status (active, removed, missing) and entry.
+3. Entries: launch every entrant in this turn, then end it.
 
 ```json tool=agent.launch
-{"agentId":"<id from agent.listAvailable>","name":"Contest entry: <agent>","worktreeId":"<resolved worktree id>","prompt":"Entry round for <contest id>. <task>. Produce ONE <entry>, in your own words, here. Do not look at or contact any other agent. Change no files.","notify":true,"handback":true}
+{"agentId":"<id from agent.listAvailable>","name":"Contest: <agent> <n>","worktreeId":"<worktree id>","prompt":"<task>. Reply with ONE <entry> of at most a few lines, in your own words, here. Do not contact other agents. Change no files.","focusPolicy":"preserve","notify":true,"handback":true}
 ```
 
-   Record each `terminalId` and end your turn. The phase closes when every active entrant has an entry or is recorded missing (failed, removed, or the user says go on). Entries lock when the first ballot is sent.
-5. Ballot phase. Build each voter's ballot from the locked, eligible entries in their own wording, presented in one identical format, with no author, agent kind or status. Rotate the neutral tags per voter and record that voter's map before sending. Never mark "(you)". Then:
+4. Ballots, once every active entrant has an entry or is recorded missing: entries lock. For each voter, list the eligible entries in one identical format under neutral labels, with no author, agent kind or "(you)", in a different order per voter, and keep that voter's label-to-entrant map to yourself, out of every prompt. Send every ballot in one turn, then end it.
 
 ```json tool=terminal.sendCommandOwned
-{"terminalId":"<voter terminal id>","command":"Ballot <contest id>, round <r>. Task was: <task>. Entry A: <entry>. Entry B: <entry>. Entry C: <entry>. Judge these on merit. Reply with exactly one label and a one-line reason.","notify":true,"handback":true}
+{"terminalId":"<voter terminal id>","command":"Ballot. Task was: <task>. A: <entry>. B: <entry>. C: <entry>. Judge on merit. Reply with exactly one label and a one-line reason.","notify":true,"handback":true}
 ```
 
-   Record each token and end your turn. For a neutral judge, launch one fresh agent with the same neutral ballot as its `prompt`. It is not an entrant and casts no tallied vote, and its verdict replaces the peer tally only when that is the agreed method.
+   A neutral judge is one fresh launch with the same ballot as its `prompt`; it casts no peer vote, and its verdict decides only when that was the agreed method.
 
 On notice or resume:
-1. Follow the foundation's resume procedure, for each terminal the notice names.
-2. Correlate by phase. An entry counts only from an active entrant whose entry prompt is pending. A vote counts only from an eligible voter whose current ballot is pending and settled after that ballot's send (`terminal.getStatus` with its `submissionToken`).
-3. A late entry that lands after ballots went out is recorded as late and changes no issued ballot. It joins only if the user reopens entries, and then every voter gets a new ballot generation and every earlier vote is void.
-4. Read each vote from the voter's own words (`terminal.readLastMessageOwned` for Claude Code, otherwise `terminal.getOutput`), map its label through that voter's map, and attribute it by terminal id. An ambiguous or off-ballot answer gets one clarification to that voter alone; if it is still unclear, the vote is invalid. A forbidden self-vote: quietly ask that voter for its next choice, never revealing authorship.
-5. A voter at an approval, trust or login screen has not voted; that screen is the user's. A removed or disqualified agent leaves the active set at once: send it nothing, count none of its later replies, and score nothing from it.
-6. Result, once every eligible vote is in or recorded missing: tally mechanically from the recorded votes and give eligible, received and valid counts. A missing voter is not counted and no vote is manufactured; a result a missing or invalid vote could change is provisional. The top score alone wins; a tied top score is a tie, never broken by you. A neutral judge's verdict is reported as given; any doubt you have is an observation, not a re-ranking.
-7. On a tie, a winner-only follow-up ("close all but the winner", "winner gives a speech") waits for the user's choice: one of the tied, co-winners, or a runoff (daintree.orchestration.runoff-tiebreaker). Keep all tied terminals open and hand the checkpoint over intact for a runoff.
+1. Each notice names a terminal and quotes its reply: that is the entry or vote. Count it only from an active entrant or eligible voter with that round's prompt pending. Where a quote is missing or cut short, read all such terminals in one `terminal.getStatus` with `includeOutput`.
+2. A dialog is not an entry: answer a trust dialog for the launch directory as the foundation says, with `notify`; anything else goes to the user and that entrant stays pending.
+3. An entry arriving after ballots went out is late and changes no issued ballot. Entries lock when the first ballot is sent.
+4. Map each vote through that voter's map. An ambiguous or off-ballot vote gets one clarification to that voter only, then counts as invalid. A removed agent gets nothing more and nothing from it counts; if its entry was on issued ballots, apply the agreed rule or void and reissue that ballot round, never silently remap labels.
+5. Tally once every eligible vote is in or recorded missing. Never manufacture a vote for a missing or unclear reply. The top score alone wins; a tied top score is a tie, never broken by you. A result a missing vote could change is provisional: it crowns no one and closes nothing until the user decides.
+6. On a tie, a winner-only follow-up waits for the user's choice: one of the tied, co-winners, or a runoff (daintree.orchestration.runoff-tiebreaker). Keep the tied terminals open.
 
-Stop and recovery: two phases and no extra rounds unless the rules say so. At most one clarification per ambiguous vote. Never resend a ballot to a voter whose ballot is pending, and never relaunch an entrant after entries lock. Reconcile a lost launch reply with `terminal.list`. Close only on request: "all but the winner" closes the recorded non-winning entrants and any judge (never a winner) and keeps every winner or co-winner; confirm each close from `closedIds`, since finished is not closed. A winner follow-up goes only to the resolved winner terminals, with `notify`.
+Stop and recovery: two rounds, no extras unless the rules say so. Never resend a ballot that is pending or relaunch an entrant after entries lock. "Close all but the winner" closes the non-winning entrants and any judge, never a winner; confirm each from `closedIds`.
 
-Report back: each entrant's entry, votes received and total; each voter's de-blinded choice and reason; eligible, received and valid counts; who decided (peer vote, the judge agent, or you as the agreed judge), noting that peer voting was only partially blinded; the winner, co-winners or tie; removed, missing or late participants; anything pending; and any cleanup, with the terminals left open.
+Report back: each entry with its votes and total; each voter's de-blinded choice and reason; eligible, received and valid vote counts; who judged (peer votes are only partly blind, since voters wrote entries); the winner, co-winners or tie; missing, late or removed participants; the terminals left open.

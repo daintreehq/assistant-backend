@@ -349,3 +349,32 @@ cases:
     expect:
       required: [daintree.workflow.follow-up-on-issue]
       optional: [daintree.foundation]
+
+  - id: same-question-to-several-agents-is-poll
+    category: routing-trap
+    note: >-
+      Several agents, one question, every answer brought back, no vote and no
+      synthesis. It used to co-select multi-agent, whose convergence loop costs a
+      relay round per agent; poll-pinned-agents is one launch round and one notice each.
+    messages:
+      - role: user
+        content: >-
+          Ask a few agents the same question, whether our retry backoff is too
+          aggressive, and bring back what each of them says.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: named-agents-same-question-not-ask-and-relay
+    category: routing-trap
+    note: >-
+      Named agents plural. ask-and-relay is ONE agent and one question, and
+      following it for three agents launches them one relay at a time.
+    messages:
+      - role: user
+        content: >-
+          Ask Claude, Codex and Gemini what they make of the new config loader and
+          show me each of their answers.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]

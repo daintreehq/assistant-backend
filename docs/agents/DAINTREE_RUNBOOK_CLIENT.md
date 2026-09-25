@@ -71,8 +71,9 @@ For a child response that must be collected, prefer a supported Daintree notice.
 Record the task and returned identities, then end your turn when no immediate work
 remains.
 
-On a notice or resume, restore the checkpoint, apply the user's latest instructions,
-read fresh state and output, and verify the expected result before advancing. A
+On a notice, apply the user's latest instructions, read the reply from the notice's
+quote (read the terminal again only when the quote is missing or cut), and verify the
+expected result before advancing. A
 stopped agent may be asking a question or showing an error. A notice, handback or
 successful send is not proof the work succeeded. Do not replay uncertain or
 completed writes.
@@ -92,10 +93,12 @@ runbooks leave them to the host:
    uses `mcp__<server>__…`), and may rewrite characters such as the dots. Call the
    name the host actually lists. The action id is what a runbook names.
 2. **How instructions are installed.** See above.
-3. **Where a checkpoint can live.** Runbooks that span several activations keep a small
-   JSON record. The default is `.daintree/runbook-runs/<run-id>.json` in a stable
-   coordinator checkout, kept out of git (e.g. via `.git/info/exclude`), or a host
-   scratch directory whose persistence matches the task. See the foundation runbook.
+3. **Where a checkpoint can live.** Only runs spanning many rounds, hours or sessions
+   keep a small JSON record; a short run's state stays in the conversation. It goes in
+   `$DAINTREE_ASSISTANT_SCRATCH_DIR` when the host sets one (Daintree's sidebar
+   assistant never writes into the user's repository), otherwise
+   `.daintree/runbook-runs/<run-id>.json` in the coordinator checkout, excluded via the
+   file `git rev-parse --git-path info/exclude` names. See the foundation runbook.
 4. **Which continuation mechanisms really exist.** Daintree notices, when the pane is
    offered them. Anything else must be a verified host feature: a Claude Code
    monitor or scheduled task, or a Codex environment's own facility. The dated

@@ -76,11 +76,13 @@ def test_runbooks_end_with_report_back() -> None:
 
 # The foundation rides along with every search and every retrieval, as a supporting
 # runbook, so it is paid for on EVERY response rather than only on a hit. Measured at
-# the migration to the app MCP (2026-09-25): 14.0KB.
-FOUNDATION_BODY_CEILING = 15 * 1024
+# the migration to the app MCP (2026-09-25): 14.0KB; cut the same day to 5.7KB of
+# cross-cutting judgment, with workflow rules moved into the runbooks that need them.
+FOUNDATION_BODY_CEILING = 6 * 1024
 # What following one runbook costs: its body plus everything `supporting_for` sends
-# with it. Measured at the same point: 28.1KB at the largest (fan-out-work).
-RUNBOOK_BUNDLE_CEILING = 32 * 1024
+# with it. Measured at the same point: 28.1KB at the largest (fan-out-work); 14.9KB
+# after the foundation cut (edits.spawn-visible-agent).
+RUNBOOK_BUNDLE_CEILING = 20 * 1024
 
 
 def test_foundations_stay_compact() -> None:

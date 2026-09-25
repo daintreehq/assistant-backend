@@ -65,12 +65,20 @@ Search ranks a runbook by its **title, `summary` and `whenToUse`**, never the bo
 
 ## Being followable: the body
 
-The body is returned in full, and the foundation comes with it on every response,
-so every byte is paid for in the caller's context. **Put shared rules in
-`daintree.foundation`**: preflight, caller differences, ownership, the notice and
-resume procedure, the checkpoint, proving a finish, even-handed judging. Do not
-repeat them. Put what is specific to this task beside the step it affects: vote
-mapping, PR head binding, setup readiness, question protocols.
+A selected runbook's body is returned in full with the foundation, and callers that
+print the whole result pay for it twice, so every byte counts. **Put shared rules in
+`daintree.foundation`**: caller differences, ownership, launching, reading replies
+from the notice's quote, long-run checkpoints, proving a finish. Do not repeat them,
+and do not repeat what Daintree's own assistant prompt or a tool's description
+already says. Put what is specific to this task beside the step it affects: ballot
+blinding, PR head binding, setup readiness, question protocols.
+
+**Design for the fewest calls.** Launch every participant in one turn (same-kind
+agents one at a time), pass `notify:true, handback:true`, and end the turn. The
+notice quotes each agent's last screen lines, so read the reply there; one batched
+`terminal.getStatus` is for quotes that are missing or cut. No wait or poll after a
+notice is armed, and no per-reply status read just to correlate: the notice names
+the terminal. Tell children how long to make their reply so it fits the quote.
 
 A runbook that waits for an agent follows this shape:
 
@@ -84,14 +92,13 @@ Procedure:
 1. Resolve and preflight.
 2. Observe the relevant starting state.
 3. Dispatch the smallest authorized action (brief, `name`, `worktreeId`, `notify`).
-4. Inspect the result and record the checkpoint.
-5. Arrange the supported continuation and end the turn when nothing else is left.
+4. Inspect the result; for a long run, record the checkpoint.
+5. End the turn on the notice when nothing else is left.
 
 On notice or resume:
-1. Restore the checkpoint and apply user changes.
-2. Read current state and correlate the response with this step.
-3. Handle questions, approvals, errors, missing evidence and duplicate notices.
-4. Verify, then finish or advance one eligible step.
+1. Apply user changes; read the reply from the notice's quote.
+2. Handle questions, dialogs, errors, cut quotes and duplicate notices.
+3. Verify, then finish or advance one eligible step.
 
 Stop and recovery: <finite bounds; what is never replayed>.
 
@@ -108,10 +115,11 @@ shorter. It gets no empty notice or checkpoint sections.
 2. **Stay inside the requested outcome.** A runbook does not authorize extra writes,
    terminal closure or public messages, and it should not demand a second approval
    for work already authorized. App confirmations and approvals still apply.
-3. **Make asynchronous work re-entrant.** Record the dispatch, arrange a real
-   continuation (a `notify` on the launch or send, or `terminal.notifyWhenIdle`),
-   end the turn, and on the next activation recover state without repeating a
-   launch or a public write. Give a no-notice path: one bounded wait of at most 60
+3. **Make asynchronous work re-entrant.** Arrange a real continuation (a `notify`
+   on the launch or send, or `terminal.notifyWhenIdle`), end the turn, and on the
+   next activation recover state without repeating a launch or a public write. A
+   short run keeps its state in the conversation; only a long or multi-session run
+   writes a checkpoint, and never into the user's repository from the sidebar. Give a no-notice path: one bounded wait of at most 60
    seconds, or an honest "this needs your continuation".
 4. **Never replay an ambiguous write.** Read the real state first: the listing, the
    submission receipt, the forge.

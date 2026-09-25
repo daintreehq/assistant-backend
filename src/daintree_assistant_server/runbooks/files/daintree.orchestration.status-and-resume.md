@@ -9,39 +9,39 @@ requiredTools:
   - terminal.getStatus
   - worktree.list
 optionalTools:
-  - terminal.getOutput
-  - terminal.readLastMessageOwned
   - agentSessionHistory.list
   - agentSessionHistory.resume
   - notifications.recent
 ---
 Use when: the user wants the cross-turn or cross-session picture (where were we, what is still open, what happened while I was away), wants a closed agent session back, or a saved run checkpoint needs reconciling with reality.
 
-Availability: Core for live reads. `agentSessionHistory.list`, `agentSessionHistory.resume` and `notifications.recent` raise an approval in a core pane. Branch and PR state come from your host's `git` and `gh` (Hybrid). The app keeps no workflow ledger, launch history or audit log. The record is the run checkpoints under `.daintree/runbook-runs/`, live Daintree state, Daintree's closed-session journal, and git and the forge. This is a read-and-reconcile sweep: continuing a piece of work happens under the runbook that started it.
+Availability: Core for live reads. `agentSessionHistory.list`, `agentSessionHistory.resume` and `notifications.recent` raise an approval in a core pane. Branch and PR state come from your host's `git` and `gh`. The app keeps no workflow ledger or record of past MCP calls: the record is your run checkpoints (in `$DAINTREE_ASSISTANT_SCRATCH_DIR` or `.daintree/runbook-runs/`), live Daintree state, the closed-session journal, and git and the forge. This is a read-and-reconcile sweep; continuing work happens under the runbook that started it.
 
 Procedure:
-1. Find the record. Read the run checkpoints in the coordinator checkout (usually the project root) that are not closed. If there are none, say so: rebuild the picture from live evidence only, label earlier decisions unknown, and never replay a write from memory. Your own compacted or resumed context is not a record you can read back; the checkpoint and live reads are.
-2. Read live state in one pass: `terminal.list`; `worktree.list` for branches and its `issueNumber`, `prNumber` and `setupState` hints; and one `terminal.getStatus` over the checkpoint's terminal ids plus any listed agents, with `includeOutput`. For branch and PR state use `git -C <worktree path>` and `gh pr list --repo <owner/repo> --head <branch>`. Keep the sweep broad: offer a focused CI or review read (daintree.workflow.follow-up-on-issue) rather than pulling one per unit.
-3. Reconcile each checkpoint unit on evidence, never on its recorded status or its age:
-   - Terminal present and working: live. Whether anything will wake you is a separate question. Notices belong to the pane that armed them and end with it: after that pane relaunched or Daintree restarted, none is pending; after a compaction in the same pane, the ones your checkpoint records still are.
-   - Terminal present and stopped: a candidate result, verified against the recorded acceptance before it becomes done.
-   - Terminal absent from a successful listing: gone. How it ended comes from the branch, commits and PR, or stays unknown. A failed or partial listing is unknown, not gone.
-   - A public write recorded as intended but not confirmed: uncertain until you read it back from the forge or repository.
-   Correct the checkpoint only where evidence supports the change: `done` needs verified acceptance, `failed` a confirmed failure, `cancelled` the user's word. Otherwise leave the status and note the gap. Record confirmed PR numbers and branches onto their units. Write atomically, as the only writer.
-4. Ownership after an interruption. A relaunched pane, a new session and an app restart own nothing the old connection created. `terminal.list` with `owned:true` shows what this connection holds. Status reads and notices still work on any agent terminal in the project. Sending or interrupting needs the user to hand the terminal over in Daintree; closing and worktree deletion are never handed over and stay with the user. Report which resources are no longer yours instead of trying them.
-5. Closed agent sessions. List them per worktree or project, newest first, paging with `offset` while `hasMore`:
+1. Find the record: open checkpoints in the coordinator's checkpoint location, and whatever your own host can verifiably show of the earlier session. With none, say so, rebuild from live evidence, label earlier decisions unknown, and replay no write from memory.
+2. Read live state in one pass: `terminal.list`; `worktree.list` for branches and its `issueNumber`, `prNumber` and `setupState` hints; one `terminal.getStatus` over the recorded terminal ids plus listed agents, with `includeOutput`. Branch and PR state from `git -C <worktree path>` and `gh pr list --repo <owner/repo> --head <branch>`. Offer a focused CI read (daintree.workflow.follow-up-on-issue) rather than one per unit.
+3. Reconcile each recorded unit on evidence, not on its recorded status:
+   - Present and working: live. A checkpoint shows a notice was requested, not that it is still pending: it may have fired, been cleared by the user, or died with a relaunched pane or restarted app. Say whether anything will wake you, and if not, that continuing needs a fresh notice or the user.
+   - Present and stopped: a candidate result, checked against the recorded acceptance.
+   - Absent from a successful listing: gone; how it ended comes from the branch, commits and PR, or stays unknown. A failed or partial listing is unknown, not gone.
+   - A recorded public-write intent with no confirmed result: uncertain until read back from the forge or repository.
+   Children may have progressed while the coordinator was away, even though nothing of yours advanced. Correct the checkpoint only on evidence (`done` needs verified acceptance, `failed` a confirmed failure, `cancelled` the user's word), atomically and as the only writer.
+4. Ownership after an interruption. A relaunched pane, a new session and an app restart own nothing the old connection created; `terminal.list` with `owned:true` shows what this one holds. Status reads and notices work on any agent terminal in the project. Sending needs the user to hand the terminal over in Daintree; closing and worktree deletion are never handed over. Report which resources are no longer yours.
+5. Closed agent sessions, newest first, paging with `offset` while `hasMore`:
 
 ```json tool=agentSessionHistory.list
 {"worktreeId":"<exact worktree id>","limit":20,"offset":0}
 ```
 
-   The journal names sessions but holds no transcript text, and old entries are pruned, so absence does not prove a session never existed. To bring one back, only when the user asks:
+   The journal holds no transcript text and prunes old entries, so absence proves nothing. Resume one only when the user asks:
 
 ```json tool=agentSessionHistory.resume
 {"worktreeId":"<worktree the session was recorded in>","sessionId":"<exact sessionId from the listing>"}
 ```
 
-   It relaunches that agent on its own saved conversation, in the worktree it was recorded in (another worktree is refused); a second call brings the same pane forward rather than starting a second agent. It restores the agent's conversation as its CLI saved it, and nothing of yours: not your checkpoint, your notices or your ownership, since this connection did not launch that pane. Say exactly that. It opens off-screen unless its worktree is active.
-6. "What happened while I was away": `notifications.recent` lists the completion, waiting and error messages Daintree raised for the user. Combine it with the reconciled units. No record of past MCP calls exists to read.
+   It relaunches that agent on its saved conversation in its recorded worktree (a second call brings the same pane forward), restoring nothing of yours: not your checkpoint, notices or ownership. Say so.
+6. "What happened while I was away": `notifications.recent` lists the completion, waiting and error messages Daintree raised, to combine with the reconciled units.
 
-Report back: one ranked picture with real ids: (a) needs the user now (questions, approvals, errors, uncertain writes); (b) live, and whether anything will wake you; (c) stopped and awaiting verification; (d) done on evidence, gone, or unknown; (e) resumable sessions, newest first. Then what you corrected in which checkpoint and on what evidence, which resources this session no longer owns, and what continuing needs: the recorded runbook's resume steps and the user's go-ahead.
+Continuing an already authorized plan needs these fresh target and ownership checks, not a new generic approval.
+
+Report back: one ranked picture with real ids: (a) needs the user now (questions, approvals, errors, uncertain writes); (b) live, and whether anything will wake you; (c) stopped, awaiting verification; (d) done on evidence, gone, or unknown; (e) resumable sessions. Then what you corrected in which checkpoint and on what evidence, which resources this session no longer owns, and what continuing needs.

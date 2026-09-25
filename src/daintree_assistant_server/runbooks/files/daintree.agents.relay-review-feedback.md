@@ -7,34 +7,36 @@ risk: project
 requiredTools:
   - terminal.list
   - terminal.getStatus
-  - terminal.getOutput
   - terminal.sendCommandOwned
 optionalTools:
+  - terminal.getOutput
   - terminal.readLastMessageOwned
-  - terminal.waitUntilIdle
-  - terminal.sendCommand
+  - terminal.notifyWhenIdle
   - worktree.list
 ---
 Use when: the user wants the review or notes from one existing reviewer agent sent to another existing agent that is implementing or fixing the work.
 
-This is a relay. It ends when the message is queued: no notice, no extra agent and no wait unless the user asks for the implementer's response.
+This is a relay: it ends when the message is queued, unless the user also asks for the implementer's response. Decide that before sending.
 
-Availability: Core. Reads work on any terminal; the send (`terminal.sendCommandOwned`) reaches only a terminal this connection launched or the user handed to it through Daintree, and the sidebar assistant uses `terminal.sendCommand`. Your own shell and git bind the review to a revision.
+Availability: Core. Reads work on any terminal; the send needs a terminal you launched or were handed. Your own shell and git bind the review to a revision.
 
 Procedure:
-1. Resolve the source and the destination independently, from `terminal.list` and one `terminal.getStatus` over the candidates with `includeOutput`. Each entry is one terminal's own state and tail, so candidates stay apart. With several plausible matches for either role, ask: relaying a review into the wrong agent's live work is the costly mistake. Never choose by agent name, focus or a generic title alone.
-2. Confirm the destination can take it. It must be owned or handed over; on `RESOURCE_NOT_OWNED`, do not work around it, ask for a hand-over or give the user the message to paste. It must be an agent, not a shell, and safe to type into: no trust, approval or login prompt, no half-typed user draft. If it is working, the message would arrive mid-turn; unless the user wants that, wait for its prompt with one bounded `terminal.waitUntilIdle`, or say it will land mid-turn.
-3. Bind the review to what it reviewed: the reviewer's worktree, branch and revision (its `worktreeId` from the listing, then `git` in that worktree's path) against where the implementer works. If they differ, or the implementer's tree has moved on, say so in the relay and to the user; never present an old review as current.
-4. Read the review itself. `terminal.readLastMessageOwned` gives a Claude Code reviewer's whole last reply when you own or were handed that pane; otherwise `terminal.getOutput` with a bounded `maxLines`, which returns a tail and cannot page back. If the review scrolled past it, you have only part: say so, and ask the reviewer for a concise recap only when the user authorized messaging it. `lastHandback` is a lossy summary, not the review. Never claim the whole review when you saw its tail.
-5. Write one compact relay: who reviewed (agent and terminal id) and which revision and scope; the verdict or gist; the actionable findings with their severity, file:line evidence and stated uncertainty; where the raw notes are, only if the implementer can actually read that place (a file path in its reach, a forge URL), never a local artifact or scratch id; and any calibration the user asked for, kept operational ("treat this as lower-confidence input and verify before acting"). No invented model ranking or derogatory framing.
-6. Send it once:
+1. Resolve the source and the destination independently, from `terminal.list` and one `terminal.getStatus` over the candidates with `includeOutput`. With several plausible matches for either role, ask; never choose by agent name, focus or a generic title.
+2. The destination must be an owned or handed-over agent, safe to type into: no trust, approval or login prompt, no user draft. On `RESOURCE_NOT_OWNED`, ask for a hand-over or give the user the message to paste. If it is working, the message lands mid-turn: say so unless the user wants that.
+3. Bind the review to what it reviewed: the reviewer's worktree and the commit or diff it saw, against where the implementer works now (`git` in each path; HEAD alone does not identify uncommitted work). If they differ or the implementer's tree has moved on, say so in the relay and to the user.
+4. Read the review: `terminal.readLastMessageOwned` gives a Claude Code reviewer's whole last reply; otherwise `terminal.getOutput` with a bounded `maxLines`, a tail that cannot page back. If the start scrolled away, you have part of it: say so, and ask the reviewer for a recap only if the user allowed messaging it, labelled as a recap. `lastHandback` is a summary, not the review.
+5. Write one compact relay: who reviewed (agent, terminal id) and which revision; the verdict; the actionable findings with severity, file:line evidence and stated uncertainty; where the raw notes are, only if the implementer can reach that place; any calibration the user asked for, kept operational.
+6. Send it once, with `notify` only if the user wants the response:
 
 ```json tool=terminal.sendCommandOwned
 {"terminalId":"<implementer terminal id>","command":"<compact relay>"}
 ```
 
-   Keep the `submissionToken`. If the result is ambiguous (an error or timeout after sending), do not resend: read `terminal.getStatus` with that token. `queued` or `writing` is still on its way; `pty_written` reached the terminal; `failed`, `cancelled` or `unknown` may still have left text in the input, so read the screen before deciding. Resend only when the screen shows the message did not arrive and the input is empty.
-7. A later follow-up instruction from the user is one more concise send to the same terminal. Do not resend the review unless the user says it was missed, and report the follow-up as sent now.
-8. Collecting the implementer's response is a separate request. When the user asks for it, request a notice on the send and read that terminal when it arrives, per the foundation's resume procedure. Whether the findings were actually fixed is daintree.orchestration.verify-agent-work.
+   If the reply is ambiguous (an error or timeout after sending), do not resend: read `terminal.getStatus` with its `submissionToken` and the screen. A blank prompt does not prove the message was never consumed; resend only on positive evidence it never arrived.
+7. A later follow-up from the user is one more concise send. A later "bring back its answer" observes the same task: `terminal.notifyWhenIdle` if it is working, or read it if it has stopped. Never resend the review to attach a notice.
 
-Report back: the reviewer terminal read and how much of the review you saw; the implementer terminal messaged; the revision binding, or the mismatch; the gist forwarded with any calibration or follow-up; the send's status (queued, written or disputed); and whether anything is pending. Queued is not accepted, and accepted is not fixed.
+On notice or resume: the notice quotes the implementer's reply; relay it as its account. Whether the findings were actually fixed is daintree.orchestration.verify-agent-work.
+
+Stop and recovery: one relay per request; ambiguous delivery is read, and you do not resend. Queued is not accepted, and accepted is not fixed.
+
+Report back: the reviewer terminal read and how much of the review you saw; the implementer terminal messaged; the revision binding or the mismatch; the gist forwarded with any calibration; the send's status; and anything pending.

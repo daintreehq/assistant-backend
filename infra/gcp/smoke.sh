@@ -162,8 +162,9 @@ fi
 # ONNX artifact loaded and ranks, rather than that the process is up.
 STATUS="$(rpc '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_runbooks","arguments":{"query":"rename my terminals so I can tell the agents apart","max_results":3}}}')"
 if [ "$STATUS" = "200" ]; then
-  VERDICT="$(check '(lambda r: r["isError"] is False and 1 <= len(r["structuredContent"]["runbooks"]) <= 3 and all(x["instructions"] for x in r["structuredContent"]["runbooks"]) or r)(body["result"])')"
-  [ "$VERDICT" = "ok" ] && pass "MCP search returns runbooks with instructions" \
+  # Selected hits carry their procedure; neighbours are named only.
+  VERDICT="$(check '(lambda r: r["isError"] is False and 1 <= len(r["structuredContent"]["runbooks"]) <= 3 and all(x.get("instructions") if x["selected"] else "instructions" not in x for x in r["structuredContent"]["runbooks"]) or r)(body["result"])')"
+  [ "$VERDICT" = "ok" ] && pass "MCP search returns selected runbooks with instructions" \
                         || fail "MCP search result is wrong" "$VERDICT"
   # Routing, not just availability: a selector that loads but ranks garbage
   # would pass every check above. This query is the catalog's canonical case.

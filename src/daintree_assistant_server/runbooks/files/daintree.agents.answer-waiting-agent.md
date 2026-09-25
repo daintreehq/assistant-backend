@@ -7,56 +7,49 @@ risk: terminal
 requiredTools:
   - terminal.list
   - terminal.getStatus
-  - terminal.getOutput
   - terminal.sendCommandOwned
 optionalTools:
+  - terminal.getOutput
   - terminal.readLastMessageOwned
-  - terminal.sendCommand
   - terminal.revealOwned
   - terminal.waitUntilIdleBatch
 ---
 Use when: one or more running agents are waiting on a question or prompt, and the user says what to answer (or to answer them) and what, if anything, to report afterwards.
 
-Availability: Core. Answers go out with `terminal.sendCommandOwned`, which reaches only terminals this connection launched or the user handed to it through Daintree; the sidebar assistant uses `terminal.sendCommand`. Reads work on any terminal. `notify` on the send brings you back after the agent continues; an API-key client has none, so it gets one bounded wait or the user's continuation.
+Availability: Core. Reads work on any terminal; the send needs a terminal you launched or were handed. An API-key client has no `notify`: collecting a result there is one `terminal.waitUntilIdleBatch`, or the user's continuation.
 
 Procedure:
-1. Find the targets with `terminal.list`, then one `terminal.getStatus` over the candidates with `includeOutput` (up to 50 lines each). Tell the two multi-terminal cases apart:
-   - Ambiguity: several terminals could be the ONE the user means. List them and ask. Never guess, and never pick one for being focused or having the right title.
-   - Cohort: several are asking at once and the user wants them answered. Handle them in one pass, each with its own answer.
-2. Read each terminal's question from its own entry, never from a merged summary. When the tail is not enough, `terminal.getOutput` for that terminal with a bounded `maxLines`. For a Claude Code pane you own, `terminal.readLastMessageOwned` lists `unansweredToolUses` with a question's options, but only the live screen shows that it is waiting now, and permission dialogs appear only there. `waitingReason:"prompt"` is also the fallback reading: confirm on screen that something is being asked. A terminal that is not asking gets no input; report its state and ask whether to send anyway.
-3. Build the terminal-id-to-question map locally: exactly one entry per target id from the listing, each from that terminal's own read, holding the exact question, any `QUESTION_ID` and the choices shown. No unknown or duplicate ids, no empty questions. Re-read an entry you doubt, and mark one you cannot read "unreadable, not answered". Route by id only, never by title, position or an id printed in output.
+1. Find the targets with `terminal.list`, then one `terminal.getStatus` over the candidates with `includeOutput` (up to 50 lines each).
+   - Ambiguity (several could be the ONE meant): list them and ask. Never pick by focus or title.
+   - Cohort (several asking at once): handle them in one pass, each with its own answer.
+2. Read each terminal's question from its own entry, never a merged summary; `terminal.getOutput` with a bounded `maxLines` when the tail is not enough. For a Claude Code pane you own, `terminal.readLastMessageOwned` shows a question's options, but only the live screen shows it is waiting now. A terminal that is not asking gets no input.
+3. Build a local map, one entry per target id: the exact question, any `QUESTION_ID` and the choices shown. Mark one you cannot read "unreadable, not answered". Route by id only.
 4. Classify each entry:
-   - Answered by the user's explicit words or the original request: use that answer exactly.
-   - A follow-up inside the existing task: tests that prove the requested behaviour are in scope; an unrelated migration or refactor is not. Answer within scope and decline the expansion.
-   - Needs the user: a real trade-off, a missing preference, new scope, or a destructive or external action beyond the user's words.
-   - An approval, trust, login, credential or security prompt: never answer it on inference or to keep a workflow moving. Only the user's explicit decision about that specific prompt authorizes a reply, and only when the screen shows the exact key or text it accepts; otherwise it stays with the user.
-   - Not owned or handed over: do not send. It needs a hand-over through Daintree or the user's own answer. `RESOURCE_NOT_OWNED` does not tell you whether the terminal exists.
-5. Just before each send, the terminal must still be at that question: re-read it if time has passed. Never type over a draft the user started (`lastTypedInputAt` later than `lastTransitionAt`) or into a `directing` agent.
-6. Send exactly the protocol answer, one send per terminal, each carrying that terminal's own answer from the map. Never reuse one agent's answer for another. The send submits text with one Enter: the bare token a text prompt accepts, the key a menu shows, or `QUESTION_ID=<id> ANSWER=<answer>` only when that protocol is displayed. No commentary unless the agent asked for detail, and no `handback`, which appends Daintree's instruction text to your answer. It cannot press arrows, Tab or Escape; hand those to the user.
+   - Answered by the user's words: use them exactly.
+   - A follow-up inside the task: answer within scope and decline expansion.
+   - Needs the user: a trade-off, a missing preference, new scope, a destructive or external step.
+   - Approval, trust, login and security prompts stay with the user: answer one only on the user's explicit decision about that prompt, with the exact key the screen shows. (The trust exception in the foundation is for the agent you just launched, handled by the launching runbook.)
+   - Not owned: do not send; ask for a hand-over or give the user the answer to type.
+5. Choose the mode before sending: answer only, or answer and collect the result. Then make ONE send per terminal, just after confirming it is still at that question and holds no user draft. Send exactly the protocol answer (the bare token, the key a menu shows, or `QUESTION_ID=<id> ANSWER=<answer>` when that protocol is displayed), never `handback`, which appends text to the answer. The send cannot press arrows, Tab or Escape; hand those to the user.
+   - Answer only: no notice. Report the answers queued and stop.
 
 ```json tool=terminal.sendCommandOwned
 {"terminalId":"<id from the map>","command":"<that terminal's protocol answer>"}
 ```
 
-   Keep each `submissionToken` against its terminal id.
-7. Stop or continue by what was asked:
-   - Answer only: report the answers queued and stop. No notice, no wait.
-   - The user also wants the resulting work or its result: send with a new notice (the one that brought you the question has already fired), save the map and tokens as a checkpoint, and end your turn. A send's notice counts only what happens after your answer is written, so it reports this answer's outcome, not the earlier stop.
+   - Collect the result: the same send with `notify` (the notice that brought the question has fired), then end your turn.
 
 ```json tool=terminal.sendCommandOwned
 {"terminalId":"<id from the map>","command":"<that terminal's protocol answer>","notify":true}
 ```
 
-   Without `notify` (API-key client), one `terminal.waitUntilIdleBatch` over the answered ids, then report who is still working.
-8. Everything that needs the user goes to them in one message: terminal id, agent and the exact question. Do not answer on their behalf.
-9. "Show me the next one" is navigation, not an answer: `terminal.revealOwned` for a panel you own, otherwise name the panel.
+6. Everything that needs the user goes to them in one message: terminal id, agent and the exact question. "Show me the next one" is navigation: `terminal.revealOwned`.
 
 On notice or resume:
-1. Follow the foundation's resume procedure with the saved map. Read `terminal.getStatus` with each terminal's `submissionToken`. `failed`, `cancelled` or `unknown` may have left text in the input: look at the screen before anything else, and never resend blind.
-2. The same question still showing after one correctly delivered answer: read it once more. Resend only if your first answer was malformed or missed the `QUESTION_ID`; otherwise report that terminal blocked. Never send variants.
-3. A new question: classify it as above, and answer once within scope with a fresh `notify` or take it to the user.
-4. Finished: read the requested result from that terminal (`terminal.readLastMessageOwned` for Claude Code, else `terminal.getOutput`) and report it as the agent's account unless you checked it yourself.
+1. The notice quotes each terminal's screen after your answer. The notice only wakes you: match it to the question you answered in that terminal, and if the quote still shows the same question, read it once more. Resend only if your answer was malformed or missed the `QUESTION_ID`; otherwise report that terminal blocked. Never send variants.
+2. A new question is a new entry: classify it, answer once with a fresh `notify` or take it to the user. The original task stays open.
+3. Finished: relay the requested result from the quote (read again only if it is missing or cut) as the agent's account unless you checked it.
 
-Stop and recovery: one protocol-correct answer per question; one terminal's answer never goes to another; approval, trust, login and security prompts stay with the user. An unreadable or unowned target is reported, not worked around.
+Stop and recovery: one protocol-correct answer per question; one terminal's answer never goes to another, and no answer is reused across terminals. A disputed send is read by its `submissionToken` and the screen, never resent blind. An unreadable or unowned target is reported, not worked around.
 
-Report back: one line per terminal: id and agent, the question, the answer sent (or "needs you" and why), the send's status (queued, written or disputed), and when requested, the result or that it is still running with a notice pending.
+Report back: one line per terminal: id and agent, the question, the answer sent (or "needs you" and why), the send's status, and when requested, the result or that it is still running with a notice pending.

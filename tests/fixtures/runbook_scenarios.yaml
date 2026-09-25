@@ -54,10 +54,10 @@ scenarios:
 
   - id: child-at-trust-login-or-approval
     situation: A child stops at a trust, login or permission dialog.
-    must: Hand it to the user.
-    must_not: Approve it to keep the workflow moving, or count it as success.
+    must: Trust only the directory the user asked to launch in, with the key the dialog shows, and say so; hand anything else to the user.
+    must_not: Approve anything else to keep the workflow moving, or count it as success.
     runbooks: [daintree.foundation]
-    states: ["Never approve to keep a workflow moving"]
+    states: ["Trusting the directory the user asked you to launch in is inside their authority", "send exactly the key the dialog shows", "Never approve to keep a workflow moving"]
 
   - id: submission-uncertain
     situation: A send's delivery is disputed or queued.
@@ -142,6 +142,27 @@ scenarios:
     must_not: Treat a deadline in a checkpoint as a wake.
     runbooks: [daintree.foundation]
     states: ["deadline written in a checkpoint wakes nothing"]
+
+  - id: reply-arrives-in-the-notice
+    situation: A child launched or prompted with notify stops, and the notice quotes its last screen lines.
+    must: Read the reply from the quote; read the terminal again only when the quote is missing or cut.
+    must_not: Wait or poll after arming the notice, or re-read every reply as a matter of course.
+    runbooks: [daintree.foundation]
+    states: ["do not also wait or poll", "The quote is the reply", "one `terminal.getStatus` with `includeOutput` over all of them"]
+
+  - id: short-run-needs-no-checkpoint-file
+    situation: A one- or two-round orchestration, or the sidebar assistant with a scratch folder.
+    must: Keep state in the conversation; for a long run use the scratch folder first.
+    must_not: Write a checkpoint into the user's repository from the sidebar.
+    runbooks: [daintree.foundation]
+    states: ["For one or two rounds your conversation is the record", "DAINTREE_ASSISTANT_SCRATCH_DIR", "never writes into the user's repository", "git rev-parse --git-path info/exclude"]
+
+  - id: same-kind-launches-are-distinct
+    situation: Two participants of the same agent kind are launched for one task.
+    must: Give each a distinct name or requestedId.
+    must_not: Send identical launch arguments and silently get one panel.
+    runbooks: [daintree.foundation]
+    states: ["distinct `name`", "identical launch arguments within two minutes return the earlier launch"]
 
   - id: default-worktree-is-the-users
     situation: A pane launches an agent without naming a worktree.

@@ -60,7 +60,7 @@ def _healthy_deployment() -> dict[str, Any]:
                 "selected": True,
                 "instructions": "1. List the terminals.",
             },
-            {"id": "daintree.foundation", "selected": False, "instructions": "Shared judgement."},
+            {"id": "daintree.foundation", "selected": False},
         ],
         "search_revision": REVISION,
         "get_is_error": False,
@@ -251,11 +251,28 @@ _MUTATIONS = [
     ("the search finds nothing", {"search_results": []}),
     (
         "the search ignores max_results",
-        {"search_results": [{"id": f"r{i}", "instructions": "x"} for i in range(4)]},
+        {
+            "search_results": [
+                {"id": f"r{i}", "selected": True, "instructions": "x"} for i in range(4)
+            ]
+        },
     ),
     (
-        "a result carries no instructions",
-        {"search_results": [{"id": "daintree.foundation", "instructions": ""}]},
+        "a selected result carries no instructions",
+        {
+            "search_results": [
+                {"id": "daintree.terminals.rename", "selected": True, "instructions": ""}
+            ]
+        },
+    ),
+    (
+        "an unselected neighbour carries its whole procedure",
+        {
+            "search_results": [
+                {"id": "daintree.terminals.rename", "selected": True, "instructions": "x"},
+                {"id": "daintree.foundation", "selected": False, "instructions": "x"},
+            ]
+        },
     ),
     (
         "the search ranks the wrong runbook first",
@@ -264,9 +281,7 @@ _MUTATIONS = [
     (
         "the right runbook ranks first but would not be loaded",
         {
-            "search_results": [
-                {"id": "daintree.terminals.rename", "selected": False, "instructions": "x"}
-            ]
+            "search_results": [{"id": "daintree.terminals.rename", "selected": False}]
         },
     ),
     ("search and readiness disagree on the catalog", {"search_revision": "sha256:other"}),

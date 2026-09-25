@@ -9,44 +9,34 @@ requiredTools:
   - terminal.getStatus
   - terminal.notifyWhenIdle
 optionalTools:
-  - terminal.getOutput
-  - terminal.readLastMessageOwned
+  - agent.launch
   - worktree.waitForPullRequest
-  - forge.getCIStatus
-  - forge.getPR
 ---
-Use when: the user wants to hear about something later, or wants something to happen at a later time or when a condition holds. Your job is to choose a continuation that really exists, or to say plainly that none does. It is never to do the deferred work now.
+Use when: the user wants to hear about something later, or wants something done at a later time or when a condition holds. Choose a continuation that really exists, or say plainly that none does. Deferred work is never started now.
 
-Availability: Core, in an agent pane with a Daintree connection. Daintree offers exactly one way to be woken later: a notice when an agent terminal stops working (`notify` on a launch or send, or `terminal.notifyWhenIdle` for work already running). It has no timer or scheduler, no watcher for output text, CI, reviews or PR state, nothing that runs after the app or your pane closes, and no way to list or cancel a notice. An API-key client gets no notices at all. Anything beyond a stop notice must be a mechanism of your own host that you have verified here. `forge.getCIStatus` and `forge.getPR` are one-off reads that raise an approval in a core pane; your host's `gh` is the alternative.
+Availability: Core. Daintree's only wake is a notice when an agent terminal stops working (`notify` on a launch or send, or `terminal.notifyWhenIdle`). It has no timer, scheduler, condition watcher, and nothing that runs after the app or your pane closes. An API-key client gets no notices. Anything more must be a host mechanism you have verified here.
 
 Procedure:
-1. Name what is being asked. Three different things hide behind "later":
-   - Wake you when work stops, so you can read it and report: a notice.
-   - Run a command or start work at a time, or when a condition holds: scheduled execution.
-   - Tell the human at a time or on an event: a reminder. A notice types into your pane, not into the user's attention; they hear only what you report after it, and only if they look at your pane.
-   Keep the requested delay or condition. Deferred work is never started now "to be safe": a spawn asked for in ten minutes does not spawn now.
-2. Wake-on-stop, the supported path.
-   - You are about to prompt the agent: request `notify` on that launch or send, in the runbook that does it. Nothing else to arm.
-   - It is already running: resolve the exact terminal with `terminal.list` and `terminal.getStatus`. It must be an agent terminal in this project and not your own pane; a plain shell never reports working or idle, so it cannot be watched this way. When the follow-up spans activations, record the pending step and what "done" means (the foundation's checkpoint). Then arm, putting the run and step in the note, which comes back in the notice:
+1. Name the ask. A wake when work stops, so you can read and report: a notice. Running something at a time or when a condition holds: scheduled execution. Telling the human: a reminder (a notice types into your prompt, not into the user's attention). Keep the requested delay or condition: a spawn asked for in ten minutes does not spawn now.
+2. Wake on stop. If you are about to prompt the agent, `notify` on that launch or send is all it takes. For an agent already working, resolve the exact terminal (`terminal.list`; an agent in this project, not your own pane; a plain shell never reports working) and arm with your step in the note:
 
 ```json tool=terminal.notifyWhenIdle
-{"terminalId":"<working agent terminal id>","note":"run <run id>: read the build result and report it"}
+{"terminalId":"<working agent terminal id>","note":"read the build result and report it"}
 ```
 
-   `armed:true`: tell the user what you armed and its limits, then end your turn. `armed:false`: it is not working now and `state` says where it is. It may already have finished, so read it now instead of waiting.
-   - The notice fires once, the first time the agent stops working for any reason: finished, asking a question, at an approval, at an error, exited or closed.
-3. Anything else needs a verified host mechanism, or an honest no.
-   - A time ("at 6pm", "in ten minutes", "remind me in an hour") or after-shutdown work ("overnight while the laptop is closed"): Daintree has no timer. Use your host's scheduler only after confirming it exists in this environment, that it will really start a model turn (or run the command) at that time, and that what it starts can reach this Daintree instance with the authority needed. A cloud routine cannot see local panes. A new headless session is a new connection: it owns none of your terminals and receives none of your notices.
-   - A condition ("when CI turns green", "when the PR merges", "when the output says ERROR"): Daintree has no condition watcher, and a stop notice is not one. What works is a command that waits until the condition holds and then exits (for example `gh pr checks <number> --watch --repo <owner/repo>`), run where its exit reaches you: your host's background command, if it re-invokes you when the command ends, or a visible agent the user agrees to launch, with `notify`, whose task is that wait. The notice then means the command ended; read why before reporting the condition. `worktree.waitForPullRequest` only sees that a PR exists, for up to 25 seconds.
-   - When no verified mechanism exists, say so: Daintree cannot run anything or remind anyone at a time or on a condition. Offer what is real: do it now, check right now, a stop notice on work already running, or the user asking again later. Do not start the deferred work, and never arm a notice and call it a timer.
-4. Report what you arranged, then end the turn: the mechanism, the terminal id or host handle, what fires it, and its limits. A notice has no deadline (an agent that never stops never sends one), ends if your pane exits or Daintree restarts, and is cleared only by the user's Stop on your pane's notice chip, which clears all of them.
+   `armed:false` means it is not working: `state` says where it is, so read it now instead of waiting. The notice fires on the first stop for any reason: finished, a question, an approval, an error, exit or close.
+3. Anything else needs a verified host mechanism or an honest no.
+   - A time or after-shutdown work: use your host's scheduler only after confirming it exists here, will start a model turn or the command at that time, and can reach this Daintree instance. A new headless session owns none of your terminals and gets none of your notices.
+   - A condition ("when CI turns green", "when the PR merges"): a stop notice is not a watcher. What works is a command that waits for the condition and exits (`gh pr checks <number> --watch --repo <owner/repo>`), run where its exit reaches you: a host background command that re-invokes you, or a visible agent the user agrees to launch with `notify` whose task is that wait. `worktree.waitForPullRequest` sees only that a PR exists, for up to 25 seconds.
+   - No verified mechanism: say Daintree cannot act or remind at a time or on a condition, and offer what is real (do it now, check now, a stop notice on running work, ask again later). Never arm a notice and call it a timer.
+4. Report the mechanism, its terminal id or host handle, what fires it and its limits: no deadline (an agent that never stops never notifies), and it ends with your pane or a Daintree restart. Then end your turn.
 
 On notice or resume:
-1. Follow the foundation's resume procedure, correlating by the terminal id and the note echoed in the line.
-2. A stop is not the outcome. Read the terminal and apply the acceptance you recorded: a build that stopped may have failed, an agent that stopped may be asking a question, a wait command may have timed out. Report what you observed with its evidence, never just "it finished".
-3. If the terminal is working again, the notice was spent on the earlier stop. Arm once more only if the user still wants to hear, with a fresh note.
-4. Work that a host mechanism started later: revalidate the target and the user's authority before acting, and do not repeat an effect already visible in its system of record.
+1. Match the terminal id and echoed note to what you armed. A stop is not the outcome: read the quote against what "done" meant. A build may have failed, an agent may be asking, a wait command may have timed out.
+2. A wait command's notice means it ended, not that the condition holds: read its exit status and output before reporting the condition.
+3. Working again: the notice was spent on an earlier stop. Re-arm once only if the user still wants to hear.
+4. Work a host mechanism started later: revalidate the target and authority, and repeat no effect already visible in its system of record.
 
-Stop and recovery: one notice per pending step. Arming again for the same terminal replaces the earlier notice, and a pane holds at most 32. There is no cancel: to stop waiting, record a tombstone so a later notice produces nothing, and tell the user their pane's Stop clears every pending notice. Stopping observation never interrupts, closes or restarts the work; those are separate requests. A deadline written in a checkpoint wakes nothing: if the user needs to know by a time, say that only a verified timeout mechanism can promise it.
+Stop and recovery: one notice per pending step; arming again replaces the earlier one. There is no cancel: to stop waiting, drop the step so a late notice does nothing, and tell the user their pane's Stop on the notice chip clears all pending notices. Stopping observation never interrupts, closes or restarts the work.
 
-Report back: what the user asked for (a wake, a scheduled run or a reminder), the mechanism actually arranged with its terminal id or handle, what fires it and what does not, how long it lives, and plainly anything that could not be arranged and was therefore not started.
+Report back: what was asked (wake, scheduled run or reminder), the mechanism actually arranged with its id or handle, what fires it and what does not, how long it lives, and anything that could not be arranged and so was not started.
