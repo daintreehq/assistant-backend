@@ -27,6 +27,7 @@ from .api import (
     daintree_auth,
     daintree_capabilities,
     daintree_doctor,
+    daintree_mcp,
     daintree_respond,
     daintree_runbooks,
     daintree_tasks,
@@ -1037,6 +1038,7 @@ def create_app(
     # patient cannot diagnose the outage a tester is calling about.
     app.include_router(daintree_doctor.router)
     app.include_router(daintree_runbooks.router)
+    app.include_router(daintree_mcp.router)
     # The overlay reload trigger is mounted ONLY for local runbook authoring. It
     # mutates process state, and `require_auth` is not the boundary that stops it:
     # under the shipped `open` posture every caller is the anonymous principal

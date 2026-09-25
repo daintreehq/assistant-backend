@@ -1209,6 +1209,32 @@ byte-identical; a client will occasionally re-fetch a list that did not change. 
 full metadata (summary, when-to-use, risk, required tools) use `/v1/daintree/runbooks`,
 which serves it with an ETag; `runbooks.catalog` deliberately does not repeat it.
 
+### POST /v1/daintree/mcp — runbook search over MCP
+
+A stateless MCP server (Streamable HTTP) exposing one tool, `search_runbooks`, for other
+agents. It runs the same two-stage search a turn runs (cosine shortlist, then the set-wise
+head) over the query as a lone user message with nothing loaded, and returns the top
+`max_results` runbooks (1–20, default 5) by head probability, **bodies included** under
+`instructions`. Each result also carries `score` and `selected` — whether automatic
+selection would have loaded it for this query. The answer is in `structuredContent` and,
+as the same JSON, in a `text` content block.
+
+- **Both protocol eras, one endpoint, no sessions.** `2026-07-28` clients call
+  `server/discover` / `tools/list` / `tools/call` directly with the version in
+  `MCP-Protocol-Version` and `params._meta`; `2025-11-25`, `2025-06-18` and `2025-03-26`
+  clients open with `initialize`, which is answered and forgotten. No `Mcp-Session-Id` is
+  ever issued. `ping` is answered; notifications and client responses get `202`.
+- **Plain JSON only.** Every response is `application/json`; `GET` and `DELETE` are `405`
+  with `Allow: POST`.
+- **Errors.** Argument problems are tool results with `isError: true` (the model can read
+  and fix them), as is a search the classifier could not answer (retryable). Unknown tool
+  `-32602`, unknown method `-32601`. Transport faults are HTTP `400`: parse error `-32700`,
+  batch or malformed message `-32600`, an `Mcp-Method`/`Mcp-Name`/version header
+  contradicting the body `-32020`, an unsupported version `-32022` with
+  `data.supported`. A foreign `Origin` is `403`, a non-JSON `Content-Type` `415`.
+- **Gating** is `/runbooks/resolve`'s: `runbooks:read` plus readiness, inside the identity
+  and private-staging subject gates, outside the billing gate (it spends nothing).
+
 ---
 
 ## Profiles

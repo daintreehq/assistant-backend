@@ -29,6 +29,7 @@ next deploy — reachable, not yet competitive against its trained neighbours; s
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 from pydantic import SecretStr
@@ -51,6 +52,23 @@ _log = get_logger("daintree.runbooks.selector")
 #: what let it describe the shape of the task rather than the shape of the answer.
 #: Costs one list slice — these ids are already ranked and already in hand.
 FAST_CONTEXT_RUNBOOKS = 5
+
+
+@dataclass(frozen=True)
+class RunbookSearchHit:
+    """One ranked answer to a runbook search.
+
+    ``score`` is the set-wise head's probability for this runbook against the
+    query — the same number automatic selection ranks by, not a cosine.
+    ``selected`` says whether automatic selection would actually have LOADED it
+    for this query: the head's cardinality answer and admission floors applied,
+    exactly as on a turn. A caller wanting "the runbooks Daintree would use" reads
+    ``selected``; one browsing for neighbours reads the ranking.
+    """
+
+    runbook_id: str
+    score: float
+    selected: bool
 
 
 class RunbookSelector(Protocol):
@@ -80,6 +98,8 @@ class RunbookSelector(Protocol):
         available_tools: list[str] | None = None,
         catalog: Catalog | None = None,
     ) -> SelectionDecision: ...
+
+    async def search(self, query: str, *, limit: int) -> list[RunbookSearchHit] | None: ...
 
 
 class LocalSelector:
@@ -278,6 +298,46 @@ class LocalSelector:
             docs_query=_docs_search_query(docs_text) if result.docs_wanted else None,
         )
 
+
+    async def search(self, query: str, *, limit: int) -> list[RunbookSearchHit] | None:
+        """Rank the selectable catalog against ``query``; the top ``limit`` hits.
+
+        The SAME two stages a turn runs — cosine shortlist, then the set-wise head
+        — over the query as a lone user message with nothing loaded. What differs
+        is only what is read off the answer: a turn keeps the admitted set, a
+        search keeps the ranking, so a caller asking for five runbooks gets five
+        even where selection would have loaded one or none. The admission verdict
+        still rides along as ``selected``.
+
+        No docs pass: nothing reads the docs flag here, and that pass is the
+        largest single cost the classifier can pay.
+
+        ``None`` when the model could not answer (pool refused, graph failed) —
+        distinct from ``[]``, which is an honest empty catalog. A search has no
+        prior set to fail open to, so the caller must be able to tell the two
+        apart.
+        """
+        catalog = self.catalog
+        text = fit_query(
+            [ChatMessage(role="user", content=query)],
+            fits=self._classifier.query_fits,
+        )
+        result = await self._pool.run(
+            lambda: self._classifier.select(
+                text,
+                [],
+                catalog=catalog,
+                max_active=self._settings.max_active_runbooks,
+            )
+        )
+        if result is None:
+            return None
+        selected = set(result.runbook_ids)
+        return [
+            RunbookSearchHit(runbook_id=sid, score=float(p), selected=sid in selected)
+            for sid, p in result.ranked
+            if sid in catalog.selectable_ids
+        ][:limit]
 
 #: Cap on the string handed to the docs MCP's search box.
 #:

@@ -21,6 +21,7 @@ from daintree_assistant_server.providers.base import (
     ProviderUsage,
 )
 from daintree_assistant_server.runbooks.decision import SelectionDecision
+from daintree_assistant_server.runbooks.local.selector import RunbookSearchHit
 from daintree_assistant_server.services.compaction import (
     CompactionRequest,
     CompactionResult,
@@ -441,10 +442,30 @@ class ScriptedSelector:
         self.provider = provider
         self.catalog_manager = catalog_manager
         self.settings = settings
+        #: Scripted `search` answer, as (runbook id, score, selected) in rank
+        #: order. None ranks the selectable catalog by id with falling scores —
+        #: deterministic, and enough for a test about the wire rather than the
+        #: ranking. `search_fails` makes the model "unable to answer".
+        self.search_hits: list[tuple[str, float, bool]] | None = None
+        self.search_fails = False
+        self.search_requests: list[tuple[str, int]] = []
 
     @property
     def catalog(self) -> Any:
         return self.catalog_manager.catalog
+
+    async def search(self, query: str, *, limit: int) -> list[RunbookSearchHit] | None:
+        self.search_requests.append((query, limit))
+        if self.search_fails:
+            return None
+        hits = self.search_hits
+        if hits is None:
+            ids = sorted(self.catalog.selectable_ids)
+            hits = [(sid, round(0.9 - i * 0.01, 4), False) for i, sid in enumerate(ids)]
+        return [
+            RunbookSearchHit(runbook_id=sid, score=score, selected=selected)
+            for sid, score, selected in hits
+        ][:limit]
 
     async def select(
         self,

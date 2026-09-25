@@ -521,6 +521,7 @@ GATED_ROUTES = [
     ("GET", "/v1/daintree/runbooks", None),
     ("GET", "/v1/daintree/account", None),
     ("POST", "/v1/daintree/runbooks/resolve", {"input": {"messages": []}}),
+    ("POST", "/v1/daintree/mcp", {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}),
     ("POST", "/v1/daintree/auth/verify", {}),
     ("POST", "/v1/daintree/doctor", {}),
     ("POST", "/v1/daintree/respond", _respond_body()),
