@@ -9,6 +9,7 @@ allowed-tools:
   - Glob
   - TaskCreate
   - TaskUpdate
+  - Monitor
   - AskUserQuestion
 ---
 
@@ -33,8 +34,8 @@ went, and that what is actually serving afterwards is what you shipped.
 | Repo | `daintreehq/assistant-backend` |
 
 The trigger's region is **not** necessarily `us-central1` — it lives wherever the
-Developer Connect repository link lives. Discover it once at the start and reuse
-it for every `gcloud builds` call:
+Developer Connect repository link lives. Discover it once in preflight (after the
+auth check) and reuse it for every `gcloud builds` call:
 
 ```bash
 BUILD_REGION=$(for r in us-central1 europe-west1 us-east1 us-west1; do
@@ -53,8 +54,11 @@ done)
 - **No AI attribution** in the merge commit message.
 - **Do not run the test suite locally.** GitHub CI already ran it on this exact
   head; use that verdict. Local runs are slow and prove nothing extra.
-- **Never use a foreground `sleep`** to wait — the harness blocks it. Poll with
-  a backgrounded `until` loop (`run_in_background: true`).
+- **Never use a foreground `sleep`** to wait — the harness blocks it. Wait for CI
+  with a backgrounded Bash call and watch the build with the Monitor tool (step 5).
+- **Nothing irreversible before every tool works.** An expired `gcloud` login
+  discovered after the push leaves a deploy running that you cannot watch or
+  verify. Preflight proves `gh` and `gcloud` both work before touching `main`.
 - **Never release red code.** A failed or missing CI run is a full stop, not a
   judgement call.
 
@@ -67,6 +71,30 @@ git status --porcelain          # must be empty
 git fetch origin --prune
 git rev-parse --abbrev-ref HEAD # the release branch, usually develop
 ```
+
+Prove both CLIs are authenticated, non-interactively:
+
+```bash
+gh auth status >/dev/null 2>&1 || echo "gh: not logged in"
+gcloud auth print-access-token --quiet >/dev/null 2>&1 || echo "gcloud: token expired"
+```
+
+Either failing is a stop. The user has to re-auth interactively: tell them to run
+`! gcloud auth login` (or `! gh auth login`) and then pick up from here. Only
+then discover `BUILD_REGION` (see Constants).
+
+Refuse to start a release while another `deploy-main` build is still running.
+`cloudbuild.yaml` has no ordering guard, so if two builds overlap the slower
+one's `promote` can land after the newer one and quietly put the older commit back
+on 100%:
+
+```bash
+gcloud builds list --region="$BUILD_REGION" --project=daintree-research \
+  --filter='status=(QUEUED OR WORKING)' --format='value(id,substitutions.COMMIT_SHA)'
+```
+
+If anything is listed, watch it to completion with `watch-build.sh` (step 5) and
+only then continue.
 
 A dirty tree is a stop: report what is uncommitted and let the user decide. Then
 confirm the local branch matches its remote (`git rev-list --left-right --count
@@ -97,14 +125,21 @@ included `--dry-run`, stop here.
 
 ### 3. Gate on GitHub CI
 
+Query by the exact commit, not by the branch, so there's no need to match SHAs
+by eye:
+
 ```bash
-gh run list --branch <branch> --limit 5 \
-  --json headSha,conclusion,status,workflowName,url,createdAt
+HEAD_SHA=$(git rev-parse origin/<branch>)
+gh run list --commit "$HEAD_SHA" --workflow CI --event push \
+  --json databaseId,status,conclusion,attempt,url
 ```
 
-Require a **completed, successful** run whose `headSha` equals the branch head.
+Require a **completed, successful** run. `cancelled` is not green: it usually
+means a newer push replaced this one, so re-check the branch head.
 
-- Still running → wait for it with a backgrounded poll loop, then re-check.
+- Still running → `gh run watch <databaseId> --exit-status --interval 15`
+  with `run_in_background: true`. It exits non-zero on failure, so the exit code
+  is the verdict. Then re-check.
 - Failed → stop. Report which job failed and its URL. Do not merge.
 - No run for this SHA → stop and say so; CI is the only full-suite gate.
 
@@ -140,18 +175,38 @@ gcloud builds triggers run deploy-main --region="$BUILD_REGION" \
 
 ### 5. Watch the build
 
-The build takes a few minutes and appears a few seconds after the push. Find it
-by commit, then poll it in the background until it settles:
+Run `watch-build.sh` (next to this file) under the **Monitor** tool, with
+`timeout_ms: 1800000` to match the build's own 1800s timeout:
 
 ```bash
-gcloud builds list --region="$BUILD_REGION" --project=daintree-research \
-  --filter="substitutions.COMMIT_SHA=$RELEASE_SHA" \
-  --format='value(id,status)' --limit=1
+.claude/skills/release/watch-build.sh "$RELEASE_SHA" "$BUILD_REGION"
 ```
 
-Poll `gcloud builds describe <id> --region=$BUILD_REGION --format='value(status)'`
-until it is no longer `QUEUED` or `WORKING`. Tell the user the build id and its
-log URL while it runs; do not narrate every poll.
+It finds the build for that commit from this trigger, waiting up to 5 minutes for
+it to appear. Then it polls `gcloud builds describe` every 20s and prints only
+changes:
+
+- `BUILD <id> <console url>`: pass the URL on to the user once.
+- `STEP <id>=<status>`: one line per step transition.
+- `DONE <status> <id> [detail]`: the build's verdict. The script exits 0 only on
+  `SUCCESS`.
+- `ERROR ...`: no build appeared, or gcloud failed 5 times in a row (usually auth
+  expiring mid-watch). This means **unknown**, not failed: check the console
+  before you report anything.
+
+It polls rather than using `gcloud builds log --stream`, because that command's
+exit code does not reliably reflect how the build ended.
+
+Pay attention to step events before the build finishes. `deploy-rc`, `smoke` and
+`promote` have `allowFailure`, so one of them can show `STEP smoke=FAILURE` while
+the build keeps running. `release-gate` still has to remove the candidate tag
+before it turns the build red. As soon as you see that line you know the release
+will not go live, and you can start reading the log. Don't narrate the other
+steps.
+
+If no build appears, check the trigger history in the console before firing
+`gcloud builds triggers run` by hand. A late webhook plus a manual run means two
+overlapping builds, which is exactly the risk preflight guards against.
 
 **If it ends in anything but `SUCCESS`:**
 
@@ -161,7 +216,9 @@ gcloud builds log <id> --region="$BUILD_REGION" --project=daintree-research \
 tail -80 /tmp/release-build.log
 ```
 
-Identify the failing step and report it. The `smoke` step failing is the
+Identify the failing step and report it. `TIMEOUT` means the whole build ran past
+1800s. Steps it never reached show `CANCELLED`, and it may have stranded an
+`rc-` tag (see CLAUDE.md, "Deploying"). The `smoke` step failing is the
 important case to explain clearly: the candidate revision was deployed with
 **no traffic**, so production is untouched and still serving the previous
 revision. A `deploy-rc` or `build` failure likewise never reached traffic.
@@ -185,24 +242,30 @@ the container no matter how healthy the service is. Or just run the script that
 already knows all of this:
 
 ```bash
-./infra/gcp/smoke.sh --expect-env production            # free checks only
-./infra/gcp/smoke.sh --expect-env production --full     # + two real turns
+./infra/gcp/smoke.sh --expect-env production --expect-build-sha "$RELEASE_SHA"
+./infra/gcp/smoke.sh --expect-env production --expect-build-sha "$RELEASE_SHA" --full
 ```
 
-Pass `--expect-env`: without it the script checks whatever is at the URL and never
-notices that it is the wrong deployment, which is precisely the mistake a release
-can make. `--full` needs no key — the server holds the upstream credential now, so
+Pass both `--expect-*` flags. Without them the script checks whatever is at the
+URL: it won't notice that it's the wrong deployment or an older commit, which are
+exactly the mistakes a release can make. `--full` needs no key — the server holds the upstream credential now, so
 those two turns spend DAINTREE's money rather than yours, which is why they stay
 opt-in.
 
 `build_sha` disagreeing with `RELEASE_SHA` means traffic is still on an older
-revision — say so plainly rather than reporting success. Confirm the rollout:
+revision — say so plainly rather than reporting success. Confirm which revision
+holds the traffic and that the service is Ready:
 
 ```bash
-gcloud run revisions list --service=daintree-assistant --region=us-central1 \
-  --project=daintree-research --limit=3 \
-  --format='table(metadata.name,status.conditions[0].status,spec.containers[0].image)'
+gcloud run services describe daintree-assistant --region=us-central1 \
+  --project=daintree-research \
+  --format='value(status.traffic.filter(percent=100).revisionName,status.conditions.filter(type=Ready).status)'
 ```
+
+That should print the new revision followed by `True`. Also check the
+`commit-sha` label on that revision (`gcloud run revisions describe <rev>
+--format='value(metadata.labels.commit-sha)'`), which should be the short form of
+`RELEASE_SHA`.
 
 A `/readyz` 503 is a configuration failure — a missing or weak secret, a
 malformed prompt template, an unparseable runbook file. The response withholds the
