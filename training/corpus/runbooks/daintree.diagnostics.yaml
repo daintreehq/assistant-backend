@@ -173,6 +173,57 @@ boundaries:
   - query: daintree says my account is out of credits, what is going on
     confusable_with: [daintree.agents.check-usage-limits]
     run: 2026-09-24-agent-usage-limits
+  - query: clicked create worktree and literally nothing happened
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: why is the worktree tool missing from your tools
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: am i still signed in to daintree? want to confirm before i kick off a long run
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: daintree says my account isn't entitled or something, can you check sign-in
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: show me the recent daintree errors, something about limits keeps popping up
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: show me the last few daintree notifications and errors for a bug report
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: daintree's MCP says disconnected and none of the tools work
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: nothing is responding, i click new terminal and nothing happens
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: why is the terminal.sendCommand tool missing all of a sudden
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '``` [mcp] daintree: connection refused (127.0.0.1:47111) [mcp] retrying in 5s... ``` keep seeing this'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '2026-09-24T09:12:03Z [mcp] tools/list failed: connect ECONNREFUSED 127.0.0.1:4712 2026-09-24T09:12:08Z [mcp] reconnect attempt 3/5 2026-09-24T09:12:18Z [mcp] giving up 2026-09-24T09:12:18Z [ui] notification: Assistant tools unavailable and now the assistant cant see any of my terminals. whats wrong with daintree'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: all the daintree tools vanished from the assistant, it says it cant see any worktrees
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: show me recent daintree errors, i want to file a bug
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: can you confirm im signed in before i kick off the big run
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: the mcp says disconnected
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: nothing's responding, even the terminal list comes back empty
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: argh, monday. daintree's mcp keeps saying disconnected and none of the tools do anything
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: and the key thing too?
     history:
@@ -410,6 +461,18 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: wait, half your terminal tools just vanished from the list and nothing responds. is daintree itself broken?
+    history:
+      - 'user: why is the build failing'
+      - 'assistant: tsc error TS2345 in src/api/client.ts — spawned codex in t3 to fix the argument type, rerunning build.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: did that, same thing
+    history:
+      - 'user: nothing happens when i click spawn'
+      - 'assistant: Error log shows `mcp: bridge not ready`. Try reloading the Daintree window, then tell me if status changes.'
+    active: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher fired: MCP link back up]'
     history:
@@ -425,42 +488,42 @@ near_misses:
   - nothing is responding, is the mcp link dead?
   - why is nothing responding
 docs:
-  - query: "i shared a terminal out to the fleet and nobody on the other end sees it"
-    run: 2026-09-22-docs-live-state
+  - query: i shared a terminal out to the fleet and nobody on the other end sees it
     docs: true
-  - query: "shared a terminal with the other machines and nothing turned up over there"
     run: 2026-09-22-docs-live-state
+  - query: shared a terminal with the other machines and nothing turned up over there
     docs: true
-  - query: "i pinned an agent and it never showed up in the queue on the other box"
     run: 2026-09-22-docs-live-state
+  - query: i pinned an agent and it never showed up in the queue on the other box
     docs: true
-  - query: "broadcast a terminal to the fleet, the other side is still empty"
     run: 2026-09-22-docs-live-state
+  - query: broadcast a terminal to the fleet, the other side is still empty
     docs: true
-  - query: "handed a terminal to the fleet and nothing appeared for anyone else"
     run: 2026-09-22-docs-live-state
+  - query: handed a terminal to the fleet and nothing appeared for anyone else
     docs: true
-  - query: "i turned on sharing for this tab and the second machine sees nothing"
     run: 2026-09-22-docs-live-state
+  - query: i turned on sharing for this tab and the second machine sees nothing
     docs: true
-  - query: "sent the terminal across and the far side never picked it up"
     run: 2026-09-22-docs-live-state
+  - query: sent the terminal across and the far side never picked it up
     docs: true
-  - query: "shared this session to the fleet and it didnt land anywhere"
     run: 2026-09-22-docs-live-state
+  - query: shared this session to the fleet and it didnt land anywhere
     docs: true
-  - query: "i enabled the fleet link and nothing is syncing between the two machines"
     run: 2026-09-22-docs-live-state
+  - query: i enabled the fleet link and nothing is syncing between the two machines
     docs: true
-  - query: "put a terminal on the fleet and the other host shows an empty list"
     run: 2026-09-22-docs-live-state
+  - query: put a terminal on the fleet and the other host shows an empty list
     docs: true
-  - query: "i shared a worktree with the fleet and the other machine cant see it"
     run: 2026-09-22-docs-live-state
+  - query: i shared a worktree with the fleet and the other machine cant see it
     docs: true
-  - query: "the fleet is connected but nothing i share reaches the other side"
     run: 2026-09-22-docs-live-state
+  - query: the fleet is connected but nothing i share reaches the other side
     docs: true
+    run: 2026-09-22-docs-live-state
   - query: i shared a terminal and nothing showed up on the other machine
     docs: true
   - query: why isnt the copytree tool showing up this turn

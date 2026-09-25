@@ -98,7 +98,7 @@ boundaries:
   - query: anything open with the bug label that nobody's assigned to?
     confusable_with: [daintree.forge.manage-issue]
   - query: what should i pick up next
-    confusable_with: [daintree.forge.manage-issue]
+    confusable_with: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
   - query: search the tracker for anything with rate limit in the title, open only
     confusable_with: [daintree.forge.manage-issue]
   - query: three candidates please, ranked, and tell me what you threw out and why
@@ -163,6 +163,39 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: find me a small bug in the parser area nobody's started
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: find me a small bug nobody's on, don't start anything yet
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: anything unassigned tagged good-first-issue?
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'before i commit to #231 — is anyone already working it?'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: triage the backlog for perf issues and give me the top 3
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: '#744 Crash when exporting empty report bug 2d #741 Add dark mode to settings page enhancement 3d #739 Typo in onboarding copy good first issue 5d #733 Retry uploads on 503 bug 6d #728 Migrate logger to pino chore 9d #720 Flaky e2e on checkout test 12d which of these is small and nobody''s already on? just pick one for me, dont start it'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: i have no idea which of the open bugs are safe to grab without stepping on someone
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: did we ever ship the csv export thing? find the closed PRs about it
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: which PRs touched the rate limiter in the last few months
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: was there ever a merged pr for dark mode or did it die
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: list open PRs with the needs-review label
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: dig up the old PR where someone ripped out redux, i want to see what it changed
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: any of those small enough for an hour?
     history:
@@ -403,6 +436,42 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
+  - query: cool what should I grab next, something in the api label
+    history:
+      - 'user: merge #611'
+      - 'assistant: Merged #611 (squash) into main after required checks passed; verified the PR now reads MERGED.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: now find me anything else unassigned tagged perf
+    history:
+      - 'user: open an issue for the flaky tz test'
+      - 'assistant: Created #522 "Flaky timezone test in scheduler" in acme/core, labelled flaky, read back ok.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: smaller ones please
+    history:
+      - 'user: what should i pick up next'
+      - 'assistant: Unassigned and not in flight: #501 migrate logger (large), #507 refactor config loader (large), #509 retry jitter (medium).'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: any that aren't already half done on some branch?
+    history:
+      - 'user: find me something in the frontend label'
+      - 'assistant: 4 unassigned: #611 modal focus trap, #612 table sort, #618 dark mode tokens, #620 toast stacking.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: show the rest
+    history:
+      - 'user: anything unassigned in the api label'
+      - 'assistant: 6 hits; showing the first 3: #245, #261, #262.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'ok its back. unrelated: find me an unassigned good first issue'
+    history:
+      - 'user: daintree isnt responding'
+      - 'assistant: The MCP link had dropped; after the restart daintree.status reports connected and tools are listed again.'
+    active: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent task a_12 completed: cross-check against in-flight worktrees done]'
     history:

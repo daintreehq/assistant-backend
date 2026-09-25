@@ -62,15 +62,15 @@ positives:
   - spawn an explore agent and have it tell me how the scheduler decides what runs next, with file refs
   - review the auth module for me and tell me how it works — i'm not judging it, i just need to understand it
 boundaries:
-  - query: "where in the codebase do we parse slash commands typed into the terminal"
-    run: 2026-09-11-mission-9-capability-lookup
+  - query: where in the codebase do we parse slash commands typed into the terminal
     confusable_with: [daintree.foundation]
-  - query: "how does the app discover command files, walk me through the code"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: how does the app discover command files, walk me through the code
     confusable_with: [daintree.foundation]
-  - query: "which module implements the command palette"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: which module implements the command palette
     confusable_with: [daintree.foundation]
+    run: 2026-09-11-mission-9-capability-lookup
   - query: where in the code do we build the issue body
     confusable_with: [daintree.forge.manage-issue]
   - query: where does the migration runner actually live in this repo
@@ -215,6 +215,33 @@ boundaries:
     confusable_with: [daintree.workflow.find-issue-work]
   - query: where in this codebase does the worktree path actually get resolved?
     confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: yo. new to this codebase honestly, where does the rate limiting actually happen?
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: walk me through what the reviewer bot is actually checking in our codebase, not reviewing anything just want to get it
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: '$ git log --oneline -- src/payments f19a02c payments: split provider adapters 8c1e774 payments: idempotency keys on capture 2a3b9d0 payments: webhook signature check 71de0aa payments: initial stripe adapter explain what the payments module actually does, i keep seeing commits to it and have no idea'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: where is retry backoff implemented
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: explain how the ci pipeline decides which tests to run
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: how does the checkout flow work end to end
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: remind me where the retry backoff is implemented in src
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: explain how the payment webhooks work
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
+  - query: what would i have to touch to add a csv export? just tell me
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: hows it going?
     history:
@@ -667,6 +694,48 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
+  - query: and what would i need to touch to add per-tenant schedules? show me the files
+    history:
+      - 'user: what does the scheduler module do'
+      - 'assistant: scheduler/ runs cron-style jobs from jobs.yaml via a leader-elected worker; locking in lease.go.'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: forget the review for a sec — how does the worker pool even decide concurrency? walk me through it
+    history:
+      - 'user: review PR #640'
+      - 'assistant: Findings: 1 high (unchecked error in queue/worker.go:57), 2 medium. Full list with evidence above.'
+    active: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: what does our deploy script in the repo actually do step by step
+    history:
+      - 'user: remember we deploy with fly, not heroku'
+      - 'assistant: Saved to project memory: "Deploys go through fly.io (not Heroku)".'
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: where's the router config actually defined in this repo, i want to understand how routes get registered
+    history:
+      - 'user: the preview is throwing a 404 on /settings'
+      - 'assistant: Console shows the route isn''t registered; the lazy import path was wrong. Fixed and reloaded — /settings renders.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: how does token refresh actually work end to end? explain it
+    history:
+      - 'user: bundle the auth code as context'
+      - 'assistant: Wrote auth.copytree.md: 11 files from pkg/authz and pkg/session plus tests, 48 KB.'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
+  - query: and who calls that?
+    history:
+      - 'user: how does the scheduler pick jobs'
+      - 'assistant: scheduler/pick.go: jobs sorted by priority then enqueue time; picked under a pg advisory lock (lock.go:22).'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: now actually explain how the backoff in there works
+    history:
+      - 'user: bundle the retry code into a reference file'
+      - 'assistant: Generated retry-context.xml with src/net/retry.ts, backoff.ts and their tests.'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent task a_1140 completed]'
     history:

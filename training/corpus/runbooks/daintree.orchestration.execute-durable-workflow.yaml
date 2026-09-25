@@ -111,6 +111,21 @@ boundaries:
     confusable_with: [daintree.worktree.relocate-agents]
   - query: Track a multi-stage infrastructure migration across several turns.
     confusable_with: [daintree.worktree.manage-resource]
+  - query: i need to migrate the orders table in phases — schema, backfill, dual write, cutover — and track it so we can resume after restarts
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'make this a proper plan with dependencies: delegate the refactor to codex, verify it, then bump the sdk, then update docs'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: hey, big one today. we need to move the auth service to the new token format — schema change, backfill, flip the readers, then rip out the old code. track it as a plan i can resume tomorrow
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: track this plan and resume it later, it's gonna take days
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: 'build a workflow graph for the release: changelog depends on version bump, publish depends on both'
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: run the next one
     history:
@@ -360,6 +375,24 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
+  - query: right, the db migration. lay it out as a proper plan with dependencies so we can track it across restarts
+    history:
+      - 'user: where were we, what was i working on yesterday'
+      - 'assistant: From the ledger: #502 PR open waiting review, the csv-export fan-out had 2 of 4 merged, and a codex run on fix/memory-leak was left unsupervised in t8.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: next
+    history:
+      - 'user: plan out the postgres 14 -> 16 migration as a tracked workflow, it''s going to take days'
+      - 'assistant: Created workflow with 6 nodes: dump schema, test restore on staging, fix extension incompatibilities, cut over, verify, decommission. Node 1 is done; node 2 is running in t3.'
+    active: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
+  - query: 'great. switching gears: set up a tracked plan for the orders db split — new schema, dual writes, backfill, cutover — i need to resume it across days'
+    history:
+      - 'user: ask the pinned agents if we should adopt zod'
+      - 'assistant: Polled 4 agents. 3 said yes (runtime validation at the API edge), 1 said not yet. Consensus: adopt at boundaries.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher completed: implementation agent exited]'
     active: [daintree.orchestration.execute-durable-workflow]

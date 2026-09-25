@@ -115,6 +115,33 @@ boundaries:
     confusable_with: [daintree.orchestration.interview]
   - query: let them hash the api shape out between themselves and relay it back and forth for a while
     confusable_with: [daintree.orchestration.interview]
+  - query: just get claude and codex talking about error handling philosophy and see where it goes, no need to conclude anything
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: let them hash it out between themselves, i wanna watch the back and forth
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: i don't need a summary, just keep relaying so the two of them keep chatting
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: 'claude: I''d argue the cache should be write-through... codex: disagree, write-back is fine if we fsync... keep it going, want to see where they land — no need to wrap up'
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: hey! felt like trying something — get gemini and claude talking to each other about monorepos and just see where it goes
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: host a little roundtable with gemini, grok and claude on whether TDD is worth it
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
+  - query: have them debate react vs svelte, open ended, nobody gets voted out
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
+  - query: keep the group chat going another couple rounds
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-24-selector-hardening
+  - query: have gemini and claude chat back and forth about the api design, nobody's judging
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -309,6 +336,30 @@ topic_shifts:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
+  - query: let the two survivors just keep talking, no more voting, see where it goes
+    history:
+      - 'user: have claude, codex, gemini and grok debate rest vs graphql and vote off the weakest'
+      - 'assistant: Vote done: gemini''s tRPC position eliminated (3 votes), codex''s GraphQL second (1). Survivors: claude and grok, both REST-leaning.'
+    active: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
+  - query: and?
+    history:
+      - 'user: get claude, codex and grok talking about whether we should move to a monorepo, see where it goes'
+      - 'assistant: Round 1 done: claude is for it (shared tooling), codex against (CI time), grok wants a hybrid. Caught each up on the others; round 2 is under way.'
+    active: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: keep going, another round
+    history:
+      - 'user: get claude, codex and grok talking about whether we should move to a monorepo, see where it goes'
+      - 'assistant: Round 1 done: claude is for it (shared tooling), codex against (CI time), grok wants a hybrid. Caught each up on the others; round 2 is under way.'
+    active: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: thanks. unrelated, get codex and claude chatting about testing strategy, just let them go and see
+    history:
+      - 'user: remember we use pnpm'
+      - 'assistant: Saved: this project uses pnpm, not npm.'
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent task a_0302 completed]'
     history:

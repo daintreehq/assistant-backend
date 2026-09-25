@@ -145,6 +145,33 @@ boundaries:
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: have each agent write its own take on the fix, then get them to vote on which one is best
     confusable_with: [daintree.review.review-change]
+  - query: get each agent to pitch its own idea for the onboarding flow, then they judge each other's pitches and we crown one
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: 'had a great lunch lol. ok fun one: have claude, codex and grok each come up with a name for the new cli, then have them vote on each other''s and award points'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: 'happy thursday! lets do a thing: every agent writes a one-line tagline for the landing page, then each picks the best of the others'' and you tally the points'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: ask claude codex and gemini for one name idea each for the cli, then have them vote on each other's, points for the winner
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'contest time: every open agent gives me their single best perf tip, blind peer vote, tally it'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: sounds like fun — have claude and codex each tell me a weird fact about unix, then let them vote on whose is better
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: each agent writes one haiku about rust, they rate each other's, highest points wins
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
+  - query: 'start a fresh competition, new topic: best one-liner for reversing a linked list'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-24-selector-hardening
+  - query: ask each agent for their best idea, judge the entries on merit, no questioning needed just points
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -360,6 +387,18 @@ topic_shifts:
     history:
       - 'user: hows it going'
       - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: fun. now have each of them submit their own worst production bug story, then they vote on the best one, points to the winner
+    history:
+      - 'user: poll the pinned agents: should we drop node 18 support? want a consensus'
+      - 'assistant: Polled claude, codex, gemini and grok. 3 of 4 say drop it now (EOL, blocking the fetch refactor); grok says wait one minor release. Consensus: drop it.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: next round
+    history:
+      - 'user: get claude, codex and gemini to each come up with one idea for speeding up cold start, then have them vote on the best'
+      - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[terminal.awaitAll returned: 4 submissions in]'
     history:

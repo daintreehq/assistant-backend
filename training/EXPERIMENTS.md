@@ -4,15 +4,20 @@
 > ```
 > stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
 > stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
-> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 9,800 rows
+> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 10,731 rows
 > train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
 >            stage 2: --epochs 10 --ordering equivariant --seed 41
+>            both: doc_max_length 512, content-keyed split; stage 2 also permutation
+>            sampling, sqrt cardinality weights, boundary loss 0.1, 3 doc variants
+>            (all now the trainers' DEFAULTS — see "The retrain lottery" at the foot)
 > serve      ONNX int8 encoders + fp32 head, ~410 MB whole-process RSS,
->            BONUS_FLOOR 0.45 / NEWCOMER_FLOOR 0.65 (re-calibrated, see below)
+>            BONUS_FLOOR 0.55 / NEWCOMER_FLOOR 0.75
 > ```
-> **Current benchmark: shipped int8 measures 164/177 recall-pass (92.7%),
-> fp32 163/177; docs flag 19/21; int8 p50 11.5 ms. Synthetic held-out
-> exact-match 0.931.**
+> **Current (2026-09-25): shipped int8 measures 200/217 on the benchmark and
+> 185/197 on held-out round 3; with canonical active sets the RECIPE averages
+> 202.8/217 and 186.5/197 over six seeds, against 200.8 and 178.3 for the recipe
+> it replaced. int8 p50 10.5 ms.
+> Numbers older than that entry were measured on different suites and corpora.**
 >
 > The denominator moved 169 → 172 → 177 across two rounds on 2026-08-20, as docs
 > and context cases were added to cover failures the suite could not see (see the
@@ -1151,3 +1156,134 @@ All three are closed. **The 4/14 number was measured under the leaky probe**
 and is therefore, if anything, optimistic about a genuinely unseen runbook;
 re-measure before quoting it as a floor. None of this affects an ordinary
 run: `holdout` is empty unless the flag is passed.
+
+
+# The retrain lottery, and what actually moved routing (2026-09-24/25)
+
+Retraining for the 41st runbook (`agents.check-usage-limits`) scored **198/217** against
+the shipped artifact's **203**, on a corpus that had changed by 63 rows (0.6%). This is
+the investigation, the fixes, and the one change that measurably improved routing.
+
+## The 198 was a draw, not a regression
+
+Same recipe, same corpus, four seeds: **198 / 205 / 202 / 198** (dev, int8). A control
+retrain on the shipped artifact's own corpus and seed reproduced 203 — but disagreed with
+the shipped artifact on 6 cases (MPS training is not bit-reproducible). None of the five
+cases the 198 lost went to the new runbook or to anything the new rows touched. The
+single-run spread of this recipe is ~7 cases; "retrain and accept if it scores higher" was
+a coin toss with a thumb on neither side.
+
+Why 63 rows behaved like a new seed (found by Codex): the train/val split was a seeded
+shuffle of the WHOLE corpus, so adding rows reassigned ~1,020 existing ones across the
+split — ~12% of the training set replaced. `training.common.stable_split` now keys each
+row's side on its content.
+
+## Correctness fixes (kept regardless of their measured effect)
+
+- **Truncated documents.** Under both tokenizers `watch-outcome` is 510 tokens and
+  `fan-out-work`/`provision-local-environment` 398, against `doc_max_length` 384 — the cut
+  fell exactly on the whenToUse exclusion fences. Both stages now train at 512, and
+  `test_every_runbook_document_fits_the_shipped_document_cap` fails the next runbook edit
+  that would cross it. `watch-outcome` sits 2 tokens under the new cap.
+- **Batch-dependent serving vectors.** Dynamic int8 quantisation scales over the whole
+  input tensor, so a document encoded in a batch differed 6-7% (relative L2) from the same
+  document encoded alone, and which documents shared a batch depended on cache history.
+  `sync` encodes one document per call; pinned by
+  `test_a_runbook_vector_does_not_depend_on_what_it_was_synced_with`.
+- **Split churn** (above).
+- **Train/serve active-set skew.** Production pairs every specific with
+  `daintree.foundation` and shows the model both; 61% of the corpus's stateful rows (and
+  many eval cases) carried the specific alone — a state serving never produces.
+  `canonical_active` renders them through the server's own merge; the benchmark runner
+  can do the same (`DAINTREE_BENCH_CANONICAL_ACTIVE=1`). All numbers below are scored that
+  way. Training on canonical states was measured separately (see the ablation table).
+
+## Evaluation that could see a difference
+
+The 217-case benchmark is a development set (inspected across many iterations), and at
+~7 cases of seed spread it cannot resolve a 3-case gain from one run. Three suites were
+added, written by agents that read ONLY the catalog digest and runbook files, each case
+labelled blind by two further annotators (Opus + Sonnet) and kept only on a majority:
+
+| suite | cases | unanimous | status |
+|---|---|---|---|
+| round 1 (easy) | 100 | 100 | development — its failures were read |
+| round 2 (hard: fences, state, messy turns) | 189 | 189 | development — its failure SHAPES informed generator briefs |
+| round 3 (personas, goal-phrased, long sessions) | 197 | 196 | **sealed**: scored once, after the decision |
+
+Every arm is scored over several seeds and compared by mean (and paired by seed where
+possible); a single run is never a result.
+
+## What moved: verified targeted data, not training tricks
+
+781 rows (`run: 2026-09-24-selector-hardening`) from eight generator agents aimed at the
+measured weak spots — turns needing two runbooks, topic shifts that share vocabulary with
+the loaded runbook, no-task turns while a runbook is loaded, fence traps in both
+directions, social lead-ins, pasted output before the ask. Every row was relabelled blind
+by a second model and kept only where the labels agreed (791/801); rows near-duplicating
+any holdout case were removed.
+
+int8 recall-pass, canonical evaluation, mean ± sd over seeds:
+
+| arm | n | dev 217 | round 1 | round 2 | extras |
+|---|---|---|---|---|---|
+| baseline recipe, old corpus | 4 | 200.8 ± 3.4 | 93.5 | 166.0 | 31.8 |
+| all training changes, OLD corpus | 3 | 201.7 ± 4.6 | 93.0 | 167.3 | 33.7 |
+| all training changes + new data (FULL) | 5 | 202.6 ± 3.2 | 97.6 | 173.6 | 31.4 |
+| FULL − EMA (**chosen**) | 6 | 202.8 ± 1.5 | 97.2 | 174.7 | 31.0 |
+| FULL − document augmentation | 5 | 202.0 ± 1.2 | 96.2 | 174.2 | 31.8 |
+| FULL − EMA + canonical-active training | 3 | 199.0 ± 1.0 | 98.3 | 177.3 | 33.7 |
+| permutation sampling alone | 2 | 200.0 ± 1.4 | 94.0 | 166.5 | 34.0 |
+
+- **The training-procedure changes alone bought nothing measurable** (row 2 ≈ row 1, same
+  seed noise). Kept because they are fixes, not because they scored.
+- **The data bought +4 on round 1 and +8 on round 2**, and cut dev seed spread from ±3.4 to
+  ±1.5. Some of round 2's gain is adaptive (generator briefs echoed its failure shapes) —
+  which is why round 3 was sealed.
+- **EMA** changes nothing at the end of a OneCycle schedule (the learning rate is already
+  near zero; EMA and live weights read within 0.001 on validation), matching Codex's
+  prediction. Dropped.
+- **Canonical-active training** trades ~4 dev cases for ~3 round-2 cases: net zero on the
+  pre-declared score. Not shipped; the eval-side canonicalisation stays.
+- **Admission floors are a weak lever** (every floor from 0.45-0.75 moves ≤2 cases per
+  suite), and **runbook-text fences that name a neighbour's vocabulary backfire** with this
+  encoder: adding "find past, closed or merged PRs" to `follow-up-on-issue`'s exclusions
+  made the shipped artifact LOSE the case the fence was written for — the words attract
+  regardless of the "do not".
+
+## Ensemble distillation: built, measured, not shipped
+
+`--teachers` scores every training row's ballot with several stage-2 models and trains
+the student on a 50/50 mix of hard labels and the ensemble's averaged probabilities —
+ensemble behaviour at one model's inference cost. Five `FULL − EMA` seeds as teachers,
+three fresh student seeds: **474.0** on the decision score against 475.2 for the teachers'
+own recipe. It does not beat plain training on this corpus.
+
+The first build had a bug worth recording: the soft slot targets went through the
+hard-label loss, which carries `pos_weight` ≈ 31. Against a soft target t that moves the
+optimum to 31t / (31t + 1 − t) — a neighbour the teachers scored 0.1 is pushed to 0.78,
+over the bonus floor. It showed as 21/217 turns loading three runbooks (6-8 otherwise),
+extras 52 against 31 and strict 161 against 175-192, with recall untouched — so a
+recall-only readout would have called it the best arm. Soft targets now use unweighted
+BCE, summed over slots so the term is not ~30x smaller than the hard loss.
+
+## The decision, and the sealed result
+
+The rule was written down before round 3 was scored (`mean over seeds of dev + round 1 +
+round 2`, highest wins; ship that recipe's seed-41 artifact, no seed selection; ship only
+if round 3 gains ≥ 2 cases and dev loses ≤ 1). Decision scores: `FULL − EMA` 475.2,
+canonical 474.7, distillation 474.0, FULL 473.8, no-doc-aug 472.4, baseline 461.3.
+
+Round 3, scored once, int8, canonical active sets:
+
+| | seeds | round 3 (197) |
+|---|---|---|
+| artifact shipped before this entry | — | 183 |
+| baseline recipe, current corpus | 4 | 181 / 178 / 177 / 177 — mean 178.3 |
+| `FULL − EMA` | 6 | 187 / 189 / 183 / 186 / 188 / 186 — mean **186.5** |
+
+**+8.2 cases (+4.2 points) at the recipe level, with non-overlapping seed ranges; errors
+fall from a mean of 18.8 to 10.5.** The shipped artifact is seed 41 (186); it is the exact
+file set that was measured, copied rather than re-exported, because every export redraws
+the int8 graph. On the benchmark it reads 200/217 int8 — inside the recipe's range, and
+the draw the rule dealt; docs-classification is its weakest category (20/24).

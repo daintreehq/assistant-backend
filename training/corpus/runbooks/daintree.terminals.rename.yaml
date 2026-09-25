@@ -132,6 +132,24 @@ boundaries:
     confusable_with: [daintree.orchestration.supervise-fleet]
   - query: retitle tab 3 to billing-fix
     confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: theyre all called Claude, i cant tell which is which
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: figure out what each tab is doing and label them
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: sorry to bug you, rename these by whatever theyre doing
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: t1 claude "Claude" feat/cart working t2 claude "Claude" fix/tax waiting t3 claude "Claude" docs/readme idle t4 codex "Codex" spike/grpc working theyre all just called Claude, give them tab names based on what each is actually doing
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: call t3 migrations and t5 frontend
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: four tabs all called Claude and ive got no idea which is which
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: rename the tabs to match the branches
     history:
@@ -398,6 +416,24 @@ topic_shifts:
     history:
       - 'user: hows it going'
       - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: can you work out what each claude is on and name them accordingly
+    history:
+      - 'user: what terminals are open?'
+      - 'assistant: 5 terminals: t1 claude, t2 claude, t3 codex, t4 claude, t5 zsh. All in the main worktree.'
+    active: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: shorter
+    history:
+      - 'user: rename my tabs'
+      - 'assistant: Renamed t1 "refactor of the auth middleware", t2 "csv export bug fix", t3 "flaky timezone test".'
+    active: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: cool thanks. totally unrelated, but can you rename the tabs so i know which claude is which
+    history:
+      - 'user: why is ci red on feat/tokens'
+      - 'assistant: The unit job fails in token.test.ts: expiry is computed in local time. Spawned claude in t3 to switch it to UTC; rerun is green.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[async wait returned: 6 terminal summaries ready]'
     history:

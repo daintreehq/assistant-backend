@@ -280,3 +280,160 @@ examples:
     expect: [daintree.agents.poll-pinned-agents, daintree.worktree.manage-resource]
   - query: resume the box for the auth worktree and open an issue about how slow provisioning is
     expect: [daintree.worktree.manage-resource, daintree.forge.manage-issue]
+  - query: file an issue for the broken csv export and start claude on it
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: morning! find me an unassigned good-first-issue and kick off codex on it
+    expect: [daintree.workflow.find-issue-work, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: ci is red on main. fix it and then open a pr with the fix
+    expect: [daintree.ci.diagnose-and-fix, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: review feat/billing-v3 for security problems, then prep it for review and open the PR
+    expect: [daintree.review.review-change, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: open a pr for this branch and ping me when it merges
+    expect: [daintree.orchestration.watch-outcome, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 1. make a worktree for feat/search-ui 2. give it its own database so it doesn't clobber main's
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-24-selector-hardening
+  - query: claude says it finished the migration — check it actually did, and if it did, squash-merge pr 219
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'remember that staging deploys only happen on tuesdays. also label #77 as blocked'
+    expect: [daintree.forge.manage-issue, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: codex in t2 is asking me something, answer yes. then rename all the tabs, i can't tell which is which
+    expect: [daintree.agents.answer-waiting-agent, daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: how's the fleet doing? and afterwards tear down anything that's finished
+    expect: [daintree.orchestration.supervise-fleet, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: explain how the auth flow works end to end, and bundle the relevant files into a copytree reference i can hand to a contractor
+    expect: [daintree.context.curate-copytree-bundle, daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: check how much usage claude has left. if there's room, have claude, codex and gemini each pitch a logo idea and score them
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: poll the pinned agents on vitest vs jest, then remember whatever we pick
+    expect: [daintree.agents.poll-pinned-agents, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: my preview is throwing errors in the console, debug it. also the unit tests went red after my last commit
+    expect: [daintree.ci.diagnose-and-fix, daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: grok reviewed the parser in t5 — send that review to claude in t1. then file a follow-up issue for the perf stuff it flagged
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: these 3 agents are all in the same worktree stepping on each other, split them into their own worktrees. plus give each of those its own port
+    expect: [daintree.worktree.provision-local-environment, daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: where were we yesterday? and while you're at it tidy up the terminals from that session
+    expect: [daintree.orchestration.status-and-resume, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: is pr 404 green? also merge 399, it's approved and ready
+    expect: [daintree.forge.land-pull-request, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: spawn claude to add retry tests to the http client. then in an hour, have gemini review what it wrote
+    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: ask codex what it thinks of the new queue design and remember its answer as the decision
+    expect: [daintree.agents.ask-and-relay, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: get claude, grok and gemini talking about how to structure the plugin api. and pause my devbox while they do, don't need it
+    expect: [daintree.orchestration.conversation, daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: 'have claude interview codex and copilot on the refactor plan and pick one. then start the winner on #501'
+    expect: [daintree.orchestration.interview, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'kick off agents on #20, #21 and #22 in parallel. also track the bigger migration as a durable plan with dependencies so we can resume it next week'
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: daintree's mcp says disconnected and none of the tools show up. once it's back, rename the terminals
+    expect: [daintree.diagnostics, daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: t4 has been sitting there forever, is it hung? also t6 is waiting on a trust prompt, approve it
+    expect: [daintree.agents.answer-waiting-agent, daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: find the closed PRs about the websocket reconnect, and explain where reconnect lives in the code now
+    expect: [daintree.explore.repository, daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: make a worktree for fix/tz-bug then spawn cursor in it to fix the timezone rounding
+    expect: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 'debate between the 4 pinned agents: graphql or rest for v2, vote off the weakest. after that clean up all their terminals'
+    expect: [daintree.orchestration.debate-elimination, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: did anyone reply on issue 72? also forget the note about using yarn, we switched
+    expect: [daintree.memory.manage-project-memory, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: verify codex really fixed the n+1 query in t3, and send claude's review from t2 over to codex too
+    expect: [daintree.agents.relay-review-feedback, daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: review pr 188 for me. plus request @kim as a reviewer on it
+    expect: [daintree.forge.land-pull-request, daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: 'ok two things: add a teardown script that drops the per-worktree db on delete, and delete the old feat/legacy worktree'
+    expect:
+      - daintree.orchestration.workspace-cleanup
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-24-selector-hardening
+  - query: catch me up on the agents, and at 6pm start the nightly e2e run in the build terminal
+    expect: [daintree.orchestration.supervise-fleet, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: 'reopen #33, the bug is back. then get claude working on it'
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: show me recent daintree errors for a bug report. and separately — the build for the api is broken, fix it
+    expect: [daintree.ci.diagnose-and-fix, daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: spawn gemini to write docs for the export module also ask codex whether our export format handles unicode filenames and tell me what it says
+    expect: [daintree.agents.ask-and-relay, daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: have claude and codex collaborate on one design for the rate limiter until they agree, then file an issue with the final design
+    expect: [daintree.forge.manage-issue, daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: what's still in flight from last week? and is anything running right now stuck or asking me stuff — deal with it
+    expect: [daintree.orchestration.status-and-resume, daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: resume the devbox for feat/ml-train and spin up claude in that worktree to rerun the training script
+    expect: [daintree.edits.spawn-visible-agent, daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: list the recipes we have. then make a plain worktree for chore/cleanup, no recipe
+    expect: [daintree.recipe.run-or-create, daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 'check codex''s weekly limit, then fan out #61 #62 #63 across codex agents, one worktree each'
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: curate a copytree bundle of the search subsystem and copy it to my clipboard. also poll the fleet on whether search should move to its own service
+    expect: [daintree.agents.poll-pinned-agents, daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
+  - query: pr 250 is red on e2e — get it green, and once it is, merge it
+    expect: [daintree.ci.diagnose-and-fix, daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: is issue 118's pr passing? and remind me at 4 to chase the reviewer
+    expect: [daintree.orchestration.watch-outcome, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: fan out issues 90-93 one agent each, and ping me when they're all finished
+    expect: [daintree.orchestration.fan-out-work, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: 'clean up the old competition terminals, then run a new contest: each agent''s best git alias, peer vote'
+    expect: [daintree.orchestration.competition, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: file an issue for the csv header bug and start codex on it
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'review #812 and if it''s clean approve and merge it'
+    expect: [daintree.forge.land-pull-request, daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: get this branch ready for review, then have a couple of reviewers go over it for bugs
+    expect: [daintree.review.review-change, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 'fix the red lint check on #331 and then label issue 330 as in-progress'
+    expect: [daintree.ci.diagnose-and-fix, daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'find me something unassigned in the parser area, and also close #88 with a note that it shipped'
+    expect: [daintree.workflow.find-issue-work, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening

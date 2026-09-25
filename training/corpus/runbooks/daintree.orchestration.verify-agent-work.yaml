@@ -204,6 +204,42 @@ boundaries:
     confusable_with: [daintree.workflow.prep-branch-for-review]
   - query: did the agent actually make the change it claims? check before i merge 214
     confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: codex says it addressed every review comment. did it actually?
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: gemini finished in t5, did it actually write the migration or just say it did
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: codex went quiet and printed 'all done ✅' — i don't trust it, check
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: codex swears the endpoint is done but the route file looks untouched to me
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: claude says the tests pass now, confirm that before i merge
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: codex says t4 is done and tests pass, confirm that before i merge
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: '[claude t2] ✓ Implemented rate limiter, all 42 tests passing did it actually do it tho'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: hi. codex says it fixed the n+1 query in orders and the tests pass. i dont trust it, confirm before i merge
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: ✔ Implemented exponential retry in src/net/client.ts ✔ Added 6 tests in client.test.ts ✔ All 48 tests pass ✔ Updated CHANGELOG Done! Let me know if you want anything else. is that actually true? check before i push it
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: '``` ✓ Implemented rate-limit headers ✓ Added tests (12 passing) ✓ Updated README Task complete. ``` that''s what claude says. verify before i push'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: '``` > All 3 acceptance criteria met. Ready for PR. ``` check that against the issue before we open anything'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: the fix in t2 claims it handles the null case but im not convinced the tests even ran
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's that going?
     history:
@@ -518,6 +554,30 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
+  - query: it says done and tests pass. confirm that before i merge
+    history:
+      - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
+      - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: codex says it addressed all of gemini's points. did it actually? check before i push
+    history:
+      - 'user: gemini finished reviewing in t2, send its notes to codex in t1 and tell it the perf comments matter most'
+      - 'assistant: Read gemini''s review from t2 (7 points, 3 on perf). Sent codex in t1 a pointer to them with your weighting; it acknowledged and is working through the perf items.'
+    active: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: 'and the one on #312?'
+    history:
+      - 'user: codex says #311 is done, check it actually did it before i merge'
+      - 'assistant: Read the diff on fix/311-token-refresh: refresh path changed in auth/session.ts and a new test added. Ran the test suite tail — 142 passed. Verdict: verified.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: did it actually add the migration though
+    history:
+      - 'user: answer claude, it''s asking about the schema'
+      - 'assistant: Sent ''use uuid primary keys'' to claude in t1; it resumed and finished: ''migration 0043 added, tests green''.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[async verdict returned: unverified — no commits on the branch]'
     history:

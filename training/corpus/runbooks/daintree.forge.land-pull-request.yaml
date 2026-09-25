@@ -99,6 +99,39 @@ boundaries:
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: Reopen pull request 12 and request reviewers.
     confusable_with: [daintree.forge.manage-issue]
+  - query: 'merge #55'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: approve and squash 812
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: 'request changes on #400 and add alice as reviewer'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: ✓ ci / test ✓ ci / lint 1 approving review ok squash it in
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: 'convert #77 back to draft'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: good morning. pr 412 has two approvals and green checks, go ahead and squash merge it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: land this pr once its ready
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: close pr 1190 without merging, we went another way
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: '✓ lint ✓ test (3.11) ✓ test (3.12) ✓ build all green on #640. merge it'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: '$ gh pr view 488 title: Add rate limit headers state: OPEN reviewDecision: APPROVED mergeable: MERGEABLE checks: 9 passing, 0 failing great, merge it with rebase'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: rebase-merge the dependabot pr
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: squash
     history:
@@ -371,6 +404,54 @@ topic_shifts:
     history:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
+  - query: good enough. approve it and merge once checks pass
+    history:
+      - 'user: code review PR 77'
+      - 'assistant: PR #77 findings: no high severity; 2 medium (unbounded map in cache.go, missing ctx cancel), 4 low.'
+    active: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: approve from my side too and merge it
+    history:
+      - 'user: is my PR green'
+      - 'assistant: PR #77: all checks green, approved by @sam.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: approve and merge it once checks are done, rebase style
+    history:
+      - 'user: open the pr for this branch'
+      - 'assistant: Readiness verdict clean. Committed, pushed feat/onboarding-copy and opened PR #377 against main.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: great, approve it and squash merge
+    history:
+      - 'user: review #412'
+      - 'assistant: No blocking findings; one nit about naming in export/csv.go:22. Looks good to ship.'
+    active: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: request review from @mira and @jo on it
+    history:
+      - 'user: what''s the CI status on my PR'
+      - 'assistant: PR #480: 6/6 checks green, review REVIEW_REQUIRED — no reviewer assigned yet.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: squash
+    history:
+      - 'user: approve #650'
+      - 'assistant: Approved #650. It''s not merged — want me to merge it too, and squash or rebase?'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: merge it once it's ready
+    history:
+      - 'user: get feat/csv-export ready for review'
+      - 'assistant: Committed 3 files, pushed, opened PR #633 against main. Checks are running.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 'perfect. totally different thing: #512 is approved and green, merge it'
+    history:
+      - 'user: give those terminals proper names'
+      - 'assistant: Renamed t1 ''cart: claude'', t2 ''tax fix: claude'', t3 ''docs: claude''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[forge activity: pull request changed]'
     active: [daintree.forge.land-pull-request]

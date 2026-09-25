@@ -86,7 +86,13 @@ from daintree_assistant_server.runbooks.local.documents import (  # noqa: E402
     INDEX_DOC_VARIANT,
     runbook_document,
 )
-from training.common import build_query, corpus_rows, device  # noqa: E402
+from training.common import (  # noqa: E402
+    build_query,
+    canonical_active,
+    corpus_rows,
+    device,
+    stable_split,
+)
 
 DATA = ROOT / "training" / "data"
 MODELS = ROOT / "training" / "models"
@@ -100,7 +106,7 @@ def main() -> int:
     ap.add_argument("--val-fraction", type=float, default=0.12)
     ap.add_argument("--seed", type=int, default=41)
     ap.add_argument("--max-length", type=int, default=256)
-    ap.add_argument("--doc-max-length", type=int, default=384)
+    ap.add_argument("--doc-max-length", type=int, default=512)
     ap.add_argument("--temperature", type=float, default=0.05)
     ap.add_argument(
         "--hard-negatives",
@@ -140,6 +146,19 @@ def main() -> int:
         "invisible to BOTH stages — the honest zero-shot probe, since a runbook "
         "held out of only stage 2 was still shortlisted by an encoder that knew it.",
     )
+    ap.add_argument("--data", default=str(DATA / "selection.jsonl"))
+    ap.add_argument(
+        "--canonical-active",
+        action="store_true",
+        help="render every row's active set as the server would hold it "
+        "(specifics paired with their domain foundation) — see canonical_active",
+    )
+    ap.add_argument(
+        "--split",
+        choices=("seed", "hash"),
+        default="hash",
+        help="`hash` keys each row's side of the split on its content (stable_split)",
+    )
     ap.add_argument("--out", default=str(MODELS / "retriever"))
     args = ap.parse_args()
 
@@ -170,15 +189,24 @@ def main() -> int:
     ]
     print(f"catalog: {len(labels)} selectable runbooks")
 
-    rows = corpus_rows(DATA / "selection.jsonl")
+    rows = corpus_rows(Path(args.data))
+    if args.canonical_active:
+        rows = [
+            {**r, "active_ids": canonical_active(r.get("active_ids") or [], catalog)}
+            for r in rows
+        ]
     labelled = [r for r in rows if [s for s in r["expect_ids"] if s in index]]
     print(f"corpus: {len(rows)} rows, {len(labelled)} with a selectable positive")
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
-    random.Random(args.seed).shuffle(labelled)
-    cut = int(len(labelled) * (1 - args.val_fraction))
-    train_rows, val_rows = labelled[:cut], labelled[cut:]
+    if args.split == "hash":
+        train_rows, val_rows = stable_split(labelled, args.val_fraction)
+        random.Random(args.seed).shuffle(train_rows)
+    else:
+        random.Random(args.seed).shuffle(labelled)
+        cut = int(len(labelled) * (1 - args.val_fraction))
+        train_rows, val_rows = labelled[:cut], labelled[cut:]
 
     holdout = {sid.strip() for sid in args.holdout_runbooks.split(",") if sid.strip()}
     if holdout:

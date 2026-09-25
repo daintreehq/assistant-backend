@@ -62,12 +62,12 @@ positives:
   - morning. leftover from yesterday — close whatever agents are still hanging around and delete the merged worktrees
   - there's a couple of stale async waits from the overnight run, cancel those and close the terminals they were on
 boundaries:
-  - query: "tear down the checkouts for everything that already landed"
-    run: 2026-09-22-provision-boundary-fix
+  - query: tear down the checkouts for everything that already landed
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "remove that tree and delete its branch"
     run: 2026-09-22-provision-boundary-fix
+  - query: remove that tree and delete its branch
     confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-22-provision-boundary-fix
   - query: delete the four worktrees we made earlier and close what's in them
     confusable_with: [daintree.worktree.relocate-agents]
   - query: tear all this down, the branches are merged
@@ -246,6 +246,39 @@ boundaries:
     confusable_with: [daintree.worktree.create-plain-worktree]
   - query: clean up — close those terminals and remove the worktrees that are done
     confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: clean up the stale worktrees from last week's competition
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: delete the feat/csv-export worktree and everything attached to it, disarm the watchers too
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: tidy up — the fan-out finished, shut it all down
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: 'all 8 agents report done: t1 ✓ #201 t2 ✓ #202 t3 ✓ #203 t4 ✓ #204 t5 ✓ #205 t6 ✓ #206 t7 ✓ #207 t8 ✓ #208 clean everything up'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: 't1 claude feat/a done t2 codex feat/b done t3 gemini feat/c done t4 grok feat/d done (worktree: ../shop-feat-d) all of those are done. shut them all down and remove their worktrees'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: ok close all the codex tabs and remove their worktrees, competition's over
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: tidy up, shut everything from the fan-out down
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: remove the worktrees for the branches that already merged
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: phew that was a lot. alright close all these terminals and delete the worktrees from the competition
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: delete the feat/seed-data worktree, merged yesterday
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
+  - query: delete the worktree for gpu-exp, done with it
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: actually delete the last one, i don't need that task
     history:
@@ -657,6 +690,60 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
+  - query: verified, nice. now close its terminal and delete that worktree
+    history:
+      - 'user: codex says #311 is done, check it actually did it before i merge'
+      - 'assistant: Read the diff on fix/311-token-refresh: refresh path changed in auth/session.ts and a new test added. Ran the test suite tail — 142 passed. Verdict: verified.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: great. close all the contestant terminals now
+    history:
+      - 'user: it tied, do a runoff between claude and gemini with the same voters'
+      - 'assistant: Got fresh entries from claude and gemini, sent both to codex, grok and cursor blind. Runoff result: gemini 2, claude 1 — gemini wins.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-24-selector-hardening
+  - query: actually shut it all down — close the terminals, delete the worktrees, cancel the watchers
+    history:
+      - 'user: let me know when the build in t2 finishes, i''m heading out'
+      - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: yep go ahead
+    history:
+      - 'user: clean up everything from the competition earlier'
+      - 'assistant: Inventory: 4 terminals (t1–t4), 3 worktrees, 1 watcher. Safe: t1–t3 and their worktrees (merged). Unknown: t4 has uncommitted changes. Confirm before I close anything?'
+    active: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: t4 as well, i don't need those changes
+    history:
+      - 'user: clean up everything from the competition earlier'
+      - 'assistant: Inventory: 4 terminals (t1–t4), 3 worktrees, 1 watcher. Safe: t1–t3 and their worktrees (merged). Unknown: t4 has uncommitted changes. Confirm before I close anything?'
+    active: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: great, close them all and remove the worktrees
+    history:
+      - 'user: fan out issues 40-45, one agent each'
+      - 'assistant: Spawned 6 agents in t1–t6. All six have now reported done and pushed branches.'
+    active: [daintree.orchestration.fan-out-work, daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: actually also cancel that and close t8, i'm done for the day — tear down everything from today
+    history:
+      - 'user: let me know when the nightly bench finishes'
+      - 'assistant: Armed a watcher on t8 for exit; I''ll wake you when it completes.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: nah, delete the whole worktree, done with it
+    history:
+      - 'user: status of the devbox on gpu-exp?'
+      - 'assistant: Remote resource for gpu-exp is running (4h). I can pause it if you want.'
+    active: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: thanks. unrelated — shut down all the terminals from this mornings fan-out and delete their worktrees
+    history:
+      - 'user: bundle the search subsystem as copytree context'
+      - 'assistant: Generated search-context.md (14 files, 38KB) with src/search/*, its tests and the ranking config.'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[wake: both worktree deletes completed]'
     history:

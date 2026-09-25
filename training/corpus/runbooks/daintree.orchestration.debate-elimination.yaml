@@ -113,6 +113,21 @@ boundaries:
     confusable_with: [daintree.orchestration.interview]
   - query: they've been arguing about the retry policy for a while — get them to vote one of these positions out now
     confusable_with: [daintree.orchestration.interview]
+  - query: let claude codex and grok argue about monorepo vs polyrepo, then vote off whoever made the weakest case
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: 'Round 3 positions: claude: keep REST codex: move to gRPC gemini: graphql ok now vote off the weakest'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: debate first, then eliminate one — topic is whether we should drop python 3.10 support
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: ok they've been debating tabs vs spaces for three rounds, time to kick the weakest position out
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: morning all. lets have the three agents debate tabs vs spaces and then vote one of them off
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -259,6 +274,36 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
+  - query: ok now vote off the weakest position
+    history:
+      - 'user: let claude, codex and grok talk about the API versioning'
+      - 'assistant: Round 2: claude pushes header versioning, codex URL versioning, grok is undecided.'
+    active: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: ok enough chat — vote off the weakest position
+    history:
+      - 'user: get claude, codex and grok talking about whether we should move to a monorepo, see where it goes'
+      - 'assistant: Round 1 done: claude is for it (shared tooling), codex against (CI time), grok wants a hybrid. Caught each up on the others; round 2 is under way.'
+    active: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: carry on
+    history:
+      - 'user: have claude, codex, gemini and grok debate rest vs graphql for the public api, then vote off the weakest'
+      - 'assistant: Two debate rounds done. Final positions collected: claude REST, codex GraphQL, gemini tRPC, grok REST+webhooks. Now running the peer vote.'
+    active: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
+  - query: actually, vote one of them off now
+    history:
+      - 'user: get claude and grok debating static vs dynamic typing'
+      - 'assistant: Relayed round 2 — grok rebutted claude''s point on refactor safety; claude conceded tooling matters.'
+    active: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: cool. separately — have claude, gemini and grok debate rest vs graphql for the public api and vote the weakest off
+    history:
+      - 'user: the claude in t2 is asking something'
+      - 'assistant: It asked whether to delete the legacy fixtures; I answered yes. It continued and finished the cleanup.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[terminal.awaitAll returned: 4 elimination votes in]'
     history:

@@ -186,6 +186,54 @@ boundaries:
     confusable_with: [daintree.orchestration.supervise-fleet]
   - query: the agent in tab 3 has been sitting at the same title for an hour, is it hung?
     confusable_with: [daintree.terminals.rename]
+  - query: '``` Error: spawn failed: agent binary not found (cursor-agent) ``` that''s what came back when you launched cursor'
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: '``` error: terminal not found: term_8f3a2 ``` when i tried to read codex''s output. where did it go'
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: my codex tab is wedged but the rest of daintree is fine
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: my codex agent's been frozen for 20 min
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: morning. coffee hasnt kicked in yet lol. the gemini agent i launched ten mins ago never showed up, did it even start?
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: the spawn call came back with no terminal id at all
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: codex has been silent for 40 minutes, no prompt, no output, nothing. hung?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: claude isn't asking anything, it's just not doing anything either
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: tried to answer the agent in t7 but you said that terminal id doesn't exist
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: you launched grok but i never saw a terminal appear, did it even start
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '``` Traceback (most recent call last): File "/opt/homebrew/bin/gemini", line 8, in <module> KeyboardInterrupt $ ``` gemini just dropped back to the shell mid task. can you get it going again'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '``` ⠋ Thinking… (1847s · esc to interrupt) ``` it''s shown this for half an hour. hung or slow?'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: ⠋ Thinking… (14m 22s · esc to interrupt) ⠙ Thinking… (14m 23s · esc to interrupt) ⠹ Thinking… (14m 24s · esc to interrupt) its been on that since before lunch and nothing else has printed. is it hung or just slow?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: there's a codex running from this morning that nothing's watching, pick it up
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: claude's been frozen on the same spinner for 20 min in t5, get it unstuck
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: the codex tab has been frozen on the same line since lunch
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how long has it actually been like that?
     history:
@@ -445,6 +493,36 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: is it hung or slow? if hung, kick it and make sure it picks back up
+    history:
+      - 'user: my agent in t3 isn''t responding'
+      - 'assistant: t3 (gemini) is hung: no output for 18 min, not waiting for input.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: grok in t5 hasnt printed a thing in 20 min, hung or just slow?
+    history:
+      - 'user: how''s everyone doing? anything need me'
+      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: 'the one on #415 never came back with a terminal id. did it even start??'
+    history:
+      - 'user: codex on #412 #415 #419 #420, one worktree each, run /implement then /review'
+      - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: now it's just frozen. no output at all since you sent that, cursor isn't blinking
+    history:
+      - 'user: gemini''s asking something in t3, tell it yes'
+      - 'assistant: t3 was asking "Apply migration 0042 to the dev db? (y/n)". Sent y; it continued and is now running the migration.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: try once more
+    history:
+      - 'user: my agent in t6 has been sitting there for ages'
+      - 'assistant: Checked the spawn saga for t6: launch succeeded, codex started, last output 22 minutes ago and no process activity since. Looks hung rather than slow.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher w_77 fired: t_3300 produced output after the interrupt]'
     history:

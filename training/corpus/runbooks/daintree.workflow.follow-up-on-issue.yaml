@@ -269,6 +269,48 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: what did the reviewer say on the token refresh ticket
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: is pr 61 green, and if the reviewer asked for anything forward it to the agent still on it
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: 'pull the review comments off PR #231 and get the agent to address them'
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: what did the reviewer say on the auth refactor PR
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: 'is #512 green yet'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: did anyone reply on issue 88
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'any new comments on the flaky upload ticket #230? codex is still working it'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: pr 77 has been sitting there forever, no idea if anyone even looked at it
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: whats blocking pr 1043 from going in
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: 'hey quick one, did checks pass on #77'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: Some checks were not successful 1 failing, 6 successful checks X e2e / chromium what's that about, just tell me what failed on 902 — dont fix anything, claude's still on it and i'll forward it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: $ gh pr checks 518 lint pass 41s typecheck pass 1m2s unit fail 3m10s e2e pending review REVIEW_REQUIRED dont fix anything yet, i just want to know whats blocking 518 and whether the reviewer has said anything
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: 'close #88 with a comment saying it shipped in 2.4'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: post a note on 341 that the fix is in main then close it out
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: comment on the issue and close it
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: and the review?
     history:
@@ -658,6 +700,48 @@ topic_shifts:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
+  - query: codex says it opened a pr for 88 - did the checks come back green?
+    history:
+      - 'user: pick up #88 with codex'
+      - 'assistant: Started #88 in t6, codex on branch issue-88-paging with a background supervisor watcher.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: whats blocking 250, did the reviewer say anything
+    history:
+      - 'user: show me open bugs in the api label'
+      - 'assistant: 5 open: #245 (has PR #250), #261, #262, #270, #279. #245 is already in flight.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: and the other one, 705?
+    history:
+      - 'user: is #702 green?'
+      - 'assistant: PR #702: 5/6 green, `build-arm64` still pending.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: what did CI say?
+    history:
+      - 'user: check on the PR for #88'
+      - 'assistant: PR #91 for #88 is open; CI was still running a minute ago, review not requested yet.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: is its PR green yet?
+    history:
+      - 'user: start codex on #419'
+      - 'assistant: Spawned codex in t4 on worktree feat/419-null-guard; background supervisor attached.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: why was 455 reverted? what did the thread on 502 say
+    history:
+      - 'user: find closed PRs about the websocket reconnect'
+      - 'assistant: 3 merged: #401 (backoff), #455 (heartbeat), #502 (revert of #455). One closed unmerged: #470.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'sweet. totally unrelated: did anyone reply on issue 902?'
+    history:
+      - 'user: move those three into their own worktrees'
+      - 'assistant: Created 3 worktrees, filed t1/t2/t3 under them and told each agent to continue in its new directory.'
+    active: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[wake: t_6001 responded, agent has picked up the review blockers]'
     history:

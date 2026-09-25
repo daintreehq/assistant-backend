@@ -6,21 +6,21 @@
 runbook: daintree.orchestration.watch-outcome
 run: pre-split
 positives:
-  - query: "Please start a countdown lasting eight minutes"
+  - query: Please start a countdown lasting eight minutes
     run: 2026-09-09-mission-2-timers
-  - query: "I need a fourteen-minute timer"
+  - query: I need a fourteen-minute timer
     run: 2026-09-09-mission-2-timers
-  - query: "Could you time the next ninety seconds for me"
+  - query: Could you time the next ninety seconds for me
     run: 2026-09-09-mission-2-timers
-  - query: "Start counting down from six minutes"
+  - query: Start counting down from six minutes
     run: 2026-09-09-mission-2-timers
-  - query: "Put on a timer for seven minutes please"
+  - query: Put on a timer for seven minutes please
     run: 2026-09-09-mission-2-timers
-  - query: "Give me a countdown of eleven minutes"
+  - query: Give me a countdown of eleven minutes
     run: 2026-09-09-mission-2-timers
-  - query: "In seventeen minutes remind me to inspect the indexing job"
+  - query: In seventeen minutes remind me to inspect the indexing job
     run: 2026-09-09-mission-2-timers
-  - query: "Nudge me about the rollout when the next twelve minutes are up"
+  - query: Nudge me about the rollout when the next twelve minutes are up
     run: 2026-09-09-mission-2-timers
   - run the migration overnight and wake me if anything blows up
   - keep an eye on tab 3 while I grab lunch
@@ -83,18 +83,18 @@ boundaries:
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: in twenty minutes launch an agent on the flaky test, just that one
     confusable_with: [daintree.orchestration.fan-out-work]
-  - query: "Wait for twelve minutes before you launch a terminal for the smoke tests"
-    run: 2026-09-09-mission-2-timers
+  - query: Wait for twelve minutes before you launch a terminal for the smoke tests
     confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: "Once seven minutes have elapsed, start an agent to inspect the worker logs"
     run: 2026-09-09-mission-2-timers
+  - query: Once seven minutes have elapsed, start an agent to inspect the worker logs
     confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: "Set a nine-minute timer with no task attached"
     run: 2026-09-09-mission-2-timers
+  - query: Set a nine-minute timer with no task attached
     confusable_with: [daintree.foundation]
-  - query: "All I need is a countdown for thirteen minutes"
     run: 2026-09-09-mission-2-timers
+  - query: All I need is a countdown for thirteen minutes
     confusable_with: [daintree.foundation]
+    run: 2026-09-09-mission-2-timers
   - query: tell me when all of those finish
     confusable_with: [daintree.worktree.relocate-agents]
   - query: ping me when the build goes green
@@ -305,6 +305,54 @@ boundaries:
   - query: in an hour check whether the claude agent has pushed the quota fix
     confusable_with: [daintree.agents.check-usage-limits]
     run: 2026-09-24-agent-usage-limits
+  - query: in 20 minutes spawn codex to run the refactor on feat/billing
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: in 10 min spawn a terminal and run the integration tests
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: wait an hour then start the codex agent on the migration
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: list the timers and watchers you've left lying around and cancel the stale ones
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: revoke the grants you set up earlier, nothing else
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: stop all the supervision you set up but don't close anything
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: ping me when codex finishes the refactor in t2
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: let me know once claude's done with the migration, i'm heading out
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: at 6pm kick off the deploy check
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: '> cargo build --release Compiling serde v1.0.210 Compiling tokio v1.40.0 Compiling app-core v0.3.1 (/Users/dev/app/core) Building [=========> ] 312/900 this takes forever. ping me when its done, im going for a walk'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: brb, keep an eye on the agents while i'm at lunch and ping me if anything breaks
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: let me know when the build finishes
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: ok heading out for the night. let me know when the claude in t3 finishes the migration
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: keep an eye on codex and tell me when it's done
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'ping me when #233 merges'
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: run the full bench overnight and wake me when it's done
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:
@@ -714,6 +762,24 @@ topic_shifts:
     history:
       - 'user: hows it going'
       - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: keep an eye on them while i grab lunch, wake me if any of them fails
+    history:
+      - 'user: how''s everyone doing? anything need me'
+      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: let me know when it finishes, i'll be in a meeting for an hour
+    history:
+      - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
+      - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: make it 20 minutes instead
+    history:
+      - 'user: let me know when the build in t2 finishes, i''m heading out'
+      - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher pr_482 fired: state changed open -> merged]'
     history:

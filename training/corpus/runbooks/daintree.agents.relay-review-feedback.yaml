@@ -129,6 +129,30 @@ boundaries:
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: read what that review terminal said and forward the useful bits to the other agent
     confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: send gemini's review notes over to the claude that wrote the parser, and have it say whether they were useful
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: hand codex the notes from claude's review terminal
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: take whatever grok wrote in its review tab and hand it to codex, treat the style nits as optional
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: claude in t1 finished its review of codex's branch. point codex at it and tell it to fix the blockers
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: tell the implementer to go read what the reviewer agent said and act on it
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: hi! thanks for yesterday btw. can you take what the reviewer codex in t4 wrote and point the claude in t1 at it, tell it to treat the nits as optional
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: '## Review of feat/ledger (claude, t5) HIGH ledger.ts:88 balance can go negative on concurrent writes, no lock HIGH ledger.ts:132 refund path skips audit log MED api.ts:40 missing input validation on amount LOW naming: `doThing` in utils.ts LOW trailing whitespace in 3 files send that to the codex in t2 and tell it to fix the HIGH ones only, ignore style'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: codex's review in t6 is done — forward it to claude in t3
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:
@@ -355,6 +379,36 @@ topic_shifts:
     history:
       - 'user: hows it going'
       - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: gemini's done its review in t3 — point claude in t1 at those notes and tell it to skip the style nits
+    history:
+      - 'user: how''s everyone doing? anything need me'
+      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: ok gemini posted its review notes in t6 — send them to codex in t2, tell it only to act on the correctness ones and report back if the review was any use
+    history:
+      - 'user: codex says #311 is done, check it actually did it before i merge'
+      - 'assistant: Read the diff on fix/311-token-refresh: refresh path changed in auth/session.ts and a new test added. Ran the test suite tail — 142 passed. Verdict: verified.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: codex in t3 wrote up a review of claude's patch. point claude at it and have it tell me whether it was useful
+    history:
+      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
+      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
+    active: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: do it the other way round too
+    history:
+      - 'user: gemini finished reviewing in t2, send its notes to codex in t1 and tell it the perf comments matter most'
+      - 'assistant: Read gemini''s review from t2 (7 points, 3 on perf). Sent codex in t1 a pointer to them with your weighting; it acknowledged and is working through the perf items.'
+    active: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: ok. unrelated — take the codex reviewer's notes in t6 and pass them to the claude in t2
+    history:
+      - 'user: how much codex usage do i have left'
+      - 'assistant: Codex /status: 5h window 62% used, resets 14:20; weekly 41% used, resets Monday.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent task a_0007 completed]'
     history:

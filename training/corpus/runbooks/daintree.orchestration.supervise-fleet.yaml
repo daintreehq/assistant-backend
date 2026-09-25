@@ -88,7 +88,9 @@ boundaries:
   - query: adopt these running agents so i can steer them from here
     confusable_with: [daintree.worktree.relocate-agents]
   - query: how's everyone doing
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    confusable_with:
+      - daintree.orchestration.execute-durable-workflow
+      - daintree.orchestration.status-and-resume
   - query: anything need me right now?
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: is anyone stuck in there
@@ -223,6 +225,36 @@ boundaries:
     confusable_with: [daintree.terminals.rename]
   - query: whats each tab up to right now, anything need me?
     confusable_with: [daintree.terminals.rename]
+  - query: there's an agent running in t7 that nobody's supervising, adopt it along with the rest and give me the rundown
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: sweep the terminals, deal with whatever's done or failed, tell me what needs me
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: anyone stuck? i've got like 6 agents going
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: how's everyone doing, anyone need me?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: sweep the agents — answer whatever's asking, nudge anything idle, tell me who's done
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: check on all the agents, who's finished who's stuck
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: t1 claude done t2 codex working t3 gemini waiting for input t4 grok exited 1 sort these out
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: hey, back from standup. hows everyone doing, anything need me?
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: got like 6 agents going and havent looked at a single one, is anybody stuck or done
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: what's each of the claude tabs actually working on
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: ok show me the failed one
     history:
@@ -526,6 +558,36 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
+  - query: adopt t4 and show me the next one that needs me
+    history:
+      - 'user: how are the agents doing'
+      - 'assistant: t1 finished, t2 working, t3 waiting for input (typed), t4 unsupervised.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: hows everyone doing, anything need me
+    history:
+      - 'user: codex on #412 #415 #419 #420, one worktree each, run /implement then /review'
+      - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: ok and the agents running right this minute, sweep them, anything stuck or waiting on me?
+    history:
+      - 'user: where were we, what was i working on yesterday'
+      - 'assistant: From the ledger: #502 PR open waiting review, the csv-export fan-out had 2 of 4 merged, and a codex run on fix/memory-leak was left unsupervised in t8.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: and now?
+    history:
+      - 'user: how''s everyone doing? anything need me'
+      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: how are they getting on
+    history:
+      - 'user: fan out issues 40-45, one agent each'
+      - 'assistant: Spawned 6 agents in t1–t6, each in its own worktree on feat/40…feat/45.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher fired: t_8110 idle — agent finished]'
     history:

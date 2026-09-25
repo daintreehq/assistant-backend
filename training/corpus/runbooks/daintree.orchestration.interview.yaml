@@ -107,6 +107,21 @@ boundaries:
     confusable_with: [daintree.orchestration.debate-elimination]
   - query: one agent asks the questions, the rest answer, narrow it to a top 2 and pick my pair programmer
     confusable_with: [daintree.orchestration.debate-elimination]
+  - query: let grok interview the others about the payments module, verify what they claim against the code, narrow to two, then pick
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: which of these three should be my pair programmer for the rust port? have one quiz the others
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: hi there. i want to pick a pair programmer for the rust port — have claude grill gemini, codex and grok on it and tell me who wins
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: have claude grill codex and gemini on how they'd approach our flaky e2e suite and pick which one i should pair with
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: i want claude to question the other agents and name a winner
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -289,6 +304,24 @@ topic_shifts:
     history:
       - 'user: How are you?'
       - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: 'next: have claude interview gemini and grok on how theyd structure the cache layer and pick one'
+    history:
+      - 'user: points contest between claude, gemini, grok on best cold start idea'
+      - 'assistant: Tally: claude 3, gemini 2, grok 1. Claude wins with lazy-loading plugins.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: go on
+    history:
+      - 'user: have claude interview codex, gemini and grok on how they''d do the plugin sandbox, pick the best'
+      - 'assistant: Claude (t1) is the judge. Relayed its first three questions and all answers; it''s verifying gemini''s claim about the existing ipc layer against src/ipc now.'
+    active: [daintree.orchestration.interview]
+    run: 2026-09-24-selector-hardening
+  - query: 'nice. different topic: have claude interview codex and grok about the go rewrite and pick a winner'
+    history:
+      - 'user: merge 488'
+      - 'assistant: Previewed the target, checks conclusive, approved. Rebased and merged #488; forge confirms merged.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[wake: 3 candidate answers ready for the judge]'
     history:

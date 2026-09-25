@@ -97,3 +97,52 @@ def device() -> str:
     except Exception:  # noqa: BLE001
         pass
     return "cpu"
+
+
+def stable_split(rows: list[dict], val_fraction: float) -> tuple[list[dict], list[dict]]:
+    """Train/val split keyed on each row's CONTENT, not on a seeded shuffle.
+
+    A seeded shuffle of the whole corpus reassigns rows wholesale whenever one is
+    added: 63 new rows once moved ~1,020 existing rows across the split, replacing
+    ~12% of the training set and turning a 0.6% data change into what behaved like
+    a new seed. Hashing the rendered input keeps every existing row on its side
+    of the split however the corpus grows, so a corpus edit perturbs training by
+    the rows it actually changed.
+    """
+    import hashlib
+
+    train, val = [], []
+    cut = int(val_fraction * 10_000)
+    for r in rows:
+        key = "\x1f".join(
+            [
+                str(r.get("query", "")),
+                "\x1e".join(str(h) for h in (r.get("history") or [])),
+                ",".join(sorted(r.get("active_ids") or [])),
+            ]
+        )
+        bucket = int(hashlib.sha1(key.encode()).hexdigest()[:8], 16) % 10_000
+        (val if bucket < cut else train).append(r)
+    return train, val
+
+
+def canonical_active(
+    active_ids: list[str], catalog: object, max_active: int = 3
+) -> list[str]:
+    """An active set as the SERVER would have left it: every specific paired
+    with its domain foundation, admitted as atomic units under the cap.
+
+    Production never holds ``[daintree.x]`` alone — the turn that selected it
+    also loaded ``daintree.foundation`` (``active_set._admit_with_domain_foundations``),
+    and ``LocalSelector`` shows every SELECTABLE active id to the model, the
+    foundation included. A training row written as ``active: [daintree.x]``
+    therefore teaches the model on a ``[loaded: …]`` prefix and an ``active``
+    feature pattern it never sees in serving; 61% of the corpus's stateful rows
+    were that shape. Routed through the server's own merge so the two cannot
+    drift in order or in cap behaviour.
+    """
+    from daintree_assistant_server.runbooks.active_set import merge_active_runbooks
+
+    if not active_ids:
+        return []
+    return merge_active_runbooks(list(active_ids), [], catalog, max_active).active  # type: ignore[arg-type]

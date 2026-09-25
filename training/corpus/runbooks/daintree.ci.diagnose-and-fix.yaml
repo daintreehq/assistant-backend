@@ -240,6 +240,57 @@ boundaries:
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: that check on 88 keeps failing, is it flaky? sort it out
     confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: ci's red on main, lint job
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: pr looks fine to me but the e2e check wont pass, sort it
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: '● Cart › applies coupon expect(received).toBe(expected) Expected: 90 Received: 100 got this locally and on ci. codex wrote the coupon code, can you make it pass'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: fix the failing lint job
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 'why is CI red on #512'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: checks keep failing on my pr, get them green
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'Run npm run lint /home/runner/work/app/src/components/Table.tsx 42:7 error ''rows'' is assigned a value but never used @typescript-eslint/no-unused-vars ✖ 1 problem (1 error, 0 warnings) Error: Process completed with exit code 1. that''s the only red check on #331'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: X build (ubuntu-latest) — failing after 2m ✓ lint ✓ typecheck why
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'E ModuleNotFoundError: No module named ''pendulum'' ERROR collecting tests/test_dates.py this is on the pr claude opened, is the whole thing broken or just this'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: happy friday!! ok so the unit tests on feat/billing-export are failing since the rebase, can you sort it
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'Run npm test FAIL src/billing/invoice.test.ts ● invoice totals › applies tax after discount expect(received).toBe(expected) Expected: 108.9 Received: 110 at Object.<anonymous> (src/billing/invoice.test.ts:44:27) Test Suites: 1 failed, 23 passed, 24 total Tests: 1 failed, 211 passed, 212 total Error: Process completed with exit code 1. thats from the checks on #512. figure out why and get it green pls'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'the lint job on #230 keeps going red on a file nobody touched, why'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: is test_upload_resume flaky? it fails like 1 in 5 on ci
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: 'FAILED tests/test_billing.py::test_proration_rounding - AssertionError: assert 1999 == 2000 === 1 failed, 412 passed in 38.2s === this started after the decimal change, fix it'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: the build broke after the vite bump
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: 'error TS2345: Argument of type ''string | undefined'' is not assignable to parameter of type ''string''. src/api/client.ts:88:23 ci''s been red since this morning on main'
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: 'FAILED tests/test_parser.py::test_unicode_headers - UnicodeDecodeError: ''utf-8'' codec can''t decode byte 0xff in position 0 FAILED tests/test_parser.py::test_bom_stripped - AssertionError: assert ''\ufeffid'' == ''id'' ========= 2 failed, 318 passed in 41.22s ========= thats pytest on main, been failing since yesterdays merge. find out why and fix it'
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -499,6 +550,72 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: is it flaky or real? and once you've fixed it, rerun and confirm it's green
+    history:
+      - 'user: the tests are failing'
+      - 'assistant: `test_export_large` fails with MemoryError on CI only. Investigating the fixture size.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: 'FAILED tests/test_cache.py::test_key_collision - AssertionError: assert ''a:1'' != ''a:1'' === 1 failed, 212 passed in 9.4s === that''s on main too, can you get it passing'
+    history:
+      - 'user: start work on #87 with claude'
+      - 'assistant: Started #87 — claude is in t4 on worktree issue-87-cache-keys, supervisor watcher attached.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: ugh ok figure out whats wrong and fix it
+    history:
+      - 'user: did CI pass on #502?'
+      - 'assistant: PR #502 has 1 failing check: `lint` — ruff E501 in api/routes.py plus 3 others. Everything else is green.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: good. separately our jest suite is red on CI since this morning, can you sort it
+    history:
+      - 'user: daintree says mcp disconnected'
+      - 'assistant: Daintree''s MCP was down after the update; you restarted the bridge and daintree.status now reports connected, tools present.'
+    active: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: unrelated, the go unit tests are failing in CI, no browser involved. fix those
+    history:
+      - 'user: the dashboard preview is blank'
+      - 'assistant: Console showed `Cannot read properties of undefined (reading ''map'')` in Chart.tsx; claude patched it and after reload the preview renders.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: ok figure out why e2e is timing out and get it green
+    history:
+      - 'user: merge #604 when it''s ready'
+      - 'assistant: Can''t merge #604 yet: required check `e2e` is failing (3 specs time out in checkout.spec.ts).'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: keep going
+    history:
+      - 'user: why is CI red'
+      - 'assistant: Patched the null deref in parser.go; reran — still 2 failures in parser_test.go (TestEmptyInput, TestBOM).'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: still red on CI for me
+    history:
+      - 'user: fix the failing build'
+      - 'assistant: Build green locally in t3 after fixing the import cycle. CI rerun queued.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: ok figure out why and fix it
+    history:
+      - 'user: is #512 passing?'
+      - 'assistant: #512 has 1 failing required check: test (3.12) — 2 failures in tests/test_sync.py. Review: 1 approval.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: is it green now?
+    history:
+      - 'user: why is ci red on main'
+      - 'assistant: lint fails: src/utils/date.ts:12 unused import ''addDays''. Spawned codex in t3 to remove it.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: great. unrelated, the integration tests are red on main since this morning, can you find out why
+    history:
+      - 'user: run the fullstack recipe'
+      - 'assistant: Ran recipe fullstack: api, web and worker terminals are up, db container healthy.'
+    active: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher w_88 fired: rerun complete, 0 failures]'
     history:

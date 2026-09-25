@@ -210,6 +210,39 @@ boundaries:
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: look over the diff on 412 and tell me what youd change
     confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: review what codex wrote on feat/upload for security issues
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: what's your take on the diff claude just produced, is it any good?
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: hey, hope your days going ok. can you review the diff on fix/session-timeout, especially for security problems
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: the diff on feat/oauth is huge and ive barely skimmed it, worried theres a security hole in there
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: look over what codex wrote on fix/token-refresh and tell me what you'd change
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: check the diff for security problems before i open it for review
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 3 files changed, 214 insertions(+), 12 deletions(-) create mode 100644 src/export/csv.ts that's what the agent committed. review it before it goes anywhere
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 'is this PR any good? #812'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: code review the branch, severity and file refs pls
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: 'diff --git a/src/auth/session.ts b/src/auth/session.ts @@ -12,7 +12,9 @@ export function refresh(token: string) { - if (isExpired(token)) throw new AuthError() + if (isExpired(token)) { + return issue(token.sub) + } return token what would you change about this'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: review pr 55
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -535,6 +568,30 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
+  - query: ok now code review feat/session-rewrite against that, anything risky?
+    history:
+      - 'user: explain how the session store works'
+      - 'assistant: Sessions live in pkg/session: a Redis-backed Store with an in-memory fallback, TTL refreshed on read (store.go:88).'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: cheers. now can you do a proper code review of feat/stripe-v3
+    history:
+      - 'user: bundle everything around the billing webhooks into a copytree file'
+      - 'assistant: Generated billing-webhooks.copytree.md with 14 files (handlers, models, 3 test files), 61 KB.'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
+  - query: before i mark it for anyone, have a couple reviewers go over the diff for security problems
+    history:
+      - 'user: get this branch ready for review'
+      - 'assistant: Pushed feat/export-api and opened draft PR #455. Verdict noted 2 TODOs left in exporter.go.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: do the tests too
+    history:
+      - 'user: review this branch'
+      - 'assistant: 3 findings so far from the handler diff; I haven''t looked at the test changes yet.'
+    active: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[terminal.awaitAll returned: t_2201 finished, t_2202 finished]'
     history:

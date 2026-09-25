@@ -106,6 +106,27 @@ boundaries:
     confusable_with: [daintree.orchestration.debate-elimination]
   - query: the vote came out 2-2. run a runoff between those two with the same agents voting.
     confusable_with: [daintree.orchestration.interview]
+  - query: vote came back 2-2 between claude and gemini, run it again with just those two entries
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: 'final tally: claude 3 codex 3 gemini 1 break the tie'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: ha, its a 2-2 tie. ok run a tiebreaker between claude and gemini with the same voters
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: ugh, 2 votes each again between gemini and grok. same voters, need a decider round
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: it's a tie lol. tiebreak round with the same voters pls
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: the poll on the naming tied — get the two tied ones to resubmit and have everyone vote again
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: tied between codex and grok on the elimination vote, do a runoff between them
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -343,6 +364,30 @@ topic_shifts:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
+  - query: tiebreak it with the same four
+    history:
+      - 'user: poll the fleet: tabs or spaces'
+      - 'assistant: 4 votes: 2 tabs, 2 spaces. It''s a tie.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: 2-2 tie between claude and gemini. runoff, same voters
+    history:
+      - 'user: get claude, codex and gemini to each come up with one idea for speeding up cold start, then have them vote on the best'
+      - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: again, it's tied again
+    history:
+      - 'user: it tied, do a runoff between claude and gemini with the same voters'
+      - 'assistant: Got fresh entries from claude and gemini, sent both to codex, grok and cursor blind. Runoff result: gemini 2, claude 1 — gemini wins.'
+    active: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-24-selector-hardening
+  - query: ugh. runoff
+    history:
+      - 'user: ask claude codex and gemini for their best cli name, peer vote it'
+      - 'assistant: Collected 3 submissions and ran blind votes. Tally: claude 1, codex 1, gemini 1 — three-way tie.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[wake: both runoff submissions received]'
     history:

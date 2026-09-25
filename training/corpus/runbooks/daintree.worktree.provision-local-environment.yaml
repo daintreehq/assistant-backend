@@ -1,12 +1,10 @@
-# Training examples whose answer is `daintree.worktree.provision-local-environment`
-# and nothing else.
+# Training examples whose answer is `daintree.worktree.provision-local-environment` and nothing else.
 #
 # Sections name what kind of evidence a row is; see ../README.md. An example is
 # either a bare query string or a mapping (query/history/active/confusable_with).
 # Rows whose answer is several runbooks, or none, live in ../shared/.
 runbook: daintree.worktree.provision-local-environment
 run: 2026-09-18-worktree-provisioning
-
 positives:
   - all my checkouts point at the same mysql database so only one branch can actually be opened at a time
   - i have four trees but one docroot, how do i get four sites
@@ -35,7 +33,82 @@ positives:
   - the agents keep swapping which copy is active so they can test, i want that to stop
   - one of them switched the shared install over to its own branch and now the others are testing the wrong code
   - make it so nobody has to deactivate anyone else's build to look at theirs
-
 boundaries:
   - query: get an agent to write the provisioning scripts for me
     confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: each branch needs its own postgres, the worktrees keep migrating the same db
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: '== worktree feat/orders == $ npm run db:migrate ERROR: relation "users" already exists STATEMENT: CREATE TABLE users (id uuid primary key, ...) == worktree fix/login == $ npm run dev seed: inserted 14 rows into orders (from feat/orders fixtures??) both worktrees point at the same local postgres. i want every worktree to get its own database automatically when its created'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: worktrees keep colliding on the db — add a setup script that creates one per worktree and a teardown that drops it
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: add a hook so every new worktree gets its own .env and a fresh db, and drops it when i delete the worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: the teardown script isnt dropping the schema when i remove a worktree, fix the config
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: two worktrees both want port 5173 and the second one just dies on boot
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: port 8080 clash between my main checkout and the new worktree, how do i make them coexist
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: seed data from feat/a keeps showing up in feat/b's app
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: '> next dev Error: listen EADDRINUSE: address already in use :::3000 at Server.setupListenHandle [as _listen2] (node:net:1872:16) at listenInCluster (node:net:1920:12) code: ''EADDRINUSE'', errno: -48, port: 3000 second worktree cant boot because the first one already has 3000. set it up so each worktree gets its own port'
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: every new worktree comes up without the .env and a migrated db and i have to set it all up by hand, want that automatic
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: every worktree shares one local wordpress site, want each on its own hostname
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: each worktree needs its own docker container locally, right now theyre sharing one
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: every time i run the second checkout it tries to reuse the first one's postgres
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+topic_shifts:
+  - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
+    history:
+      - 'user: make me a worktree for feat/payments-v2'
+      - 'assistant: Created worktree ../repo-payments-v2 on new branch feat/payments-v2 off main. No agent launched.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: that worktree will share the dev db with main. give it its own database
+    history:
+      - 'user: start work on #77'
+      - 'assistant: Started #77 "Add CSV import" — worktree ../app-77-csv-import, claude spawned in t3 with a background supervisor watcher.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: problem is it'll point at the same postgres as main and the migrations will stomp each other. can each worktree get its own db
+    history:
+      - 'user: make me a worktree for feat/billing-v2 off develop'
+      - 'assistant: Created worktree feat/billing-v2 at ../app-billing-v2 from develop. No recipe or agent launched.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 'different thing: my two local worktrees both try to grab port 3000 and the second one dies'
+    history:
+      - 'user: what''s the status of the devbox for feat/ml-pipeline?'
+      - 'assistant: Remote resource for feat/ml-pipeline: running, gpu-small, up 6h.'
+    active: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: they boot now but all three hit the same local mysql schema, seed data bleeding across. fix that
+    history:
+      - 'user: those three claudes in main keep overwriting each other, split them up'
+      - 'assistant: Created 3 worktrees (agent-a/b/c), moved t1-t3 into them and told each to continue in its new dir.'
+    active: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: both, and yeah ports too
+    history:
+      - 'user: my worktrees fight over the same database'
+      - 'assistant: I can write a setup script that creates db_<branch> and a teardown that drops it. Want both, and should I also allocate a port per worktree?'
+    active: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening

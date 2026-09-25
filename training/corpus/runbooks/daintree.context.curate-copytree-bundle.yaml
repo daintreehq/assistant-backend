@@ -87,6 +87,21 @@ boundaries:
     confusable_with: [daintree.explore.repository]
   - query: bundle up everything to do with the billing subsystem into one context file
     confusable_with: [daintree.orchestration.fan-out-work]
+  - query: bundle up everything related to the payment webhooks incl tests into one file i can hand off
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: grab the auth middleware + its tests into a context file and put it on my clipboard
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: pack the scheduler module into a reference file so i can review it later
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: hey, hope youre good. can you put together a copytree file with everything related to the websocket reconnect code incl tests, i want it for a handoff later
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: '// src/sync/queue.ts import { backoff } from ''./backoff'' import { store } from ''../db/store'' import type { Job } from ''./types'' export async function drain(q: Job[]) { for (const j of q) await backoff(() => store.put(j)) } bundle this file plus everything it imports and its tests into a copytree reference and copy it to my clipboard'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: also throw in the middleware tests
     history:
@@ -324,6 +339,18 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: make me a context bundle of all that incl tests so I can hand it off later
+    history:
+      - 'user: how does the plugin loader find plugins'
+      - 'assistant: loader/scan.go walks $PLUGIN_PATH, reads manifest.toml per dir and registers via registry.Add (registry.go:31).'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: drop testdata then go
+    history:
+      - 'user: bundle the ingest pipeline as a copytree file'
+      - 'assistant: Proposed selection: ingest/*.go, ingest/testdata/**, cmd/ingest, 3 test files — ~72 KB. Generate?'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[async wait returned: copyTree.generate finished]'
     history:

@@ -434,17 +434,25 @@ class SetwiseClassifier:
                     continue
                 stale.append(sid)
             if stale:
-                fresh_docs = [wanted[sid] for sid in stale]
-                r_vecs = _run_encoder(
-                    self._retriever, self._retriever_doc_tok, fresh_docs, normalize=True
-                )
-                c_vecs = _run_encoder(
-                    self._ranker, self._ranker_doc_tok, fresh_docs, normalize=False
-                )
+                # ONE document per encoder call, never a batch. The int8 graphs
+                # quantise activations dynamically — the scale is taken over the
+                # whole input tensor — so a batched document's vector depended on
+                # which OTHER documents happened to be stale alongside it: measured
+                # at 6-7% relative L2 between the same runbook encoded alone and
+                # encoded with the rest of the catalog, enough to change six
+                # benchmark decisions between two tables built from identical
+                # weights. Encoding singly makes a runbook's vector a function of
+                # its own text, whichever path (export, cold load, reload, a
+                # sub-agent's narrowed menu) happens to build it.
                 positions = {sid: i for i, sid in enumerate(ids)}
-                for sid, r_vec, c_vec in zip(stale, r_vecs, c_vecs, strict=True):
-                    retrieval[positions[sid]] = r_vec
-                    ranking[positions[sid]] = c_vec
+                for sid in stale:
+                    doc = [wanted[sid]]
+                    retrieval[positions[sid]] = _run_encoder(
+                        self._retriever, self._retriever_doc_tok, doc, normalize=True
+                    )[0]
+                    ranking[positions[sid]] = _run_encoder(
+                        self._ranker, self._ranker_doc_tok, doc, normalize=False
+                    )[0]
 
             table = RunbookTable(
                 ids=ids,

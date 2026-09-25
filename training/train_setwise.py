@@ -73,8 +73,15 @@ from daintree_assistant_server.runbooks.local.documents import (  # noqa: E402
     INDEX_DOC_VARIANT,
     routing_revision,
     runbook_document,
+    split_when_to_use,
 )
-from training.common import build_query, corpus_rows, device  # noqa: E402
+from training.common import (  # noqa: E402
+    build_query,
+    canonical_active,
+    corpus_rows,
+    device,
+    stable_split,
+)
 from training.setwise_model import CARD_CLASSES, SetwiseHead  # noqa: E402
 
 DATA = ROOT / "training" / "data"
@@ -92,7 +99,7 @@ def main() -> int:
     ap.add_argument("--val-fraction", type=float, default=0.12)
     ap.add_argument("--seed", type=int, default=41)
     ap.add_argument("--max-length", type=int, default=256)
-    ap.add_argument("--doc-max-length", type=int, default=384)
+    ap.add_argument("--doc-max-length", type=int, default=512)
     ap.add_argument("--candidates", type=int, default=32)
     ap.add_argument("--base-model", default="BAAI/bge-base-en-v1.5")
     ap.add_argument("--retriever", default=str(MODELS / "retriever"))
@@ -113,8 +120,86 @@ def main() -> int:
         help="comma-separated runbook ids to strip from TRAINING rows entirely — "
         "the zero-shot probe: can the head route a runbook it never trained on?",
     )
+    ap.add_argument("--data", default=str(DATA / "selection.jsonl"))
+    ap.add_argument(
+        "--canonical-active",
+        action="store_true",
+        help="render every row's active set as the server would hold it "
+        "(specifics paired with their domain foundation) — see canonical_active",
+    )
+    ap.add_argument(
+        "--split",
+        choices=("seed", "hash"),
+        default="hash",
+        help="`seed` shuffles the corpus by --seed, so adding rows reassigns ~all "
+        "of them; `hash` keys each row's side on its content (stable_split).",
+    )
+    ap.add_argument(
+        "--card-weight",
+        choices=("inverse", "sqrt"),
+        default="sqrt",
+        help="cardinality class weights: full inverse frequency (the 3+ class "
+        "weighs ~243) or its square root",
+    )
+    ap.add_argument(
+        "--boundary-loss",
+        type=float,
+        default=0.1,
+        help="weight of a margin loss ranking each positive above the row's "
+        "authored `confusable_with` candidates on the ballot (0 = off)",
+    )
+    ap.add_argument(
+        "--sampling",
+        choices=("replacement", "permutation"),
+        default="permutation",
+        help="how an epoch draws rows. `replacement` is WeightedRandomSampler with "
+        "replacement, so a uniform epoch sees ~63%% of distinct rows; `permutation` "
+        "visits every row exactly once (requires --balance-power 0).",
+    )
+    ap.add_argument(
+        "--ema",
+        type=float,
+        default=0.0,
+        help="decay of an exponential moving average over backbone+head weights, "
+        "evaluated and SAVED in place of the last step's (0 = off).",
+    )
+    ap.add_argument(
+        "--doc-aug",
+        type=int,
+        default=3,
+        help="clause-dropout variants of every runbook document, re-embedded at "
+        "each refresh; each training slot draws one (0 = canonical only).",
+    )
+    ap.add_argument(
+        "--doc-aug-drop",
+        type=float,
+        default=0.3,
+        help="per-sentence drop probability for --doc-aug variants",
+    )
+    ap.add_argument(
+        "--cand-noise",
+        type=float,
+        default=0.0,
+        help="training-only Gaussian jitter on candidate vectors, relative to each "
+        "vector's norm (0 = off)",
+    )
+    ap.add_argument(
+        "--teachers",
+        default="",
+        help="comma-separated stage-2 model dirs whose averaged predictions are "
+        "distilled into this run (same stage 1, encoder and doc cap)",
+    )
+    ap.add_argument("--distill-weight", type=float, default=0.5)
     ap.add_argument("--out", default=str(MODELS / "setwise"))
     args = ap.parse_args()
+    if args.sampling == "permutation" and args.balance_power != 0.0:
+        raise SystemExit("--sampling permutation draws uniformly; use --balance-power 0")
+    if args.doc_aug and args.doc_refresh <= 0:
+        # Augmentation lives on the cached-document path; the gradient path
+        # encodes the canonical text. Defaulted on, so switch it off here rather
+        # than make every --doc-refresh 0 run also pass --doc-aug 0.
+        print("--doc-refresh 0: document augmentation disabled (cached path only)")
+        args.doc_aug = 0
 
     import torch
     from torch.utils.data import WeightedRandomSampler
@@ -135,10 +220,18 @@ def main() -> int:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    rows = corpus_rows(DATA / "selection.jsonl")
-    random.Random(args.seed).shuffle(rows)
-    cut = int(len(rows) * (1 - args.val_fraction))
-    train_rows, val_rows = rows[:cut], rows[cut:]
+    rows = corpus_rows(Path(args.data))
+    if args.canonical_active:
+        rows = [
+            {**r, "active_ids": canonical_active(r.get("active_ids") or [], catalog)}
+            for r in rows
+        ]
+    if args.split == "hash":
+        train_rows, val_rows = stable_split(rows, args.val_fraction)
+    else:
+        random.Random(args.seed).shuffle(rows)
+        cut = int(len(rows) * (1 - args.val_fraction))
+        train_rows, val_rows = rows[:cut], rows[cut:]
 
     holdout = {s.strip() for s in args.holdout_runbooks.split(",") if s.strip()}
     if holdout:
@@ -308,6 +401,50 @@ def main() -> int:
     ).to(dev)
     print(f"runbook documents: {doc_enc['input_ids'].shape[1]} tokens padded")
 
+    # ---- document-side augmentation (--doc-aug) ------------------------------
+    #
+    # The head only ever sees ~40 fixed runbook vectors, so nothing stops it
+    # recognising each vector by IDENTITY — a per-runbook parameter by another
+    # name, and exactly what the architecture exists not to have. Clause-dropout
+    # variants give the same runbook a different vector on different steps, so
+    # what survives training is reading the content. Sentences naming another
+    # runbook (the "do not use for X" fences) are dropped at a third of the rate:
+    # they are the densest routing signal a document carries.
+    aug_rng = random.Random(args.seed + 1)
+
+    def _sentences(text: str) -> list[str]:
+        import re
+
+        return [s for s in re.split(r"(?<=[.;!?])\s+", text.strip()) if s]
+
+    def _drop(text: str) -> str:
+        sents = _sentences(text)
+        if len(sents) <= 1:
+            return text
+        kept = [
+            s for s in sents
+            if aug_rng.random()
+            >= (args.doc_aug_drop / 3 if "daintree." in s else args.doc_aug_drop)
+        ]
+        return " ".join(kept or [aug_rng.choice(sents)])
+
+    def augmented_docs() -> list[str]:
+        """Clause dropout over the POSITIVE description only.
+
+        The exclusion tail ("do not use for X, use Y") is kept verbatim: dropping
+        a fence while keeping the row's label would teach the head that a request
+        the fence routes elsewhere belongs here — contradictory supervision.
+        """
+        out = []
+        for sid in labels:
+            meta = catalog.get(sid).meta
+            title = (meta.title or "").strip()
+            summary = _drop((meta.summary or "").strip())
+            head_txt, tail_txt = split_when_to_use((meta.when_to_use or "").strip())
+            when = f"{_drop(head_txt)} {tail_txt}".strip()
+            out.append(f"{title}. {summary} {when}".strip())
+        return out
+
     def pool(model, ids, mask):  # type: ignore[no-untyped-def]
         hidden = model(input_ids=ids, attention_mask=mask)[0]
         m = mask.unsqueeze(-1).to(hidden.dtype)
@@ -330,9 +467,11 @@ def main() -> int:
     # brand-new runbook's document also lands in, which is the zero-shot property
     # the whole design is for. Set --doc-refresh 0 to restore full gradient flow.
     doc_cache: torch.Tensor | None = None
+    # (variants, runbooks, hidden) — row 0 is always the canonical document.
+    doc_variants: torch.Tensor | None = None
 
-    def refresh_docs() -> None:
-        nonlocal doc_cache
+    def refresh_docs(*, with_variants: bool = False) -> None:
+        nonlocal doc_cache, doc_variants
         if args.doc_refresh <= 0:
             return
         was_training = backbone.training
@@ -341,6 +480,19 @@ def main() -> int:
             doc_cache = pool(
                 backbone, doc_enc["input_ids"], doc_enc["attention_mask"]
             ).detach()
+            if with_variants and args.doc_aug > 0:
+                stack = [doc_cache]
+                for _ in range(args.doc_aug):
+                    enc = tok(
+                        augmented_docs(), padding=True, truncation=True,
+                        max_length=args.doc_max_length, return_tensors="pt",
+                    ).to(dev)
+                    stack.append(
+                        pool(backbone, enc["input_ids"], enc["attention_mask"]).detach()
+                    )
+                doc_variants = torch.stack(stack)
+            else:
+                doc_variants = None
         if was_training:
             backbone.train()
 
@@ -466,7 +618,13 @@ def main() -> int:
             return_tensors="pt",
         ).to(dev)
         q = pool(backbone, q_enc["input_ids"], q_enc["attention_mask"])
-        if doc_cache is not None:
+        if doc_variants is not None and rng is not None:
+            # Training with --doc-aug: each slot draws its own variant.
+            which = torch.randint(
+                0, doc_variants.shape[0], idx_p.shape, device=dev
+            )
+            s = doc_variants[which, torch.tensor(idx_p, device=dev)]
+        elif doc_cache is not None:
             s = doc_cache[torch.tensor(idx_p, device=dev)]
         else:
             # --doc-refresh 0: encode WITH gradients, but only the runbooks this
@@ -484,6 +642,9 @@ def main() -> int:
                 [[u_pos[int(v)] for v in row] for row in idx_p], device=dev
             )
             s = s_all[gather]
+        if args.cand_noise > 0 and rng is not None:
+            scale = s.norm(dim=-1, keepdim=True) / (s.shape[-1] ** 0.5)
+            s = s + args.cand_noise * scale * torch.randn_like(s)
         feats_t = torch.tensor(feats_p, device=dev)
         # Training always fills every slot, so the head's PADDING path is never
         # exercised here. It only engages when the catalog is smaller than k,
@@ -518,9 +679,10 @@ def main() -> int:
          for r in train_rows],
         minlength=CARD_CLASSES,
     ).astype(np.float32).clip(min=1.0)
-    card_weight = torch.tensor(
-        len(train_rows) / (CARD_CLASSES * card_counts), device=dev, dtype=torch.float32
-    )
+    card_w = len(train_rows) / (CARD_CLASSES * card_counts)
+    if args.card_weight == "sqrt":
+        card_w = np.sqrt(card_w)
+    card_weight = torch.tensor(card_w, device=dev, dtype=torch.float32)
     card_loss = torch.nn.CrossEntropyLoss(weight=card_weight)
 
     opt = torch.optim.AdamW(
@@ -544,6 +706,65 @@ def main() -> int:
         pct_start=0.1,
     )
     rng = random.Random(args.seed)
+
+    # ---- weight averaging (--ema) --------------------------------------------
+    #
+    # Training ends at a near-zero loss, and the last step's weights are one
+    # point on a trajectory that ~20 near-tie benchmark cases are sensitive to.
+    # An average along the SAME trajectory is a flatter point (unlike averaging
+    # across seeds, which EXPERIMENTS.md measured as meaningless: independently
+    # initialised heads are not aligned). Bias-corrected warm-up so the first
+    # steps do not anchor the average to the pretrained weights.
+    ema_params: list[torch.Tensor] = []
+    live_params: list[torch.Tensor] = []
+    if args.ema > 0:
+        live_params = list(backbone.parameters()) + list(head.parameters())
+        ema_params = [p.detach().clone() for p in live_params]
+    ema_steps = 0
+
+    def ema_update() -> None:
+        nonlocal ema_steps
+        ema_steps += 1
+        d = min(args.ema, (1 + ema_steps) / (10 + ema_steps))
+        with torch.no_grad():
+            for e, p in zip(ema_params, live_params, strict=True):
+                e.lerp_(p.detach(), 1.0 - d)
+
+    def swap_ema() -> None:
+        """Exchange live and averaged weights in place (call twice to restore)."""
+        with torch.no_grad():
+            for e, p in zip(ema_params, live_params, strict=True):
+                tmp = p.detach().clone()
+                p.copy_(e)
+                e.copy_(tmp)
+
+    def boundary_margin(subset, logits, y_t, idx_p):  # type: ignore[no-untyped-def]
+        """Rank each positive above the row's AUTHORED confusables, margin 1.
+
+        BCE gives a hard negative one slot's share of an averaged loss, the same
+        as any easy one. The corpus already records which neighbour a query could
+        be mistaken for (`confusable_with`, mostly lifted from whenToUse fences);
+        stage 1 reads it, stage 2 never did. Averaged per row over (positive,
+        confusable) pairs, then over the rows that have any.
+        """
+        conf = np.zeros(idx_p.shape, dtype=np.float32)
+        for i, row in enumerate(subset):
+            names = {index[s] for s in (row.get("confusable_with") or []) if s in index}
+            names -= {index[s] for s in row["expect_ids"] if s in index}
+            if not names:
+                continue
+            for j, sid_idx in enumerate(idx_p[i].tolist()):
+                if sid_idx in names:
+                    conf[i, j] = 1.0
+        conf_t = torch.tensor(conf, device=dev)
+        pairs = y_t[:, :, None] * conf_t[:, None, :]  # (b, pos, neg)
+        n = pairs.sum(dim=(1, 2))
+        if float(n.sum()) == 0.0:
+            return logits.sum() * 0.0
+        diff = logits[:, None, :] - logits[:, :, None]  # l_neg - l_pos
+        per_row = (torch.nn.functional.softplus(1.0 + diff) * pairs).sum(dim=(1, 2))
+        has = n > 0
+        return (per_row[has] / n[has]).mean()
 
     def evaluate() -> tuple[float, float, float]:
         backbone.eval()
@@ -580,17 +801,116 @@ def main() -> int:
         n = len(val_rows)
         return exact / n, card_ok / n, docs_ok / n
 
+    # ---- ensemble distillation (--teachers) ----------------------------------
+    #
+    # A few stage-2 models trained from different seeds disagree on the same
+    # ~20 near-tie turns that move a single model's benchmark score by several
+    # cases between seeds. Their AVERAGE is steadier, but serving N encoders
+    # costs N times the latency. So the ensemble's averaged probabilities are
+    # computed once over every training row's ballot and the student learns
+    # from them alongside the hard labels — ensemble behaviour, one model's
+    # inference. Teachers must share this run's stage 1 and document cap: they
+    # score the student's ballots, features included.
+    soft_slot: list[dict[int, float]] = []
+    soft_card = np.zeros((0, CARD_CLASSES), dtype=np.float32)
+    soft_docs = np.zeros(0, dtype=np.float32)
+    teacher_dirs = [t for t in args.teachers.split(",") if t.strip()]
+    if teacher_dirs:
+        n_rows = len(train_rows)
+        acc_slot: list[dict[int, float]] = [{} for _ in range(n_rows)]
+        acc_card = np.zeros((n_rows, CARD_CLASSES), dtype=np.float64)
+        acc_docs = np.zeros(n_rows, dtype=np.float64)
+        for tdir in teacher_dirs:
+            t_meta = json.loads((Path(tdir) / "meta.json").read_text())
+            if (
+                t_meta["doc_max_length"] != args.doc_max_length
+                or t_meta["base_model"] != args.base_model
+                or t_meta.get("ordering", "equivariant") != args.ordering
+            ):
+                raise SystemExit(
+                    f"teacher {tdir} does not match this run's encoder, doc cap or ordering"
+                )
+            state = torch.load(Path(tdir) / "model.pt", map_location="cpu")
+            t_backbone = AutoModel.from_pretrained(args.base_model)
+            t_backbone.load_state_dict(state["backbone"])
+            t_backbone.to(dev).eval()
+            t_head = SetwiseHead(
+                hidden_size, d_model=t_meta["d_model"], layers=t_meta["layers"],
+                rank_positions=t_meta.get("rank_positions", 0),
+            )
+            t_head.load_state_dict(state["head"])
+            t_head.to(dev).eval()
+            with torch.no_grad():
+                t_docs = pool(t_backbone, doc_enc["input_ids"], doc_enc["attention_mask"])
+                for start in range(0, n_rows, 64):
+                    sl = slice(start, start + 64)
+                    subset = train_rows[sl]
+                    idx, cs, rk, _y, _card, _docs = make_batch(
+                        subset, tr_cand[sl], tr_cos[sl], tr_rank[sl], tr_sim[sl], train=True
+                    )
+                    feats, _perm, _ = features(subset, idx, cs, rk, rng=None)
+                    q_enc = tok(
+                        [build_query(r) for r in subset], padding=True, truncation=True,
+                        max_length=args.max_length, return_tensors="pt",
+                    ).to(dev)
+                    q = pool(t_backbone, q_enc["input_ids"], q_enc["attention_mask"])
+                    s = t_docs[torch.tensor(idx, device=dev)]
+                    mask = torch.ones(len(subset), k, device=dev)
+                    lg, dl, cl = t_head(q, s, torch.tensor(feats, device=dev), mask)
+                    p = torch.sigmoid(lg).cpu().numpy()
+                    acc_card[sl] += torch.softmax(cl, -1).cpu().numpy()
+                    acc_docs[sl] += torch.sigmoid(dl).cpu().numpy()
+                    for i in range(len(subset)):
+                        row_acc = acc_slot[start + i]
+                        for j, sid_idx in enumerate(idx[i].tolist()):
+                            row_acc[sid_idx] = row_acc.get(sid_idx, 0.0) + float(p[i, j])
+            del t_backbone, t_head, t_docs, state
+            if dev == "mps":
+                torch.mps.empty_cache()
+            print(f"teacher scored: {tdir}")
+        m = float(len(teacher_dirs))
+        soft_slot = [{key: v / m for key, v in d.items()} for d in acc_slot]
+        soft_card = (acc_card / m).astype(np.float32)
+        soft_docs = (acc_docs / m).astype(np.float32)
+
+    def distill_loss(picks, logits, dlogit, clogits, idx_p):  # type: ignore[no-untyped-def]
+        target = np.zeros(idx_p.shape, dtype=np.float32)
+        for i, pk in enumerate(picks):
+            d = soft_slot[pk]
+            for j, sid_idx in enumerate(idx_p[i].tolist()):
+                target[i, j] = d.get(sid_idx, 0.0)
+        t_slot = torch.tensor(target, device=dev)
+        t_card = torch.tensor(soft_card[picks], device=dev)
+        t_docs = torch.tensor(soft_docs[picks], device=dev)
+        card_kl = -(t_card * torch.log_softmax(clogits, -1)).sum(-1).mean()
+        # UNWEIGHTED BCE against the teachers' probabilities. The hard-label
+        # losses carry pos_weight (~31 for slots), and against a SOFT target t
+        # that moves the optimum to 31t / (31t + 1 - t): a neighbour the teachers
+        # gave 0.1 is pushed to 0.78, over the bonus floor. Measured on the first
+        # build: 21 of 217 turns loaded three runbooks (6-8 without distillation)
+        # and strict passes fell from 175-192 to 161. The teachers' probabilities
+        # were already shaped by pos_weight; matching them needs no second dose.
+        bce = torch.nn.functional.binary_cross_entropy_with_logits
+        # Summed over slots rather than averaged: the hard slot loss spends its
+        # weight on the one positive in ~32 (pos_weight), so a per-slot MEAN of
+        # an unweighted term would be ~30x smaller and the mix would barely
+        # distil at all.
+        return bce(logits, t_slot) * logits.shape[1] + card_kl + bce(dlogit, t_docs)
+
     for epoch in range(1, args.epochs + 1):
         backbone.train()
         head.train()
-        sampler = WeightedRandomSampler(
-            weights, num_samples=len(train_rows), replacement=True
-        )
-        order = list(sampler)
+        if args.sampling == "permutation":
+            order = np.random.permutation(len(train_rows)).tolist()
+        else:
+            sampler = WeightedRandomSampler(
+                weights, num_samples=len(train_rows), replacement=True
+            )
+            order = list(sampler)
         total = 0.0
         for step, start in enumerate(range(0, len(order), args.batch_size)):
             if args.doc_refresh > 0 and step % args.doc_refresh == 0:
-                refresh_docs()
+                refresh_docs(with_variants=True)
             picks = order[start : start + args.batch_size]
             subset = [train_rows[p] for p in picks]
             idx, cs, rk, y, card, docs_y = make_batch(
@@ -598,21 +918,38 @@ def main() -> int:
                 train=True,
             )
             opt.zero_grad()
-            logits, dlogit, clogits, y_t, _ = run_batch(subset, idx, cs, rk, y, rng)
+            logits, dlogit, clogits, y_t, idx_p = run_batch(subset, idx, cs, rk, y, rng)
             loss = (
                 slot_loss(logits, y_t)
                 + card_loss(clogits, torch.tensor(card, device=dev))
                 + docs_loss(dlogit, torch.tensor(docs_y, device=dev))
             )
+            if args.boundary_loss > 0:
+                loss = loss + args.boundary_loss * boundary_margin(subset, logits, y_t, idx_p)
+            if teacher_dirs:
+                lam = args.distill_weight
+                loss = (1 - lam) * loss + lam * distill_loss(picks, logits, dlogit, clogits, idx_p)
             loss.backward()
             opt.step()
             sched.step()
+            if ema_params:
+                ema_update()
             total += float(loss.detach())
         exact, card_acc, docs_acc = evaluate()
-        print(
+        line = (
             f"  epoch {epoch}: loss {total / steps_per_epoch:.4f}  "
             f"val exact-match {exact:.4f}  card {card_acc:.4f}  docs {docs_acc:.4f}"
         )
+        if ema_params:
+            swap_ema()
+            e_exact, e_card, e_docs = evaluate()
+            swap_ema()
+            line += f"  | ema {e_exact:.4f}  card {e_card:.4f}  docs {e_docs:.4f}"
+        print(line)
+
+    if ema_params:
+        # What gets saved — and therefore exported and served — is the average.
+        swap_ema()
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -643,6 +980,12 @@ def main() -> int:
                 # gate is the point of the architecture.
                 "routing_revision_at_train": routing_revision(catalog),
                 "holdout_runbooks": sorted(holdout),
+                "sampling": args.sampling,
+                "ema": args.ema,
+                "doc_aug": args.doc_aug,
+                "cand_noise": args.cand_noise,
+                "seed": args.seed,
+                "epochs": args.epochs,
             },
             indent=2,
         )

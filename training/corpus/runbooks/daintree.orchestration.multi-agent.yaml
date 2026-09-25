@@ -157,6 +157,27 @@ boundaries:
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: get the four of them working the same migration together and give me one merged plan
     confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'have the agents review each other''s fix for #300 until they agree on one patch'
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: hey, so i've got the auth bug — can you get claude and gemini to both chew on it, swap notes, and give me one fix they agree on
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: codex and claude on the same race condition pls, have them cross-check each other til they land on one root cause
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: want one merged design doc for the cache layer out of claude, codex and grok working it together
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: have the three of them collaborate on the migration plan and hand me back a single version
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: have codex and claude discuss the schema until they converge, then give me the merged answer
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: evening. get claude and codex working the memory leak together and cross checking each other till you have one answer
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -318,6 +339,36 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
+  - query: keep relaying until they agree and then give me the one merged plan
+    history:
+      - 'user: have codex and claude debate the cache invalidation plan'
+      - 'assistant: Round 1 relayed: codex argues event-driven purge, claude argues short TTLs.'
+    active: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: ok have them hash it out together until they converge on one recommendation i can take to the team
+    history:
+      - 'user: poll the pinned agents: should we drop node 18 support? want a consensus'
+      - 'assistant: Polled claude, codex, gemini and grok. 3 of 4 say drop it now (EOL, blocking the fetch refactor); grok says wait one minor release. Consensus: drop it.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: stop the free-form chat, i need ONE merged proposal from them, iterate till they converge
+    history:
+      - 'user: get claude, codex and grok talking about whether we should move to a monorepo, see where it goes'
+      - 'assistant: Round 1 done: claude is for it (shared tooling), codex against (CI time), grok wants a hybrid. Caught each up on the others; round 2 is under way.'
+    active: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: one more pass
+    history:
+      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
+      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
+    active: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: cool. totally separate, put claude and codex on the cache invalidation bug together until they agree on one fix
+    history:
+      - 'user: where were we yesterday'
+      - 'assistant: Open: #640 agent still working in t4; #611 merged; batch-7 finished. Closed 2 stale ledger rows.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[terminal.awaitAll returned: 3 finished round one]'
     history:

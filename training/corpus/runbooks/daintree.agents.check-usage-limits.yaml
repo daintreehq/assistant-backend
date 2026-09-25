@@ -51,35 +51,149 @@ boundaries:
     confusable_with: [daintree.diagnostics]
   - query: codex keeps saying ive hit my limit, how much is actually left
     confusable_with: [daintree.agents.recover-agent]
+  - query: when does my claude code weekly cap reset
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: how long till codex lets me use it again, i hit the five hour thing
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: ask claude how much of its weekly limit is left
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: can you get codex to tell me when its 5h window resets
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: have gemini check how many requests i've got left today
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: how much of my codex plan is left
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: claude usage?
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: hey hey. quick q before lunch — how much of my claude weekly limit have i burned
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: check usage on all my pinned agents, want to know who has headroom
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: which of codex, claude and gemini is closest to hitting its limit
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: check usage for claude and codex both please
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: before i fan out these 6 issues, how much allowance does each agent have left
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: how many premium requests do i have left on copilot this month
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: is my kimi credit balance getting low
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: how do i even check usage in antigravity
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: what's my rate limit situation on grok
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: my five hour window is nearly gone isnt it
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: '> claude ⎿ Claude usage limit reached. Your limit will resets at 3pm (Europe/London). ok that''s claude out. how much has codex got left?'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '``` ■ You''ve hit your usage limit. Upgrade to Pro or try again in 2 hours 14 minutes. ``` how close is gemini to the same wall'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: • Edited src/search/index.ts (+120 -34) • Ran npm test (212 passed) • Edited src/search/rank.ts (+48 -9) • Ran npm run lint • Thinking about next step... codex has been churning like that all morning. how much of its quota do i have left before it cuts me off
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: now do grok
     history:
-      - "user: how much usage do i have left in claude and codex"
-      - "assistant: Claude: 34% of the week left, resets Sep 28. Codex: 25% of the weekly limit left, resets Sep 26."
+      - 'user: how much usage do i have left in claude and codex'
+      - 'assistant: Claude: 34% of the week left, resets Sep 28. Codex: 25% of the weekly limit left, resets Sep 26.'
     active: [daintree.agents.check-usage-limits]
   - query: and antigravity?
     history:
-      - "user: check my codex limits"
-      - "assistant: Codex /status shows 25% of the weekly limit left, resetting Sep 26 at 08:30."
+      - 'user: check my codex limits'
+      - 'assistant: Codex /status shows 25% of the weekly limit left, resetting Sep 26 at 08:30.'
     active: [daintree.agents.check-usage-limits]
   - query: same for gemini please
     history:
-      - "user: how much quota is left on antigravity"
-      - "assistant: agy /usage: 100% left on both Gemini and Claude/GPT families, five-hour and weekly."
+      - 'user: how much quota is left on antigravity'
+      - 'assistant: agy /usage: 100% left on both Gemini and Claude/GPT families, five-hour and weekly.'
     active: [daintree.agents.check-usage-limits]
   - query: is that percentage used or remaining?
     history:
-      - "user: whats left on grok"
-      - "assistant: Grok's Usage limit tab shows a weekly bar at 0%, resetting September 28."
+      - 'user: whats left on grok'
+      - 'assistant: Grok''s Usage limit tab shows a weekly bar at 0%, resetting September 28.'
     active: [daintree.agents.check-usage-limits]
 topic_shifts:
   - query: before we go on, how much of my codex allowance is left
     history:
-      - "user: spawn claude on the auth refactor"
-      - "assistant: Claude is working on the auth refactor in terminal t3."
+      - 'user: spawn claude on the auth refactor'
+      - 'assistant: Claude is working on the auth refactor in terminal t3.'
     active: [daintree.edits.spawn-visible-agent]
   - query: ok forget the tabs, check my usage limits on claude and codex
     history:
-      - "user: rename these tabs"
-      - "assistant: Renamed four tabs by branch."
+      - 'user: rename these tabs'
+      - 'assistant: Renamed four tabs by branch.'
     active: [daintree.terminals.rename]
+  - query: same for gemini and grok
+    history:
+      - 'user: how much usage does codex have left'
+      - 'assistant: Codex /status: 5-hour limit 40% used (resets 14:10), weekly 62% used.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: random q, how much of my codex weekly allowance is left? dont want it dying mid-vote
+    history:
+      - 'user: get claude, codex and gemini to each come up with one idea for speeding up cold start, then have them vote on the best'
+      - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: how much codex allowance have i got left before the weekly cap
+    history:
+      - 'user: codex on #412 #415 #419 #420, one worktree each, run /implement then /review'
+      - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: gemini mentioned it's near its quota — check how much it's got left and when it resets
+    history:
+      - 'user: gemini''s asking something in t3, tell it yes'
+      - 'assistant: t3 was asking "Apply migration 0042 to the dev db? (y/n)". Sent y; it continued and is now running the migration.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: is codex gonna run out mid-interview? how much has it got left this week
+    history:
+      - 'user: have claude interview codex, gemini and grok on how they''d do the plugin sandbox, pick the best'
+      - 'assistant: Claude (t1) is the judge. Relayed its first three questions and all answers; it''s verifying gemini''s claim about the existing ipc layer against src/ipc now.'
+    active: [daintree.orchestration.interview]
+    run: 2026-09-24-selector-hardening
+  - query: before the next phase — how close is claude to its five-hour cap
+    history:
+      - 'user: plan out the postgres 14 -> 16 migration as a tracked workflow, it''s going to take days'
+      - 'assistant: Created workflow with 6 nodes: dump schema, test restore on staging, fix extension incompatibilities, cut over, verify, decommission. Node 1 is done; node 2 is running in t3.'
+    active: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
+  - query: and gemini?
+    history:
+      - 'user: how much claude code usage do i have left'
+      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: what about grok and kimi
+    history:
+      - 'user: how much claude code usage do i have left'
+      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: ha nice. unrelated — how much of my claude weekly limit is left?
+    history:
+      - 'user: have everyone write a haiku about rust and vote'
+      - 'assistant: Collected 4 submissions, relayed them blind. Tally: codex 3, gemini 2, claude 1, grok 0. Codex wins.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening

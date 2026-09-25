@@ -95,6 +95,39 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
   - query: Start the React development preview for this worktree.
     confusable_with: [daintree.worktree.manage-resource]
+  - query: the preview panel just shows a white screen and the console is full of red
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: whats in the browser console on the preview, something's throwing
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: 'GET http://localhost:5173/api/me 401 (Unauthorized) Warning: Each child in a list should have a unique "key" prop. the dashboard in the dev preview just spins forever, whats going on'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: '[vite] Internal server error: Failed to resolve import "@/lib/format" from "src/pages/Home.tsx". Does the file exist? Plugin: vite:import-analysis File: /Users/sam/app/src/pages/Home.tsx:3:23 1 | import { useState } from "react" 2 | import Header from "@/components/Header" 3 | import { money } from "@/lib/format" this is in the preview panel, home page wont render. fix it and reload the preview'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: the checkout page is blank in the preview, fix it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: dev preview shows a white screen after my last change
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: reload the preview now that claude pushed the css fix
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: 'Uncaught TypeError: Cannot read properties of undefined (reading ''map'') at ProductList (ProductList.tsx:31:18) at renderWithHooks (react-dom.development.js:16305) that''s from the preview console, page is empty'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: '[vite] hmr update /src/App.tsx Uncaught SyntaxError: The requested module ''/src/store.ts'' does not provide an export named ''useStore'' preview''s broken since gemini''s refactor'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: Refused to load the script 'https://cdn.x.com/a.js' because it violates the following Content Security Policy directive console in the preview is full of these and the chart doesnt render
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: 'Uncaught TypeError: Cannot read properties of undefined (reading ''map'') at ProductList (ProductList.tsx:42:18) at renderWithHooks (react-dom.development.js:16305:18) at mountIndeterminateComponent (react-dom.development.js:20074:13) The above error occurred in the <ProductList> component [HMR] connected thats what the console in the daintree preview panel shows, page is just white. can you debug it'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: and the second one?
     history:
@@ -378,6 +411,30 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
+  - query: now the dev preview panel just shows a white screen and the console is full of hydration errors, look at that
+    history:
+      - 'user: why is the build red'
+      - 'assistant: Fixed the vitest failures in utils/date.test.ts; build is green again.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: reload it
+    history:
+      - 'user: debug the preview, it''s blank'
+      - 'assistant: Codex fixed the undefined `user` in Header.tsx. Reload the preview to confirm?'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: claude says done. did it fix it?
+    history:
+      - 'user: the preview is blank, console shows Uncaught ReferenceError: process is not defined'
+      - 'assistant: Traced to src/config.ts reading process.env in the browser bundle. Spawned claude in t2 to switch to import.meta.env.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: got it. anyway unrelated — the dev preview is throwing a hydration mismatch in the console, debug that
+    history:
+      - 'user: how does the session refresh work?'
+      - 'assistant: refresh() in src/auth/session.ts checks expiry, then issue() mints a new token; middleware in api/auth.ts calls it on every request.'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent completed: frontend fix]'
     active: [daintree.runtime.debug-web-app]

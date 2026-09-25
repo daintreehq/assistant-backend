@@ -458,12 +458,33 @@ positives:
   - Our merge plan assumes five independent branches, but the five agents are still editing one checkout. Move the same sessions into separate worktrees before the plan becomes fiction.
   - The four live roles are implementation, tests, docs, and migration, but they are all writing here. Give each role its own branch folder and retain the sessions.
 boundaries:
-  - query: "move the agents that are already running into separate checkouts"
-    run: 2026-09-22-provision-boundary-fix
+  - query: move the agents that are already running into separate checkouts
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "these two terminals are in the same folder, split them up"
     run: 2026-09-22-provision-boundary-fix
+  - query: these two terminals are in the same folder, split them up
     confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-22-provision-boundary-fix
+  - query: claude and codex are both editing src/ in the same checkout and stepping on each other. split them up
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: give t2 and t4 their own branches, they're mid-task so dont restart them
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: create three worktrees and move the gemini tabs into them
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 't1 claude: error: Your local changes to the following files would be overwritten by checkout: src/api/routes.ts t2 codex: ! Detected unexpected modifications to src/api/routes.ts, re-reading t3 gemini: warning: file changed on disk since last read (src/db/schema.ts) all three are running in the same checkout mid-task and stepping on each other. move each one into its own worktree without restarting them'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: the three agents already running are all in main, move each into its own worktree
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: the four claudes in this worktree keep clobbering each other's package-lock, isolate them
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
+  - query: the three agents i started in main keep overwriting each other's files, theyre all mid-task
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: did they all pick it up
     history:
@@ -1520,3 +1541,21 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: also codex and grok are both mid-task in main and colliding on files, move each into its own worktree
+    history:
+      - 'user: new worktree for spike/grpc please'
+      - 'assistant: Created plain worktree spike/grpc at ../app-grpc from main.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: leave t3, rest yes
+    history:
+      - 'user: the 4 agents in main are colliding'
+      - 'assistant: I''d move t1, t2, t4 and t6 into 4 fresh worktrees. t3 looks idle — include it too?'
+    active: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: actually the codex and gemini tabs already going in main, give them each their own too
+    history:
+      - 'user: make a worktree for feat/export'
+      - 'assistant: Created worktree feat/export from main. Nothing launched.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening

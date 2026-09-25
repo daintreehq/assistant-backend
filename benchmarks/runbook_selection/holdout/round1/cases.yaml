@@ -1,0 +1,1319 @@
+cases:
+- id: hA-waiting-overwrite-yes
+  category: single-runbook
+  note: A running agent is blocked on a typed question and the user wants it answered and the result reported
+    — answer-waiting-agent ("the agent is asking something, tell it yes").
+  messages:
+  - role: user
+    content: the codex one in tab 3 is sitting there asking if it should overwrite the old migration file.
+      just tell it yes and let me know what it does after
+  expect:
+    required:
+    - daintree.agents.answer-waiting-agent
+    optional:
+    - daintree.foundation
+- id: hA-waiting-trust-folder
+  category: single-runbook
+  note: An agent blocked on a trust dialog is waitingReason "approval", which answer-waiting-agent explicitly
+    covers ("it's asking whether to trust the folder").
+  messages:
+  - role: user
+    content: claude popped up one of those trust-this-directory things for the new packages folder. go
+      ahead and ok it so it can carry on
+  expect:
+    required:
+    - daintree.agents.answer-waiting-agent
+    optional:
+    - daintree.foundation
+- id: hA-ask-gemini-session-expiry
+  category: single-runbook
+  note: One named agent, one question, and the deliverable is its answer relayed back — ask-and-relay;
+    review-change and explore.repository both carve out "the user names a specific agent to ask and just
+    wants its answer relayed back".
+  messages:
+  - role: user
+    content: can you get gemini to have a look at how we handle session expiry in src/auth and tell me
+      whether anything seems off to it
+  expect:
+    required:
+    - daintree.agents.ask-and-relay
+    optional:
+    - daintree.foundation
+- id: hA-usage-codex-week
+  category: single-runbook
+  note: How much of an agent CLI's plan allowance is left against a weekly cap — check-usage-limits.
+  messages:
+  - role: user
+    content: how much codex have i got left this week before it starts refusing me? been hammering it
+  expect:
+    required:
+    - daintree.agents.check-usage-limits
+    optional:
+    - daintree.foundation
+- id: hA-usage-claude-refill
+  category: single-runbook
+  note: Remaining allowance and when it resets for Claude Code — check-usage-limits ("when an agent's
+    usage resets").
+  messages:
+  - role: user
+    content: claude code keeps nagging me that im close to the cap. whats actually remaining and when
+      does it refill
+  expect:
+    required:
+    - daintree.agents.check-usage-limits
+    optional:
+    - daintree.foundation
+- id: hA-poll-sqlite-postgres
+  category: single-runbook
+  note: Independent opinions from the pinned fleet synthesized into a consensus — poll-pinned-agents.
+  messages:
+  - role: user
+    content: quick gut check — ask my pinned agents whether the local cache should be sqlite or postgres,
+      and tell me where they land overall
+  expect:
+    required:
+    - daintree.agents.poll-pinned-agents
+    optional:
+    - daintree.foundation
+- id: hA-recover-blank-tab
+  category: single-runbook
+  note: A launched agent showing nothing and possibly never started — recover-agent ("nothing happened
+    when you launched it", "is it hung or just slow?").
+  messages:
+  - role: user
+    content: i kicked off that refactor agent like 10 mins ago and the tab is just blank. no output, nothing.
+      did it even start or is it dead?
+  expect:
+    required:
+    - daintree.agents.recover-agent
+    optional:
+    - daintree.foundation
+- id: hA-relay-payment-review
+  category: single-runbook
+  note: Read an existing reviewer agent's output and point the implementer agent at it with calibration
+    on how to weigh it — relay-review-feedback.
+  messages:
+  - role: user
+    content: the reviewer codex is done going over the payment changes. point the claude that wrote them
+      at its notes — the style nitpicks it can mostly ignore but take the concurrency stuff seriously.
+      have it tell me if the review was actually useful
+  expect:
+    required:
+    - daintree.agents.relay-review-feedback
+    optional:
+    - daintree.foundation
+- id: hA-competition-cli-names
+  category: single-runbook
+  note: Each agent produces its own submission, then peer-votes on the others' and a winner is tallied
+    — the two-stage signal of competition.
+  messages:
+  - role: user
+    content: get claude, codex and gemini to each come up with a name for the new cli tool, then show
+      each of them the other two's names and have them pick the best one (no voting for yourself). tell
+      me who wins
+  expect:
+    required:
+    - daintree.orchestration.competition
+    optional:
+    - daintree.foundation
+- id: hA-conversation-monorepo-chat
+  category: single-runbook
+  note: An open-ended live back-and-forth between two agents with no judge, vote or synthesis target —
+    conversation ("let them talk to each other", "see where it goes").
+  messages:
+  - role: user
+    content: i want claude and gemini chatting about whether monorepos are worth the pain. keep passing
+      what each says to the other for a while, im just curious where it goes
+  expect:
+    required:
+    - daintree.orchestration.conversation
+    optional:
+    - daintree.foundation
+- id: hA-debate-kick-weakest
+  category: single-runbook
+  note: Several agents debate, then vote off the weakest position — debate-elimination.
+  messages:
+  - role: user
+    content: have the four agents argue it out over redux vs zustand vs signals vs plain context for the
+      dashboard, then get them to boot whoever made the weakest case
+  expect:
+    required:
+    - daintree.orchestration.debate-elimination
+    optional:
+    - daintree.foundation
+- id: hA-interview-pair-programmer
+  category: single-runbook
+  note: One agent questions several others and a winner is picked — interview ("which of these should
+    be my pair programmer?").
+  messages:
+  - role: user
+    content: need to choose one agent to pair with on the rust rewrite. let codex grill claude, gemini
+      and kimi about our codebase, check whether what they say is true, and pick one for me
+  expect:
+    required:
+    - daintree.orchestration.interview
+    optional:
+    - daintree.foundation
+- id: hA-multiagent-logging-proposal
+  category: single-runbook
+  note: Two agents collaborate and cross-check toward ONE merged deliverable — multi-agent ("the deliverable
+    is the ONE answer you assemble").
+  messages:
+  - role: user
+    content: get kimi and claude to jointly put together one proposal for the logging overhaul — have
+      them cross check each others drafts and iterate, then hand me the single combined version
+  expect:
+    required:
+    - daintree.orchestration.multi-agent
+    optional:
+    - daintree.foundation
+- id: hA-runoff-two-two
+  category: single-runbook
+  note: A peer vote ended in a tie and the user wants a runoff with the same electorate — runoff-tiebreaker.
+  messages:
+  - role: user
+    content: ugh 2-2 between gemini's entry and codex's. run it again just between those two, same voters
+      as before
+  expect:
+    required:
+    - daintree.orchestration.runoff-tiebreaker
+    optional:
+    - daintree.foundation
+- id: hA-verify-migration-done
+  category: single-runbook
+  note: An agent claims done with tests passing and the next step (push) is irreversible — verify-agent-work
+    ("it says the tests pass, confirm that").
+  messages:
+  - role: user
+    content: the migration agent reckons it's finished and everything's green. before i push anything
+      can you make sure that's actually true
+  expect:
+    required:
+    - daintree.orchestration.verify-agent-work
+    optional:
+    - daintree.foundation
+- id: hA-spawn-pagination
+  category: single-runbook
+  note: One visible agent to change project files now, with no issue, recipe or cohort involved — spawn-visible-agent
+    is the fallback single-agent path.
+  messages:
+  - role: user
+    content: open up a claude agent and have it add cursor pagination to the /orders endpoint. i'd like
+      to watch it do it
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: hA-trap-ask-codex-quota
+  category: routing-trap
+  note: '"Ask codex" reads like ask-and-relay, but the deliverable is account figures from the agent''s
+    own usage screen — check-usage-limits ("never an answer the agent composes"), and check-usage-limits
+    excludes putting a question about code to an agent.'
+  messages:
+  - role: user
+    content: ask codex how many requests it has left on my plan
+  expect:
+    required:
+    - daintree.agents.check-usage-limits
+    optional:
+    - daintree.foundation
+- id: hA-trap-pinned-agents-implement
+  category: routing-trap
+  note: Mentions the pinned agents, but each gets its own unit of real work — poll-pinned-agents says
+    "Do not use when each agent is instead to be given its own unit of real work (use daintree.orchestration.fan-out-work)".
+  messages:
+  - role: user
+    content: 'hand each of my pinned agents one of #412, #415 and #418 to implement, each in its own worktree'
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+- id: hA-trap-scored-vote-on-my-options
+  category: routing-trap
+  note: 'Points and a tally sound like competition, but the options are the user''s own — competition:
+    "A vote over options YOU supplied, even one scored and tallied, is a fleet poll".'
+  messages:
+  - role: user
+    content: 'have the whole fleet vote: option A is redis, option B is an in-memory LRU. give a point
+      per vote, tally it up and tell me which wins'
+  expect:
+    required:
+    - daintree.agents.poll-pinned-agents
+    optional:
+    - daintree.foundation
+- id: hA-trap-stuck-but-asking
+  category: routing-trap
+  note: 'The user says "stuck", but the agent is healthy and asking a question — recover-agent: "Do not
+    use when the agent is healthy and merely ASKING something — answer it with daintree.agents.answer-waiting-agent".'
+  messages:
+  - role: user
+    content: codex looks stuck... oh wait, scrolling up it's asking whether it's allowed to reset the
+      dev db. yeah tell it that's fine
+  expect:
+    required:
+    - daintree.agents.answer-waiting-agent
+    optional:
+    - daintree.foundation
+- id: hA-trap-debate-until-agree
+  category: routing-trap
+  note: '"Debate" suggests debate-elimination, but it ends in one synthesized answer with no vote-off
+    — debate-elimination excludes "a collaborative debate that ends in one synthesized answer (use daintree.orchestration.multi-agent)".'
+  messages:
+  - role: user
+    content: have claude and codex debate the cache invalidation design until they actually agree, then
+      give me the one plan they settle on
+  expect:
+    required:
+    - daintree.orchestration.multi-agent
+    optional:
+    - daintree.foundation
+- id: hA-trap-forge-review-to-agent
+  category: routing-trap
+  note: 'Forwarding review feedback resembles relay-review-feedback, but the review lives on the forge
+    — relay-review-feedback: "feedback that must first be fetched from the forge (a PR''s review decision...)
+    is a different job (use daintree.workflow.follow-up-on-issue)".'
+  messages:
+  - role: user
+    content: 'the reviewer left a bunch of comments on PR #88 on github. pull them and pass them along
+      to the claude that''s still working on that branch'
+  expect:
+    required:
+    - daintree.workflow.follow-up-on-issue
+    optional:
+    - daintree.foundation
+- id: hA-trap-delayed-spawn
+  category: routing-trap
+  note: The verb is "spawn", but the action is deferred — watch-outcome covers "a delayed spawn is a scheduled
+    action... do not fall through to daintree.edits.spawn-visible-agent".
+  messages:
+  - role: user
+    content: in 20 minutes spin up a claude agent and have it run the e2e suite, i'll be in a meeting
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+- id: hA-trap-judge-agent-code
+  category: routing-trap
+  note: About an agent's output, but the ask is whether the code is good — verify-agent-work excludes
+    judging "a change on its merits rather than check a claim about it (daintree.review.review-change)".
+  messages:
+  - role: user
+    content: look over what the agent wrote for the parser rewrite — is it any good? anything you'd change?
+  expect:
+    required:
+    - daintree.review.review-change
+    optional:
+    - daintree.foundation
+- id: hA-trap-get-agent-to-refactor
+  category: routing-trap
+  note: '"Get an agent to look at the auth module" echoes ask-and-relay, but the deliverable is work —
+    ask-and-relay: "Do not use when the deliverable is WORK rather than an answer — implementing, refactoring...
+    (use daintree.edits.spawn-visible-agent)".'
+  messages:
+  - role: user
+    content: get an agent to look at the auth module and refactor it onto the new TokenService, the old
+      helper functions can go
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: hA-trap-anyone-stuck-sweep
+  category: routing-trap
+  note: '"Stuck" suggests recover-agent, but this is a routine sweep of the running fleet — recover-agent
+    excludes "routine triage of a fleet where nothing is broken (daintree.orchestration.supervise-fleet)",
+    whose whenToUse lists "is anyone stuck?".'
+  messages:
+  - role: user
+    content: how's everybody getting on? is anyone stuck or needing me for anything?
+  expect:
+    required:
+    - daintree.orchestration.supervise-fleet
+    optional:
+    - daintree.foundation
+- id: hA-cont-competition-collect-votes
+  category: continuation
+  note: The competition is mid-run with submissions in hand; asking for the peer votes and a winner is
+    the second stage of the same loaded runbook.
+  active:
+  - daintree.orchestration.competition
+  messages:
+  - role: user
+    content: have claude, codex and gemini each give me their single favourite obscure git trick, then
+      score them
+  - role: assistant
+    content: 'All three have submitted: claude suggested `git worktree`, codex suggested `git rerere`,
+      gemini suggested `git bisect run`. Ready for the peer vote.'
+  - role: user
+    content: cool, send each of them the other two and get the votes in, then who won
+  expect:
+    required:
+    - daintree.orchestration.competition
+    optional:
+    - daintree.foundation
+- id: hA-cont-debate-vote-off
+  category: continuation
+  note: debate-elimination explicitly covers "when the elimination request arrives mid-debate"; the loaded
+    runbook keeps working.
+  active:
+  - daintree.orchestration.debate-elimination
+  messages:
+  - role: user
+    content: get the three agents debating tabs vs spaces for the go codebase, and we'll vote one off
+      at the end
+  - role: assistant
+    content: Round 2 is done — claude argues gofmt settles it, codex argues for tabs on accessibility
+      grounds, gemini is holding out for spaces. Want another round?
+  - role: user
+    content: nah thats enough, time to vote someone off
+  expect:
+    required:
+    - daintree.orchestration.debate-elimination
+    optional:
+    - daintree.foundation
+- id: hA-shift-conversation-to-usage
+  category: topic-shift
+  note: A conversation between agents is loaded, but the new turn asks how much Claude allowance remains
+    — check-usage-limits, not the loaded conversation runbook.
+  active:
+  - daintree.orchestration.conversation
+  messages:
+  - role: user
+    content: let claude and gemini keep talking about the plugin architecture, i'll check in
+  - role: assistant
+    content: Round 6 relayed — gemini is now pushing back on claude's idea of a shared event bus.
+  - role: user
+    content: hold on, all these rounds must be chewing through claude. how much have i got left before
+      the five hour limit
+  expect:
+    required:
+    - daintree.agents.check-usage-limits
+    optional:
+    - daintree.foundation
+- id: hA-shift-competition-tie-runoff
+  category: topic-shift
+  note: The competition ended tied and the user asks for a runoff with the same cohort — runoff-tiebreaker,
+    and competition is not for continuing past a tie ("or a runoff after a tie (runoff-tiebreaker)").
+  active:
+  - daintree.orchestration.competition
+  messages:
+  - role: user
+    content: have the four agents each suggest a mascot for the project and peer vote
+  - role: assistant
+    content: 'Votes tallied: claude''s axolotl and kimi''s pangolin got 2 votes each, the other two got
+      none. It''s a tie.'
+  - role: user
+    content: lol ok, do a runoff between the axolotl and the pangolin with the same four voting
+  expect:
+    required:
+    - daintree.orchestration.runoff-tiebreaker
+    optional:
+    - daintree.foundation
+- id: hA-none-thanks-contest
+  category: no-task
+  note: Pure thanks after a finished contest; nothing asks for a procedure.
+  messages:
+  - role: user
+    content: haha that was fun, thanks for running that!
+  expect:
+    required: []
+    optional: []
+- id: hA-none-signoff
+  category: no-task
+  note: Sign-off small talk with no request.
+  messages:
+  - role: user
+    content: ok thats everything for today, cheers
+  expect:
+    required: []
+    optional: []
+- id: hA-foundation-which-agents-open
+  category: foundation-only
+  note: A plain what-exists-right-now read of agents with no action — daintree.foundation; supervise-fleet
+    excludes "a plain state read with no action (daintree.foundation)".
+  messages:
+  - role: user
+    content: which agents have i got open at the moment?
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hA-foundation-focus-codex
+  category: foundation-only
+  note: Focusing ONE terminal is a single direct control-plane action covered by daintree.foundation.
+  messages:
+  - role: user
+    content: bring the codex terminal to the front for me
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hA-foundation-cancel-one-watcher
+  category: foundation-only
+  note: Cancelling ONE watcher is daintree.foundation; watch-outcome and workspace-cleanup both carve
+    out "cancel ONE named watcher (daintree.foundation)".
+  messages:
+  - role: user
+    content: cancel that watcher you set on the build agent, i dont need it anymore
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hB-db-upgrade-phased-tracked
+  category: single-runbook
+  note: Multi-phase goal with ordered dependent steps that must survive the app closing — execute-durable-workflow
+    ("substantial multi-step goal with dependent phases that must survive turns, restarts … migrations").
+  messages:
+  - role: user
+    content: 'We have to move off Postgres 13 to 16. Order is: schema changes, then backfill the new columns,
+      then flip the app over, then verify nothing broke. Each step depends on the last. I want this tracked
+      properly so if I quit the app tonight we can pick it straight back up tomorrow at the right step.'
+  expect:
+    required:
+    - daintree.orchestration.execute-durable-workflow
+    optional:
+    - daintree.foundation
+- id: hB-four-unrelated-tickets-codex-each
+  category: single-runbook
+  note: Several independent issues, one agent per worktree running a command sequence — fan-out-work ("BATCH
+    of independent issues … implement each issue, then review it, then prepare its PR").
+  messages:
+  - role: user
+    content: '#412, #415, #419 and #420 have nothing to do with each other. put a codex on each one in
+      its own worktree and have each do /implement then /review then /pr. if one blows up don''t hold
+      the others back'
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+- id: hB-lint-tickets-max-four
+  category: single-runbook
+  note: A list of work plus a concurrency cap and refill-on-finish is the rolling queue that fan-out-work
+    owns ("no more than 6 at a time", "start the next one whenever one finishes").
+  messages:
+  - role: user
+    content: there are ~25 tiny lint cleanup tickets labelled good-first-issue. grind through all of them,
+      but never more than 4 agents going at the same time — when one wraps up kick off the next
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+- id: hB-back-from-weekend
+  category: single-runbook
+  note: Reconstructing what was in flight in an earlier session is status-and-resume ("where were we …
+    pick up / resume something from an earlier session").
+  messages:
+  - role: user
+    content: ok back after the long weekend and my brain is empty. what was I in the middle of on friday
+      and what's still hanging open?
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+- id: hB-six-claudes-sort-them-out
+  category: single-runbook
+  note: Agents already running, user wants the whole set swept and acted on — supervise-fleet ("anything
+    need me?", "is anyone stuck?").
+  messages:
+  - role: user
+    content: I've got like six claudes grinding away in different tabs. go through them all, deal with
+      whatever you can, and just tell me the ones that actually need me
+  expect:
+    required:
+    - daintree.orchestration.supervise-fleet
+    optional:
+    - daintree.foundation
+- id: hB-e2e-ping-when-done
+  category: single-runbook
+  note: Wants to be woken later when a long run finishes — watch-outcome ("let me know when the build
+    finishes").
+  messages:
+  - role: user
+    content: the e2e suite in the build terminal takes about 40 mins. I'm going to grab lunch, give me
+      a shout when it's finished and tell me if it passed
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+- id: hB-post-contest-teardown
+  category: single-runbook
+  note: Explicit teardown of several terminals and worktrees after a competition — workspace-cleanup ("shut
+    it all down", "delete that worktree").
+  messages:
+  - role: user
+    content: right, the bake-off is done and I've got what I need. close all those contestant terminals
+      and get rid of the worktrees they were using
+  expect:
+    required:
+    - daintree.orchestration.workspace-cleanup
+    optional:
+    - daintree.foundation
+- id: hB-mcp-red-no-terminal-tools
+  category: single-runbook
+  note: Daintree itself misbehaving — missing tools and a disconnected MCP indicator — is diagnostics
+    ("the MCP is disconnected", "why is this tool missing").
+  messages:
+  - role: user
+    content: something's off with the app — you keep telling me you don't have any terminal tools, and
+      the little MCP light in the corner is red. what's going on
+  expect:
+    required:
+    - daintree.diagnostics
+    optional:
+    - daintree.foundation
+- id: hB-errors-for-bug-report
+  category: single-runbook
+  note: Showing recent Daintree errors for a bug report is diagnostics ("show recent Daintree errors or
+    notifications, wants diagnostics for a bug report").
+  messages:
+  - role: user
+    content: I'm filing a bug with the daintree folks. can you dig out whatever errors the app has logged
+      recently plus any notifications so I can paste them in?
+  expect:
+    required:
+    - daintree.diagnostics
+    optional:
+    - daintree.foundation
+- id: hB-we-deploy-with-fly-now
+  category: single-runbook
+  note: A durable project fact to keep for later sessions — manage-project-memory ("remember that we use
+    pnpm").
+  messages:
+  - role: user
+    content: 'heads up for the future: this project deploys to fly.io now, not vercel. we switched last
+      month. don''t suggest vercel stuff anymore'
+  expect:
+    required:
+    - daintree.memory.manage-project-memory
+    optional:
+    - daintree.foundation
+- id: hB-billing-webhook-reference-file
+  category: single-runbook
+  note: The deliverable is a deliberately selected context file for a later handoff — curate-copytree-bundle
+    ("bundle everything relevant to X, including supporting files and tests").
+  messages:
+  - role: user
+    content: a contractor's picking up the stripe webhook stuff next week. can you put together one file
+      with everything they'd need — the webhook handlers, the models they write to, the related tests.
+      no need to do anything else, just the file
+  expect:
+    required:
+    - daintree.context.curate-copytree-bundle
+    optional:
+    - daintree.foundation
+- id: hB-tabs-all-say-claude
+  category: single-runbook
+  note: New tab titles for several same-named agents — terminals.rename ("several agents share the same
+    name (e.g. all "Claude") and need to be told apart").
+  messages:
+  - role: user
+    content: my tab bar is just claude claude claude claude claude. can you work out what each one is
+      actually doing and label them so I can tell them apart
+  expect:
+    required:
+    - daintree.terminals.rename
+    optional:
+    - daintree.foundation
+- id: hB-list-saved-recipes-then-apply
+  category: single-runbook
+  note: Listing and running an existing workspace recipe is recipe.run-or-create ("list, inspect, load,
+    run or apply an existing Daintree workspace recipe").
+  messages:
+  - role: user
+    content: what recipes have i got saved in this workspace? whichever one has the storybook terminal
+      in it, fire that up
+  expect:
+    required:
+    - daintree.recipe.run-or-create
+    optional:
+    - daintree.foundation
+- id: hB-trap-remind-to-check-agents
+  category: routing-trap
+  note: Mentions checking agents (supervise-fleet vocabulary) but asks for something LATER — watch-outcome
+    ("remind me in an hour"); supervise-fleet excludes "watching past this turn".
+  messages:
+  - role: user
+    content: remind me in an hour to go check on the agents, I'm heading into a meeting
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+- id: hB-trap-one-codex-frozen
+  category: routing-trap
+  note: Sounds like fleet triage, but it is ONE hung agent — supervise-fleet excludes "rescuing one broken
+    or hung agent (daintree.agents.recover-agent)"; recover-agent covers "is it hung or just slow?".
+  messages:
+  - role: user
+    content: the codex in the payments tab hasn't printed a single thing in like 25 minutes. is it hung
+      or is it just thinking really hard?
+  expect:
+    required:
+    - daintree.agents.recover-agent
+    optional:
+    - daintree.foundation
+- id: hB-trap-close-scratch-terminal
+  category: routing-trap
+  note: Closing is cleanup vocabulary, but ONE named terminal is foundation — workspace-cleanup says "Do
+    not use for closing ONE named terminal … (daintree.foundation covers that)".
+  messages:
+  - role: user
+    content: close the terminal called scratch, I'm done with it
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hB-trap-cancel-one-watcher
+  category: routing-trap
+  note: Watcher vocabulary suggests watch-outcome, but it explicitly excludes cancelling ONE named watcher,
+    which belongs to daintree.foundation ("cancelling ONE watcher or async wait").
+  messages:
+  - role: user
+    content: you can drop the watcher you put on the migration terminal, I'll keep an eye on it myself
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hB-trap-project-tests-broken
+  category: routing-trap
+  note: '"Something broke" sounds like diagnostics, but it is the project''s own tests — diagnostics excludes
+    "ordinary project failures … red project CI (use daintree.ci.diagnose-and-fix)".'
+  messages:
+  - role: user
+    content: ugh everything's broken — the unit tests on my branch started failing after the rebase this
+      morning. can you figure out what's wrong and get them passing again
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: hB-trap-where-are-flag-defaults
+  category: routing-trap
+  note: Phrased like a recall question, but the answer lives in the code — manage-project-memory excludes
+    looking "something up in the project's CODE rather than in memory (use daintree.explore.repository)".
+  messages:
+  - role: user
+    content: where do we actually define the default values for feature flags? I can never find it in
+      the codebase
+  expect:
+    required:
+    - daintree.explore.repository
+    optional:
+    - daintree.foundation
+- id: hB-trap-four-waiting-say-yes
+  category: routing-trap
+  note: Several running agents (supervise-fleet vocabulary), but all are asking questions and the only
+    action is answering — supervise-fleet excludes "answering agents that are ASKING (daintree.agents.answer-waiting-agent)".
+  messages:
+  - role: user
+    content: four of the agents are sat there waiting on a y/n question about overwriting files. just
+      tell all of them yes so they carry on
+  expect:
+    required:
+    - daintree.agents.answer-waiting-agent
+    optional:
+    - daintree.foundation
+- id: hB-trap-author-new-recipe
+  category: routing-trap
+  note: Looks like a creation/spawn task, but recipe.run-or-create covers a request to CREATE a recipe
+    "only so you can say plainly that no tool can author one".
+  messages:
+  - role: user
+    content: can you make me a new recipe that opens a dev server, a test watcher and a claude session,
+      and save it so I can reuse it on every worktree?
+  expect:
+    required:
+    - daintree.recipe.run-or-create
+    optional:
+    - daintree.foundation
+- id: hB-trap-context-then-fix
+  category: routing-trap
+  note: Mentions gathering files as context (copytree vocabulary), but the context only feeds an agent
+    doing a fix — curate-copytree-bundle excludes "when context is merely an input to launching or feeding
+    an agent … daintree.edits.spawn-visible-agent for one new agent".
+  messages:
+  - role: user
+    content: pull together the auth middleware and session files as context for claude and have it fix
+      the bug where login redirects to a blank page
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: hB-trap-is-pr-green-yet
+  category: routing-trap
+  note: A PR status question, not a request to be woken later — watch-outcome says a one-off read of CI/checks
+    "is not a watch at all (use daintree.workflow.follow-up-on-issue)".
+  messages:
+  - role: user
+    content: is PR 88 green yet or is it still running checks?
+  expect:
+    required:
+    - daintree.workflow.follow-up-on-issue
+    optional:
+    - daintree.foundation
+- id: hB-cont-add-issue-to-batch
+  category: continuation
+  note: Extends the batch already being fanned out with one more independent issue on the same command
+    chain — stays in fan-out-work.
+  active:
+  - daintree.orchestration.fan-out-work
+  - daintree.foundation
+  messages:
+  - role: user
+    content: 'spin up an agent per issue for #501, #503 and #507, each in its own worktree, and run /implement
+      then /review'
+  - role: assistant
+    content: Started three Claude terminals, one per issue in worktrees issue-501, issue-503 and issue-507.
+      Each is running /implement now; /review follows once implement finishes.
+  - role: user
+    content: 'nice. throw #512 in there too, same deal'
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+- id: hB-cont-cleanup-confirm-keep-one
+  category: continuation
+  note: User answers the teardown confirmation gate with a go-ahead and an exception — still workspace-cleanup's
+    confirm-then-teardown procedure.
+  active:
+  - daintree.orchestration.workspace-cleanup
+  - daintree.foundation
+  messages:
+  - role: user
+    content: clean up everything from the refactor sprint
+  - role: assistant
+    content: 'Here''s what I found: 5 agent terminals (all idle), 4 worktrees (refactor-a through refactor-c,
+      plus docs-refresh), and 2 active watchers. refactor-b has uncommitted changes. Want me to go ahead?'
+  - role: user
+    content: yep go for it, but leave docs-refresh alone, I still need that one
+  expect:
+    required:
+    - daintree.orchestration.workspace-cleanup
+    optional:
+    - daintree.foundation
+- id: hB-shift-sweep-to-verify-one
+  category: topic-shift
+  note: After a fleet sweep the user asks whether ONE finished agent really did what it claimed — supervise-fleet
+    excludes "proving one agent's work landed (daintree.orchestration.verify-agent-work)".
+  active:
+  - daintree.orchestration.supervise-fleet
+  - daintree.foundation
+  messages:
+  - role: user
+    content: how's everyone doing?
+  - role: assistant
+    content: 'Four agents: the API agent says it''s done and added the users migration, two are still
+      working, and the docs agent is idle waiting for input.'
+  - role: user
+    content: hmm, the API one — I don't buy that it actually added the migration. check before I merge
+      anything
+  expect:
+    required:
+    - daintree.orchestration.verify-agent-work
+    optional:
+    - daintree.foundation
+- id: hB-shift-resume-to-teardown
+  category: topic-shift
+  note: After a where-were-we catch-up the user asks to tear down the old session's leftovers — status-and-resume
+    excludes "to close terminals or delete worktrees (daintree.orchestration.workspace-cleanup)".
+  active:
+  - daintree.orchestration.status-and-resume
+  - daintree.foundation
+  messages:
+  - role: user
+    content: what was I working on last week?
+  - role: assistant
+    content: Last week you had the search-indexing work across three worktrees; all three PRs have since
+      merged. Three agent terminals from that session are still open and the worktrees still exist.
+  - role: user
+    content: ok that's all done then. close those old terminals and delete the three worktrees
+  expect:
+    required:
+    - daintree.orchestration.workspace-cleanup
+    optional:
+    - daintree.foundation
+- id: hB-notask-thanks
+  category: no-task
+  note: Pure acknowledgement with no request — nothing should load.
+  messages:
+  - role: user
+    content: perfect, thanks, that's exactly what I needed
+  expect:
+    required: []
+    optional: []
+- id: hB-notask-smalltalk
+  category: no-task
+  note: Small talk with no task or Daintree question — nothing should load.
+  messages:
+  - role: user
+    content: haha ok it's friday, I'm logging off soon. have a good one
+  expect:
+    required: []
+    optional: []
+- id: hB-found-list-worktrees
+  category: foundation-only
+  note: A plain what-exists-now read of worktrees with no action — daintree.foundation ("which terminals,
+    agents, worktrees, branches … exist").
+  messages:
+  - role: user
+    content: list the worktrees I've got right now and which branch each one's on
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hB-found-focus-dev-server
+  category: foundation-only
+  note: A single direct control-plane action on one terminal — daintree.foundation ("reading or focusing
+    ONE terminal").
+  messages:
+  - role: user
+    content: bring the tab with the dev server to the front please
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hB-found-is-it-connected
+  category: foundation-only
+  note: Connection check with nothing reported wrong — diagnostics says "A plain 'is Daintree connected?'
+    with nothing wrong is daintree.foundation".
+  messages:
+  - role: user
+    content: quick one before I start — are you hooked up to daintree ok?
+  expect:
+    required:
+    - daintree.foundation
+    optional: []
+- id: hC-date-spec-keeps-dying
+  category: single-runbook
+  note: A test that is failing and the user wants it working — "the tests are failing", "fix the failing
+    test" in daintree.ci.diagnose-and-fix.
+  messages:
+  - role: user
+    content: npm test keeps blowing up on the date parsing spec since this morning. can you sort it out?
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: hC-request-path-orientation
+  category: single-runbook
+  note: The user wants to UNDERSTAND how code flows, nothing changed — "how does the auth flow work",
+    "orientation before work starts" in daintree.explore.repository.
+  messages:
+  - role: user
+    content: I'm new on this codebase. how does a request actually get from the http handler down to the
+      db layer? which files should I be reading
+  expect:
+    required:
+    - daintree.explore.repository
+    optional:
+    - daintree.foundation
+- id: hC-squash-412
+  category: single-runbook
+  note: Merging/squashing a PR is daintree.forge.land-pull-request ("merge, squash or rebase it").
+  messages:
+  - role: user
+    content: 412 looks fine to me, squash it into main
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    optional:
+    - daintree.foundation
+- id: hC-ticket-for-modal-flicker
+  category: single-runbook
+  note: Filing a new issue with a label is daintree.forge.manage-issue ("file or create an issue ... add
+    or remove labels").
+  messages:
+  - role: user
+    content: can you open a ticket for the settings modal flickering when you resize the window? tag it
+      as a bug pls
+  expect:
+    required:
+    - daintree.forge.manage-issue
+    optional:
+    - daintree.foundation
+- id: hC-pushback-on-billing-diff
+  category: single-runbook
+  note: The user wants a change judged on its merits with findings — "what would you change about this
+    diff" in daintree.review.review-change.
+  messages:
+  - role: user
+    content: take a look over what's on feat/billing-rework vs main and tell me what you'd push back on
+      if you were reviewing it
+  expect:
+    required:
+    - daintree.review.review-change
+    optional:
+    - daintree.foundation
+- id: hC-white-screen-preview
+  category: single-runbook
+  note: A runtime rendering failure in an already-open Dev Preview with console errors is daintree.runtime.debug-web-app.
+  messages:
+  - role: user
+    content: the preview pane just went blank white after my last change. console's complaining 'Cannot
+      read properties of undefined (reading map)'. whats going on
+  expect:
+    required:
+    - daintree.runtime.debug-web-app
+    optional:
+    - daintree.foundation
+- id: hC-free-afternoon-small-bug
+  category: single-runbook
+  note: Searching the backlog for unclaimed work is daintree.workflow.find-issue-work ("what should I
+    pick up next", "find me a small bug nobody's on").
+  messages:
+  - role: user
+    content: got a free afternoon. anything smallish in the tracker that nobody's grabbed yet?
+  expect:
+    required:
+    - daintree.workflow.find-issue-work
+    optional:
+    - daintree.foundation
+- id: hC-anyone-respond-88
+  category: single-runbook
+  note: A one-off read of an issue's comment thread — "did anyone reply on that issue?" in daintree.workflow.follow-up-on-issue.
+  messages:
+  - role: user
+    content: 'has anyone gotten back to me on #88 yet?'
+  expect:
+    required:
+    - daintree.workflow.follow-up-on-issue
+    optional:
+    - daintree.foundation
+- id: hC-done-get-pr-up
+  category: single-runbook
+  note: Commit, push and open the PR for finished work is daintree.workflow.prep-branch-for-review ("open
+    or ready a PR").
+  messages:
+  - role: user
+    content: ok I think this branch is done. commit whatever's outstanding and get a PR up for it
+  expect:
+    required:
+    - daintree.workflow.prep-branch-for-review
+    optional:
+    - daintree.foundation
+- id: hC-kick-off-231
+  category: single-runbook
+  note: One already-chosen forge issue with an agent put on it is daintree.workflow.start-work-on-issue.
+  messages:
+  - role: user
+    content: 'right, lets get going on #231. put claude on it'
+  expect:
+    required:
+    - daintree.workflow.start-work-on-issue
+    optional:
+    - daintree.foundation
+- id: hC-release-branch-checkout
+  category: single-runbook
+  note: Checking out an existing branch as a worktree with no agent or recipe is daintree.worktree.create-plain-worktree.
+  messages:
+  - role: user
+    content: I need release/2.4 checked out somewhere separate so I can poke at it without stashing. no
+      agent, just the tree
+  expect:
+    required:
+    - daintree.worktree.create-plain-worktree
+    optional:
+    - daintree.foundation
+- id: hC-devbox-burning-money
+  category: single-runbook
+  note: Pausing a worktree's cloud devbox to save cost is daintree.worktree.manage-resource.
+  messages:
+  - role: user
+    content: the cloud box behind the payments worktree is still running and I'm not touching it till
+      monday. can you pause it so it stops costing us
+  expect:
+    required:
+    - daintree.worktree.manage-resource
+    optional:
+    - daintree.foundation
+- id: hC-migrations-clobber-shared-db
+  category: single-runbook
+  note: Worktrees colliding over one shared database is daintree.worktree.provision-local-environment
+    ("each branch needs its own database").
+  messages:
+  - role: user
+    content: whenever I have two branches going at once they both hit the same local postgres and the
+      migrations trash each other. how do I stop that for good
+  expect:
+    required:
+    - daintree.worktree.provision-local-environment
+    optional:
+    - daintree.foundation
+- id: hC-split-colliding-claudes
+  category: single-runbook
+  note: Agents that are ALREADY RUNNING in one checkout and need separating is daintree.worktree.relocate-agents
+    ("isolate these agents so they stop colliding").
+  messages:
+  - role: user
+    content: those three claudes I've got going are all editing the same checkout and keep overwriting
+      each other's files. split them up so each one has its own tree and let them carry on
+  expect:
+    required:
+    - daintree.worktree.relocate-agents
+    optional:
+    - daintree.foundation
+- id: hC-trap-is-pr-green
+  category: routing-trap
+  note: 'Mentions CI but only asks to READ check status — follow-up-on-issue: "reading that a check is
+    red is here, working out why and getting it green is daintree.ci.diagnose-and-fix".'
+  messages:
+  - role: user
+    content: quick one, are the checks on PR 55 passing yet?
+  expect:
+    required:
+    - daintree.workflow.follow-up-on-issue
+    optional:
+    - daintree.foundation
+- id: hC-trap-pr-lint-red-fix
+  category: routing-trap
+  note: Names a PR (follow-up vocabulary) but wants the red check diagnosed and made green — follow-up-on-issue
+    says "Do not use to DIAGNOSE or FIX a failing check", so daintree.ci.diagnose-and-fix.
+  messages:
+  - role: user
+    content: the lint job on PR 55 is red. work out what it's unhappy about and get it passing
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: hC-trap-close-issue-with-comment
+  category: routing-trap
+  note: Issue-editing vocabulary, but manage-issue excludes "add a closing comment and close it (use daintree.workflow.follow-up-on-issue)".
+  messages:
+  - role: user
+    content: 'close out #77 with a note saying it was fixed in 1.3'
+  expect:
+    required:
+    - daintree.workflow.follow-up-on-issue
+    optional:
+    - daintree.foundation
+- id: hC-trap-reopen-issue
+  category: routing-trap
+  note: Looks like follow-up on an issue, but reopening is explicitly daintree.forge.manage-issue ("reopen
+    an issue").
+  messages:
+  - role: user
+    content: 'ugh the export bug is back. reopen #77'
+  expect:
+    required:
+    - daintree.forge.manage-issue
+    optional:
+    - daintree.foundation
+- id: hC-trap-close-pr
+  category: routing-trap
+  note: Closing sounds like issue close-out, but closing a PULL REQUEST is in daintree.forge.land-pull-request
+    ("close or reopen it").
+  messages:
+  - role: user
+    content: 'we''re going a different direction on the caching thing, close PR #301 without merging'
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    optional:
+    - daintree.foundation
+- id: hC-trap-past-prs-rate-limiter
+  category: routing-trap
+  note: Sounds like a code-understanding question, but locating past PRs is daintree.workflow.find-issue-work
+    ("find the closed PRs about X", "which PRs touched Y").
+  messages:
+  - role: user
+    content: which merged PRs have touched the rate limiter over the last few months? want to see the
+      history
+  expect:
+    required:
+    - daintree.workflow.find-issue-work
+    optional:
+    - daintree.foundation
+- id: hC-trap-worktree-for-issue
+  category: routing-trap
+  note: Says "make a worktree" but for a forge issue with an agent — create-plain-worktree excludes "starting
+    a forge issue with an agent (use daintree.workflow.start-work-on-issue)".
+  messages:
+  - role: user
+    content: make a worktree for issue 140 and stick codex in it to do the fix
+  expect:
+    required:
+    - daintree.workflow.start-work-on-issue
+    optional:
+    - daintree.foundation
+- id: hC-trap-worktree-with-recipe
+  category: routing-trap
+  note: A worktree request, but with a workspace recipe — create-plain-worktree excludes "a worktree with
+    a workspace recipe (use daintree.recipe.run-or-create)".
+  messages:
+  - role: user
+    content: create a worktree for feature/search-v2 and use the node-dev recipe to start it up
+  expect:
+    required:
+    - daintree.recipe.run-or-create
+    optional:
+    - daintree.foundation
+- id: hC-trap-container-per-worktree
+  category: routing-trap
+  note: '"Resource" vocabulary suggests manage-resource, but a per-worktree local container and port via
+    setup scripts is daintree.worktree.provision-local-environment (manage-resource is for a cloud devbox).'
+  messages:
+  - role: user
+    content: when a new worktree gets created I want it to bring up its own docker container on its own
+      port automatically, and drop it when the worktree goes away
+  expect:
+    required:
+    - daintree.worktree.provision-local-environment
+    optional:
+    - daintree.foundation
+- id: hC-trap-did-agent-fix-flaky
+  category: routing-trap
+  note: Talks about a flaky test, but asks whether an agent's claim is true before merging — ci.diagnose-and-fix
+    excludes "to confirm an agent did what it claimed (use daintree.orchestration.verify-agent-work)".
+  messages:
+  - role: user
+    content: the agent in tab 2 says it fixed the flaky upload test and everything passes now. confirm
+      that's actually true before I merge
+  expect:
+    required:
+    - daintree.orchestration.verify-agent-work
+    optional:
+    - daintree.foundation
+- id: hC-trap-request-changes-reviewer
+  category: routing-trap
+  note: Review vocabulary, but requesting changes and adding a reviewer are PR lifecycle actions in daintree.forge.land-pull-request,
+    not a findings review.
+  messages:
+  - role: user
+    content: mark PR 90 as changes requested and add alice as a reviewer
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    optional:
+    - daintree.foundation
+- id: hC-trap-react-tests-red-no-browser
+  category: routing-trap
+  note: A web app, but the failure is ordinary CI with no browser symptom — debug-web-app excludes "ordinary
+    test/build CI failures without a browser runtime symptom (use daintree.ci.diagnose-and-fix)".
+  messages:
+  - role: user
+    content: frontend app renders fine in the browser but the jest suite fails in CI on the Header component
+      snapshot. fix it
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: hC-cont-apply-fix-rerun
+  category: continuation
+  note: Still the fix-and-verify loop of the loaded daintree.ci.diagnose-and-fix ("including the fix-and-verify
+    loop that follows").
+  active:
+  - daintree.ci.diagnose-and-fix
+  messages:
+  - role: user
+    content: the build on main is broken, can you figure it out
+  - role: assistant
+    content: 'The build fails in tsc: src/api/client.ts line 44 passes a string where the new RequestOptions
+      type expects a number for timeout. The fix is to parse it in the config loader. Want me to apply
+      it?'
+  - role: user
+    content: yep go ahead, then rerun it and make sure it's actually green
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: hC-cont-review-skipped-file
+  category: continuation
+  note: Continues the loaded review of the same diff — still judging the change on its merits (daintree.review.review-change).
+  active:
+  - daintree.review.review-change
+  messages:
+  - role: user
+    content: review the auth-refactor branch
+  - role: assistant
+    content: 'Findings: 1) high — session tokens logged at debug level in middleware.ts; 2) medium — refresh
+      path lacks a retry cap; 3) low — duplicated header parsing.'
+  - role: user
+    content: you didn't say anything about the migration file in that diff though, look at that too
+  expect:
+    required:
+    - daintree.review.review-change
+    optional:
+    - daintree.foundation
+- id: hC-shift-shortlist-to-start
+  category: topic-shift
+  note: The issue is now chosen and should be started — find-issue-work says "Do not use once the issue
+    is chosen and the user wants it started (use daintree.workflow.start-work-on-issue)".
+  active:
+  - daintree.workflow.find-issue-work
+  messages:
+  - role: user
+    content: find me something unassigned to work on
+  - role: assistant
+    content: 'Three unclaimed candidates: #12 (typo in CLI help), #19 (CSV export drops the last row),
+      #33 (dark mode contrast on badges). None has a branch or agent on it.'
+  - role: user
+    content: 19. get an agent going on it
+  expect:
+    required:
+    - daintree.workflow.start-work-on-issue
+    optional:
+    - daintree.foundation
+- id: hC-shift-pr-opened-now-file-issue
+  category: topic-shift
+  note: After the PR is open the user switches to filing a new issue — daintree.forge.manage-issue, not
+    the loaded prep-branch runbook.
+  active:
+  - daintree.workflow.prep-branch-for-review
+  messages:
+  - role: user
+    content: wrap this branch up and open a PR
+  - role: assistant
+    content: 'Committed 3 files, pushed feat/export-fix, and opened PR #210 against main.'
+  - role: user
+    content: nice. unrelated, but can you file an issue about startup taking like 8 seconds now? label
+      it perf
+  expect:
+    required:
+    - daintree.forge.manage-issue
+    optional:
+    - daintree.foundation
+- id: hC-none-thanks
+  category: no-task
+  note: Pure thanks, no procedure requested; nothing should load.
+  messages:
+  - role: user
+    content: perfect, thanks, that's exactly what I needed
+  expect:
+    required: []
+    optional: []
+- id: hC-none-signing-off
+  category: no-task
+  note: Small talk signing off; no task.
+  messages:
+  - role: user
+    content: ok that's me done for today lol. long one. talk tomorrow
+  expect:
+    required: []
+    optional: []
+- id: hC-multi-file-issue-and-fix-build
+  category: multi-runbook
+  note: 'Two separate procedures: filing a new issue (daintree.forge.manage-issue) and getting the red
+    build green (daintree.ci.diagnose-and-fix).'
+  messages:
+  - role: user
+    content: 'two things: file an issue for the CSV export dropping its header row, and separately the
+      build on main has been red since last night — get that passing'
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    - daintree.forge.manage-issue
+    optional:
+    - daintree.foundation

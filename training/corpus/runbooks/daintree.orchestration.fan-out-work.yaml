@@ -59,7 +59,6 @@ positives:
   - start agents on 77 88 and 99, and make sure each one gets the relevant context injected for its area
   - create a worktree with the dev recipe for each of those tickets and put an agent in it
   - i want 5 agents working right now, pick the 5 most independent open bugs and go
-  # Rolling queue under a cap (lab mission 22): more units than slots, refill as each lands.
   - there's a list of 25 small things to polish. keep five agents going on it at once and when one opens its PR hand its slot to the next item
   - work down this backlog three at a time — new worktree per item, /work in each, refill as they land
   - rolling batch please. 30 total, never more than 6 live, keep going till the list is empty
@@ -336,6 +335,57 @@ boundaries:
   - query: spin up an agent per failing test file and have each fix its own
     confusable_with: [daintree.agents.check-usage-limits]
     run: 2026-09-24-agent-usage-limits
+  - query: work through these 12 issues, max 3 agents at once, and check every 10 min to start the next
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: keep going till all 30 are done, no more than 5 at once, check every few min and start the next
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: rolling queue over the backlog label, cap of 6, check in every 10 mins to top it up
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: '- #801 add csv import - #802 fix timezone on reports - #803 dark mode toggle - #804 cache avatars - #805 retry webhooks - #806 paginate audit log - #807 remove moment.js - #808 i18n for errors run these through codex, max 3 at a time, start the next whenever one finishes'
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: each agent gets one of these five flaky tests to fix, no voting just do the work
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: morning! give each of the pinned agents its own ticket from the sprint board — 88, 91, 97 — and let them rip
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: 'split issues #412 #413 #418 across codex and claude, one each, go'
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: hand out the next four issues to the fleet
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: 'give claude #412 and codex #415, separate worktrees, they dont touch the same files'
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: split the logging refactor up so each agent owns a different package and nobody collides
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: spin up agents for 301 302 303 304, one each
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: 'issues: 501 502 503 504 505 506 507 508 509 510 511 512 max 4 agents at a time, refill whenever one finishes'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
+  - query: fix issues 71, 72, 73 in parallel, they're unrelated
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
+  - query: open a coding agent in each of the existing issue worktrees
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: start four fresh codex agents, one worktree each, one per lint rule we listed
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: '$ gh issue list --label good-first #130 typo in readme #131 flaky date test #134 missing --json flag one agent per issue pls'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: morning! got issues 301 302 305 and 311, all independent — one codex each in its own worktree please
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: yeah all of them except the docs one
     history:
@@ -602,6 +652,42 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: 'actually also do #141, #142, #143, #144 — one agent each, no more than 2 running at a time, start the next when one finishes'
+    history:
+      - 'user: start codex on #140'
+      - 'assistant: Started #140 in ../repo-140; codex in t4.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'plenty left then. kick off codex on #501 #503 #507, own worktree each'
+    history:
+      - 'user: how much claude code usage do i have left'
+      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: 'forget that one. start fresh: codex on #201, #204 and #207, each in its own worktree'
+    history:
+      - 'user: my agent in t6 has been sitting there for ages'
+      - 'assistant: Checked the spawn saga for t6: launch succeeded, codex started, last output 22 minutes ago and no process activity since. Looks hung rather than slow.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: ok now the other two
+    history:
+      - 'user: codex on #412 #415 #419 #420, one worktree each, run /implement then /review'
+      - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: ok the rest of them too
+    history:
+      - 'user: codex on #412 #415 #419 #420, one worktree each, run /implement then /review'
+      - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: make it 6 at a time instead
+    history:
+      - 'user: queue up the 20 lint issues, 4 at a time'
+      - 'assistant: Started #601–#604 in t1–t4 and set a 10-minute check to refill as they finish.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher w_1190 fired: t_8821 exited 0, suite green]'
     history:

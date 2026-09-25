@@ -62,24 +62,24 @@ positives:
   - load the perf one
   - i need four tabs going at once for this — isn't there a saved thing that does that already? use it
 boundaries:
-  - query: "open a checkout with my usual terminal layout"
-    run: 2026-09-22-provision-boundary-fix
+  - query: open a checkout with my usual terminal layout
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "start the dev server in this checkout"
     run: 2026-09-22-provision-boundary-fix
+  - query: start the dev server in this checkout
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "run the linter here"
     run: 2026-09-22-provision-boundary-fix
+  - query: run the linter here
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "run the release recipe in a new worktree"
-    run: 2026-09-11-mission-9-capability-lookup
+    run: 2026-09-22-provision-boundary-fix
+  - query: run the release recipe in a new worktree
     confusable_with: [daintree.foundation]
-  - query: "what recipes do we have saved for this project"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: what recipes do we have saved for this project
     confusable_with: [daintree.foundation]
-  - query: "start the dev-preview recipe"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: start the dev-preview recipe
     confusable_with: [daintree.foundation]
+    run: 2026-09-11-mission-9-capability-lookup
   - query: create a worktree with the inrepo-work recipe on it
     confusable_with: [daintree.worktree.relocate-agents]
   - query: run the dev recipe in a new tree please
@@ -164,6 +164,33 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: run the bootstrap recipe in a new worktree off develop
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: spin up a worktree off main for fix/login-redirect using my fullstack recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: new worktree for hotfix/csv-quotes and have it boot the usual startup layout
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: run the api+web+db layout i saved, in this worktree
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: morning! run the fullstack recipe for me
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 'Recipes in this workspace: fullstack (api, web, worker, db) api-only (api, db) docs (docs dev server) make a new worktree off feat/ledger with api-only as its startup recipe'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: what recipes have i got saved in this project
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: can you write me a recipe that opens claude plus a test watcher
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: save this 4 terminal setup so i can bring it back tomorrow
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: boot the worktree's startup terminals, dev server and all
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: is it done yet?
     history:
@@ -462,6 +489,18 @@ topic_shifts:
     history:
       - 'user: you there?'
       - 'assistant: Here. What do you need?'
+  - query: actually make another for feat/ui-refresh but use the 'frontend' recipe on it
+    history:
+      - 'user: create a worktree for chore/deps-bump'
+      - 'assistant: Created plain worktree chore/deps-bump at ../app-deps-bump off main.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: run the second one
+    history:
+      - 'user: what recipes do we have'
+      - 'assistant: 3 recipes: `fullstack` (api+web+claude), `backend` (api+worker+db), `docs` (mkdocs serve).'
+    active: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher w_808 fired: recipe agent t_0808 finished setup]'
     history:

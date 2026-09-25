@@ -63,9 +63,9 @@ positives:
   - check out origin/feat/search-v2 as its own worktree
   - add worktree branch=bugfix/csv-export base=develop
 boundaries:
-  - query: "make a checkout for the billing branch"
-    run: 2026-09-22-provision-boundary-fix
+  - query: make a checkout for the billing branch
     confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-22-provision-boundary-fix
   - query: set up a worktree off main for the payments refactor, nothing needs to run in it yet
     confusable_with: [daintree.worktree.relocate-agents]
   - query: can you just check out release/3.2 as a worktree somewhere
@@ -192,6 +192,24 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: check out branch fix/upload-race as a worktree
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: i want a spare worktree for experiments/perf. no agent, just the checkout
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: $ git worktree list /Users/dev/shop a1f3c2e [main] /Users/dev/shop-feat-cart 9be0d11 [feat/cart] /Users/dev/shop-fix-tax 3c7aa90 [fix/tax-rounding] /Users/dev/shop-docs e02b5f4 [docs/readme] ok make me one more for a new branch spike/grpc. no agent, just the worktree
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: hey! quick one - feature/i18n exists on the remote, can i get it as a worktree
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: make me a worktree for feat/billing-export, dont start anything in it
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: check out origin/release-2.4 as its own worktree pls, nothing else
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: make a worktree for feat/seed-data
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: nice. do another one off origin/develop, call it spike/cache
     history:
@@ -366,6 +384,30 @@ topic_shifts:
     history:
       - 'user: How are you?'
       - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+  - query: also a bare worktree for hotfix/tz-offset, no recipe no agents
+    history:
+      - 'user: run the fullstack recipe on a new worktree for feat/search'
+      - 'assistant: Created worktree feat/search with the fullstack recipe; api, web and a claude terminal launched.'
+    active: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: and one more empty worktree for docs/readme, no agent in it
+    history:
+      - 'user: isolate the 4 agents in main'
+      - 'assistant: Created 4 worktrees, re-filed t2,t3,t5,t6 under them, each agent told to cd and continue.'
+    active: [daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: off develop actually
+    history:
+      - 'user: make a worktree for feat/api-v3'
+      - 'assistant: Should feat/api-v3 be a new branch off main, or check out the existing remote branch?'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: sweet. on a different note, create a plain worktree for chore/deps-bump
+    history:
+      - 'user: tell me when the e2e run in t5 finishes'
+      - 'assistant: Watcher armed on t5; I''ll wake you when it completes or fails.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[wake: worktree creation completed]'
     history:

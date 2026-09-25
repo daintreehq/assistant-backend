@@ -85,12 +85,12 @@ positives:
   - The resource action says the target is not configured even though I named another worktree.
   - Inspect the resource state without dumping credential-bearing metadata.
 boundaries:
-  - query: "how's the cloud box for this checkout doing"
-    run: 2026-09-22-provision-boundary-fix
+  - query: how's the cloud box for this checkout doing
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "spin up the remote sandbox for this branch"
     run: 2026-09-22-provision-boundary-fix
+  - query: spin up the remote sandbox for this branch
     confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-22-provision-boundary-fix
   - query: the gpu worktree's cloud box is parked, bring it back up
     confusable_with: [daintree.worktree.relocate-agents]
   - query: provision the remote environment for that tree
@@ -115,6 +115,30 @@ boundaries:
     confusable_with: [daintree.runtime.debug-web-app]
   - query: Check the remote cloud devbox status for this worktree.
     confusable_with: [daintree.runtime.debug-web-app]
+  - query: is the devbox for feat/ml-train still running? pretty sure its costing me
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: pause the cloud box on the gpu-exp worktree overnight
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: tear down the remote resource on that worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: stop paying for the devbox while im asleep - pause it at midnight
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: devbox feat-search status running uptime 14h 06m size 8 vCPU / 32GB cost $0.42/hr pause it, im done for the day
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: the cloud box for feat/search has been running all weekend burning money
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: resume the remote env for branch data-pipeline
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
+  - query: provision the devbox for the new worktree
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: pause it then
     history:
@@ -354,6 +378,30 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
+  - query: pause it now to save money, and resume it at 8am tomorrow
+    history:
+      - 'user: my devbox for feat/ml status?'
+      - 'assistant: Remote resource for feat/ml: running, gpu.large, up 9h.'
+    active: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: while we're at it, pause the cloud devbox on the staging worktree, it's burning money
+    history:
+      - 'user: each worktree needs its own db'
+      - 'assistant: Added .daintree setup/teardown scripts: setup creates app_<branch> and writes DATABASE_URL, teardown drops it.'
+    active: [daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
+  - query: 'yes'
+    history:
+      - 'user: what''s the devbox status on feat/gpu'
+      - 'assistant: feat/gpu remote resource: running, idle 3h. Pausing would stop billing; resume takes ~2 min. Pause it?'
+    active: [daintree.worktree.manage-resource]
+    run: 2026-09-24-selector-hardening
+  - query: done, thanks. totally unrelated but is the devbox for feat/search still running?
+    history:
+      - 'user: get feat/cart ready for review'
+      - 'assistant: Readiness check passed. Committed 2 files, pushed feat/cart, opened PR #530.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[timer fired: pause reminder]'
     active: [daintree.worktree.manage-resource]

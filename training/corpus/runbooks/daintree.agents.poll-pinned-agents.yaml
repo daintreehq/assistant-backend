@@ -189,6 +189,45 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: ask all the pinned agents which of these two approaches they'd pick and give me the consensus
     confusable_with: [daintree.review.review-change]
+  - query: 'poll the fleet: which of these three names is best, give each a score and tally it'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: ask all the agents whether we should use pnpm or bun, just want a quick show of hands
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: 'poll the fleet: postgres, sqlite or duckdb? score it and tell me which option wins'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: evening :) can you get claude, gemini and codex to each vote on whether we go sqlite or postgres for the cache layer
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: hey! quick one before standup — ask the pinned agents whether we should drop node 18 support, i want a consensus
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: get claude, gemini and grok to each give a verdict on codex's parser rewrite
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: ask claude, codex and gemini whether we should vendor the proto files, want a consensus
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: 'poll the pinned agents: monorepo or split repos? short answers'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: ask all the pinned agents which queue lib they'd pick, bullmq or pg-boss
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: get claude, codex and gemini to each vote on whether we drop the v1 endpoints
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: quick straw poll across the fleet — tabs or spaces for the yaml configs lol
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: get a recommendation from each configured agent on the logging lib and tell me where they agree
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: the pinned agents are all waiting — actually no, i want each of them to vote on sqlite vs postgres
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -424,6 +463,30 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
+  - query: now put the same question to all the pinned agents and tell me where they agree
+    history:
+      - 'user: ask claude what it makes of the retry logic in client.go'
+      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: 'separate thing: quick poll of the pinned agents, sqlite or postgres for the local cache? one line each'
+    history:
+      - 'user: have claude, codex, gemini and grok debate rest vs graphql for the public api, then vote off the weakest'
+      - 'assistant: Two debate rounds done. Final positions collected: claude REST, codex GraphQL, gemini tRPC, grok REST+webhooks. Now running the peer vote.'
+    active: [daintree.orchestration.debate-elimination]
+    run: 2026-09-24-selector-hardening
+  - query: 'different q — poll the pinned agents: tabs or spaces for the new repo, one word each, give me the consensus'
+    history:
+      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
+      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
+    active: [daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: same but add copilot this time
+    history:
+      - 'user: poll the pinned agents: should we drop node 18 support? want a consensus'
+      - 'assistant: Polled claude, codex, gemini and grok. 3 of 4 say drop it now (EOL, blocking the fetch refactor); grok says wait one minor release. Consensus: drop it.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[terminal.awaitAll returned: 5 finished]'
     history:

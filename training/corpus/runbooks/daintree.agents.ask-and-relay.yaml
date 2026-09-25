@@ -166,6 +166,42 @@ boundaries:
   - query: have an agent look at the quota module and report what it finds
     confusable_with: [daintree.agents.check-usage-limits]
     run: 2026-09-24-agent-usage-limits
+  - query: spawn claude to tell me whether the cache invalidation in store.go is racy, just want its answer
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: fire up codex and have it explain what the retry wrapper actually does, report back what it says
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: 'quick q for gemini: is the session cookie httpOnly? relay what it says'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: ugh long day. anyway can you ask codex what it thinks of the retry backoff in src/net/client.ts, just want its take back
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: ask claude for its opinion on codex's approach to the parser
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-24-selector-hardening
+  - query: ask codex whether the rate limit in api/throttle.go is set too low
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: get claude to look at our retry quota logic in the uploader and tell me if it's sane
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: spawn something to check how the token bucket limiter in middleware/ works and report back
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: ask grok what it thinks our credits ledger schema is missing
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: just ask codex, not the whole fleet — does the rate limiter need a mutex
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-24-selector-hardening
+  - query: spin up claude and ask it if we should keep the old env var names
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: 'ask codex one thing for me: does it think the retry logic is safe'
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: hows it going
     history:
@@ -341,6 +377,42 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
+  - query: while thats going, spin up a fresh claude and just ask it if our rate limiter handles bursts, bring me its answer
+    history:
+      - 'user: get claude, codex and gemini to each come up with one idea for speeding up cold start, then have them vote on the best'
+      - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-24-selector-hardening
+  - query: cool. ask claude what it thinks of the backoff in client.go, just bring back its answer
+    history:
+      - 'user: how much claude code usage do i have left'
+      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: same again but gemini
+    history:
+      - 'user: ask claude what it makes of the retry logic in client.go'
+      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: what about codex
+    history:
+      - 'user: ask claude what it makes of the retry logic in client.go'
+      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: ok. ask gemini whether the webhook retries in hooks.ts are idempotent
+    history:
+      - 'user: check usage on gemini'
+      - 'assistant: Gemini /stats shows 812 of 1000 daily requests used, resets at midnight PT.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: cool. unrelated — ask gemini what it thinks the biggest risk in our webhook retry logic is and tell me
+    history:
+      - 'user: start work on #733'
+      - 'assistant: Created worktree issue-733-retry-uploads and spawned claude in t6 with a supervisor watcher.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent a_3021 completed]'
     history:

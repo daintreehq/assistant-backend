@@ -96,6 +96,30 @@ boundaries:
     confusable_with: [daintree.runtime.debug-web-app]
   - query: Create an issue describing the flaw found in PR 42.
     confusable_with: [daintree.forge.land-pull-request]
+  - query: 'turn this bug into an issue: search box loses focus after every keystroke'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: assign 455 to me
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: file a ticket for the broken retry logic in the webhook worker, just file it dont fix it
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'label #302 as bug and p1'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'reopen #120, the fix didnt hold'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: retitle issue 77 to something that says what it actually is — 'uploads >2GB time out'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: unassign grok-bot from 610 and add the needs-triage label
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: hey hope ur well. can u file an issue for the flaky date parsing on windows and label it bug
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: actually make it p1 not p2
     history:
@@ -342,6 +366,48 @@ topic_shifts:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: right nobody filed the empty-row thing then. file it, label bug + export
+    history:
+      - 'user: find issues about the csv exporter'
+      - 'assistant: 2 hits: #301 (closed, unicode headers) and #355 (open, assigned to @dev-k, large file timeouts). Nothing about empty rows.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: we left a TODO about the old endpoint in there, open a ticket for removing it and assign it to me
+    history:
+      - 'user: land #590'
+      - 'assistant: #590 merged via rebase; forge confirms MERGED at 3f2a9c1.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: reopen it and assign sam
+    history:
+      - 'user: did anyone reply on #199?'
+      - 'assistant: #199 thread: @sam replied yesterday saying the fix in #203 regressed it on Safari; issue is closed.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: actually file an issue to move staging to us-east, label infra
+    history:
+      - 'user: remember that staging uses the eu-west db'
+      - 'assistant: Saved: "Staging database is in eu-west".'
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: bug, and me
+    history:
+      - 'user: file a bug: pdf export cuts the last page'
+      - 'assistant: Draft: "PDF export drops final page" in acme/docs, body with repro steps. Labels? Assignee?'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: ok open an issue to make the sniff size configurable
+    history:
+      - 'user: how does the importer decide which parser to use?'
+      - 'assistant: src/import/detect.ts sniffs the first 4KB; parsers register in src/import/registry.ts by mime and extension.'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: 'thanks. different thing: file an issue for that missing index and label it perf'
+    history:
+      - 'user: review fix/orders-index'
+      - 'assistant: Two reviewers read the diff. Findings: HIGH missing index on orders.created_at makes the report query scan; LOW unused import in report.ts.'
+    active: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[user returned after confirmation interruption]'
     active: [daintree.forge.manage-issue]

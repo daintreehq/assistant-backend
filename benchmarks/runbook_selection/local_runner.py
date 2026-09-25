@@ -57,6 +57,7 @@ beside it so a precision collapse is still visible.
 
 from __future__ import annotations
 
+import os
 import statistics
 import time
 from collections import Counter
@@ -178,7 +179,15 @@ def run_local(
     spans: dict[str, list[float]] = {}
     reserved_cases = 0
 
+    canonical = os.environ.get("DAINTREE_BENCH_CANONICAL_ACTIVE") == "1"
     for case in cases:
+        if canonical and case.active:
+            from dataclasses import replace as _replace
+
+            from daintree_assistant_server.runbooks.active_set import merge_active_runbooks
+
+            paired = merge_active_runbooks(list(case.active), [], catalog, MAX_ACTIVE)
+            case = _replace(case, active=paired.active)
         eligible = [m for m in case.messages if m.role in ("user", "assistant", "tool")]
         started = time.perf_counter()
         # The background-wake rule is STRUCTURAL and lives in ``LocalSelector``,

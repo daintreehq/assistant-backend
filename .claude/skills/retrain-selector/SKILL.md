@@ -105,6 +105,16 @@ ESTABLISHED runbook is correct and the new one is the hard negative. The new
 runbook's whenToUse fences against its neighbours, but their whenToUse predates it
 and names it nowhere, so without those rows every fence runs one way only.
 
+**Verify every generated row blind before it lands.** Strip the labels, shuffle,
+and have an agent on a DIFFERENT model label the rows from the catalog alone; keep
+only the rows where both agree (2026-09-24: 791 of 801 survived). This is the
+guard against the failure recorded for the 40th runbook, where 11 of 12 boundary
+rows were filed backwards and nothing noticed until routing regressed. The same
+round showed where data helps most: generation aimed at MEASURED weak spots —
+two-runbook turns, topic shifts that share the loaded runbook's vocabulary, no-task
+turns while something is loaded, fences in both directions, pasted output before
+the ask — was the only change that moved routing (+8 cases on a sealed suite).
+
 ### 2. Ingest into the curated corpus, then compile
 
 The corpus is **three planes** — raw journals, curated YAML, compiled artifact —
@@ -158,6 +168,16 @@ and negatives have collapsed together looks like. Watch on
 stage 2: `card` ~0.95 — this is what makes "zero runbooks" work — and
 `val exact-match`.
 
+The trainers' defaults ARE the shipped recipe (2026-09-25): 512-token documents
+in both stages, a content-keyed train/val split, and for stage 2 permutation
+sampling, sqrt cardinality weights, a 0.1 boundary loss on authored
+`confusable_with` pairs and 3 clause-dropout document variants. Measured in
+`EXPERIMENTS.md` ("The retrain lottery"): none of these moved routing on its own —
+the verified data did — but the 512 cap and the split are correctness fixes, and
+`test_every_runbook_document_fits_the_shipped_document_cap` fails a runbook edit
+that would push a document past the cap again. `--ema`, `--canonical-active` and
+`--teachers` (distillation) exist, were measured, and are off.
+
 Keep `--ordering equivariant`. `positional` and `blind` exist so the choice stays
 measured rather than assumed, and both were scored (see `EXPERIMENTS.md`):
 `positional` is worse at matched precision (154 vs 158) and gives up
@@ -188,8 +208,27 @@ $PY -m training.eval_two_stage --ablate
 
 The canonical evaluator: the exported ONNX at both precisions, under the
 production decision procedure, with the fp32-vs-int8 decision diff. int8 is the
-shipped precision. Compare per-category numbers against `EXPERIMENTS.md`; the
-family's honest error bar is ±2 cases.
+shipped precision. Compare per-category numbers against `EXPERIMENTS.md`.
+
+**One run is not a result.** The "±2" this file used to quote was too kind: the
+same recipe on the same corpus scored 198 / 205 / 202 / 198 across four seeds
+(2026-09-24), so "retrain once and keep it if the number went up" is a coin toss —
+and that is exactly how a 63-row corpus change once read as a 5-case regression.
+When a retrain changes the RECIPE or a lot of DATA, train at least three seeds
+(`--seed`, and `--out` per seed) and compare means, on the benchmark AND on the
+held-out suites, with active sets presented as production holds them:
+
+```bash
+DAINTREE_BENCH_CANONICAL_ACTIVE=1 $PY -m training.eval_two_stage --artifact <dir>
+for r in 1 2 3; do DAINTREE_BENCH_CANONICAL_ACTIVE=1 $PY -m training.eval_two_stage \
+    --artifact <dir> --cases-dir benchmarks/runbook_selection/holdout/round$r; done
+```
+
+Decide which recipe ships BEFORE looking at whichever suite is your final check,
+and ship a pre-chosen seed rather than the best-scoring one. The holdout rounds are
+development data now (see their README); a clean final check needs a fresh round
+written the same way. A routine retrain for one new runbook on the settled recipe
+can still be judged on one run — the rule is about choosing between recipes.
 
 `--ablate` reverses the shortlist and re-scores. With `equivariant` this must
 report **0 cases changed** — that is the permutation-equivariance claim being

@@ -89,7 +89,9 @@ boundaries:
   - query: the workflow list still shows that issue's row as active and it's long finished
     confusable_with: [daintree.forge.manage-issue]
   - query: where were we
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    confusable_with:
+      - daintree.orchestration.execute-durable-workflow
+      - daintree.orchestration.supervise-fleet
   - query: what was i in the middle of last week? i've completely lost it
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: the workflow list still says that one is active but it finished days ago, tidy it up
@@ -258,6 +260,45 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: whats still in flight from last nights session?
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: what happened while i was away yesterday
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: workflow list still says the csv export is active but that PR merged last week, fix the ledger
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: who closed terminal t4 yesterday? check the audit log
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: what's still in flight from earlier today? not closing anything, just asking
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: 'workflows: #12 start-work #611 active (agent exited 3d ago, PR merged) #13 fan-out batch-7 active (all 4 terminals closed) #14 start-work #640 active why does it still say 12 and 13 are active, they finished days ago. tidy that up'
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: 'record PR #640 onto the search workflow row'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: back from the weekend. what was i working on friday?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: catch me up — not the live agents, i mean what was in flight across my last couple sessions
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: morning, just back from a week off. where were we?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: pick up the thing from this morning's session, the retry refactor
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
+  - query: where are we on the migration plan? just status, nothing to advance
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-24-selector-hardening
+  - query: where were we on the billing refactor
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: honestly no idea what i was in the middle of on friday
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: close the stale ones
     history:
@@ -538,6 +579,18 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
+  - query: hold on before you delete anything — what was i even doing in those yesterday? catch me up
+    history:
+      - 'user: clean up everything from the competition earlier'
+      - 'assistant: Inventory: 4 terminals (t1–t4), 3 worktrees, 1 watcher. Safe: t1–t3 and their worktrees (merged). Unknown: t4 has uncommitted changes. Confirm before I close anything?'
+    active: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: and before that?
+    history:
+      - 'user: where were we, what was i working on yesterday'
+      - 'assistant: From the ledger: #502 PR open waiting review, the csv-export fan-out had 2 of 4 merged, and a codex run on fix/memory-leak was left unsupervised in t8.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[async wait returned: resume digest ready]'
     history:

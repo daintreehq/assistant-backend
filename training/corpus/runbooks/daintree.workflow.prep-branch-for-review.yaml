@@ -216,6 +216,27 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: wrap up 88 for review and push it
     confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: is my branch ready to push?
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: claude says it's done on feat/csv-export, get it committed pushed and a PR up
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: 'warning: 2 uncommitted changes branch feat/csv-export is 3 ahead of origin get this ready for review'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: it's done, open the PR for claude's branch
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'wrap up the work on #231 for review'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: mark the draft ready — actually no, first get the branch pushed and open the pr, nothing exists on github yet
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
+  - query: '$ git status On branch feat/export-csv Changes not staged for commit: modified: src/export/csv.ts modified: src/export/csv.test.ts $ git log --oneline -3 4d1e9a2 add csv header options b7720c1 csv export skeleton i think its done. commit whats left, push and open the pr'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: yeah go ahead
     history:
@@ -550,6 +571,36 @@ topic_shifts:
     history:
       - 'user: hows it going'
       - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+  - query: sweet, commit that and open a PR
+    history:
+      - 'user: the snapshot tests broke after the icon change'
+      - 'assistant: Root cause was a stale snapshot for <Badge/>; regenerated it, reran the suite in t2 — 148 passed, 0 failed.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: cool, push the branch and get the PR up
+    history:
+      - 'user: review the diff on feat/rate-limit'
+      - 'assistant: Two reviewers found nothing blocking. One low: the limiter''s window constant could be config. Details with file refs above.'
+    active: [daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: copilot says its done. commit push and open the PR for it
+    history:
+      - 'user: start #77 with copilot'
+      - 'assistant: Started #77, copilot in t8 on issue-77-null-guard, watcher attached.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: yes do it
+    history:
+      - 'user: prep this branch for review'
+      - 'assistant: Verdict: ready, 4 commits, tests pass. Want me to push feat/audit-log and open the PR against main?'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 'fixed, thanks. unrelated: wrap up feat/cart and open the pr'
+    history:
+      - 'user: the preview is blank'
+      - 'assistant: Console showed an undefined map in ProductList; claude fixed the null guard, I reloaded and new navigation is clean.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent a_3390 completed: readiness verdict ready]'
     history:

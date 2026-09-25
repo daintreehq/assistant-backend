@@ -261,6 +261,39 @@ boundaries:
     confusable_with: [daintree.worktree.create-plain-worktree]
   - query: start on the csv export ticket, whatever worktree it needs
     confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: 'start codex on #44 and set up its worktree + branch'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 'set up a worktree for #233 and get an agent going on it'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: 'start one agent on #77'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: hiya, sorry for the delay. issue 1187 is the one, spin up a branch and get codex on it
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
+  - query: set up a branch for issue 67 and get cursor going on it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: 'morning! grab #231 and put claude on it'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: start codex on issue 419 in its own worktree
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: 'pick up #904 with gemini pls'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: '#733 Retry uploads on 503 Open · opened 6 days ago by mira When S3 returns a 503 the upload just fails. We should retry with backoff up to 3 times. Acceptance: uploads retry on 503, test covers it. no assignee · no linked PR ok thats the one. set up a worktree and put claude on it'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: ok lets do the pagination ticket, 88. spin up an agent
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'start issue #412 and feed the agent the relevant context'
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it looking?
     history:
@@ -532,6 +565,36 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
+  - query: 412 sounds good, get codex going on it
+    history:
+      - 'user: anything small and unassigned in the backlog?'
+      - 'assistant: Found 4 open, unassigned issues with no linked branch: #412 csv export drops trailing newline, #418 typo in settings modal, #420 flaky tz test, #431 dark mode contrast on badges.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: put gemini on it in its own worktree
+    history:
+      - 'user: file an issue: login spinner never stops when the token expires'
+      - 'assistant: Created #519 "Login spinner hangs on expired token" in acme/web, read back: open, no labels.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'there''s already an issue for making it configurable, #276. start on that one w/ claude'
+    history:
+      - 'user: where''s the webhook retry logic implemented?'
+      - 'assistant: It''s in internal/hooks/dispatch.go (retryWithBackoff, line 140) with the policy table in internal/hooks/policy.go.'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: codex, develop
+    history:
+      - 'user: start work on #219'
+      - 'assistant: Which agent should take #219 — claude, codex or gemini? And should it branch off main or develop?'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: ok start claude on 219
+    history:
+      - 'user: anything small and unassigned in the api repo?'
+      - 'assistant: Found 4 unassigned: #212 (typo in error msg), #219 (missing 404 on /users/:id), #230 (flaky upload test), #241 (docs link). None have linked PRs or running agents.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[supervisor watcher fired: t_9002 idle, agent reports work complete]'
     history:

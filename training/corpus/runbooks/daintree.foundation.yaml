@@ -6,25 +6,25 @@
 runbook: daintree.foundation
 run: pre-split
 positives:
-  - query: "what custom commands have I set up for claude"
+  - query: what custom commands have I set up for claude
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "list every slash command I can use right now"
+  - query: list every slash command I can use right now
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "which commands do I have installed globally"
+  - query: which commands do I have installed globally
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "do I have any user-level commands for writing release notes"
+  - query: do I have any user-level commands for writing release notes
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "what commands does the codex agent have access to"
+  - query: what commands does the codex agent have access to
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "is there a command on my machine for reviewing designs"
+  - query: is there a command on my machine for reviewing designs
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "tell me which commands the agent in terminal 3 supports"
+  - query: tell me which commands the agent in terminal 3 supports
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "does the claude agent over there have a command for changelogs"
+  - query: does the claude agent over there have a command for changelogs
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "what is the invocation token for my deploy command"
+  - query: what is the invocation token for my deploy command
     run: 2026-09-11-mission-9-capability-lookup
-  - query: "how do I call my code-review command from codex"
+  - query: how do I call my code-review command from codex
     run: 2026-09-11-mission-9-capability-lookup
   - what terminals are open
   - list worktrees
@@ -79,45 +79,45 @@ positives:
   - what is each of these tabs called at the moment
   - 'give me the full picture: terminals, worktrees, watchers, queue'
 boundaries:
-  - query: "I wrote a claude command for triaging bugs, where did I put it"
-    run: 2026-09-11-mission-9-capability-lookup
+  - query: I wrote a claude command for triaging bugs, where did I put it
     confusable_with: [daintree.explore.repository]
-  - query: "find the command I made for UI critique, I cannot remember what I called it"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: find the command I made for UI critique, I cannot remember what I called it
     confusable_with: [daintree.explore.repository]
-  - query: "which slash commands are available to the codex agent in this worktree"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: which slash commands are available to the codex agent in this worktree
     confusable_with: [daintree.explore.repository]
-  - query: "locate my global slash command for design reviews"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: locate my global slash command for design reviews
     confusable_with: [daintree.explore.repository]
-  - query: "somewhere I have a claude command that reviews screenshots, can you track it down"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: somewhere I have a claude command that reviews screenshots, can you track it down
     confusable_with: [daintree.explore.repository]
-  - query: "what is the right syntax to invoke my changelog command in claude"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: what is the right syntax to invoke my changelog command in claude
     confusable_with: [daintree.recipe.run-or-create]
-  - query: "how do I trigger my release command, what do I type"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: how do I trigger my release command, what do I type
     confusable_with: [daintree.recipe.run-or-create]
-  - query: "give me the exact syntax to run my review command in the codex terminal"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: give me the exact syntax to run my review command in the codex terminal
     confusable_with: [daintree.recipe.run-or-create]
-  - query: "is a /code-review command available to the agent here"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: is a /code-review command available to the agent here
     confusable_with: [daintree.review.review-change]
-  - query: "can the claude agent run /design-review in this project"
     run: 2026-09-11-mission-9-capability-lookup
+  - query: can the claude agent run /design-review in this project
     confusable_with: [daintree.review.review-change]
-  - query: "Show the timers that are currently pending"
-    run: 2026-09-09-mission-2-timers
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: Show the timers that are currently pending
     confusable_with: [daintree.orchestration.watch-outcome]
-  - query: "Cancel the timer called index checkpoint"
     run: 2026-09-09-mission-2-timers
+  - query: Cancel the timer called index checkpoint
     confusable_with: [daintree.orchestration.watch-outcome]
-  - query: "What time is the release reminder due"
     run: 2026-09-09-mission-2-timers
+  - query: What time is the release reminder due
     confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-09-mission-2-timers
   - query: which worktrees do we have open
     confusable_with: [daintree.worktree.relocate-agents]
   - query: switch me over to the billing worktree
@@ -278,6 +278,51 @@ boundaries:
     confusable_with: [daintree.worktree.create-plain-worktree]
   - query: which branch is my current worktree on?
     confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: in general how should i split worktrees vs terminals for daintree work, no action just your take
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: close t9
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: cancel the pr watcher on 455, leave the terminals alone
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: close the terminal called scratch
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: cancel that one watcher on t7
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: kill the logs tab
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: stop that async wait you set up earlier
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: morning. just close t4 for me, done with it
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: which agents are open right now
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: read me the last output from t2
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: hiya. what terminals do i have open right now?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: anything pending on the queue or timers?
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: list my terminals
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: focus the gemini terminal
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: keep in mind t4 is the codex one for now
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: read the last 20 lines of the third one
     history:
@@ -864,6 +909,24 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
+  - query: close the idle one
+    history:
+      - 'user: rename the tabs, they''re all Claude'
+      - 'assistant: Retitled: t1 "auth refactor", t2 "csv export", t3 "flaky tz test", t4 "idle".'
+    active: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: and t5?
+    history:
+      - 'user: read t3 for me'
+      - 'assistant: t3 (codex): last output "All 48 tests passed", now idle at prompt.'
+    active: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: now close the scratch one
+    history:
+      - 'user: rename my tabs'
+      - 'assistant: Renamed t2 ''scratch'', t3 ''api-refactor'', t4 ''e2e''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[background wake: t_0004 idle]'
     history:

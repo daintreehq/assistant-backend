@@ -60,18 +60,18 @@ positives:
   - dont write it yourself, delegate it. the throttle helper needs a max-attempts arg
   - spin up a read only agent in a tab and have it trace how a request gets from the router down to the db. leave it open, i'll follow along
 boundaries:
-  - query: "write me a shell script that seeds the database"
-    run: 2026-09-22-provision-boundary-fix
+  - query: write me a shell script that seeds the database
     confusable_with: [daintree.worktree.provision-local-environment]
-  - query: "Start the smoke-test agent right away in this checkout"
-    run: 2026-09-09-mission-2-timers
+    run: 2026-09-22-provision-boundary-fix
+  - query: Start the smoke-test agent right away in this checkout
     confusable_with: [daintree.orchestration.watch-outcome]
-  - query: "Open a terminal now and have an agent inspect the worker logs"
     run: 2026-09-09-mission-2-timers
+  - query: Open a terminal now and have an agent inspect the worker logs
     confusable_with: [daintree.orchestration.watch-outcome]
-  - query: "Launch an agent immediately to run the integration suite"
     run: 2026-09-09-mission-2-timers
+  - query: Launch an agent immediately to run the integration suite
     confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-09-mission-2-timers
   - query: spawn a claude to refactor the auth middleware
     confusable_with: [daintree.worktree.relocate-agents]
   - query: get an agent to look through the migration code and tell me what it finds
@@ -258,6 +258,33 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: spin up claude on the api worktree and have it fix the lint errors
     confusable_with: [daintree.orchestration.watch-outcome]
+  - query: open a new worktree and put a fresh claude in it to rewrite the readme
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: spawn codex now on feat/billing and have it do the refactor
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: have codex implement the pagination in orders/list.ts
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: get an agent to fix the flaky date parsing in utils, i want to watch it
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: ask claude to add tests for the webhook signer
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: ugh, long week. anyway open a claude in the api worktree and have it add pagination to the /users endpoint
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: start a new claude on the auth refactor
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: morning! can you get a claude going to refactor the config loader into its own module
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: give claude the relevant files for the auth bug and have it fix it
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -520,6 +547,30 @@ topic_shifts:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
+  - query: good answer. ok have claude actually fix it then, visible terminal on a branch
+    history:
+      - 'user: ask claude what it makes of the retry logic in client.go'
+      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: grok won, fine. spin up a fresh grok in a visible terminal and have it implement the sandbox in src/plugins
+    history:
+      - 'user: have claude interview codex, gemini and grok on the plugin sandbox and pick the best'
+      - 'assistant: Judge''s verdict: grok — only candidate whose ipc claims checked out against src/ipc and whose design handled permission revocation.'
+    active: [daintree.orchestration.interview]
+    run: 2026-09-24-selector-hardening
+  - query: eh don't wait. spawn claude now to fix the flaky test in auth_test.go
+    history:
+      - 'user: let me know when the build in t2 finishes, i''m heading out'
+      - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: now do the same for the payments one
+    history:
+      - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
+      - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher fired: t_1414 idle, agent reports the refactor is complete]'
     history:

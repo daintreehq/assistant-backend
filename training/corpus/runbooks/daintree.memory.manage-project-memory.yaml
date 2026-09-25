@@ -87,6 +87,33 @@ boundaries:
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: remember that the tab called merge pipeline is the one with the prod hotfix in it
     confusable_with: [daintree.terminals.rename]
+  - query: that saved note about docker compose is wrong now, update it
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-24-selector-hardening
+  - query: what did we decide about the api error shape last week?
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: morning! remember that we deploy from the release branch, never from main
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-24-selector-hardening
+  - query: '$ NODE_ENV=test npm test PASS src/db/mocks.test.ts PASS src/api/users.test.ts Test Suites: 24 passed, 24 total $ npm test FAIL src/db/mocks.test.ts (Cannot find module ''./mock-pool'') ok so remember for next time: tests in this repo need NODE_ENV=test or the db mocks dont load'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-24-selector-hardening
+  - query: fyi we use pnpm here, not npm. keep that in mind going forward
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: forget the thing about node 18, we're on 22 now
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: always run the linter before you hand work to an agent in this repo
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: pin the note about the staging db being read-only
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
+  - query: you keep suggesting npm, weve been on pnpm since march — make that stick
+    confusable_with: [daintree.foundation]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: also the node version, 22
     history:
@@ -471,6 +498,30 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
+  - query: remember that for next time pls, authz is under pkg/authz not internal/
+    history:
+      - 'user: where does the auth middleware live'
+      - 'assistant: pkg/authz/middleware.go — Wrap() checks the bearer, then the role table in pkg/authz/roles.go.'
+    active: [daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: pin it too
+    history:
+      - 'user: remember we pin node 20'
+      - 'assistant: Saved: "Node version pinned to 20".'
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: and remember we always use fullstack for this repo
+    history:
+      - 'user: run the fullstack recipe on a new worktree for feat/cart'
+      - 'assistant: Created feat/cart with startup recipe ''fullstack''; api, web and claude terminals are up.'
+    active: [daintree.recipe.run-or-create]
+    run: 2026-09-24-selector-hardening
+  - query: ok leave them to it. separately, remember that staging deploys always need a manual approval step
+    history:
+      - 'user: one codex per issue for 410 411 412'
+      - 'assistant: Spawned codex in t2, t3, t4, each in its own worktree (issue-410/411/412). All three are working.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[async wait returned: memory search complete, 1 near-duplicate found]'
     history:

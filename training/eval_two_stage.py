@@ -63,6 +63,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--artifact", default=str(ARTIFACT))
     ap.add_argument(
+        "--cases-dir",
+        default=None,
+        help="score another case suite (e.g. benchmarks/runbook_selection/holdout/round3) "
+        "instead of the benchmark",
+    )
+    ap.add_argument(
         "--ablate",
         action="store_true",
         help="also score the shortlist REVERSED — the permutation-equivariance "
@@ -71,7 +77,11 @@ def main() -> int:
     args = ap.parse_args()
 
     catalog = load_catalog(default_runbooks_dir())
-    cases = load_cases(catalog)
+    cases = (
+        load_cases(catalog, cases_dir=Path(args.cases_dir))
+        if args.cases_dir
+        else load_cases(catalog)
+    )
     artifact = Path(args.artifact)
     meta = json.loads((artifact / "meta.json").read_text())
     print(

@@ -930,3 +930,313 @@ examples:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
     expect: [daintree.orchestration.fan-out-work, daintree.orchestration.watch-outcome]
+  - query: yes overwrite it. and i'm heading out, ping me when it finishes
+    history:
+      - 'user: codex in t3 is asking me something, can you look'
+      - 'assistant: Codex (t3, feat/csv-export) is waiting on: "Overwrite existing export_test.go? [y/N]".'
+    active: [daintree.agents.answer-waiting-agent]
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: approve it, then set a watcher so i get woken if it stalls overnight
+    history:
+      - 'user: claude''s blocked on a trust prompt'
+      - 'assistant: Claude in t2 wants approval to trust /Users/dev/api-gateway (waitingReason: approval).'
+    active: [daintree.agents.answer-waiting-agent]
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: tell it v2. also remember for the future that we're on schema v2 now, so you don't ask again
+    history:
+      - 'user: gemini is waiting on a question'
+      - 'assistant: Gemini (t5) asks: "Should I use the v2 schema or keep v1 for the migration?"'
+    active: [daintree.agents.answer-waiting-agent]
+    expect: [daintree.agents.answer-waiting-agent, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: assign it to me and then start work on it with claude
+    history:
+      - 'user: file an issue: login page flickers on dark mode toggle'
+      - 'assistant: Created issue #412 "Login page flickers when toggling dark mode" in acme/web and read it back — labelled bug, unassigned.'
+    active: [daintree.forge.manage-issue]
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: cool, add the p1 label. then kick off codex on it in its own worktree
+    history:
+      - 'user: turn that stack trace into an issue'
+      - 'assistant: Filed #88 "NPE in InvoiceMapper when currency missing" on billing-svc. Read back ok.'
+    active: [daintree.forge.manage-issue]
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: make another one for chore/deps-bump too, and both of them need their own port, they keep colliding on 3000
+    history:
+      - 'user: create a worktree for fix/rate-limit'
+      - 'assistant: Worktree created at ~/code/api-fix-rate-limit on branch fix/rate-limit.'
+    active: [daintree.worktree.create-plain-worktree]
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-24-selector-hardening
+  - query: also have codex tell you whether the review was actually useful. and when it's done, open the PR
+    history:
+      - 'user: point codex at gemini''s review notes'
+      - 'assistant: Forwarded gemini''s review from t6 to codex in t2; told it the naming nits are low priority. Codex is applying fixes.'
+    active: [daintree.agents.relay-review-feedback]
+    expect: [daintree.agents.relay-review-feedback, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: once that's green, push it and open a pr against main
+    history:
+      - 'user: tests failing on main after the merge'
+      - 'assistant: 3 failures in tests/test_billing.py — all from the rounding change in a1f9c2. Fix is in progress in t2 (claude).'
+    active: [daintree.ci.diagnose-and-fix]
+    expect: [daintree.ci.diagnose-and-fix, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: great, squash merge it. then find me the next unassigned bug to pick up
+    history:
+      - 'user: is the PR for #190 green?'
+      - 'assistant: PR #203 (closes #190): CI green, 1 approving review from @mara, no requested changes.'
+    active: [daintree.workflow.follow-up-on-issue]
+    expect: [daintree.forge.land-pull-request, daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: pass that to claude in t2 so it can fix it, and wake me when the PR merges
+    history:
+      - 'user: what did the reviewer say on the auth pr'
+      - 'assistant: @jlee requested changes on PR #88: wants the token refresh moved out of middleware, and asks for a test on expiry.'
+    active: [daintree.workflow.follow-up-on-issue]
+    expect: [daintree.orchestration.watch-outcome, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: ugh. get that passing, then comment on the issue that it's fixed and close it out
+    history:
+      - 'user: did ci pass on #512'
+      - 'assistant: PR #512: `unit` passed, `e2e` failed — `checkout.spec.ts › applies coupon` timed out after 30s.'
+    active: [daintree.workflow.follow-up-on-issue]
+    expect: [daintree.ci.diagnose-and-fix, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: check t1's work actually landed before i trust it, and rename all the tabs so i can tell them apart
+    history:
+      - 'user: how''s everyone doing'
+      - 'assistant: 5 agents: 2 done (t1 claude, t4 grok), 1 working (t2 codex), 1 waiting on a question (t3 gemini: "use pnpm or npm?"), 1 idle unsupervised (t6).'
+    active: [daintree.orchestration.supervise-fleet]
+    expect: [daintree.orchestration.verify-agent-work, daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: verify codex's claim that tests pass. and set something to ping me when claude in t3 is done, i'm stepping out
+    history:
+      - 'user: anything need me?'
+      - 'assistant: Swept 4 agents: t2 codex finished (claims tests pass), t3 claude still working, t5 copilot finished, t7 grok failed on a missing env var.'
+    active: [daintree.orchestration.supervise-fleet]
+    expect: [daintree.orchestration.verify-agent-work, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: move t1 into its own worktree so it stops stepping on the others, then clean up t2 and t3 — close them
+    history:
+      - 'user: catch me up on the agents'
+      - 'assistant: 3 running: t1 claude (refactor, working), t2 codex (done), t3 gemini (done). All in the same worktree on main.'
+    active: [daintree.orchestration.supervise-fleet]
+    expect: [daintree.orchestration.workspace-cleanup, daintree.worktree.relocate-agents]
+    run: 2026-09-24-selector-hardening
+  - query: run a runoff. after that, close all three terminals
+    history:
+      - 'user: have claude, codex and gemini each give me one interesting fact about rust and score them'
+      - 'assistant: Submissions in. Blind peer votes: claude 1, codex 1, gemini 1 — a three-way tie.'
+    active: [daintree.orchestration.competition]
+    expect: [daintree.orchestration.runoff-tiebreaker, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: ok postgres it is. remember that decision. and file an issue to migrate the queue off redis
+    history:
+      - 'user: poll the pinned agents: redis or postgres for the job queue'
+      - 'assistant: Poll result: 3 for postgres (skip locked), 1 for redis. Consensus: postgres, citing one fewer moving part.'
+    active: [daintree.agents.poll-pinned-agents]
+    expect: [daintree.forge.manage-issue, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: keep them going another couple rounds. and in parallel have cursor dump the current cache module into a copytree bundle for them
+    history:
+      - 'user: let claude and grok hash out the caching design'
+      - 'assistant: Round 3 done. Claude favors write-through, grok argues for TTL-only invalidation; they agree on keying by tenant.'
+    active: [daintree.orchestration.conversation]
+    expect: [daintree.context.curate-copytree-bundle, daintree.orchestration.conversation]
+    run: 2026-09-24-selector-hardening
+  - query: good catch. file an issue for that and put claude on it
+    history:
+      - 'user: ask codex what it thinks of our retry logic'
+      - 'assistant: Codex says retries lack jitter and the max backoff (60s) exceeds the upstream timeout, so late retries are wasted.'
+    active: [daintree.agents.ask-and-relay]
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: ok. spawn codex to add dead-letter handling there, and remember that ingest owns events_raw
+    history:
+      - 'user: what does the ingest subsystem do'
+      - 'assistant: Ingest (src/ingest/) pulls S3 events via SQS, validates in validator.py, and writes to the `events_raw` table; retries live in backoff.py.'
+    active: [daintree.explore.repository]
+    expect: [daintree.edits.spawn-visible-agent, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: review the last change to that file for bugs, and file an issue if it's bad
+    history:
+      - 'user: where is rate limiting implemented'
+      - 'assistant: Rate limiting is in middleware/ratelimit.go (token bucket per API key), configured from config/limits.yaml.'
+    active: [daintree.explore.repository]
+    expect: [daintree.forge.manage-issue, daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: file the high one as an issue and start claude on it right away
+    history:
+      - 'user: review the branch feat/sso'
+      - 'assistant: Review done: 1 high (state param not validated in callback.ts:31), 2 medium, 3 nits. Evidence attached.'
+    active: [daintree.review.review-change]
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: sweet, open a pr for it. and after that tidy up — close its terminal and delete the worktree
+    history:
+      - 'user: did claude actually write those migration tests'
+      - 'assistant: Verified: 4 new tests in migrations_test.go, all passing on the branch; commit 7be21a matches the claim.'
+    active: [daintree.orchestration.verify-agent-work]
+    expect: [daintree.orchestration.workspace-cleanup, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: figures. get that heap test passing properly and then have gemini code review whatever the fix is
+    history:
+      - 'user: check that codex really fixed the leak'
+      - 'assistant: Contradicted: codex says the leak is fixed but the diff only adds a comment; heap test still fails in t4 tail.'
+    active: [daintree.orchestration.verify-agent-work]
+    expect: [daintree.ci.diagnose-and-fix, daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: thanks. let me know when it gets merged, and meanwhile what's the next thing in the backlog nobody has picked up
+    history:
+      - 'user: prep feat/onboarding for review'
+      - 'assistant: Readiness verdict: ok. Committed, pushed, opened PR #144 against main.'
+    active: [daintree.workflow.prep-branch-for-review]
+    expect: [daintree.orchestration.watch-outcome, daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: request review from @dana on it and have grok do a proper code review of the diff too
+    history:
+      - 'user: open a pr for this branch'
+      - 'assistant: Opened PR #61 fix/null-avatar → main. CI started.'
+    active: [daintree.workflow.prep-branch-for-review]
+    expect: [daintree.forge.land-pull-request, daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: 417. assign it to me and start codex on it
+    history:
+      - 'user: find me a small bug nobody''s on'
+      - 'assistant: Shortlist: #402 (typo in CLI help), #417 (off-by-one in pager), #420 (tooltip clipped). None in flight.'
+    active: [daintree.workflow.find-issue-work]
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: start 88 now. and in half an hour kick off 91 too, i want to see how 88 goes first
+    history:
+      - 'user: what''s unassigned with the perf label'
+      - 'assistant: 6 open perf issues unassigned: #88, #91, #97, #103, #110, #115 — none have worktrees or agents.'
+    active: [daintree.workflow.find-issue-work]
+    expect: [daintree.orchestration.watch-outcome, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: after it reloads clean, open a pr with the fix
+    history:
+      - 'user: the preview is blank, console?'
+      - 'assistant: Dev preview console: `TypeError: Cannot read properties of undefined (reading ''map'')` at ProductList.tsx:22. Delegated the fix to claude in t2.'
+    active: [daintree.runtime.debug-web-app]
+    expect: [daintree.runtime.debug-web-app, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-24-selector-hardening
+  - query: t6's gemini — did that spawn even start? it never printed anything. also is 231's pr green?
+    history:
+      - 'user: where were we'
+      - 'assistant: In flight from yesterday: #231 (claude, t2, waiting review), the queue migration plan (step 3 of 5), and an orphaned gemini in t6.'
+    active: [daintree.orchestration.status-and-resume]
+    expect: [daintree.agents.recover-agent, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: verify codex's work on 140 before i look, and fix that stale ledger row
+    history:
+      - 'user: catch me up, what happened while i was away'
+      - 'assistant: Overnight: codex finished #140 (PR #152 open), claude on #141 still running, and the ledger still shows #130 active though it merged Tuesday.'
+    active: [daintree.orchestration.status-and-resume]
+    expect: [daintree.orchestration.status-and-resume, daintree.orchestration.verify-agent-work]
+    run: 2026-09-24-selector-hardening
+  - query: thanks. rename t5 to 'codex – billing' and remember that codex lives at ~/.local/bin
+    history:
+      - 'user: the spawn failed, nothing happened'
+      - 'assistant: Spawn saga shows codex launch returned no terminalId — agent CLI not found on PATH in that worktree. Relaunched with the configured path; codex is up in t5.'
+    active: [daintree.agents.recover-agent]
+    expect: [daintree.memory.manage-project-memory, daintree.terminals.rename]
+    run: 2026-09-24-selector-hardening
+  - query: and codex? if codex has room, spawn it to refactor the logger
+    history:
+      - 'user: how much usage does claude have left'
+      - 'assistant: Claude Code /usage: 5-hour window 71% used (resets 16:40), weekly 38% used (resets Mon 09:00).'
+    active: [daintree.agents.check-usage-limits]
+    expect: [daintree.agents.check-usage-limits, daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: good. remember grok is our go-to for test work. and close the other interview terminals
+    history:
+      - 'user: have claude interview codex, gemini and grok on our test strategy and pick one'
+      - 'assistant: Claude picked grok: strongest on flake isolation, backed its claims against tests/e2e.'
+    active: [daintree.orchestration.interview]
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-24-selector-hardening
+  - query: perfect. now review what t2 wrote, and file an issue for anything serious
+    history:
+      - 'user: rename the tabs, they''re all called claude'
+      - 'assistant: Renamed: t1 "claude – auth refactor", t2 "claude – csv export", t3 "claude – docs".'
+    active: [daintree.terminals.rename]
+    expect: [daintree.forge.manage-issue, daintree.review.review-change]
+    run: 2026-09-24-selector-hardening
+  - query: thanks. next — make a worktree for chore/pnpm-lock and have claude regenerate the lockfile in it
+    history:
+      - 'user: remember we use pnpm, never npm'
+      - 'assistant: Saved to project memory: "Use pnpm for all installs and scripts; never npm."'
+    active: [daintree.memory.manage-project-memory]
+    expect: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
+    run: 2026-09-24-selector-hardening
+  - query: nice one. clean up its worktree and terminals, then find me something else to work on
+    history:
+      - 'user: land pr 90'
+      - 'assistant: PR #90 squash-merged into main after required checks passed; merge commit 3c1d0e verified.'
+    active: [daintree.forge.land-pull-request]
+    expect: [daintree.orchestration.workspace-cleanup, daintree.workflow.find-issue-work]
+    run: 2026-09-24-selector-hardening
+  - query: ok fresh start. ask gemini how the plugin loader works, and check how much of its quota is left first
+    history:
+      - 'user: clean up everything from the competition'
+      - 'assistant: Closed 4 terminals, cancelled 2 watchers, deleted worktrees comp-a..comp-d, marked the workflow done.'
+    active: [daintree.orchestration.workspace-cleanup]
+    expect: [daintree.agents.ask-and-relay, daintree.agents.check-usage-limits]
+    run: 2026-09-24-selector-hardening
+  - query: good. separately, the tests on main are red — sort that out, and ping me tonight when the nightly build finishes
+    history:
+      - 'user: make a copytree bundle of the payments module'
+      - 'assistant: Generated payments-context.md (14 files, 38 KB) covering src/payments, its tests and the stripe client.'
+    active: [daintree.context.curate-copytree-bundle]
+    expect: [daintree.ci.diagnose-and-fix, daintree.orchestration.watch-outcome]
+    run: 2026-09-24-selector-hardening
+  - query: 'ok that answers it. different thing: explain how retries work in the webhook sender, and remember that the signer secret rotates monthly'
+    history:
+      - 'user: which PRs touched the webhook signer'
+      - 'assistant: Found 3 merged PRs: #45 (initial), #112 (rotate secret), #201 (timing-safe compare).'
+    active: [daintree.workflow.find-issue-work]
+    expect: [daintree.explore.repository, daintree.memory.manage-project-memory]
+    run: 2026-09-24-selector-hardening
+  - query: 'cheers. now: poll the pinned agents on whether we should drop python 3.10, and file an issue with whatever they land on'
+    history:
+      - 'user: pause my devbox'
+      - 'assistant: Paused the remote resource for feat/gpu-bench; fresh status confirms paused.'
+    active: [daintree.worktree.manage-resource]
+    expect: [daintree.agents.poll-pinned-agents, daintree.forge.manage-issue]
+    run: 2026-09-24-selector-hardening
+  - query: 'fun. ok back to work — relay claude''s review in t1 to cursor in t4, and start copilot on issue #58'
+    history:
+      - 'user: debate: monorepo vs polyrepo, then vote off the weakest'
+      - 'assistant: After 3 rounds, peers voted off codex''s "split per service" position 3–1. Tally attached.'
+    active: [daintree.orchestration.debate-elimination]
+    expect: [daintree.agents.relay-review-feedback, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening
+  - query: '👍 unrelated: the dev preview is showing a white screen, check the console. and tomorrow at 9 remind me to ship the migration'
+    history:
+      - 'user: verify grok actually added the index'
+      - 'assistant: Verified: migration 0042 adds idx_orders_user_id; grok''s test run in t3 shows it applied.'
+    active: [daintree.orchestration.verify-agent-work]
+    expect: [daintree.orchestration.watch-outcome, daintree.runtime.debug-web-app]
+    run: 2026-09-24-selector-hardening
+  - query: 'ok. then let''s do the next thing: spin up agents on #311, #312 and #313 in parallel, and give each worktree its own postgres'
+    history:
+      - 'user: where were we'
+      - 'assistant: Open from last session: PR #310 awaiting review; nothing else active. Ledger is clean.'
+    active: [daintree.orchestration.status-and-resume]
+    expect: [daintree.orchestration.fan-out-work, daintree.worktree.provision-local-environment]
+    run: 2026-09-24-selector-hardening
+  - query: great, label it bug and put gemini on it
+    history:
+      - 'user: file an issue for the search focus bug'
+      - 'assistant: Created #688 ''Search input loses focus on each keystroke'' in acme/web and read it back — label: none, unassigned.'
+    active: [daintree.forge.manage-issue]
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-24-selector-hardening

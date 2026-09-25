@@ -1,6 +1,7 @@
 [
   "daintree.agents.answer-waiting-agent",
   "daintree.agents.ask-and-relay",
+  "daintree.agents.check-usage-limits",
   "daintree.agents.poll-pinned-agents",
   "daintree.agents.recover-agent",
   "daintree.agents.relay-review-feedback",

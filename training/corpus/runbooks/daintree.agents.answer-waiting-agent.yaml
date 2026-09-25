@@ -139,6 +139,48 @@ boundaries:
     confusable_with: [daintree.orchestration.supervise-fleet]
   - query: its blocked on a prompt about overwriting the file — say no
     confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: the agent is asking whether to squash the commits, say no
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '``` ? Allow command `rm -rf dist && pnpm build`? (y/N) ``` codex''s asking this, go ahead and allow'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: claude in t2 wants to know if it should keep the old env var names. tell it yes, keep them
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: 'codex in t5 already asked me something about the schema, just answer it: use uuid'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-24-selector-hardening
+  - query: it's been sitting on that permission thing for ages, just approve it
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: codex in t3 has been stuck forever on 'do you trust the files in this folder?'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: claude's frozen waiting for me to say yes to running npm install, say yes
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: the gemini tab hasn't moved in 20 min, it's asking which migration to run first — tell it 0042
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: three of them are blocked on prompts, unblock them all
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: '``` Do you want to proceed? ❯ 1. Yes 2. Yes, and don''t ask again for this session 3. No, and tell Claude what to do differently ``` that''s been up in t4 for a while. yes to that'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: morning! hope the weekend was good. so the claude in t2 is asking whether it can overwrite the migration file, just tell it yes
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: src/db/migrate.ts + ALTER TABLE orders ADD COLUMN archived boolean DEFAULT false; - DROP INDEX orders_created_idx; Do you want to apply these changes? (y/n) thats the grok tab. go ahead and tell it yes
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: gemini's sitting there with a y/n on screen
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: codex in t3 is asking me something about the migration, answer it — yes use the new column
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
 followups:
   - query: how's it going?
     history:
@@ -413,6 +455,42 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
+  - query: yes, and tell me what it does after
+    history:
+      - 'user: codex is waiting on something'
+      - 'assistant: Codex (t2) asks: "Proceed with deleting 3 unused migrations? (y/n)"'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: no, yes, yes. and report back what each does next
+    history:
+      - 'user: three of them are asking questions'
+      - 'assistant: t1 claude: "keep the old API?"; t3 gemini: "trust this folder?"; t5 codex: "run migrations now?"'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: the two sitting on prompts — tell both yes, use pnpm
+    history:
+      - 'user: anything need me?'
+      - 'assistant: Swept 6 agents: 3 working, 1 finished, and codex (t2) and cursor (t4) are waiting on questions — both asking which package manager to use.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-24-selector-hardening
+  - query: oh wait it's not hung, scrolled up — it's asking whether to trust the folder. tell it yes
+    history:
+      - 'user: my agent in t6 has been sitting there for ages'
+      - 'assistant: Checked the spawn saga for t6: launch succeeded, codex started, last output 22 minutes ago and no process activity since. Looks hung rather than slow.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
+  - query: t5 too, same answer
+    history:
+      - 'user: gemini''s asking something in t3, tell it yes'
+      - 'assistant: t3 was asking "Apply migration 0042 to the dev db? (y/n)". Sent y; it continued and is now running the migration.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-24-selector-hardening
+  - query: oh. yeah allow it
+    history:
+      - 'user: codex seems stuck'
+      - 'assistant: Read t3 — codex isn''t hung, it''s waiting on ''Allow write to .env? (y/n)''.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[watcher fired: t_0022 stopped again — askingQuestion, wants a second confirmation]'
     history:
