@@ -7,17 +7,17 @@ captured from the app itself rather than written by hand. Runbooks that show
 Daintree MCP calls can validate their tagged JSON examples against these.
 
 **Source:** `daintreehq/daintree`, branch `feature/mcp-cleanup`, commit
-`cab0d5253102775a247c5af4fe000cb0628e22aa` ("feat(mcp): notify the asking pane
-when a terminal stops working"), app version 0.38.0, MCP SDK 1.30.0, protocol
+`ae0796d9dc` ("fix(mcp): drop echoed terminal-query replies from notice
+quotes"), app version 0.38.0, MCP SDK 1.30.0, protocol
 `2025-11-25`. Captured 2026-09-25.
 
 | file | caller | tier | tools | `mcp.surface` hash |
 |---|---|---|---|---|
-| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 68 (28 run, 40 ask first) | `a34610e0…` |
-| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 68 | `e74844a5…` |
-| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 28 | `0a7556a5…` |
-| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 73 | `c6f8669b…` |
-| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `955498ca…` |
+| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 69 (29 run, 40 ask first) | `b88cbcf5…` |
+| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 69 | `89920c5a…` |
+| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 29 | `3f4f6182…` |
+| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 74 | `caee5f0d…` |
+| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `6f5481ee…` |
 
 Full hashes are in each file's `capture.surface_hash`.
 
