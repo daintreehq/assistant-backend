@@ -382,6 +382,9 @@ _INSUFFICIENT_CREDIT_MARKERS = (
 # numeric status rides the in-band error. Narrow on purpose: mistaking anything
 # else for an auth failure marks a transient condition permanent and kills a
 # retry that would have succeeded.
+#: OpenAI's spelling of an exhausted balance, which it sends as a 429.
+_QUOTA_MARKERS = ("insufficient_quota", "exceeded your current quota")
+
 _INVALID_KEY_MARKERS = (
     "invalid_api_key",
     "invalid api key",
@@ -401,6 +404,11 @@ def map_stream_error(err: dict[str, Any]) -> DaintreeError:
     Most turns are streamed, so this is the path that matters most.
     """
     status = _stream_error_status(err)
+    blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
+    if status == 429 and any(marker in blob for marker in _QUOTA_MARKERS):
+        # OpenAI answers an exhausted balance with a 429, which is a spent account
+        # and not a rate limit — replaying it only burns the retry budget.
+        return provider_insufficient_credits()
     if status is not None:
         # Reuse the HTTP mapping wholesale. No headers are available in-band, so
         # a rate limit here simply carries no Retry-After.
@@ -408,7 +416,6 @@ def map_stream_error(err: dict[str, Any]) -> DaintreeError:
         return _map_status(status, retry_after=None, detail=detail or None)
 
     # No usable status: fall back to prose, narrowly.
-    blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
     if any(marker in blob for marker in _INSUFFICIENT_CREDIT_MARKERS):
         return provider_insufficient_credits()
     if any(marker in blob for marker in _INVALID_KEY_MARKERS):

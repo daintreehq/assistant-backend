@@ -77,6 +77,7 @@ from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
 from ..providers.retry import retry_upstream
+from ..providers.upstream import UpstreamRoute
 from ..runbooks.active_set import (
     merge_active_runbooks,
     resolve_active_runbooks,
@@ -738,6 +739,7 @@ class ChatOrchestrator:
         # spend, and account authentication will pass one per caller — so the
         # parameter stays, defaulted, rather than being deleted and rebuilt.
         api_key: SecretStr | None = None,
+        upstream: UpstreamRoute | None = None,
         request_id: str | None = None,
         # Who this turn is attributed to, resolved at the route boundary after
         # identity and entitlement. `None` under the open door and on every
@@ -769,6 +771,7 @@ class ChatOrchestrator:
                     request,
                         request_id=request_id,
                     api_key=api_key,
+                    upstream=upstream,
                     budget=budget,
                 )
             )
@@ -801,6 +804,7 @@ class ChatOrchestrator:
                 request,
                 request_id=request_id,
                 api_key=api_key,
+                upstream=upstream,
                 budget=budget,
                 headers=headers,
                 account=account,
@@ -823,6 +827,7 @@ class ChatOrchestrator:
         *,
         request_id: str,
         api_key: SecretStr | None,
+        upstream: UpstreamRoute | None = None,
         budget: RequestBudget,
         headers: dict[str, str],
         account: AccountContext | None = None,
@@ -841,6 +846,7 @@ class ChatOrchestrator:
                     request,
                     request_id=request_id,
                     api_key=api_key,
+                    upstream=upstream,
                     budget=budget,
                     headers=headers,
                     account=account,
@@ -854,6 +860,7 @@ class ChatOrchestrator:
         *,
         request_id: str,
         api_key: SecretStr | None,
+        upstream: UpstreamRoute | None = None,
         budget: RequestBudget,
         headers: dict[str, str],
         account: AccountContext | None = None,
@@ -871,6 +878,7 @@ class ChatOrchestrator:
             request,
             request_id=request_id,
             api_key=api_key,
+            upstream=upstream,
             budget=budget,
         )
         try:
@@ -1053,6 +1061,7 @@ class ChatOrchestrator:
         *,
         request_id: str,
         api_key: SecretStr | None,
+        upstream: UpstreamRoute | None = None,
         budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
         """Validate, decode state, select runbooks and assemble — under a deadline.
@@ -1068,6 +1077,7 @@ class ChatOrchestrator:
                 request,
                 request_id=request_id,
                 api_key=api_key,
+                upstream=upstream,
                 budget=None,
             )
         try:
@@ -1076,6 +1086,7 @@ class ChatOrchestrator:
                     request,
                         request_id=request_id,
                     api_key=api_key,
+                    upstream=upstream,
                     budget=budget,
                 )
         except TimeoutError as exc:
@@ -1126,6 +1137,7 @@ class ChatOrchestrator:
         *,
         request_id: str,
         api_key: SecretStr | None,
+        upstream: UpstreamRoute | None = None,
         budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
         """Terminate the trace when preparation FAILS, then re-raise unchanged.
@@ -1147,6 +1159,7 @@ class ChatOrchestrator:
                 request,
                 request_id=request_id,
                 api_key=api_key,
+                upstream=upstream,
                 budget=budget,
                 trace_holder=holder,
             )
@@ -1168,6 +1181,7 @@ class ChatOrchestrator:
         *,
         request_id: str,
         api_key: SecretStr | None,
+        upstream: UpstreamRoute | None = None,
         # Only the docs lookup reads it: everything else in preparation is bounded
         # by the enclosing `asyncio.timeout`, but an outbound call to a third
         # server needs a slice of its own or a slow docs host silently spends the
@@ -1691,6 +1705,10 @@ class ChatOrchestrator:
             api_key=api_key,
             cache_session_id=cache_session_id,
         )
+        if upstream is not None:
+            # The caller's own host, model and key. Everything above this line
+            # — selection, runbooks, assembly — is identical either way.
+            provider_request = upstream.apply(provider_request)
 
         meta = self._build_meta(
             request_id=request_id,

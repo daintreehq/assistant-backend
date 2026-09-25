@@ -1181,6 +1181,16 @@ class Settings(BaseSettings):
     # Secret Manager.
     baseten_api_key: SecretStr = Field(default=SecretStr(""), alias="BASETEN_API_KEY")
 
+    # ---- Bring your own key (providers/upstream.py).
+    # A caller may name its own host, model and key in the
+    # ``X-Daintree-Upstream-*`` headers on /respond and /tasks, and that turn is
+    # then paid for by the caller, not by BASETEN_API_KEY. When this is true the
+    # deployment serves ONLY such turns: a request without the headers is
+    # refused, and BASETEN_API_KEY stops being a readiness requirement because
+    # nothing can spend it. Off by default so local development, benchmarks and
+    # the server-funded path keep working unchanged.
+    require_caller_upstream: bool = Field(default=False, alias="REQUIRE_CALLER_UPSTREAM")
+
     # ---- Second provider (OpenRouter) — OPTIONAL, and deliberately not gating.
     # It now funds TWO different things, and they are worth keeping apart because
     # only one of them is on the serving path:
@@ -1713,7 +1723,7 @@ class Settings(BaseSettings):
         missing: list[str] = []
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
-        if not self.serving_api_key.get_secret_value():
+        if not self.require_caller_upstream and not self.serving_api_key.get_secret_value():
             missing.append(EXECUTOR_KEY_ENV)
         # CEREBRAS_API_KEY is deliberately NOT here any more. It was added when the
         # fast-response stage lost its off switch — a missing key then meant the

@@ -100,6 +100,12 @@ the application carries no per-caller, per-IP or global rate limit — so an
 unadvertised URL is the only thing between a discovered endpoint and unbounded
 spend on our account.
 
+**`REQUIRE_CALLER_UPSTREAM=true` restores the original premise for model spend.**
+A deployment in that mode answers only turns that name the caller's own host and
+key ([KEY_HANDLING.md §1b](KEY_HANDLING.md#1b-bring-your-own-key--the-callers-upstream)),
+so the model bill is once again the caller's. It does nothing for the rest of
+this list.
+
 Be accurate about what is consumable: model spend first, and then CPU, memory
 (the outer middleware buffers a whole body — up to 8 MiB — before any route
 dependency runs), concurrency slots, connections, log volume, and therefore

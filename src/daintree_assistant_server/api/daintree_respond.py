@@ -13,7 +13,13 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from ..auth import PERMISSION_CHAT, Principal
 from ..contracts.daintree_api import RespondRequest
 from ..services.validation import validate_respond_request
-from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
+from .deps import (
+    check_protocol_header,
+    check_protocol_value,
+    request_id,
+    require_ready,
+    upstream_route,
+)
 from .paid_access import account_context, require_paid_access
 
 router = APIRouter()
@@ -55,11 +61,11 @@ async def respond(
 
     outcome = await container.orchestrator.complete(
         body,
-        # No per-call credential: the provider spends the SERVER's key. The
-        # parameter is still there for benchmarks and live tests, which name the
-        # credential they mean to spend; the serving path never does.
         # The middleware-resolved id, so logs, X-Request-Id, and SSE meta all agree.
         request_id=request_id(request),
+        # The caller's own host, model and key when they brought one; `None`
+        # spends the server's (providers/upstream.py).
+        upstream=upstream_route(request),
         # Resolved by the guard above, from the verified principal and whatever
         # the billing authority said. `None` under the open door. Carries a
         # pseudonymous subject and a plan — never an email, a session id or a

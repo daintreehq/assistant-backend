@@ -51,7 +51,8 @@ from fastapi import APIRouter, Depends, Request, Response
 from ..auth import Principal, require_auth
 from ..config import OAUTH_REDIRECT_URI, Settings
 from ..errors import DaintreeError
-from .deps import require_ready
+from ..providers.upstream import UPSTREAMS, UpstreamRoute, UpstreamRouter
+from .deps import require_ready, resolve_upstream
 
 router = APIRouter()
 
@@ -205,6 +206,10 @@ async def verify(
     settings = request.app.state.settings
     provider = container.provider
 
+    route = resolve_upstream(request)
+    if route is not None:
+        return await _verify_caller_route(provider, route)
+
     try:
         record = await provider.verify_key()
     except DaintreeError as exc:
@@ -284,6 +289,47 @@ async def verify(
     # `ProviderChatRequest.api_key` stays an unused seam rather than a source —
     # so it is an assertion about the credential model, not a computed value.
     out["server_holds_credential"] = True
+    return out
+
+
+async def _verify_caller_route(provider: UpstreamRouter, route: UpstreamRoute) -> dict[str, object]:
+    """The same verdict shape, answered for the CALLER's own key.
+
+    Nothing from the provider's key record is echoed except the numeric limit
+    fields: the record is about the caller's own account, and a label or an id
+    has no use to them here.
+    """
+    base: dict[str, object] = {
+        "server_holds_credential": False,
+        "provider": route.provider,
+        "model": route.model,
+    }
+    try:
+        record = await provider.verify_route(route)
+    except DaintreeError as exc:
+        if exc.code in ("invalid_api_key", "provider_invalid_api_key"):
+            return {
+                **base,
+                "valid": False,
+                "usable": False,
+                "reason": REASON_REJECTED,
+                "detail": f"{UPSTREAMS[route.provider].label} rejected your API key.",
+            }
+        raise
+    out: dict[str, object] = {**base, "valid": True}
+    if isinstance(record, dict):
+        for field in ("limit", "usage", "limit_remaining"):
+            value = record.get(field)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                out[field] = value
+    usable, reason = _usability(out)
+    out["usable"] = usable
+    out["reason"] = reason
+    out["detail"] = (
+        f"{UPSTREAMS[route.provider].label} accepted your API key."
+        if usable
+        else f"Your {UPSTREAMS[route.provider].label} key has no credit left."
+    )
     return out
 
 
