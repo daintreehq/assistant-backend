@@ -1,11 +1,8 @@
-"""Internal canonical message / tool / content models.
+"""Conversation message models, in the OpenAI chat shape.
 
-These mirror the OpenAI wire shape because that is what the provider adapters
-speak *upstream*. They are reused as the internal conversation representation
-by the selector, the prompt assembler, and the native respond contract — so the
-public protocol can be Daintree-native while the provider stays unchanged.
-Role validation is intentionally permissive at the schema level (``role: str``)
-so validation can reject ``system``/``developer`` with a precise error code.
+The selector's query renderer (``runbooks/local/documents.py``) reads a
+conversation of these, and the routing benchmark and training corpus replay
+conversations as them. Search itself sends a single user message.
 """
 
 from __future__ import annotations
@@ -97,13 +94,5 @@ class ChatMessage(BaseModel):
     name: str | None = Field(default=None, max_length=256)
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = Field(default=None, max_length=256)
-    # The serving model's chain-of-thought. The model returns it alongside
-    # content; on an assistant turn that performed tool calls it MUST be replayed
-    # verbatim in later requests or the upstream returns 400 (it is ignored on
-    # turns without tool calls). This is Daintree's canonical name for the field:
-    # it happens to be Baseten's own spelling too, in both the message and the
-    # streaming delta, which is why `providers/baseten.py` undoes the parent
-    # adapter's outbound rename to `reasoning`. Prompt assembly forwards it
-    # verbatim on tool-call turns only and drops it on final-answer turns, where
-    # it would be pure prompt cost.
+    # Model reasoning text, carried when a replayed conversation includes it.
     reasoning_content: str | None = Field(default=None, max_length=1_048_576)

@@ -3,7 +3,6 @@ id: daintree.agents.relay-review-feedback
 title: Relay review feedback to an implementer
 summary: Forward review output from one running agent to another with user-specified calibration and optional follow-up instructions.
 whenToUse: Use when the user asks you to read one existing reviewer agent's output, review, or notes and point/send another existing implementer agent to it, optionally telling the target how to weigh the source or to report whether the review was useful. The source is a reviewer AGENT's terminal — feedback that must first be fetched from the forge (a PR's review decision, a failing check, an issue thread) is a different job (use daintree.workflow.follow-up-on-issue). Do not use to judge whether the reviewed work is actually done or correct (use daintree.orchestration.verify-agent-work), to spawn a new single agent and ask it a question (use daintree.agents.ask-and-relay), to poll several agents for independent opinions (use daintree.agents.poll-pinned-agents), or to run multi-round collaboration among agents (use daintree.orchestration.multi-agent).
-confirmation: "Passing a review on to the implementer. The aim is to get the reviewer's findings, and anything you said about how much weight to give them, to the agent that is actually doing the work."
 risk: project
 requiredTools:
   - context.snapshot

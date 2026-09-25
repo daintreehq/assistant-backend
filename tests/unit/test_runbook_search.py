@@ -1,8 +1,8 @@
 """``LocalSelector.search`` — the ranking behind the runbook-search MCP tool.
 
-Split like ``test_local_selection.py``: the read-off-the-ballot rules run against
-a stub classifier in the ordinary sweep, and the claim that the search actually
-FINDS the right runbook runs against the shipped artifact and skips without it.
+The read-off-the-ballot rules run against a stub classifier in the ordinary
+sweep, and the claim that the search actually FINDS the right runbook runs
+against the shipped artifact and skips without it.
 """
 
 from __future__ import annotations
@@ -58,15 +58,6 @@ class _Catalog:
         self.selectable_ids = frozenset(selectable)
 
 
-class _Manager:
-    def __init__(self, catalog: _Catalog) -> None:
-        self.catalog = catalog
-
-
-class _Settings:
-    max_active_runbooks = 3
-
-
 def _search(clf: _Classifier, selectable: set[str], query: str, limit: int) -> Any:
     async def go() -> Any:
         pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=5.0)
@@ -74,8 +65,7 @@ def _search(clf: _Classifier, selectable: set[str], query: str, limit: int) -> A
             selector = LocalSelector(
                 clf,  # type: ignore[arg-type]
                 pool,
-                _Manager(_Catalog(selectable)),  # type: ignore[arg-type]
-                _Settings(),  # type: ignore[arg-type]
+                _Catalog(selectable),  # type: ignore[arg-type]
             )
             return await selector.search(query, limit=limit)
         finally:
@@ -85,8 +75,8 @@ def _search(clf: _Classifier, selectable: set[str], query: str, limit: int) -> A
 
 
 def test_search_keeps_the_ranking_not_just_the_admitted_set() -> None:
-    """A turn loads what cardinality admits; a search returns what was asked for.
-    Selection admitted one runbook here, and the caller still gets three."""
+    """The classifier admitted one runbook here, and the caller still gets the
+    three it asked for, with the admission verdict as ``selected``."""
     clf = _Classifier([("a", 0.9), ("b", 0.6), ("c", 0.2), ("d", 0.1)], admitted=["a"])
     hits = _search(clf, {"a", "b", "c", "d"}, "rename terminals", 3)
     assert [(h.runbook_id, h.score, h.selected) for h in hits] == [
@@ -127,11 +117,7 @@ def test_the_scripted_seam_matches_the_search_signature() -> None:
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 def test_shipped_search_finds_the_obvious_runbook() -> None:
-    from daintree_assistant_server.runbooks.catalog import (
-        CatalogManager,
-        default_runbooks_dir,
-        load_catalog,
-    )
+    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     catalog = load_catalog(default_runbooks_dir())
@@ -140,12 +126,7 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
     async def go() -> Any:
         pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=30.0)
         try:
-            selector = LocalSelector(
-                clf,
-                pool,
-                CatalogManager(catalog, primary_dir=default_runbooks_dir()),
-                _Settings(),  # type: ignore[arg-type]
-            )
+            selector = LocalSelector(clf, pool, catalog)
             return await selector.search(
                 "rename my terminals so i can tell the agents apart", limit=4
             )
@@ -158,3 +139,14 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
     assert hits[0].selected
     scores = [h.score for h in hits]
     assert scores == sorted(scores, reverse=True)
+
+
+def test_a_query_the_tokenizer_rejects_is_a_failed_search_not_a_crash() -> None:
+    """Fitting runs on the worker, inside the pool's failure boundary."""
+    clf = _Classifier([("a", 0.9)], admitted=["a"])
+
+    def boom(text: str) -> bool:
+        raise ValueError("unencodable")
+
+    clf.query_fits = boom  # type: ignore[method-assign]
+    assert _search(clf, {"a"}, "q", 5) is None

@@ -3,7 +3,6 @@ id: daintree.workflow.find-issue-work
 title: Find forge issue work
 summary: Search issues or pull requests with a provider-native query, then screen the hits against work already in flight so the shortlist only contains work nobody has started.
 whenToUse: Use when the user wants to FIND issues or pull requests rather than start one — search or filter the tracker, triage the backlog, "what should I pick up next", "anything unassigned", "find me a small bug nobody's on" — or to locate past pull requests by text, "find the closed PRs about X", "which PRs touched Y", "did we ever ship Z" — or to check whether an issue is already being worked before committing to it. The deliverable is a shortlist or one chosen issue, NOT a launched agent. Do not use once the issue is chosen and the user wants it started (use daintree.workflow.start-work-on-issue); to launch a batch of issues in parallel, one agent each (use daintree.orchestration.fan-out-work); to reconstruct what was already running across earlier sessions (use daintree.orchestration.status-and-resume); or to read an existing PR's CI, review state or issue thread (use daintree.workflow.follow-up-on-issue).
-confirmation: "Searching the issue and pull request tracker. The aim is a short list that answers what was asked, with anything already assigned or underway called out rather than left to be spotted."
 risk: read
 requiredTools:
   - context.snapshot

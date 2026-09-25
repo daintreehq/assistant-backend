@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 #
-# Run the Daintree Assistant Server locally.
+# Run the runbook search server locally.
 #
 #   ./dev
 #
-# Everything comes from .env, which this script EXPORTS into the environment
-# before starting the server.
+# Settings come from .env (see .env.example), which this script EXPORTS so a
+# curl in the same terminal agrees with the server about the port.
 set -euo pipefail
 
-# Resolve the repo root (this script's own directory) so ./dev works from anywhere.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
@@ -21,17 +20,6 @@ else
   PY="python3"
 fi
 
-# Load .env into the ENVIRONMENT, not just into pydantic-settings.
-#
-# `Settings` reads .env by itself, so this is not what makes the server work — it
-# is what makes everything ELSE in this shell agree with the server: a `curl`
-# typed in the same terminal, a benchmark launched beside it, an inherited
-# subprocess. Without it the config the server holds and the config the operator
-# can see are two different things, which is exactly the confusion this script
-# exists to prevent.
-#
-# `set -a` exports every assignment; existing environment values are overwritten
-# by .env deliberately, so what the file says is what runs.
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091  # runtime file, not present at lint time
@@ -39,33 +27,11 @@ if [[ -f "$ROOT/.env" ]]; then
   set +a
 fi
 
-# Friendly heads-up: the server always boots, but /readyz stays 503 without the
-# two required secrets, and this list must stay in step with
-# `Settings.missing_secrets()` — a name missing from here is not a missing warning,
-# it is a developer watching a healthy-looking process answer 503 with nothing on
-# screen to say why.
-#
-# Both are SERVER-owned. BASETEN_API_KEY funds every turn — a request no
-# longer brings its own key, so there is nothing to fall back on without it.
-# FAST_RESPONSE_ENABLED is currently false, so CEREBRAS_API_KEY is optional.
-# OPENROUTER_API_KEY enables failover but does not gate readiness.
-missing=()
-[[ -z "${STATE_SIGNING_KEY_CURRENT:-}" ]] && missing+=("STATE_SIGNING_KEY_CURRENT")
-[[ -z "${BASETEN_API_KEY:-}" ]] && missing+=("BASETEN_API_KEY")
-if (( ${#missing[@]} )); then
-  echo "⚠  Missing: ${missing[*]} — server will boot but /readyz will be 503." >&2
-  [[ -f "$ROOT/.env" ]] || echo "   Run:  cp .env.example .env   then fill them in." >&2
-fi
-
-# Human-readable structured logs in dev so per-round timing lines (`respond`,
-# `respond_upstream_open` → selector_ms / upstream_first_event_ms) are legible in
-# the terminal instead of raw JSON. Export-only; unset it or set LOG_LEVEL=WARNING
-# in .env to quiet things down.
+# Human-readable structured logs in dev.
 export DAINTREE_LOG_CONSOLE="${DAINTREE_LOG_CONSOLE:-1}"
 
-echo "▶ Daintree Assistant Server"
-echo "  python: $PY   logs: console (DAINTREE_LOG_CONSOLE=$DAINTREE_LOG_CONSOLE)"
-# Presence only — never the value.
-echo "  upstream: baseten    key: $([[ -n "${BASETEN_API_KEY:-}" ]] && echo set || echo MISSING)"
+echo "▶ Daintree runbook search"
+echo "  python: $PY"
+echo "  MCP:    http://${HOST:-127.0.0.1}:${PORT:-8080}/v1/daintree/mcp"
 
 exec "$PY" -m daintree_assistant_server

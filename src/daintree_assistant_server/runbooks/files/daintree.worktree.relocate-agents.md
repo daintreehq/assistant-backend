@@ -3,7 +3,6 @@ id: daintree.worktree.relocate-agents
 title: Move running agents into their own worktrees
 summary: Give agents that are ALREADY RUNNING one isolated worktree each — create the empty worktrees, file each terminal under its own, and tell each agent to continue in its new directory.
 whenToUse: Use when agents that are already running share a worktree and the user wants them separated — "move each of those into its own worktree", "create four worktrees and move the agents into them", "give each terminal its own branch", "isolate these agents so they stop colliding". The tell is that the terminals ALREADY EXIST and are mid-task; the user wants them relocated, not replaced. Do not use to create a worktree with no agent involved (use daintree.worktree.create-plain-worktree), to spawn NEW agents into fresh worktrees (use daintree.edits.spawn-visible-agent, or daintree.orchestration.fan-out-work for a cohort), to start a forge issue in a worktree (use daintree.workflow.start-work-on-issue), to create a worktree with a startup recipe (use daintree.recipe.run-or-create), or to delete worktrees (use daintree.orchestration.workspace-cleanup).
-confirmation: "Moving running agents into separate worktrees. The aim is one worktree each, with every agent told in its own session where it now works, since refiling a pane leaves the process where it started."
 risk: project
 requiredTools:
   - context.snapshot

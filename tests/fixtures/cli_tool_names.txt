@@ -12,12 +12,12 @@
 # substitution before comparing.
 #
 # REGENERATION. This file is the name-only projection of the full-schema capture at
-# benchmarks/_harness/fixtures/cli_tool_inventory.json. Refresh that one FIRST — the
+# tests/fixtures/cli_tool_inventory.json. Refresh that one FIRST — the
 # CLI ships a committed generator for it now (`go run ./cmd/tooldump`), and the full
-# recipe lives in benchmarks/_harness/fixtures/README.md. Then regenerate this file
+# recipe lives in tests/fixtures/README.md. Then regenerate this file
 # from it, keeping this header and the commit line above in step with the pin:
 #
-#   python -c "import json;print('\n'.join(sorted(t['function']['name'] for t in json.load(open('benchmarks/_harness/fixtures/cli_tool_inventory.json')))))"
+#   python -c "import json;print('\n'.join(sorted(t['function']['name'] for t in json.load(open('tests/fixtures/cli_tool_inventory.json')))))"
 #
 # Regenerate when the CLI adds, removes, or renames a tool. The hygiene test asserts
 # ONE direction only (every declared requiredTools name appears here); registry tools

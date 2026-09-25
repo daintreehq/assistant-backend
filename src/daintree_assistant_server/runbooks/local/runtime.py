@@ -47,31 +47,31 @@ T = TypeVar("T")
 # NODE's cores, so sizing from it would spawn a dozen workers to share one.
 #
 # One thread per vCPU, with each ONNX session pinned to one intra-op thread
-# (onnx_models._INTRA_OP_THREADS), gives exactly as many concurrent forward
+# (``setwise._session``), gives exactly as many concurrent forward
 # passes as there are cores to run them on. More workers than cores does not add
 # throughput here — it adds context switching to work that is already saturating
 # the core it has.
 WORKER_THREADS = 1
 
-# How many requests may be waiting for a worker before new ones are refused.
+# How many searches may be admitted (running or waiting) before new ones are
+# refused. Must be at least Cloud Run's `--concurrency` (cloudbuild.yaml,
+# pinned by tests/unit/test_runtime_sizing.py), so the queue is never the
+# binding constraint: every request the platform lets in gets a place.
 #
-# Sized against the concurrency limit rather than picked round: at
-# --concurrency=8 no more than 8 turns exist on an instance at once, so a depth
-# of 8 holds every one of them and the queue can never be the binding
-# constraint. Rejection here means the instance is in a state Cloud Run's own
-# concurrency limit says is impossible.
-QUEUE_DEPTH = 8
+# Measured on one worker thread (2026-09-25): ~12ms of CPU per search, and
+# throughput is flat at ~87/s from 2 concurrent requests to 32. Concurrency
+# past that point buys no throughput — it only trades queueing latency (p50
+# 181ms at 16 in flight, 359ms at 32) for fewer instances.
+QUEUE_DEPTH = 16
 
 # Wall-clock ceiling on one ranking, queue wait included.
 #
-# There is no upstream selector to fall back to — failing open means the turn
-# REUSES the prior active set instantly, a fine-but-stale answer. So the timeout
-# is purely a bound on pathology: deep enough that an eight-deep burst on a
-# single vCPU (measured worst case 280ms; allow ~1s for a slower server core)
-# rides it out, short enough that a genuinely wedged session costs a turn 1.5s
-# once rather than hanging it. When it fires, the slot stays held until the
-# thread actually finishes (see ``run``), so a wedged worker drains admission
-# instead of poisoning every later turn with the same wait.
+# A bound on pathology, not on load: a full queue of QUEUE_DEPTH searches at
+# ~12ms each drains in ~200ms (allow ~2x for a slower server core), and a
+# timeout returns a retryable tool error rather than hanging the caller. When
+# it fires, the slot stays held until the thread actually finishes (see
+# ``run``), so a wedged worker drains admission instead of poisoning every
+# later search with the same wait.
 RANK_TIMEOUT_SECONDS = 1.5
 
 

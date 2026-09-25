@@ -1,20 +1,15 @@
 # Runbook-selection benchmark
 
-Two suites over one corpus, because there are two selectors and only one of them
-serves traffic.
-
 **`bench local` is the release authority.** It drives the shipped ONNX artifact
-(`runbooks/local/artifacts/selector/`) through the production decision procedure —
-the visible-active projection, the structural background-wake rule, the
+(`runbooks/local/artifacts/selector/`) through the classifier's decision procedure
+— the visible-active projection, the structural background-wake rule, the
 earn-your-place admission floors, the bare-question docs pass — offline,
-deterministically, and for free. It is gated in CI through
-`dashboard bench run --deterministic-only`.
+deterministically, and for free. CI runs it on every push.
 
-**There is no paid comparator any more.** `bench run` drove the prompt-based
-`Selector` against a live API (~450 calls per variant). Both are deleted: that
-selector had not been on the serving path since selection moved local, and a
-comparator whose baseline nobody serves measures a road not taken at ~450 paid
-calls a run. `local` is the routing verdict, and it is free.
+The corpus is conversational because the classifier was trained on conversations.
+The MCP search sends a bare query with nothing loaded, which the single-runbook,
+routing-trap and no-task cases exercise directly; the continuation, topic-shift and
+background-wake cases keep the classifier honest on the distribution it learned.
 
 ### What `local` reports that nothing else can
 
@@ -29,7 +24,7 @@ four different fixes. Every missing runbook is attributed to the stage that lost
 | `cardinality_short` | the count head asked for fewer | the count head |
 | `cap_full` | the answer was already at `max_active_runbooks` | the cap |
 
-`candidate_miss` is the one to watch. It is nearly unreachable at 38 runbooks
+`candidate_miss` is the one to watch as the catalog grows. It is nearly unreachable at ~40 runbooks
 against `k=32` — 84% of the catalog is on the ballot regardless — and it is the
 first number to move as the catalog grows, which is exactly why it is gated at
 zero now rather than after it starts happening.
@@ -56,27 +51,15 @@ well below the measurement, so a precision collapse still reddens the suite.
 # from the repo root, venv active
 python -m benchmarks.runbook_selection.bench local         # THE gate: shipped ONNX, free
 python -m benchmarks.runbook_selection.bench local --fp32  # same, unquantised
-python -m benchmarks.runbook_selection.bench list          # validate cases, no API calls
-python -m benchmarks.runbook_selection.bench coverage      # per-runbook coverage matrix, no API calls
+python -m benchmarks.runbook_selection.bench list          # validate cases
+python -m benchmarks.runbook_selection.bench coverage      # per-runbook coverage matrix
 
 python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
 ```
 
-Only `run` costs money. `local`, `list`, `coverage`, `report`, and `compare` are
-offline and free — they work with `BASETEN_API_KEY=` blanked. `report` reads
-which suite wrote the artifact and regrades it under that suite's gate, so a
-saved local run and a saved paid run are not graded against each other's
-thresholds.
-
-A full default run is `cases x trials` (currently 150 x 3 = 450) real selector
-calls per variant — cheap on deepseek-v4-flash, but not free, and it is the bulk
-of what `dashboard qualify-release` spends. Run `bench list` for the current
-count rather than trusting this number.
-
-`run` and `report` exit NON-ZERO on a quality failure, graded by
-`runbook_selection_verdict()` in `_harness/quality.py`. Both used to return 0
-unconditionally, so a release job could watch cases fail on screen and still get
-a successful exit.
+Everything here is offline and free. `local` and `report` exit NON-ZERO on a
+quality failure, graded by `runbook_selection_local_verdict()` in `quality.py`;
+`report` regrades a saved run under today's floors.
 
 ## Cases (`cases/*.yaml`)
 
@@ -169,11 +152,10 @@ specific match), `adversarial` (instruction injection + keyword bait),
 
 ## Results
 
-Runs are saved to `results/<timestamp>-<variant>.json` (gitignored). The document
+Runs are saved to `results/<timestamp>.json` (gitignored). The document
 carries the catalog revision, the selector artifact's revision, per-case picks
 and stage attribution, and the summary block. Latency is end-to-end per
-selection (embed + shortlist + head + admission), i.e. exactly the first-byte
-cost `/respond` pays — which is now in-process and free.
+selection (embed + shortlist + head + admission), i.e. what a search pays.
 
 ## Historical findings — 2026-07-07, **13-runbook catalog**, superseded
 

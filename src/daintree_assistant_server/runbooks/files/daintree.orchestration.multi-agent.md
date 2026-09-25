@@ -3,7 +3,6 @@ id: daintree.orchestration.multi-agent
 title: Orchestrate multiple agents on one problem
 summary: Spawn or use explicitly named open agents, relay their work between them with terminal.sendCommand, and synthesize ONE answer — collaborative multi-agent work driven until the cohort converges.
 whenToUse: 'Use when several agents must work ONE problem together and you relay between them until they CONVERGE on a single synthesized answer — debate until they converge, collaborate, cross-check, iterate toward one merged result. The signal is a synthesis target: the deliverable is the ONE answer you assemble, not a dialogue. Do not use when each agent gets its OWN independent unit of work with no shared deliverable (use daintree.orchestration.fan-out-work); for an open-ended visible dialogue — let them talk, see where it goes (use daintree.orchestration.conversation); a debate that ends by voting a position off (use daintree.orchestration.debate-elimination); independent submissions scored or peer-voted to pick a winner (use daintree.orchestration.competition); a one-shot independent poll (use daintree.agents.poll-pinned-agents); or forwarding one agent''s review to another (use daintree.agents.relay-review-feedback).'
-confirmation: "Driving several agents toward one answer. The goal is a single merged result rather than a transcript, with each round of positions relayed between them until they stop moving."
 risk: project
 requiredTools:
   - context.snapshot

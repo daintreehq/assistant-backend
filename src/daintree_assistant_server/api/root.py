@@ -19,10 +19,8 @@ MARKETING_URL = "https://daintree.org/assistant"
 async def root() -> RedirectResponse:
     """Send a browser that reached the API origin to the product page.
 
-    Scoped to ``/`` ALONE, and deliberately not a host-wide rule: this same origin
-    serves the API, so a redirect covering ``/v1/daintree/*`` would break the CLI
-    the moment it stops pointing at localhost. Root is the one path with no API
-    meaning — it answered a bare 404 before this existed.
+    Scoped to ``/`` alone: this same origin serves the MCP endpoint, and root is
+    the one path with no API meaning.
 
     302 rather than 301 because browsers cache a permanent redirect for a long
     time and honour it without re-asking, which is difficult to walk back if root

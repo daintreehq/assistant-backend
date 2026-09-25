@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from daintree_assistant_server.services.runbook_mcp import (
+from daintree_assistant_server.runbook_mcp import (
     MAX_RESULTS_CAP,
     SUPPORTED_PROTOCOL_VERSIONS,
     TOOL_NAME,
@@ -108,7 +108,7 @@ def test_stateless_2026_client_discovers_and_calls_with_no_handshake(client: Tes
 
 def test_search_returns_full_runbooks_as_structured_json(client: TestClient, app: Any) -> None:
     selector = app.state.container.selector
-    catalog = app.state.container.catalog_manager.catalog
+    catalog = app.state.container.catalog
     first, second = sorted(catalog.selectable_ids)[:2]
     selector.search_hits = [(second, 0.97, True), (first, 0.41, False)]
 
@@ -174,7 +174,11 @@ def test_unknown_tool_and_method_are_protocol_errors(client: TestClient) -> None
 
 
 def test_ping_is_answered(client: TestClient) -> None:
-    assert _rpc(client, "ping", request_id="p").json() == {"jsonrpc": "2.0", "id": "p", "result": {}}
+    assert _rpc(client, "ping", request_id="p").json() == {
+        "jsonrpc": "2.0",
+        "id": "p",
+        "result": {"resultType": "complete"},
+    }
 
 
 def test_unsupported_protocol_version_names_the_supported_ones(client: TestClient) -> None:
@@ -270,3 +274,47 @@ def test_not_ready_refuses_before_searching(client: TestClient, app: Any) -> Non
     response = _call(client, {"query": "anything"})
     assert response.status_code == 503
     assert app.state.container.selector.search_requests == []
+
+
+def test_no_credential_is_needed(client: TestClient) -> None:
+    """Anyone can add this server: there is no auth to fail."""
+    response = _call(client, {"query": "rename terminals"})
+    assert response.status_code == 200
+    assert response.json()["result"]["isError"] is False
+
+
+def test_an_oversized_body_is_refused_before_parsing(client: TestClient) -> None:
+    response = client.post(
+        URL,
+        content=b"{" + b" " * (128 * 1024) + b"}",
+        headers={**HEADERS, "Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == -32600
+
+
+def test_a_malformed_origin_is_refused_not_a_crash(client: TestClient) -> None:
+    body = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
+    response = client.post(URL, json=body, headers={**HEADERS, "Origin": "https://["})
+    assert response.status_code == 403
+
+
+def test_deeply_nested_json_is_a_parse_error_not_a_crash(client: TestClient) -> None:
+    nested = b"[" * 50_000 + b"]" * 50_000
+    response = client.post(
+        URL, content=nested, headers={**HEADERS, "Content-Type": "application/json"}
+    )
+    assert response.status_code in (400, 413)
+    if response.status_code == 400:
+        assert response.json()["error"]["code"] == -32700
+
+
+def test_2026_results_carry_result_type_and_cache_hints(client: TestClient) -> None:
+    """2026-07-28 requires `resultType` on every result, and `ttlMs` plus
+    `cacheScope` on the cacheable ones (`tools/list`, `server/discover`)."""
+    for method in ("server/discover", "tools/list"):
+        result = _rpc(client, method).json()["result"]
+        assert result["resultType"] == "complete", method
+        assert result["ttlMs"] >= 0 and result["cacheScope"] == "public", method
+    assert _call(client, {"query": "x"}).json()["result"]["resultType"] == "complete"
+    assert _call(client, {}).json()["result"]["resultType"] == "complete"

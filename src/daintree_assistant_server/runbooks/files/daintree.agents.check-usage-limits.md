@@ -3,7 +3,6 @@ id: daintree.agents.check-usage-limits
 title: Check how much usage an agent has left
 summary: Read an agent CLI's own account-usage view — remaining session, five-hour and weekly allowance, premium requests or credits, and when each resets — with the command that only reads, and report what is left and where each figure came from.
 whenToUse: 'Use when the user wants to know how much of an AI agent CLI''s plan allowance is LEFT — usage limits, rate limits, quota, premium requests, credits, how close they are to a weekly or five-hour cap, when an agent''s usage resets, or how to check usage in a given agent CLI — for Claude Code, Codex, Grok, Antigravity, Gemini, Copilot, Kimi or any other configured agent, one agent or several, and for a follow-up asking the same about another agent. The deliverable is the account figures read off the agent''s own usage screen, never an answer the agent composes, so the work is running a read-only command inside the agent rather than giving it a task. Do not use to put a question about code or the project to an agent (daintree.agents.ask-and-relay), to start agents on work in parallel (daintree.orchestration.fan-out-work), to be told later when something finishes (daintree.orchestration.watch-outcome), or for Daintree''s own sign-in or health (daintree.diagnostics).'
-confirmation: "Checking how much usage an agent has left. The aim is to read the figures off the agent's own screen with its read-only command, never one that spends a reset or buys credits."
 risk: terminal
 requiredTools:
   - context.snapshot

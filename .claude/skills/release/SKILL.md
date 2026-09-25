@@ -119,8 +119,8 @@ git diff --stat origin/main...origin/<branch>
 ```
 
 Summarise it for the user in prose — what changes, and anything that looks
-operationally risky (a config default, a prompt template, a new required secret,
-a wire-contract change that the CLI would need in lockstep). If the arguments
+operationally risky (a config default, a runbook that changes routing, a change to
+the MCP tool contract that callers depend on). If the arguments
 included `--dry-run`, stop here.
 
 ### 3. Gate on GitHub CI
@@ -242,15 +242,13 @@ the container no matter how healthy the service is. Or just run the script that
 already knows all of this:
 
 ```bash
-./infra/gcp/smoke.sh --expect-env production --expect-build-sha "$RELEASE_SHA"
-./infra/gcp/smoke.sh --expect-env production --expect-build-sha "$RELEASE_SHA" --full
+./infra/gcp/smoke.sh --expect-build-sha "$RELEASE_SHA"
 ```
 
-Pass both `--expect-*` flags. Without them the script checks whatever is at the
-URL: it won't notice that it's the wrong deployment or an older commit, which are
-exactly the mistakes a release can make. `--full` needs no key — the server holds the upstream credential now, so
-those two turns spend DAINTREE's money rather than yours, which is why they stay
-opt-in.
+Pass `--expect-build-sha`. Without it the script checks whatever is at the URL
+and won't notice an older commit, which is exactly the mistake a release can
+make. It is free: it runs one real search through the shipped selector, which
+makes no model call.
 
 `build_sha` disagreeing with `RELEASE_SHA` means traffic is still on an older
 revision — say so plainly rather than reporting success. Confirm which revision
@@ -267,8 +265,8 @@ That should print the new revision followed by `True`. Also check the
 --format='value(metadata.labels.commit-sha)'`), which should be the short form of
 `RELEASE_SHA`.
 
-A `/readyz` 503 is a configuration failure — a missing or weak secret, a
-malformed prompt template, an unparseable runbook file. The response withholds the
+A `/readyz` 503 is a startup failure — an unparseable runbook file, or a
+missing or LFS-pointer selector artifact. The response withholds the
 reason in production, so read the real error from the logs:
 
 ```bash

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# One-time (and safely repeatable) GCP setup for the Daintree Assistant Server's
-# continuous deployment pipeline. Creates everything cloudbuild.yaml assumes:
-# the Artifact Registry repository, the two Secret Manager secrets, a runtime
-# service account and a build service account with least-privilege roles, and
+# One-time (and safely repeatable) GCP setup for the Daintree runbook search
+# service's continuous deployment pipeline. Creates everything cloudbuild.yaml
+# assumes: the Artifact Registry repository, a runtime service account and a
+# build service account with least-privilege roles, the GitHub connection, and
 # the Cloud Build trigger that fires on every push to main.
 #
 # Idempotent by design — every step checks before it creates, so re-running is
@@ -15,33 +15,17 @@
 #     <release to main>            # the trigger builds and creates the service
 #     ./infra/gcp/bootstrap.sh     # picks up the domain mapping and the rest
 #
-# THE SERVICE IT CREATES IS PRIVATE, and re-running never changes that. This
-# script used to grant `allUsers roles/run.invoker` on every run — which, since
-# the server holds the upstream credential and funds every turn, published an
-# open Daintree-funded model endpoint as a side effect of finishing a setup.
-# Public access is now a cutover, performed once and on purpose, against a
-# revision that has been seen to enforce; see the "Public access" section at the
-# bottom of this file and infra/gcp/README.md.
+# A NEW service is created private, and re-running never changes that on its
+# own. Making it public — which an MCP server anyone can add must be — is a
+# deliberate cutover; see the "Public access" section at the bottom of this file.
 #
-# Secret VALUES are generated here and never leave Secret Manager. Re-running
-# will NOT rotate an existing secret: rotating the state signing key would
-# invalidate every outstanding state token, so that is a deliberate manual act.
-# One secret is never given a value here at all — the private-staging subject
-# gate's membership list, which this script creates empty and never reads.
-#
-# What the server needs at runtime is state-signing material PLUS the upstream
-# credential (BASETEN_API_KEY), which it holds itself and funds every turn from.
-# Callers supply no key of their own (see README.md and docs/KEY_HANDLING.md).
+# The service holds no secrets. The only Secret Manager secret involved is the
+# GitHub connection's token, which the build reads to fetch the LFS model.
 
 set -euo pipefail
 
 PROJECT="${PROJECT:-daintree-research}"
 REGION="${REGION:-us-central1}"              # Cloud Run + Artifact Registry
-# The Cloud Run service. `cloudbuild.yaml` holds a CLOSED service -> environment
-# table and refuses a name it does not know, so this is not a free-form value:
-# `daintree-assistant` is the production service and `daintree-assistant-staging`
-# is the staging one. A genuinely new service is a row added to that table, in a
-# commit, before it can receive a release — see infra/gcp/README.md.
 SERVICE="${SERVICE:-daintree-assistant}"
 AR_REPO="${AR_REPO:-daintree}"
 RUNTIME_SA="${RUNTIME_SA:-daintree-assistant-run}"
@@ -75,14 +59,6 @@ retry() {
   done
 }
 
-# True when the secret already has at least one version, in any state. Any
-# version at all means hands off: adding another would silently rotate the state
-# signing key and invalidate every state token already in the wild.
-has_version() {
-  [ -n "$(gcloud secrets versions list "$1" --project="$PROJECT" \
-            --format='value(name)' --limit=1 2>/dev/null)" ]
-}
-
 # ---------------------------------------------------------------------------
 say "Project"
 gcloud config set project "$PROJECT" --quiet >/dev/null
@@ -109,112 +85,8 @@ if gcloud artifacts repositories describe "$AR_REPO" \
 else
   gcloud artifacts repositories create "$AR_REPO" \
     --repository-format=docker --location="$REGION" --project="$PROJECT" \
-    --description="Daintree Assistant Server container images"
+    --description="Daintree container images"
   ok "created $AR_REPO"
-fi
-
-# ---------------------------------------------------------------------------
-say "Secrets"
-# STATE_SIGNING_KEY_CURRENT must be >=32 chars and STATE_SALT must not be the
-# packaged default, or production readiness fails (Settings.weak_secrets).
-#
-# The two upstream credentials are DIFFERENT IN KIND from the two below: they
-# cannot be generated, only supplied. So this script creates the secret shell and stops —
-# a random value here would deploy a service that fails /readyz on a credential
-# nobody realised was fake.
-ensure_secret() {
-  local name="$1" generator="$2"
-  if ! gcloud secrets describe "$name" --project="$PROJECT" >/dev/null 2>&1; then
-    gcloud secrets create "$name" --replication-policy=automatic --project="$PROJECT" >/dev/null
-    ok "created secret $name"
-  fi
-  if has_version "$name"; then
-    ok "$name already has a version (left alone — rotation is manual)"
-  else
-    printf '%s' "$($generator)" \
-      | gcloud secrets versions add "$name" --data-file=- --project="$PROJECT" >/dev/null
-    ok "added the first version of $name"
-  fi
-}
-gen_key()  { openssl rand -hex 32; }   # 64 chars, comfortably over the 32 minimum
-gen_salt() { openssl rand -hex 16; }
-ensure_secret state-signing-key-current gen_key
-ensure_secret state-salt gen_salt
-
-# The upstream credential gets a shell and it GATES: baseten-api-key funds every
-# turn, the deploy mounts it unconditionally, and a missing version has to stop
-# the deploy here rather than surface as a red /readyz two steps later.
-ensure_supplied_secret() {
-  local name="$1" example="$2" gates="$3"
-  if ! gcloud secrets describe "$name" --project="$PROJECT" >/dev/null 2>&1; then
-    gcloud secrets create "$name" --replication-policy=automatic \
-      --project="$PROJECT" >/dev/null
-    ok "created secret $name"
-  fi
-  if has_version "$name"; then
-    ok "$name already has a version (left alone — rotation is manual)"
-  elif [ "$gates" = "gates" ]; then
-    ok "!! $name has NO version. The deploy will fail until you add one:"
-    echo "    printf '%s' '$example' | gcloud secrets versions add $name \\"
-    echo "      --data-file=- --project=$PROJECT"
-  else
-    ok "$name has no version (not gating)"
-  fi
-}
-ensure_supplied_secret baseten-api-key '<Baseten API key>' gates
-
-# The FAST-RESPONSE credential, and it NO LONGER GATES. It did while the stage
-# ran on every eligible turn with no off switch — a missing key then failed the
-# stage open everywhere, indistinguishable from a model choosing to say nothing.
-# `config.FAST_RESPONSE_ENABLED` is False now, so no call is ever opened, the key
-# funds nothing, and `Settings.missing_secrets` no longer asks for it.
-#
-# The shell is still created and still mounted: the stage is off by a one-word
-# decision that is expected to be revisited, and a project missing the resource
-# entirely would make re-enabling it a two-step rollout. A version is optional.
-ensure_supplied_secret cerebras-api-key 'csk-...' optional
-
-# The EXECUTOR FALLBACK credential, and it does not gate either — but for the
-# opposite reason to the one above. Cerebras funds a stage that is switched off;
-# this one funds a host that is very much live, just only when Baseten cannot
-# answer (docs/PROVIDER_POLICY.md 1a). Without a version, `_build_provider`
-# returns the bare Baseten adapter and the service is complete but has no spare
-# tyre: a Baseten outage is a Daintree outage again. `/v1/daintree/doctor`
-# reports `provider.fallback.armed` so which of the two you have is checkable
-# rather than guessable.
-#
-# Optional rather than gating because readiness must not refuse a deployment
-# whose only shortcoming is robustness — that would take the server down for a
-# fault it does not have.
-ensure_supplied_secret openrouter-api-key 'sk-or-v1-...' optional
-
-# The private-staging subject gate's membership list — A SHELL ONLY, and this
-# script must never put a version in it.
-#
-# It is different in kind from every secret above. The two generated ones are
-# random bytes nobody needs to know; the two supplied ones are vendor credentials
-# an operator pastes. This one is a list of SHA-256 digests of the Supabase
-# subject ids of the people admitted to the private beta — so a generator here
-# could only invent members, and a helper that took a subject and hashed it would
-# put a real user id into a shell history and a terminal scrollback on the way to
-# the only place it is supposed to exist. Publishing the list is an operator act
-# performed from the runbook, and this script's whole contribution is the
-# container and the grant.
-#
-# Nothing here reads it back either. `gcloud secrets versions access` returns the
-# payload and appears nowhere in this repo; `has_version` asks only whether one
-# exists.
-if ! gcloud secrets describe staging-allowed-subject-digests \
-     --project="$PROJECT" >/dev/null 2>&1; then
-  gcloud secrets create staging-allowed-subject-digests \
-    --replication-policy=automatic --project="$PROJECT" >/dev/null
-  ok "created secret staging-allowed-subject-digests (empty)"
-fi
-if has_version staging-allowed-subject-digests; then
-  ok "staging-allowed-subject-digests already has a version (left alone)"
-else
-  ok "staging-allowed-subject-digests has no version (not gating unless you deploy"
-  ok "  ENVIRONMENT=staging with AUTH_MODE=enforce — see infra/gcp/README.md)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -223,59 +95,8 @@ if gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" --project="$PROJECT"
   ok "$RUNTIME_SA_EMAIL already exists"
 else
   gcloud iam service-accounts create "$RUNTIME_SA" \
-    --display-name="Daintree Assistant Cloud Run runtime" --project="$PROJECT"
+    --display-name="Daintree runbook search Cloud Run runtime" --project="$PROJECT"
   ok "created $RUNTIME_SA_EMAIL"
-fi
-# Scoped per-secret rather than project-wide: this identity can read exactly the
-# secrets it mounts and nothing else in the project.
-# baseten-api-key appears here because the deploy mounts it: without the grant,
-# the runtime identity cannot read the key that funds every turn, and the
-# revision fails at startup.
-# cerebras-api-key is granted whether or not it has a version yet: the binding is
-# on the secret, so granting it now means enabling the fast-response stage later
-# needs no IAM change — and a missing grant would present as a revision that
-# starts, passes readiness with the stage off, and then fails the moment somebody
-# turns it on.
-# staging-allowed-subject-digests is granted whether or not it has a version, for
-# the same reason cerebras-api-key is: the binding is on the SECRET, so publishing
-# a membership list later needs no IAM change — and a missing grant would present
-# as a private staging revision that fails at startup on a mount it cannot read,
-# which reads as a broken image rather than a missing permission.
-RUNTIME_SECRETS="state-signing-key-current state-salt baseten-api-key cerebras-api-key openrouter-api-key staging-allowed-subject-digests"
-for s in $RUNTIME_SECRETS; do
-  retry 12 gcloud secrets add-iam-policy-binding "$s" \
-    --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-    --role=roles/secretmanager.secretAccessor \
-    --project="$PROJECT" --quiet >/dev/null
-done
-ok "granted secretAccessor on $RUNTIME_SECRETS"
-
-# The Developer Connect connection's GitHub OAuth token. The fetch-lfs build
-# step reads it to pull LFS content (the model artifact) from the PRIVATE repo
-# — the v2 checkout leaves no git credential behind. The secret's name carries
-# a random suffix minted by Developer Connect, so it is discovered, not
-# hardcoded; skipped with a warning if the connection is not set up yet.
-GH_TOKEN_SECRET=$(gcloud secrets list --project="$PROJECT"   --filter="name~daintree-github-github-oauthtoken"   --format="value(name)" --limit=1 || true)
-if [ -n "$GH_TOKEN_SECRET" ]; then
-  retry 12 gcloud secrets add-iam-policy-binding "$GH_TOKEN_SECRET"     --member="serviceAccount:${BUILD_SA_EMAIL}"     --role=roles/secretmanager.secretAccessor     --project="$PROJECT" --quiet >/dev/null
-  ok "granted deploy SA secretAccessor on $GH_TOKEN_SECRET (LFS fetch)"
-else
-  ok "!! no daintree-github oauthtoken secret found — LFS fetch will fail until granted"
-fi
-
-# The rotation-overlap secret, granted only if it exists. It is created by hand at
-# the start of a rotation and deleted once the old token TTL has expired, so it is
-# absent most of the time — but a rotating deploy MOUNTS it, and a mount the
-# runtime identity cannot read fails the revision at startup. Re-run bootstrap
-# after creating it (it is idempotent), or the rotation release will not come up.
-if gcloud secrets describe state-signing-key-previous --project="$PROJECT" >/dev/null 2>&1; then
-  retry 12 gcloud secrets add-iam-policy-binding state-signing-key-previous \
-    --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-    --role=roles/secretmanager.secretAccessor \
-    --project="$PROJECT" --quiet >/dev/null
-  ok "granted secretAccessor on state-signing-key-previous (rotation in progress)"
-else
-  ok "no state-signing-key-previous — not in a rotation window, nothing to grant"
 fi
 
 # ---------------------------------------------------------------------------
@@ -284,24 +105,16 @@ if gcloud iam service-accounts describe "$BUILD_SA_EMAIL" --project="$PROJECT" >
   ok "$BUILD_SA_EMAIL already exists"
 else
   gcloud iam service-accounts create "$BUILD_SA" \
-    --display-name="Daintree Assistant Cloud Build deployer" --project="$PROJECT"
+    --display-name="Daintree runbook search Cloud Build deployer" --project="$PROJECT"
   ok "created $BUILD_SA_EMAIL"
 fi
 # logWriter is required because cloudbuild.yaml sets logging: CLOUD_LOGGING_ONLY;
 # without it the build fails before running a step. builds.builder is what Cloud
 # Build itself checks when a trigger names a user-specified service account —
 # without it, trigger creation is rejected outright with PERMISSION_DENIED.
-# secretmanager.viewer is the deploy's own need, not the app's: cloudbuild.yaml
-# asks whether `state-signing-key-previous` EXISTS to decide whether to mount it,
-# and without `secrets.get` that question comes back PERMISSION_DENIED. The build
-# now fails closed on that rather than reading it as "no previous key", so the
-# missing grant would break every deploy rather than silently skipping the
-# rotation — but the grant is what makes it work at all. Viewer reads metadata
-# only; it cannot read a secret's VALUE.
 for role in roles/cloudbuild.builds.builder \
             roles/logging.logWriter \
             roles/artifactregistry.writer \
-            roles/secretmanager.viewer \
             roles/run.admin; do
   retry 12 gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:${BUILD_SA_EMAIL}" --role="$role" \
@@ -366,6 +179,20 @@ else
   ok "linked ${GITHUB_OWNER}/${GITHUB_REPO}"
 fi
 
+# The Developer Connect connection's GitHub OAuth token. The fetch-lfs build
+# step reads it to pull LFS content (the model artifact) from the PRIVATE repo
+# — the v2 checkout leaves no git credential behind. The secret's name carries
+# a random suffix minted by Developer Connect, so it is discovered, not
+# hardcoded. Granted here, after both the build service account and the
+# connection exist, so neither is referenced before it is created.
+GH_TOKEN_SECRET=$(gcloud secrets list --project="$PROJECT"   --filter="name~daintree-github-github-oauthtoken"   --format="value(name)" --limit=1 || true)
+if [ -n "$GH_TOKEN_SECRET" ]; then
+  retry 12 gcloud secrets add-iam-policy-binding "$GH_TOKEN_SECRET"     --member="serviceAccount:${BUILD_SA_EMAIL}"     --role=roles/secretmanager.secretAccessor     --project="$PROJECT" --quiet >/dev/null
+  ok "granted deploy SA secretAccessor on $GH_TOKEN_SECRET (LFS fetch)"
+else
+  ok "!! no daintree-github oauthtoken secret found — LFS fetch will fail until granted"
+fi
+
 # ---------------------------------------------------------------------------
 say "Cloud Build trigger"
 if gcloud builds triggers describe "$TRIGGER" \
@@ -387,38 +214,18 @@ fi
 
 # ---------------------------------------------------------------------------
 say "Public access to the service"
-# THIS SCRIPT NO LONGER GRANTS PUBLIC ACCESS, and the removal is the point of the
-# section rather than a tidy-up inside it.
-#
-# `allUsers roles/run.invoker` is what makes the service reachable by anybody at
-# all, and it used to be granted here on every run — ungated, unprompted, on a
-# script whose header tells you that re-running it is how you finish the setup.
-# The binding is per-SERVICE, so it also publishes every no-traffic release
-# candidate's `rc-<build>` tag URL. And the app cannot compensate: the server
-# holds the upstream credential and funds every turn from it, so an unenforced
-# public service is an open, Daintree-funded model endpoint that a re-run of a
-# setup script created.
-#
-# Attaching public access is now a CUTOVER — a deliberate, separate operation
-# performed once the deployed revision has been seen to enforce identity, enforce
-# entitlement, and hold a non-empty subject gate. It is done by re-running this
-# script with the service NAMED:
+# `allUsers roles/run.invoker` is what makes the MCP endpoint reachable by
+# anybody. It is granted as a CUTOVER — once, on purpose, by naming the service —
+# never as a side effect of finishing a setup:
 #
 #     PUBLIC_CUTOVER=daintree-assistant ./infra/gcp/bootstrap.sh
 #
-# Naming the service is the INTENT half of the confirmation, and it is worth
-# being honest about how much that is worth: an exported `PUBLIC_CUTOVER` left
-# over in a shell would satisfy it if it happened to hold this exact name. That
-# is why it is only half. The other half is below and does the real work — the
-# deployed revision's posture is READ BACK before the binding is created, so a
-# cutover aimed at yesterday's revision, or at staging while thinking of
-# production, is refused by what is actually deployed rather than by what was
-# typed.
+# Naming the service is the intent; the deployed revision is then read back
+# with an identity token (it is still private) and must be ready and answering
+# a runbook search before the binding is created.
 #
-# What this section will NOT do in either direction: it never removes an existing
-# public binding. Production carries one today, it predates this rule, and taking
-# it away is an outage — so revoking is as deliberate an act as granting, and it
-# is a command an operator runs rather than a side effect of a setup script.
+# This section never REMOVES an existing public binding. Taking it away is an
+# outage, so revoking is a command an operator runs deliberately.
 PUBLIC_CUTOVER="${PUBLIC_CUTOVER:-}"
 if ! gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJECT" >/dev/null 2>&1; then
   ok "service does not exist yet — release to main, then re-run this script"
@@ -431,8 +238,7 @@ else
   # thing this file decides on the strength of that read is whether to publish a
   # service, which is the last decision that should depend on a shared filename.
   POLICY_FILE="$(mktemp)"
-  VERSION_FILE="$(mktemp)"
-  trap 'rm -f "$POLICY_FILE" "$VERSION_FILE"' EXIT
+  trap 'rm -f "$POLICY_FILE"' EXIT
   gcloud run services get-iam-policy "$SERVICE" --region="$REGION" \
     --project="$PROJECT" --format=json > "$POLICY_FILE"
   ALREADY_PUBLIC="$(POLICY_FILE="$POLICY_FILE" python3 - <<'PYEOF'
@@ -444,10 +250,9 @@ members = set()
 for binding in policy.get("bindings", []):
     if binding.get("role") == "roles/run.invoker":
         members.update(binding.get("members", []))
-# allAuthenticatedUsers is not "our users" — it is every Google account there is,
-# which for a service that funds its own model calls is the same exposure with a
-# sign-in page in front of it.
-print("yes" if members & {"allUsers", "allAuthenticatedUsers"} else "no")
+# Only allUsers is anonymous. allAuthenticatedUsers still demands a Google
+# identity, which an MCP client adding this server by URL does not send.
+print("yes" if "allUsers" in members else "no")
 PYEOF
 )"
 
@@ -458,70 +263,29 @@ PYEOF
     echo "      --region=$REGION --project=$PROJECT --member=allUsers --role=roles/run.invoker"
   elif [ "$PUBLIC_CUTOVER" != "$SERVICE" ]; then
     ok "private (no allUsers invoker) — and this script will not change that"
-    ok "  to attach public access, prove the posture first and then:"
+    ok "  to make it public:"
     echo "    PUBLIC_CUTOVER=$SERVICE ./infra/gcp/bootstrap.sh"
-    ok "  see infra/gcp/README.md for what has to be true before you do"
   else
-    # THE POSTURE IS PROVED, NOT ASSERTED BY THE OPERATOR. Typing the service
-    # name says "I mean to do this"; it does not say the revision in front of us
-    # is the one that was supposed to receive it, and the two are exactly the
-    # thing that comes apart during a rollout — a cutover run against yesterday's
-    # revision, or against staging while thinking of production.
-    #
-    # /version is read with an IDENTITY TOKEN because the service is still
-    # private at this moment, which is the whole reason the check is possible: it
-    # can be answered before anybody outside can ask anything.
-    ok "cutover requested — checking what the deployed revision actually enforces"
-    curl -sS --max-time 30 \
-      -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-      "$URL/version" > "$VERSION_FILE" || true
-    POSTURE_OK="$(VERSION_FILE="$VERSION_FILE" python3 - <<'PYEOF'
-import json, os
-
-try:
-    with open(os.environ["VERSION_FILE"]) as handle:
-        body = json.load(handle)
-except Exception:
-    print("unreadable")
-    raise SystemExit(0)
-
-posture = body.get("posture") or {}
-gate = posture.get("subject_gate") or {}
-problems = []
-if posture.get("auth") != "enforce":
-    problems.append("AUTH_MODE is %r, not 'enforce'" % posture.get("auth"))
-if posture.get("entitlement") != "enforce":
-    problems.append("ENTITLEMENT_MODE is %r, not 'enforce'" % posture.get("entitlement"))
-if gate.get("enabled") is not True:
-    problems.append("the subject gate is not enabled")
-elif not isinstance(gate.get("entries"), int) or gate.get("entries") < 1:
-    problems.append("the subject gate admits nobody")
-# The LABEL is printed and the membership never is. A count and a name are what
-# an operator needs to recognise the list they published; neither narrows who is
-# on it.
-print("ok" if not problems else "; ".join(problems))
-PYEOF
-)"
-    if [ "$POSTURE_OK" != "ok" ]; then
-      ok "!! refusing the cutover: $POSTURE_OK"
-      ok "   A public service in this posture funds anonymous or ungated work."
-      ok "   Release the enforced, gated revision first, then re-run the cutover."
+    ok "cutover requested — checking the deployed revision serves searches"
+    if ! bash "$(dirname "$0")/smoke.sh" --url "$URL" --identity-token; then
+      ok "!! refusing the cutover: the deployed revision failed its smoke test"
       exit 1
     fi
     gcloud run services add-iam-policy-binding "$SERVICE" \
       --region="$REGION" --project="$PROJECT" \
       --member=allUsers --role=roles/run.invoker --quiet >/dev/null
-    ok "granted allUsers roles/run.invoker after proving enforce/enforce/gated"
+    ok "granted allUsers roles/run.invoker"
   fi
 fi
 
 # ---------------------------------------------------------------------------
 say "Custom domain"
 # Cloud Run's built-in domain mapping: a CNAME straight at the service, no load
-# balancer and no cost. It is deliberately the smaller of the two options — the
+# balancer and no cost. It is deliberately the smaller of the two options — a
 # global external Application Load Balancer (reserved anycast IP, Cloud Armor,
-# CDN) is documented in infra/terraform/README.md and can replace this later by
-# swapping the CNAME for an A record. Nothing about the service changes.
+# CDN) can replace this later by swapping the CNAME for an A record, with
+# `_INGRESS=internal-and-cloud-load-balancing` on the build. Nothing about the
+# service changes.
 #
 # Google must already believe you own the domain: verify it once at
 # https://search.google.com/search-console (verifying the apex daintree.org

@@ -63,7 +63,9 @@ def test_a_runbook_vector_does_not_depend_on_what_it_was_synced_with() -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     catalog = load_catalog(default_runbooks_dir())
-    narrow = catalog.executable_with(["fs.read", "fs.list"])
+    from daintree_assistant_server.runbooks.catalog import Catalog
+
+    narrow = Catalog(catalog.runbooks[::7])
     assert 0 < len(narrow) < len(catalog), "fixture must actually narrow the catalog"
 
     def fresh_table(cat):  # type: ignore[no-untyped-def]

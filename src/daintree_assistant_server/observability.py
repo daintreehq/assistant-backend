@@ -1,21 +1,7 @@
-"""Structured logging and request identifiers — the OPERATIONAL plane.
+"""Structured logging and request identifiers.
 
-Logs carry *metadata*, never content: no message text, tool arguments,
-project instructions, memories, terminal tails, runbook bodies, bearer keys, or
-state tokens. Helpers here make that the easy default.
-
-**This is not the only plane, and the distinction is load-bearing.** ``tracing/``
-is the other one: content-bearing, restricted, off by default, and written for
-replay and model training. They are NOT two verbosity levels of one system.
-Merging them would put user content in front of everyone who can read a log line
-and leave access control with no good answer — which is exactly why the trace
-store exists separately rather than as a `DEBUG` level here.
-
-Nothing from the trace plane may cross into this one. That includes content
-hashes: a stable digest in Cloud Logging is a cross-session fingerprint, so two
-turns sharing one are two turns sharing the text. Counts and byte totals are
-fine; hashes stay in the restricted trace manifest.
-``tests/unit/test_tracing_log_separation.py`` holds the boundary.
+Logs carry metadata, never content: a search query is user content and stays
+out of the log plane, like every other request body.
 """
 
 from __future__ import annotations
@@ -51,15 +37,6 @@ def _sortable_id(prefix: str) -> str:
 
 def new_request_id() -> str:
     return _sortable_id("req")
-
-
-def new_call_id() -> str:
-    """A server-originated synthetic tool-call id (``call_srv_...``)."""
-    return f"call_srv_{_sortable_id('x').split('_', 1)[1]}"
-
-
-def new_task_run_id() -> str:
-    return _sortable_id("taskrun")
 
 
 _configured = False

@@ -3,7 +3,6 @@ id: daintree.forge.land-pull-request
 title: Review-state and land a pull request
 summary: Apply public PR lifecycle actions and merge only after an exact-target preview, conclusive required-check evidence, review-state checks and a verified forge result.
 whenToUse: Use when the user asks to approve a pull request, request changes or reviewers, mark it ready or draft, dismiss a known review, close or reopen it, or merge, squash or rebase it. Also use for "land this PR", "approve and merge", or "merge it once it is ready". Do not use merely to read PR, CI, review or comment status (use daintree.workflow.follow-up-on-issue), to review code quality and produce findings (use daintree.review.review-change), to fix red CI (use daintree.ci.diagnose-and-fix), to create the PR (use daintree.workflow.prep-branch-for-review), or to watch for a later state transition (use daintree.orchestration.watch-outcome).
-confirmation: "Changing a pull request's public state. The aim is to apply exactly the action that was asked for, once its preconditions hold, and confirm the result on the pull request itself."
 risk: system
 requiredTools:
   - context.snapshot

@@ -1,27 +1,18 @@
-"""Runbook-selection benchmark CLI.
+"""Runbook-selection benchmark CLI. Offline and free: no API calls.
 
-Run from the repo root (venv active, BASETEN_API_KEY in .env or the env):
+Run from the repo root:
 
-    python -m benchmarks.runbook_selection.bench local                  # SHIPPED selector, free
-    python -m benchmarks.runbook_selection.bench scale                  # recall at 200/500/1000
-    python -m benchmarks.runbook_selection.bench run                    # baseline prompt
-    python -m benchmarks.runbook_selection.bench run --variant v2-foo   # a prompts/ variant
-    python -m benchmarks.runbook_selection.bench run --variant baseline --variant v2-foo
+    python -m benchmarks.runbook_selection.bench local       # the SHIPPED selector
+    python -m benchmarks.runbook_selection.bench scale       # recall at 200/500/1000
+    python -m benchmarks.runbook_selection.bench lint        # most-confusable runbook pairs
     python -m benchmarks.runbook_selection.bench list
     python -m benchmarks.runbook_selection.bench coverage
     python -m benchmarks.runbook_selection.bench report results/<run>.json
     python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
 
-``local`` is the one that qualifies a release: it drives the shipped ONNX
-artifact — the selector that actually serves — offline, deterministically, for
-free, and reports WHICH STAGE lost each missing runbook. ``run`` drives the
-prompt-based selector live against a paid API; that selector has not been on the
-serving path since selection moved local, so it is a comparator, not the
-authority.
-
-Only ``run`` makes API calls (REAL, paid: cases x trials per variant). ``local``,
-``list``, ``coverage``, ``report``, and ``compare`` are offline and free — they
-need no key, so they work with ``BASETEN_API_KEY=`` blanked.
+``local`` is the release gate: it drives the shipped ONNX artifact — the
+selector the search serves — deterministically, and reports WHICH STAGE lost
+each missing runbook.
 """
 
 from __future__ import annotations
@@ -30,10 +21,10 @@ import argparse
 import sys
 from pathlib import Path
 
-from .._harness.quality import print_verdict
 from .cases import CaseError, load_cases
 from .coverage import print_coverage
-from .reporting import load_doc, print_compare, print_failures, print_summary, save_doc
+from .quality import print_verdict
+from .reporting import load_doc, print_compare, save_doc
 
 
 def _cmd_local(args: argparse.Namespace) -> int:
@@ -41,9 +32,8 @@ def _cmd_local(args: argparse.Namespace) -> int:
 
     from .local_runner import print_categories, print_local, run_local
 
-    # The SAME free preflight the dashboard runs before this suite, and it
-    # belongs on both paths for the same reason: this command is advertised as
-    # the release gate, and it grades the cases that exist. A runbook nobody wrote
+    # The free coverage preflight: this command is the release gate, and it
+    # grades the cases that exist. A runbook nobody wrote
     # a case for is invisible to it by construction, so a catalog with a coverage
     # hole could be qualified by a run that never mentioned the gap. Skipped
     # under --filter, which is already refused by the verdict.
@@ -116,25 +106,16 @@ def _cmd_report(args: argparse.Namespace) -> int:
     # artifact saved before a threshold existed is graded against today's — and so
     # replaying a failed run in CI stays a failure.
     doc = load_doc(Path(args.path))
-    # Both suites write into the same results directory, and they are graded by
-    # different gates. Read which one produced the file rather than assuming:
-    # regrading a local artifact against the paid selector's thresholds is how a
-    # healthy run gets reported as a failure, and the reverse is worse.
-    suite = str((doc.get("meta") or {}).get("benchmark") or "runbook_selection")
-    if suite not in ("runbook_selection", "runbook_selection_local"):
+    suite = str((doc.get("meta") or {}).get("benchmark") or "")
+    if suite != "runbook_selection_local":
         # `print_verdict` returns True for a suite it does not know, so an
-        # artifact carrying an unrecognised `meta.benchmark` would report a pass
-        # having been graded by nothing at all.
+        # artifact from another suite would report a pass graded by nothing.
         print(f"unrecognised benchmark {suite!r} — this CLI cannot grade it")
         return 1
-    if suite == "runbook_selection_local":
-        from .local_runner import print_categories, print_local
+    from .local_runner import print_categories, print_local
 
-        print_local(doc)
-        print_categories(doc)
-    else:
-        print_summary(doc)
-        print_failures(doc)
+    print_local(doc)
+    print_categories(doc)
     return 0 if print_verdict(doc, suite) else 1
 
 

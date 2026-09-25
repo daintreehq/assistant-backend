@@ -3,7 +3,6 @@ id: daintree.worktree.create-plain-worktree
 title: Create a plain Daintree worktree
 summary: Create a standalone Daintree worktree for a new or existing branch through the typed worktree wrapper, without launching a recipe or agent.
 whenToUse: Use when the user asks to create, add, or set up a plain worktree for a new branch or an existing branch — "create a worktree", "make a new branch in its own worktree", or "check out this branch as a worktree" — and they do not want a recipe or agent launched. Do not use for a worktree with a workspace recipe (use daintree.recipe.run-or-create), for starting a forge issue with an agent (use daintree.workflow.start-work-on-issue), for spawning an agent into an existing worktree (use daintree.edits.spawn-visible-agent), for giving agents that are ALREADY RUNNING one worktree each (use daintree.worktree.relocate-agents), or for deleting a worktree (use daintree.orchestration.workspace-cleanup).
-confirmation: "Adding a worktree for a branch. The aim is a checkout of its own for the branch, with nothing launched inside it, since an agent or a startup layout is a separate request."
 risk: project
 requiredTools:
   - context.snapshot

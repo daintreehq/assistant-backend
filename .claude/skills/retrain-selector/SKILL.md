@@ -246,10 +246,9 @@ $PY -m training.export_two_stage --setwise training/models/sw_probe --out .tmp/a
 $PY -m training.eval_zero_shot --artifact .tmp/art_probe
 ```
 
-### 6. Refresh the baseline and commit
+### 6. Commit
 
 ```bash
-$PY -m tools.baseline capture > benchmarks/baseline.json
 git add -A .
 git diff --cached --numstat | awk '{a+=$1} END {print a" staged lines"}'  # thousands, not 100k+
 ```

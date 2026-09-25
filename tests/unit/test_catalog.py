@@ -161,17 +161,6 @@ def test_one_foundation_per_domain_across_distinct_domains_is_fine() -> None:
     assert catalog.domain_foundation("other.thing") == "other.base"
 
 
-def test_public_list_includes_required_tools_no_body() -> None:
-    catalog = _catalog()
-    entries = catalog.public_list()
-    assert all("body" not in e for e in entries)
-    assert all("required_tools" in e for e in entries)
-    # foundation is a selector-only concern; it must not leak to the public wire.
-    assert all("foundation" not in e for e in entries)
-    # priority is gone from the schema entirely — it must not reappear on the wire.
-    assert all("priority" not in e for e in entries)
-
-
 def test_duplicate_id_rejected() -> None:
     runbook = parse_runbook(RUNBOOK_A, expected_id="a.one")
     with pytest.raises(RunbookLoadError, match="duplicate"):

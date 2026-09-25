@@ -1,20 +1,9 @@
 """The selector that actually ships, scored offline — and told WHERE it lost.
 
-## Why this exists beside ``runner.py``
-
-``runner.py`` drives ``runbooks.selector.Selector``: a prompt, an upstream model,
-~450 paid calls per variant. That selector has not been on the serving path since
-selection moved local. It is a useful comparator and a scriptable test seam, and
-it is not the thing a release should be qualified on — a green dashboard row
-measuring a component nobody runs is worse than no row, because it reads as
-coverage.
-
-This module drives ``SetwiseClassifier`` from the shipped ONNX artifact, under
-the decision procedure ``LocalSelector`` runs in production: the visible-active
-projection, the structural background-wake rule, the earn-your-place admission
-floors, and the bare-question docs pass. It costs nothing, needs no key, and
-returns the same summary shape as the paid runner, so the dashboard, the verdict
-gate and ``bench report`` all consume it unchanged.
+This module drives ``SetwiseClassifier`` from the shipped ONNX artifact under
+the classifier's full decision procedure: the visible-active projection, the
+structural background-wake rule, the earn-your-place admission floors, and the
+bare-question docs pass. It costs nothing and needs no key.
 
 ## Stage decomposition, which is the actual new thing
 
@@ -70,8 +59,8 @@ from daintree_assistant_server.runbooks.local import setwise as S
 from daintree_assistant_server.runbooks.local.documents import last_user_text, query_document
 from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-from .._harness.quality import attach_verdict
 from .cases import BenchCase, load_cases
+from .quality import attach_verdict
 from .scoring import percentile, score_trial, summarize
 
 ARTIFACT = (

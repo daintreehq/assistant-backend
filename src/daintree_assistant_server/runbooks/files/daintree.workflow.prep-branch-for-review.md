@@ -3,7 +3,6 @@ id: daintree.workflow.prep-branch-for-review
 title: Prepare a branch for review
 summary: Get a read-only review-readiness verdict, then do the real prep — commit, push, open the PR — branching on what the verdict reports.
 whenToUse: Use when the user asks to prepare a branch for review, open or ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push. Do not use to judge whether an agent's work is actually correct or complete before trusting it (use daintree.orchestration.verify-agent-work), to START work on an issue rather than finish it (use daintree.workflow.start-work-on-issue), to be notified later when the PR merges (use daintree.orchestration.watch-outcome), to read an EXISTING PR's CI or review state or to comment on and close its issue (use daintree.workflow.follow-up-on-issue), to forward a reviewer's findings to an implementer agent (use daintree.agents.relay-review-feedback), to REVIEW the change rather than ready it (use daintree.review.review-change), or to fix a failing check (use daintree.ci.diagnose-and-fix).
-confirmation: "Getting the branch ready for review. The goal is a tree that is committed, pushed and free of conflicts, which is a question about the branch's shape rather than whether the work is good."
 risk: external
 requiredTools:
   - context.snapshot

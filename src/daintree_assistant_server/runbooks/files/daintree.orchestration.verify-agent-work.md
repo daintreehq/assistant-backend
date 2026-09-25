@@ -3,7 +3,6 @@ id: daintree.orchestration.verify-agent-work
 title: Verify an agent actually did the work
 summary: Test an agent's "done" against evidence — cheap git reads, a small-model verdict on the tail, an explore agent when it needs real inspection — then route on verified, unverified, or contradicted.
 whenToUse: Use when the user wants a finished agent's work checked before it is trusted — "did it actually do it?", "check that the agent did what I asked", "verify this before I merge", "it says the tests pass, confirm that", "I don't trust that result" — or when an agent reports done and the next step is irreversible (commit, push, merge, close, hand off). Also to judge a claim against acceptance criteria, or when the tail seems to contradict what the agent said. Do not use to sweep the whole fleet rather than judge ONE result (daintree.orchestration.supervise-fleet), to ready a branch or open a PR (daintree.workflow.prep-branch-for-review), to forward findings to an implementer (daintree.agents.relay-review-feedback), to wait on an agent still running (daintree.orchestration.watch-outcome), for "where were we" across sessions (daintree.orchestration.status-and-resume), or to JUDGE a change on its merits rather than check a claim about it (daintree.review.review-change).
-confirmation: "Testing an agent's claim of done. The aim is to settle whether the asked-for work actually landed, using evidence from the branch and the terminal rather than the report that says it did."
 risk: terminal
 requiredTools:
   - context.snapshot

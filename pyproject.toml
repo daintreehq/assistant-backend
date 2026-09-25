@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "daintree-assistant-server"
 version = "1.0.0"
-description = "Daintree Assistant Server - Backend orchestration service"
+description = "Daintree runbook search - a stateless MCP server"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
@@ -21,10 +21,8 @@ classifiers = [
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
-    "httpx[http2]>=0.26.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    "jinja2>=3.1.0",
     "structlog>=24.1.0",
     "pyyaml>=6.0.0",
     # Local runbook selection. These three, and deliberately nothing else — no
@@ -34,15 +32,6 @@ dependencies = [
     "numpy>=1.26",
     "onnxruntime>=1.19",
     "tokenizers>=0.20",
-    # Account-token verification. The `crypto` extra is what pulls in
-    # `cryptography` for RS256/ES256 — without it PyJWT installs happily and then
-    # refuses every asymmetric algorithm at runtime, which would present as "every
-    # login is rejected" rather than as a missing dependency.
-    #
-    # Only the library. JWKS is fetched over the httpx client this service already
-    # owns rather than through PyJWT's `PyJWKClient`, which is synchronous and
-    # would block the event loop on every key rotation.
-    "pyjwt[crypto]>=2.10",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +40,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.12.0",
+    "httpx>=0.26.0",
     "jsonschema>=4.23.0",
     "ruff>=0.1.0",
     "mypy>=1.8.0",
@@ -62,20 +52,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 daintree_assistant_server = [
-    "prompts/main/*.md",
-    "prompts/main/base/*.md",
-    # The sub-agent persona. Listed explicitly like base/ because package-data
-    # globs do NOT recurse: omitting it shipped a wheel whose PromptLoader raised
-    # `missing prompt dir` at import — and because the loader reads it EAGERLY at
-    # startup, that broke every request, not merely sub-agent ones.
-    "prompts/main/subagent/*.md",
-    "prompts/main/*.j2",
-    "prompts/tasks/*.md",
-    # The fast-response stage's own prompts. Eagerly loaded at startup like
-    # the task prompts, so a missing glob here is a container that fails
-    # readiness rather than a feature that quietly degrades.
-    "prompts/fast_response/*.md",
-    "prompts/fast_response/*.j2",
     "runbooks/files/*.md",
     # The local two-stage runbook selector — the SHIPPED selector. Both encoders
     # ship int8 only: fp32 is gitignored and exists locally so the export can
@@ -120,20 +96,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# LocalSelector.select must keep the upstream Selector.select signature exactly —
-# that parity is what lets the orchestrator and the benchmark harness drive
-# either one unchanged, which is the only way the two can be compared on
-# identical evidence. Several of those parameters are meaningless to a local
-# model (there is no credential to spend and no endpoint to route to) and are
-# deliberately accepted and ignored. Same reasoning as the global ARG001 ignore
-# above, which already exempts the plain-function form of this.
-"src/daintree_assistant_server/runbooks/local/selector.py" = ["ARG002"]
-# Null objects: every argument is unused BY DESIGN — that is what makes them null.
-# Naming them anyway is what keeps the signature checkable against the Protocol,
-# and mypy --strict does check it, so the arguments are load-bearing even though
-# no body reads them.
-"src/daintree_assistant_server/tracing/sinks/null.py" = ["ARG002"]
-"src/daintree_assistant_server/tracing/recorder.py" = ["ARG002"]
 "tests/**/*.py" = [
     "ARG001",
     "ARG002",
@@ -158,10 +120,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-# "." so `tools/` imports under the bare `pytest` console script, not just under
-# `python -m pytest`. Only the latter puts the working directory on sys.path, and
-# CI runs the former — so `test_baseline.py` (which imports tools.baseline)
-# collected fine on every developer machine and failed on every push.
+# "." so `benchmarks/` imports under the bare `pytest` console script (CI runs
+# it), which unlike `python -m pytest` does not put the working directory on
+# sys.path.
 pythonpath = [".", "tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -175,11 +136,8 @@ omit = [
 ]
 
 [tool.coverage.report]
-# A floor, not a target. Set just under the measurement at the time it was
-# introduced (93% with branch coverage) so ordinary churn does not trip it while
-# a real drop still does. Per-MODULE floors for the security and reliability
-# surfaces live in `tools/coverage_floors.py`, because one global number can stay
-# green while exactly the code that must not regress does.
+# A floor, not a target: set just under the measurement so ordinary churn does
+# not trip it while a real drop still does.
 fail_under = 90
 exclude_lines = [
     "pragma: no cover",

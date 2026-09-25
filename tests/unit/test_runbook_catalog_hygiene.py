@@ -59,13 +59,7 @@ TOOL_NAMES_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "cli_too
 # The full-schema capture of the SAME registry, which the name list above declares
 # itself to be a pure projection of. Both are committed (no submodule involved), so
 # that claim can be asserted literally instead of approximated by a count.
-TOOL_INVENTORY_FIXTURE = (
-    Path(__file__).resolve().parents[2]
-    / "benchmarks"
-    / "_harness"
-    / "fixtures"
-    / "cli_tool_inventory.json"
-)
+TOOL_INVENTORY_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "cli_tool_inventory.json"
 
 # The registry projects an internal dotted name to its OpenAI wire name by replacing
 # every "." with "__" (cli/internal/tools/registry.go, toWireName). Runbook frontmatter
@@ -144,15 +138,7 @@ def test_the_name_fixture_is_exactly_the_projection_of_the_inventory() -> None:
     This is free and offline, which matters because CI does not fetch the `cli/`
     submodule and so cannot regenerate either file to compare.
     """
-    inventory = json.loads(
-        (
-            Path(__file__).resolve().parents[2]
-            / "benchmarks"
-            / "_harness"
-            / "fixtures"
-            / "cli_tool_inventory.json"
-        ).read_text(encoding="utf-8")
-    )
+    inventory = json.loads(TOOL_INVENTORY_FIXTURE.read_text(encoding="utf-8"))
     projected = sorted(t["function"]["name"] for t in inventory)
     raw = TOOL_NAMES_FIXTURE.read_text(encoding="utf-8")
     recorded = [ln for ln in raw.splitlines() if ln.strip() and not ln.startswith("#")]
@@ -163,7 +149,7 @@ def test_the_name_fixture_is_exactly_the_projection_of_the_inventory() -> None:
         "the two CLI fixtures disagree — they are one capture and must be "
         f"regenerated together.\n  in cli_tool_names.txt only: {only_names}\n"
         f"  in cli_tool_inventory.json only: {only_inventory}\n"
-        "Recipe: benchmarks/_harness/fixtures/README.md."
+        "Recipe: tests/fixtures/README.md."
     )
     # Compared as a LIST, not a set: set equality passes on a duplicated or
     # unsorted file, and both are the shape a hand-edit produces. The file is

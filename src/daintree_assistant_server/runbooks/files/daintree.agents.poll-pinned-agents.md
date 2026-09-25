@@ -3,7 +3,6 @@ id: daintree.agents.poll-pinned-agents
 title: Poll pinned agents
 summary: Poll the pinned or configured agent fleet with one neutral question or option vote, read their free-form verdicts, and synthesize a consensus.
 whenToUse: Use when the user asks to poll the pinned or configured agent fleet (or several named agents) for independent opinions, votes among options, verdicts, recommendations, or short answers and wants a synthesized consensus. The deliverable is opinions, not work. Do not use when each agent is instead to be given its own unit of real work (use daintree.orchestration.fan-out-work), for a single agent (use daintree.agents.ask-and-relay), for multi-round debate or collaboration (use daintree.orchestration.multi-agent), for an open-ended dialogue where the agents talk to each other (use daintree.orchestration.conversation), for a judged scoring competition or interview (use daintree.orchestration.competition or daintree.orchestration.interview), or for breaking a tie (use daintree.orchestration.runoff-tiebreaker).
-confirmation: "Polling several agents for their verdicts. The goal is a consensus built from each one's own words, with the question put neutrally so the answers stay independent of each other."
 risk: project
 requiredTools:
   - context.snapshot

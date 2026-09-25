@@ -3,7 +3,6 @@ id: daintree.workflow.start-work-on-issue
 title: Start work on a forge issue
 summary: How to pick a forge issue and start work on it through workflow.startWorkOnIssue, which spawns the agent and auto-attaches a BACKGROUND supervisor watcher.
 whenToUse: Use when the user asks to start work on ONE forge issue they have already settled on — pick up a ticket, begin an issue, set up a worktree/branch for it and put an agent on it. Do not use when the issue is NOT yet chosen and the job is searching or triaging the backlog for a candidate (use daintree.workflow.find-issue-work); for SEVERAL issues at once, an agent per ticket, or working a batch in parallel (use daintree.orchestration.fan-out-work); to finish work and open a PR (use daintree.workflow.prep-branch-for-review); to check CI, a review decision or the issue thread on work already underway (use daintree.workflow.follow-up-on-issue); for a change with no forge issue behind it (use daintree.edits.spawn-visible-agent); to create a worktree from a workspace recipe rather than an issue (use daintree.recipe.run-or-create); or to pick up / resume work already in flight from an earlier session (use daintree.orchestration.status-and-resume).
-confirmation: "Starting work on one chosen issue. The goal is an isolated worktree with an agent running in it, supervised in the background so its finish comes back on its own."
 risk: external
 requiredTools:
   - context.snapshot

@@ -219,10 +219,11 @@ def test_the_helper_analyzer_diagnoses_a_known_bad_script(tmp_path) -> None:
 #
 # `bootstrap.sh` used to grant `allUsers roles/run.invoker` on every run —
 # ungated, unprompted, on a script whose own header says re-running it is how you
-# finish the setup. Since the server holds the upstream credential and funds
-# every turn from it, that published an open Daintree-funded model endpoint. The
-# binding is per-SERVICE, so it also published every no-traffic release
-# candidate's tag URL.
+# finish the setup. The binding is per-SERVICE, so it also publishes every
+# no-traffic release candidate's tag URL. Making the MCP endpoint public is
+# still the destination; what these checks hold is that it only happens when an
+# operator names the service, and only after the deployed revision has been
+# smoked.
 #
 # These are static checks because CI runs no GCP project and never will. They are
 # worth having anyway: what they assert is an ORDER, and an order is exactly what
@@ -252,14 +253,12 @@ def _command_lines(text: str) -> list[tuple[int, str]]:
 
 
 def test_bootstrap_does_not_publish_the_service_as_a_side_effect() -> None:
-    """The grant must sit behind the named cutover AND behind a posture check.
+    """The grant must sit behind the named cutover AND behind a passing smoke.
 
     Typing the service name says "I mean to do this". It does not say the
-    revision in front of us is the one that was supposed to receive it, and those
-    two come apart during exactly the rollout this exists for — a cutover run
-    against yesterday's revision, or against staging while thinking of
-    production. So the posture is read back from the deployment before the
-    binding is created.
+    revision in front of us actually serves searches, so the shared smoke script
+    is run against it — with an identity token, since the service is still
+    private — and a failure stops the script before the binding is created.
     """
     text = BOOTSTRAP.read_text(encoding="utf-8")
     grants = [
@@ -271,49 +270,65 @@ def test_bootstrap_does_not_publish_the_service_as_a_side_effect() -> None:
         f"expected exactly one allUsers grant in bootstrap.sh, found {len(grants)}"
     )
     grant_line = grants[0][0]
-    preceding = "\n".join(text.splitlines()[: grant_line - 1])
+    lines = text.splitlines()
+    # The binding command spans several lines; the verb sits above the member.
+    assert "add-iam-policy-binding" in "\n".join(lines[grant_line - 3 : grant_line])
+    preceding = "\n".join(lines[: grant_line - 1])
     assert 'PUBLIC_CUTOVER" != "$SERVICE"' in preceding, (
         "the public grant is not behind the named-cutover confirmation"
     )
-    assert "POSTURE_OK" in preceding, (
-        "the public grant does not read the deployed revision's posture first"
+    smoke = [
+        line for _, line in _command_lines(preceding) if "smoke.sh" in line
+    ]
+    assert smoke, "the public grant does not smoke the deployed revision first"
+    assert all("--identity-token" in line for line in smoke), (
+        "the cutover smoke cannot reach a service that is still IAM-private"
     )
-    assert 'POSTURE_OK" != "ok"' in preceding, (
-        "the posture is read and never acted on before the grant"
+    assert any(line.strip().startswith("if ! bash") for line in smoke), (
+        "the smoke runs before the grant but its failure is never acted on"
     )
 
 
-def test_bootstrap_never_writes_or_reads_the_membership_list() -> None:
-    """The gate secret is a list of digests of real user ids.
+def test_bootstrap_never_removes_a_public_binding() -> None:
+    """Revoking the binding is an outage, so it is only ever PRINTED.
 
-    A generator here could only invent members, and a helper that took a subject
-    and hashed it would put a real user id into a shell history and a terminal
-    scrollback on the way to the only place it is supposed to exist. This script
-    creates the container and grants the read; publishing is an operator act.
+    The script shows the operator the revoke command when the service is already
+    public; running it is a decision somebody makes on purpose.
     """
     text = BOOTSTRAP.read_text(encoding="utf-8")
-    assert "gcloud secrets create staging-allowed-subject-digests" in text, (
-        "bootstrap no longer creates the gate secret's shell"
+    assert "remove-iam-policy-binding" in text, (
+        "bootstrap no longer shows the operator how to revoke the binding"
     )
-    for forbidden in (
-        "versions add staging-allowed-subject-digests",
-        "versions access",
-        "sha256sum",
-        "shasum",
-    ):
-        offending = [
-            line for _, line in _command_lines(text) if forbidden in line
-        ]
-        assert not offending, (
-            f"bootstrap.sh {forbidden!r}: it must neither synthesize nor read a "
-            f"subject or a digest ({offending})"
-        )
+    offending = [
+        line for _, line in _command_lines(text) if "remove-iam-policy-binding" in line
+    ]
+    assert not offending, f"bootstrap.sh removes an IAM binding: {offending}"
+
+
+def test_bootstrap_provisions_no_runtime_secret() -> None:
+    """The service holds no credential, so there is nothing to create or mount.
+
+    The one secret the pipeline still touches is the GitHub connection's token,
+    which the BUILD reads to fetch LFS content. A `secrets create`, a version
+    write or a payload read here would be the provider-key plumbing coming back.
+    """
+    text = BOOTSTRAP.read_text(encoding="utf-8")
+    for forbidden in ("secrets create", "versions add", "versions access"):
+        offending = [line for _, line in _command_lines(text) if forbidden in line]
+        assert not offending, f"bootstrap.sh runs {forbidden!r}: {offending}"
+    grants = [
+        line
+        for _, line in _command_lines(text)
+        if "secrets add-iam-policy-binding" in line
+    ]
+    assert len(grants) == 1, "expected exactly one secret grant (the LFS token)"
+    assert "GH_TOKEN_SECRET" in grants[0]
 
 
 def test_the_command_scanner_can_tell_an_instruction_from_an_example() -> None:
-    """Negative control for the two checks above.
+    """Negative control for the checks above.
 
-    Both scan for command lines and both pass over the real file, which proves
+    They scan for command lines and pass over the real file, which proves
     nothing until the scanner is shown distinguishing the two cases it exists to
     separate — a printed revoke recipe, which must be allowed, and an actual
     binding, which must be found.

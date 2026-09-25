@@ -16,9 +16,7 @@ from jsonschema import Draft202012Validator
 
 from daintree_assistant_server.runbooks.catalog import load_catalog
 
-INVENTORY = Path(__file__).resolve().parents[2] / (
-    "benchmarks/_harness/fixtures/cli_tool_inventory.json"
-)
+INVENTORY = Path(__file__).resolve().parents[1] / "fixtures" / "cli_tool_inventory.json"
 EXAMPLE = re.compile(r"^```json tool=([\w.]+)\n(.*?)\n```$", re.M | re.S)
 
 
