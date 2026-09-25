@@ -202,6 +202,21 @@ boundaries:
   - query: 'ask codex one thing for me: does it think the retry logic is safe'
     confusable_with: [daintree.orchestration.conversation]
     run: 2026-09-24-selector-hardening
+  - query: ask claude which function in src is most likely to cause a bug and bring its answer back
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: just ask codex, not the others, what it thinks of the retry logic and tell me what it says
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask gemini the same question you asked earlier and relay its answer
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: get claude to look at the payments module and tell me the riskiest function
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: 'only ask codex this one: is the websocket reconnect safe? bring its answer back'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
 followups:
   - query: hows it going
     history:

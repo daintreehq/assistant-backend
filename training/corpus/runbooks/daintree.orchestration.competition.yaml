@@ -172,6 +172,18 @@ boundaries:
   - query: ask each agent for their best idea, judge the entries on merit, no questioning needed just points
     confusable_with: [daintree.orchestration.interview]
     run: 2026-09-24-selector-hardening
+  - query: have claude, codex and gemini each write their own name for the module, then show each the others' names, let them vote and tally the points
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and codex to each propose a fix, then have them judge each other's fix and declare a winner
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: get claude, codex and gemini to each submit one interesting fact about the repo, then blind peer-vote on the best one
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
+  - query: 'contest: claude, codex, gemini and opencode each pitch a logo idea, then they score each other''s pitches and we crown a winner'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-26-same-question-named-agents
 followups:
   - query: how's it going?
     history:

@@ -1,0 +1,48 @@
+# The same question put to two or more NAMED agents, every answer brought back.
+# Measured from live Daintree assistant runs: the selector sent these to
+# ask-and-relay (one agent) or multi-agent (relayed debate), and the assistant
+# re-searched two or three times before it found poll-pinned-agents.
+
+cases:
+  - id: named-pair-same-question-side-by-side-not-ask-and-relay
+    category: routing-trap
+    note: >-
+      Two named agents, one question, both answers side by side. ask-and-relay is
+      ONE agent; it took this at 1.0 with poll-pinned-agents at 0.42.
+    messages:
+      - role: user
+        content: >-
+          Ask Claude and Codex the same question about a source function likely to
+          cause a bug and bring both answers side by side
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: named-pair-put-same-question-independently-not-multi-agent
+    category: routing-trap
+    note: >-
+      "Independently" and "bring both answers back" rule out a relayed debate:
+      there is no round and no synthesis. multi-agent took this at 0.999 with
+      poll-pinned-agents at 0.52.
+    messages:
+      - role: user
+        content: >-
+          Put the same question to Claude and Codex independently and bring both
+          answers back side by side
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: named-pair-poll-each-answer-independently
+    category: routing-trap
+    note: >-
+      The phrasing that already routed correctly, pinned so the fix for the two
+      above cannot trade it away.
+    messages:
+      - role: user
+        content: >-
+          Poll Claude and Codex with the same question and return each answer
+          independently
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]

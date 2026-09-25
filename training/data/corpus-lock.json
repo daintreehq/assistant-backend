@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 10731,
-  "compiled_sha256": "48cb41ab0973d5b483eaa4c11e487161bb97d94e4dcfcd46d0d23d51e1d3ff8e",
+  "rows": 10806,
+  "compiled_sha256": "c9d1ffc92cd1b21d7a0fd6604d2735fac25492d87803c2ca6427a10bfba2106b",
   "label_space_sha256": "df0d1ebc2785b5ab8ed95e2d266c3a659011b31b2294bd506cdf985dc686456e",
   "label_space_size": 40,
   "by_source": {
-    "boundary": 2531,
+    "boundary": 2561,
     "docs": 740,
     "followup": 468,
     "foundation": 312,
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 595,
     "off_domain": 212,
-    "positive": 2635,
+    "positive": 2680,
     "topic_shift": 2419,
     "wake": 149
   },
@@ -28,6 +28,7 @@
     "2026-09-22-provision-boundary-fix": 11,
     "2026-09-24-agent-usage-limits": 52,
     "2026-09-24-selector-hardening": 773,
+    "2026-09-26-same-question-named-agents": 75,
     "pre-split": 9811
   },
   "dropped": {},
@@ -40,10 +41,10 @@
       "sha256": "c06b9c776fe0f1c81b8035d83bb28edf2313316b1c019f041132500299606790"
     },
     "runbooks/daintree.agents.ask-and-relay.yaml": {
-      "examples": 166,
-      "rows": 166,
+      "examples": 171,
+      "rows": 171,
       "runbook": "daintree.agents.ask-and-relay",
-      "sha256": "a1659f37576ebc0f6769ebf363d0bad1bd094a44f22f4b7c3a807d163712b55c"
+      "sha256": "23d59f4dc61e3b228a111b1d578db27cec524231abe1c2332e0f3d83600d4dac"
     },
     "runbooks/daintree.agents.check-usage-limits.yaml": {
       "examples": 72,
@@ -52,10 +53,10 @@
       "sha256": "b79b2be360f1ab1c84e2c06a636772585fe6dc8e9bd8cda3add29db8f1326f12"
     },
     "runbooks/daintree.agents.poll-pinned-agents.yaml": {
-      "examples": 197,
-      "rows": 197,
+      "examples": 258,
+      "rows": 258,
       "runbook": "daintree.agents.poll-pinned-agents",
-      "sha256": "e9514c6235df8cdb14cd1e40db01b94e66e5adb7a91e69ed05f27e8d0d807d69"
+      "sha256": "1ef8ecb7bedd7b8cc03409846e982fb1440c68747fb25021d6c6a385b2366cd2"
     },
     "runbooks/daintree.agents.recover-agent.yaml": {
       "examples": 206,
@@ -124,10 +125,10 @@
       "sha256": "adac8357a13a19e767c596d4ab031995c7eb6f4a383f4ad259d53ec67dc7e52e"
     },
     "runbooks/daintree.orchestration.competition.yaml": {
-      "examples": 161,
-      "rows": 161,
+      "examples": 165,
+      "rows": 165,
       "runbook": "daintree.orchestration.competition",
-      "sha256": "85dc2f8bd4bc00d3d0b58168156511e960b848094f1348ac77f16df7a116c70d"
+      "sha256": "646e478301a914c1b588ddc67caeddcc11a9f96c402b7868fc16f26bd08bdc88"
     },
     "runbooks/daintree.orchestration.conversation.yaml": {
       "examples": 139,
@@ -160,10 +161,10 @@
       "sha256": "91e10e18bf2855a4c610aa8ad32baae41fbf06422c7df582100cf0df7f8da130"
     },
     "runbooks/daintree.orchestration.multi-agent.yaml": {
-      "examples": 156,
-      "rows": 156,
+      "examples": 161,
+      "rows": 161,
       "runbook": "daintree.orchestration.multi-agent",
-      "sha256": "4d688bf2a74deeef34fe27fde8657d86d494f1f670a09ae1855e421ed7eea6d4"
+      "sha256": "3c18ae4d284bedb37007809e2909b803eefda0b7fda77c0f04eb9bc7f6a00370"
     },
     "runbooks/daintree.orchestration.runoff-tiebreaker.yaml": {
       "examples": 145,

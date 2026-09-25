@@ -60,6 +60,96 @@ positives:
   - one terminal per pinned agent, same question to each, nobody talks to anybody — what should we name the module
   - two of the poll agents are still spinning, just go with the ones that answered and give me the tally
   - i don't want your opinion on the auth flow, i want the fleet's. ask them
+  - query: 'ask claude and codex the same thing: which module in src is the most fragile? show me both answers next to each other'
+    run: 2026-09-26-same-question-named-agents
+  - query: put one question to claude, codex and gemini — where is the likeliest place for a race condition in this repo — and give me all three replies
+    run: 2026-09-26-same-question-named-agents
+  - query: send the same question to codex and gemini and bring back what each of them says, side by side
+    run: 2026-09-26-same-question-named-agents
+  - query: ask both claude and codex which test file is the flakiest and lay out their answers in a table
+    run: 2026-09-26-same-question-named-agents
+  - query: i want claude and gemini asked the identical question about the caching layer, independently, then compare their answers for me
+    run: 2026-09-26-same-question-named-agents
+  - query: 'have claude, codex, gemini and opencode each answer this: what''s the riskiest function in the payments code? summarise all four'
+    run: 2026-09-26-same-question-named-agents
+  - query: same prompt to claude and codex please — what would you delete from this repo first — and show me both responses
+    run: 2026-09-26-same-question-named-agents
+  - query: ask each of claude, codex and cursor what they'd rename the `utils` folder to and bring every answer back
+    run: 2026-09-26-same-question-named-agents
+  - query: 'put this to all of claude, codex, gemini, opencode and copilot: is the retry logic correct? i want each answer separately'
+    run: 2026-09-26-same-question-named-agents
+  - query: get claude's and codex's take on the same question — which endpoint is slowest — and compare them side by side
+    run: 2026-09-26-same-question-named-agents
+  - query: ask codex and claude separately which dependency we should drop, don't let them see each other, then show me both
+    run: 2026-09-26-same-question-named-agents
+  - query: can you ask gemini and claude the same question about the migration plan and put the two answers side by side
+    run: 2026-09-26-same-question-named-agents
+  - query: 'same question to both claude and codex: where would you add logging first? bring both answers back'
+    run: 2026-09-26-same-question-named-agents
+  - query: fire the same question at claude, gemini and qwen and give me a comparison table of what they said
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and codex independently what the biggest code smell in src/ is, then line their answers up next to each other
+    run: 2026-09-26-same-question-named-agents
+  - query: 'question for claude, codex and gemini, all the same: is this error handling adequate? show all three answers'
+    run: 2026-09-26-same-question-named-agents
+  - query: i'd like claude and codex to each answer, on their own, which function is most likely to hide a bug, then compare what they came back with
+    run: 2026-09-26-same-question-named-agents
+  - query: ask all of them — claude, codex, gemini, amp — the same thing about the state store and summarise each answer
+    run: 2026-09-26-same-question-named-agents
+  - query: send one identical question to codex and opencode about the parser and give me both answers in two columns
+    run: 2026-09-26-same-question-named-agents
+  - query: hey, ask claude and gemini the same question — what's wrong with our config loading — and show me how their answers differ
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude, codex and gemini which of our api handlers is least tested and report each one's answer
+    run: 2026-09-26-same-question-named-agents
+  - query: put the identical question to both codex and claude — should this class be split? — and bring back both verdicts
+    run: 2026-09-26-same-question-named-agents
+  - query: get both claude and gemini to answer what the worst-named function in the repo is and show them side by side
+    run: 2026-09-26-same-question-named-agents
+  - query: ask codex, claude, gemini and cursor independently which file they'd refactor first, then give me a table of the four answers
+    run: 2026-09-26-same-question-named-agents
+  - query: 'same question for claude and codex: what''s the most likely source of the memory leak? i want both answers back'
+    run: 2026-09-26-same-question-named-agents
+  - query: have claude and codex each tell me which of our modules would break first under load, and compare the two answers
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and codex the one question — where's the dead code — and summarise both replies next to each other
+    run: 2026-09-26-same-question-named-agents
+  - query: can you ask each of claude, codex and gemini what they think the weakest part of the auth flow is and bring all the answers back
+    run: 2026-09-26-same-question-named-agents
+  - query: run the same question past claude and codex separately and come back with both answers so i can compare
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude, codex, gemini, opencode and qwen the same question about the build script and list every answer
+    run: 2026-09-26-same-question-named-agents
+  - query: 'both codex and claude: which function is most at risk of an off-by-one? bring back what each says side by side'
+    run: 2026-09-26-same-question-named-agents
+  - query: ask gemini and codex what they'd test first in this repo, independently, and show me both lists next to each other
+    run: 2026-09-26-same-question-named-agents
+  - query: get a separate answer from claude and from codex to the same question about the websocket reconnect, then compare
+    run: 2026-09-26-same-question-named-agents
+  - query: i want to see how claude and codex each answer the same question — is this sql injectable — side by side please
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and copilot the same question about the error boundary and bring both of their answers back to me
+    run: 2026-09-26-same-question-named-agents
+  - query: 'pose the same question to claude, codex and gemini: what''s the riskiest part of this diff? collect all three answers'
+    run: 2026-09-26-same-question-named-agents
+  - query: 'ask codex and claude the same question and put their answers in a two-column comparison: which hook re-renders too much?'
+    run: 2026-09-26-same-question-named-agents
+  - query: send claude and gemini the same question on whether the queue can drop jobs, and summarise both of their answers
+    run: 2026-09-26-same-question-named-agents
+  - query: ask each of claude and codex, independently, which source file is most likely to cause a production bug, and bring both answers back
+    run: 2026-09-26-same-question-named-agents
+  - query: put the question to claude and codex both — which regex is broken — and give me each answer, no merging
+    run: 2026-09-26-same-question-named-agents
+  - query: 'compare how claude, codex and gemini answer this one question: where is the n+1 query? show all their answers'
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and codex what they each think the slowest test is and show me both, labelled by agent
+    run: 2026-09-26-same-question-named-agents
+  - query: the same question to claude, codex, gemini and opencode — which config flag is dead — tally up what they say
+    run: 2026-09-26-same-question-named-agents
+  - query: have claude and codex both answer independently whether we should drop node 18, then show me both answers together
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and gemini separately which component is most bug-prone and show me their two answers next to each other
+    run: 2026-09-26-same-question-named-agents
 boundaries:
   - query: ask each of my pinned agents what they think of this API
     confusable_with: [daintree.worktree.relocate-agents]
@@ -228,6 +318,54 @@ boundaries:
   - query: the pinned agents are all waiting — actually no, i want each of them to vote on sqlite vs postgres
     confusable_with: [daintree.agents.answer-waiting-agent]
     run: 2026-09-24-selector-hardening
+  - query: ask claude and codex which function is most likely to throw and bring both answers back
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude, and also codex, the same question about the retry loop and show me each answer
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-26-same-question-named-agents
+  - query: get claude and gemini to each look at the auth module and tell me, separately, what they find — show both
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask codex and claude what they make of the queue code and relay both answers side by side
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-26-same-question-named-agents
+  - query: spawn claude and codex to answer the same question about the parser and report both replies
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude and codex each for their read on the cache invalidation and bring back the two answers
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-26-same-question-named-agents
+  - query: put the identical question to claude and codex, keep them apart, and bring back both answers side by side
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-26-same-question-named-agents
+  - query: claude and codex, same question, independently — no back and forth — give me both answers next to each other
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude, codex and gemini the same question in parallel and show me all three answers, no synthesis
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-26-same-question-named-agents
+  - query: get claude and codex to answer the same question separately and compare the answers for me
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-26-same-question-named-agents
+  - query: put the same question to claude and gemini and bring both replies back so i can compare them myself
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask codex, claude and opencode the same thing independently and summarise each answer, i don't need them to agree
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude, codex and gemini the same question and tally which answer comes up most
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-26-same-question-named-agents
+  - query: put the same question to claude and codex and show me their answers side by side, no scoring
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-26-same-question-named-agents
+  - query: ask claude, codex, gemini and cursor which of my three options is best and count the votes
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-26-same-question-named-agents
+  - query: same question to claude, codex and gemini — which of these two libraries should we use — and tell me how they voted
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-26-same-question-named-agents
 followups:
   - query: how's it going?
     history:
