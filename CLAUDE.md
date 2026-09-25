@@ -16,7 +16,10 @@ retired and deleted; git history has it. **Do not reintroduce any of it incident
 no provider adapters, no prompt layers, no auth modes, no state tokens.
 
 **The main ongoing work is growing the runbook catalog** and keeping search good as it
-grows.
+grows. Real sessions are the main input: `/learn-from-transcript <path>` takes a Claude Code
+or Codex transcript, measures what matched and what should have, and lands the lessons as
+runbooks, cases and training rows on the current branch. It replaced the retired
+`assistant-lab` missions; no issue or PR is involved.
 
 ## Layout
 
@@ -49,6 +52,7 @@ ruff check .
 mypy --strict src
 python -m benchmarks.runbook_selection.bench coverage   # every runbook has a case requiring it
 python -m benchmarks.runbook_selection.bench local      # shipped selector over every case, gated
+python -m benchmarks.runbook_selection.bench search "<task>"   # one query, ranked as the MCP ranks it
 
 # Run locally (settings from .env; see .env.example — nothing is required)
 ./dev

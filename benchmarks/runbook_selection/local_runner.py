@@ -287,12 +287,14 @@ def build_local_doc(
     # the paid suite grades a different contract and should keep doing so.
     by_category: dict[str, list[bool]] = {}
     recall_pass = 0
+    recall_flags: list[bool] = []
     for case, got_ids in zip(cases, picked, strict=True):
         got = set(got_ids)
         ok = not (set(case.required) - got) and (
             bool(case.required) or not (got - case.allowed)
         )
         recall_pass += ok
+        recall_flags.append(ok)
         by_category.setdefault(case.category, []).append(ok)
     summary["recall_pass_cases"] = recall_pass
     summary["recall_pass_categories"] = {
@@ -342,6 +344,13 @@ def build_local_doc(
         # decision diff in ``training/eval_two_stage.py`` can be taken over two
         # runs of this function rather than a second copy of the scoring loop.
         "picked": [list(p) for p in picked],
+        # The case each `picked` entry belongs to. `compare` aligns two runs on
+        # it: position alone breaks the moment a case file gains a case.
+        "case_ids": [case.id for case in cases],
+        # Per case, by the same rule as `recall_pass_cases`. Not derivable from
+        # `losses`: a no-task case that loads anything fails recall and loses
+        # no required runbook.
+        "recall_pass": recall_flags,
         "losses": [
             {
                 "case": loss.case_id,
@@ -397,3 +406,55 @@ def print_categories(doc: dict[str, Any]) -> None:
             f"  {name:22} {block['passed']:3d}/{block['cases']:3d}"
             f"   {tight.get('passed', 0):3d}/{tight.get('cases', 0):3d}"
         )
+
+
+def _by_case(doc: dict[str, Any]) -> dict[str, tuple[list[str], list[str], bool]]:
+    """case id -> (what it loaded, what it lost and where, whether it passed recall)."""
+    ids, flags = doc.get("case_ids"), doc.get("recall_pass")
+    if not isinstance(ids, list) or not isinstance(flags, list):
+        raise ValueError("a run saved before bench local recorded case ids; re-run it")
+    lost: dict[str, list[str]] = {}
+    for loss in doc.get("losses") or []:
+        lost.setdefault(loss["case"], []).append(f"{loss['runbook']} ({loss['stage']})")
+    return {
+        cid: (list(p), lost.get(cid, []), bool(ok))
+        for cid, p, ok in zip(ids, doc.get("picked") or [], flags, strict=True)
+    }
+
+
+def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
+    """Two ``bench local`` runs, case by case.
+
+    The totals can hide a trade: an edit that fixes one case and breaks another
+    nets to zero, and a case that swaps an extra for a wrong pick moves no pass
+    count at all. So every case whose loaded set moved is listed, with what each
+    side lost.
+    """
+    ca, cb = _by_case(a), _by_case(b)
+    sa, sb = a["summary"], b["summary"]
+    print("\n== bench local: A vs B ==")
+    for label, key in (("recall-pass", "recall_pass_cases"), ("strict", "cases_passed")):
+        print(
+            f"{label:14} A {sa[key]}/{sa['cases_total']}   B {sb[key]}/{sb['cases_total']}"
+        )
+    print(
+        f"{'candidate_miss':14} A {sa['candidate_miss_trials']}   "
+        f"B {sb['candidate_miss_trials']}"
+    )
+    common = sorted(set(ca) & set(cb))
+    fixed = [c for c in common if cb[c][2] and not ca[c][2]]
+    broke = [c for c in common if ca[c][2] and not cb[c][2]]
+    print(f"recall fixed in B ({len(fixed)}): {', '.join(fixed) or '—'}")
+    print(f"recall broken in B ({len(broke)}): {', '.join(broke) or '—'}")
+    moved = [c for c in common if set(ca[c][0]) != set(cb[c][0])]
+    print(f"loaded set changed ({len(moved)}):")
+    for cid in moved:
+        lost = f"   B lost: {', '.join(cb[cid][1])}" if cb[cid][1] else ""
+        print(f"  {cid}: {ca[cid][0]} -> {cb[cid][0]}{lost}")
+    sides = (("only in A", set(ca) - set(cb), ca), ("only in B", set(cb) - set(ca), cb))
+    for label, only, side in sides:
+        if only:
+            print(f"{label} ({len(only)}):")
+            for cid in sorted(only):
+                lost = f"   lost: {', '.join(side[cid][1])}" if side[cid][1] else ""
+                print(f"  {cid}: {side[cid][0]}{lost}")

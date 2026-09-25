@@ -53,6 +53,7 @@ python -m benchmarks.runbook_selection.bench local         # THE gate: shipped O
 python -m benchmarks.runbook_selection.bench local --fp32  # same, unquantised
 python -m benchmarks.runbook_selection.bench list          # validate cases
 python -m benchmarks.runbook_selection.bench coverage      # per-runbook coverage matrix
+python -m benchmarks.runbook_selection.bench search "…"    # queries as search_runbooks ranks them
 
 python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
 ```

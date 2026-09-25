@@ -99,3 +99,11 @@ Unknown keys are rejected (`runbooks/models.py`).
 Passing the routing gate says search finds the runbook; it does not say an agent
 executes it well. Only a live trial against a connected Daintree instance shows
 that — don't claim it from offline checks.
+
+## Learning from real sessions
+
+A transcript of an agent doing the work is the best evidence of both halves: the
+query it actually sent, what came back, and whether it could follow the procedure.
+`/learn-from-transcript <path>` (`.claude/skills/learn-from-transcript`) turns one
+Claude Code or Codex session into measured catalog changes. Cases it adds live in
+`benchmarks/runbook_selection/cases/19-from-transcripts.yaml` with `tx-` ids.

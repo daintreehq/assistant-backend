@@ -3,6 +3,7 @@
 Run from the repo root:
 
     python -m benchmarks.runbook_selection.bench local       # the SHIPPED selector
+    python -m benchmarks.runbook_selection.bench search "…"  # one query, as the MCP ranks it
     python -m benchmarks.runbook_selection.bench scale       # recall at 200/500/1000
     python -m benchmarks.runbook_selection.bench lint        # most-confusable runbook pairs
     python -m benchmarks.runbook_selection.bench list
@@ -58,6 +59,20 @@ def _cmd_local(args: argparse.Namespace) -> int:
         path = save_doc(doc, Path(args.out) if args.out else None)
         print(f"\nsaved: {path}")
     return 0 if print_verdict(doc, "runbook_selection_local") else 1
+
+
+def _cmd_search(args: argparse.Namespace) -> int:
+    from .search import print_search, read_queries, request_errors, search
+
+    queries = list(args.queries) + (read_queries(Path(args.file)) if args.file else [])
+    errors = request_errors(queries, args.max_results) if queries else ["give a query, or --file"]
+    if errors:
+        for error in errors:
+            print(f"error: {error}", file=sys.stderr)
+        return 2
+    catalog, results, shrunk = search(queries, limit=args.max_results)
+    print_search(catalog, queries, results, shrunk)
+    return 0 if all(hits is not None for hits in results) else 1
 
 
 def _cmd_scale(args: argparse.Namespace) -> int:
@@ -120,7 +135,21 @@ def _cmd_report(args: argparse.Namespace) -> int:
 
 
 def _cmd_compare(args: argparse.Namespace) -> int:
-    print_compare(load_doc(Path(args.a)), load_doc(Path(args.b)))
+    a, b = load_doc(Path(args.a)), load_doc(Path(args.b))
+    suites = {str((doc.get("meta") or {}).get("benchmark") or "") for doc in (a, b)}
+    if suites == {"runbook_selection_local"}:
+        from .local_runner import print_local_compare
+
+        try:
+            print_local_compare(a, b)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        return 0
+    if "runbook_selection_local" in suites:
+        print("error: compare two bench local runs, or two of the older format", file=sys.stderr)
+        return 2
+    print_compare(a, b)
     return 0
 
 
@@ -143,6 +172,17 @@ def main(argv: list[str] | None = None) -> int:
     local.add_argument("--no-save", action="store_true", help="do not write a results file")
     local.set_defaults(func=_cmd_local)
 
+    search = sub.add_parser(
+        "search",
+        help="rank queries exactly as search_runbooks does, over this tree's catalog "
+        "and the shipped artifact (free): score, and which runbooks are selected",
+    )
+    search.add_argument("queries", nargs="*", help="each one a separate search")
+    search.add_argument("--file", help="more queries, one per line (# comments skipped)")
+    search.add_argument(
+        "--max-results", type=int, default=5, help="hits per query (default 5, as the tool)"
+    )
+    search.set_defaults(func=_cmd_search)
 
     scale = sub.add_parser(
         "scale",
@@ -180,7 +220,10 @@ def main(argv: list[str] | None = None) -> int:
     report.add_argument("path")
     report.set_defaults(func=_cmd_report)
 
-    compare = sub.add_parser("compare", help="compare two saved results files")
+    compare = sub.add_parser(
+        "compare",
+        help="compare two saved results files; two bench local runs are diffed case by case",
+    )
     compare.add_argument("a")
     compare.add_argument("b")
     compare.set_defaults(func=_cmd_compare)
