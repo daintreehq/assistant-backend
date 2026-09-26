@@ -27,6 +27,15 @@ Separate actions, each needing its own request:
 - Delete a branch: `git branch -d` from the main checkout, only when asked; force or remote deletes need explicit instruction after the user sees what would be lost.
 
 Procedure:
+
+Fast path: the user precisely names terminals you launched in this conversation ("close all three", "close them", "close every agent except Codex" right after launching them, meaning those you launched). Skip steps 2 to 4: no listing, status read or worktree listing. If the last you saw of one was `working` or a question, say so first; otherwise close them all in one call with the ids you hold and verify by `closedIds`:
+
+```json tool=terminal.closeMany
+{"terminalIds":["<terminal id>","<terminal id>"]}
+```
+
+A sweep, a worktree deletion, or any panel you did not launch takes the full procedure.
+
 1. "Once those finish, close them" authorizes later cleanup, not hurrying the work: arm `terminal.notifyWhenIdle` on each (unless a notice is pending) and close later only after the finish is verified.
 2. Inventory fresh: `terminal.list` (also `owned:true`), one `terminal.getStatus` with `includeOutput` over the candidates, `worktree.list`, and the run's record. Per worktree: `git -C <path> status --porcelain`, whether the branch is pushed or merged, its resource status if configured.
 3. Classify: authorized; consequences to settle first (still working or asking, dirty files, teardown or a remote resource, the active worktree); not yours; unknown (left running and reported).
