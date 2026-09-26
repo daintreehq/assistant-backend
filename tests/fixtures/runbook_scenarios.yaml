@@ -148,7 +148,7 @@ scenarios:
     must: Read the reply from the quote; read the terminal again only when the quote is missing or cut.
     must_not: Wait or poll after arming the notice, or re-read every reply as a matter of course.
     runbooks: [daintree.foundation]
-    states: ["do not also wait or poll", "The quote is the reply", "one `terminal.getStatus` with `includeOutput` over all of them"]
+    states: ["do not also wait or poll", "The reply is always sent", "Never read a terminal for a reply you asked to be notified about", "one `terminal.getStatus` with `includeOutput` over all of them"]
 
   - id: short-run-needs-no-checkpoint-file
     situation: A one- or two-round orchestration, or the sidebar assistant with a scratch folder.

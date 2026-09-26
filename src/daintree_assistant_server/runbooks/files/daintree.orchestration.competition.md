@@ -5,10 +5,10 @@ summary: 'Run a scored contest among several named agents: ask each for one inde
 whenToUse: 'Use when the user names several agents (or the fleet) and asks each to produce one independent submission — an interesting fact, a design idea, a quick answer — and then wants them scored: award points, send each agent the others'' submissions, ask each to pick the best, tally, declare a winner. The signal is two-stage: the agents'' OWN submissions become the ballot they peer-judge. A vote over options YOU supplied, even one scored and tallied, is a fleet poll, not a competition. Do not use when each agent instead gets its own unit of real work (daintree.orchestration.fan-out-work), for a judge-led interview (interview runbook), a fleet poll with no scoring (poll-pinned-agents), collaborative debate toward one synthesized answer (multi-agent), a debate that ends by voting a position off (debate-elimination), or a runoff after a tie (runoff-tiebreaker).'
 risk: project
 requiredTools:
-  - agent.listAvailable
   - agent.launch
   - terminal.sendCommandOwned
 optionalTools:
+  - agent.listAvailable
   - worktree.list
   - terminal.list
   - terminal.getStatus
@@ -22,11 +22,11 @@ Availability: Core, two rounds of notices. An API-key client has no `notify`: cl
 
 Procedure:
 1. Fix the rules before launching: the entry task; the judge (peer vote by default); the scoring rule, applied exactly as the user gave it; whether voters may pick their own entry (default no, and ballots then omit it); the tie rule (default: report the tie). Without an agreed judge you never score entries on merit yourself.
-2. Cohort: one fresh entrant per agent named ("Claude, Codex and Gemini" means new launches, not open terminals of those kinds). Resolve each `agentId` from `agent.listAvailable`; use one worktree for all. Track per entrant: agent, terminal id, status (active, removed, missing) and entry.
+2. Cohort: one fresh entrant per agent named ("Claude, Codex and Gemini" means new launches, not open terminals of those kinds). Launch each by its built-in `agentId` without listing first, all in one worktree (the sidebar omits `worktreeId`). Track per entrant: agent, terminal id, status (active, removed, missing) and entry.
 3. Entries: launch every entrant in this turn, then end it.
 
 ```json tool=agent.launch
-{"agentId":"<id from agent.listAvailable>","name":"Contest: <agent> <n>","worktreeId":"<worktree id>","prompt":"<task>. Reply with ONE <entry> of at most a few lines, in your own words, here. Do not contact other agents. Change no files.","focusPolicy":"preserve","notify":true,"handback":true}
+{"agentId":"<built-in id: claude, codex, gemini, …>","name":"Contest: <agent> <n>","prompt":"<task>. Reply with ONE <entry> of at most a few lines, in your own words, here. Do not contact other agents. Change no files.","focusPolicy":"preserve","notify":true,"handback":true}
 ```
 
 4. Ballots, once every active entrant has an entry or is recorded missing: entries lock. For each voter, list the eligible entries in one identical format under neutral labels, with no author, agent kind or "(you)", in a different order per voter, and keep that voter's label-to-entrant map to yourself, out of every prompt. Send every ballot in one turn, then end it.
