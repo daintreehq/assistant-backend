@@ -17,7 +17,7 @@ optionalTools:
 4. New entries: one `terminal.sendCommandMany` to the tied entrants only, with `waitForReply:true, handback:true`: "Runoff: new entry. Task: <original task, with its exclusions>. Give ONE new short <entry>, different from your earlier one, in at most a few lines. Do not contact other agents."
 5. Runoff ballot: every eligible voter gets only the tied entries under new neutral labels, a new order and a new private map (never the original round's), asking for exactly one label and a one-line reason; one `terminal.sendCommandMany` with `waitForReply:true, handback:true`.
 6. A reply to the original ballot is stale, and an old label is never mapped through the runoff map. Accept only the tied entries. An ambiguous answer gets one clarification, then is invalid. A voter that cannot choose abstains under the rules; never force a vote, and never silently drop a ballot: it changes the denominator.
-7. Tally the runoff from zero under the inherited scoring; show a combined leaderboard only labelled as combined. One leader wins. Still tied: report it, or apply only a tie-break agreed in advance. A result a missing vote could change is provisional and crowns no one.
+7. Tally the runoff from zero under the inherited scoring; show a combined leaderboard only labelled as combined. One leader wins. Still tied: apply the tie-break the user already gave (anything it needs, such as a runner-up, asked on this ballot and mapped through this round's map) before reporting; with none, or still tied, report the tie and ask. A result a missing vote could change is provisional and crowns no one.
 
 One runoff per request. Close only on request, the recorded cohort ids, confirmed from `closedIds`.
 
