@@ -192,7 +192,7 @@ else
 fi
 
 STATUS="$(get /v1/daintree/mcp)"
-[ "$STATUS" = "405" ] && pass "GET on the MCP endpoint is 405 (stateless, POST only)" \
+[ "$STATUS" = "405" ] && pass "GET on the MCP endpoint is 405 (JSON only, no stream)" \
                       || fail "GET on the MCP endpoint answered $STATUS, expected 405"
 
 echo

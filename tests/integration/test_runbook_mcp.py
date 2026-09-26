@@ -8,6 +8,7 @@ shipped artifact in ``tests/unit/test_runbook_search.py``.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from typing import Any
 
@@ -19,6 +20,7 @@ from daintree_assistant_server.runbook_mcp import (
     GET_TOOL_DEFINITION,
     GET_TOOL_NAME,
     MAX_RESULTS_CAP,
+    SENT_EARLIER_NOTE,
     SUPPORTED_PROTOCOL_VERSIONS,
     TOOL_DEFINITION,
     TOOL_NAME,
@@ -60,9 +62,9 @@ def _assert_schema(definition: dict[str, Any], structured: dict[str, Any]) -> No
     assert not errors, errors
 
 
-def test_legacy_handshake_then_search_without_any_session(client: TestClient) -> None:
-    """A 2025-era client: initialize, initialized, list, call. No session id is
-    ever issued, and nothing after the handshake depends on it having happened."""
+def test_legacy_handshake_issues_a_session_nothing_depends_on(client: TestClient) -> None:
+    """A 2025-era client: initialize, initialized, list, call. The handshake issues a
+    session id, but nothing after it depends on the client sending it back."""
     init = _rpc(
         client,
         "initialize",
@@ -74,7 +76,7 @@ def test_legacy_handshake_then_search_without_any_session(client: TestClient) ->
     )
     assert init.status_code == 200
     assert init.headers["content-type"].startswith("application/json")
-    assert "mcp-session-id" not in init.headers
+    assert init.headers["mcp-session-id"]
     result = init.json()["result"]
     assert result["protocolVersion"] == "2025-06-18"
     assert result["capabilities"] == {"tools": {"listChanged": False}}
@@ -150,7 +152,6 @@ def test_search_returns_full_runbooks_as_structured_json(client: TestClient, app
     assert structured["runbooks"][1] == {
         "id": first,
         "title": neighbour.title,
-        "summary": neighbour.summary,
         "score": 0.41,
         "selected": False,
     }
@@ -181,7 +182,13 @@ def test_search_delivers_each_prerequisite_once_outside_the_ranking(
     supporting = [r["id"] for r in structured["supporting_runbooks"]]
     assert supporting == ["daintree.foundation"]
     foundation = catalog.get("daintree.foundation")
-    assert structured["supporting_runbooks"][0]["instructions"] == foundation.body
+    # Read because a selected runbook needs it, not chosen: no routing text or flags.
+    assert structured["supporting_runbooks"][0] == {
+        "id": foundation.id,
+        "title": foundation.title,
+        "content_hash": foundation.content_hash,
+        "instructions": foundation.body,
+    }
     _assert_schema(TOOL_DEFINITION, structured)
 
 
@@ -481,3 +488,134 @@ def test_2026_results_carry_result_type_and_cache_hints(client: TestClient) -> N
         assert result["ttlMs"] >= 0 and result["cacheScope"] == "public", method
     assert _call(client, {"query": "x"}).json()["result"]["resultType"] == "complete"
     assert _call(client, {}).json()["result"]["resultType"] == "complete"
+
+
+def _open_session(client: TestClient) -> dict[str, str]:
+    init = _rpc(client, "initialize", {"protocolVersion": "2025-06-18"})
+    return {"Mcp-Session-Id": init.headers["mcp-session-id"]}
+
+
+def _supporting(response: Any) -> list[dict[str, Any]]:
+    structured = response.json()["result"]["structuredContent"]
+    return list(structured["supporting_runbooks"])
+
+
+def test_a_session_is_sent_its_foundation_in_full_once(client: TestClient, app: Any) -> None:
+    catalog = app.state.container.catalog
+    foundation = catalog.get("daintree.foundation")
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    session = _open_session(client)
+
+    first = _call(client, {"query": "x", "max_results": 1}, headers=session)
+    assert _supporting(first)[0]["instructions"] == foundation.body
+
+    later = _call(client, {"query": "y", "max_results": 1}, headers=session)
+    structured = later.json()["result"]["structuredContent"]
+    assert structured["supporting_runbooks"] == [
+        {"id": "daintree.foundation", "note": SENT_EARLIER_NOTE}
+    ]
+    assert json.loads(later.json()["result"]["content"][0]["text"]) == structured
+    _assert_schema(TOOL_DEFINITION, structured)
+    # The selected procedure itself is never withheld.
+    assert structured["runbooks"][0]["instructions"] == catalog.get(
+        "daintree.terminals.rename"
+    ).body
+
+    # A caller that lost it fetches it by id, and gets it whole.
+    fetched = _get(client, {"id": "daintree.foundation"}, headers=session)
+    assert fetched.json()["result"]["structuredContent"]["runbook"]["instructions"] == (
+        foundation.body
+    )
+
+
+def test_get_runbook_shares_the_sessions_record(client: TestClient) -> None:
+    session = _open_session(client)
+    fetched = _get(client, {"id": "daintree.terminals.rename"}, headers=session)
+    assert "instructions" in _supporting(fetched)[0]
+    again = _get(client, {"id": "daintree.agents.ask-and-relay"}, headers=session)
+    assert _supporting(again) == [{"id": "daintree.foundation", "note": SENT_EARLIER_NOTE}]
+    _assert_schema(GET_TOOL_DEFINITION, again.json()["result"]["structuredContent"])
+
+
+def test_a_foundation_fetched_by_id_counts_as_sent(client: TestClient, app: Any) -> None:
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    session = _open_session(client)
+    _get(client, {"id": "daintree.foundation"}, headers=session)
+    searched = _call(client, {"query": "x", "max_results": 1}, headers=session)
+    assert _supporting(searched) == [{"id": "daintree.foundation", "note": SENT_EARLIER_NOTE}]
+
+
+def test_a_new_handshake_starts_over(client: TestClient, app: Any) -> None:
+    """A client that reconnects initializes again, and its new session has seen nothing."""
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    old = _open_session(client)
+    _call(client, {"query": "x", "max_results": 1}, headers=old)
+    new = _open_session(client)
+    assert new != old
+    assert "instructions" in _supporting(_call(client, {"query": "x"}, headers=new))[0]
+
+
+def test_no_session_or_a_malformed_one_is_always_sent_everything(
+    client: TestClient, app: Any
+) -> None:
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    for headers in ({}, {"Mcp-Session-Id": "x" * 500}):
+        for _ in range(2):
+            response = _call(client, {"query": "x", "max_results": 1}, headers=headers)
+            assert "instructions" in _supporting(response)[0], headers
+
+
+def test_an_id_this_instance_never_issued_is_adopted_not_refused(
+    client: TestClient, app: Any
+) -> None:
+    """A sibling instance issued it, or this one restarted: serve it, and send
+    everything the first time rather than trust a record that is not here."""
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    foreign = {"Mcp-Session-Id": "issued-elsewhere"}
+    first = _call(client, {"query": "x", "max_results": 1}, headers=foreign)
+    assert first.status_code == 200
+    assert "instructions" in _supporting(first)[0]
+    assert "note" in _supporting(_call(client, {"query": "x"}, headers=foreign))[0]
+
+
+def test_a_changed_foundation_is_sent_again(client: TestClient, app: Any) -> None:
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    session = _open_session(client)
+    _call(client, {"query": "x", "max_results": 1}, headers=session)
+    record = app.state.container.sessions.delivered(session["Mcp-Session-Id"])
+    record["daintree.foundation"] = "sha256:an-older-version"
+    again = _call(client, {"query": "x", "max_results": 1}, headers=session)
+    assert "instructions" in _supporting(again)[0]
+
+
+def test_a_sessionless_revision_ignores_a_session_header(client: TestClient, app: Any) -> None:
+    """2026-07-28 has no sessions, so an id it happens to carry changes nothing."""
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    session = _open_session(client)
+    meta = {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}
+    for _ in range(2):
+        response = _rpc(
+            client,
+            "tools/call",
+            {"name": TOOL_NAME, "arguments": {"query": "x", "max_results": 1}, "_meta": meta},
+            headers=session,
+        )
+        assert "instructions" in _supporting(response)[0]
+
+
+def test_a_reply_that_fails_to_render_marks_nothing_as_sent(client: TestClient, app: Any) -> None:
+    """A lone surrogate is a valid JSON string id that cannot be encoded as UTF-8:
+    the reply never leaves, so the session must not believe it was sent."""
+    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    session = _open_session(client)
+    body = (
+        '{"jsonrpc":"2.0","id":"\\ud800","method":"tools/call","params":'
+        '{"name":"search_runbooks","arguments":{"query":"x","max_results":1}}}'
+    )
+    with contextlib.suppress(Exception):
+        client.post(
+            URL,
+            content=body,
+            headers={**HEADERS, **session, "Content-Type": "application/json"},
+        )
+    assert app.state.container.sessions.delivered(session["Mcp-Session-Id"]) == {}

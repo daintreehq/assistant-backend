@@ -1,7 +1,12 @@
-"""The runbook-search MCP endpoint — Streamable HTTP, stateless, POST only.
+"""The runbook-search MCP endpoint — Streamable HTTP, POST only.
 
 The protocol lives in ``runbook_mcp.py``; this module is the transport: content
-negotiation, the Origin check, and turning a reply into a response.
+negotiation, the Origin check, session ids, and turning a reply into a response.
+
+A successful legacy ``initialize`` is answered with an ``Mcp-Session-Id``, and a
+request carrying one gets that session's record of what it was already sent
+(``mcp_sessions.py``). The id changes what a reply repeats, never whether a
+request is served: an unknown id is adopted, and a missing one is no session.
 
 Open by design: anyone can add this server to their agent. A search is the local
 classifier over public runbooks, so there is no credential to hold and nothing a
@@ -17,6 +22,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
+from ..mcp_sessions import SessionMemory
 from ..observability import get_logger
 from ..runbook_mcp import (
     INTERNAL_ERROR,
@@ -70,6 +76,7 @@ async def mcp_post(request: Request) -> Response:
 
     container = request.app.state.container
     selector: RunbookSelector = container.selector
+    sessions: SessionMemory = container.sessions
 
     reply = await handle_message(
         message,
@@ -80,7 +87,13 @@ async def mcp_post(request: Request) -> Response:
         ),
         catalog=container.catalog,
         search=lambda query, limit: selector.search(query, limit=limit),
+        delivered=(record := sessions.delivered(_header(request, "mcp-session-id"))),
     )
+    session_id: str | None = None
+    if reply.method == "initialize" and reply.body is not None and "result" in reply.body:
+        # Every handshake starts a session afresh, so a client that reconnects is
+        # sent its supporting runbooks again.
+        session_id = sessions.open()
     # Metadata only. The query is user content and stays out of the log plane.
     logger.info(
         "mcp_request",
@@ -89,16 +102,24 @@ async def mcp_post(request: Request) -> Response:
         results=reply.results,
         duration_ms=round((time.perf_counter() - started) * 1000, 1),
     )
-    return _send(reply)
+    # Rendered first: only a reply that serialized marks its runbooks as sent.
+    response = _send(reply)
+    if record is not None:
+        record.update(reply.sent_in_full)
+    if session_id is not None:
+        response.headers["Mcp-Session-Id"] = session_id
+    return response
 
 
 @router.api_route("/v1/daintree/mcp", methods=["GET", "DELETE"])
 async def mcp_unsupported_method() -> Response:
-    """No server-initiated stream to open (GET) and no session to end (DELETE).
+    """No server-initiated stream to open (GET), and no session for a client to end (DELETE).
 
-    Both are what the transport spec prescribes for a stateless, JSON-only
-    server: 405 with ``Allow: POST``, so a client stops trying rather than
-    retrying something that will never exist.
+    405 with ``Allow: POST`` is what the transport spec prescribes for both: a
+    JSON-only server offers no stream, and one that does not let clients terminate
+    a session answers DELETE this way. Sessions are never terminated at all (no id
+    is ever refused); only their delivery records age out of ``SessionMemory``,
+    which costs nothing but a resend.
     """
     return Response(status_code=405, headers={"Allow": "POST"})
 

@@ -1,12 +1,12 @@
 # Daintree runbooks
 
-A stateless MCP server that supplies Daintree runbooks: procedures that Claude Code
+An MCP server that supplies Daintree runbooks: procedures that Claude Code
 and Codex follow to orchestrate work in Daintree. They cover launching visible agents
 and waiting on them through Daintree notices, worktrees, reviews, and issue and PR
 workflows. `search_runbooks` takes a plain-language task and returns the runbooks
 that fit, ranked, with their full instructions. `get_runbook` fetches one by id.
-Both return the foundation runbook each procedure builds on. Anyone can add it: no
-credential, no account, no session.
+Both return the foundation runbook each procedure builds on, in full once per MCP
+session. Anyone can add it: no credential, no account.
 
 The server supplies instructions only. The actions the runbooks call
 (`agent.launch`, `terminal.getStatus`, `terminal.notifyWhenIdle`, …) come from the

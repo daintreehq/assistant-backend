@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from . import __version__
 from .api import health, mcp, root
 from .config import Settings, get_settings
+from .mcp_sessions import SessionMemory
 from .observability import (
     bind_request_context,
     clear_request_context,
@@ -128,6 +129,7 @@ class Container:
     catalog: Catalog
     selector: RunbookSelector
     pool: InferencePool | None = None
+    sessions: SessionMemory = field(default_factory=SessionMemory)
 
     def close(self) -> None:
         if self.pool is not None:

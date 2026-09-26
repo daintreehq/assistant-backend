@@ -1,8 +1,9 @@
 # The runbook MCP server
 
-`POST https://assistant.daintree.org/v1/daintree/mcp` — a stateless MCP server
-(Streamable HTTP) with two read-only tools, `search_runbooks` and `get_runbook`.
-Anyone can add it: there is no credential, no account and no session.
+`POST https://assistant.daintree.org/v1/daintree/mcp` — an MCP server (Streamable
+HTTP) with two read-only tools, `search_runbooks` and `get_runbook`. Anyone can add
+it: there is no credential and no account. The only session state is which
+supporting runbooks a session was already sent ([Protocol](#protocol)).
 
 ```bash
 claude mcp add --transport http daintree-runbooks https://assistant.daintree.org/v1/daintree/mcp
@@ -52,13 +53,12 @@ lone user message with nothing loaded. Results come back best first:
     {
       "id": "daintree.worktree.relocate-agents",
       "title": "…",
-      "summary": "…",
       "score": 0.0031,
       "selected": false
     }
   ],
   "supporting_runbooks": [
-    { "id": "daintree.foundation", "foundation": true, "instructions": "…", "…": "…" }
+    { "id": "daintree.foundation", "title": "…", "content_hash": "sha256:…", "instructions": "…" }
   ]
 }
 ```
@@ -70,16 +70,26 @@ lone user message with nothing loaded. Results come back best first:
   ranking fills `max_results` when the catalog has that many, so lower hits are
   neighbours rather than answers.
 - Only a selected hit carries the full document. An unselected neighbour is `id`,
-  `title`, `summary`, `score` and `selected: false` and nothing else: its procedure
-  would cost the caller context it will not use (a caller printing the whole result
-  pays for the text block and `structuredContent` alike). `get_runbook` fetches one.
+  `title`, `score` and `selected: false` and nothing else: its procedure, and even
+  its summary, would cost the caller context it will not use. `get_runbook` fetches
+  one.
 - `supporting_runbooks` is every selected runbook's instruction dependencies — its
   nearest domain foundation, then anything it declares in `requires`, recursively —
   once each, dependencies first, and never a runbook already selected (a foundation
   ranked as a neighbour still arrives here in full). With nothing selected it is
-  empty. Read them
-  before following the procedure. They are not ranked hits and do not count against
-  `max_results`.
+  empty. Read them before following the procedure. They are not ranked hits and do
+  not count against `max_results`. A supporting runbook is `id`, `title`,
+  `content_hash` and `instructions`: it is read because a delivered runbook needs
+  it, so its routing text and tool lists would be paid for and never used.
+- **Once per session.** A supporting runbook this session was already sent in full
+  (by either tool, at the same `content_hash`) comes back as
+  `{"id": "daintree.foundation", "note": "Sent in full earlier in this session; …"}`:
+  the caller still has it in context, and resending it cost ~5 KB a search. A
+  caller that no longer has it (compaction, a subagent sharing the connection)
+  fetches it with `get_runbook`, which always returns the runbook it names in full.
+  Only a 2025-era client has a session: measured on 2026-09-26, Codex 0.157
+  (`2025-06-18`) keeps one per process, while Claude Code 2.1.283 negotiates
+  `2026-07-28`, which has no sessions, so it is sent everything every time.
 
 ## `get_runbook`
 
@@ -91,7 +101,7 @@ lone user message with nothing loaded. Results come back best first:
 {
   "catalog_revision": "sha256:…",
   "runbook": { "id": "daintree.agents.ask-and-relay", "content_hash": "sha256:…", "instructions": "…", "…": "…" },
-  "supporting_runbooks": [ { "id": "daintree.foundation", "…": "…" } ]
+  "supporting_runbooks": [ { "id": "daintree.foundation", "instructions": "…", "…": "…" } ]
 }
 ```
 
@@ -104,10 +114,13 @@ following has changed.
 
 ## Served fields
 
-Both tools serve a runbook in the same form: `id`, `title`, `summary`, `when_to_use`,
-`foundation`, `risk`, `required_tools`, `optional_tools`, `requires`, `content_hash`
-and `instructions`; a selected search hit adds `score` and `selected`, and an
-unselected one is only `id`, `title`, `summary`, `score` and `selected`.
+Both tools serve a runbook the caller will follow in the same form: `id`, `title`,
+`summary`, `when_to_use`, `foundation`, `risk`, `required_tools`, `optional_tools`,
+`requires`, `content_hash` and `instructions`; a selected search hit adds `score` and
+`selected`. An unselected hit is only `id`, `title`, `score` and `selected`; a
+supporting runbook is `id`, `title`, `content_hash` and `instructions`, or `id` and
+`note` once the session has it. `when_to_use` stays on a selected hit on purpose: its
+carve-outs are how a caller notices a selection that does not fit its task.
 
 - `required_tools` and `optional_tools` are **Daintree app MCP action ids** — the
   baseline path's actions, and those of a conditional branch or caller variant. A
@@ -123,13 +136,20 @@ for clients that predate structured output. Both tools declare `outputSchema` an
 
 ## Protocol
 
-- **Both protocol eras, one endpoint, no sessions.** `2026-07-28` clients call
+- **Both protocol eras, one endpoint.** `2026-07-28` clients call
   `server/discover` / `tools/list` / `tools/call` directly, with the version in the
-  `MCP-Protocol-Version` header and `params._meta["io.modelcontextprotocol/protocolVersion"]`.
-  `2025-11-25`, `2025-06-18` and `2025-03-26` clients open with `initialize`, which is
-  answered and forgotten. No `Mcp-Session-Id` is ever issued, so consecutive requests
-  may land on different Cloud Run instances. `ping` is answered; notifications and
-  client responses get `202` with no body.
+  `MCP-Protocol-Version` header and `params._meta["io.modelcontextprotocol/protocolVersion"]`,
+  and have no session. `2025-11-25`, `2025-06-18` and `2025-03-26` clients open with
+  `initialize`, which is answered with a fresh `Mcp-Session-Id`.
+  `ping` is answered; notifications and client responses get `202` with no body.
+- **A session only saves bytes.** Its id keys one thing, in the memory of the
+  instance that served the request: which supporting runbooks it was sent in full.
+  No request is ever refused for its session id. A missing or malformed id is no
+  session, and an id this instance never issued (another Cloud Run instance did, or
+  this one restarted) is adopted with an empty record, so every gap errs toward
+  resending. A reconnecting client initializes again and starts over. Records are
+  bounded (least-recently-used past 4,096 sessions, and dropped after 12 idle hours),
+  and a client cannot end one: `DELETE` is `405`, which the transport spec allows.
 - **Plain JSON only.** Every response is `application/json`; `GET` and `DELETE` are
   `405` with `Allow: POST`.
 - **Errors.** Argument problems are tool results with `isError: true`, so the calling
@@ -142,7 +162,7 @@ for clients that predate structured output. Both tools declare `outputSchema` an
   and a server that is still starting `503`.
 
 The protocol lives in `src/daintree_assistant_server/runbook_mcp.py`; the HTTP
-transport in `api/mcp.py`. `tests/integration/test_runbook_mcp.py` drives both eras
+transport in `api/mcp.py`; the session record in `mcp_sessions.py`. `tests/integration/test_runbook_mcp.py` drives both eras
 and both tools over HTTP.
 
 ## Other routes

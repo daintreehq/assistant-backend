@@ -4,14 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this service is
 
-**Daintree runbooks**: a stateless MCP server at `POST /v1/daintree/mcp` with two read-only
+**Daintree runbooks**: an MCP server at `POST /v1/daintree/mcp` with two read-only
 tools. `search_runbooks` ranks the runbook catalog against a described task and returns the
 top runbooks as JSON: selected ones with their full procedures, unselected neighbours by
-id, title and summary only; `get_runbook` returns one by id. Both add the prerequisite
+id and title only; `get_runbook` returns one by id. Both add the prerequisite
 instructions (domain foundation, plus `requires`) of each runbook they deliver in full,
-once, as `supporting_runbooks`. That is all it does. Anyone can add it — there is no
-authentication, no account, no session, no credential held, and no upstream call. The wire
-contract is `docs/MCP.md`.
+once, as `supporting_runbooks` — and only once per MCP session: a later reply in the same
+session names them with a note (`mcp_sessions.py`). That is all it does. Anyone can add
+it — there is no authentication, no account, no credential held, and no upstream call.
+The session record only saves bytes: no request depends on it. The wire contract is
+`docs/MCP.md`.
 
 **Who follows the runbooks:** Claude Code and Codex, acting through the **Daintree app's own
 MCP** (`agent.launch`, `terminal.getStatus`, `terminal.notifyWhenIdle`, …) and their native
@@ -36,7 +38,8 @@ runbooks, cases and training rows on the current branch. It replaced the retired
 | path | what |
 |---|---|
 | `src/daintree_assistant_server/runbook_mcp.py` | JSON-RPC dispatch: both MCP protocol eras, the two tool definitions, argument validation, result rendering. Transport-agnostic. |
-| `src/daintree_assistant_server/api/mcp.py` | The HTTP transport: Origin check, content negotiation, parse errors, 405 for GET/DELETE. |
+| `src/daintree_assistant_server/api/mcp.py` | The HTTP transport: Origin check, content negotiation, parse errors, session ids, 405 for GET/DELETE. |
+| `src/daintree_assistant_server/mcp_sessions.py` | Per-session record of supporting runbooks already sent in full; bounded, and every gap errs toward resending. |
 | `src/daintree_assistant_server/api/health.py`, `api/root.py` | `/health`, `/healthz`, `/readyz`, `/version`, `/` redirect. |
 | `src/daintree_assistant_server/main.py` | App factory and lifespan: loads the catalog and selector; body-size limit; request ids. |
 | `src/daintree_assistant_server/config.py` | Tiny `Settings`: environment, log level, build sha, bind address, body cap. |
@@ -140,8 +143,8 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 
 The routing document the ranker embeds is title + summary + `whenToUse`, **not the body**.
 Editing routing text re-embeds that runbook and must be measured with `bench local`.
-Every selected result carries the full body under `instructions`, plus the foundation, and
-a caller that prints the whole result pays for both the text block and
+Every selected result carries the full body under `instructions`, plus the foundation (once
+per session), and a caller that prints the whole result pays for both the text block and
 `structuredContent`, so body size is paid twice on every hit
 (`tests/unit/test_runbook_budgets.py` holds the ceilings).
 

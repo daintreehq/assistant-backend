@@ -3,26 +3,25 @@
 Two read-only tools. ``search_runbooks`` runs the runbook selector's two-stage
 search over a task description and returns the top runbooks as JSON: the
 selected ones with their bodies, since the body IS the runbook, and the
-unselected neighbours by name and summary only. ``get_runbook`` returns one
+unselected neighbours by id and title only. ``get_runbook`` returns one
 runbook by id, with no ranking involved. Both deliver the instruction
 dependencies (domain foundation and declared ``requires``) of each runbook they
-deliver in full, once, as ``supporting_runbooks``. Nothing else: no model call,
-no session, no state, and no workspace action — the runbooks tell a caller which
-Daintree app actions to take; this server takes none. The HTTP half
-(``api/mcp.py``) owns headers and status codes; this module owns what a JSON-RPC
-message means.
+deliver in full, once, as ``supporting_runbooks``. Nothing else: no model call
+and no workspace action — the runbooks tell a caller which Daintree app actions
+to take; this server takes none. The HTTP half (``api/mcp.py``) owns headers,
+status codes and session ids; this module owns what a JSON-RPC message means.
 
-**Stateless, and serving both eras of the protocol from one endpoint.** MCP
-revision 2026-07-28 removed the ``initialize`` handshake and sessions: every
-request carries its protocol version (the ``MCP-Protocol-Version`` header and
-``params._meta["io.modelcontextprotocol/protocolVersion"]``) and discovery is
-``server/discover``. The 2025 revisions still open with ``initialize``, and
-several hosted clients still speak them. Because this server holds NO session
-state in either era, supporting both costs one extra method each way: a legacy
-``initialize`` is answered and forgotten, a ``tools/call`` is answered the same
-whether or not one preceded it, and no ``Mcp-Session-Id`` is ever issued. That
-is also what makes it safe on Cloud Run, where consecutive requests land on
-different instances.
+**Serving both eras of the protocol from one endpoint, with no state a request
+depends on.** MCP revision 2026-07-28 removed the ``initialize`` handshake and
+sessions: every request carries its protocol version (the ``MCP-Protocol-Version``
+header and ``params._meta["io.modelcontextprotocol/protocolVersion"]``) and
+discovery is ``server/discover``. The 2025 revisions still open with
+``initialize``, and several hosted clients still speak them. The one thing a 2025
+session buys is not resending a supporting runbook the session already received in
+full (``mcp_sessions.py``); every answer is otherwise the same whether or not a
+handshake preceded it, and an unknown session only means sending everything. That
+is what keeps it safe on Cloud Run, where consecutive requests land on different
+instances.
 
 **Every response is plain ``application/json``**, never SSE. The spec lets a
 server choose per request, and a search that answers in ~10ms has no progress to
@@ -33,7 +32,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -89,7 +88,8 @@ INSTRUCTIONS = (
     "terminal output or credentials) and follow a result marked `selected`; call "
     "get_runbook for a runbook you already know by id. Every response carries the "
     "runbooks' prerequisite instructions once, in `supporting_runbooks` — read those "
-    "first. This server supplies instructions only: the steps call the separate "
+    "first; one this session was already sent in full comes back as its id and a note. "
+    "This server supplies instructions only: the steps call the separate "
     "Daintree app MCP, and a runbook grants no permission. Use the tools and "
     "arguments your Daintree connection actually offers."
 )
@@ -128,12 +128,11 @@ _SELECTED_HIT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 #: An unselected hit is a neighbour the caller should not follow, so it is named,
-#: not delivered: its procedure would cost the caller context for nothing, and
-#: ``get_runbook`` fetches it in the rare case it is wanted.
+#: not delivered: its procedure, and even its summary, would cost the caller
+#: context for nothing, and ``get_runbook`` fetches it in the rare case it is wanted.
 _NEIGHBOUR_PROPERTIES: dict[str, Any] = {
     "id": {"type": "string"},
     "title": {"type": "string"},
-    "summary": {"type": "string"},
     "score": {"type": "number"},
     "selected": {"const": False},
 }
@@ -144,6 +143,37 @@ _NEIGHBOUR_HIT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 _HIT_SCHEMA: dict[str, Any] = {"oneOf": [_SELECTED_HIT_SCHEMA, _NEIGHBOUR_HIT_SCHEMA]}
+
+#: A supporting runbook is read because a delivered runbook needs it, not chosen,
+#: so its routing text, flags and tool lists would be paid for and never used.
+_SUPPORTING_PROPERTIES: dict[str, Any] = {
+    "id": {"type": "string"},
+    "title": {"type": "string"},
+    "content_hash": {"type": "string"},
+    "instructions": {"type": "string"},
+}
+_SUPPORTING_FULL_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": _SUPPORTING_PROPERTIES,
+    "required": list(_SUPPORTING_PROPERTIES),
+    "additionalProperties": False,
+}
+#: One this session already received in full: the caller still has it in context.
+_SUPPORTING_SENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {"id": {"type": "string"}, "note": {"type": "string"}},
+    "required": ["id", "note"],
+    "additionalProperties": False,
+}
+_SUPPORTING_LIST_SCHEMA: dict[str, Any] = {
+    "type": "array",
+    "items": {"oneOf": [_SUPPORTING_FULL_SCHEMA, _SUPPORTING_SENT_SCHEMA]},
+}
+SENT_EARLIER_NOTE = (
+    "Sent in full earlier in this session. Follow that copy; if its full text is not "
+    "in your own context (a subagent, a compacted or cleared conversation), "
+    "get_runbook this id first."
+)
 
 _READ_ONLY_ANNOTATIONS: dict[str, Any] = {
     "readOnlyHint": True,
@@ -162,10 +192,11 @@ TOOL_DEFINITION: dict[str, Any] = {
         "output or secrets. Returns up to max_results runbooks, best first. `selected` is "
         "true for the runbooks the classifier judges actually fit: those carry their "
         "full procedure in `instructions`, so follow them. The rest are neighbours, "
-        "named with a summary only (get_runbook fetches one if it is really wanted), and "
+        "named by id and title only (get_runbook fetches one if it is really wanted), and "
         "an empty selected set means no runbook really fits. `score` is the ranker's "
         "confidence (0-1). `supporting_runbooks` holds the prerequisite instructions "
-        "(the foundation) of the selected runbooks, once each."
+        "(the foundation) of the selected runbooks, once each; one already sent in full "
+        "earlier in this session comes back as its id and a `note` instead."
     ),
     "inputSchema": {
         "type": "object",
@@ -192,7 +223,7 @@ TOOL_DEFINITION: dict[str, Any] = {
         "properties": {
             "catalog_revision": {"type": "string"},
             "runbooks": {"type": "array", "items": _HIT_SCHEMA},
-            "supporting_runbooks": {"type": "array", "items": _DOCUMENT_SCHEMA},
+            "supporting_runbooks": _SUPPORTING_LIST_SCHEMA,
         },
         "required": ["catalog_revision", "runbooks", "supporting_runbooks"],
         "additionalProperties": False,
@@ -206,9 +237,11 @@ GET_TOOL_DEFINITION: dict[str, Any] = {
     "description": (
         "Return one Daintree runbook by its exact id (e.g. \"daintree.foundation\"), "
         "with its full procedure in `instructions` and its prerequisite instructions in "
-        "`supporting_runbooks`. Use it for a runbook named by another runbook, a search "
-        "result or a checkpoint; compare `content_hash` with the one you recorded to see "
-        "whether the procedure changed. An unknown id is an error — search instead."
+        "`supporting_runbooks` (by id and a note when this session already has them). "
+        "Use it for a runbook named by another runbook, a search result or a checkpoint, "
+        "or one whose instructions are no longer in your context; compare `content_hash` "
+        "with the one you recorded to see whether the procedure changed. An unknown id is "
+        "an error — search instead."
     ),
     "inputSchema": {
         "type": "object",
@@ -228,7 +261,7 @@ GET_TOOL_DEFINITION: dict[str, Any] = {
         "properties": {
             "catalog_revision": {"type": "string"},
             "runbook": _DOCUMENT_SCHEMA,
-            "supporting_runbooks": {"type": "array", "items": _DOCUMENT_SCHEMA},
+            "supporting_runbooks": _SUPPORTING_LIST_SCHEMA,
         },
         "required": ["catalog_revision", "runbook", "supporting_runbooks"],
         "additionalProperties": False,
@@ -266,6 +299,9 @@ class McpReply:
     #: For the log line only — never echoed to the client.
     method: str | None = None
     results: int | None = None
+    #: (runbook id, content hash) of everything this reply carries in full, for the
+    #: transport to add to the session's record once the reply has been rendered.
+    sent_in_full: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -287,7 +323,12 @@ def error_reply(
 
 
 def _result(
-    request_id: Any, result: dict[str, Any], *, method: str, results: int | None = None
+    request_id: Any,
+    result: dict[str, Any],
+    *,
+    method: str,
+    results: int | None = None,
+    sent_in_full: tuple[tuple[str, str], ...] = (),
 ) -> McpReply:
     # `resultType` is required on every 2026-07-28 result; clients of the
     # earlier revisions ignore a field they do not know.
@@ -300,6 +341,7 @@ def _result(
         },
         method=method,
         results=results,
+        sent_in_full=sent_in_full,
     )
 
 
@@ -330,8 +372,15 @@ async def handle_message(
     headers: RequestHeaders,
     catalog: Catalog,
     search: SearchFn,
+    delivered: Mapping[str, str] | None = None,
 ) -> McpReply:
     """Answer ONE JSON-RPC message.
+
+    ``delivered`` is what the caller's session was already sent in full (runbook
+    id to content hash; ``mcp_sessions``), or None for no session. It is only
+    read: the reply's ``sent_in_full`` says what to add to it, and the transport
+    adds it once the reply is rendered, so a reply that never gets that far cannot
+    mark anything as sent.
 
     Batches are refused rather than unrolled: 2025-06-18 removed them from the
     protocol, and no client of the revisions this serves may send one.
@@ -428,7 +477,12 @@ async def handle_message(
             request_id, {"tools": list(TOOL_DEFINITIONS), **_CACHE_HINTS}, method=method
         )
     if method == "tools/call":
-        return await _call_tool(request_id, params, headers, catalog, search)
+        version = headers.protocol_version or meta_version
+        if version is not None and version not in _HANDSHAKE_VERSIONS:
+            # A sessionless revision: a session header it happens to carry is not
+            # a session, and such a caller is always sent everything.
+            delivered = None
+        return await _call_tool(request_id, params, headers, catalog, search, delivered)
     return error_reply(request_id, METHOD_NOT_FOUND, f"Method not found: {method}")
 
 
@@ -438,6 +492,7 @@ async def _call_tool(
     headers: RequestHeaders,
     catalog: Catalog,
     search: SearchFn,
+    delivered: Mapping[str, str] | None,
 ) -> McpReply:
     name = params.get("name")
     if headers.name is not None and headers.name != name:
@@ -458,12 +513,16 @@ async def _call_tool(
     # routes them back to the model, which can read the message and correct the
     # call — a protocol error would be swallowed by the client instead.
     if name == GET_TOOL_NAME:
-        return _get_runbook(request_id, arguments, catalog)
-    return await _search_runbooks(request_id, arguments, catalog, search)
+        return _get_runbook(request_id, arguments, catalog, delivered)
+    return await _search_runbooks(request_id, arguments, catalog, search, delivered)
 
 
 async def _search_runbooks(
-    request_id: Any, arguments: dict[str, Any], catalog: Catalog, search: SearchFn
+    request_id: Any,
+    arguments: dict[str, Any],
+    catalog: Catalog,
+    search: SearchFn,
+    delivered: Mapping[str, str] | None,
 ) -> McpReply:
     unknown = sorted(set(arguments) - {"query", "max_results"})
     if unknown:
@@ -490,7 +549,7 @@ async def _search_runbooks(
         )
 
     runbooks: list[dict[str, Any]] = []
-    selected: list[str] = []
+    selected: list[Runbook] = []
     for hit in hits:
         runbook = catalog.get_public(hit.runbook_id)
         if runbook is None:
@@ -500,20 +559,28 @@ async def _search_runbooks(
         score = round(hit.score, 4)
         if hit.selected:
             runbooks.append({**_document(runbook), "score": score, "selected": True})
-            selected.append(runbook.id)
+            selected.append(runbook)
         else:
             runbooks.append(_neighbour(runbook, score))
+    # Prerequisites of what the caller will follow. A foundation ranked as an
+    # unselected neighbour still arrives here in full when a selected hit needs it.
+    supporting, sent = _supporting(
+        catalog.supporting_for([r.id for r in selected]), selected, delivered
+    )
     structured = {
         "catalog_revision": catalog.revision,
         "runbooks": runbooks,
-        # Prerequisites of what the caller will follow. A foundation ranked as an
-        # unselected neighbour still arrives here in full when a selected hit needs it.
-        "supporting_runbooks": [_document(r) for r in catalog.supporting_for(selected)],
+        "supporting_runbooks": supporting,
     }
-    return _tool_result(request_id, structured, results=len(runbooks))
+    return _tool_result(request_id, structured, results=len(runbooks), sent_in_full=sent)
 
 
-def _get_runbook(request_id: Any, arguments: dict[str, Any], catalog: Catalog) -> McpReply:
+def _get_runbook(
+    request_id: Any,
+    arguments: dict[str, Any],
+    catalog: Catalog,
+    delivered: Mapping[str, str] | None,
+) -> McpReply:
     unknown = sorted(set(arguments) - {"id"})
     if unknown:
         return _tool_error(request_id, f"Unknown argument(s): {', '.join(unknown)}.")
@@ -530,12 +597,15 @@ def _get_runbook(request_id: Any, arguments: dict[str, Any], catalog: Catalog) -
             request_id,
             "No runbook has that id. Use search_runbooks to find one by task.",
         )
+    supporting, sent = _supporting(catalog.supporting_for([runbook.id]), [runbook], delivered)
     structured = {
         "catalog_revision": catalog.revision,
+        # Always in full, even when this session has it: fetching a runbook by id is
+        # how a caller that lost one from its context gets it back.
         "runbook": _document(runbook),
-        "supporting_runbooks": [_document(r) for r in catalog.supporting_for([runbook.id])],
+        "supporting_runbooks": supporting,
     }
-    return _tool_result(request_id, structured, results=1)
+    return _tool_result(request_id, structured, results=1, sent_in_full=sent)
 
 
 def _document(runbook: Runbook) -> dict[str, Any]:
@@ -558,16 +628,43 @@ def _document(runbook: Runbook) -> dict[str, Any]:
 
 def _neighbour(runbook: Runbook, score: float) -> dict[str, Any]:
     """An unselected hit: enough to recognise it, nothing to follow."""
-    return {
-        "id": runbook.id,
-        "title": runbook.title,
-        "summary": runbook.summary,
-        "score": score,
-        "selected": False,
-    }
+    return {"id": runbook.id, "title": runbook.title, "score": score, "selected": False}
 
 
-def _tool_result(request_id: Any, structured: dict[str, Any], *, results: int) -> McpReply:
+def _supporting(
+    supporting: list[Runbook], sent_now: list[Runbook], delivered: Mapping[str, str] | None
+) -> tuple[list[dict[str, Any]], tuple[tuple[str, str], ...]]:
+    """Render the prerequisites, and list everything this reply sends in full.
+
+    ``sent_now`` is what the reply already carries in full (the selected hits, or
+    the fetched runbook). A prerequisite whose exact version the session was sent
+    earlier is named with a note instead; any other arrives in full.
+    """
+    rendered: list[dict[str, Any]] = []
+    in_full = list(sent_now)
+    for runbook in supporting:
+        if delivered is not None and delivered.get(runbook.id) == runbook.content_hash:
+            rendered.append({"id": runbook.id, "note": SENT_EARLIER_NOTE})
+            continue
+        rendered.append(
+            {
+                "id": runbook.id,
+                "title": runbook.title,
+                "content_hash": runbook.content_hash,
+                "instructions": runbook.body,
+            }
+        )
+        in_full.append(runbook)
+    return rendered, tuple((r.id, r.content_hash) for r in in_full)
+
+
+def _tool_result(
+    request_id: Any,
+    structured: dict[str, Any],
+    *,
+    results: int,
+    sent_in_full: tuple[tuple[str, str], ...] = (),
+) -> McpReply:
     return _result(
         request_id,
         {
@@ -585,6 +682,7 @@ def _tool_result(request_id: Any, structured: dict[str, Any], *, results: int) -
         },
         method="tools/call",
         results=results,
+        sent_in_full=sent_in_full,
     )
 
 
