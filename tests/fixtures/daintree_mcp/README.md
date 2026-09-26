@@ -7,16 +7,18 @@ captured from the app itself rather than written by hand. Runbooks that show
 Daintree MCP calls can validate their tagged JSON examples against these.
 
 **Source:** `daintreehq/daintree`, branch `feature/mcp-cleanup`, commit
-`ae0796d9dc` ("fix(mcp): drop echoed terminal-query replies from notice
-quotes"), app version 0.38.0, MCP SDK 1.30.0, protocol
-`2025-11-25`. Captured 2026-09-25.
+`fecde51aec` ("refactor(help): cut the assistant prompts to the rules they
+need"), app version 0.38.0, MCP SDK 1.30.0, protocol `2025-11-25`. Captured
+2026-09-26. It has the batch tools (`agent.launchMany`,
+`terminal.sendCommandMany`, `terminal.closeMany`) but predates `waitForReply`
+and `waitSeconds`, so no tagged runbook example may carry those yet.
 
 | file | caller | tier | tools | `mcp.surface` hash |
 |---|---|---|---|---|
-| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 69 (29 run, 40 ask first) | `b88cbcf5…` |
-| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 69 | `89920c5a…` |
-| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 29 | `3f4f6182…` |
-| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 74 | `caee5f0d…` |
+| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 72 (32 run, 40 ask first) | `cddd2871…` |
+| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 72 | `e799664e…` |
+| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 32 | `49b24675…` |
+| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 77 | `7c1479fe…` |
 | `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `6f5481ee…` |
 
 Full hashes are in each file's `capture.surface_hash`.
@@ -66,7 +68,7 @@ in the pane's `--mcp-config` and in the help session's settings, so Claude Code
 shows these as `mcp__daintree__<name>`; whatever further character mapping a
 client applies to the dots is the client's and is not captured here.
 
-**Agent panes list the same 68 tools at core and full.** A pane's tier is where
+**Agent panes list the same 72 tools at core and full.** A pane's tier is where
 auto-approval stops, not a ceiling (#12692): `tools/list` carries everything up to
 the full surface a non-assistant origin may hold, and a call above the tier asks
 the user instead of being refused. The two pane files are identical on the wire;
@@ -82,20 +84,23 @@ owned form in their place, and loses the tools that have none:
 | `terminal.sendCommand` | `terminal.sendCommandOwned` |
 | `terminal.inject` (full) | `terminal.injectOwned` |
 | `terminal.close` | `terminal.closeOwned` |
+| `terminal.sendKeys` | `terminal.sendKeysOwned` |
 | `worktree.delete` (full) | only `worktree.deleteOwned`, which help also has |
 | `terminal.kill`, `terminal.restart`, `terminal.closeAll`, `copyTree.injectToTerminal` (full) | none |
 
 **`notify`.** `terminal.sendCommand`, `terminal.sendCommandOwned` and
-`agent.launch` take `notify: boolean` for panes and the assistant. The external
+`agent.launch` take `notify: boolean` for panes and the assistant, as do
+`agent.launchMany`, `terminal.sendCommandMany` and `terminal.sendKeys(Owned)`,
+none of which the external listing carries. The external
 listing drops it from `terminal.sendCommandOwned` and `agent.launch`
 (`MCP_EXTERNAL_OMITTED_ARGS`); main refuses it from an API-key client if sent
 anyway. That is the only property-level difference between surfaces for the same
 action id. `terminal.notifyWhenIdle` is on core (panes and assistant) and not on
 external.
 
-**External** is a strict subset of the pane surface. Bound to a workspace
-(`Daintree-Workspace-Id`), it also withholds the confirm-gated `recipe.run` and
-`worktree.deleteOwned`.
+**External** is a strict subset of the pane surface, without the batch tools or
+`terminal.sendKeysOwned`. Bound to a workspace (`Daintree-Workspace-Id`), it
+also withholds the confirm-gated `recipe.run` and `worktree.deleteOwned`.
 
 ## Regenerating
 

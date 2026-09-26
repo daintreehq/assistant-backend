@@ -6,38 +6,21 @@ whenToUse: 'Use when the user wants the SAME question put to several agents and 
 risk: project
 requiredTools:
   - agent.listAvailable
-  - agent.launch
+  - agent.launchMany
 optionalTools:
-  - worktree.list
-  - terminal.list
+  - agent.launch
   - terminal.getStatus
-  - terminal.waitUntilIdleBatch
-  - terminal.closeOwned
+  - terminal.closeMany
 ---
-Use when: the user puts one question to several named agents, or the pinned or configured ones (not existing open terminals), for independent answers, opinions, a vote or verdicts. With no vote or verdict asked for, report each answer and skip the tally.
+The deliverable is each independent answer; with no vote or verdict asked for, report the answers and skip the tally. The voters are fresh launches of the agents named, pinned or configured, never existing open terminals.
 
-Availability: Core, one round of notices. An API-key client has no `notify`: one `terminal.waitUntilIdleBatch` (`mode:"all"`), then report who answered and who is pending.
+1. Roster from `agent.listAvailable`. Pinned means `pinned:true` (`toolbarVisible` is something else). A missing `pinned` is an unknown pin state, not "unpinned": with no entry carrying it, say the pinned subset cannot be identified and offer all configured or named agents; with some carrying it, poll the `pinned:true` ones and list the rest as excluded for unknown pin state. Never report "no pinned agents" from missing fields. Skip one not `launchable` or not ready, with the reason. If the user only asked whether you can see them, report the count and names and stop.
+2. One neutral prompt: the question and context, that the agent is polled independently and must change no files, and to answer in at most 15 lines, ending (for a vote) with a clear verdict and its two to five strongest reasons.
+3. A vote among options: option text only, equal detail, no origin or status labels, neutral labels A/B/C rotated per voter; keep each voter's label-to-option map to yourself. Rotated ballots differ per voter, so launch each with its own `agent.launch` in one turn; an identical prompt for distinct kinds goes in one `agent.launchMany`. Pass `waitForReply:true, handback:true`. A repeated kind starts only after the previous one, so give it `notify:true, handback:true` instead and end your turn once the others are back.
+4. `missing-cli` or `launched:false` excludes that voter, with the reason.
+5. Translate each label through that voter's own map. A missing, ambiguous, off-ballot or unreadable answer is excluded, never counted against the majority, and no vote is made up for it. A voter at any question, approval or error other than the launch-directory trust dialog is excluded with the reason.
+6. Tally once every voter has answered or been excluded. A later answer is a marked provisional update, never a silent change to a result already given.
 
-Procedure:
-1. Roster from `agent.listAvailable`; report only ids, names, pin state and availability.
-   - Pinned means `pinned:true` (`toolbarVisible` is something else). A missing `pinned` is an unknown pin state, not "unpinned": with no entry carrying it, say the pinned subset cannot be identified and offer all configured or named agents; with some carrying it, poll the `pinned:true` ones and list the rest as excluded for unknown pin state. Never report "no pinned agents" from missing fields.
-   - "All my agents" or named agents mean exactly those. Skip one not `launchable` or not ready, with the reason; `availabilityComplete:false` leaves some unknown.
-2. If the user only asked whether you can see them, report the count and names and stop.
-3. Write one neutral prompt: the question and its context, that the agent is polled independently, that it must change no files, and to answer in at most 15 lines of plain prose, ending (for a poll or vote) with a clear verdict and its two to five strongest reasons.
-4. For a vote among options: option text only, equal detail, no origin or status labels, neutral labels A/B/C in a rotated order per voter. Keep each voter's label-to-option map to yourself.
-5. Launch one fresh voter per agent in this turn, each with a distinct `name`, even two of the same kind; never reuse a terminal that wrote an option or that the user did not name. Record voter, terminal id and ballot map, then end your turn.
+If the user flags bias, rerun from scratch with fresh voters; never mix biased and corrected votes. Close only this poll's terminals, only on request.
 
-```json tool=agent.launch
-{"agentId":"<voter's agent id>","name":"Poll <n>: <topic>","worktreeId":"<worktree id>","prompt":"<neutral poll prompt with this voter's ballot>","focusPolicy":"preserve","notify":true,"handback":true}
-```
-
-   `missing-cli` excludes that voter. `launched:false` created nothing: retry that voter once after the same-kind launch before it has started, or exclude it.
-
-On notice or resume:
-1. Each notice names a terminal and quotes its answer: take the verdict from the quote. Where a quote is missing or cut, read all such terminals in one `terminal.getStatus` with `includeOutput`; an answer you still cannot read whole is excluded as unreadable.
-2. Translate each label through that voter's own map. A missing, ambiguous or off-ballot answer is excluded, never counted against the majority, and no vote is ever made up for it. A voter at a trust dialog for the launch directory is answered as the foundation says; any other question, approval or error excludes it with the reason.
-3. Tally once every voter has answered or been excluded. While a notice is pending, end your turn instead of waiting or reading: a notice held back while you were working lands as soon as you stop. Report early only when the user asked for it or a voter is stuck at a dialog, marking the rest still running. A later answer is a marked provisional update, never a silent change to the result already given.
-
-Stop and recovery: one launch per voter, one answer per terminal, never merged across terminals. If the user flags bias, rerun from scratch with fresh voters; never mix biased and corrected votes. Close only this poll's terminals, only on request. Peer judging, debate, interviews or tie-breaks belong to daintree.orchestration.competition, daintree.orchestration.multi-agent, daintree.orchestration.interview and daintree.orchestration.runoff-tiebreaker.
-
-Report back: each agent's answer, attributed; requested, launched, answered and excluded counts (with reasons); for a poll or vote, the tally over answered voters, the majority verdict with the dissent, the mapped options and the synthesized recommendation; anyone still running.
+Report back: each agent's answer, attributed; requested, launched, answered and excluded counts with reasons; for a vote, the tally over answered voters, the majority verdict with dissent, the mapped options and a synthesized recommendation; anyone still running.

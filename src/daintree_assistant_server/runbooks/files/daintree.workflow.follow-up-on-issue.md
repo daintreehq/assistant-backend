@@ -13,44 +13,18 @@ optionalTools:
   - forge.listPRs
   - terminal.getStatus
   - terminal.sendCommandOwned
-  - terminal.readLastMessageOwned
-  - terminal.getOutput
 ---
-Use when: the user wants to know where an issue or its PR stands on the forge right now (CI, review decision, the thread), wants forge-sourced blockers relayed to the agent still working on it, or wants the issue commented on or closed.
+Daintree's forge reads ask first at core tier and are absent for API-key clients; comment text, reviews, per-check lists, logs, comments and closing go through the host forge tool (`gh`), always with `--repo <owner/name>` and the number.
 
-Availability: Hybrid. Daintree's app MCP reads `forge.getIssue`, `forge.getPR`, `forge.getCIStatus` and `forge.listPRs`; at core tier each read asks the user first, and an API-key client or a session with no Daintree connection has none, so the host tool reads instead. It does not read comment text, formal or inline review bodies, the per-check list or job logs, and it cannot comment or close: use the host's own permitted forge tool for those (for GitHub, `gh`), always with `--repo <owner/name>` and the number. A relay to the implementer uses Daintree's owned send.
+1. Fix the issue, PR and repository. `worktree.list` rows carry cached `issueNumber`, `prNumber`, `prUrl`; use that worktree's id on Daintree reads. `forge.getIssue` empty means no such issue; a missing `linkedPR` proves nothing; match by branch with `forge.listPRs` `"search":"head:<branch>"`. If nothing ties the user's issue to a PR, ask rather than report on the wrong one. A PR-only question skips the issue read.
+2. Read `forge.getPR` and `forge.getCIStatus` (`worktreeId`, `prNumber`). `pr: null` is absence. `reviewDecision: null` means reviews are not gated, never approval. `ciStatus: null` means nothing reported; counts cover required checks only, and a zero total also appears when the required list could not be read. The roll-up is cached, can lag a minute and names no commit. Never take CI from the PR's own `ciStatus`.
+3. "Did my fix pass?": compare the PR head (`gh pr view N --repo <r> --json headRefOid`) with the commit in question (`git rev-parse HEAD` there, and whether it is pushed). Different: the verdict is another commit's. Same: read that commit's own checks (`gh pr checks N --repo <r>`, `gh run list --repo <r> --commit <sha>`); report a roll-up without them as unbound.
+4. Fetch only what the question needs: the thread (`gh issue view N --repo <r> --comments`, read to the newest comment); reviews (`gh pr view N --json reviews,latestReviews`; inline comments with `gh api --paginate repos/<o>/<r>/pulls/N/comments`); a failed check's log (`gh run view <id> --log-failed`; fixing it is daintree.ci.diagnose-and-fix). A status question ends here: it authorizes no relay, comment or close.
+5. Relay blockers only when asked: the specific asks, failing check names and log lines, never a bare `CHANGES_REQUESTED`, to a terminal you launched or were handed, after `terminal.getStatus` shows it at a prompt. If the user wants the result back, send with `notify:true, handback:true` and end your turn; otherwise report the submission and stop. Feedback sitting in a reviewer agent's terminal is daintree.agents.relay-review-feedback.
+6. Comment and close only on explicit request. Re-read first; skip a note or close someone already made. Comment with `gh issue comment N --repo <r> --body-file <f>` (public, notifies watchers); a lost reply is checked in the thread before any retry. Close with `gh issue close N --repo <r> --reason completed` (or `"not planned"`); a close-only request posts no comment. Both: comment first, and a failed comment means no close. Read back with `gh issue view N --json state,stateReason,comments`.
 
-Procedure:
-1. Fix the issue, the PR and the repository. `worktree.list` rows carry `issueNumber`, `prNumber` and `prUrl` (cached hints). Use that worktree's `worktreeId` on every Daintree read and its repository on every host command. Read the issue with `forge.getIssue`: an empty result means no such issue; `linkedPR` may name the PR, and its absence proves nothing. To match by branch, `forge.listPRs` with `"search":"head:<branch>"`. If the user named one and nothing ties it to the other, ask rather than report on the wrong PR. A question about a PR alone needs no issue: skip the issue read rather than guess one.
-2. Read the PR and its CI roll-up:
+On notice or resume (only after a relay with `notify`): answer a question within the relayed scope or take it to the user; a claim that it pushed a fix is checked by re-reading the PR and CI, not repeated.
 
-```json tool=forge.getPR
-{"worktreeId":"<resolved worktree id>","prNumber":42}
-```
+Stop and recovery: one relay per set of blockers, one comment per request. Never close on green CI or an approval alone: they are evidence, not authority.
 
-```json tool=forge.getCIStatus
-{"worktreeId":"<resolved worktree id>","prNumber":42}
-```
-
-   `pr: null` is absence, not an error. `reviewDecision` is `APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null` when reviews are not gated; `null` is not anyone's approval. `ciStatus.state` is the verdict, and `ciStatus: null` means no status was reported. Its counts cover required checks only, and a zero total also appears when the required-check list could not be read, so it never means "nothing gates this". The roll-up is cached, can lag a minute, and names no commit. Do not take CI from the PR's own `ciStatus`.
-3. Bind CI to the right commit when it matters ("did my fix pass?"). Get the PR head (`gh pr view 42 --repo <r> --json headRefOid`) and compare it with the commit in question (`git rev-parse HEAD` in that worktree, and whether it is pushed). If they differ, the verdict describes another commit: say so instead of calling the fix green or red. If they match, the cached roll-up can still be the previous head's, so read the commit's own checks: `gh pr checks 42 --repo <r>` lists each check on the current head (`--required` narrows to required ones), and `gh run list --repo <r> --commit <sha>` names the runs for that commit. Report a roll-up with no such evidence as unbound.
-4. Fetch only what the question needs, from the tool that has it:
-   - The thread: `gh issue view N --repo <r> --comments` (Daintree's issue read gives only `commentCount`). Read to the newest comment before saying what the latest reply is.
-   - Reviews: `gh pr view 42 --repo <r> --json reviews,latestReviews`; inline comments with `gh api --paginate repos/<owner>/<repo>/pulls/42/comments` (without `--paginate` you get the first page only). A review decision is a state; the review body is the feedback.
-   - Why a check failed: `gh run view <run id> --repo <r> --log-failed`. Diagnosing or fixing it is daintree.ci.diagnose-and-fix.
-   A status question ends here with the report. It does not authorize messaging the implementer, commenting or closing.
-5. Relay blockers only when the user asked for coordination. Send the actionable content (the specific asks, failing check names, the relevant log lines), never a bare `CHANGES_REQUESTED`, with `terminal.sendCommandOwned`, after reading `terminal.getStatus`: not into an approval, trust or login prompt, not over a draft. The terminal must be one you launched or the user handed you; `RESOURCE_NOT_OWNED` means ask the user to hand it over. Decide before sending whether the user wants its result brought back. If so, record a checkpoint first (issue, PR, terminal, what you relay), send once with `notify:true`, save its `submissionToken` and end your turn; if not, send without it, report the submission and stop. Feedback that sits in a reviewer agent's terminal rather than on the forge is daintree.agents.relay-review-feedback.
-6. Comment and close only on an explicit request, each as its own step:
-   - Re-read the issue first. If someone already closed it or posted the same note, do not add another.
-   - Comment: `gh issue comment N --repo <r> --body-file <file>`. It is public, notifies watchers and cannot be quietly withdrawn, so get it right once. If the reply is lost, read the thread and look for your text before any retry.
-   - Close: `gh issue close N --repo <r> --reason completed` (or `"not planned"`, as the user meant). A close-only request posts no comment.
-   - When both were asked for, comment first; if the comment fails, do not close. If the close fails after the comment landed, say exactly that.
-   - Read back with `gh issue view N --repo <r> --json state,stateReason,comments`.
-
-On notice or resume (only after a relay sent with `notify`):
-1. Restore the checkpoint (issue, PR, terminal, what was relayed) and apply anything the user said since. Read `terminal.getStatus` and make sure the state belongs to your relay, not to earlier work.
-2. A question is answered within the relayed scope or taken to the user; an approval or login screen is the user's. When it stops at its prompt, read its reply (`lastHandback` matched by your `submissionToken`, `terminal.readLastMessageOwned`, or `terminal.getOutput`), then re-read the PR and CI: a claim that it pushed a fix is checked on the forge, not repeated.
-
-Stop and recovery: one relay per set of blockers; a disputed send is checked with its `submissionToken`, never resent blind. One comment per request; an uncertain comment is found in the thread, not reposted. Never close on green CI or an approval alone: they are evidence, not authority.
-
-Report back: repository, issue and PR numbers with the PR URL; the CI verdict as the roll-up stated it (state and counts, and whether it is bound to the commit in question); the review decision and any review text read; the newest thread reply and whether you read to the end; what you relayed and to which terminal; and for each write exactly what landed and what the read-back shows. Never report "closed out" when only the comment posted.
+Report back: repository, issue and PR with URL; the CI verdict (state, counts, and whether bound to the commit in question); the review decision and any review text read; the newest thread reply and whether you read to the end; what you relayed and where; each write as read back. Never report "closed out" when only the comment posted.

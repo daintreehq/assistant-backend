@@ -117,10 +117,11 @@ runbook, **filename stem must equal the `id`** (enforced at load). Auto-discover
 registration. `docs/RUNBOOKS.md` is the authoring guide.
 
 **Format** — YAML frontmatter + Markdown body. The body is operational prose in the house
-style: a `Use when:` line, an `Availability:` line, a numbered procedure, and for a
-runbook that waits on an agent `On notice or resume:` and `Stop and recovery:` sections,
-ending with a "Report back" line. Shared rules (caller differences, ownership, launching,
-reading replies from the notice's quote, long-run checkpoints, proving a finish) live once,
+style: a numbered procedure (no `Use when:` or `Availability:` line; the served document
+already carries `when_to_use` and the tool lists), `On notice or resume:` and
+`Stop and recovery:` sections for a runbook that ends its turn on a notice, ending with a
+"Report back" line. Shared rules (caller differences, ownership, launching, batch calls,
+`waitForReply` and notices, long-run checkpoints, proving a finish) live once,
 in `daintree.foundation`, which both tools deliver with every runbook they deliver in full.
 Anything Daintree's own assistant prompt already says stays out of it. Frontmatter is validated
 by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are rejected):

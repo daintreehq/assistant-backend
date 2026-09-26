@@ -8,50 +8,25 @@ requiredTools:
   - worktree.list
   - worktree.createWithRecipe
   - worktree.waitUntilReady
-optionalTools:
-  - actions.getContext
 ---
-Use when: the user wants a standalone worktree for a new or existing branch, with no recipe or agent.
+`worktree.createWithRecipe` with no `recipeId` is Daintree's plain creator: checkout, config copy, submodules, background setup, no terminals. It needs no confirmation turn of yours. Never substitute `git worktree add` or a shell checkout: that skips Daintree's setup, and a checkout in the main worktree moves the user's branch.
 
-Availability: Core. `worktree.createWithRecipe` without `recipeId` is Daintree's plain creator despite its name: it creates the checkout, copies project config, initialises submodules and starts the project's setup in the background, and launches no terminals. It runs without an approval; do not add a confirmation turn of your own. No agent, notice or checkpoint is involved. An API-key client has no `worktree.waitUntilReady`: read `setupState` from `worktree.list` instead. Do not substitute `git worktree add` or a `git checkout` in the shell for a Daintree worktree: that skips Daintree's config copy and setup, and a checkout in the main worktree moves the user's branch.
-
-Procedure:
-1. Route first. A startup recipe is daintree.recipe.run-or-create; starting a forge issue with an agent is daintree.workflow.start-work-on-issue; an agent in a worktree that already exists is daintree.edits.spawn-visible-agent.
-2. Read `worktree.list` (`id`, `path`, `branch`, `isMain`, `setupState`). Note the main worktree's branch so you can show later that it did not move. If the requested branch is already checked out in a worktree, report that worktree instead of creating another: git cannot check one branch out twice. Use `actions.getContext` only when the project itself is ambiguous.
-3. Settle the `source` mode before creating. Each mode is strict: a field from another mode is rejected.
-   - New branch: `{"kind":"newBranch","branchName":…,"baseBranch":…}`. Pass the base the user named; omitted, it defaults to the main worktree's branch. The name must already be a valid git ref: nothing rewrites it.
-   - New branch off a remote base: `baseBranch` as the remote ref (`origin/develop`) plus `fromRemote:true`. `fromRemote` describes the BASE; it does not reuse a remote branch.
-   - Existing local branch: `{"kind":"existingBranch","branchName":…}` checks it out exactly as named, never suffixed, and never replaced by a new branch if it is missing. For a branch that exists only on the remote, offer a new local branch of the same name based on `origin/<name>` with `fromRemote:true`, and say that is what you did.
-   - Pull request: `{"kind":"pullRequest","pullRequestNumber":N}` alone, never with a branch name. A closed or merged PR is accepted while its head ref exists.
-   - Collisions: the default `collisionPolicy:"suffix"` may quietly REUSE an existing branch of that name that nothing has checked out, with whatever commits it holds, or create `<name>-2`. Pass `"collisionPolicy":"error"` whenever the user named a branch they expect to be new; keep `suffix` for when they said the name can be anything.
-   - Pass `issueNumber` only when the user tied the worktree to an issue; it does not attach the issue. With it, set `assignToSelf` to what they asked, because omitting it applies their saved preference.
-   If the name is up to you, pick one short valid name and state it. If the base is ambiguous, ask.
-4. Create once, with no `recipeId`:
+1. Read `worktree.list`. Note the main worktree's branch. A branch already checked out in a worktree: report that worktree instead of creating another.
+2. Pick the `source` mode; fields from another mode are rejected.
+   - New branch: `{"kind":"newBranch","branchName":…,"baseBranch":…}` (base defaults to the main worktree's branch; the name must already be a valid ref). A remote base: `baseBranch:"origin/<b>"` plus `fromRemote:true`, which describes the base, not a reused remote branch.
+   - Existing local branch: `{"kind":"existingBranch","branchName":…}` checks it out exactly as named, never suffixed, never replaced by a new branch if missing. Remote-only: offer a new local branch of that name from `origin/<name>` with `fromRemote:true`, and say so.
+   - Pull request: `{"kind":"pullRequest","pullRequestNumber":N}` alone.
+   - The default `collisionPolicy:"suffix"` may silently reuse an unchecked-out branch of that name or create `<name>-2`: pass `"collisionPolicy":"error"` when the user named a branch they expect to be new.
+   - `issueNumber` only when the user tied it to an issue; then set `assignToSelf` as asked.
+   Name up to you: pick one short valid name and state it. Ambiguous base: ask.
+3. Create once:
 
 ```json tool=worktree.createWithRecipe
 {"source":{"kind":"newBranch","branchName":"<new branch>","baseBranch":"<verified base>","collisionPolicy":"error"}}
 ```
 
-```json tool=worktree.createWithRecipe
-{"source":{"kind":"existingBranch","branchName":"<existing local branch>"}}
-```
+4. Keep `worktreeId` and `worktreePath`. Report any `requestedBranch`/`effectiveBranch` difference. An error is fixed in the arguments, never by raw git. A lost reply is reconciled with `worktree.list`: identical arguments within 120 seconds return the cached result, so a blind retry proves nothing.
+5. `worktree.waitUntilReady` (`timeoutMs:25000`), at most three calls. `ready` is the only success; `timedOut:true` means still running at `stage`. `failed`/`timed-out`: report `stage` and `error`, never delete or recreate. `needs-approval`: the user approves setup commands in Daintree, not you. `unknown`: setup cannot be confirmed. API-key clients read `setupState` from `worktree.list` once.
+6. Confirm with `worktree.list` that the new worktree appears and the main worktree's branch did not move (if it did, someone else moved it: report, don't revert). Stop: launch nothing.
 
-5. Read the result. Keep `worktreeId` and `worktreePath` verbatim, both of them. Compare `requestedBranch` with `effectiveBranch` (they differ only after a suffix collision) and report a difference plainly. `recipeLaunched` should be false, with no spawned terminals. Its `setupState` is a snapshot from when git finished, not the current state.
-   - An error is reported as given and fixed in the arguments (an invalid ref, a taken name under `error`). Never fall back to raw git.
-   - A lost or ambiguous reply is reconciled with `worktree.list` (look for the branch and path) before anything else. Identical arguments within 120 seconds return the cached earlier result, success or failure, without creating anything, so a blind retry proves nothing.
-6. Check setup before calling the checkout ready. Setup keeps running after creation, and work started early can run against an unpopulated tree:
-
-```json tool=worktree.waitUntilReady
-{"worktreeId":"<returned worktreeId>","timeoutMs":25000}
-```
-
-   - `ready` is the only success.
-   - `pending` or `running` with `timedOut:true` is not a failure: call again, at most three calls in all (about 75 seconds, the setup budget; terminal waits have their own), then report the worktree as created with setup still running at `stage`.
-   - An API-key client, which has no `worktree.waitUntilReady`, reads `setupState` once from `worktree.list` and reports anything but `ready` as it stands.
-   - `failed` or `timed-out`: report `stage` and `error`. The worktree exists; do not delete or recreate it.
-   - `needs-approval`: the repository's setup commands are waiting for the user to approve them in Daintree. You cannot approve them; say so.
-   - `unknown`: this Daintree did not create it, or has restarted since; setup cannot be confirmed.
-7. Confirm with `worktree.list` that the new id, path and branch appear and that the main worktree is still on its earlier branch. A plain create never checks out there, so if that branch moved, report it as a change someone else made; do not attribute it to this call or move it back.
-8. Stop. A creation-only request needs no agent, terminal or notice.
-
-Report back: the worktree id and path, its branch (requested and effective if they differ) with its mode and base, the setup state (ready, still running at a stage, failed with its error, or awaiting the user's approval), that the original worktree's branch did not move, and that no recipe or agent was launched.
+Report back: worktree id and path, branch (requested and effective) with mode and base, setup state, that the main branch did not move, and that nothing was launched.

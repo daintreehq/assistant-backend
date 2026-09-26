@@ -13,50 +13,27 @@ requiredTools:
   - terminal.moveToWorktree
   - terminal.sendCommandOwned
 optionalTools:
-  - terminal.getOutput
   - terminal.notifyWhenIdle
-  - terminal.sendCommand
 ---
-Use when: agents that are already running share a worktree and the user wants each in its own, keeping their sessions.
+Instructing an agent needs the owned send (agents you launched or were handed). An API-key client lacks `terminal.moveToWorktree` and `worktree.waitUntilReady`: leave panel filing to the user.
 
-Availability: Core, from an agent pane. `terminal.moveToWorktree` works on any terminal in the project, but telling an agent to continue elsewhere needs `terminal.sendCommandOwned`, which reaches only agents you launched or the user handed to you (the sidebar assistant uses `terminal.sendCommand`). An API-key client has no `terminal.moveToWorktree`, `worktree.waitUntilReady` or notices: it can create the worktrees and instruct its own agents, and must leave panel filing to the user. Inspecting and carrying uncommitted changes is native git work in verified paths.
+Three separate facts: panel placement (all `terminal.moveToWorktree` changes), process root (the process keeps working where it launched until told, and some CLIs cannot change root without a restart), and Daintree binding (its `DAINTREE_WORKTREE_ID` still names the old worktree, so its own calls must pass `worktreeId`).
 
-Three facts, kept separate, because none implies another:
-- Panel placement: where Daintree files the panel. `terminal.moveToWorktree` changes only this.
-- Process root: the directory the agent's process works in. A move never restarts the process, so the agent keeps working where it launched until it is told, and is able, to work elsewhere. Some agent CLIs can work in another directory through explicit paths; some cannot change their root without a restart.
-- Daintree binding: a moved agent's own Daintree connection, and its `DAINTREE_WORKTREE_ID`, still name its launch worktree, so its own calls that default to "current" keep targeting the old one.
-
-Procedure:
-1. Resolve the cohort. From `terminal.list` and `worktree.list`, keep only the terminals the user meant, and build a map per agent: terminal id, old worktree id and path, new branch and base, and later its destination id and path. `terminal.list` with `owned:true` shows which you can instruct. New agents in fresh worktrees are daintree.edits.spawn-visible-agent or daintree.orchestration.fan-out-work.
-2. Find a safe boundary and protect uncommitted work. Read each agent's state with `terminal.getStatus`, and the source tree's changes with `git status` in its path. Several agents' edits are interleaved in one tree, and a new worktree brings none of them along. If an agent's work must travel, that agent moves its own changes, for example by applying a patch of them in the destination, and leaves the source tree as it is. With several writers in one tree, its account of which hunks are its own is evidence, not proof: check its patch against the diff (and any commits or baseline you hold), and report hunks nobody can attribute rather than moving them. Never reset, clean, stash or check out in the shared tree to make room. An agent that is `working` is mid-edit: instruct it only once it is back at its prompt. For each working agent you must instruct, arm `terminal.notifyWhenIdle` with a note naming this relocation and that agent, record the checkpoint, and do steps 5 to 7 for it on its notice.
-3. Settle one distinct branch and base per agent, following the user's and the repository's naming. Create an EMPTY worktree per agent, with no `recipeId`, one call each:
-
-```json tool=worktree.createWithRecipe
-{"source":{"kind":"newBranch","branchName":"<branch for this agent>","baseBranch":"<verified base>","collisionPolicy":"error"}}
-```
-
-4. Read every result before moving anything, and keep `worktreeId` and `worktreePath` verbatim; never build one from the other. A lost or partial reply is reconciled with `worktree.list`, not answered with another create. Then run `worktree.waitUntilReady` on each destination: only `ready` is usable. A destination that `failed` or `needs-approval` gets no agent; report it.
-5. File each panel under its destination, one call per agent:
-
-```json tool=terminal.moveToWorktree
-{"terminalId":"<exact terminal id>","worktreeId":"<destination worktreeId>"}
-```
-
-   Panels sharing a tab group travel together, this action cannot split them, and `terminal.list` does not show groups. So snapshot every panel's `worktreeId` from `terminal.list` before the first move, and compare after it. If an unrequested panel moved, or a panel bound for a different destination moved with it, stop moving: report the group and leave the split to the user. Never move it back, which would move the whole group again.
-6. Tell each owned agent once, at its prompt:
+1. From `terminal.list` and `worktree.list` map each agent the user meant: terminal id, old worktree id and path, new branch and base.
+2. Protect uncommitted work. Read each agent's state and `git status` in the shared tree. A new worktree brings no changes: an agent whose work must travel applies a patch of its own changes in the destination and leaves the source as is. Check its patch against the diff; report hunks nobody can attribute. Never reset, clean, stash or check out in the shared tree. A `working` agent is instructed only back at its prompt: arm `terminal.notifyWhenIdle` with a note naming this relocation and agent, and do steps 5 to 7 for it on the notice.
+3. One EMPTY worktree per agent, distinct branch, no `recipeId`, `collisionPolicy:"error"`. Keep each `worktreeId` and `worktreePath` verbatim; reconcile a lost reply with `worktree.list`. `worktree.waitUntilReady` each: only `ready` gets an agent.
+4. Before the first move, snapshot every panel's `worktreeId` from `terminal.list`.
+5. `terminal.moveToWorktree` per agent, then compare with the snapshot. Tab-grouped panels travel together and the listing doesn't show groups: if anything else moved, stop, report the group and leave the split to the user. Never move a panel back.
+6. Instruct each owned agent once, at its prompt, with `waitForReply:true, handback:true`; the agent now awaits relocation confirmation until the reply returns. Tell the user, so they skip the pane's "continue in the new worktree" banner; for an agent you don't own that banner is the path.
 
 ```json tool=terminal.sendCommandOwned
-{"terminalId":"<owned agent terminal id>","command":"Continue this task in <destination worktreePath> on branch <branch>. First run pwd and git branch there and report both. Work only inside that directory from now on, and pass worktreeId <destination worktreeId> on any Daintree call. Leave the original worktree's changes as they are.","notify":true}
+{"terminalId":"<owned agent terminal id>","command":"Continue this task in <destination worktreePath> on branch <branch>. First run pwd and git branch there and report both. Work only inside that directory, and pass worktreeId <destination worktreeId> on any Daintree call. Leave the original worktree's changes as they are.","handback":true}
 ```
 
-   Ask for `notify` here: any notice that brought you to the boundary has already fired, so only this one brings its confirmation back (an API-key client omits it and makes one bounded wait). Record the `submissionToken` and that the agent now awaits relocation confirmation before ending your turn. If the prompt does not appear to land, read `terminal.getStatus` with that token before anything else; never resend because the screen has not changed yet. Tell the user you have instructed it, so they do not also use the pane's own "continue in the new worktree" banner. For an agent you do not own, that banner is the path: point the user to it, or ask them to hand the terminal to you.
-7. Verify each fact on its own. Placement: `terminal.list`. Root: the agent's reported `pwd` and branch in its output (`terminal.getStatus` with `includeOutput`), and in the end where its new edits land (`git status` in both paths); an "OK" is not evidence, and a `pwd` from one shell command shows only that the command ran there. Source: the retained changes are still there. An agent that cannot change its root keeps its session: report the limit and let the user decide; do not restart or discard it.
+7. Verify each fact: placement from `terminal.list`; root from the reported `pwd` and branch, then where new edits land (`git status` in both paths), since "OK" is not evidence; the source changes still there. An agent that cannot change root keeps its session: report the limit, never restart or discard it.
 
-On notice or resume:
-1. Follow the foundation's resume procedure. A boundary notice's note names the relocation and the agent; the relocation send's notice carries no note, so match it by terminal id.
-2. Take the agent's phase from the checkpoint, not from the notice. Awaiting the boundary, and at its prompt with its turn finished: do steps 5 to 7 for it. Awaiting relocation confirmation: do step 7 only, and never move its panel or send the instruction again. If it stopped on a question, an approval or an error, handle that first, and never type the relocation into a question or approval prompt.
-3. Record each agent's outcome; a duplicate notice changes nothing.
+On notice or resume: take each agent's phase from your record, not the notice. At the boundary and back at its prompt: steps 5 to 7. Awaits relocation confirmation: step 7 only; never move its panel or send the instruction again. A question, approval or error comes first; never type the relocation into it.
 
-Stop and recovery: one create per destination and one relocation message per agent. A refused move or send never justifies closing or respawning an agent, raw `git worktree` commands, or deleting the original checkout. Close nothing without a separate request.
+Stop and recovery: one create per destination, one relocation message per agent. A refused move or send never justifies closing or respawning an agent, raw `git worktree`, or deleting the original checkout. Close nothing unasked.
 
-Report back: per agent, the destination worktree id, path and branch; whether its panel moved (and anything that moved with it); whether it confirmed the new directory and branch, and where its edits now land; changes retained in the source tree; and any agent not yet instructed (unowned, still working, or blocked) with the next step.
+Report back: per agent the destination id, path and branch; whether its panel moved (and what moved with it); its confirmed directory and branch and where edits land; changes kept in the source tree; agents not yet instructed and why.

@@ -9,47 +9,25 @@ requiredTools:
   - terminal.getStatus
   - terminal.sendCommandOwned
 optionalTools:
+  - terminal.sendCommandMany
+  - terminal.sendKeysOwned
   - terminal.getOutput
   - terminal.readLastMessageOwned
   - terminal.revealOwned
-  - terminal.waitUntilIdleBatch
 ---
-Use when: one or more running agents are waiting on a question or prompt, and the user says what to answer (or to answer them) and what, if anything, to report afterwards.
-
-Availability: Core. Reads work on any terminal; the send needs a terminal you launched or were handed. An API-key client has no `notify`: collecting a result there is one `terminal.waitUntilIdleBatch`, or the user's continuation.
-
-Procedure:
-1. Find the targets with `terminal.list`, then one `terminal.getStatus` over the candidates with `includeOutput` (up to 50 lines each).
-   - Ambiguity (several could be the ONE meant): list them and ask. Never pick by focus or title.
-   - Cohort (several asking at once): handle them in one pass, each with its own answer.
-2. Read each terminal's question from its own entry, never a merged summary; `terminal.getOutput` with a bounded `maxLines` when the tail is not enough. For a Claude Code pane you own, `terminal.readLastMessageOwned` shows a question's options, but only the live screen shows it is waiting now. A terminal that is not asking gets no input.
-3. Build a local map, one entry per target id: the exact question, any `QUESTION_ID` and the choices shown. Mark one you cannot read "unreadable, not answered". Route by id only.
-4. Classify each entry:
+1. Find the targets with `terminal.list`, then one `terminal.getStatus` over the candidates with `includeOutput`. Several could be the ONE meant: list them and ask; never pick by focus or title. Several asking at once: handle them in one pass, each with its own answer.
+2. Read each question from its own entry, never a merged summary (`terminal.getOutput` or, for a Claude Code pane you own, `terminal.readLastMessageOwned` for the options; only the live screen shows it is waiting now). A terminal that is not asking gets no input. Map target id to the exact question, any `QUESTION_ID` and the choices; mark one you cannot read "unreadable, not answered".
+3. Classify each:
    - Answered by the user's words: use them exactly.
-   - A follow-up inside the task: answer within scope and decline expansion.
+   - A follow-up inside the task: answer within scope, decline expansion.
    - Needs the user: a trade-off, a missing preference, new scope, a destructive or external step.
-   - Approval, trust, login and security prompts stay with the user: answer one only on the user's explicit decision about that prompt, with the exact key the screen shows. (The trust exception in the foundation is for the agent you just launched, handled by the launching runbook.)
+   - Approval, trust, login and security prompts stay with the user: answer one only on the user's explicit decision about that prompt. (The foundation's trust exception is for an agent you just launched.)
    - Not owned: do not send; ask for a hand-over or give the user the answer to type.
-5. Choose the mode before sending: answer only, or answer and collect the result. Then make ONE send per terminal, just after confirming it is still at that question and holds no user draft. Send exactly the protocol answer (the bare token, the key a menu shows, or `QUESTION_ID=<id> ANSWER=<answer>` when that protocol is displayed), never `handback`, which appends text to the answer. The send cannot press arrows, Tab or Escape; hand those to the user.
-   - Answer only: no notice. Report the answers queued and stop.
+4. Confirm each is still at that question with no user draft, then send exactly the protocol answer: the bare token, `QUESTION_ID=<id> ANSWER=<answer>` when that protocol is shown, or for a dialog or menu `terminal.sendKeysOwned` with `choose` set to the option label. No `handback` on an answer; it appends text. Several terminals: one `terminal.sendCommandMany`, each its own answer.
+5. Answer only: send without waiting and report the answers queued. Result wanted: add `waitForReply:true` and relay each reply as the agent's account.
+6. Everything that needs the user goes to them in one message: terminal id, agent, exact question. "Show me the next one" is `terminal.revealOwned`.
+7. A reply still showing the same question: resend only if your answer was malformed or missed the `QUESTION_ID`, otherwise report it blocked; never send variants. A new question is a new entry: classify it again.
 
-```json tool=terminal.sendCommandOwned
-{"terminalId":"<id from the map>","command":"<that terminal's protocol answer>"}
-```
+One protocol-correct answer per question; one terminal's answer never goes to another, and no answer is reused across terminals. A disputed send is read by its `submissionToken`, never resent blind.
 
-   - Collect the result: the same send with `notify` (the notice that brought the question has fired), then end your turn.
-
-```json tool=terminal.sendCommandOwned
-{"terminalId":"<id from the map>","command":"<that terminal's protocol answer>","notify":true}
-```
-
-6. Everything that needs the user goes to them in one message: terminal id, agent and the exact question. "Show me the next one" is navigation: `terminal.revealOwned`.
-
-On notice or resume:
-1. The notice quotes each terminal's screen after your answer. The notice only wakes you: match it to the question you answered in that terminal, and if the quote still shows the same question, read it once more. Resend only if your answer was malformed or missed the `QUESTION_ID`; otherwise report that terminal blocked. Never send variants.
-2. A new question is a new entry: classify it, answer once with a fresh `notify` or take it to the user. The original task stays open.
-3. Finished: relay the requested result from the quote (read again only if it is missing or cut) as the agent's account unless you checked it.
-
-Stop and recovery: one protocol-correct answer per question; one terminal's answer never goes to another, and no answer is reused across terminals. A disputed send is read by its `submissionToken` and the screen, never resent blind. An unreadable or unowned target is reported, not worked around.
-
-Report back: one line per terminal: id and agent, the question, the answer sent (or "needs you" and why), the send's status, and when requested, the result or that it is still running with a notice pending.
+Report back: one line per terminal: id and agent, the question, the answer sent (or "needs you" and why), the send's status, and when requested the result or that it is still running.

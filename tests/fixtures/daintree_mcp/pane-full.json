@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "feature/mcp-cleanup",
-    "app_commit": "ae0796d9dc22af0be8fb0e61d62136dbc4d28c59",
+    "app_commit": "fecde51aecd7480bbc1a1a5f44f7a6e1854104d3",
     "app_version": "0.38.0",
     "caller_origin": "agent-pane",
     "session_origin": "external",
@@ -13,12 +13,12 @@
       "renderer_owned_origin": false
     },
     "caller": "The same agent-pane caller with the project's Daintree MCP set to Full.",
-    "captured_at": "2026-09-25",
+    "captured_at": "2026-09-26",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry, served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) configured as this caller, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "89920c5aae874f0750b9f8322a49e6b5add0f0bf1d160c1b1f518aded882f579",
+    "surface_hash": "e799664e7dec229b906389e082f655dd78ff109c7a7b89e8bcfcbad829723479",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest)",
-    "tool_count": 69,
+    "tool_count": 72,
     "context_gated_tools": [],
     "notes": [
       "An agent pane's tier is where auto-approval stops, not a ceiling (#12692): tools/list also carries every tool up to the full non-renderer-owned surface, and calling one above the tier asks the user first. The wire listing is therefore the same at core and full; tools[].daintree.reach says which run without asking ('tier') and which ask ('approval')."
@@ -437,6 +437,68 @@
       },
       "annotations": {
         "title": "Launch agent",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "agent",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "agent.launchMany",
+      "wire_name": "agent.launchMany",
+      "description": "Launch several agents with one shared prompt in one call, each in its own terminal as a single launch with its own notice. Results come back in order, one per agent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "1-8 distinct agent ids, launched in order, one terminal each."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The first turn every agent receives."
+          },
+          "name": {
+            "description": "Tab title prefix; each tab is \"<name>: <agentId>\".",
+            "type": "string"
+          },
+          "worktreeId": {
+            "description": "Defaults to the active worktree.",
+            "type": "string"
+          },
+          "notify": {
+            "description": "As on the single call: each agent's notice quotes its reply when it finishes.",
+            "type": "boolean"
+          },
+          "handback": {
+            "description": "As on the single call, for each item.",
+            "type": "boolean"
+          },
+          "replyLines": {
+            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agentIds",
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Launch several agents",
         "readOnlyHint": false,
         "idempotentHint": false,
         "destructiveHint": false,
@@ -3668,6 +3730,43 @@
       }
     },
     {
+      "action_id": "terminal.closeMany",
+      "wire_name": "terminal.closeMany",
+      "description": "Close several terminals in one call, each as a single close (owned for an agent pane), to the trash. Results come back in order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "terminalIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "1-16 terminals to close, each as a single close."
+          }
+        },
+        "required": [
+          "terminalIds"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Close several terminals",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "terminal",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
       "action_id": "terminal.closeOwned",
       "wire_name": "terminal.closeOwned",
       "description": "Close a panel this session itself created, usually to the trash, where it is briefly recoverable before its process is killed. Only panels created by this connection can be closed: a panel opened by the user, another client, or a plugin is refused outright, as is an id that never existed. The result names what closed, already gone from the listing by then.",
@@ -3818,7 +3917,7 @@
         "type": "object",
         "properties": {
           "terminalIds": {
-            "description": "Explicit terminal IDs to query (1-256). When set, `worktreeId`/`location` filters are ignored. Unknown IDs return per-entry `error` rather than aborting the call.",
+            "description": "Terminals to query (1-256); overrides `worktreeId` and `location`. An unknown id gets an `error` entry, not a failed call.",
             "type": "array",
             "items": {
               "type": "string"
@@ -4808,6 +4907,67 @@
       }
     },
     {
+      "action_id": "terminal.sendCommandMany",
+      "wire_name": "terminal.sendCommandMany",
+      "description": "Submit a different message to each of several terminals in one call, such as one ballot per voter. Each runs as a single send, with its own notice; results come back in order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "terminalId": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "terminalId",
+                "command"
+              ]
+            },
+            "description": "1-16 messages, one per terminal, each its next prompt."
+          },
+          "notify": {
+            "description": "As on the single call: each agent's notice quotes its reply when it finishes.",
+            "type": "boolean"
+          },
+          "handback": {
+            "description": "As on the single call, for each item.",
+            "type": "boolean"
+          },
+          "replyLines": {
+            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sends"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Submit to several terminals",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "terminal",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
       "action_id": "terminal.sendCommandOwned",
       "wire_name": "terminal.sendCommandOwned",
       "description": "Queue text as one submission to a terminal this connection created or was handed: a shell runs it as a command, an agent pane takes it as the next prompt. Any other panel is refused. Returns once queued, not delivered or run: pass the returned `submissionToken` to the status capability to find out.",
@@ -4892,7 +5052,7 @@
     {
       "action_id": "terminal.sendKeysOwned",
       "wire_name": "terminal.sendKeysOwned",
-      "description": "Press named keys in a terminal this connection created or was handed, to answer a CLI's own dialog (trust, permission, a list). Read the screen before and after.",
+      "description": "Answer a CLI's own dialog (trust, permission, a list) by option label or named keys, in a terminal this connection created or was handed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4900,15 +5060,19 @@
             "type": "string",
             "description": "The terminal to press keys in."
           },
+          "choose": {
+            "description": "An option's label as shown; Daintree moves to it and presses Enter. Prefer it to `keys`.",
+            "type": "string"
+          },
           "keys": {
+            "description": "Or up to 16 of: Up, Down, Left, Right, Enter, Escape, Tab, Space, Backspace, a-z, 0-9.",
             "type": "array",
             "items": {
               "type": "string"
-            },
-            "description": "Up to 16: Up, Down, Left, Right, Enter, Escape, Tab, Space, Backspace, or one lowercase letter or digit. Second option of a list: [\"Down\", \"Enter\"]."
+            }
           },
           "notify": {
-            "description": "As on a send: be told, with its reply, when the turn these keys unblock ends.",
+            "description": "As on a send: hear, with its reply, when the turn these keys unblock ends.",
             "type": "boolean"
           },
           "replyLines": {
@@ -4917,8 +5081,7 @@
           }
         },
         "required": [
-          "terminalId",
-          "keys"
+          "terminalId"
         ],
         "additionalProperties": false
       },

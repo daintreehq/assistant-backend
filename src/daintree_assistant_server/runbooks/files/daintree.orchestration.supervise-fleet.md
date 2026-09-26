@@ -12,30 +12,19 @@ optionalTools:
   - terminal.revealOwned
   - fleet.getRunStatus
 ---
-Use when: agents are already running and the user wants the fleet swept, classified and, where they ask, acted on.
+A synchronous, read-only sweep. A status request authorizes reading only; launching, answering, interrupting, closing, arming notices or moving the user's view each needs the user to ask.
 
-This is a synchronous, read-only sweep: no launch, no notice, no checkpoint. A status request authorizes reading only; launching, answering, interrupting, closing, arming notices or moving the user's view each needs the user to ask.
-
-Availability: Core. `fleet.getRunStatus`, for a broadcast the user runs from Daintree, raises an approval in a core pane.
-
-Procedure:
-1. Scope: the agents or worktree the user named, otherwise every agent terminal in the project from `terminal.list` (add `location:"background"` only if agents live there). Your own run records say what each terminal was asked to do.
-2. Read the cohort in one batched call, paging past 256 ids:
-
-```json tool=terminal.getStatus
-{"terminalIds":["<id 1>","<id 2>","<id 3>"],"includeOutput":{"lines":30}}
-```
-
-   Only where 50 tail lines are not enough, `terminal.readLastMessageOwned` for a Claude Code pane you own.
-3. Classify each terminal from its own entry:
-   - `working` or `directing`: reported working. An old `lastOutputChangeAt` is "possibly stalled", not a hang verdict.
-   - `waiting` with `waitingReason` `question`, `approval` or `error`: needs someone; quote the prompt or error.
-   - At its prompt with a coherent final message or a `lastHandback`: a candidate completion, unverified.
+1. Scope: the agents or worktree the user named, otherwise every agent terminal from `terminal.list` (`location:"background"` only if agents live there). `fleet.getRunStatus` covers a broadcast the user ran.
+2. Read the cohort in one `terminal.getStatus` (`includeOutput: {"lines":30}`), paging past 256 ids; `terminal.readLastMessageOwned` only where the tail is not enough.
+3. Classify each from its own entry:
+   - `working` or `directing`: working. An old `lastOutputChangeAt` is "possibly stalled", not hung.
+   - `waiting` with `waitingReason` `question`, `approval` or `error`: needs someone; quote it.
+   - At its prompt with a coherent final message or `lastHandback`: a candidate completion, unverified.
    - `idle` before any turn: given no work, or its prompt never landed.
-   - Exited: report `exitCode` as returned; success is unproven.
-   - Unknown: an entry `error`, a reduced reading with `unavailableFields`, or a terminal missing from a failed or filtered listing. Missing from a filter is not exited.
-   Never let one terminal's state stand for another's. Do not call a terminal "unsupervised" because your records hold no notice for it: another pane may be waiting on it, and notices cannot be listed.
-4. Act only on what the user asked, each through its own runbook: questions and approvals (daintree.agents.answer-waiting-agent), a broken agent (daintree.agents.recover-agent), proof of work (daintree.orchestration.verify-agent-work), being told when one finishes (daintree.orchestration.watch-outcome).
-5. Navigation only on request: `terminal.revealOwned` for a panel you created or were handed; otherwise give its title and worktree. Broadcast arming is read from each entry's `armed`; changing it is the user's.
+   - Exited: report `exitCode`; success is unproven.
+   - Unknown: an entry `error`, `unavailableFields`, or missing from a failed or filtered listing (not exited).
+   Do not call a terminal "unsupervised" because your records hold no notice for it: another pane may be waiting on it.
+4. Act only on what the user asked, through its runbook: daintree.agents.answer-waiting-agent, daintree.agents.recover-agent, daintree.orchestration.verify-agent-work, daintree.orchestration.watch-outcome.
+5. Navigation only on request: `terminal.revealOwned` for your panels, otherwise give title and worktree. Broadcast arming is each entry's `armed`; changing it is the user's.
 
-Report back: one line per agent (title, terminal id, worktree, observed state with its evidence, outcome or blocker), what needs the user and why, any action taken at their request, and what remains unknown.
+Report back: one line per agent (title, terminal id, worktree, state with its evidence, outcome or blocker), what needs the user and why, any action taken at their request, and what remains unknown.

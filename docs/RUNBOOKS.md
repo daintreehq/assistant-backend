@@ -73,40 +73,33 @@ and do not repeat what Daintree's own assistant prompt or a tool's description
 already says. Put what is specific to this task beside the step it affects: ballot
 blinding, PR head binding, setup readiness, question protocols.
 
-**Design for the fewest calls.** Launch every participant in one turn (same-kind
-agents one at a time), pass `notify:true, handback:true`, and end the turn. The
-notice quotes each agent's last screen lines, so read the reply there; one batched
-`terminal.getStatus` is for quotes that are missing or cut. No wait or poll after a
-notice is armed, and no per-reply status read just to correlate: the notice names
-the terminal. Tell children how long to make their reply so it fits the quote.
+**Design for the fewest calls.** One call per round: `agent.launchMany` for one
+prompt to several agents, `terminal.sendCommandMany` for a different message per
+terminal, `terminal.closeMany` for teardown. When the next step needs the
+answers (a vote, a poll, a relay), pass `waitForReply:true, handback:true` and
+read each `reply` from the result. Only long background work passes
+`notify:true, handback:true` and ends the turn. Never read a terminal for a reply
+the call or notice already carried.
 
-A runbook that waits for an agent follows this shape:
+The served document already carries `when_to_use` and the tool lists, so a body
+has no `Use when:` or `Availability:` line; one short line for a real caller
+difference at most. A runbook that ends its turn on a notice follows this shape:
 
 ```markdown
-Use when: <one concrete task boundary>.
-
-Availability: <the baseline app actions; what changes with no `notify` (API-key
-client) or when a full-surface action raises an approval; any native host alternative>.
-
 Procedure:
 1. Resolve and preflight.
-2. Observe the relevant starting state.
-3. Dispatch the smallest authorized action (brief, `name`, `worktreeId`, `notify`).
-4. Inspect the result; for a long run, record the checkpoint.
-5. End the turn on the notice when nothing else is left.
+2. Dispatch the smallest authorized action (brief, `name`, `worktreeId`, `notify`).
+3. End the turn on the notice when nothing else is left.
 
-On notice or resume:
-1. Apply user changes; read the reply from the notice's quote.
-2. Handle questions, dialogs, errors, cut quotes and duplicate notices.
-3. Verify, then finish or advance one eligible step.
+On notice or resume: what the reply means here; questions, dialogs, errors.
 
 Stop and recovery: <finite bounds; what is never replayed>.
 
 Report back: <evidence, outcome, pending work, the real continuation>.
 ```
 
-A synchronous runbook (rename, a status read, a relay that stops at submission) is
-shorter. It gets no empty notice or checkpoint sections.
+A synchronous runbook (rename, a status read, a `waitForReply` round) is shorter.
+It gets no empty notice or checkpoint sections.
 
 1. **State the whole contract.** Target scope, concrete arguments, what the result
    looks like, what success looks like, partial failure and retry, and when to stop.
@@ -119,8 +112,8 @@ shorter. It gets no empty notice or checkpoint sections.
    on the launch or send, or `terminal.notifyWhenIdle`), end the turn, and on the
    next activation recover state without repeating a launch or a public write. A
    short run keeps its state in the conversation; only a long or multi-session run
-   writes a checkpoint, and never into the user's repository from the sidebar. Give a no-notice path: one bounded wait of at most 60
-   seconds, or an honest "this needs your continuation".
+   writes a checkpoint, and never into the user's repository from the sidebar. The
+   no-notice path is `waitForReply`, or an honest "this needs your continuation".
 4. **Never replay an ambiguous write.** Read the real state first: the listing, the
    submission receipt, the forge.
 5. **Give complete examples** in a tagged fence. Put the action id in the fence
@@ -129,13 +122,14 @@ shorter. It gets no empty notice or checkpoint sections.
 
    ````markdown
    ```json tool=agent.launch
-   {"agentId":"<id from agent.listAvailable>","name":"Review: retry","worktreeId":"<worktree id>","prompt":"…","notify":true}
+   {"agentId":"claude","name":"Review: retry","worktreeId":"<worktree id>","prompt":"…","notify":true}
    ```
    ````
 
    Add `surface=external` (or another capture name) for an example written for that
    caller; `tests/unit/test_runbook_examples.py` validates each example against its
-   caller's captured schema, so an external example carrying `notify` fails.
+   caller's captured schema, so an external example carrying `notify` fails, and
+so does any argument the capture predates (see its README).
 6. **Stay under the size budgets** (`tests/unit/test_runbook_budgets.py`). Remove
    duplication before adding a rule.
 
@@ -158,7 +152,7 @@ optional. The nearest domain foundation is delivered automatically and needs no
 `requires` entry. `requires` targets must exist, must be public, and must not form a
 cycle, including through the implicit foundation edge; a violation fails readiness.
 Native host tools (a shell, `gh`, file edits) never go in either tool list. Name them
-in the body's Availability line.
+in the step that uses them.
 
 ## Adding one
 
