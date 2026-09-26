@@ -217,6 +217,9 @@ boundaries:
   - query: 'only ask codex this one: is the websocket reconnect safe? bring its answer back'
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-26-same-question-named-agents
+  - query: "ask gemini to review the retry module for bugs and just tell me what it says, don't fix anything"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-26-reviewer-fixer-relay
 followups:
   - query: hows it going
     history:

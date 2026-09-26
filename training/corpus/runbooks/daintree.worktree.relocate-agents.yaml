@@ -485,6 +485,18 @@ boundaries:
   - query: the three agents i started in main keep overwriting each other's files, theyre all mid-task
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-24-selector-hardening
+  - query: "the claude I started earlier is just sitting there. move it into a new worktree called fix-dates and have it fix the date bug"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "shift the codex in t3 over to its own worktree before it touches anything, then let it carry on"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "put that idle agent on a fresh branch in its own worktree and tell it to add the missing tests there"
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "gemini's already open, give it a new worktree and tell it to start on the lint cleanup there"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-26-competition-relocate
 followups:
   - query: did they all pick it up
     history:

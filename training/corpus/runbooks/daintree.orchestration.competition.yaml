@@ -184,6 +184,18 @@ boundaries:
   - query: 'contest: claude, codex, gemini and opencode each pitch a logo idea, then they score each other''s pitches and we crown a winner'
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-26-same-question-named-agents
+  - query: "claude and gemini should each take a crack at rewriting the date parser in their own worktree, then tell me whose is cleaner"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "let codex and claude both build the retry helper separately, compare the two diffs and pick one"
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "race three agents on the flaky test fix, each on its own branch, and tell me which fix is best"
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "two agents, same job: speed up the export query. separate worktrees. which one wins?"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-09-26-competition-relocate
 followups:
   - query: how's it going?
     history:

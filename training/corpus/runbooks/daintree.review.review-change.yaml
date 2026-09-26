@@ -243,6 +243,12 @@ boundaries:
   - query: review pr 55
     confusable_with: [daintree.forge.land-pull-request]
     run: 2026-09-24-selector-hardening
+  - query: "review the parser changes yourself and list the bugs, nobody needs to fix anything yet"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "look over what codex just wrote on this branch and tell me what you'd push back on"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-26-reviewer-fixer-relay
 followups:
   - query: how's it going?
     history:

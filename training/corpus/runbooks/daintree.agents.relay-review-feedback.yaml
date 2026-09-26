@@ -153,6 +153,24 @@ boundaries:
   - query: codex's review in t6 is done — forward it to claude in t3
     confusable_with: [daintree.orchestration.verify-agent-work]
     run: 2026-09-24-selector-hardening
+  - query: "get gemini to go over the parser for bugs, read-only, and then have claude fix whatever it flags"
+    confusable_with: [daintree.review.review-change]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "spin up codex to review my last commit and send what it finds to a fresh claude to patch"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "let claude do a read-only bug hunt in utils and hand the list to codex to fix, then tell me what codex changed"
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "reviewer is codex, fixer is claude, target is the csv exporter. go"
+    confusable_with: [daintree.review.review-change]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "i want gemini's read on the retry module for bugs, then the claude already in t2 should act on whatever it finds"
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "have codex audit the migration script without touching it, then a new claude applies its fixes in the same worktree"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-26-reviewer-fixer-relay
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:

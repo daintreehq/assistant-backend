@@ -1,0 +1,116 @@
+# Cases taken from real sessions by /learn-from-transcript. Queries are the agent's
+# query as sent (or the user's words), scrubbed of specifics with their shape kept.
+
+cases:
+  - id: tx-named-reviewer-then-named-fixer-agent-query
+    category: routing-trap
+    note: >-
+      Live sidebar-assistant run, 2026-09-26: the agent's own query. Served
+      spawn-visible-agent and review-change; relay-review-feedback ranked third
+      unselected, and review-change's body sent the assistant to fingerprint and read
+      the file itself instead of launching the named reviewer. Decided by
+      relay-review-feedback's "or launch the reviewer the user names … and relay its
+      findings to the named fixer".
+    messages:
+      - role: user
+        content: >-
+          Have Codex review a file for bugs without changing anything, then have Claude
+          fix the findings
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: tx-named-reviewer-then-named-fixer-user-words
+    category: routing-trap
+    note: >-
+      Same run, the user's own words. relay-review-feedback was 0.007 behind
+      review-change and ask-and-relay. Decided by review-change's fence "when the user
+      names a reviewer agent and a different agent to fix what it finds (use
+      daintree.agents.relay-review-feedback)".
+    messages:
+      - role: user
+        content: >-
+          Ask Codex to review a source file for bugs without changing anything, then
+          pass its findings to Claude and have Claude fix them here. Tell me what
+          changed.
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: tx-plain-worktree-new-branch
+    category: single-runbook
+    note: >-
+      Live sidebar-assistant run, 2026-09-26: routed correctly at 1.0; pinned so the
+      body trim (no up-front or confirming listing) keeps its route. Decided by
+      create-plain-worktree's "create, add, or set up a plain worktree for a new
+      branch".
+    messages:
+      - role: user
+        content: Create a new worktree on a fresh branch for me, nothing launched in it
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]
+
+  - id: tx-rival-versions-in-separate-worktrees-agent-query
+    category: routing-trap
+    note: >-
+      Live sidebar-assistant run, 2026-09-26: the agent's own query. Served
+      multi-agent 0.96, relocate-agents 0.74 and fan-out-work 0.73; competition was
+      0.40 and unselected, so the assistant fetched it by id. Decided by
+      competition's "has each produce its OWN independent entry for the SAME task …
+      its own version of the same code change in its own worktree".
+    messages:
+      - role: user
+        content: >-
+          have two different agents each write their own version in separate
+          worktrees, then compare the results
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: tx-rival-versions-same-refactor-pick-better
+    category: routing-trap
+    note: >-
+      Paraphrase measured with the same run: relocate-agents 0.99 and fan-out-work
+      0.97 took it, competition 0.002. relocate-agents fences "to launch NEW agents
+      into fresh worktrees … daintree.orchestration.competition when each does the
+      same task to be compared".
+    messages:
+      - role: user
+        content: >-
+          Get Claude and Codex to each implement the same refactor independently in
+          their own worktrees and pick the better one
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: tx-move-running-agent-to-new-worktree-agent-query
+    category: routing-trap
+    note: >-
+      Live sidebar-assistant run, 2026-09-26: the agent's own query after a Claude
+      had been started to wait for instructions. Served spawn-visible-agent 0.99,
+      relocate-agents 0.001. Decided by relocate-agents' "an agent that ALREADY
+      EXISTS … is to be moved into its own new or another worktree, optionally with a
+      task to do there" and spawn-visible-agent's fence to it.
+    messages:
+      - role: user
+        content: >-
+          Move a running agent to a new worktree and have it implement a code change
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]
+
+  - id: tx-move-running-agent-to-new-worktree-user-words
+    category: routing-trap
+    note: >-
+      Same run, the user's second message. relocate-agents was 0.01 behind
+      spawn-visible-agent. Decided by relocate-agents' "move Claude to a new worktree
+      called X and have it fix Y there".
+    messages:
+      - role: user
+        content: >-
+          Actually, move Claude to a new worktree called fix-quotes and have it make
+          the CSV parser handle quoted commas there.
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]

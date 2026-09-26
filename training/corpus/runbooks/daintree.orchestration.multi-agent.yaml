@@ -193,6 +193,9 @@ boundaries:
   - query: have claude and gemini work the caching question together, swapping notes, and hand me one agreed answer
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-26-same-question-named-agents
+  - query: "have claude and codex work together on one version of the retry helper and hand me the merged result"
+    confusable_with: [daintree.orchestration.competition]
+    run: transcript-2026-09-26-competition-relocate
 followups:
   - query: how's it going?
     history:

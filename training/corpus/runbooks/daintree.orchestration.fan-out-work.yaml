@@ -386,6 +386,12 @@ boundaries:
   - query: morning! got issues 301 302 305 and 311, all independent — one codex each in its own worktree please
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-24-selector-hardening
+  - query: "give claude the parser cleanup and codex the export fix, each in its own worktree"
+    confusable_with: [daintree.orchestration.competition]
+    run: transcript-2026-09-26-competition-relocate
+  - query: "launch three new agents, one per worktree, one issue each: 41, 42 and 43"
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: transcript-2026-09-26-competition-relocate
 followups:
   - query: yeah all of them except the docs one
     history:

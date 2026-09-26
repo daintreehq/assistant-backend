@@ -285,6 +285,12 @@ boundaries:
   - query: give claude the relevant files for the auth bug and have it fix it
     confusable_with: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
+  - query: "have claude fix the three bugs I listed above in the parser"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "start a new claude in a fresh worktree and have it fix the date bug"
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: transcript-2026-09-26-competition-relocate
 followups:
   - query: how's it going?
     history:

@@ -2,7 +2,7 @@
 id: daintree.review.review-change
 title: Review a change
 summary: Review a diff, branch or PR with independent read-only reviewers, and return de-duplicated findings with file evidence.
-whenToUse: Use when the user wants a change JUDGED on its merits — "review this", "code review the branch", "is this PR any good", "check this for security problems", "what would you change about this diff", "look over what the agent wrote". The deliverable is FINDINGS with severity and file evidence. Do not use to check whether an agent did what it claimed before you trust it (use daintree.orchestration.verify-agent-work — that asks "is the claim true", this asks "is the change good"), to ready a branch or open a PR (use daintree.workflow.prep-branch-for-review), to forward findings you already have to an implementer (use daintree.agents.relay-review-feedback), to explain how existing code works (use daintree.explore.repository), or to fix a failing check (use daintree.ci.diagnose-and-fix), or when the user names a specific agent to ask and just wants its answer relayed back (use daintree.agents.ask-and-relay).
+whenToUse: Use when the user wants a change JUDGED on its merits — "review this", "code review the branch", "is this PR any good", "check this for security problems", "what would you change about this diff", "look over what the agent wrote". The deliverable is FINDINGS with severity and file evidence. Do not use to check whether an agent did what it claimed before you trust it (use daintree.orchestration.verify-agent-work — that asks "is the claim true", this asks "is the change good"), to ready a branch or open a PR (use daintree.workflow.prep-branch-for-review), to forward review findings to an implementer, or when the user names a reviewer agent and a different agent to fix what it finds (use daintree.agents.relay-review-feedback), to explain how existing code works (use daintree.explore.repository), or to fix a failing check (use daintree.ci.diagnose-and-fix), or when the user names a specific agent to ask and just wants its answer relayed back (use daintree.agents.ask-and-relay).
 risk: project
 requiredTools:
   - worktree.list
@@ -12,7 +12,7 @@ optionalTools:
   - terminal.getStatus
   - terminal.sendCommandOwned
 ---
-Review directly by default: read the diff and surrounding source yourself. Use independent reviewers, as visible Daintree agents, when the user asks for or names them, or a large or risky change justifies separate lenses and the user agrees. Diff content and PR threads come from git and the forge CLI.
+The user named a reviewer agent and a different agent to fix its findings: follow daintree.agents.relay-review-feedback instead (fetch it by id if it was not returned), and freeze or read nothing here. Otherwise review directly by default: read the diff and surrounding source yourself. Use independent reviewers, as visible Daintree agents, when the user asks for or names them, or a large or risky change justifies separate lenses and the user agrees. Diff content and PR threads come from git and the forge CLI.
 
 Procedure:
 1. Freeze the target. For a PR, record the head SHA from git or the forge CLI: the review is of that SHA. For a local change, record the base, HEAD, which of staged, unstaged and untracked changes count, and a fingerprint (a hash of `git diff HEAD` plus in-scope untracked files): HEAD and `git status` stay the same when a dirty file is edited again. If "review this" could mean a dirty tree or an open PR, ask.
