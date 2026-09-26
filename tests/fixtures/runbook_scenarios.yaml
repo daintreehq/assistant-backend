@@ -145,10 +145,26 @@ scenarios:
 
   - id: reply-arrives-in-the-notice
     situation: A child launched or prompted with notify stops, and the notice quotes its last screen lines.
-    must: Read the reply from the quote; read the terminal again only when the quote is missing or cut.
-    must_not: Wait or poll after arming the notice, or re-read every reply as a matter of course.
+    must: Read the reply from the quote; read the terminal again only when the quote holds no answer.
+    must_not: Also wait for a reply it armed a notice for, or re-read every reply as a matter of course.
     runbooks: [daintree.foundation]
-    states: ["do not also wait or poll", "The reply is always sent", "Never read a terminal for a reply you asked to be notified about", "one `terminal.getStatus` with `includeOutput` over all of them"]
+    states: ["instead of `waitForReply`", "notice quote with its answer is final: never re-read it"]
+
+  - id: needed-reply-still-pending
+    situation: >-
+      A reply the next step needs came back without its answer (a wait that returned early,
+      a screen captured before the answer drew) or is overdue, and nothing is armed to bring
+      it back.
+    must: >-
+      Recheck its status, count it in only when its handback carries that send's token and
+      the text holds the answer, and while it is still working keep rechecking at a pace
+      fitted to the work until it answers, exits, closes, is cancelled or is long overdue.
+    must_not: >-
+      Report a provisional result and end the turn with nothing coming; count a bare marker
+      as the answer; poll back-to-back; block on one long silent wait; or give up on a
+      quiet, still-working agent because its screen has not changed.
+    runbooks: [daintree.foundation]
+    states: ["pending: never advance or end your turn on it with nothing coming", "Recheck with `terminal.getStatus`", "a `lastHandback` for that prompt \\(a send's by its `submissionToken`\\) and the answer in the text, not just a marker", "Stopped without it: act on its screen", "Still working: `terminal.waitUntilIdleBatch` on those", "paced to the work", "a minute for a vote", "never back-to-back, never one long silent wait", "Stop on the answer, exit, closure, cancellation or long overdue"]
 
   - id: short-run-needs-no-checkpoint-file
     situation: A one- or two-round orchestration, or the sidebar assistant with a scratch folder.
@@ -423,6 +439,20 @@ scenarios:
     must_not: Call it unsupervised, or launch, answer or close anything.
     runbooks: [daintree.orchestration.supervise-fleet]
     states: ["Do not call a terminal \"unsupervised\""]
+
+  - id: competition-vote-pending
+    situation: Ballots were sent and one voter's reply came back without its vote.
+    must: Keep rechecking that voter and tally when the vote lands.
+    must_not: Report the tally as provisional and stop while the vote is still coming, or record a quiet voter missing.
+    runbooks: [daintree.orchestration.competition, daintree.foundation]
+    states: ["A vote not back yet is pending, not missing: recheck it as the foundation's Replies say", "missing only on exit, closure, an error or long overdue", "a dialog keeps it pending"]
+
+  - id: competition-entry-not-runner-up
+    situation: A tie rule asked each entrant for a runner-up, and a short read of one entrant shows only its runner-up.
+    must: Recover that entrant's main answer before sending ballots.
+    must_not: Put the runner-up on the ballots as its entry.
+    runbooks: [daintree.orchestration.competition]
+    states: ["its main answer, never a runner-up given for a tie rule; recover a cut one before ballots"]
 
   - id: competition-late-entry
     situation: An entry arrives after ballots were sent.

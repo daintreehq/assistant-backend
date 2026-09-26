@@ -196,6 +196,18 @@ boundaries:
   - query: "two agents, same job: speed up the export query. separate worktrees. which one wins?"
     confusable_with: [daintree.orchestration.fan-out-work]
     run: transcript-2026-09-26-competition-relocate
+  - query: "ask claude, grok and opencode for one surprising fact each and tell me which agent came up with the best one"
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: transcript-2026-09-26-fact-contest-named-agents
+  - query: "get gemini, codex and claude to each pitch a release name, give a point to your top two, let each vote on the others' pitches and say whose won"
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: transcript-2026-09-26-fact-contest-named-agents
+  - query: "have codex, claude and cursor each write a short customer explanation of the outage, then tell me which agent's is clearest"
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: transcript-2026-09-26-fact-contest-named-agents
+  - query: "ask each pinned agent for one onboarding experiment it would run and tell me whose proposal is best"
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: transcript-2026-09-26-fact-contest-named-agents
 followups:
   - query: how's it going?
     history:

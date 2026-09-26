@@ -24,7 +24,7 @@ A plain question to distinct kinds:
 ```
 
 4. `missing-cli` or `launched:false` excludes that voter, with the reason.
-5. Translate each label through that voter's own map. A missing, ambiguous, off-ballot or unreadable answer is excluded, never counted against the majority, and no vote is made up for it. A voter at any question, approval or error other than the launch-directory trust dialog is excluded with the reason.
+5. Translate each label through that voter's own map. An answer still missing after the foundation's recheck, ambiguous, off-ballot or unreadable is excluded, never counted against the majority, and no vote is made up for it. A voter at any question, approval or error other than the launch-directory trust dialog is excluded with the reason.
 6. Tally once every voter has answered or been excluded. A tie: apply the tiebreak the user already gave before reporting; ask only when none was given or it still ties. A later answer is a marked provisional update, never a silent change to a result already given.
 
 If the user flags bias, rerun from scratch with fresh voters; never mix biased and corrected votes. Close only this poll's terminals, only on request.

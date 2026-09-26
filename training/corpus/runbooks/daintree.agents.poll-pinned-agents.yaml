@@ -366,6 +366,15 @@ boundaries:
   - query: same question to claude, codex and gemini — which of these two libraries should we use — and tell me how they voted
     confusable_with: [daintree.orchestration.competition]
     run: 2026-09-26-same-question-named-agents
+  - query: "ask claude, grok and codex which of my three release names they prefer and tell me which name got the most votes"
+    confusable_with: [daintree.orchestration.competition]
+    run: transcript-2026-09-26-fact-contest-named-agents
+  - query: "have each pinned agent vote yes or no on shipping friday and give me the tally"
+    confusable_with: [daintree.orchestration.competition]
+    run: transcript-2026-09-26-fact-contest-named-agents
+  - query: "put my two api designs to claude, gemini and codex, have each pick one, and tell me which design won"
+    confusable_with: [daintree.orchestration.competition]
+    run: transcript-2026-09-26-fact-contest-named-agents
 followups:
   - query: how's it going?
     history:

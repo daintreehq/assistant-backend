@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 10828,
-  "compiled_sha256": "b857f64d4c69d50f7fa6c8d657567fd61752da3904889c0cdb7eb836bca839bd",
+  "rows": 10835,
+  "compiled_sha256": "9e5dcef55d07fa8795171a5c4834a79a39a6c82e865b6ffaae8d257d5d807952",
   "label_space_sha256": "df0d1ebc2785b5ab8ed95e2d266c3a659011b31b2294bd506cdf985dc686456e",
   "label_space_size": 40,
   "by_source": {
-    "boundary": 2583,
+    "boundary": 2590,
     "docs": 740,
     "followup": 468,
     "foundation": 312,
@@ -31,6 +31,7 @@
     "2026-09-26-same-question-named-agents": 75,
     "pre-split": 9811,
     "transcript-2026-09-26-competition-relocate": 12,
+    "transcript-2026-09-26-fact-contest-named-agents": 7,
     "transcript-2026-09-26-reviewer-fixer-relay": 10
   },
   "dropped": {},
@@ -55,10 +56,10 @@
       "sha256": "b79b2be360f1ab1c84e2c06a636772585fe6dc8e9bd8cda3add29db8f1326f12"
     },
     "runbooks/daintree.agents.poll-pinned-agents.yaml": {
-      "examples": 258,
-      "rows": 258,
+      "examples": 261,
+      "rows": 261,
       "runbook": "daintree.agents.poll-pinned-agents",
-      "sha256": "1ef8ecb7bedd7b8cc03409846e982fb1440c68747fb25021d6c6a385b2366cd2"
+      "sha256": "6a84ddc19b740ac8cf8345a12f700cc95b6b37b7948d98abca4d450439d58ced"
     },
     "runbooks/daintree.agents.recover-agent.yaml": {
       "examples": 206,
@@ -127,10 +128,10 @@
       "sha256": "adac8357a13a19e767c596d4ab031995c7eb6f4a383f4ad259d53ec67dc7e52e"
     },
     "runbooks/daintree.orchestration.competition.yaml": {
-      "examples": 169,
-      "rows": 169,
+      "examples": 173,
+      "rows": 173,
       "runbook": "daintree.orchestration.competition",
-      "sha256": "549e2181a46e248a462485b70d287187ede33ddae75c2bb9346f84a401a40c07"
+      "sha256": "48f86353dba147f799b888176e0b9f4cf0617eb932af53b208bfadef4ba623b5"
     },
     "runbooks/daintree.orchestration.conversation.yaml": {
       "examples": 139,

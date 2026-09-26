@@ -114,3 +114,39 @@ cases:
     expect:
       required: [daintree.worktree.relocate-agents]
       optional: [daintree.foundation]
+
+  - id: tx-fact-contest-peer-vote-agent-query
+    category: routing-trap
+    note: >-
+      Live sidebar-assistant run (Codex), 2026-09-26, session 01a0dece: the agent's
+      own query, served competition 0.9998 with poll-pinned-agents 0.003. Pinned so a
+      fix for the user-words phrasing below cannot trade it away. Decided by
+      competition's "has each produce its OWN independent entry for the SAME task —
+      an interesting fact … send each agent the others' submissions to pick the best,
+      tally, declare a winner".
+    messages:
+      - role: user
+        content: >-
+          Ask multiple agents for unique interesting facts and have them vote on the
+          best fact
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: tx-fact-contest-peer-vote-user-words
+    category: routing-trap
+    note: >-
+      Same run, the user's own words, trimmed. poll-pinned-agents took it at 0.9994
+      with competition 0.004: named agents plus "tell me which agent gave the most
+      interesting fact" read as a poll. The entries are the agents' own facts, then a
+      verdict on them. Decided by poll-pinned-agents' fence "for a judged competition
+      over the agents' own submissions … (use daintree.orchestration.competition)".
+    messages:
+      - role: user
+        content: >-
+          Ask Claude, Antigravity, Grok and Codex each for one interesting fact, pick
+          the two best, have each vote on the others' facts, tally and tell me which
+          agent gave the most interesting fact
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]

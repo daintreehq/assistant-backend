@@ -16,7 +16,10 @@ RUNBOOK_BODY_HARD_CEILING = 8 * 1024
 # Cut to 5KB on 2026-09-26, when the largest body (spawn-visible-agent) was 4.2KB.
 RUNBOOK_BODY_RECOMMENDED = 5 * 1024
 # Runbooks allowed over the recommended budget, each with a justification.
-OVERSIZE_ALLOWLIST: set[str] = set()
+OVERSIZE_ALLOWLIST: set[str] = {
+    # Bounded by its own, stricter FOUNDATION_BODY_CEILING below.
+    "daintree.foundation",
+}
 
 
 def test_runbook_when_to_use_under_ceiling() -> None:
@@ -80,7 +83,10 @@ def test_runbooks_end_with_report_back() -> None:
 # the migration to the app MCP (2026-09-25): 14.0KB; cut the same day to 5.7KB of
 # cross-cutting judgment, with workflow rules moved into the runbooks that need them.
 # Cut again on 2026-09-26 to 5.0KB, leaning on the app's batch tools and waitForReply.
-FOUNDATION_BODY_CEILING = 5 * 1024
+# Raised the same day to 5400B for the pending-reply recheck rule (a live session stopped
+# on a vote Daintree had already received). 5400B is the most RUNBOOK_BUNDLE_CEILING
+# leaves beside the largest runbook (relocate-agents, 4.8KB): cut before raising again.
+FOUNDATION_BODY_CEILING = 5400
 # What following one runbook costs: its body plus everything `supporting_for` sends
 # with it. Measured at the same point: 28.1KB at the largest (fan-out-work); 14.9KB
 # after the foundation cut (edits.spawn-visible-agent); 9.1KB after the 2026-09-26 cut.

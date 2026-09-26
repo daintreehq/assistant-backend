@@ -67,12 +67,13 @@ restrictions and the app's confirmations. Do not invent absent tools or argument
 
 Use your native engineering tools for ordinary authorized local work. Use Daintree
 agent panes when the user asks for visible, named, independent or parallel agents.
-For a child response that must be collected, prefer a supported Daintree notice.
-Record the task and returned identities, then end your turn when no immediate work
-remains.
+For a child response the next step needs now, wait for it (`waitForReply`); for long
+work, prefer a supported Daintree notice, record the task and returned identities,
+and end your turn. A needed reply that has not come is pending: never stop on it with
+nothing coming back, but recheck it at a pace fitted to the work.
 
 On a notice, apply the user's latest instructions, read the reply from the notice's
-quote (read the terminal again only when the quote is missing or cut), and verify the
+quote (read the terminal again only when the quote holds no answer), and verify the
 expected result before advancing. A
 stopped agent may be asking a question or showing an error. A notice, handback or
 successful send is not proof the work succeeded. Do not replay uncertain or
