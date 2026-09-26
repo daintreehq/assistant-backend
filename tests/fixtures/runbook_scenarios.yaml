@@ -292,11 +292,11 @@ scenarios:
     states: ["\"no changes needed\" is verified when you confirm the required behaviour"]
 
   - id: explore-read-only-violation
-    situation: Files change during a read-only investigation.
-    must: Report the boundary failure.
-    must_not: Hide it.
+    situation: Files change during a read-only investigation, including a further edit to an already-dirty file.
+    must: Report the unexpected change, and call it a boundary failure only once the investigation is known to have made it.
+    must_not: Hide it, or blame the investigation for an edit the user or another process made.
     runbooks: [daintree.explore.repository]
-    states: ["read-only investigation is a boundary failure"]
+    states: ["hash of `git diff HEAD`", "unexpected change", "boundary failure only once you know the investigation made it"]
 
   - id: web-app-stale-console
     situation: The console still shows errors from before the reload.
@@ -451,3 +451,74 @@ scenarios:
     must_not: Start the deferred work now, or call a notice a timer.
     runbooks: [daintree.orchestration.watch-outcome]
     states: ["never arm a notice and call it a timer", "Deferred work is never started now"]
+
+  # ---- the runbooks audit's regression cases (non-agent runbooks) ------------------------
+  - id: relocate-group-moves-together
+    situation: Two panels the user asked to relocate share a tab group, and terminal.list shows no groups.
+    must: Snapshot placements before the first move, compare after it, and stop if anything else moved.
+    must_not: Move a panel back, or report independent isolation.
+    runbooks: [daintree.worktree.relocate-agents]
+    states: ["snapshot every panel's `worktreeId`", "leave the split to the user"]
+
+  - id: relocate-confirmation-is-a-second-continuation
+    situation: The safe-boundary notice has fired, and the relocation instruction is then sent.
+    must: Ask for a fresh notice on the relocation send and record that phase.
+    must_not: Move the panel or send the instruction again on resume.
+    runbooks: [daintree.worktree.relocate-agents]
+    states: ["awaits relocation confirmation", "never move its panel or send the instruction again"]
+
+  - id: dirty-snapshot-identity
+    situation: An already-dirty file is edited again, so HEAD and git status are unchanged but the diff differs.
+    must: Bind review evidence to a content fingerprint, not HEAD and status alone.
+    must_not: Treat an earlier review or a reviewer's current HEAD as proof for the new content.
+    runbooks: [daintree.review.review-change]
+    states: ["hash of `git diff HEAD`", "consistency check, not proof"]
+
+  - id: cached-ci-rollup-is-unbound
+    situation: forge.getCIStatus shows green for commit A while a fresh head read returns commit B.
+    must: Read the checks bound to the exact commit, and report a roll-up without them as unbound.
+    must_not: Claim B passed because a head read sits beside a cached roll-up.
+    runbooks: [daintree.ci.diagnose-and-fix]
+    states: ["does not bind it", "--commit <sha>", "unbound"]
+
+  - id: merge-queue-is-not-merged
+    situation: The repository takes the PR into a merge queue, or auto-merge is enabled.
+    must: Report what the read-back shows (queued, or auto-merge waiting).
+    must_not: Report merged, repeat the merge, or pass --admin.
+    runbooks: [daintree.forge.land-pull-request]
+    states: ["report it queued, not merged", "never merged on the request alone", "Never pass `--admin`"]
+
+  - id: publish-only-the-requested-stage
+    situation: The user asks only to commit (or only to push).
+    must: Stop after that stage.
+    must_not: Treat the later numbered steps as authorized.
+    runbooks: [daintree.workflow.prep-branch-for-review]
+    states: ["commit-only request stops after the commit"]
+
+  - id: issue-command-resolved-before-launch
+    situation: The user names a command for the issue agent, and it cannot be found in the new worktree.
+    must: Block the launch and report it with the worktree.
+    must_not: Launch first and resolve later, or substitute a similar command.
+    runbooks: [daintree.workflow.start-work-on-issue]
+    states: ["Resolve any command or skill the user named before launching", "block the launch"]
+
+  - id: shortcut-terminal-idle-is-not-empty
+    situation: workflow.startWorkOnIssue's agent sits idle when the coordinator first reads it.
+    must: Establish it holds no task before sending the brief.
+    must_not: Send the brief just because the terminal is idle.
+    runbooks: [daintree.workflow.start-work-on-issue]
+    states: ["Idle is not proof the agent holds no task"]
+
+  - id: null-launch-destination-is-unconfirmed
+    situation: agent.launch returns a null worktreeId or worktreePath.
+    must: Confirm the placement from terminal.list.
+    must_not: Treat null as a proven wrong checkout and interrupt the agent.
+    runbooks: [daintree.edits.spawn-visible-agent, daintree.workflow.start-work-on-issue]
+    states: ["unconfirmed, not wrong"]
+
+  - id: teardown-fails-closed
+    situation: A lifecycle teardown runs with a missing ownership marker or an empty name variable.
+    must: Refuse, and release only what this worktree's marker names.
+    must_not: Delete by prefix or touch a shared resource.
+    runbooks: [daintree.worktree.provision-local-environment]
+    states: ["refuses on a missing or mismatched marker", "never touches a shared resource"]

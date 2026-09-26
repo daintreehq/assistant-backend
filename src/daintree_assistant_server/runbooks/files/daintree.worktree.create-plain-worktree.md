@@ -46,11 +46,12 @@ Procedure:
 ```
 
    - `ready` is the only success.
-   - `pending` or `running` with `timedOut:true` is not a failure: call again, at most three calls in all, then report the worktree as created with setup still running at `stage`.
+   - `pending` or `running` with `timedOut:true` is not a failure: call again, at most three calls in all (about 75 seconds, the setup budget; terminal waits have their own), then report the worktree as created with setup still running at `stage`.
+   - An API-key client, which has no `worktree.waitUntilReady`, reads `setupState` once from `worktree.list` and reports anything but `ready` as it stands.
    - `failed` or `timed-out`: report `stage` and `error`. The worktree exists; do not delete or recreate it.
    - `needs-approval`: the repository's setup commands are waiting for the user to approve them in Daintree. You cannot approve them; say so.
    - `unknown`: this Daintree did not create it, or has restarted since; setup cannot be confirmed.
-7. Confirm with `worktree.list` that the new id, path and branch appear and that the main worktree is still on its earlier branch.
+7. Confirm with `worktree.list` that the new id, path and branch appear and that the main worktree is still on its earlier branch. A plain create never checks out there, so if that branch moved, report it as a change someone else made; do not attribute it to this call or move it back.
 8. Stop. A creation-only request needs no agent, terminal or notice.
 
 Report back: the worktree id and path, its branch (requested and effective if they differ) with its mode and base, the setup state (ready, still running at a stage, failed with its error, or awaiting the user's approval), that the original worktree's branch did not move, and that no recipe or agent was launched.

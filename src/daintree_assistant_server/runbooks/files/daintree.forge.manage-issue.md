@@ -31,11 +31,11 @@ Procedure:
 {"worktreeId":"<resolved worktree id>","issueNumber":42}
 ```
 
-   An empty result means no such issue: stop. A title or body edit replaces the old value, so re-read right before replacing and keep whatever someone added since your first read. An additive note is a comment (daintree.workflow.follow-up-on-issue), not a body rewrite. Reopen only an issue the read shows closed.
+   An empty result means no such issue: stop. A title or body edit replaces the old value, so re-read right before replacing and keep whatever someone added since your first read. That narrows the race without closing it: if the read-back shows someone else's change lost, restore it or report the conflict. An additive note is a comment (daintree.workflow.follow-up-on-issue), not a body rewrite. Reopen only an issue the read shows closed.
 6. Labels and assignees: `gh issue edit 42 --repo <r> --add-label <l> --remove-label <l>`, and `--add-assignee`/`--remove-assignee`. Removing a label the issue does not carry fails, so check first. With `gh`, `@me` resolves to the authenticated account; with another tool, use a concrete login grounded in context or ask. A forge can silently drop an assignee without repository access: the resulting list, not the call's success, is the answer.
 7. Read back every requested field (title, body, state, the complete label set, assignees) with `gh issue view 42 --repo <r> --json title,body,state,labels,assignees,url` or `forge.getIssue`. Daintree's listings can serve a cached page after a change made outside the app; pass `bypassCache:true` to `forge.listIssues` when re-searching. Report each field as confirmed, not applied, or unknown: a multi-field request can partly land.
 
-Uncertain create: when the create's reply is lost or ambiguous, search the same repository for the exact title, including closed issues and with `bypassCache:true`, before any retry. A second create after a timeout is how duplicates happen, and the host tool offers no idempotency key to lean on.
+Uncertain create: when the create's reply is lost or ambiguous, search the same repository before any retry: the exact title, closed issues included, narrowed to your account and time (`author:@me created:>=<date>`), with `bypassCache:true`. A title match is a candidate; confirm it by its body before calling it yours. A second create after a timeout is how duplicates happen, and the host tool offers no idempotency key to lean on.
 
 Scope: closing an issue and its closing comment belong to daintree.workflow.follow-up-on-issue. Filing or labelling an issue is not a request to start work on it; that happens only when the user asks, through daintree.workflow.start-work-on-issue.
 
