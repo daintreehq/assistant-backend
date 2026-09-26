@@ -27,7 +27,7 @@ Three separate facts: panel placement (all `terminal.moveToWorktree` changes), p
 6. Instruct each owned agent once, at its prompt, with `waitForReply:true, handback:true`; the agent now awaits relocation confirmation until the reply returns. Tell the user, so they skip the pane's "continue in the new worktree" banner; for an agent you don't own that banner is the path.
 
 ```json tool=terminal.sendCommandOwned
-{"terminalId":"<owned agent terminal id>","command":"Continue this task in <destination worktreePath> on branch <branch>. First run pwd and git branch there and report both. Work only inside that directory, and pass worktreeId <destination worktreeId> on any Daintree call. Leave the original worktree's changes as they are.","handback":true}
+{"terminalId":"<owned agent terminal id>","command":"Continue this task in <destination worktreePath> on branch <branch>. First run pwd and git branch there and report both. Work only inside that directory, and pass worktreeId <destination worktreeId> on any Daintree call. Leave the original worktree's changes as they are.","waitForReply":true,"handback":true}
 ```
 
 7. Verify each fact: placement from `terminal.list`; root from the reported `pwd` and branch, then where new edits land (`git status` in both paths), since "OK" is not evidence; the source changes still there. An agent that cannot change root keeps its session: report the limit, never restart or discard it.

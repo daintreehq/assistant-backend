@@ -17,7 +17,7 @@ optionalTools:
 3. Ballots, once every active entrant has an entry or is recorded missing. Entries lock when the first ballot is sent: a later entry is late and changes no issued ballot. Give each voter the eligible entries in one identical format under neutral labels, with no author, agent kind or "(you)", in a different order per voter; keep each voter's label-to-entrant map to yourself. Send all ballots in one `terminal.sendCommandMany` with `waitForReply:true`:
 
 ```json tool=terminal.sendCommandMany
-{"sends":[{"terminalId":"<voter terminal id>","command":"Ballot. Task was: <task>. A: <entry>. B: <entry>. C: <entry>. Judge on merit. Reply with exactly one label and a one-line reason."}],"handback":true}
+{"sends":[{"terminalId":"<voter terminal id>","command":"Ballot. Task was: <task>. A: <entry>. B: <entry>. C: <entry>. Judge on merit. Reply with exactly one label and a one-line reason."}],"waitForReply":true,"handback":true}
 ```
 
    A neutral judge is one fresh launch with the same ballot as its `prompt`; it casts no peer vote, and decides only when that was the agreed method.

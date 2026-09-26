@@ -7,19 +7,19 @@ captured from the app itself rather than written by hand. Runbooks that show
 Daintree MCP calls can validate their tagged JSON examples against these.
 
 **Source:** `daintreehq/daintree`, branch `feature/mcp-cleanup`, commit
-`fecde51aec` ("refactor(help): cut the assistant prompts to the rules they
-need"), app version 0.38.0, MCP SDK 1.30.0, protocol `2025-11-25`. Captured
+`c5f42a0935` ("feat(mcp): let a send or launch wait for the agent's reply"),
+app version 0.38.0, MCP SDK 1.30.0, protocol `2025-11-25`. Captured
 2026-09-26. It has the batch tools (`agent.launchMany`,
-`terminal.sendCommandMany`, `terminal.closeMany`) but predates `waitForReply`
-and `waitSeconds`, so no tagged runbook example may carry those yet.
+`terminal.sendCommandMany`, `terminal.closeMany`) and `waitForReply` /
+`waitSeconds` on `agent.launch`, the sends and both batches, external included.
 
 | file | caller | tier | tools | `mcp.surface` hash |
 |---|---|---|---|---|
-| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 72 (32 run, 40 ask first) | `cddd2871…` |
-| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 72 | `e799664e…` |
-| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 32 | `49b24675…` |
-| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 77 | `7c1479fe…` |
-| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `6f5481ee…` |
+| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 72 (32 run, 40 ask first) | `afa2fd53…` |
+| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 72 | `9b5e257e…` |
+| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 32 | `09ddea22…` |
+| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 77 | `cf208e7a…` |
+| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `fd13e204…` |
 
 Full hashes are in each file's `capture.surface_hash`.
 

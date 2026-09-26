@@ -22,7 +22,7 @@ You facilitate, never participate: relay, condense, report, with no position of 
 4. Pass the floor: send the current speaker only everything public it has not seen since it last spoke, labelled by name (condensed messages marked as condensed), with `waitForReply:true, handback:true`:
 
 ```json tool=terminal.sendCommandOwned
-{"terminalId":"<speaker terminal id>","command":"Turn <t>. Since your last turn: <Name> said …; <Name> said …. Respond to the group in at most 15 lines. Private notes go under [Operator].","handback":true}
+{"terminalId":"<speaker terminal id>","command":"Turn <t>. Since your last turn: <Name> said …; <Name> said …. Respond to the group in at most 15 lines. Private notes go under [Operator].","waitForReply":true,"handback":true}
 ```
 
 5. Append the reply's public part to the log, keep `[Operator]` notes out of every peer's messages (they may still go to the user), and advance that speaker's last-seen position. A reply from anyone else, or for an earlier turn, is logged as late, never as the current turn. Fold a user interjection into the next speaker's message; never restart.

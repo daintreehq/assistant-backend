@@ -23,7 +23,7 @@ You conduct: never answer the judge's questions, assess a candidate or override 
 3. Launch together, each with `waitForReply:true, handback:true`: the candidates (one `agent.launchMany` when kinds are distinct) with the topic and "make your case in at most 20 lines; answer the interviewer's questions; change no files", and the judge:
 
 ```json tool=agent.launch
-{"agentId":"<agent id>","name":"Interview judge: <topic>","prompt":"You interview candidates <labels> on <topic>. Rubric: <rubric>. Write your first question set, at most 10 lines. Answers will be relayed to you; then ask follow-ups or give a verdict with reasons. <verified: check each concrete claim by reading the project, challenge unsupported ones, narrow to a top 2, then pick one>. Read-only: change no files.","focusPolicy":"preserve","handback":true}
+{"agentId":"<agent id>","name":"Interview judge: <topic>","prompt":"You interview candidates <labels> on <topic>. Rubric: <rubric>. Write your first question set, at most 10 lines. Answers will be relayed to you; then ask follow-ups or give a verdict with reasons. <verified: check each concrete claim by reading the project, challenge unsupported ones, narrow to a top 2, then pick one>. Read-only: change no files.","focusPolicy":"preserve","waitForReply":true,"handback":true}
 ```
 
 4. Each question set: send every candidate the judge's exact questions (the same set unless the judge addressed one) in one `terminal.sendCommandMany` with `waitForReply:true, handback:true`, asking for at most 30 lines with evidence for each claim. Never send a set to a candidate still answering one. On a verified run, relay each challenge only to the candidate it names.

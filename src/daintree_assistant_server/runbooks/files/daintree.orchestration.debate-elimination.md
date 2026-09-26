@@ -23,7 +23,7 @@ You relay every hand-off. The vote is attributed: debaters know each position by
 5. Vote, the same way: every active position with equal detail and neutral wording, and only the user's criterion.
 
 ```json tool=terminal.sendCommandMany
-{"sends":[{"terminalId":"<debater terminal id>","command":"Elimination vote, round <r>. Active positions: <Name>: <position>. <Name>: <position>. Criterion: <the user's exact words>. <self-vote rule>. Reply with exactly one name and a one-line reason."}],"handback":true}
+{"sends":[{"terminalId":"<debater terminal id>","command":"Elimination vote, round <r>. Active positions: <Name>: <position>. <Name>: <position>. Criterion: <the user's exact words>. <self-vote rule>. Reply with exactly one name and a one-line reason."}],"waitForReply":true,"handback":true}
 ```
 
 6. A reply counts only from an active participant for the current round; an eliminated participant's late reply is recorded, never counted. A dialog or error is not a vote: never answer it with debate text or "choose anyway". Map each vote to exactly one active target; an ambiguous one gets one clarification to that voter alone, then is invalid. An elimination request mid-debate votes on the latest positions and says whose input is missing.

@@ -128,8 +128,7 @@ It gets no empty notice or checkpoint sections.
 
    Add `surface=external` (or another capture name) for an example written for that
    caller; `tests/unit/test_runbook_examples.py` validates each example against its
-   caller's captured schema, so an external example carrying `notify` fails, and
-so does any argument the capture predates (see its README).
+   caller's captured schema, so an external example carrying `notify` fails.
 6. **Stay under the size budgets** (`tests/unit/test_runbook_budgets.py`). Remove
    duplication before adding a rule.
 
