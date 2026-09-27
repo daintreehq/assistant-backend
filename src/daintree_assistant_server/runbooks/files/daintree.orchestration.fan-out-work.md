@@ -18,6 +18,8 @@ optionalTools:
   - forge.getIssue
   - slashCommands.list
   - skills.search
+  - terminal.closeMany
+  - worktree.deleteOwned
 ---
 The queue advances only on notices; an API-key client has none, so refilling needs the user: say so first. A pane holds at most 32 pending notices, so never run a cohort beyond that. There is no watchdog for stalled units.
 
@@ -40,6 +42,7 @@ On notice or resume:
 
    Idle, a question, a failed command or an unconfirmed submission never unlocks the next command. A failed unit stops only its own chain.
 3. Release and refill. A slot frees when the unit's last step is verified, or it is failed or blocked and no longer working. A detected PR is not a finished agent: a working agent keeps its slot. A blocked unit re-reserves a slot before it is answered. An uncertain launch keeps its slot until reconciled by `requestedId`. Refill through the gate only on these transitions. Save after each.
+4. Teardown the user asked for per unit ("then delete its worktree") waits for their condition, not a merge unless they said so. Once verified (branch pushed, tree clean), close the unit's panel in its own call (`terminal.closeMany`, confirmed by `closedIds`), never through `closeTerminals`, then `worktree.deleteOwned`, which keeps the branch. Each delete waits on the user's confirmation in Daintree. On `CONFIRMATION_TIMEOUT` mark it `delete pending`, say so once, and retry one at a time only when the user says they are there; it holds no slot unless the user made deletion the condition for the next launch. `USER_REJECTED` keeps it. Count deleted, pending and kept from the checkpoint, checked against a fresh `worktree.list`.
 
 Stop and recovery: one corrective prompt per unit unless the user set another bound. A `working` unit with an old `lastOutputChangeAt` is reported possibly stalled and keeps its slot; recovering it (daintree.agents.recover-agent) needs the user. A late lockfile collision holds the later unit. Never relaunch to repair tracking. Integrating branches is a separate serialized step verified on the combined tree. On cancellation launch nothing more; closing is daintree.orchestration.workspace-cleanup.
 

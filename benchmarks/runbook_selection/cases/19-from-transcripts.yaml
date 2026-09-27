@@ -307,3 +307,51 @@ cases:
     expect:
       required: [daintree.agents.ask-and-relay]
       optional: [daintree.foundation]
+
+  - id: tx-rolling-queue-per-unit-teardown-agent-query
+    category: routing-trap
+    note: >-
+      Help-assistant session 80156813, 2026-09-27: the agent's own query, served
+      fan-out-work at 1.0 (workspace-cleanup 0.03); 20 agents ran to 20 PRs. The
+      request asks for each unit's worktree to be deleted as it lands, which is the
+      queue's own teardown, not a cleanup. Decided by fan-out-work's "a ROLLING QUEUE
+      under a cap … including refilling it as each unit finishes" against
+      workspace-cleanup's "tear down workspace state after a fan-out".
+    messages:
+      - role: user
+        content: >-
+          Run design review agents in parallel worktrees, keep six going, prompt them
+          periodically, open PRs, delete worktrees when done
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: tx-rolling-queue-per-unit-teardown-user-words
+    category: single-runbook
+    note: >-
+      Same session, the user's own words, scrubbed: routed at 0.999. Decided by
+      fan-out-work's "a list of work plus a concurrency cap is this runbook".
+    messages:
+      - role: user
+        content: >-
+          Create new worktrees and branches for small, focused areas. In each, send a
+          Claude Code agent on Opus running the design review command so it opens a pull
+          request. Only 6 at a time; when one finishes, delete its worktree and start the
+          next. Keep going until 20 to 30 are done.
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: tx-delete-done-worktrees-mid-queue
+    category: single-runbook
+    note: >-
+      Same session, 13:41: asked mid-queue after two deletes had timed out unanswered;
+      five deletes then ran and were confirmed. Routed at 1.0. Decided by
+      workspace-cleanup's "the user explicitly asks to tear down workspace state …
+      'delete that worktree'".
+    messages:
+      - role: user
+        content: Can you delete the worktrees that are done?
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
