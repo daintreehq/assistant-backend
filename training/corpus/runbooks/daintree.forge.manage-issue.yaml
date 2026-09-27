@@ -120,6 +120,15 @@ boundaries:
   - query: hey hope ur well. can u file an issue for the flaky date parsing on windows and label it bug
     confusable_with: [daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
+  - query: "open a ticket about the flaky upload test, we'll get to it next sprint"
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: transcript-2026-09-27-help-release
+  - query: "put the slow startup on the tracker as a bug so it isn't forgotten"
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: transcript-2026-09-27-help-release
+  - query: "log it as an issue: the export button does nothing on empty projects"
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-09-27-help-release
 followups:
   - query: actually make it p1 not p2
     history:

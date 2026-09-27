@@ -32,6 +32,6 @@ Four boundaries fail independently; find the failed one before prescribing:
 
 Secrets: never output a credential in any form (value, prefix, length or hash): the Daintree key, a pane's MCP credential, provider tokens, credential-shaped text in errors, URLs, env dumps or output. Don't read one to prove it is set. Runbook searches leave the machine: describe the task, never paste logs.
 
-Bug report: the failed boundary and evidence; `appVersion`, `tier`, surface `hash`; host and CLI versions; bounded, redacted error and notification rows with timestamps and context ids; checks unavailable.
+Bug report: the failed boundary and evidence; `appVersion`, `tier`, surface `hash`; host and CLI versions; bounded, redacted error and notification rows with timestamps and context ids; checks unavailable. Logs to share: send the user to Settings → Troubleshooting → Download diagnostics, where they choose sections, redactions and find-and-replace rules before saving. Its redaction is best-effort: have them read the ZIP before sending it. Never copy raw log files out yourself unless asked, and then bounded and redacted.
 
 Report back: the failing boundary, evidence and how observed, checks unavailable and why, and the one grounded next step, saying whether recovery was verified.

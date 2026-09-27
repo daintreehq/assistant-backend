@@ -2,7 +2,7 @@
 id: daintree.forge.manage-issue
 title: Create and maintain a forge issue
 summary: Create, edit, reopen, label or assign an issue against the exact repository, then read it back so public forge state is never inferred from a successful call.
-whenToUse: Use when the user asks to file or create an issue, change an issue title or body, reopen an issue, add or remove labels, or assign or unassign an account. Also use for issue intake such as "turn this bug into an issue" or "label and assign this ticket". Do not use to search the backlog for work (use daintree.workflow.find-issue-work), start implementation (use daintree.workflow.start-work-on-issue), read an issue or PR's current status or add a closing comment and close it (use daintree.workflow.follow-up-on-issue), or create a pull request (use daintree.workflow.prep-branch-for-review).
+whenToUse: 'Use when the user asks to file, log or create an issue ("log this as an issue", "log it for later", "turn this bug into an issue"), change an issue title or body, reopen an issue, add or remove labels, or assign or unassign an account, as in "label and assign this ticket". Logging an issue for later is filing it now, not a later wake (not daintree.orchestration.watch-outcome). Do not use to search the backlog for work (use daintree.workflow.find-issue-work), start implementation (use daintree.workflow.start-work-on-issue), read an issue or PR''s current status, ask why an issue is still open, or add a closing comment and close it (use daintree.workflow.follow-up-on-issue), or create a pull request (use daintree.workflow.prep-branch-for-review).'
 risk: system
 requiredTools:
   - forge.getIssue

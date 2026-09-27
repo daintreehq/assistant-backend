@@ -150,3 +150,160 @@ cases:
     expect:
       required: [daintree.orchestration.competition]
       optional: [daintree.foundation]
+
+  - id: tx-why-is-shipped-issue-still-open
+    category: routing-trap
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-24: the user's own words after a fix
+      shipped and its issue stayed open. forge.manage-issue took it at 0.997 with
+      follow-up-on-issue outside the top 5. Decided by manage-issue's fence "read an
+      issue or PR's current status, ask why an issue is still open, or add a closing
+      comment and close it (use daintree.workflow.follow-up-on-issue)".
+    messages:
+      - role: user
+        content: Why is this open? https://github.com/acme/widgets/issues/1384
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: tx-reaudit-fix-with-codex-fresh-sessions
+    category: routing-trap
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-25: the user's words, trimmed. The
+      assistant launched three read-only Codex reviewers, one lens each, and merged
+      their findings; no fixer was named. relay-review-feedback took it at 0.999 with
+      review-change 0.002. Decided by relay-review-feedback's fence "when you review
+      the change yourself and no agent is named to fix it (use
+      daintree.review.review-change)".
+    messages:
+      - role: user
+        content: >-
+          Reaudit the entire fix with Codex via brand new sessions, looking for all
+          second and third order effects
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: tx-daintree-logs-for-bug-report
+    category: single-runbook
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-27: the user's words, verbatim. Nothing was
+      selected (create-plain-worktree 0.86, diagnostics 0.46); a tidier phrasing
+      selects diagnostics at 0.995. Decided by diagnostics' "wants diagnostics for a
+      bug report".
+    messages:
+      - role: user
+        content: >-
+          Can you put daintree logs to send to author to look for bugs on desktop?
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: tx-log-it-as-issue-for-later
+    category: routing-trap
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-23: "log" meaning file an issue, the
+      user's "Ok log the e2e for this for later" with its referent filled in. "for
+      later" pulled it to watch-outcome (0.63) beside the foundation, with
+      manage-issue unranked. Decided by manage-issue's "file or create an issue …
+      turn this bug into an issue"; nothing is to happen at a later time.
+    messages:
+      - role: user
+        content: Ok log the missing e2e tests for this widget move as an issue for later
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: tx-drive-release-checklist-in-browser-yourself
+    category: no-task
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-23: the user asked the assistant itself
+      to run a plugin release checklist in its own browser tool. No Daintree agent
+      or terminal is involved, yet spawn-visible-agent took it at 0.996. Its fence is
+      "a direct visible agent to change project files … or to explore/investigate a
+      project"; nothing here asks for an agent.
+    messages:
+      - role: user
+        content: >-
+          Please drive the checklist in Claude in Chrome. Spin up sites as needed with
+          the release zip
+    expect:
+      required: []
+
+  - id: tx-finish-gitflow-release
+    category: no-task
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-24: a git-flow chore in the user's own
+      repository. execute-durable-workflow (0.97) and runoff-tiebreaker (0.96, on
+      "ties") were selected. runoff-tiebreaker is for when "an agent competition, poll,
+      or peer-vote ends in a tie"; this is one local git-flow command, not execute-durable-workflow's
+      "substantial multi-step goal with dependent phases".
+    messages:
+      - role: user
+        content: Finish the release flow in native gitflow so it all ties up
+    expect:
+      required: []
+
+  - id: tx-where-are-we-mid-release
+    category: single-runbook
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-23: after hours away from a delegated
+      pipeline. Routed at 0.985; pinned. Decided by status-and-resume's "where were
+      we" across turns.
+    messages:
+      - role: user
+        content: Where are we!
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: tx-who-is-doing-work
+    category: single-runbook
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-23: the delegated agent had stopped
+      and nothing noticed. Routed at 0.9996; pinned. Decided by supervise-fleet's
+      "agents are ALREADY running and the user wants the fleet swept and acted on"
+      and its "is anyone stuck?".
+    messages:
+      - role: user
+        content: Where are we!
+      - role: assistant
+        content: >-
+          The fix agent is on its plan step and the checklist agent is waiting on
+          you; nothing has landed yet.
+      - role: user
+        content: who is doing work? Anyone?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: tx-close-sessions-no-longer-in-use
+    category: single-runbook
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-25: the assistant closed three panels
+      the user had opened with no proposed set. Routed at 0.958; pinned, since the
+      runbook it reaches is the one whose body rule "A broad one gets the proposed set
+      … then one question" would have stopped it.
+    messages:
+      - role: user
+        content: close sessions no longer in use
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: tx-ask-codex-second-order-risks
+    category: routing-trap
+    note: >-
+      Help-assistant session 58fe462a, 2026-09-25: one Codex agent, one read-only
+      question, its answer relayed. ask-and-relay is selected (0.84) behind
+      poll-pinned-agents (0.999), which wants "the SAME question put to several
+      agents". Decided by ask-and-relay's "ONE agent asked ONE question and its
+      answer brought back".
+    messages:
+      - role: user
+        content: >-
+          We've had lots of issues with allow lists in the past. Ask Codex what the
+          potential issues are there, second and third order
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.foundation]

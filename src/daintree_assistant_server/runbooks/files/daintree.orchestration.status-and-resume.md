@@ -23,7 +23,7 @@ The app keeps no workflow ledger or record of past MCP calls. The record is your
    - Absent from a successful listing: gone; how it ended comes from the branch, commits and PR, or stays unknown. A failed listing is unknown, not gone.
    - A recorded public write with no confirmed result: uncertain until read back.
    Correct the checkpoint only on evidence (`done` needs verified acceptance, `failed` a confirmed failure, `cancelled` the user's word).
-4. A relaunched pane, a new session and an app restart own nothing the old connection created; `terminal.list` with `owned:true` shows what this one holds. Reads and notices work on any agent terminal; sending needs a hand-over; closing and worktree deletion are never handed over. Report which resources are no longer yours.
+4. A relaunched pane or an app restart may own nothing the old connection created (a reconnect of the same pane keeps it); `terminal.list` with `owned:true` shows what this one holds. Status and screen reads (`terminal.getStatus`, `terminal.getOutput`) and notices work on any agent terminal in the project; `terminal.readLastMessageOwned` and owned sends need a hand-over; closing and worktree deletion are never handed over. Report which resources are no longer yours.
 5. Closed sessions: `agentSessionHistory.list` with the exact `worktreeId`, paging with `offset` while `hasMore`. The journal holds no transcript and prunes, so absence proves nothing. Resume only on request with `agentSessionHistory.resume` (`worktreeId`, exact `sessionId`); it restores that agent's conversation, not your checkpoint, notices or ownership. Say so.
 6. "What happened while I was away": `notifications.recent`, combined with the reconciled units.
 

@@ -220,6 +220,12 @@ boundaries:
   - query: "ask gemini to review the retry module for bugs and just tell me what it says, don't fix anything"
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "have codex explain what would break if we dropped the retry queue, and tell me what it says"
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: transcript-2026-09-27-help-release
+  - query: "ask claude whether the new rate limiter can starve background jobs and report back"
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: transcript-2026-09-27-help-release
 followups:
   - query: hows it going
     history:

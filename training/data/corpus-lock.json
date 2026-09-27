@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 10835,
-  "compiled_sha256": "9e5dcef55d07fa8795171a5c4834a79a39a6c82e865b6ffaae8d257d5d807952",
+  "rows": 10850,
+  "compiled_sha256": "017f14cdf568ffaa5b2921a6d13e9da86275078b5a81691b039e0da08c11ced8",
   "label_space_sha256": "df0d1ebc2785b5ab8ed95e2d266c3a659011b31b2294bd506cdf985dc686456e",
   "label_space_size": 40,
   "by_source": {
-    "boundary": 2590,
+    "boundary": 2605,
     "docs": 740,
     "followup": 468,
     "foundation": 312,
@@ -32,7 +32,8 @@
     "pre-split": 9811,
     "transcript-2026-09-26-competition-relocate": 12,
     "transcript-2026-09-26-fact-contest-named-agents": 7,
-    "transcript-2026-09-26-reviewer-fixer-relay": 10
+    "transcript-2026-09-26-reviewer-fixer-relay": 10,
+    "transcript-2026-09-27-help-release": 15
   },
   "dropped": {},
   "adjusted": {},
@@ -44,10 +45,10 @@
       "sha256": "c06b9c776fe0f1c81b8035d83bb28edf2313316b1c019f041132500299606790"
     },
     "runbooks/daintree.agents.ask-and-relay.yaml": {
-      "examples": 172,
-      "rows": 172,
+      "examples": 174,
+      "rows": 174,
       "runbook": "daintree.agents.ask-and-relay",
-      "sha256": "22722d5370b1397033ac9970fbd0b05433fa76efaa13d199fa4bddc478623577"
+      "sha256": "bc6b88102e441022586b805e4574bb60618a4b49034fde9841b87a8d3d8974ee"
     },
     "runbooks/daintree.agents.check-usage-limits.yaml": {
       "examples": 72,
@@ -86,10 +87,10 @@
       "sha256": "d635927ab4f2826bb092f2f0c3d4de7c5f69827f5292da1510d02f3342249961"
     },
     "runbooks/daintree.diagnostics.yaml": {
-      "examples": 238,
-      "rows": 238,
+      "examples": 240,
+      "rows": 240,
       "runbook": "daintree.diagnostics",
-      "sha256": "54e90cd3887c79a94fefb5f40b08ba2ace3aa51e133d6962e6f582603305fa24"
+      "sha256": "cfb1518643b4e163b3ad49ac232f50f0512300b007659806a6366a5fce32f86a"
     },
     "runbooks/daintree.edits.spawn-visible-agent.yaml": {
       "examples": 239,
@@ -110,10 +111,10 @@
       "sha256": "a08254ebbc526430746348c92e86f7f415a2a4b3f5014cba9871da08a41a1d4a"
     },
     "runbooks/daintree.forge.manage-issue.yaml": {
-      "examples": 160,
-      "rows": 160,
+      "examples": 163,
+      "rows": 163,
       "runbook": "daintree.forge.manage-issue",
-      "sha256": "68a9500234225e729673eb26a1943501c0c95dd04a345949148141cc1544cab4"
+      "sha256": "09a2d6e9594a9533b9fd8ec4d51f90e72559c62f5a72f47af2cad99963797eb3"
     },
     "runbooks/daintree.foundation.yaml": {
       "examples": 676,
@@ -212,10 +213,10 @@
       "sha256": "b11c6351a64ce10fc0b61e2da748b4b716ac3473aa16b600b60d93dd6b353005"
     },
     "runbooks/daintree.review.review-change.yaml": {
-      "examples": 219,
-      "rows": 219,
+      "examples": 222,
+      "rows": 222,
       "runbook": "daintree.review.review-change",
-      "sha256": "349c5e5e2df29c03803d481ac4d59b8504753541e15d384bcc53792de2b64f61"
+      "sha256": "1e376f25cbf5a2974c0a316575b82b885a6fc06192e6c365fcfd70d06e21520e"
     },
     "runbooks/daintree.runtime.debug-web-app.yaml": {
       "examples": 171,
@@ -236,10 +237,10 @@
       "sha256": "b69817be95a85982fc5cec763bef92b0f94ebc8fb6abcef03db0ac83ec66a84d"
     },
     "runbooks/daintree.workflow.follow-up-on-issue.yaml": {
-      "examples": 267,
-      "rows": 267,
+      "examples": 270,
+      "rows": 270,
       "runbook": "daintree.workflow.follow-up-on-issue",
-      "sha256": "c634544e656393bfc92c6b5c2f5185ac54c532a0daaf08fe0d240f4d35da6b68"
+      "sha256": "11c2cf0eb37dbf25b471157fff8a08cc8afd7310d0579408a1b88dcda4682edc"
     },
     "runbooks/daintree.workflow.prep-branch-for-review.yaml": {
       "examples": 214,
@@ -278,10 +279,10 @@
       "sha256": "3aa7662570809ed128bef14fc308dca40199f0adafd3aec037593f5d34ba3c8c"
     },
     "shared/boundary.yaml": {
-      "examples": 30,
-      "rows": 30,
+      "examples": 32,
+      "rows": 32,
       "runbook": null,
-      "sha256": "b69db2b27da184ccb7eaabe9a260797b10f61581b9faf0abb642ec610b1babdd"
+      "sha256": "afc66c6d77cf9186c416eace152e7daae9dc114e1c93a4702e47c0914a4bd880"
     },
     "shared/docs.yaml": {
       "examples": 518,

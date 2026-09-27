@@ -24,7 +24,7 @@ A relay ends when the message is queued, unless the user also wants the fixer's 
 {"agentId":"<named reviewer>","name":"Review: <target>","prompt":"<target, shape, read-only line>","waitForReply":true,"handback":true}
 ```
 
-   - Existing reviewer: `terminal.readLastMessageOwned` for a Claude Code reviewer's whole last reply, otherwise `terminal.getOutput` with a bounded `maxLines`. If the start scrolled away, say you saw part of it; ask for a recap only if the user allowed messaging it. `lastHandback` is a summary, not the review.
+   - Existing reviewer: `terminal.readLastMessageOwned` for the whole last reply of a Claude Code reviewer you launched or were handed, otherwise `terminal.getOutput` with a bounded `maxLines`. If the start scrolled away, say you saw part of it; ask for a recap only if the user allowed messaging it. `lastHandback` is a summary, not the review.
    A reply that says nothing was found: report that and send nothing. A timeout is not that: the reviewer is still working.
 5. Write one compact relay: reviewer (agent, terminal id) and revision; verdict; actionable findings with severity, `file:line` evidence and stated uncertainty; any calibration the user asked for; when a response is wanted, "reply with what you changed for each finding".
 6. Deliver once: to an existing fixer with `terminal.sendCommandOwned`, to a new one as the `prompt` of its `agent.launch` in the same worktree. Add `waitForReply:true, handback:true` when the user wants the response, relay the reply as the fixer's account, and check it against `git diff` in that worktree. Whether findings were truly fixed is daintree.orchestration.verify-agent-work.

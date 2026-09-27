@@ -249,6 +249,15 @@ boundaries:
   - query: "look over what codex just wrote on this branch and tell me what you'd push back on"
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: "have two separate reviewer agents look over the payment changes for regressions, findings only"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-27-help-release
+  - query: "get a security-minded agent and a performance-minded agent to each review the caching diff, no edits"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-27-help-release
+  - query: "I want an independent codex review of the migration branch, just findings with file and line"
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: transcript-2026-09-27-help-release
 followups:
   - query: how's it going?
     history:

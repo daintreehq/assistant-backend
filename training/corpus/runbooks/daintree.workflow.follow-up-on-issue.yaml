@@ -311,6 +311,15 @@ boundaries:
   - query: comment on the issue and close it
     confusable_with: [daintree.forge.manage-issue]
     run: 2026-09-24-selector-hardening
+  - query: "the auth refactor landed on main, did its tracking issue get closed or is it still sitting there"
+    confusable_with: [daintree.forge.manage-issue]
+    run: transcript-2026-09-27-help-release
+  - query: "check whether anyone closed out the ticket for the crash fix we deployed"
+    confusable_with: [daintree.forge.manage-issue]
+    run: transcript-2026-09-27-help-release
+  - query: "is issue 212 closed now that its PR merged, or does it need a closing comment"
+    confusable_with: [daintree.forge.manage-issue]
+    run: transcript-2026-09-27-help-release
 followups:
   - query: and the review?
     history:

@@ -265,6 +265,36 @@ def test_claude_injected_text_is_kept_for_include_injected(
     assert "deferred tools: mcp__runbooks__search_runbooks" in out
 
 
+def test_a_message_typed_mid_turn_is_shown_as_the_user(td: ModuleType, tmp_path: Path) -> None:
+    def queued(prompt: Any, origin: str | None, mode: str = "prompt") -> dict[str, Any]:
+        attachment: dict[str, Any] = {
+            "type": "queued_command", "prompt": prompt, "commandMode": mode,
+        }
+        if origin:
+            attachment["origin"] = {"kind": origin}
+        return {"type": "attachment", "timestamp": "2026-09-25T10:00:00Z",
+                "attachment": attachment}
+
+    path = _write(
+        tmp_path,
+        [
+            _claude("assistant", [{"type": "text", "text": "Testing now."}]),
+            queued("test it on a classic site too", "human"),
+            queued([{"type": "text", "text": "and the block theme"}], "human"),
+            queued("<task-notification>background wait done</task-notification>", None,
+                   "task-notification"),
+            queued("keep going", "auto-continuation"),
+            queued("peer says hi", "peer"),
+        ],
+    )
+    out = _digest(td, path)
+    assert out.count("### USER") == 2
+    assert "test it on a classic site too" in out
+    assert "and the block theme" in out
+    for absent in ("background wait done", "keep going", "peer says hi"):
+        assert absent not in out
+
+
 def test_malformed_records_do_not_crash_the_digest(td: ModuleType, tmp_path: Path) -> None:
     odd = dict(_RESULT, catalog_revision=["not", "a", "string"])
     path = _write(

@@ -420,6 +420,24 @@ def parse_claude(rows: list[dict[str, Any]]) -> tuple[Meta, list[Event]]:
                         events.append(Event("injected", injected, ts, raw=text))
                     if genuine.strip():
                         events.append(Event("user", genuine, ts))
+        elif kind == "attachment":
+            # A message typed while the agent was mid-turn is recorded only as a
+            # queued_command attachment, never as a user record. Task
+            # notifications, auto-continuations and peer messages share the
+            # record type, so only an explicit human prompt counts.
+            attachment = _dict(row.get("attachment"))
+            origin = _dict(attachment.get("origin"))
+            if (
+                attachment.get("type") == "queued_command"
+                and attachment.get("commandMode", "prompt") == "prompt"
+                and origin.get("kind") == "human"
+            ):
+                text = flatten_content(attachment.get("prompt"))
+                genuine, injected = split_injected(text)
+                if injected:
+                    events.append(Event("injected", injected, ts, raw=text))
+                if genuine.strip():
+                    events.append(Event("user", genuine, ts))
         elif kind == "system":
             # The harness's own records (/loop ticks, Stop-hook verdicts, away
             # summaries): the only trace of WHY a turn started.

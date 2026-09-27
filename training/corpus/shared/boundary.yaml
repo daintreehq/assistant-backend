@@ -68,3 +68,9 @@ examples:
     confusable_with: [daintree.terminals.rename]
   - query: i can't create worktrees at all any more — the worktree tools aren't even showing up for you
     expect: [daintree.diagnostics, daintree.worktree.create-plain-worktree]
+  - query: "test the checkout flow on the staging site yourself in the browser"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-27-help-release
+  - query: "cut the hotfix with git flow and merge it back into develop"
+    confusable_with: [daintree.orchestration.runoff-tiebreaker, daintree.orchestration.execute-durable-workflow]
+    run: transcript-2026-09-27-help-release

@@ -224,6 +224,12 @@ boundaries:
   - query: argh, monday. daintree's mcp keeps saying disconnected and none of the tools do anything
     confusable_with: [daintree.foundation]
     run: 2026-09-24-selector-hardening
+  - query: "export the daintree error log so I can attach it to my github report about the crash"
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: transcript-2026-09-27-help-release
+  - query: "the app keeps freezing, gather whatever daintree logs its developers would need"
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: transcript-2026-09-27-help-release
 followups:
   - query: and the key thing too?
     history:
