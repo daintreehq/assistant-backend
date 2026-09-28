@@ -145,6 +145,8 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: all six agents are running now, nice. rename them by the package each is refactoring
     run: 2026-09-28-agent-queries-2
+  - query: figure out what each terminal is doing and give it a proper title
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: rename these tabs so i can tell them apart
     confusable_with: [daintree.worktree.relocate-agents]
@@ -536,6 +538,12 @@ topic_shifts:
       - 'assistant: The unit job fails in token.test.ts: expiry is computed in local time. Spawned claude in t3 to switch it to UTC; rerun is green.'
     active: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
+  - query: while that runs, give the terminals proper titles, I can't tell which is which
+    history:
+      - 'user: can you repro #412? the CSV export drops the last row'
+      - 'assistant: Created worktree repro/412 from origin/main at 3f9c2e1 and launched claude-2 as "Repro: 412" with the report, harness rules and test-only scope. I''ll check its result when the notice arrives.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[async wait returned: 6 terminal summaries ready]'
     history:

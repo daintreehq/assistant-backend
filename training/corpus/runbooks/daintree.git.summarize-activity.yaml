@@ -1,0 +1,147 @@
+# Training examples whose answer is `daintree.git.summarize-activity` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.summarize-activity
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Compile my standup for yesterday 9am-6pm Pacific: PRs merged, reviews I gave, and what''s still open, each line citing a PR number or SHA.'
+  - what did i ship this week
+  - Write the weekly engineering update for the payments team covering Sept 21-27 (Europe/Berlin), grouped by theme, every item cited.
+  - Summarize what the codex and claude-2 agents actually got merged into main today, crediting each only via its worktree branch.
+  - how active has the repo been the last couple of months? whats our commit streak at
+  - 'Sprint retro prep: everything the whole team merged to develop between Sep 15 and Sep 26, grouped by author.'
+  - standup pls. yesterday was friday, i'm on AEST
+  - 'Produce a personal work log for last week, by day: direct commits to main and my PRs that merged, plus the PRs I reviewed.'
+  - For this week's status update, list my open PRs and mark which are blocked on requested changes or failing checks.
+  - 'Draft a Friday update for my manager since Monday: shipped, in review, in progress, blocked. Don''t post it anywhere.'
+  - What did the team get done in the last 14 days on the monorepo? Need a cited write-up for the investor update.
+  - Activity report for Sept 1-30 covering my login and the two contractor emails, merged PRs and unmapped direct commits only, read-only.
+  - ok quick one - what did i actually get merged today vs what's still sitting in review?
+  - Summarize the PR reviews I submitted this week, with PR numbers, for my performance self-review.
+  - Give me a September recap of who landed what on main. Not release notes, just a per-person account.
+  - Over the last 48 hours, which agent worktrees produced commits that reached main? Write it up as a short dated report.
+  - 'Weekly repo digest: commits per author, merged PRs, and the 120-day activity trend from the project pulse.'
+  - write up what we shipped since last wednesday's sync for the team channel, but don't post it
+  - 'Standup notes for 2026-09-25, America/New_York: shipped, in progress, blocked.'
+  - 'subject: me. window: last 7 days. output: shipped / in review / in progress / blocked, cited.'
+  - Summarize the last sprint (two weeks ending Sept 26) for the mobile repo by theme, including PRs still waiting on review.
+  - what have the agents been landing this week? i want a written tally, not a live status check
+  - Tally the PRs I merged and the ones I reviewed between Monday and today for the weekly report.
+  - is our commit streak still alive, and how busy has main been over the last 180 days?
+  - List the PRs I merged in the last 7 days so I can paste them into my standup.
+  - Before I plan today, write yesterday's standup from git and the forge. Just the report, don't resume or restart anything.
+  - End-of-week summary for the infra team grouped by author; nothing goes to Slack or the forge.
+boundaries:
+  - query: 'write my weekly update: what i shipped since monday'
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: Summarize what the team merged over the last sprint, grouped by author, for standup.
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: what did we merge this week? need it for standup
+    confusable_with: [daintree.git.bisect-regression]
+  - query: Write a report of what merged to main Thursday and Friday while I was out, by author, PR numbers cited.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Before resuming anything, give me a written list of what I shipped and reviewed last week.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Recap last sprint's merged work for the retro, grouped by theme.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: What did the agents land on main today? Written account, commits and PRs cited.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: Of the four agents I ran this week, whose branches actually got merged? Report per agent with PR numbers.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: anything the agents shipped since monday? write it up
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: find everything the team merged in September and summarise it per person for the monthly report
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: Which PRs did I review this week? It's for my weekly update.
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: 'Status of all my open PRs for the weekly update: which are in review and which are blocked, with PR numbers.'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: Summarize every PR I merged or reviewed this week.
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: which of my PRs got merged yesterday? for standup
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: What did the agents land this week across all the worktrees? Standup format.
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: git pulse on this worktree
+    run: pre-split
+  - query: recent commits on this branch?
+    run: pre-split
+  - query: give me the project pulse for this checkout
+    run: pre-split
+followups:
+  - query: can you regroup it by person instead of by theme?
+    history:
+      - 'user: weekly update for the team, Monday to Friday'
+      - 'assistant: claude-2 compiled 14 merged PRs; I checked each with forge.getPR and dropped #882 because it merged into release/2.4, not develop.'
+      - 'assistant: Summary below, grouped by theme: shipped 13 PRs and 4 direct commits, 5 in review, 3 in progress, 1 blocked (#930, changes requested).'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also add the reviews I gave this week
+    history:
+      - 'user: what did I ship this week?'
+      - 'assistant: Shipped: #901 retry backoff, #904 coupon validation, #911 settings copy, plus direct commit 3f2a1c9 on develop. In review: #915 (draft). Reviews given weren''t in the brief.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: put the commit streak in too, over the last 60 days
+    history:
+      - 'user: summarise the last sprint for the team update'
+      - 'assistant: Sprint 2026-09-14 to 2026-09-25 NZST: 22 PRs shipped across 4 authors, 6 in review, 2 blocked. Every line cites its PR or SHA.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'it lists #907 as shipped but that one was closed without merging - take it out and redo the shipped section'
+    history:
+      - 'user: what did the agents actually land today?'
+      - 'assistant: codex-1''s worktree feat/search-v2 and claude-4''s fix/login-redirect are linked to #907 and #909. Compiler claude-5 reported both as shipped; verifying now.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, I'm in London this week - use BST, not AEST
+    history:
+      - 'user: write my standup'
+      - 'assistant: Using yesterday, Sun 2026-09-27 00:00-23:59 AEST (+1000). Launched compiler claude-2 in the main worktree with your login and git emails; ending the turn until it reports.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: ok, now write up what the agents actually landed today for my standup
+    history:
+      - 'user: how''s everyone doing?'
+      - 'assistant: claude-1 is working on #412, codex-2 finished feat/export and handed back, claude-3 is waiting on approval - I approved it.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great. now give me a summary of everything I shipped this week for the weekly update
+    history:
+      - 'user: squash-merge #915'
+      - 'assistant: Merged #915 into develop as 3f2a1c9 and deleted the head branch.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'forget cleanup - write me a summary of the last two weeks for the team: shipped, in review, in progress'
+    history:
+      - 'user: which worktrees can I get rid of?'
+      - 'assistant: 3 merged, 2 at risk, 4 parked; proposed removal set: feat/onboarding, chore/deps, fix/header.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: thanks. write my standup for this morning's meeting
+    history:
+      - 'user: CI is red on develop'
+      - 'assistant: claude-2 fixed the broken import in src/api/index.ts; I re-ran the checks and they pass on 7d8e9f0.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately - what did I personally ship between Monday and today? it's for my weekly check-in, not the changelog
+    history:
+      - 'user: write the release notes for 2.5'
+      - 'assistant: claude-5 wrote the 2.5 notes from v2.4.0..release/2.5: 19 PRs, 4 plain commits, all verified against the range.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: how active has the repo been lately - what's our commit streak and who's been landing the most this month?
+    history:
+      - 'user: review the feat/coupons branch'
+      - 'assistant: codex-1 reviewed feat/coupons: 1 high (unchecked discount overflow at coupons/apply.ts:41), 2 low. Report below.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also, for my personal weekly update, what did I ship Monday to Friday?
+    history:
+      - 'user: draft the notes for 3.2'
+      - 'assistant: Range v3.1.4..main; claude-2 wrote 11 lines, 5 internal items excluded. Nothing tagged.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful

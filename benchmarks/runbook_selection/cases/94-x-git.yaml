@@ -1,0 +1,333 @@
+# Branch operations (batch B4): syncing a branch with its base, integrating several
+# agents' branches, carrying specific commits across, splitting into stacked PRs,
+# pruning branches and stale PRs, and a read-only worktree comparison.
+#
+# Each runbook gets an agent-phrased and a user-phrased case, one routing trap that
+# requires it phrased near a neighbour, and traps where the neighbour is right.
+
+cases:
+  # --- daintree.git.sync-with-base -------------------------------------------------
+  - id: x-sync-agent-rebase-onto-develop
+    category: single-runbook
+    note: Agent phrasing of the core ask; one branch, conflicts, tests, lease-guarded push.
+    messages:
+      - role: user
+        content: Rebase branch feature/retry onto the latest origin/develop in its worktree, resolve any conflicts keeping both sides' changes, rerun the tests on the new HEAD, and push with a lease since it already has an open PR.
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: x-sync-user-pr-has-conflicts
+    category: single-runbook
+    note: Casual phrasing; merge conflicts with the base are a sync, not a failing check.
+    messages:
+      - role: user
+        content: pr 212 has merge conflicts with main now, sort it out
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: x-sync-behind-before-pr-not-prep
+    category: routing-trap
+    note: Mentions opening a PR later, but the work asked for now is catching the branch up with its base.
+    messages:
+      - role: user
+        content: my branch is like 40 commits behind main, catch it up with main first, I'll open the PR myself afterwards
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: x-sync-all-worktrees-behind
+    category: single-runbook
+    note: The several-branch form; agents in the worktrees must be respected.
+    messages:
+      - role: user
+        content: all my agent worktrees are behind main now, merge latest main into each of them without disturbing any agent that's still working
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: x-trap-uptodate-branch-is-prep
+    category: routing-trap
+    note: Branch is current with its base; committing, pushing and opening a PR is prep-branch-for-review.
+    messages:
+      - role: user
+        content: the branch is already up to date with main, just commit my changes, push it and open the PR against develop
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
+  - id: x-trap-rebase-merge-pr-is-land
+    category: routing-trap
+    note: '"Rebase" here is a forge merge method on an approved PR, not a local sync.'
+    messages:
+      - role: user
+        content: PR 212 is approved and all checks are green, rebase-merge it into main
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-trap-failing-tests-uptodate-is-diagnose
+    category: routing-trap
+    note: The branch is current; red tests are a failing check to diagnose, not a sync.
+    messages:
+      - role: user
+        content: my branch is up to date with main but the unit tests keep failing on it, find out why and fix them
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.integrate-agent-branches ---------------------------------------
+  - id: x-integrate-agent-three-branches
+    category: single-runbook
+    note: Agent phrasing; several finished branches into one, checked after each merge.
+    messages:
+      - role: user
+        content: Merge branches agent/a, agent/b and agent/c from the finished fan-out worktrees into one new integration branch off develop, one at a time, running the tests after each merge, without pushing anything.
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: x-integrate-user-merge-them-together
+    category: single-runbook
+    note: Casual phrasing right after parallel agents finish.
+    messages:
+      - role: user
+        content: ok all four agents are done, merge their work together into one branch and see if it still builds
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: x-integrate-after-fanout-not-fanout
+    category: routing-trap
+    note: Names the fan-out, but the ask is the combining step after it, which fan-out-work does not own.
+    messages:
+      - role: user
+        content: the fan-out finished, now combine every unit's branch into a single branch and run the whole suite on the result
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: x-trap-parallel-issues-is-fanout
+    category: routing-trap
+    note: Launching the parallel work is fan-out-work; nothing is being combined yet.
+    messages:
+      - role: user
+        content: put an agent on each of these five issues in its own worktree and let them run in parallel
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: x-trap-rival-versions-is-competition
+    category: routing-trap
+    note: Two versions of the same change to be judged, not combined.
+    messages:
+      - role: user
+        content: have claude and codex each write their own version of the retry fix in separate worktrees, then tell me which one is better
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.cherry-pick-changes --------------------------------------------
+  - id: x-cherry-agent-backport-two-releases
+    category: single-runbook
+    note: Agent phrasing of a backport to two release branches with PRs.
+    messages:
+      - role: user
+        content: Backport merged PR 512 onto release/2.4 and release/2.3, one backport branch per target with the commits cherry-picked with -x, run each release branch's own tests, and open one PR per target.
+    expect:
+      required: [daintree.git.cherry-pick-changes]
+      optional: [daintree.foundation]
+
+  - id: x-cherry-user-grab-fix-from-worktree
+    category: single-runbook
+    note: Porting a fix between worktrees, in the user's words.
+    messages:
+      - role: user
+        content: grab the fix claude made in the hotfix worktree and put it on my feature branch too
+    expect:
+      required: [daintree.git.cherry-pick-changes]
+      optional: [daintree.foundation]
+
+  - id: x-cherry-one-commit-not-sync
+    category: routing-trap
+    note: One commit from main, explicitly not the rest of main; a sync would bring everything.
+    messages:
+      - role: user
+        content: bring just commit abc123 from main onto the release/2.3 branch, not the rest of main
+    expect:
+      required: [daintree.git.cherry-pick-changes]
+      optional: [daintree.foundation]
+
+  - id: x-trap-move-agent-is-relocate
+    category: routing-trap
+    note: Moving the running agent itself, not its commits.
+    messages:
+      - role: user
+        content: move the claude agent that's running in the hotfix worktree into a new worktree of its own and have it carry on there
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.split-into-stacked-prs -----------------------------------------
+  - id: x-split-agent-three-layers
+    category: single-runbook
+    note: Agent phrasing; ordered layers, each passing alone, union proof.
+    messages:
+      - role: user
+        content: Split branch feature/billing into three stacked branches (schema, then backend, then UI), each based on the one below and passing tests on its own, and prove the top branch has exactly the original diff.
+    expect:
+      required: [daintree.git.split-into-stacked-prs]
+      optional: [daintree.foundation]
+
+  - id: x-split-user-pr-too-big
+    category: single-runbook
+    note: Casual phrasing.
+    messages:
+      - role: user
+        content: this PR is huge, split it up into smaller ones
+    expect:
+      required: [daintree.git.split-into-stacked-prs]
+      optional: [daintree.foundation]
+
+  - id: x-split-too-big-to-review-not-review
+    category: routing-trap
+    note: Mentions review, but the deliverable is a stack of PRs, not findings.
+    messages:
+      - role: user
+        content: PR 600 is too big for anyone to review, break it into a stack of reviewable PRs
+    expect:
+      required: [daintree.git.split-into-stacked-prs]
+      optional: [daintree.foundation]
+
+  - id: x-trap-big-pr-review-is-review-change
+    category: routing-trap
+    note: A big PR judged as it stands is a review.
+    messages:
+      - role: user
+        content: PR 600 is a big one, review it and tell me what's wrong with it
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.prune-stale-branches -------------------------------------------
+  - id: x-prune-agent-merged-incl-squash
+    category: single-runbook
+    note: Agent phrasing; squash-merged detection and worktree exclusions.
+    messages:
+      - role: user
+        content: List the local and remote branches whose work is already merged into main, including squash-merged ones, propose which to delete, and keep anything checked out in a worktree or with unpushed commits.
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: x-prune-user-delete-merged
+    category: single-runbook
+    note: Casual phrasing.
+    messages:
+      - role: user
+        content: delete all my merged branches
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: x-prune-stale-prs
+    category: single-runbook
+    note: The stale-PR half of repository hygiene.
+    messages:
+      - role: user
+        content: close the dead PRs nobody has touched in three months
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: x-prune-old-remote-branches-not-cleanup
+    category: routing-trap
+    note: '"Clean up" is workspace-cleanup''s word, but these are repository branches, not panels or worktrees.'
+    messages:
+      - role: user
+        content: clean up the old remote branches on origin that nobody uses anymore
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: x-trap-close-terminals-worktrees-is-cleanup
+    category: routing-trap
+    note: Session teardown of panels and worktrees is workspace-cleanup.
+    messages:
+      - role: user
+        content: the session's done, close the agent terminals and delete their worktrees
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: x-trap-close-one-pr-is-land
+    category: routing-trap
+    note: Closing ONE named PR is a PR lifecycle action.
+    messages:
+      - role: user
+        content: close PR 88, it's been superseded by 91
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-trap-stale-worktrees-is-audit
+    category: routing-trap
+    note: Stale worktrees, not branches, are the worktree audit.
+    messages:
+      - role: user
+        content: which of my worktrees are stale, already merged, or holding unpushed work?
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-trap-review-open-prs-is-queue
+    category: routing-trap
+    note: Going through the open PRs to review them, not to close stale ones.
+    messages:
+      - role: user
+        content: go through all the open PRs and review each one, give me a verdict per PR
+    expect:
+      required: [daintree.review.review-pr-queue]
+      optional: [daintree.foundation]
+
+  # --- daintree.worktree.compare-worktrees -----------------------------------------
+  - id: x-compare-agent-overlap-forecast
+    category: single-runbook
+    note: Agent phrasing; overlap and a trial-merge forecast, nothing changed.
+    messages:
+      - role: user
+        content: For every non-main worktree, list the files each branch changed since it forked from main, report which worktrees touch the same files, and predict with a trial merge which pairs will conflict, changing nothing.
+    expect:
+      required: [daintree.worktree.compare-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-compare-user-will-they-conflict
+    category: single-runbook
+    note: Casual phrasing.
+    messages:
+      - role: user
+        content: will these branches conflict when I merge them?
+    expect:
+      required: [daintree.worktree.compare-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-compare-diff-two-worktrees-not-review
+    category: routing-trap
+    note: A comparison between two worktrees, not findings on one change.
+    messages:
+      - role: user
+        content: diff the auth worktree against the billing worktree, what's different between them?
+    expect:
+      required: [daintree.worktree.compare-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-trap-colliding-checkout-is-relocate
+    category: routing-trap
+    note: Agents colliding in ONE checkout need separating, not a branch comparison.
+    messages:
+      - role: user
+        content: these two agents are editing the same checkout and stepping on each other, give each one its own worktree
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]

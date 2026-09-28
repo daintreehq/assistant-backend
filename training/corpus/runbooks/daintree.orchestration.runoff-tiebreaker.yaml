@@ -233,6 +233,12 @@ boundaries:
   - query: the interview vote between claude and codex came out tied; run a runoff with the same agents
     confusable_with: [daintree.orchestration.interview]
     run: 2026-09-28-agent-queries
+  - query: the vote tied 2-2, run a runoff between claude and codex
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+  - query: the vote between the two entries tied, run a runoff with the same agents
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it going?
     history:

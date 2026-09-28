@@ -98,12 +98,14 @@ positives:
     run: 2026-09-28-agent-queries
   - query: Triage all running agents and take me to the next one that needs my input.
     run: 2026-09-28-agent-queries-2
+  - query: sweep the running agents and deal with whatever's finished or stuck
+    run: 2026-09-28-catalog-expansion-refine
+  - query: is anyone stuck? check the fleet for me
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: what are all these agents actually doing right now
     confusable_with: [daintree.worktree.relocate-agents]
   - query: keep an eye on the four of them and wake me when they're done
-    confusable_with: [daintree.worktree.relocate-agents]
-  - query: send this message to all four agents
     confusable_with: [daintree.worktree.relocate-agents]
   - query: The agents already have separate worktrees; sweep the running fleet and tell me which ones are blocked.
     confusable_with: [daintree.worktree.relocate-agents]
@@ -421,6 +423,18 @@ boundaries:
   - query: Do an immediate pass over all agents in the batch and report any that failed or are waiting, instead of setting up a wake-up.
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-28-agent-queries-2
+  - query: how's everyone doing? anyone stuck right now?
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Triage every agent running this minute: which finished, which failed, which need me.'
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: Before lunch, check how everyone is doing and unblock anyone waiting on me.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: how are the agents doing? anyone stuck?
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: ok show me the failed one
     history:

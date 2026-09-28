@@ -124,6 +124,32 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Create a new worktree off develop for bugfix/null-avatar
     run: 2026-09-28-agent-queries-2
+  - query: 'check out #512''s branch as a worktree, don''t run anything'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: make a worktree from the contributor's PR 77 so I can look at it later
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Create a plain Daintree worktree on the head branch of pull request #1204, no agent, no recipe'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: new worktree for branch fix/login-redirect
+    run: 2026-09-28-catalog-expansion-refine
+  - query: worktree from pr 88 pls
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Add a worktree tracking origin/feat/search-v2 without launching anything
+    run: 2026-09-28-catalog-expansion-refine
+  - query: set up a worktree for the release/2.4 branch
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Create a worktree for a new branch chore/bump-eslint off develop
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'check out dependabot''s PR #901 into its own worktree, nothing else'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can you make a worktree for the branch in PR 45, i'll poke at it myself
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Create worktree spike-cache on a new branch from main; no agent
+    run: 2026-09-28-catalog-expansion-refine
+  - query: check out PR 212 as a worktree, don't run anything in it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: make a new worktree for a branch called feat/search-filters
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: make a checkout for the billing branch
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -347,6 +373,22 @@ boundaries:
   - query: Create a worktree for experiment/rust-port; leave the recipe out, nothing should start
     confusable_with: [daintree.recipe.run-or-create]
     run: 2026-09-28-agent-queries-2
+  - query: 'Just create a worktree for the branch behind PR #340 - don''t run or launch anything.'
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: make a worktree for the existing branch fix/sso-timeout
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - can you make a worktree
+  - query: create a worktree for feature/billing-v2 off main, nothing else
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: create a worktree for fix/login-redirect from develop
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+  - query: create a worktree for the coupon-codes branch
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: nice. do another one off origin/develop, call it spike/cache
     history:

@@ -194,16 +194,12 @@ examples:
     expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
   - query: turn each of these three bugs into issues and put an agent on each one
     expect: [daintree.forge.manage-issue, daintree.orchestration.fan-out-work]
-  - query: open an issue for the flaky auth test, then work out why it's flaky
-    expect: [daintree.forge.manage-issue, daintree.ci.diagnose-and-fix]
   - query: the preview is throwing on load — figure out why and file an issue with the stack trace
     expect: [daintree.runtime.debug-web-app, daintree.forge.manage-issue]
   - query: label 88 blocked and then tell me what's actually holding it up
     expect: [daintree.forge.manage-issue, daintree.workflow.follow-up-on-issue]
   - query: find me a small unassigned bug and assign it to me
     expect: [daintree.workflow.find-issue-work, daintree.forge.manage-issue]
-  - query: read the retry code and open issues for anything that looks wrong
-    expect: [daintree.explore.repository, daintree.forge.manage-issue]
   - query: review this branch and file a ticket for each finding above medium
     expect: [daintree.review.review-change, daintree.forge.manage-issue]
   - query: remember that we file frontend bugs under the web label, and file one for this dropdown bug
@@ -274,8 +270,6 @@ examples:
     expect: [daintree.worktree.manage-resource, daintree.orchestration.watch-outcome]
   - query: pause the devbox, and remind me where we left off on that ticket before I log out
     expect: [daintree.worktree.manage-resource, daintree.orchestration.status-and-resume]
-  - query: provision the devbox and put an agent on the integration suite once it's up
-    expect: [daintree.worktree.manage-resource, daintree.edits.spawn-visible-agent]
   - query: ask the pinned agents whether we should pause the devboxes overnight, then do whatever they land on
     expect: [daintree.agents.poll-pinned-agents, daintree.worktree.manage-resource]
   - query: resume the box for the auth worktree and open an issue about how slow provisioning is
@@ -915,3 +909,341 @@ examples:
   - query: Close the four reviewer terminals from this morning and delete their worktrees, and create a plain worktree off main named exp/winner-polish.
     expect: [daintree.orchestration.workspace-cleanup, daintree.worktree.create-plain-worktree]
     run: 2026-09-28-agent-queries-2
+  - query: codex-2 is waiting for approval to delete tmp/fixtures, approve it; and tell claude-1 to stop reformatting the whole repo and stick to src/auth.
+    expect: [daintree.agents.answer-waiting-agent, daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Ask the Claude on the auth refactor why it dropped refresh-token rotation, and separately tell the codex on the billing branch to stop adding new dependencies.
+    expect: [daintree.agents.ask-running-agent, daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Check how much of Codex's weekly allowance is left, and hand its unfinished importer task to Claude in the same worktree.
+    expect: [daintree.agents.check-usage-limits, daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: Tell the Claude working in main to stop touching the billing code, then move it into its own worktree called billing-fix.
+    expect: [daintree.agents.steer-running-agent, daintree.worktree.relocate-agents]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Ask the Claude on #512 why it skipped the Windows tests, and separately verify whether its claim that everything is green holds.'
+    expect: [daintree.agents.ask-running-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-catalog-expansion
+  - query: Hand Claude's half-done export task to Codex in the same worktree, and ask the gemini already open on the API what it decided about the pagination format.
+    expect: [daintree.agents.ask-running-agent, daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: Give Gemini's stalled parser task to Codex in the same worktree, then close the old reviewer panels from this morning.
+    expect: [daintree.agents.hand-off-task, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion
+  - query: Compact the codex agent's context in terminal 2, then give it the billing module files as fresh context.
+    expect: [daintree.agents.run-agent-command, daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Check how much weekly usage Claude has left, then compact its context in terminal 4.
+    expect: [daintree.agents.check-usage-limits, daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Tell the Claude agent to stop touching the migrations, and also load the ORM model files into it as context.
+    expect: [daintree.agents.steer-running-agent, daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: /clear the codex pane, then have it follow the Daintree plugin's release-checklist skill on release/3.0.
+    expect: [daintree.agents.run-agent-command, daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Have the running claude follow the plugin's pr-hygiene skill on its branch, then prepare the branch and open the PR.
+    expect: [daintree.skills.use-plugin-skill, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Have Codex plan the rate limiter for my approval, have Claude implement the approved plan, then commit, push and open a PR for the branch.
+    expect: [daintree.orchestration.plan-then-implement, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Plan first with my sign-off on the session store change; after Claude implements it, have Codex review it in a loop until Codex approves.
+    expect:
+      - daintree.orchestration.plan-then-implement
+      - daintree.orchestration.review-until-approved
+    run: 2026-09-28-catalog-expansion
+  - query: rebase the auth worktree onto main first, then have codex plan the token refresh change, i approve, and it implements it
+    expect: [daintree.git.sync-with-base, daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: Codex writes failing tests for invoice rounding, Claude makes them pass without touching them, then open a PR for the branch.
+    expect: [daintree.orchestration.test-first-split, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: tests first by codex for the coupon rules, claude implements against them; after that codex reviews the implementation and claude fixes until codex approves
+    expect: [daintree.orchestration.review-until-approved, daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Loop Codex''s review of Claude''s fix on PR #212 until Codex approves, then merge the PR.'
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: keep claude and codex iterating on the webhook change until codex approves, then push and open the pr
+    expect:
+      - daintree.orchestration.review-until-approved
+      - daintree.workflow.prep-branch-for-review
+    run: 2026-09-28-catalog-expansion
+  - query: Build the export API and its UI in parallel against an agreed schema, then open a PR for the integration branch.
+    expect: [daintree.orchestration.contract-first-split, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Build both halves of notifications in parallel from a frozen schema, and separately give codex 15 minutes to try push support in the mobile app, then stop it.
+    expect: [daintree.orchestration.contract-first-split, daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: Give claude 20 minutes on the retry fix then stop it; afterwards have a second agent review whatever diff it left.
+    expect: [daintree.orchestration.timebox-attempt, daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion
+  - query: Check how much usage codex has left, then give it 20 minutes on the i18n refactor and stop it at the deadline.
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: Bug bash the beta with three agents, then file every confirmed bug as a GitHub issue labelled beta.
+    expect: [daintree.forge.manage-issue, daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: run a bug bash on the importer, then have an agent fix the worst confirmed bug
+    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: 'First get a failing reproduction for #611''s data loss, then have agents each test one of the three suspected causes against it.'
+    expect: [daintree.debug.reproduce-bug, daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Have agents test the three theories for the leak, then put an agent on fixing whichever one is confirmed.
+    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Spike recharts, visx and echarts on the revenue chart, then build the winner into the real page.
+    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: Spike zod vs valibot on the forms and, once you've reported, delete all the spike worktrees.
+    expect: [daintree.orchestration.spike-options, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion
+  - query: Migrate all 70 components from the old Button API to the new one across several agents, then prep the integrated branch for review and open the PR.
+    expect: [daintree.orchestration.migration-sweep, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: First upgrade TypeScript to 5.6 in its own worktree with before/after checks, then run a multi-agent sweep replacing every `// @ts-ignore` with `// @ts-expect-error` across the repo.
+    expect: [daintree.deps.upgrade-dependency, daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: Replace every `assertEquals` with `assertEqual` across the test tree using several agents, and open a tracking issue listing any leftover TODO(migration) sites.
+    expect: [daintree.forge.manage-issue, daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Launch an agent per issue for #301 through #304, and once they''ve all finished have them review each other''s branches and fix what''s found.'
+    expect: [daintree.orchestration.fan-out-work, daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: Have the three finished agents review each other's worktrees and fix the findings, then merge all three branches into one integration branch with checks after each merge.
+    expect: [daintree.git.integrate-agent-branches, daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: Work out why yesterday's agent run went off-scope and save the resulting prevention rule to project memory.
+    expect: [daintree.agents.postmortem-run, daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Figure out why codex''s finished run on #77 failed, then hand the unfinished task to Claude with a handoff so it continues rather than restarts.'
+    expect: [daintree.agents.hand-off-task, daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: post-mortem the failed run in wt-cache, then get a fresh agent to redo the fix with a better brief
+    expect: [daintree.agents.postmortem-run, daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Fan out issues #610-#613 to four agents in separate worktrees, and when they finish merge all four branches into one branch.'
+    expect: [daintree.git.integrate-agent-branches, daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Rebase #742 on main to clear its conflicts, then squash-merge it on GitHub once checks pass.'
+    expect: [daintree.forge.land-pull-request, daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: '#88 has unresolved review threads and merge conflicts with main; resolve the conflicts and address the reviewer''s comments.'
+    expect: [daintree.forge.address-pr-review, daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Backport #512 to release/2.4 as a PR, then merge that backport PR once CI is green.'
+    expect: [daintree.forge.land-pull-request, daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: Catch feature/calendar up with main, and separately apply hotfix commit d4e5f6a onto release/1.9.
+    expect: [daintree.git.cherry-pick-changes, daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: Fix the failing test_parse_dates on main, then backport the fix to release/3.1.
+    expect: [daintree.ci.diagnose-and-fix, daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: Forecast conflicts among the four agent branches and propose a merge order, then integrate them in that order into one branch.
+    expect: [daintree.git.integrate-agent-branches, daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: Tell me whether feat/reporting and feat/exports conflict with each other, and rebase feat/exports onto current main.
+    expect: [daintree.git.sync-with-base, daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Review #702 for bugs, and separately split it into stacked PRs for the reviewers.'
+    expect: [daintree.git.split-into-stacked-prs, daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion
+  - query: bring feat/search-v2 up to date with main, then split it into stacked prs
+    expect: [daintree.git.split-into-stacked-prs, daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: Close all the fan-out terminals and delete their worktrees, then delete the merged branches across the repo.
+    expect: [daintree.git.prune-stale-branches, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion
+  - query: Audit my worktrees for merged or stale ones, and also list which branches without worktrees are merged and deletable.
+    expect: [daintree.git.prune-stale-branches, daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: 'merge #812 and then prune every branch that''s merged into main'
+    expect: [daintree.forge.land-pull-request, daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Review each of the open PRs on develop, then approve and merge the ones that come back ready.
+    expect: [daintree.forge.land-pull-request, daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: Review the four human PRs in the queue, and separately deal with the pile of renovate bumps.
+    expect: [daintree.forge.batch-dependency-updates, daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: '#88 has merge conflicts with main and unresolved review comments - bring it up to date with main, then fix what the reviewers asked for.'
+    expect: [daintree.forge.address-pr-review, daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Fix the requested changes on #217, and once CI is green on the new head, squash-merge it.'
+    expect: [daintree.forge.address-pr-review, daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Run #340 locally to see if the tests pass, and also give me a proper code review of its diff.'
+    expect: [daintree.git.test-pull-request-locally, daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Try #901 on this machine; if the tests pass there, approve and merge it.'
+    expect: [daintree.forge.land-pull-request, daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: Triage the needs-triage issues in acme/web, then launch an agent per bug that's still valid, one worktree each.
+    expect: [daintree.forge.triage-issue-backlog, daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion
+  - query: clean up the backlog first (dupes, fixed ones closed), then shortlist me a small unassigned bug to pick up
+    expect: [daintree.forge.triage-issue-backlog, daintree.workflow.find-issue-work]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Spring cleaning on org/api: triage the open issues, and separately prune merged branches and dead PRs.'
+    expect: [daintree.forge.triage-issue-backlog, daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Batch the green Dependabot patch bumps into one PR, and separately do the TypeScript 6 upgrade on its own branch, fixing what breaks.
+    expect: [daintree.deps.upgrade-dependency, daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: Take the safe renovate bumps into one PR, then delete all our merged remote branches.
+    expect: [daintree.forge.batch-dependency-updates, daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: clear the dependabot PRs and wake me when the combined PR merges tonight
+    expect: [daintree.forge.batch-dependency-updates, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-catalog-expansion
+  - query: Write my standup for yesterday, then pick up the migration run I left in flight last night.
+    expect: [daintree.git.summarize-activity, daintree.orchestration.status-and-resume]
+    run: 2026-09-28-catalog-expansion
+  - query: Draft the 2.5 changelog from v2.4.0, and separately write my weekly update for the team.
+    expect: [daintree.forge.draft-release-notes, daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Write the release notes for 3.2 into CHANGELOG.md, and after that merge release PR #402.'
+    expect: [daintree.forge.draft-release-notes, daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion
+  - query: Security-audit src/auth, then file an issue for each verified high-severity finding.
+    expect: [daintree.forge.manage-issue, daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: Find the dead code in src/legacy, then have an agent delete whatever is confirmed unused.
+    expect: [daintree.edits.spawn-visible-agent, daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: Have codex red-team claude-2's session-token fix, then send whatever breaks it proves back to claude-2 to fix.
+    expect: [daintree.agents.relay-review-feedback, daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Two things on PR #231: give me a normal code review with findings, and separately have an agent try to break it with hostile inputs and prove what fails.'
+    expect: [daintree.review.red-team-change, daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion
+  - query: Triage the prod checkout 500s since this morning's deploy, and separately have an agent add retry-with-jitter to the payment client in src/payments/client.ts.
+    expect: [daintree.debug.investigate-outage, daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Audit all my worktrees for merged or unpushed work, and also rebase feat/billing onto main since I already know it's behind.
+    expect: [daintree.git.sync-with-base, daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: tell me which of my worktrees are stale or merged, and separately delete the merged remote branches that don't have a worktree at all
+    expect: [daintree.git.prune-stale-branches, daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Reproduce #412 as a failing test on main, then bisect between v3.1 and main with that test to find the commit that introduced it.'
+    expect: [daintree.debug.reproduce-bug, daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: Reproduce the crash from the discord report with a minimal test, then log it as a GitHub issue with the repro details.
+    expect: [daintree.debug.reproduce-bug, daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion
+  - query: Find which commit since v7.2 broke the Android build, then get the build fixed and green.
+    expect: [daintree.ci.diagnose-and-fix, daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: Measure whether main is really slower than v3.0 on cold start, and if it is, bisect to the commit responsible.
+    expect: [daintree.git.bisect-regression, daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Two CI problems: test_totals fails every run since the refactor and test_ws_reconnect fails randomly about 1 in 12. Fix the first and hunt down the cause of the second.'
+    expect: [daintree.ci.diagnose-and-fix, daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: Find out why test_sync_merge fails intermittently, then file an issue with the failure rate and root cause.
+    expect: [daintree.ci.hunt-flaky-test, daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion
+  - query: Run the full check suite in the api worktree, and separately measure how flaky test_socket_reconnect is over 40 runs.
+    expect: [daintree.ci.hunt-flaky-test, daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: Run lint and the unit tests in the checkout worktree, then run the Playwright e2e suite there against its own server.
+    expect: [daintree.ci.run-e2e-suite, daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: Benchmark feature/fast-path against main, and separately run the full test suite in that worktree to make sure nothing is red.
+    expect: [daintree.ci.run-local-checks, daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: Run the Cypress suite in feature/billing and open a forge issue for each failing spec.
+    expect: [daintree.ci.run-e2e-suite, daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion
+  - query: Free port 3000 from the stale server and then start the web dev server for the checkout worktree in a terminal I can watch.
+    expect: [daintree.runtime.free-busy-port, daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Run the migrations in the feat/teams worktree's db, then start its api server in a visible terminal.
+    expect: [daintree.runtime.migrate-worktree-database, daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Each branch needs its own database — set that up for all worktrees, then run the migrations in the new invoices worktree.
+    expect:
+      - daintree.runtime.migrate-worktree-database
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-catalog-expansion
+  - query: Find what's squatting on 5173, then run the Playwright suite against the web worktree's own server.
+    expect: [daintree.ci.run-e2e-suite, daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: Upgrade React to 19 in its own worktree, then open a PR for it once the checks pass.
+    expect: [daintree.deps.upgrade-dependency, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Bump Node to 22 and afterwards benchmark the API against main to see whether the new runtime is faster.
+    expect: [daintree.deps.upgrade-dependency, daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: Build a Daintree plugin panel for our deploy board, then open a PR with the plugin and its dist.
+    expect: [daintree.plugins.develop-project-plugin, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Get our project plugin loading again, then use the migration-review skill it ships on the current branch.
+    expect: [daintree.plugins.develop-project-plugin, daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Wrap up for the day, and close the three competition worktrees we already finished with.
+    expect: [daintree.orchestration.park-work, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Park the agents for the night and wake me when CI on #412 finishes.'
+    expect: [daintree.orchestration.park-work, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-catalog-expansion
+  - query: Start the frontend development server and run its bounded tests.
+    expect: [daintree.ci.run-local-checks, daintree.terminals.run-visible-command]
+  - query: something in the last commit broke the suite, bisect it and get it passing
+    expect: [daintree.ci.diagnose-and-fix, daintree.git.bisect-regression]
+  - query: there's a merge conflict blocking the prep — get someone to sort it out and then carry on and open the PR
+    expect: [daintree.git.sync-with-base, daintree.workflow.prep-branch-for-review]
+  - query: prep said conflicts. get someone on it and then put the pr up
+    expect: [daintree.git.sync-with-base, daintree.workflow.prep-branch-for-review]
+  - query: rebase my branch onto develop and get it review ready
+    expect: [daintree.git.sync-with-base, daintree.workflow.prep-branch-for-review]
+  - query: open an issue for the flaky auth test, then work out why it's flaky
+    expect: [daintree.ci.hunt-flaky-test, daintree.forge.manage-issue]
+  - query: read the retry code and open issues for anything that looks wrong
+    expect: [daintree.forge.manage-issue, daintree.review.audit-codebase]
+  - query: provision the devbox and put an agent on the integration suite once it's up
+    expect: [daintree.ci.run-e2e-suite, daintree.worktree.manage-resource]
+  - query: have an agent go fix the flaky e2e login spec, and set something up so I get pinged the moment it's done — I'm heading out
+    expect: [daintree.ci.hunt-flaky-test, daintree.orchestration.watch-outcome]
+  - query: catch me up on the week, and note down that we've settled on the queue-per-tenant design
+    expect: [daintree.git.summarize-activity, daintree.memory.manage-project-memory]
+  - query: Break docs/prd/loyalty-points.md into issues for approval, and separately triage the pile of untriaged bug reports from this week — dupes and labels.
+    expect: [daintree.forge.triage-issue-backlog, daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Draft the work breakdown for the notifications-center epic, and also have an agent security-audit the existing push service code as it stands.
+    expect: [daintree.orchestration.decompose-work, daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'two things: split the shipping-rates spec into tickets with dependencies, and clean up the finished worktrees and panels from last sprint'
+    expect: [daintree.orchestration.decompose-work, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Add a line to CLAUDE.md forbidding edits to generated code, then open a PR for that change.
+    expect: [daintree.memory.manage-project-memory, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Write a team recipe for the API stack, and add setup so each new worktree gets its own .env and installed dependencies.
+    expect: [daintree.recipe.run-or-create, daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Merge #611 then #612, and wake me when the deploy that follows them finishes.'
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Deal with the pile of Dependabot PRs, then merge my feature PR #90.'
+    expect: [daintree.forge.batch-dependency-updates, daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
+  - query: file an issue for the tax-rounding bug, then have an agent fix it in src/tax.ts
+    expect: [daintree.edits.spawn-visible-agent, daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: red-team the coupon branch, then send the confirmed breaks to claude to fix
+    expect: [daintree.agents.relay-review-feedback, daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: spike two approaches to the money formatter, then open a PR for whichever you recommend
+    expect: [daintree.orchestration.spike-options, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: open the PR for the auth branch, then park the other agents for the night
+    expect: [daintree.orchestration.park-work, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: switch the codex pane to sonnet, then tell it to stop touching the migrations
+    expect: [daintree.agents.run-agent-command, daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-refine

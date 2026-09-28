@@ -1,0 +1,122 @@
+# Training examples whose answer is `daintree.plugins.develop-project-plugin` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.plugins.develop-project-plugin
+run: 2026-09-28-catalog-expansion
+positives:
+  - Build a Daintree project plugin under .daintree/plugins/acme.deploy-board that shows our deploy queue in a panel.
+  - The acme.release-helper plugin's 'Cut release' button does nothing when clicked; find out why and fix it.
+  - Validate the manifest in .daintree/plugins/team.metrics and report the errors by path.
+  - The plugin manager lists our project plugin as Staged after the rename; explain what state it is in and why.
+  - Rebuild dist/ for the local todo-panel plugin after the view change and get Daintree to reload it.
+  - Our project plugin loads but its panel renders blank; diagnose it and have an agent fix the view.
+  - Add a command to the existing .daintree/plugins/ops.oncall plugin that opens the runbook URL, and verify it registers after reload.
+  - The plugin shows Unreadable in the plugin manager since codex edited the manifest; find the cause.
+  - Agents launched in this project can't see the tools our project plugin declares; work out why.
+  - Have claude write a zero-build Daintree plugin that adds a panel listing open incidents from our status API.
+  - Check that dist/ for the acme.lint-panel plugin is committed and not gitignored, then reload the project plugins.
+  - Debug why host.dispatch from our plugin's panel returns ok:false when the Sync button is pressed.
+  - Get the project plugin in .daintree/plugins loading again; plugin diagnostics report a loadError about a missing entry module.
+  - Our project plugin is blocked in this repo; report its exact state and the reason, change nothing.
+  - Port the deploy-board plugin's panel to the current view API and make sure Daintree activates it after reload.
+  - The plugin I wrote in the feature worktree isn't showing up in Daintree; figure out what's going on.
+  - Our plugin's registered handler fires but the payload is always undefined; fix the handler and prove the button works.
+  - my daintree plugin isnt loading, help
+  - the panel from our .daintree plugin is just white
+  - can we make a little daintree plugin with a button that runs our seed script
+  - why does it say invalid next to my plugin
+  - validate my plugin manifest pls
+  - thanks! also the deploy board plugin still shows the old ui after i rebuilt it
+  - write us a daintree panel plugin for the flaky test dashboard
+  - query: build a Daintree plugin panel that shows our deploy board
+    run: 2026-09-28-catalog-expansion-refine
+  - query: my plugin isn't loading, figure out what's wrong with it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the plugin manager says release-board is Staged, sort it out
+    run: 2026-09-28-catalog-expansion-refine
+  - query: validate the release-board plugin's manifest
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Daintree's plugin manager shows our project's plugin with a red error; what's wrong with it?
+    confusable_with: [daintree.diagnostics]
+  - query: 'Something''s broken: Daintree didn''t pick up the panel plugin I committed under .daintree/plugins.'
+    confusable_with: [daintree.diagnostics]
+  - query: Pull the Daintree diagnostics for our acme.oncall project plugin, it's misbehaving.
+    confusable_with: [daintree.diagnostics]
+  - query: Have an agent add a 'Copy branch name' button to our Daintree project plugin and make sure it loads.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Spin up claude to write the manifest and dist for a new panel plugin under .daintree/plugins.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Fix the handler signature in our Daintree plugin so the button payload arrives.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: The panel our Daintree project plugin contributes shows nothing; debug the view and reload it.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Reload the panel from our .daintree plugin after rebuilding its dist.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Console errors in our project plugin's panel after the last change; fix the plugin.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: My Daintree plugin's skill isn't showing up after I edited the manifest; get Daintree to pick it up.
+    confusable_with: [daintree.skills.use-plugin-skill]
+  - query: Build a Daintree project plugin under .daintree/plugins that contributes a release-checklist skill.
+    confusable_with: [daintree.skills.use-plugin-skill]
+  - query: Build a Daintree project plugin that adds a panel showing our deploy queue.
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: why is it staged, what do I have to do?
+    history:
+      - 'user: build a Daintree plugin panel for our deploy board'
+      - 'assistant: claude-6 built acme.deploy-board; plugin.validate passes, and after plugin.reloadProject its row shows staged.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, have the agent fix those
+    history:
+      - 'user: validate the manifest for .daintree/plugins/acme.metrics'
+      - 'assistant: plugin.validate: origin project, 2 errors — contributes.views[0].id doesn''t match a panel, and engines.daintree is missing.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: codex in terminal 3 still can't see the plugin's tools though
+    history:
+      - 'user: add an agent tool to our deploy-board plugin'
+      - 'assistant: claude-6 added the tool; validate passes, reload shows acme.deploy-board active and I ran the command from the panel successfully.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: reload it so I can try it now
+    history:
+      - 'user: build the metrics plugin on a branch, feat/metrics-plugin'
+      - 'assistant: claude-8 wrote acme.metrics in ~/proj-metrics-plugin and built dist/; plugin.validate on that directory passes.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: ok so it's not Daintree — it's my plugin in .daintree/plugins/acme.board that won't load
+    history:
+      - 'user: Daintree feels broken, check it'
+      - 'assistant: MCP status is healthy, all tools offered, and the error log has nothing in the last hour.'
+    active: [daintree.diagnostics]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now build us a plugin panel that shows deploy status
+    history:
+      - 'user: run the full-stack recipe for feat/api-v2'
+      - 'assistant: Ran it: 3 terminals started (api, worker, web) and the claude agent in it is live.'
+    active: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately, validate the manifest of acme.release-panel
+    history:
+      - 'user: follow the release-checklist skill from our plugin on feat/release'
+      - 'assistant: claude-7 worked through all 6 checklist steps; I checked each against its report and two need your sign-off.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: different panel — the plugin panel I wrote is just blank
+    history:
+      - 'user: the preview console shows a hydration error, fix it'
+      - 'assistant: claude-3 fixed the mismatched date render; after a reload the new navigation logs nothing.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: why does the plugin manager say Unreadable for our acme.metrics plugin?
+    history:
+      - 'user: remember that staging deploys go through the deploy-bot, not CI'
+      - 'assistant: Saved to project memory: ''Staging deploys run via deploy-bot; CI only builds.'''
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-stateful

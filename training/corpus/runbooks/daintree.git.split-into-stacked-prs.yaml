@@ -1,0 +1,141 @@
+# Training examples whose answer is `daintree.git.split-into-stacked-prs` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.split-into-stacked-prs
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Break PR #612 (the 2,400-line billing rewrite) into a stack of smaller dependent PRs so reviewers can take it one layer at a time.'
+  - feat/search-v2 is about 3k lines over 40 files; rebuild it as a chain of branches, each based on the one below and each passing tests alone. Leave the original branch untouched.
+  - Propose how to carve the payments-refactor branch into reviewable layers. Plan only, create no branches yet.
+  - my pr is way too big, reviewers keep bouncing it. can you split it up into like 3-4 stacked ones
+  - 'Separate the mechanical file moves in refactor/monorepo-layout from the behaviour changes: two stacked PRs, moves at the bottom.'
+  - 'Turn the 18 commits on claude-2''s branch agent/ingest-pipeline into a PR stack: schema first, then the parser, then the API wiring.'
+  - stacked branches from feat/offline-sync, one concern per layer, checks green per layer, prove top == original tip. no push
+  - '#733 got a ''please split this'' from the lead. break it into chunks that each build on the one below'
+  - Split codex/rate-limiter into a bottom PR with the new token-bucket module and a second PR on top that wires it into the middleware.
+  - Rework gp/i18n-everything into ordered branches split/i18n-1..n, each passing lint and unit tests on its own commit.
+  - the migration + ORM changes + UI are all in one branch, pull those apart into stacked prs pls
+  - Decompose the oversized react-19 upgrade PR into a dependent chain where every layer compiles by itself; open the PRs against each other once it's built.
+  - split feature/audit-log into 3 stacked layers, verify the union equals the original, don't open PRs yet
+  - How would you slice the 4,000-line graphql-migration branch into pieces? Show me the layering first and build it if it looks sane.
+  - Carve the monolithic dashboard-v3 PR into shared types, data hooks, components and page, each its own branch stacked on the previous.
+  - The split/billing-1..4 stack we built earlier is verified. Push the layers bottom-up and open the stacked PRs with chained bases.
+  - Before feat/notifications goes up for review, cut it into a stack of smaller branches; it's far too big to open as a single PR.
+  - Instead of one giant PR for feat/exports, split it into three stacked PRs and open those against each other.
+  - wrap up the auth work for review but as stacked prs, not one massive one
+  - 'Nobody can review #640 as it stands. Restructure it into a stack of smaller dependent PRs rather than reviewing it.'
+  - 'a reviewer said #702 is unreviewable at 5k lines, split it into a reviewable stack'
+  - 'Make #655 easier to review by splitting it: a bottom PR with the new interfaces, a top PR with the callers, stacked.'
+  - Take the already-integrated branch integration/sprint-12 and unpick it into a stack of per-concern PRs, each passing CI on its own.
+  - Rather than cherry-picking bits of feat/sso into separate PRs, rebuild the whole branch as an ordered stack of dependent branches.
+  - Don't rebase feat/queue-workers onto the new main yet; first split it into stacked branches from its current fork point.
+  - 'Reviewer on #690 asked for the renames to be split out: make a rename-only layer under the real change, as stacked PRs.'
+boundaries:
+  - query: Break feature/big-refactor into three stacked PRs.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: 'PR #690 is too large to review; restructure it into a stack of smaller dependent PRs instead.'
+    confusable_with: [daintree.review.review-change]
+  - query: 'reviewers can''t get through #702, cut it into reviewable layers'
+    confusable_with: [daintree.review.review-change]
+  - query: Before anyone reviews feat/editor-rewrite, split it into stacked branches so each piece can be reviewed alone.
+    confusable_with: [daintree.review.review-change]
+  - query: Get the analytics branch ready for review, but it's 3,500 lines, so turn it into stacked PRs first and open those.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: open prs for feat/tenant-isolation as a stack of three dependent ones instead of one
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Prep gp/cache-layer for review by splitting it into a base refactor PR with the feature PR stacked on top.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: 'Split #600 into three stacked PRs: migration, service layer, UI.'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
+  - query: My branch feat/reports is 3,000 lines — break it into a stack of reviewable PRs, schema first.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: move the test helpers into the first layer instead of the last
+    history:
+      - 'user: split #600 into reviewable chunks'
+      - 'assistant: Proposed plan for feat/workflow-engine: 1) type definitions and helpers, 2) storage layer, 3) engine, 4) UI and test helpers. Nothing built yet.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine — build it
+    history:
+      - 'user: how would you split my branch into stacked PRs? don''t change anything yet'
+      - 'assistant: Plan for feat/big-refactor from fork point 1c88d02: layer 1 renames and moves (900 lines, mechanical), layer 2 new config loader, layer 3 behaviour change in the scheduler with its tests.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: yes, push them and open the PRs, bottom first
+    history:
+      - 'user: turn my branch into stacked PRs'
+      - 'assistant: claude-5 built split/billing-1 to split/billing-3; I verified the top equals the original tip, each layer holds only its scope and passes its checks. Not pushed.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: layer 2 fails typecheck on its own — tell the agent to move the interface it needs down a layer
+    history:
+      - 'user: separate the refactor from the feature in feat/export-v2'
+      - 'assistant: claude-3 is building the stack in the split worktree. It reports split/export-1 green, but split/export-2 fails typecheck because ExportSink is only defined in layer 3.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and what do I do after the bottom one gets squash-merged?
+    history:
+      - 'user: make a PR stack out of these commits'
+      - 'assistant: Opened #701 (base main), #702 (base split/search-1) and #703 (base split/search-2), read back from the forge; the original branch is untouched.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: actually make it four layers — pull the migrations out on their own
+    history:
+      - 'user: break this PR into smaller ones'
+      - 'assistant: Plan for #655: three layers — models and migrations, service logic, API handlers. About to create the stack worktree at the fork point.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: that PR is huge now, break it into a few stacked PRs
+    history:
+      - 'user: rebase #640 onto main'
+      - 'assistant: claude-9 rebased feat/workspace-v3 (#640) onto main; verified and pushed with lease. It''s 3,400 changed lines across 58 files.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the reviewer's right that it's too big — split it into stacked PRs
+    history:
+      - 'user: review #810'
+      - 'assistant: Findings are back from two reviewers. Main note: #810 mixes a 2,000-line rename with a behaviour change in the auth flow, which makes the risky part hard to review.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: no, don't open it as one PR — break it into dependent chunks first
+    history:
+      - 'user: open a PR for feat/storage-rewrite'
+      - 'assistant: Readiness verdict: tests pass, branch is 4,800 changed lines over 71 files. Ready to commit and push.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now separate the refactor from the feature so reviewers can take it in pieces
+    history:
+      - 'user: rebase feat/plugins-v2 onto main'
+      - 'assistant: claude-4 rebased it onto main; verified and green. Not pushed.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'the reviewer asked for it to be split up instead — make a PR stack out of #540'
+    history:
+      - 'user: address the review comments on #540'
+      - 'assistant: Fetched 12 unresolved threads on #540. The top-level review says: ''please split this into smaller PRs, it''s unreviewable as is''.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that's way too big for one PR — turn claude-9's branch into stacked PRs
+    history:
+      - 'user: have an agent migrate the settings screens to the new form library'
+      - 'assistant: claude-9 finished on feat/forms-migration: 34 files, 2,700 lines changed, tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: one giant PR of that won't get reviewed — break the integration branch into a stack
+    history:
+      - 'user: combine the five agents'' branches into one'
+      - 'assistant: integrate/reporting holds all five sources, verified; full suite green.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'separate thing: my PR #390 is way too big to review, turn it into a stack of smaller PRs'
+    history:
+      - 'user: decompose the search-relevance epic into issues'
+      - 'assistant: Proposed 5 units in 2 waves; waiting for your approval before filing.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful

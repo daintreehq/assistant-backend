@@ -1,0 +1,162 @@
+# Training examples whose answer is `daintree.deps.upgrade-dependency` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.deps.upgrade-dependency
+run: 2026-09-28-catalog-expansion
+positives:
+  - Upgrade the web app from Next 14 to Next 15 in a fresh worktree, record baseline checks first, then fix whatever the upgrade breaks.
+  - Move the api service from Python 3.11 to 3.13, including .python-version, the Dockerfile base image and the CI matrix, and prove the tests pass on the new interpreter.
+  - Bump SQLAlchemy 1.4 to 2.0 in the billing service; apply the official 2.0 migration guide and report which items were deferred.
+  - Have claude upgrade vitest from 1.x to 3.x on a new branch off origin/develop and compare test results before and after.
+  - Get an agent to take eslint to v9 with the flat config migration, without disabling any rules to make lint pass.
+  - Upgrade Tailwind 3 to 4 across the marketing site, run the official upgrade codemod as its own commit, then fix the build.
+  - 'Node 20 -> 22 upgrade for the monorepo: update .nvmrc, engines and the GitHub Actions images, then rerun build and tests.'
+  - Upgrade Rails 7.1 to 7.2 on branch chore/rails-7.2; don't push, just report the before/after check matrix.
+  - 'codex: bump pydantic to v2 in services/ingest and fix the validators that break; keep the tests honest, no skips.'
+  - npm audit flags lodash 4.17.15 as critical; upgrade lodash to the patched release and verify build and tests still pass.
+  - Refresh all minor and patch npm dependencies in the dashboard package and confirm nothing regressed against a baseline run.
+  - Upgrade the Rust toolchain in rust-toolchain.toml from 1.78 to 1.82 and clear the new clippy warnings without allow attributes.
+  - Take Django from 4.2 LTS to 5.1 in its own worktree, apply the deprecation removals from the release notes, and list what is left manual.
+  - Upgrade TypeScript to 5.6 and fix the new type errors properly, no @ts-ignore and no any.
+  - Webpack 4 to 5 in the legacy admin app, one agent, bump and fixes kept as separate commits.
+  - Ignore the stale Renovate PR and do the date-fns 2 -> 4 upgrade ourselves in a new worktree, fixing what breaks.
+  - Bump Spring Boot to 3.3 in the orders service and report which tests were already failing before the bump.
+  - can we get react 19 in? fix whatever breaks pls
+  - upgrade prisma to 6, the generator thing changed i think
+  - move us off go 1.21 to 1.23
+  - bump storybook to 8 and make sure it still builds
+  - 'ok thanks. next: jest 29 -> 30 on the api, dont push anything'
+  - we're stuck on vue 2, get an agent going on the vue 3 upgrade in a new wt
+  - update the deps in packages/ui, minor versions only, and prove nothing broke
+  - pnpm 8 to 9 plus the lockfile, ci still has to pass
+  - upgrade playwright to latest, our e2e config probably needs changes
+boundaries:
+  - query: Tests fail since I bumped jest to 30 on this branch; finish the upgrade and get the suite green, compared against the pre-bump results.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: The build broke the moment we moved to vite 6; carry the upgrade through properly and fix the breakage.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: why does typecheck explode when i bump typescript to 5.7? do the bump properly and fix it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Spin up a claude agent in a new worktree to move our Express 4 server to Express 5 and fix what breaks.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Have an agent make the code changes for the Pydantic v2 move in the models package.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Get codex editing the repo to switch CI and the Dockerfile to Node 22 and prove it builds.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Upgrade Next.js from 14 to 16 in the web worktree and fix whatever breaks.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: bump pydantic to v2 in the api service and make the tests pass
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: Upgrade to React 19 before we cut the 3.0 release and fix what breaks.
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: Launch an agent in its own worktree for the Django 5 upgrade, just that one task.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Of the queued tasks, only start the Kotlin 2.0 compiler upgrade, one agent, and check it still compiles.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Put a single agent on the Next.js 15 upgrade for the storefront app and verify nothing regressed.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Upgrade Next.js from 14 to 15 in its own worktree and fix whatever breaks, with a before/after check comparison.
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: bump pydantic to v2 and make sure the tests still pass
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: Upgrade axios to 1.7 to clear the advisory and fix whatever breaks.
+    confusable_with: [daintree.review.audit-codebase]
+  - query: Upgrade Prisma to v6 in the api worktree and fix whatever breaks.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: renovate bumped pydantic and now half the contract tests explode. figure out whats needed
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: can u get an agent to bump the deps and fix whatever breaks
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: pre-split
+  - query: Have Claude bump the Django version to 5.1 and fix whatever deprecation warnings the upgrade surfaces, in its own worktree.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Launch Codex in the chore/deps worktree and have it upgrade eslint to v9.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for branch chore/deps and launch an agent there to bump the dependencies
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: bump lodash to 4.17.21 in package.json
+    run: 2026-09-28-agent-queries
+  - query: Bump lodash to the latest 4.x and fix anything that breaks.
+    run: 2026-09-28-agent-queries-2
+  - query: Upgrade the project from Python 3.11 to 3.12 and fix deprecation warnings.
+    run: 2026-09-28-agent-queries-2
+followups:
+  - query: bring react-dom and @types/react along with it, obviously
+    history:
+      - 'user: upgrade us to React 19'
+      - 'assistant: Created chore/upgrade-react-19 off origin/main, setup is ready, and launched claude-5 ''Upgrade: react 19'' with the baseline-first brief. Ending my turn.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: have it take another go at those type errors, but no ts-ignore
+    history:
+      - 'user: bump Next to 16 and fix what breaks'
+      - 'assistant: claude-3 finished: baseline had 2 failing tests already, after the bump there are 3 new type errors in app/router it left after three rounds.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: tell it to undo those skips and fix the tests properly
+    history:
+      - 'user: upgrade pydantic to v2 and make sure nothing broke'
+      - 'assistant: Checked the diff on chore/upgrade-pydantic-2: two tests in tests/test_models.py now carry @pytest.mark.skip with no guide item behind them.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: did you confirm the tests actually ran on 24 and not 22?
+    history:
+      - 'user: move us to Node 24'
+      - 'assistant: claude-7 reports .nvmrc, engines and the CI image bumped to 24, bump and fixes committed separately, after-matrix all green.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what does the before/after comparison look like?
+    history:
+      - 'user: update our minor deps and make sure nothing broke'
+      - 'assistant: claude-2 in chore/upgrade-minor-deps has finished; I re-ran typecheck and unit tests there myself and both pass.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: do the eslint 9 upgrade properly on its own branch and fix whatever breaks
+    history:
+      - 'user: deal with the dependabot PRs'
+      - 'assistant: 14 open Dependabot PRs: 9 patch, 3 minor, 1 0.x minor (zod 0.3→0.4), 1 major (eslint 8→9). Proposal: fold the 12 green patch/minor bumps into deps/batch-2026-09-28 via one agent; zod and eslint on their own. Waiting on your yes.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: bump lodash to 4.17.21 to clear that advisory and make sure nothing breaks
+    history:
+      - 'user: check our dependencies for vulnerable packages'
+      - 'assistant: Verified: lodash 4.17.15 prototype pollution, reachable via utils/merge.ts:12. Two others apparently unreached.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok now do the vite 6 upgrade properly
+    history:
+      - 'user: batch the open dependabot PRs'
+      - 'assistant: Folded 6 patch and minor bumps into deps/batch-0928 and verified it; the vite 5→6 major was left out as breaking.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good baseline — now move us to pydantic v2 and prove nothing broke
+    history:
+      - 'user: run all the checks on main'
+      - 'assistant: At 7d2e1f0 on main: lint pass, mypy pass, 640/640 tests pass.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: upgrade lodash to 4.17.21 and prove nothing broke
+    history:
+      - 'user: audit our dependencies for known vulnerabilities'
+      - 'assistant: One verified finding: lodash 4.17.15 has a prototype-pollution CVE, reachable via utils/merge.ts; no licence problems.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'next: upgrade Django to 5.2 for us'
+    history:
+      - 'user: what did the team ship last week?'
+      - 'assistant: 14 PRs merged Sep 21–27: billing retries, the search facets, and 3 dependency bumps; 4 still in review.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: plenty left then — start the Tailwind v4 upgrade
+    history:
+      - 'user: how much Codex allowance is left this week?'
+      - 'assistant: Codex /status: 22% of the weekly limit used, resets Monday 00:00 UTC.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -1,0 +1,162 @@
+# Training examples whose answer is `daintree.worktree.audit-worktrees` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.worktree.audit-worktrees
+run: 2026-09-28-catalog-expansion
+positives:
+  - which of my worktrees can i get rid of
+  - Classify every worktree in this repo as merged, closed-unmerged, in use, dirty, unpushed or parked, and recommend keep, finish or remove for each. Change nothing.
+  - i've got like 20 worktrees now, what are they all
+  - Check whether any worktree holds uncommitted changes or unpushed commits before I think about removing anything — read-only.
+  - Which worktrees belong to PRs that were already merged on GitHub? Count squash-merged ones as merged.
+  - Tell me which worktrees are far behind main — counts and a recommendation, don't rebase anything.
+  - Before any cleanup I want to know which worktrees are safe to remove and which hold work I'd lose. Propose a removal set; don't delete yet.
+  - 'Not asking where we left off — I want each worktree''s state: merged, stale, dirty or still in use, with evidence.'
+  - Don't just list the worktrees; for each one say whether its branch is merged, has unpushed work, or is behind develop.
+  - Which of my worktrees sit on branches that were already merged or whose PR was closed? Worktrees only, not bare branches.
+  - For each worktree just give me its status — dirty, unpushed, merged, how far behind main — no need to compare them with each other.
+  - 'Forget the agents for now and audit the worktrees themselves: which have a terminal attached and which are orphaned and clean.'
+  - 'worktree audit: merged/stale/at-risk per wt, evidence + keep/remove, read-only'
+  - does anything in my worktrees have unpushed stuff? want to clear some out eventually
+  - Find worktrees with a rebase or merge left half-finished or conflicted files, as part of a full health check of every worktree.
+  - Go through the 14 worktrees under ~/dev/monorepo-worktrees and say which look abandoned (no commits in weeks, PR closed) and which are still live.
+  - audit my worktrees pls. disk is filling up and i want to know what's safe to ditch
+  - Which worktrees have a detached HEAD, or a branch deleted on the remote with local commits still on it? Flag anything at risk.
+  - i'm not ready to delete anything — just tell me which worktrees are merged and which aren't
+  - Give a per-worktree verdict (class, evidence, recommendation) for the issue worktrees issue-512, issue-530 and issue-547.
+  - Are any feature worktrees stale — no commits for over a week and no agent running there? Recommend which to finish and which to drop.
+  - which wts are way behind main and which are already merged? don't touch them
+  - After last week's fan-out there are nine agent worktrees left. Work out whose PRs merged and which still hold work, and propose what could go.
+  - Is the fix/session-timeout worktree already merged, or does it still have commits that never got pushed?
+  - 'Table of all worktrees: branch, ahead/behind main, dirty file count, last commit date, PR merged or not, plus a recommendation for each.'
+  - Some worktrees point at branches whose PRs were closed without merging — find them and tell me whether the unmerged commits look worth keeping.
+  - query: which of my worktrees are already merged and safe to drop?
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: list my worktrees and mark which ones are already merged
+    confusable_with: [daintree.foundation]
+  - query: Show me the worktrees along with which ones have unpushed or uncommitted work.
+    confusable_with: [daintree.foundation]
+  - query: what worktrees do I have, and which are safe to delete?
+    confusable_with: [daintree.foundation]
+  - query: List every worktree with how far behind main it is and whether its PR has merged.
+    confusable_with: [daintree.foundation]
+  - query: Which of my worktrees are stale or hold uncommitted or unpushed work? Change nothing.
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: which of my worktrees are already merged and safe to remove?
+    confusable_with: [daintree.git.summarize-activity]
+  - query: What's still open across my worktrees — which are merged and which still carry uncommitted work?
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: 'catch me up on my worktrees: which are stale or behind main, and which could go'
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Which of the worktrees left over from last month's sessions can be let go? Evidence for each.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Is anything sitting on unpushed commits? Check every worktree, not the running agents.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: 'sweep the worktrees, not the agents: which are merged, stale or dirty'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: Which worktrees have no agent running and no commits in two weeks? Say whether each looks safe to remove.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: 'clean-up planning only: which worktrees are merged and safe to remove? don''t delete anything yet'
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: Before we tidy up, which of these worktrees still have unpushed commits?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: what could I close? tell me which worktrees are finished, but don't close them
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: which of my 12 worktrees are already merged and safe to remove?
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: which terminals have worktrees with uncommitted stuff right now
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: pre-split
+  - query: are there uncommitted changes anywhere i should know about before i start moving around
+    run: pre-split
+  - query: work out which worktrees have no terminal attached — those are the ones i've abandoned
+    run: pre-split
+  - query: cross-reference my open worktrees against the branches on origin and tell me what's orphaned
+    run: pre-split
+  - query: rank my worktrees by how stale they are
+    run: pre-split
+  - query: sort my open worktrees into ones i still care about and ones i've abandoned
+    run: pre-split
+followups:
+  - query: what exactly would I lose from feat/search-v2 if I removed it?
+    history:
+      - 'user: which worktrees can I get rid of?'
+      - 'assistant: Fetched once. 9 worktrees: 3 merged, 2 at risk (feat/search-v2 has 4 commits on no remote, fix/typo has untracked files), 1 in use, 3 parked.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the fetch failed because I was off VPN - I'm back on, rerun it
+    history:
+      - 'user: audit my worktrees'
+      - 'assistant: git fetch failed (could not resolve host), so behind counts and merged-ness are unknown for all 7 rows. Everything else is below.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: check the background terminals too, I think there's a dev server in the billing one
+    history:
+      - 'user: I have 15 worktrees, what are they all?'
+      - 'assistant: Classified 15 from worktree.list and the unfiltered terminal.list: 4 merged, 1 mid-rebase, 2 in review, 8 parked.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and which of those are way behind develop?
+    history:
+      - 'user: does anything have unpushed or uncommitted work?'
+      - 'assistant: At risk: feat/billing (2 uncommitted files), exp/cache (3 commits on no remote). Every other worktree is clean and pushed.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'fix/login is merged though, #612 was squash-merged last week'
+    history:
+      - 'user: which of these are already merged?'
+      - 'assistant: Merged: feat/onboarding (#598), chore/deps (#601). fix/login is parked: no PR found for that branch name.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, just give me the proposed removal set, nothing else
+    history:
+      - 'user: audit my worktrees'
+      - 'assistant: 11 rows classified with evidence. codex-1 is still working in feat/export so that one is in use; 2 are closed-unmerged.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now tell me which of my worktrees have unpushed work
+    history:
+      - 'user: prune the branch list'
+      - 'assistant: Deleted 12 merged branches with restore SHAs; kept 5 active and why.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok. separately, I have 15 worktrees - what are they all and which are already merged?
+    history:
+      - 'user: anything need me?'
+      - 'assistant: No agent waiting; claude-2 finished and handed back.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and the worktrees - does anything in them have uncommitted or unpushed work?
+    history:
+      - 'user: what branches can I delete?'
+      - 'assistant: 14 merged branches with no worktree, listed below; nothing deleted.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now which of my worktrees are merged and could go? don't delete anything yet
+    history:
+      - 'user: merge #901'
+      - 'assistant: Merged #901 into develop.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: audit my worktrees
+    history:
+      - 'user: weekly update'
+      - 'assistant: Summary for Mon-Fri: 8 shipped, 3 in review, 2 in progress.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine. which worktrees are stale or at risk - anything mid-rebase or with conflicts?
+    history:
+      - 'user: will feat/auth and feat/billing conflict?'
+      - 'assistant: Trial merge: 2 conflicting files (config.ts, db/schema.ts).'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: which of those worktrees could I let go?
+    history:
+      - 'user: catch me up'
+      - 'assistant: Open from earlier sessions: feat/search-v2, fix/login, exp/cache, chore/deps worktrees; one workflow still marked active.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-catalog-expansion-stateful

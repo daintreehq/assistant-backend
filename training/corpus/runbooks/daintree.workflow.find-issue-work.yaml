@@ -7,7 +7,6 @@ runbook: daintree.workflow.find-issue-work
 run: pre-split
 positives:
   - anything unassigned in the backlog?
-  - triage the backlog
   - search the tracker for anything touching the auth module
   - is anyone already on 412? want to check before i commit to it
   - give me a shortlist of open issues i could knock out in an afternoon, and please skip anything that already has an assignee or an open PR hanging off it — i wasted an hour last week starting something someone else had already half done
@@ -37,7 +36,6 @@ positives:
   - list open bugs in the parser area that nobody's assigned to
   - show me everything tagged easy i think its called. the beginner ones
   - someone new starts monday, find me 3 issues that would be a decent first task for them
-  - half the backlog is probably stale. find open issues that already have a merged pr against them
   - i've got an agent deep in the auth module rn. find me open issues that dont touch auth
   - last two i grabbed were already taken. give me ones where nobody has a branch or a pr going, actually check
   - what issues have moved in the last week
@@ -76,8 +74,6 @@ positives:
     run: 2026-09-28-agent-queries
   - query: 'Check whether anyone has already started on issue #3301 before I commit to it'
     run: 2026-09-28-agent-queries
-  - query: Triage open issues with no labels in the mobile repo and group them by area
-    run: 2026-09-28-agent-queries
   - query: 'GitLab search: open merge requests by me that touch the billing service'
     run: 2026-09-28-agent-queries
   - query: Did we ever ship offline mode? find the PR if it exists
@@ -107,8 +103,6 @@ boundaries:
     confusable_with: [daintree.forge.manage-issue]
   - query: is anyone already working 512 or is it free
     confusable_with: [daintree.forge.manage-issue]
-  - query: triage the backlog for me, half of it must be stale by now
-    confusable_with: [daintree.forge.manage-issue]
   - query: how many open bugs have we actually got
     confusable_with: [daintree.forge.manage-issue]
   - query: find me something small to pick up next
@@ -134,8 +128,6 @@ boundaries:
   - query: search the tracker for anything with rate limit in the title, open only
     confusable_with: [daintree.forge.manage-issue]
   - query: three candidates please, ranked, and tell me what you threw out and why
-    confusable_with: [daintree.forge.manage-issue]
-  - query: triage the backlog for me, anything untouched since june
     confusable_with: [daintree.forge.manage-issue]
   - query: is 402 actually free or is someone on it
     confusable_with: [daintree.forge.manage-issue]
@@ -255,9 +247,6 @@ boundaries:
   - query: which prs touched the billing webhooks in the last quarter
     confusable_with: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-28-agent-queries
-  - query: Find stale issues with no reply in 60 days that could be closed
-    confusable_with: [daintree.workflow.follow-up-on-issue]
-    run: 2026-09-28-agent-queries
   - query: anything unassigned in the docs label i could grab
     confusable_with: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-28-agent-queries
@@ -312,6 +301,33 @@ boundaries:
   - query: Find the issue about the login redirect loop so I can decide whether to take it
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-28-agent-queries-2
+  - query: did the websocket reconnect fix ever ship?
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: Find the PR that added SAML login last year.
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: Find me an unassigned bug in acme/web small enough to finish today.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: what should i pick up next from the backlog
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: Search the tracker for the closed issue about CSV export timeouts; I think we fixed it last year.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: find the closed PRs that touched the retry logic
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: find the closed PRs about rate limiting from this year
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: Which PRs touched the billing webhook code? Just list them.
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: list the open PRs waiting for review on develop - just the list, nothing else
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: any of those small enough for an hour?
     history:
@@ -536,10 +552,6 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: triage the backlog
-    history:
-      - 'user: hello'
-      - 'assistant: Hello. Everything''s idle — what would you like to do?'
   - query: do the same filter for the other repo — unassigned, open, nothing with a linked PR
     history:
       - 'user: hows it going'
@@ -588,6 +600,12 @@ topic_shifts:
       - 'assistant: The MCP link had dropped; after the restart daintree.status reports connected and tools are listed again.'
     active: [daintree.diagnostics]
     run: 2026-09-24-selector-hardening
+  - query: unrelated - did we ever ship the dark mode toggle? find the PR for it
+    history:
+      - 'user: update the changelog for 1.9'
+      - 'assistant: claude-3 wrote the 1.9.0 section from v1.8.2..main: 7 features, 10 fixes.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[agent task a_12 completed: cross-check against in-flight worktrees done]'
     history:

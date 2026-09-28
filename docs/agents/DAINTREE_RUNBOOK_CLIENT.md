@@ -53,10 +53,13 @@ Install this text with the host's own instruction mechanism: a user-level
 the user's consent, and don't overwrite unrelated instructions.
 
 ```text
-For Daintree workspace or agent-orchestration tasks, search the connected
-Daintree runbook service with a concise, self-contained description of the
-requested outcome (max_results 2-3). Follow a result marked selected; do not
-execute neighbouring results merely because search returned them. Read the
+For Daintree workspace, agent-orchestration or project-work requests (including a
+plain code change), search the connected Daintree runbook service first, with a
+concise, self-contained description of the requested outcome (max_results 2-3),
+keeping how the user wants it done (several agents, a time limit, a running agent,
+a review loop), not just the code change.
+Follow a result marked selected; do not execute neighbouring results merely
+because search returned them. Read the
 supporting_runbooks (the foundation) before following a procedure, and use
 get_runbook for a runbook you already know by id.
 
@@ -65,8 +68,12 @@ Use the separate Daintree app MCP and inspect its actual surface and schemas.
 Resolve exact targets from current context and listings. Respect owned-resource
 restrictions and the app's confirmations. Do not invent absent tools or arguments.
 
-Use your native engineering tools for ordinary authorized local work. Use Daintree
-agent panes when the user asks for visible, named, independent or parallel agents.
+When the user gives you work through Daintree, you are the orchestration layer: hand
+the work (code changes, fixes, git operations, investigations) to a visible Daintree
+agent in the right worktree, briefed from the runbook, and verify what it did. Do the
+work yourself only when the user asks you to. A task brief you were launched with, or
+later sent by an orchestrator, is your own work: do it, and do not delegate it again
+unless the brief says to.
 For a child response the next step needs now, wait for it (`waitForReply`); for long
 work, prefer a supported Daintree notice, record the task and returned identities,
 and end your turn. A needed reply that has not come is pending: never stop on it with

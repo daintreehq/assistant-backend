@@ -1,0 +1,183 @@
+# Training examples whose answer is `daintree.agents.hand-off-task` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.hand-off-task
+run: 2026-09-28-catalog-expansion
+positives:
+  - Claude in wt-webhooks hit its usage limit mid-task; have Codex finish the webhook retry work in that same worktree.
+  - The codex agent's context window is exhausted on the GraphQL migration. Start a fresh Codex session in the same checkout that picks up where it stopped.
+  - claude-2 has looped on the same failing snapshot fix for an hour; give the task to Codex along with what it already tried.
+  - 'Swap the Gemini agent on #611 for Claude and continue from its current uncommitted state.'
+  - Transfer the half-done CSV export feature from codex-3 to a new Claude agent in the same worktree; it must not start over.
+  - Stop the Claude agent on feat/i18n; the user wants you to finish its remaining work yourself in that worktree.
+  - Codex hit its five-hour cap halfway through the rate-limiter refactor. Continue with Claude on the same branch, keeping its uncommitted edits.
+  - Replace the agent on the payments worktree with a fresh Claude session; the current one's context is too muddled to be useful.
+  - Hand the unfinished Postgres 16 upgrade from gemini to codex in the same worktree; gemini keeps retrying the same pg_dump flags.
+  - Move the auth-middleware task off claude-1 onto Codex, with a handoff built from git status and its last messages so Codex skips the dead ends.
+  - 'Switch the implementer on #1290 from Codex to Claude; Codex''s approach is fine but it keeps stalling on the TypeScript errors.'
+  - Kimi ran out of credits halfway through the settings page. Continue with whichever agent is ready, same worktree.
+  - Get a fresh session to continue the Rust parser rewrite where the current Claude left off; it's at 98% context.
+  - Pass the partially implemented search filters from the Codex terminal to Claude, including which approaches failed and why.
+  - Have a different agent finish the upload-service refactor Gemini started; leave Gemini's pane open for when its quota resets.
+  - Relieve codex of the docs-site migration and let claude complete it in wt-docs, building on the files it already changed.
+  - Claude's weekly usage is gone. I don't need the numbers, just get Codex to pick up its refactor in the same worktree.
+  - Don't correct Claude again, it's had three corrections already; hand the pagination task to Codex instead.
+  - The Claude agent isn't stuck, it has just used up its context. Start a new session that continues the export job.
+  - 'Same worktree, different agent: Codex should take over Claude''s feature/billing work.'
+  - Rather than compacting Claude, start a clean session and hand it the task with a proper brief of what's done.
+  - Don't start dark mode from scratch; Claude already got halfway, have Gemini continue it.
+  - claude's out of usage again. can codex finish it off
+  - codex keeps flailing on the cron fix. let claude take it from here, same wt
+  - context is full on the claude one, spin up a fresh session to carry on
+  - you finish what claude started on the settings form, it's out of tokens
+  - query: Claude hit its usage limit, have Codex finish the refactor
+    run: 2026-09-28-catalog-expansion-refine
+  - query: its context window is full, start a fresh session that carries on where it left off
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Claude on the export task is out of usage; have Codex finish it in the same worktree.
+    confusable_with: [daintree.agents.ask-running-agent]
+  - query: Claude hit its usage cap on the importer; get Codex to finish it in the same checkout.
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: Codex is almost out of its five-hour allowance. Move its unfinished task to Gemini now.
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: don't bother checking claude's quota, it's clearly out. just have codex pick up where it stopped
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: Codex is responsive but has hit its usage limit; have Claude finish its task in that worktree.
+    confusable_with: [daintree.agents.recover-agent]
+  - query: Claude's session is healthy but it has burned through its context; start a fresh one that picks up from there.
+    confusable_with: [daintree.agents.recover-agent]
+  - query: Instead of compacting codex, give its task to a fresh Claude session with a proper handoff.
+    confusable_with: [daintree.agents.run-agent-command]
+  - query: Claude hit its context limit on the importer; have a fresh Codex session take over and finish it.
+    confusable_with: [daintree.agents.run-agent-command]
+  - query: Claude keeps going in circles on the parser. Give the task to Codex to finish in the same worktree.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Claude ran out of context on the importer refactor; have Codex pick it up in the same worktree and continue.
+    confusable_with: [daintree.context.feed-running-agent]
+  - query: Have a new Codex agent continue the half-finished caching work Claude left when it hit its limit, same worktree.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: the pagination fix is half done by gemini; get claude to complete it rather than starting over
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Claude hit its usage limit mid-task; have Codex finish the export feature in the same worktree.
+    confusable_with: [daintree.orchestration.park-work]
+  - query: The claude from this morning is still open but out of context; start a fresh session that continues its work.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: 'Of the running agents, the Claude on #300 hit its limit; give its task to Codex.'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: Codex should take over Claude's task in the same worktree; Claude is out of tokens.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: don't move anything. the codex in wt-api should hand its half-finished task to gemini right there
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: the last one gave up halfway through the parser work. dont bother resurrecting it, start a clean agent on the same job
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: pre-split
+  - query: codex hit its usage limit, have claude finish the task in the same worktree
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: use codex rather than gemini for the successor, and make sure the brief says the pdfkit approach already failed
+    history:
+      - 'user: claude hit its usage limit on the invoices work, have another agent finish it'
+      - 'assistant: claude-2 is on its usage-limit screen, so it''s already stopped. feature/invoices has 4 modified files uncommitted. Building the handoff from git and its last reply now.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: no, switch now
+    history:
+      - 'user: claude-5''s context is nearly full, start a fresh session that carries on where it left off'
+      - 'assistant: claude-5 is still working, so I armed a notice to hand off once it stops rather than cutting its turn.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude-4 is only running the linter, it's fine — go ahead with the handoff
+    history:
+      - 'user: codex-2 is going in circles on the websocket reconnect, give it to Claude'
+      - 'assistant: codex-2 is stopped, but claude-4 is also working in the same worktree fix/ws-reconnect, so I''ve held the successor rather than put two writers in one checkout.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, and do the same for claude-7 in the api worktree — it's hit the limit too
+    history:
+      - 'user: swap claude-6 for gemini and keep going'
+      - 'assistant: Launched gemini-1 in feature/search with a handoff brief: done (indexer), uncommitted (query parser), failed (trigram approach), next (ranking). claude-6 is stopped and left open.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: note that it deliberately left the old column in place — tell the new one not to drop it
+    history:
+      - 'user: claude-8 ran out of context on the migration refactor, hand it to a fresh claude'
+      - 'assistant: claude-8 is idle at the context-full warning. Its last reply says steps 1-3 are done and step 4 is in progress. Checking git before writing the brief.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: Hand the unfinished cart-totals task from codex-5 to a Claude agent in the same fix/cart-totals worktree, with a handoff brief built from git and codex-5's last reply.
+    history:
+      - 'user: codex-5 hit its rate limit halfway through fixing the cart totals'
+      - 'assistant: Confirmed codex-5 shows the rate-limit screen; fix/cart-totals has 2 modified files and one new untracked test.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: ugh. have codex pick up where it left off in the same worktree
+    history:
+      - 'user: interrupt claude-4 and make it stop refactoring the router'
+      - 'assistant: Interrupted claude-4, but its screen shows ''Claude usage limit reached, resets 6pm'', so it can''t take the correction.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: then have codex finish what claude-2 was doing, same worktree
+    history:
+      - 'user: how close is claude to its five-hour cap?'
+      - 'assistant: Claude Code''s usage screen shows the five-hour limit reached, resetting at 16:40. claude-2 on feature/export is sitting on the limit screen mid-task.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: forget it, give the task to codex and let it carry on from where claude-3 got to
+    history:
+      - 'user: tell claude-3 to stop rewriting the scheduler'
+      - 'assistant: Interrupted claude-3 and sent the correction; its screen shows it went straight back to rewriting scheduler.ts.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: start a fresh session that picks up where it left off then
+    history:
+      - 'user: compact claude-4''s context'
+      - 'assistant: /compact failed on claude-4: ''Conversation too long to compact''. It is idle at its prompt.'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's going in circles. swap it for codex and keep going in the same worktree
+    history:
+      - 'user: is claude-5 hung?'
+      - 'assistant: Not hung — it is looping: it has run the same failing migration three times in the last 15 minutes.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'claude-7 just hit its usage limit — have gemini finish #431 in that same worktree'
+    history:
+      - 'user: start work on #431'
+      - 'assistant: Created worktree issue-431-retry-webhooks and launched claude-7 with the issue brief; it has been working for 40 minutes.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: have codex take over claude-3's pdf task and finish it
+    history:
+      - 'user: how are all the agents doing?'
+      - 'assistant: 5 agents: claude-1 working, codex-2 done and idle, claude-3 on the usage-limit screen halfway through the PDF export on feature/pdf, claude-4 working, gemini-1 waiting on nothing.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, hand its task to codex in the same worktree and let it carry on
+    history:
+      - 'user: compact claude-3'
+      - 'assistant: /compact failed on claude-3: ''Conversation too long to compact''.'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, have claude take over and finish the task from where it left off, keeping the good hunks
+    history:
+      - 'user: why did codex''s run go wrong?'
+      - 'assistant: Cause: environment — Codex hit its usage limit at turn 22 and stopped mid-edit. Salvage: src/api changes correct, tests unfinished.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude hit its usage limit halfway through — have codex pick it up and finish
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: move claude-4's task over to codex instead, it's burning my Claude limit
+    history:
+      - 'user: get everyone to a stopping point'
+      - 'assistant: claude-2 stopped clean; claude-4 in feat/billing is still working and hasn''t read the parking message yet.'
+    active: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -97,6 +97,8 @@ positives:
     run: 2026-09-28-agent-queries
   - query: gemini froze mid task. can u rescue it without losing its work
     run: 2026-09-28-agent-queries
+  - query: my agent's been sitting there for ages, is it hung?
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: this agent has been stuck for twenty minutes, can you unstick it
     confusable_with: [daintree.worktree.relocate-agents]
@@ -320,6 +322,27 @@ boundaries:
   - query: the codex terminal has been frozen for 40 min and won't respond to anything, sort it out
     confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-28-agent-queries
+  - query: The codex spawn came back with no terminal id. Did it even start?
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: codex has been sitting at the same spinner for 40 minutes, is it hung?
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: The spawn returned no terminal id. Did the agent even start?
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: I sent a command to claude twenty minutes ago and it's been frozen since, is it hung or just slow?
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: The codex agent has shown the same spinner for 40 minutes and doesn't respond to anything. Is it hung?
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: claude has been sitting on the same step for 20 minutes and isn't responding to anything
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: claude is stuck and hasn't printed anything in 20 min
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how long has it actually been like that?
     history:
@@ -609,6 +632,36 @@ topic_shifts:
       - 'assistant: Checked the spawn saga for t6: launch succeeded, codex started, last output 22 minutes ago and no process activity since. Looks hung rather than slow.'
     active: [daintree.agents.recover-agent]
     run: 2026-09-24-selector-hardening
+  - query: its screen hasn't changed in ten minutes and Escape does nothing — is it hung?
+    history:
+      - 'user: tell codex-3 to stop and use yarn'
+      - 'assistant: Interrupted codex-3 and sent the correction; it started a new turn.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude-1 seems wedged — no output for 20 minutes and getStatus says unknown
+    history:
+      - 'user: loop review and fix on the cache change until codex approves'
+      - 'assistant: Round 2 fixes sent to claude-1; ending turn until it reports.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's stuck on something and not responding to anything — get it back
+    history:
+      - 'user: give codex 20 minutes on the eslint 9 upgrade'
+      - 'assistant: Past the 14:35 deadline I interrupted codex-2 twice; getStatus shows trackingState unknown and no output since 14:20.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: is the billing agent stuck? it's been silent for 40 minutes and its terminal id doesn't respond
+    history:
+      - 'user: bug bash billing and onboarding'
+      - 'assistant: claude-2 (onboarding) reported 4 bugs; codex-3 (billing) still has no notice.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude-5 is hung mid-review — its terminal isn't responding at all
+    history:
+      - 'user: rotate reviews between the agents'
+      - 'assistant: Reviews came back from codex-3 and claude-2; claude-5''s item timed out.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[watcher w_77 fired: t_3300 produced output after the interrupt]'
     history:

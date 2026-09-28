@@ -529,6 +529,8 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: the agent from earlier that's still open, move it to the staging-fixes worktree and have it fix the flaky cron there
     run: 2026-09-28-agent-queries-2
+  - query: move that Claude into its own worktree called api-cleanup and let it keep going
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: move the agents that are already running into separate checkouts
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -668,6 +670,21 @@ boundaries:
   - query: 'stop the agents clobbering each other: move the one doing auth into its own wt'
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-agent-queries-2
+  - query: Move codex into its own worktree so it stops colliding with claude on main.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: Move the claude agent that's working in main into its own worktree called fix-cors and let it continue there.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Move the Claude agent running in the main checkout into the hotfix worktree so it continues there.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: claude-1 and claude-2 are editing the same checkout, move each into its own worktree
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: move the running claude into a new worktree called api-fix
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: did they all pick it up
     history:
@@ -1742,3 +1759,9 @@ topic_shifts:
       - 'assistant: Created worktree feat/export from main. Nothing launched.'
     active: [daintree.worktree.create-plain-worktree]
     run: 2026-09-24-selector-hardening
+  - query: they're sharing one checkout — move each agent into its own worktree
+    history:
+      - 'user: are claude-3 and codex-1 touching the same files?'
+      - 'assistant: They''re both in the same worktree, feat/importer, so their edits land in one tree: 4 files touched by both.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful

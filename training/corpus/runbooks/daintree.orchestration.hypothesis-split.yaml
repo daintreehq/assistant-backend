@@ -1,0 +1,125 @@
+# Training examples whose answer is `daintree.orchestration.hypothesis-split` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.hypothesis-split
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Have three agents each chase a different theory for why the worker''s RSS climbs to 2GB overnight: the LRU cache, the listeners in ws-client, or buffered log lines.'
+  - 'Split the investigation of the slow /search endpoint: one agent on the Postgres query plan, one on the JSON serializer, one on the auth middleware. Verdicts only, no fixes.'
+  - duplicate emails go out sometimes. is it the mailer retry, the cron double-firing, or webhook replay? put an agent on each
+  - Test competing explanations for dropped websocket messages in the local stack (backpressure, heartbeat timeout, nginx buffering), one probe worktree per suspect.
+  - 'One agent per suspect for why uploaded photos come out rotated: EXIF handling in sharp, the client-side canvas resize, or the CDN transform.'
+  - 'rule out each possible cause at once for the stale dashboard numbers: materialized view refresh, redis ttl, react-query staleTime'
+  - 'CLI cold start went from 300ms to 1.4s. Suspects: the new telemetry import, the config loader walking node_modules, ts-node registration. Confirm or refute each in parallel without touching my checkout.'
+  - Our Go service leaks goroutines under load. Give codex the http-client-timeout theory and claude the unclosed-ticker theory, each with an experiment that tells them apart.
+  - users in europe see wrong dates on invoices. could be server tz, the date-fns format call or the db column type. have agents check each theory separately
+  - 'Parallel hypothesis test for why the release APK doubled in size: bundled debug symbols, duplicate native libs, or the new font assets.'
+  - 'Why does the sync job sometimes skip records? Candidates: cursor pagination off-by-one, clock skew on updated_at, the batch commit swallowing errors. One agent per candidate, verdicts only.'
+  - Agents each take one theory for the random 401s after token refresh (race between tabs, clock drift on exp, refresh-token rotation) and report supported or refuted with evidence.
+  - 'search index keeps missing new products. theories: consumer lag, mapping rejects, event never fires. split across 3 agents, read-only where possible'
+  - Chase two rival causes of the high CPU in the render loop in parallel, the resize-observer storm vs the selector recomputing. I want each experiment, not a fix.
+  - For the memory growth in the Electron main process, assign one agent to IPC listeners, one to the window cache and one to the file watcher; each confirms or refutes its suspect.
+  - i think it's either the pool size or the lock on the jobs table causing the timeouts. one agent on each, nothing gets fixed yet
+  - Nothing is failing in CI, the app just crawls on large projects. Have agents each test one suspected cause (git status polling, file tree rendering, the syntax highlighter) and report which holds up.
+  - We can already trigger the crash on paste with the 5MB fixture; now split the three candidate causes across agents in probe worktrees.
+  - It isn't a regression, the deadlock in the importer has always been there. Three theories for it, one agent each, evidence per theory.
+  - 'Local only, not production: the queue worker stalls after about two hours. Rival explanations are a dropped redis connection, an unhandled promise, or the heartbeat interval. One agent per explanation.'
+  - 'Don''t have them debate it: each agent independently runs an experiment for one cause of the payload truncation (body-parser limit, proxy, gzip), and I want a verdict per cause.'
+  - Instead of just asking claude and codex what causes the double render, give each one a theory and have it prove or disprove it with an experiment.
+  - Two explanations for why the cache hit rate fell after the refactor, key format change vs eviction policy. Test both in parallel.
+  - Figure out which of these is really behind the slow app startup (plugin discovery, the sqlite migration check, font loading) with an agent per suspect taking measurements.
+  - 'Before anyone fixes the stuck spinner on the export dialog, have agents each confirm or refute one suspected cause: the promise never resolving, the IPC reply getting lost, or the reducer ignoring the event.'
+  - p95 on /orders got worse in local load tests; hypotheses are the new ORM eager loading, the added audit-log write, and JSON schema validation. Agent per hypothesis, evidence only.
+boundaries:
+  - query: Rather than polling the agents on what causes the slow login, give each one suspect and have it run an experiment to confirm or refute it.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: get claude and codex to each prove or disprove one theory for the double charge, not just give opinions
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: Nothing's red in CI, but the report generator produces off totals; three theories (rounding, currency conversion, stale FX cache), one agent per theory.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: The build passes but the app leaks file handles; split the suspected causes across agents and give me a verdict per cause, no fix yet.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: 'The desktop app leaks memory when left open overnight — one agent per theory: the image cache, event listeners, or the websocket buffer.'
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: 'Work out which of three suspects is behind the stale cache reads: one agent per suspect running an experiment, no fixes.'
+    confusable_with: [daintree.explore.repository]
+  - query: Which is really causing the slow cold build, the tsconfig paths, the barrel files or the source maps? Agent per suspect, measured.
+    confusable_with: [daintree.explore.repository]
+  - query: Fan the latency investigation out, one agent per suspected cause, each reporting confirmed or refuted.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Get several agents on the connection-reset problem, but each independently tests only its own cause; no converging on a shared answer.
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: put a few agents on the cpu spike, one theory each, and tell me which theory survives
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: Is the checkout slowdown the N+1 query, the image resizing or the session store? One agent per theory, no fixes.
+    confusable_with: [daintree.orchestration.spike-options]
+followups:
+  - query: 'add a fourth theory: the connection pool isn''t releasing on timeout'
+    history:
+      - 'user: have three agents each chase a different theory for the memory leak in the worker'
+      - 'assistant: Showed H1 (listener never removed), H2 (unbounded LRU), H3 (buffers held by the retry queue). Launching one agent each in probe/ worktrees from feat/worker at 2d8e41b.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: H2 says CONFIRMED — did you re-run its experiment yourself?
+    history:
+      - 'user: is the slowdown the cache, the query or the serializer? one agent per suspect'
+      - 'assistant: claude-2 (H1 cache), codex-3 (H2 query plan), claude-4 (H3 serializer) are running in probe/ worktrees. I''ll re-run any CONFIRMED experiment before reporting.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: those two theories are basically the same, merge them and just run two agents
+    history:
+      - 'user: rule out each possible cause of the double-charge at once'
+      - 'assistant: Proposed hypotheses: H1 webhook retried without idempotency key, H2 Stripe event delivered twice, H3 client double-submit. H1 and H2 both predict duplicate webhook rows.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: once one is proven, stop the others — no point burning tokens
+    history:
+      - 'user: one agent per suspect for why startup takes 9 seconds'
+      - 'assistant: Three probes running from main at 55f02ac: H1 plugin scan, H2 sync fs reads in config, H3 telemetry DNS lookup.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: so which cause does the evidence actually support?
+    history:
+      - 'user: chase the flicker in the sidebar three ways: re-render storm, CSS transition, virtualization'
+      - 'assistant: All three notices are in. H1 CONFIRMED, H2 REFUTED, H3 INCONCLUSIVE. Re-running H1''s profiler experiment in probe/rerender now.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: 'right, separate issue: the websocket drops every few minutes — could be the proxy idle timeout, our heartbeat, or the load balancer. one agent per theory'
+    history:
+      - 'user: bug bash the release candidate with three agents'
+      - 'assistant: Confirmed 5 bugs after cross-reproduction; the top one is a crash on paste of 10k rows.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: don't converge on one answer — give each agent one of the three theories for the leak and have it prove or refute it
+    history:
+      - 'user: get claude and codex to debate why the worker leaks memory until they agree'
+      - 'assistant: About to start the relay between claude-2 and codex-3 on the leak.'
+    active: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: we already have a repro now. is it the ORM's lazy loading or the N+1 in the serializer? put an agent on each
+    history:
+      - 'user: repro the slow orders page from #512'
+      - 'assistant: Reproduced on main at a13f9c0: /orders takes 6.2s with 200 rows; script is scripts/repro-512.sh.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'also, the export sometimes produces empty files — test the three likely causes in parallel: race on flush, wrong stream end, S3 multipart abort'
+    history:
+      - 'user: add rate limiting to the export endpoint'
+      - 'assistant: claude-2 finished in feat/export-ratelimit; I checked the diff and the new tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: never mind voting. the real question is why search results are stale — index lag, cache, or the query builder? one agent per suspect
+    history:
+      - 'user: poll the pinned agents on whether we should switch to Meilisearch'
+      - 'assistant: Claude and Gemini said stay on Postgres FTS; Codex said switch.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, now the dashboard itself is slow on first load — is it the bundle, the API fan-out or the chart lib? chase all three at once
+    history:
+      - 'user: spike recharts vs visx for the dashboard'
+      - 'assistant: Measured both; recommended visx on bundle size (118kB vs 204kB).'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful

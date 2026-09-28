@@ -1,0 +1,144 @@
+# Training examples whose answer is `daintree.forge.address-pr-review` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.forge.address-pr-review
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Address the unresolved review threads on PR #88 in acme/web - fix the valid ones in the PR''s worktree and push to its branch.'
+  - 'CodeRabbit left 23 inline comments on #1432; separate the real bugs from the noise, fix the real ones, and give me a disposition per thread.'
+  - 'The maintainer requested changes on #217 (rename the config key, add a migration test). Get those done on the PR branch and push.'
+  - 'Work through Sarah''s review of the invoice-export PR: fix each comment, answer the questions she asked, and don''t reply on GitHub yet.'
+  - Outstanding reviewer feedback on PR 56 - one commit per fix, local only, do not push.
+  - 'Resolve the review comments on #903 and reply to each thread with the commit that fixed it.'
+  - 'pr #88 got a bunch of review comments, can you get them sorted'
+  - fix what the reviewer asked for on the payments pr
+  - 'coderabbit went nuts on #412 again, fix the ones that actually matter and skip the nits'
+  - reviewer wants changes on my pr before they'll approve it, pls deal with them
+  - 'The Copilot reviewer flagged three possible nil derefs in #77; check each against the current code, fix the real ones, decline the rest with a reason.'
+  - 'On #640 the reviewer asked why we dropped the retry - draft answers for the question threads and fix the change requests; post nothing until I''ve seen the text.'
+  - 'Requested changes on PR #1180 are what''s blocking the merge: address every one, push the fixes, and report CI on the new head.'
+  - 'Take the review threads on GitHub for #333 - not the codex terminal''s notes - and have the PR''s own agent fix them.'
+  - '#88''s CI is green but the reviewer left 6 change requests; get them implemented and pushed.'
+  - 'Don''t just tell me what the reviewer said on #502 - get the requested changes made on the branch.'
+  - 'The review on #245 says the new endpoint lacks input validation and tests; have an agent add both on the PR branch, verify, and push without force.'
+  - 'Deal with the human reviewer''s inline comments on PR #71: fix them, push, then resolve the threads that were actually fixed.'
+  - 'A Sonar bot and a teammate both commented on #1502; account for every unresolved thread - fixed, answered, or declined - and push the fixes.'
+  - 'apply the review feedback on #19 and push it, the contributor''s fork allows maintainer edits'
+  - 'address pr review comments #4410, fork branch, local commits only'
+  - 'Two reviewers left contradicting comments on #95 about the cache TTL; work through the rest of their feedback and bring the conflict to me.'
+  - 'Several review threads on #300 are marked outdated but still open - check which still apply to the current code, fix those, and explain the rest.'
+  - hey, the review on my pr came back with a load of nits and a couple of real issues, just fix everything
+  - 'The agent in the checkout-v2 worktree is idle; send it the unresolved GitHub review comments on #812, have it fix them, then push.'
+  - 'Respond to the review on #58: make the requested changes and answer the reviewer''s questions in the threads.'
+boundaries:
+  - query: 'Pass the reviewer''s GitHub comments on PR #88 to the agent in that worktree and have it fix them.'
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: 'CodeRabbit''s review on #412 needs to reach claude-2, who owns the PR; have it fix the valid points and push.'
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: 'The reviewer says #88''s error handling is broken in two places - fix it per their comments.'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: 'get #77 fixed - it''s blocked on review comments, not on CI'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: 'CI on #640 passes but the review flagged an edge case in parse_date that''s wrong; fix what the reviewer found.'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: '#88 can''t merge until the requested changes are addressed - address them.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'reviewer requested changes on #217, make them so we can land it'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'Work through the reviewer''s inline comments on #742 and fix what they asked for.'
+    confusable_with: [daintree.git.sync-with-base]
+  - query: 'the reviewer''s comments on #88 are in - go fix them'
+    confusable_with: [daintree.review.review-change]
+  - query: 'Look over the review CodeRabbit left on #412 and fix whatever it''s right about.'
+    confusable_with: [daintree.review.review-change]
+  - query: 'check what the reviewer said on #88 and fix it'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: '#217 has changes requested - get them done and pushed.'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: 'Read the review on #502 and act on it: make the changes it asks for.'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: 'pull the review comments off PR #231 and get the agent to address them'
+    confusable_with: [daintree.agents.relay-review-feedback, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-24-selector-hardening
+followups:
+  - query: skip the two nits, maria said they're optional
+    history:
+      - 'user: address the review comments on #88'
+      - 'assistant: 9 unresolved threads on #88 (6 from maria-k, 3 from coderabbitai). Ledger: 5 change, 2 question, 2 nit. Briefed claude-2 in worktree pr-88 to fix them, one commit per thread; waiting on its notice.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now reply on each thread with the commit that fixed it and resolve the fixed ones
+    history:
+      - 'user: fix what the reviewer asked for on #88'
+      - 'assistant: Verified claude-2''s 5 commits against the threads, re-ran tests and lint on a91c3e0 (passed), pushed to feature/token-refresh. #88 head is now a91c3e0; CI pending. No replies posted yet.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: yes, do the rename — changing the public name is fine, nobody outside uses it
+    history:
+      - 'user: work through the comments on PR #140 and fix them'
+      - 'assistant: 7 threads. One asks to rename the exported fetchAll to listAll, which changes public API — want that in? The other 6 are briefed to claude-4 in pr-140 once you answer.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the push got rejected because Jonas pushed to the PR in the meantime — put our fixes on top of his and try again, no force
+    history:
+      - 'user: fix what the reviewer asked for on #88'
+      - 'assistant: Fixes verified on 7be02d1, but `git push origin HEAD:feature/token-refresh` was rejected: the remote branch moved to 3f19aa4.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: coderabbit's comment about a race in cache.ts is wrong, decline that one with the reason instead of changing code
+    history:
+      - 'user: address the review comments on #88'
+      - 'assistant: 9 unresolved threads on #88 (6 from maria-k, 3 from coderabbitai). Ledger: 5 change, 2 question, 2 nit. Briefed claude-2 in worktree pr-88 to fix them, one commit per thread; waiting on its notice.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: keep the fixes local for now, don't push — I want to read the commits first
+    history:
+      - 'user: address the review comments on #88'
+      - 'assistant: 9 unresolved threads on #88 (6 from maria-k, 3 from coderabbitai). Ledger: 5 change, 2 question, 2 nit. Briefed claude-2 in worktree pr-88 to fix them, one commit per thread; waiting on its notice.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: while that runs, the PR for the other branch has three review threads from Sam — get those addressed
+    history:
+      - 'user: Claude writes, Codex reviews, repeat until clean — the billing webhook'
+      - 'assistant: Round 1 review sent to codex-2 in feat/billing-webhook; waiting.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok get those fixed and pushed
+    history:
+      - 'user: what did the reviewer say on #140?'
+      - 'assistant: maria-k requested changes on #140: 4 inline threads — missing null check at src/parser.ts:88, a test for the empty case, rename of `tmp`, and a question about the timeout default.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'now CodeRabbit left a dozen comments on #203 — work through them and fix the real ones'
+    history:
+      - 'user: CI is red on #203, fix it'
+      - 'assistant: The failure was a stale snapshot in tests/export.test.ts; claude-3 updated it, I re-ran tests on 0e7c1d2 and pushed. #203 checks are green.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'the reviewer already requested changes on #256 — deal with them'
+    history:
+      - 'user: open a PR for the csv export branch'
+      - 'assistant: Pushed feature/export-csv and opened #256 against develop; URL and head 2b8d4f1 read back.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#340 is our branch — have an agent fix what the maintainer''s inline comments ask for and push it'
+    history:
+      - 'user: check out #340 and see if the tests pass'
+      - 'assistant: Worktree pr-340 at head 5c2e9ab: tests passed 212/212. Nothing pushed or posted.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'right, handle the requested changes on #77 then'
+    history:
+      - 'user: merge #77'
+      - 'assistant: Not merged: #77 has reviewDecision CHANGES_REQUESTED from jonas-w with 3 unresolved threads.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'fine, use claude then — fix the review threads on PR #512'
+    history:
+      - 'user: how much usage does codex have left?'
+      - 'assistant: Codex is at 92% of its 5-hour window; Claude is at 40%.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-catalog-expansion-stateful

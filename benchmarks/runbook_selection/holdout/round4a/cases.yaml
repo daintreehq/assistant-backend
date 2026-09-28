@@ -371,55 +371,60 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W1-073
-  category: no-task
-  note: Generic coding task.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Convert the callbacks in fs_utils.js to async/await
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W1-074
-  category: no-task
-  note: Generic coding task.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Add type hints to the functions in reporting/summary.py
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W1-076
-  category: no-task
-  note: Generic dependency bump.
+  category: single-runbook
+  note: "A dependency or tooling upgrade: daintree.deps.upgrade-dependency (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Bump lodash to the latest minor version in package.json
   expect:
-    required: []
-    optional: []
+    required: [daintree.deps.upgrade-dependency]
+    optional: [daintree.foundation]
+
 - id: r4-W1-078
-  category: no-task
-  note: Generic coding task.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Add a --verbose flag to the CLI argument parser
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W1-079
-  category: no-task
-  note: Generic coding task.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Write a docstring for the parse_config function
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W2-001
   category: multi-runbook
   note: create the issue, then start work on that one issue
@@ -471,15 +476,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W2-005
-  category: no-task
-  note: generic feature change done directly, nothing Daintree-specific
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: cursor-based pagination for the GET /api/orders handler
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W2-006
   category: routing-trap
   note: account figures from the usage view, not ask-and-relay
@@ -553,15 +559,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W2-015
-  category: no-task
-  note: direct edit by the caller; no runbook
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: add jsdoc to exported functions in utils/date.ts
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W2-017
   category: single-runbook
   note: cross-session resume plus ledger hygiene
@@ -684,15 +691,16 @@ cases:
     required: []
     optional: []
 - id: r4-W2-034
-  category: no-task
-  note: generic build config
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: multi-stage dockerfile for the go service, distroless final image
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W2-040
   category: single-runbook
   note: remote resource lifecycle action
@@ -706,15 +714,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W2-041
-  category: no-task
-  note: generic code change
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: memoize the expensive selector in the useDashboard hook to stop rerenders
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W2-042
   category: single-runbook
   note: change judged on its merits, findings deliverable
@@ -1298,15 +1307,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W3-070
-  category: no-task
-  note: Generic code change done directly; no visible agent asked for.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: rename getUserData to fetchUser across src/ and fix the imports
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W3-071
   category: no-task
   note: Generic coding ask.
@@ -1439,16 +1449,15 @@ cases:
     - daintree.foundation
 - id: r4-W4-018
   category: routing-trap
-  note: 'fence: relay-review-feedback says reviewing yourself with no fixer agent named is review-change'
+  note: "Auditing existing code rather than a change: daintree.review.audit-codebase (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: review src/billing.ts for security problems and give me the findings
   expect:
-    required:
-    - daintree.review.review-change
-    optional:
-    - daintree.foundation
+    required: [daintree.review.audit-codebase]
+    optional: [daintree.foundation]
+
 - id: r4-W4-024
   category: routing-trap
   note: 'fence: verify-agent-work says judging a change on its merits (findings) is review-change'

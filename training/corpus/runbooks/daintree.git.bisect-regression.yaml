@@ -1,0 +1,160 @@
+# Training examples whose answer is `daintree.git.bisect-regression` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.bisect-regression
+run: 2026-09-28-catalog-expansion
+positives:
+  - Find the commit that broke `npm run build` between tag v4.2.0 and main; bisect in a dedicated worktree and fix nothing.
+  - Cold start of the Electron app went from 1.2s to 3.8s sometime in the last month. Identify the first commit responsible.
+  - test_refresh_token passes on release-2.3 and fails on develop — get codex to git-bisect it and report the culprit and its PR.
+  - 'bisect login redirect regression: good=v1.8.0 bad=origin/main, oracle=tests/e2e/login.spec.ts'
+  - when did the dark mode toggle stop persisting? it definitely worked in 2.9
+  - bisect it pls. good was last friday's main
+  - which pr made the api container image double in size?
+  - Pin the nested-list flattening regression in the markdown renderer to its first bad commit; tests/test_lists.py::test_nested already reproduces it.
+  - Search the history between the March release and HEAD for the change that made the CLI's --json output drop the 'id' field.
+  - 'Have claude run a bisect with the existing #412 repro script between v3.1.0 and main, capped at 15 steps.'
+  - worked fine on 5.0.2, broken on 5.1.0. what changed? i want the exact commit
+  - Which commit introduced the worker's memory growth? Median RSS over five runs above 400MB counts as bad; the last release is known good.
+  - first-bad-commit hunt for type errors in packages/core after the tsconfig shuffle; good=a1b2c3d, bad=HEAD
+  - The Android build started failing somewhere in the last 200 commits on main. Locate the commit; don't fix it.
+  - someone broke the i18n fallback during the last sprint, can an agent work out whose commit it was
+  - Go benchmarks show parse throughput halved versus v0.9 — find the commit in between that did it.
+  - 'gemini: bisect between tags v6.0.0 and v6.1.0 for the change that stopped webhooks retrying, using scripts/check_retry.sh as the test'
+  - Locate the commit on the payments branch that made the refund test start failing; it passed at the branch point.
+  - CI on main has been red since sometime this week. Don't fix it yet — I only want the commit that turned it red.
+  - 'We already have a failing test from the #640 repro; now find which commit introduced the bug, with v2.0 as the known-good revision.'
+  - Main is measurably slower than v3.0 on the import benchmark; no need to re-measure, find the commit in that range that caused it.
+  - Which merged PR broke CSV quoting? It worked in the January build; use tests/test_csv.py to decide good versus bad.
+  - A regression QA spotted on staging reproduces locally with the checkout test — bisect between the last deployed tag and main to find its source.
+  - Walk last week's commits for the one that broke the pagination test, using git bisect with that test as the oracle.
+  - Before anyone fixes the broken Docker build, find which commit between the 2.1 tag and HEAD introduced it.
+  - The thumbnail test now fails on every run but passed at v1.4 — bisect to the culprit, nothing else.
+boundaries:
+  - query: Why is the build broken? Not the fix — I need the commit between v4.2 and main that broke it.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: The failing test_refresh_token passed two releases ago; identify the commit that made it fail, don't repair it.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: CI is red on main since last Tuesday; tell me which commit did it before anyone touches the code
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: test_cache_ttl passed consistently at v2.0 and fails on every run now; find the commit that broke it.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: The login test passes on v2.3 and fails on main locally; find which commit broke it.
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: '#412 reproduces with test_export_last_row and it passed at v3.1; find which commit broke it.'
+    confusable_with: [daintree.debug.reproduce-bug]
+  - query: Find the code change that made the CLI stop printing the id field — which commit was it? it worked in March.
+    confusable_with: [daintree.explore.repository]
+  - query: when did we break the i18n fallback? find the first commit where it stopped working
+    confusable_with: [daintree.explore.repository]
+  - query: Find which commit on release/2.4 broke the login page.
+    confusable_with: [daintree.git.cherry-pick-changes]
+  - query: Startup was fast in v3.2 and is slow now. Find which commit made it slow.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+  - query: The web app's settings page stopped saving the theme sometime after 3.2; find the commit that broke it.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: which PR made the bundle jump by 400KB? bisect it
+    confusable_with: [daintree.runtime.measure-performance]
+  - query: Which PR broke CSV quoting? It worked in the January build — test commits rather than searching titles.
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: find the pr that made startup slow, bisect it between v2.0 and main
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: Track down the merged pull request that introduced the webhook retry regression by running the test across history.
+    confusable_with: [daintree.workflow.find-issue-work]
+followups:
+  - query: it says commit 4c1e won't even build — tell it to skip that one, not mark it bad
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's done — check the answer against the parent before you tell me
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+      - 'assistant: Notice from claude-3: it names 7d2a9f1 as the first bad commit.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: actually use v2.2 as the good end, I'm not sure v2.3 was clean
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, and which PR did that commit come from?
+    history:
+      - 'user: find the PR that made startup slow'
+      - 'assistant: claude-5 finished the bisect in bisect/startup: first bad commit b81f3c0 (startup 1.9s vs 1.1s on its parent a0e44d2). I reproduced both timings myself.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the bad commit is a merge — can it go into that branch's own commits and narrow it down?
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+      - 'assistant: claude-3 reports the first bad commit is merge 9e0c2b4 (Merge branch ''feat/pdf-renderer'').'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: don't revert or fix anything, just give me the commit with the evidence
+    history:
+      - 'user: git bisect between the last release and main, the build started failing somewhere in there'
+      - 'assistant: claude-4 is bisecting in bisect/build between v5.1.0 and main using `pnpm build`; 6 of about 8 steps done.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: hmm, it worked in v2.3 — just bisect it and find the commit
+    history:
+      - 'user: cache, query or serializer — one agent each on the slowdown'
+      - 'assistant: All three came back INCONCLUSIVE; none of the experiments separated before and after.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's mitigated, and I can repro the slow query locally now - find which commit between v5.1 and v5.2 made it slow
+    history:
+      - 'user: prod latency is through the roof'
+      - 'assistant: You rolled back to v5.1; latency is back to normal. Suspects below are provisional.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it passes on v2.3 though — find which commit broke it
+    history:
+      - 'user: can you repro #412? the CSV export drops the last row'
+      - 'assistant: Created worktree repro/412 from origin/main at 3f9c2e1 and launched claude-2 as "Repro: 412" with the report, harness rules and test-only scope. I''ll check its result when the notice arrives.'
+      - 'assistant: Verified: tests/export/csv_rows.test.ts fails at 3f9c2e1 with ''expected 1001 rows, got 1000''. Only the test file changed.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it built fine last week — which commit made it start failing?
+    history:
+      - 'user: does main still build?'
+      - 'assistant: main-wt (main @ f10e2d3): `pnpm build` failed in packages/ui with ''Cannot find module ./tokens''.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok so it's real — find which commit between v4.0 and main made startup slow
+    history:
+      - 'user: is main slower to start than v4.0?'
+      - 'assistant: claude-6 measured, and I checked: main median 1.84s vs v4.0 1.52s over 30 interleaved release-mode runs, well outside the spread.'
+    active: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it passes on the v1.8 tag — bisect it with this test
+    history:
+      - 'user: write a failing test for #260 first'
+      - 'assistant: Verified: tests/cache/evict.test.ts fails on main @ 44ab0e1 with ''expected 3 entries, got 4''. Only the test file changed.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'different thing: the nightly''s been red since Tuesday, `npm run test:integration -- --grep auth` shows it — find the commit that broke it'
+    history:
+      - 'user: merge #318 once checks pass'
+      - 'assistant: #318 merged as squash commit 2e7f1aa; required checks were all green and the forge confirms it is merged.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: hold on — before any fixing, I want to know which commit broke it. it worked in 2.4
+    history:
+      - 'user: the date-range filter test fails on main, make it green'
+      - 'assistant: Launched claude-2 in fix/date-range with the failing output; it''s reading the test now.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the settings page crash started somewhere in the last 40 commits — git bisect it with the repro in tests/settings.spec.ts
+    history:
+      - 'user: what did the team ship this week?'
+      - 'assistant: 11 PRs merged since Monday, 4 in review; worktrees feat/audit-log and fix/sso still hold unpushed work.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful

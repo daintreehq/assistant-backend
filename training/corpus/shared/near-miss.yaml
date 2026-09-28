@@ -7,135 +7,78 @@ run: 2026-09-28-agent-queries
 empty_kind: off_domain
 examples:
   - Explain in general terms the difference between git worktree and cloning the repo twice.
-  - write a bash one-liner that prints each local branch with its last commit date
   - query: What keyboard shortcut splits a pane in Daintree?
     docs: true
-  - Rename the Recipe model to Formula in the cooking app's models.py and update the serializer.
   - suggest a branch naming convention for a 6-person team
   - Explain the difference between squash merge and rebase merge in git
-  - write a github actions workflow that runs pytest on push
   - what's a good template for writing bug reports in an issue tracker?
   - Suggest a naming convention for feature branches in a small team
   - write a python function that asks the user a question and relays the answer to a slack webhook
-  - rename the interview table to interviews in the prisma schema
-  - fix the typo in the conversation component's placeholder text
-  - add a README section explaining how our multi-agent SDK passes messages between agents
-  - Write a function that computes instant-runoff voting results from ranked ballots.
   - what does an HTTP 429 with a Retry-After header mean
   - suggest a format for a friendly internal hackathon competition with elimination rounds
   - Explain the difference between a token bucket and a leaky bucket rate limiter.
   - whats a good way to structure a debate club scoring rubric
   - thanks, that agent's result looks great — nice work
-  - write a python script that fans out http requests with asyncio and a semaphore of 6
   - what's the difference between git worktree prune and git worktree remove
-  - add a cleanup() method to the WorkspaceManager class that closes open file handles
-  - our supervisor process restarts workers when they crash, can you add exponential backoff
   - explain how a DAG scheduler like Airflow decides which tasks are ready
-  - Convert the date utilities from moment to date-fns
-  - Add cursor-based pagination to the /orders endpoint
   - Write a regex that validates UK postcodes
-  - Refactor UserService to take its repository through constructor injection
-  - Implement exponential backoff with jitter in the HTTP client wrapper
   - SQL query that finds duplicate emails in the users table
-  - Add type hints to the parsing module until mypy --strict passes
-  - Multi-stage Dockerfile for a FastAPI service
-  - Replace the hand-rolled LRU cache with functools.lru_cache
-  - Add zod validation to the signup form fields
-  - Eliminate the N+1 query in the posts listing view
-  - Rename the `terminal` variable in logger.ts to `sink` everywhere it is used
-  - Write a helper that parses `git worktree list --porcelain` output into structs
-  - Add a Recipe model with an ingredients relation to the Django cooking app
-  - Update the pull request template markdown to include a testing checklist
-  - Implement an Agent base class with an async run() method for our chatbot framework
-  - Add a --worktree flag to our CLI's argparse setup
-  - Unit tests for the issue-number parser in the changelog generator
-  - Make the embedded terminal emulator component support 256 colors
-  - GitHub Actions workflow YAML that runs eslint on every pull_request event
-  - Rename the React component RecipeCard to MealCard and update its imports
-  - Implement a Go worker pool capped at 6 concurrent jobs that picks up the next job when one finishes
-  - Add an assignee field to the Issue model in our tracker app and expose it in the serializer
-  - Convert the prompt templates in agents/ from f-strings to Jinja
-  - Write a migration adding a merged_at column to the pull_requests table
-  - add a dark mode toggle to the settings page
   - bash one liner to find files over 100mb
-  - set up eslint with the airbnb config
-  - python script to dedupe csv rows by id
-  - add a user agent header to outgoing requests
-  - write a function that renames files in a folder to kebab-case
-  - parse the co-authored-by trailers out of commit messages in the release script
-  - add an in-memory cache for the recipe search results
-  - debounce the terminal resize handler
-  - make the branch name validation error message clearer
   - can u write a quick regex for semver
-  - make the navbar sticky on scroll
   - whats the idiomatic way to do an enum in typescript
-  - bump lodash to 4.17.21 in package.json
-  - add a loading spinner to the upload button
-  - rename getUser to fetchUser across the api folder
-  - write a recipe scaler that multiplies ingredient quantities by servings
-  - add a 'terminal' log level between warn and error
-  - turn this for loop into a list comprehension
-  - add retry to the s3 upload
-  - makefile target that runs all the linters
-  - add an index on orders.created_at
-  - convert the settings page layout to css grid
-  - make the agent names bold in our chat ui
-  - store the worktree path in the config struct instead of recomputing it each call
-  - query: Refactor the OrderService class to extract the tax calculation into its own module.
-    run: 2026-09-28-agent-queries-2
-  - query: Add TypeScript types to the untyped helpers in src/utils/date.js.
-    run: 2026-09-28-agent-queries-2
-  - query: Bump lodash to the latest 4.x and fix anything that breaks.
-    run: 2026-09-28-agent-queries-2
-  - query: Create a multi-stage Dockerfile for the Go API that produces a distroless image.
-    run: 2026-09-28-agent-queries-2
   - query: Write a regex matching UK postcodes, including the GIR 0AA special case.
-    run: 2026-09-28-agent-queries-2
-  - query: bash one-liner to find all files over 50MB in the repo and sort by size
-    run: 2026-09-28-agent-queries-2
-  - query: Fix the typo 'recieve' across the docs folder.
-    run: 2026-09-28-agent-queries-2
-  - query: Convert the callback-based file reader in lib/io.js to async/await.
-    run: 2026-09-28-agent-queries-2
-  - query: Add a unit test for the parseDuration function covering negative inputs.
-    run: 2026-09-28-agent-queries-2
-  - query: Rename the userId column to accountId in the Prisma schema and update the queries that use it.
-    run: 2026-09-28-agent-queries-2
-  - query: Implement debounce for the search input in the Header component.
-    run: 2026-09-28-agent-queries-2
-  - query: make the login form accessible - labels, aria attributes, focus order
-    run: 2026-09-28-agent-queries-2
-  - query: Replace moment.js with date-fns throughout the frontend.
-    run: 2026-09-28-agent-queries-2
-  - query: Write a GitHub Actions step that caches pip dependencies between runs.
-    run: 2026-09-28-agent-queries-2
-  - query: Add pagination to the GET /products endpoint using cursor-based paging.
-    run: 2026-09-28-agent-queries-2
-  - query: Remove the unused imports flagged by ruff in the services package.
-    run: 2026-09-28-agent-queries-2
-  - query: Write a Python script that dedupes rows in contacts.csv by email, keeping the newest.
-    run: 2026-09-28-agent-queries-2
-  - query: extract the magic numbers in the pricing module into named constants
-    run: 2026-09-28-agent-queries-2
-  - query: Add a CHECK constraint so order quantity can never be negative, with a migration.
-    run: 2026-09-28-agent-queries-2
-  - query: Upgrade the project from Python 3.11 to 3.12 and fix deprecation warnings.
     run: 2026-09-28-agent-queries-2
   - query: Write a jq filter that pulls every name field out of a nested JSON array.
     run: 2026-09-28-agent-queries-2
-  - query: Make the ImageCard component lazy-load its image.
-    run: 2026-09-28-agent-queries-2
-  - query: Add structured JSON logging to the worker process using pino.
-    run: 2026-09-28-agent-queries-2
-  - query: split the 900-line utils.py into smaller modules by concern
-    run: 2026-09-28-agent-queries-2
   - query: Write an nginx config that proxies /api to port 8080 and serves static files from /var/www.
-    run: 2026-09-28-agent-queries-2
-  - query: Add retry with exponential backoff to the HTTP client wrapper.
-    run: 2026-09-28-agent-queries-2
-  - query: Fix the off-by-one in the pagination helper so the last page isn't dropped.
     run: 2026-09-28-agent-queries-2
   - query: Write a cron expression for 2:30am every weekday.
     run: 2026-09-28-agent-queries-2
-  - query: Add a README section documenting the environment variables the server reads.
-    run: 2026-09-28-agent-queries-2
+  - query: what's the difference between slash commands and skills in claude code, generally?
+    run: 2026-09-28-catalog-expansion
+  - query: how big is a typical LLM context window these days?
+    run: 2026-09-28-catalog-expansion
+  - query: ok got it, thanks for loading that in
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a spike and a prototype?
+    run: 2026-09-28-catalog-expansion
+  - query: is exploratory testing worth it compared to automated tests, generally speaking?
+    run: 2026-09-28-catalog-expansion
+  - query: how many hypotheses should one experiment test at a time?
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, the stack looks great
+    run: 2026-09-28-catalog-expansion
+  - query: what is a stacked pull request?
+    run: 2026-09-28-catalog-expansion
+  - query: nice, branches are all clean now
+    run: 2026-09-28-catalog-expansion
+  - query: why does git say a branch is not fully merged after a squash merge?
+    run: 2026-09-28-catalog-expansion
+  - query: how long should a standup update usually be?
+    run: 2026-09-28-catalog-expansion
+  - query: what's the OWASP top ten, roughly?
+    run: 2026-09-28-catalog-expansion
+  - query: cheers, release notes are merged, all good
+    run: 2026-09-28-catalog-expansion
+  - query: whats the point of running typecheck separately from the build?
+    run: 2026-09-28-catalog-expansion
+  - query: cheers, the benchmark numbers look good
+    run: 2026-09-28-catalog-expansion
+  - query: Explain the ABBA ordering trick for benchmarks in general terms.
+    run: 2026-09-28-catalog-expansion
+  - query: what's a good rule of thumb for how many e2e tests vs unit tests a project should have?
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, the server's up now
+    run: 2026-09-28-catalog-expansion
+  - query: cheers, port's free, all good
+    run: 2026-09-28-catalog-expansion
+  - query: what's a database seed, conceptually?
+    run: 2026-09-28-catalog-expansion
+  - query: haha the recipe editor is so much nicer than the old one
+    run: 2026-09-28-catalog-expansion-late
+  - query: what's a merge train, conceptually?
+    run: 2026-09-28-catalog-expansion-late
+  - query: is it better to keep AGENTS.md short or detailed, generally speaking?
+    run: 2026-09-28-catalog-expansion-late
+  - query: cool, spike worked out great, cheers
+    run: 2026-09-28-catalog-expansion-late

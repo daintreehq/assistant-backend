@@ -96,6 +96,10 @@ positives:
     run: 2026-09-28-agent-queries
   - query: copy the relevant auth code to my clipboard as a copytree
     run: 2026-09-28-agent-queries
+  - query: bundle everything relevant to the billing webhooks into a CopyTree file
+    run: 2026-09-28-catalog-expansion-refine
+  - query: make a context bundle of the auth module and its tests and copy it to my clipboard
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: bundle up all the files related to the worktree handling so i can paste them somewhere
     confusable_with: [daintree.worktree.relocate-agents]
@@ -165,6 +169,18 @@ boundaries:
   - query: bundle the code related to ticket 3021 into a reference file i can attach to the issue
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-28-agent-queries
+  - query: Make a CopyTree bundle of everything related to the auth module, tests included, and save it as a reference file.
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: bundle the billing subsystem into a context file and copy it to my clipboard
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Generate a context bundle of the search feature for a handoff doc I'm writing.
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: bundle the cart and pricing files into a copytree reference file
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: also throw in the middleware tests
     history:
@@ -414,6 +430,12 @@ topic_shifts:
       - 'assistant: Proposed selection: ingest/*.go, ingest/testdata/**, cmd/ingest, 3 test files — ~72 KB. Generate?'
     active: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
+  - query: also make me a copytree bundle of the same files on my clipboard for the design review
+    history:
+      - 'user: give claude-2 the payments module'
+      - 'assistant: Sent claude-2 the paths under src/payments/; it confirmed it read them.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[async wait returned: copyTree.generate finished]'
     history:

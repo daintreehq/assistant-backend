@@ -1,0 +1,210 @@
+# Training examples whose answer is `daintree.ci.hunt-flaky-test` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.ci.hunt-flaky-test
+run: 2026-09-28-catalog-expansion
+positives:
+  - test_websocket_reconnect fails roughly one CI run in ten. Have an agent measure the rate under different seeds and worker counts and find the cause.
+  - Run tests/api/test_orders.py::test_concurrent_checkout 50 times in the payments worktree and report the failure rate per condition.
+  - this test is flaky af. cart_spec line 88. figure out why
+  - the date picker spec only ever fails in CI, never on my machine. whats going on
+  - Find which test is polluting test_user_cache; it only fails when it runs after the rest of tests/services.
+  - Stabilise the intermittent upload-progress test at its source — no sleeps, no retries — and prove it with a consecutive-pass gate. Don't commit.
+  - intermittent failure in pkg/queue TestDrainOrder — measure rate, isolate trigger, root cause at file:line, no fix
+  - The notifications Jest suite fails now and then in parallel mode but never with --runInBand; quantify it and find the shared state.
+  - can u get codex to hammer TestLeaderElection a few hundred times and see how often it falls over
+  - Hunt down the race behind the Playwright checkout spec timing out on about 5% of CI runs and fix it properly, without raising timeouts.
+  - test_schedule_next_run only fails around midnight UTC; have claude confirm it's clock-dependent and fix it with an injected clock.
+  - Randomly failing pytest under pytest-randomly — take the seed from CI run 88213, replay that ordering and find the polluter.
+  - rspec order-dependent failure again, seed 41822 breaks it. find the leaky spec
+  - Last night's CI retried test_billing_cycle and it passed on the second attempt. Measure it 40 times to see whether it's genuinely unreliable.
+  - The Go test TestCacheEviction fails with -race maybe once per 30 runs; find the data race and report where it lives, read-only.
+  - 'flaky: test_pdf_render_hash, suspected locale/TZ dependency — vary TZ and LANG one at a time and report failures per setting'
+  - our e2e smoke job goes red every few days on the same assertion with no code changes in between. find the root cause
+  - Figure out why test_import_large_file fails only when the CI box is under load, and make it deterministic without widening tolerances.
+  - CI went red on test_payment_webhook but a re-run passed. Don't just retry it — find out why it only fails some of the time.
+  - The build job goes red at random on the snapshot test; fix the underlying nondeterminism so it stops failing intermittently.
+  - 'The repro test the agent wrote for #640 is red 3 times out of 8. Dig into why it''s nondeterministic.'
+  - Run the auth test file 30 times in a loop and tell me how many runs fail — it's been unreliable lately.
+  - The Cypress login spec passes most runs but sometimes fails in CI; measure the failure rate and identify what triggers it.
+  - test_export has been intermittent for about a week. First just measure how often it fails and under which conditions.
+  - failing test on main? no — it's the same one that fails once in a while, test_quota_reset. get an agent to measure and explain it
+  - Before we quarantine test_ws_heartbeat, get a real failure rate and a root cause for it so the fix is in the source.
+boundaries:
+  - query: The failing CI test only fails some of the time — reruns pass. Measure how often and find out why.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: test_sockets keeps failing in CI but only intermittently; the usual fix-the-failing-test approach isn't cutting it, find the race
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Fix the flaky test_worker_shutdown at its source and prove it with a long run of consecutive passes.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: why does test_refunds fail on CI roughly once a day and pass everywhere else?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: The cart e2e spec fails about one run in five in CI; find out why.
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: Run the websocket reconnect test 100 times and report how often it fails.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: 'the repro test the agent wrote for #640 fails about 1 in 8 runs, figure out why its intermittent'
+    confusable_with: [daintree.debug.reproduce-bug]
+  - query: Have codex find and fix whatever makes test_ws_heartbeat fail intermittently, without sleeps or retries.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: get an agent to run TestLeaderElection 200 times and explain the failures
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: test_sync passes most runs but fails maybe 1 in 15 on CI; find out why.
+    confusable_with: [daintree.git.bisect-regression]
+  - query: test_reconnect in the websocket suite fails maybe one run in ten; measure it and find out why
+    confusable_with: [daintree.orchestration.test-first-split]
+  - query: the perf test for the cache fails randomly one run in ten, stabilise it
+    confusable_with: [daintree.runtime.measure-performance]
+  - query: is this flaky?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: test_selector keeps flapping, passes on rerun. is it genuinely broken or just flaky
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: this test passes like half the time whats up with that
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: is this flaky or actually broken? dont patch anything until we know
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: test_invoice_rounding fails intermittently on CI but never locally; decide whether it's flaky and fix it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: is this test flaky or actually broken? test_retry_backoff keeps failing
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: 'ERROR: test_migrations (tests.test_db.MigrationTests) fails only on CI, not locally. flaky? fix it'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: is the failing check on that PR flaky or real
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.forge.land-pull-request]
+    run: pre-split
+  - query: vitest keeps failing on the date utils, is it flaky?
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.runtime.debug-web-app]
+    run: pre-split
+  - query: is the browser test flaky or actually broken? it passes locally every time.
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.runtime.debug-web-app]
+    run: pre-split
+  - query: one test on this PR keeps flaking, can you figure out what's going on
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.review.review-change]
+    run: pre-split
+  - query: that check on 88 keeps failing, is it flaky? sort it out
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.workflow.follow-up-on-issue]
+    run: pre-split
+  - query: is test_upload_resume flaky? it fails like 1 in 5 on ci
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.explore.repository]
+    run: 2026-09-24-selector-hardening
+  - query: is that flaky or actually broken? either way i want it green by lunch
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: is that auth test flaky or did i break it? get it green
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: is that test flaky or genuinely broken? either way make it pass
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: pre-split
+  - query: open a terminal and get an agent onto the flaky test
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.foundation]
+    run: pre-split
+  - query: spawn an agent to fix the flaky test in the payments module
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.fan-out-work]
+    run: pre-split
+  - query: spawn claude in the worktree I made earlier and have it fix the flaky test
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
+    run: pre-split
+  - query: open a terminal and get an agent to fix the flaky test in auth_test.py
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.foundation]
+    run: pre-split
+  - query: spawn an agent to fix the flaky test
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.multi-agent]
+    run: pre-split
+  - query: open a claude in this worktree and have it fix the flaky retry test
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.recipe.run-or-create]
+    run: pre-split
+  - query: launch a fresh codex agent to fix the flaky date test, visible so i can watch
+    confusable_with: [daintree.agents.recover-agent, daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+followups:
+  - query: have it try with random ordering as well, I bet something else is polluting it
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 7 of 50 in parallel, 0 serial — ok, now have it pin down the trigger
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+      - 'assistant: Notice: claude-4 reports 0/50 failures serial and 7/50 parallel. I reran 20 parallel myself and saw 3 failures.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: go ahead and fix it, but no sleeps and no retries
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+      - 'assistant: claude-4 traced it to a shared WebSocket mock server that the session tests close early; evidence attached.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it says it's fixed — make it prove it with 100 consecutive passes
+    history:
+      - 'user: stabilise the upload progress test, it randomly fails'
+      - 'assistant: Notice from codex-2 in flake/upload: it replaced the fixed timeout with an awaited progress event and says it''s fixed.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also have it check whether the fake timers from session.spec are leaking into it
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: separately, test_session_expiry has failed about 1 in 10 CI runs for weeks - find out why
+    history:
+      - 'user: red-team the session change'
+      - 'assistant: 1 regression confirmed; one repro flipped between runs, reported as flaky.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it only went red 3 times out of 10 — run it 50 times and find out why it's intermittent
+    history:
+      - 'user: can you repro #377, the double-submit on the payment form'
+      - 'assistant: claude-2''s test in repro/377 is red 3/10 runs and green the rest; I saw 1 red in 4 of my own runs.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that queue test fails every few runs lately — run it 50 times and work out what's going on
+    history:
+      - 'user: run the tests in the worker worktree'
+      - 'assistant: worker (main @ 3c3d9e0): 1 failure in queue.spec (''drains in order''); a rerun of that file passed.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: right, so it's flaky, not broken — measure how often it fails under CI-like parallelism and find the cause
+    history:
+      - 'user: the notifications test is failing in CI, fix it'
+      - 'assistant: claude-5 reports it couldn''t make it fail locally: 20 serial runs, all green, at 8a1f00c.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that checkout spec has been randomly failing on half our PRs — hunt it down and stabilise it, no retries
+    history:
+      - 'user: land #301'
+      - 'assistant: #301 is blocked: required check e2e failed on checkout.spec, which passed on the previous commit with no related change.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately — which test is polluting the websocket test? it passes alone and fails in the full run sometimes
+    history:
+      - 'user: what are all my agents doing?'
+      - 'assistant: 4 agents: claude-1 working, codex-2 finished (unverified), claude-3 waiting on a question, gemini-1 idle.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: so it's intermittent — find out what makes it flaky
+    history:
+      - 'user: can you repro #377, the double-submit on the payment form'
+      - 'assistant: claude-2''s test in repro/377 is red 3/10 runs and green the rest; I saw 1 red in 4 of my own runs.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: login.spec keeps doing that, fails then passes on retry — get an agent to figure out why it's flaky
+    history:
+      - 'user: run the Playwright suite in the auth worktree'
+      - 'assistant: Against auth''s own server on port 4410: 57 passed, 1 failed (login.spec ''remembers session''); it passed on the one retry.'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful

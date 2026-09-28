@@ -1,0 +1,161 @@
+# Training examples whose answer is `daintree.review.red-team-change` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.review.red-team-change
+run: 2026-09-28-catalog-expansion
+positives:
+  - Have codex try to break claude-2's fix for the date parser in src/lib/dates.ts and prove each break with a failing test.
+  - 'Red-team PR #412 (rate limiter rewrite): launch attackers on concurrency and resource limits, keep only breaks that reproduce, and mark each as regression or pre-existing against main.'
+  - adversarial pass on the new CSV import in feat/bulk-import — find inputs that crash it, repro scripts only, no fixes
+  - Get gemini to attack the JWT refresh change on branch auth/refresh-rotation; confirmed breaks only, each with a command I can run.
+  - can someone try to break the new markdown sanitizer before i merge it
+  - 'red team #88 pls. i don''t trust the retry logic'
+  - Spin up two attacking agents against commit 3f9c1ab, one on auth and permissions and one on error paths, and report which breaks also happen on the base.
+  - Throw hostile inputs at the new URL router in the router-v2 worktree and show me only what actually fails when run.
+  - 'Don''t give me another code review of the payments PR #230 — I want an agent actively trying to make it fail, with runnable repros.'
+  - Claude finished the upload size limit change on feat/upload-cap. Point codex at it to try to break it with oversized, chunked and zero-byte uploads; repro tests only.
+  - 'Just the new pagination change in PR #501, not the whole app: have an agent try to break it with edge-case cursors and prove anything it finds.'
+  - 'Attack the session-handling diff in PR #77 for auth bypasses and have each one demonstrated with a script that fails on the change.'
+  - Let codex attack claude's parser change and bring me the confirmed breaks only — don't send anything back to claude yet.
+  - All tests pass on fix/overflow-guard, but I want an agent writing new tests that make it fail. Nothing gets fixed; tell me which failures are regressions versus already on main.
+  - is claude's cache-invalidation PR actually solid? have codex try to break it, not just read it
+  - 'red-team change abc1234 vs develop; lenses: input handling, concurrency; repros under redteam/; no commits'
+  - The new TOML config loader landed on feat/toml-config. Have an agent hunt for inputs that crash or hang it and keep only the reproducible ones.
+  - try to break it. the websocket reconnect change on wt ws-reconnect
+  - 'Find inputs that crash the new expression evaluator in PR #1093; every break needs a failing test, and one that also fails on the merge base gets labelled pre-existing.'
+  - 'Have claude and codex each attack the permissions refactor in PR #640 separately and give me the breaks either one can actually demonstrate.'
+  - Adversarially test the new money-rounding helper before release 3.2 — negative amounts, huge values, odd locales. Proven failures only, no fixes.
+  - before we ship the oauth change can we get an agent to attack it and show me real breaks, not maybes
+  - Codex reports the SQL injection in /search is closed. Launch a different agent to try to get an injection through the patched endpoint and run whatever it produces.
+  - Point an attacker at the hotfix/null-tenant branch relative to release/2.8 and prove any crash it finds.
+  - hey quick one — can you get gemini to hammer the new file-lock code with concurrent writers and see if anything actually breaks
+  - 'Break-test the retry/backoff change in src/http/retry.go: timeouts, 429 storms, cancelled contexts. List rejected claims with reasons.'
+  - query: red-team the refund-flow branch
+    run: 2026-09-28-catalog-expansion-refine
+  - query: have an agent try to break the new rate limiter on feat/throttle and prove each break with a test
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Adversarially test PR #318 (the CSV importer rewrite); only report breaks with a runnable repro, and check each one on main'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: red team claude's fix for the session expiry bug
+    run: 2026-09-28-catalog-expansion-refine
+  - query: get codex to attack the new markdown sanitizer in the xss-fix worktree and find inputs that get through
+    run: 2026-09-28-catalog-expansion-refine
+  - query: try to break the promo-codes branch before we merge it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Point two agents at the webhook signature change to hunt for bypasses; confirm each one yourself
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'attack the new pagination change: find inputs that crash it or return wrong pages, prove with tests, fix nothing'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'red-team #402'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can you get an agent to throw nasty inputs at gemini's new date parser and show me what actually breaks
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Adversarial pass on the auth-refactor branch: demonstrate breaks with scripts, mark regression vs pre-existing'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: break-test the discount stacking change in the checkout worktree
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: 'Have codex try to break claude''s fix for the date parser in PR #231 and prove any break with a test.'
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: red team the new rate limiter change
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: have codex try to break claude's new date parser and prove any crash with a test
+    confusable_with: [daintree.orchestration.review-until-approved]
+  - query: Have Codex write tests that try to break Claude's new parser and prove each crash it finds.
+    confusable_with: [daintree.orchestration.test-first-split]
+  - query: Claude says the fix is done. Before I merge, have gemini try to break it with a failing test.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: I don't trust claude's overflow fix — have another agent attack it and prove any break it finds.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: it says the race is fixed; get codex to write a stress test that makes it fail again, if it can
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: have codex try to break claude's new parser and prove anything it finds
+    confusable_with: [daintree.review.audit-codebase]
+  - query: 'Review PR #318 by having codex try to break it — I only care about failures it can actually demonstrate and run.'
+    confusable_with: [daintree.review.review-change]
+  - query: look over claude's new parser by throwing malformed input at it and show me what really crashes
+    confusable_with: [daintree.review.review-change]
+  - query: Check the auth PR for security problems by having an agent attempt exploits against it, and run each one it writes.
+    confusable_with: [daintree.review.review-change]
+followups:
+  - query: add a concurrency attacker too
+    history:
+      - 'user: red-team PR #742'
+      - 'assistant: Candidate 5e6f7a8 (matches headRefOid), base 1a2b3c4. Created worktree redteam/pr742-general and launched codex-3 as the general attacker; ending the turn.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: give the input-handling attacker another round - its race claim had no repro
+    history:
+      - 'user: have Codex try to break Claude''s fix on fix/coupon-parse'
+      - 'assistant: codex-2 reported 3 breaks. I ran its repros: 1 confirmed (regression, passes on base 0f1e2d3), 1 rejected as pure reasoning about a race, 1 flaky.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run the confirmed one on the base too - regression or was it already broken?
+    history:
+      - 'user: try to break the new CSV parser'
+      - 'assistant: Confirmed: redteam/csv_quote.test.ts fails twice on 8c9d0e1 with ''unterminated field''. Base not yet checked.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it edited src/parser.ts despite the brief - ignore those changes and only confirm its new files
+    history:
+      - 'user: get an agent to find inputs that crash the new parser'
+      - 'assistant: codex-4 stopped in redteam/parser-input with 2 claimed crashes. git status --porcelain shows redteam/ files plus a modified src/parser.ts.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, don't run redteam/flood.sh - it hits the staging API
+    history:
+      - 'user: red-team the rate limiter change'
+      - 'assistant: codex-1 claims two breaks with repros redteam/burst.test.ts and redteam/flood.sh. Reading them before the first run.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now have codex try to break it — find inputs that crash the new parser
+    history:
+      - 'user: spec first on the CSV importer, I sign off, then implement'
+      - 'assistant: Implementation done by codex-1 in feat/csv-import, matches the approved plan; all criteria checked.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'the fix is in PR #733 now - have Codex try to break it and prove anything it finds'
+    history:
+      - 'user: threat-model the session service'
+      - 'assistant: Map and findings below; the High is session fixation in session/create.ts:30.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: reading it isn't enough - get Codex to actually try to break the new parser and prove each crash with a test
+    history:
+      - 'user: review PR #801'
+      - 'assistant: claude-2 reviewed #801: 2 findings, both about unescaped quotes in the new CSV parser.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good. now have another agent attack that fix and show me any input that crashes it
+    history:
+      - 'user: did claude-2 actually fix the overflow?'
+      - 'assistant: Verified: the new test fails on the old code and passes on 9a0b1c2, and the full suite is green.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: red-team it
+    history:
+      - 'user: have claude implement coupon validation on feat/coupons'
+      - 'assistant: claude-1 finished and committed 7c8d9e0 on feat/coupons; checks pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'different thing: PR #812 changes the session handling - have an attacker try to break the change, repro or it didn''t happen'
+    history:
+      - 'user: audit src/auth as it stands'
+      - 'assistant: codex-1 security lens: 1 Medium verified, coverage statement below.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now adversarially test the auth change on that branch and only report what it can prove
+    history:
+      - 'user: rebase feat/auth-tokens on main'
+      - 'assistant: claude-3 rebased feat/auth-tokens; no conflicts, checks pass on the new HEAD 3e4f5a6.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before I merge, point Codex at the retry change and have it try to break it
+    history:
+      - 'user: fix the review comments on #820'
+      - 'assistant: claude-2 addressed all 4 threads on #820 and pushed 5f6a7b8; replies posted.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful

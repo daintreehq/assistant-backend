@@ -1,0 +1,177 @@
+# Training examples whose answer is `daintree.terminals.run-visible-command` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.terminals.run-visible-command
+run: 2026-09-28-catalog-expansion
+positives:
+  - start the dev server for the api-v2 worktree in a panel pls
+  - Run `cargo build --release` in a visible Daintree terminal filed under the perf-tuning worktree; report rc plus an output tail.
+  - Start the vite dev server for the dashboard worktree in a side terminal (no Dev Preview panel, the user has their own browser) and report the URL it prints.
+  - tail -f storage/logs/laravel.log in a panel for the queue-fix wt
+  - Launch the jest watcher (`npm test -- --watch`) in its own shell next to claude-2's worktree. Plain shell, no agent.
+  - is the server you started earlier in the checkout-flow worktree actually up? what port
+  - stop the rails server you started for me in the payments worktree
+  - Run `docker compose up -d postgres redis` in a visible terminal in the main checkout and report whether it exited cleanly.
+  - Visible shell, worktree grpc-refactor, command `make proto`. Report exit status and tail.
+  - 'can you run `bundle exec rake assets:precompile` in a terminal i can see, in the #512 worktree'
+  - 'Open two named shells in the monorepo-split worktree: one running `turbo dev --filter=web`, one tailing logs/api.log.'
+  - 'Shell command, not an agent: run ./scripts/generate-fixtures.sh in the fixtures-v3 worktree where the user can follow along and report the rc.'
+  - fire up `python manage.py runserver` for the django-orders branch in a terminal, i want to watch the request log
+  - Kick off the production bundle (`npm run build`) in a visible panel for the auth-refresh worktree and report the rc and tail. Just run it, fix nothing.
+  - what did the build you kicked off in the 'web build' terminal end with? rc?
+  - Start `pnpm storybook` in a terminal under the design-tokens worktree and confirm from its output that it is listening.
+  - Run `go test ./... -count=1` in a side terminal in the retry-backoff worktree so the user can watch it scroll by, and report the rc.
+  - run `npx prisma generate` in a new shell in codex's worktree so i can see it
+  - 'The notifications worktree needs a worker running: start `celery -A app worker -l info` in its own panel and quote the ready line.'
+  - 'Watcher in a visible terminal: worktree feat/search-v2, `yarn tsc --watch`, report the first compile result.'
+  - shut down the webpack watcher you spun up for me this morning, the one in the legacy-ui wt
+  - 'The api server you started for me in the orders worktree: confirm it is serving that checkout and not main, and give the port.'
+  - Run `php artisan queue:work` in a visible terminal in the mail-digest worktree and leave it running.
+  - pls run `npm ci` in a new terminal under claude-3's worktree, want to see if the lockfile resolves
+  - Run `./gradlew assembleDebug` in a Daintree terminal in the android-nav worktree with a sensible deadline and quote the tail.
+  - Open a terminal in the main checkout and start `hugo server -D` for the docs; tell me the local URL once it's serving.
+  - query: tail the server log in a side terminal
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Just run the broken build in a terminal so I can see the error myself. Don't fix it.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: rerun make in a side panel for the kernel-mod worktree and show me the output, i'll fix it myself
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: run the test suite in a visible terminal in the api worktree so I can watch it scroll
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: Open a panel in the lint-fixes worktree running `eslint . --watch`.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: Run `pytest -x` in a terminal the user can see under the ingest worktree and report the rc.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: 'No agent needed: just open a shell in the parser-rewrite worktree and run `npm run bench` so I can watch the numbers.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: spawn a plain terminal, not claude, in feat/i18n and start next dev
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Run `npm run build` in a visible terminal in the release-2.4 worktree right now and read me the exit code.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: open a terminal in docs-site and run mkdocs build now, tell me if it exits 0
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: don't bother with a recipe, just start `pnpm dev` in one terminal for the landing-page worktree
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: Start only the api server for the orders worktree in a single panel, not the whole startup set.
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: The worktree came up without a log tail; open one terminal tailing var/log/app.log for it.
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: Start the vite dev server in a normal terminal for the charts worktree. No preview panel.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: is the next.js server you started in a terminal for the blog worktree up? what url?
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Port 3000 is free now; start the dev server for the api worktree in a terminal I can watch.
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: Start the Next dev server for the blog worktree in a panel and tell me what port it picked.
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: Open a terminal in the orders worktree and start the api dev server so I can watch it.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: i need a shell in the docs worktree, can you give me one
+    run: pre-split
+  - query: run that one in the other worktree too
+    confusable_with: [daintree.recipe.run-or-create]
+    run: pre-split
+  - query: start the dev server in this checkout
+    confusable_with: [daintree.recipe.run-or-create, daintree.worktree.provision-local-environment]
+    run: 2026-09-22-provision-boundary-fix
+  - query: start the dev server
+    confusable_with: [daintree.worktree.manage-resource]
+    run: pre-split
+  - query: run npm run dev in tab 2
+    confusable_with: [daintree.worktree.manage-resource]
+    run: pre-split
+  - query: spin up the local api on 8080 so i can poke at it
+    confusable_with: [daintree.worktree.manage-resource]
+    run: pre-split
+  - query: run pnpm install in a terminal in the auth worktree so I can watch it
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: what did it exit with?
+    history:
+      - 'user: run npm run build in the auth worktree in a terminal so I can watch it'
+      - 'assistant: Opened term-7 ''build'' in feat/auth-refresh (~/proj-auth) and sent npm run build with an rc marker; it''s compiling now.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok and now do the same for the api worktree
+    history:
+      - 'user: spin up the dev server for the web worktree where I can see it'
+      - 'assistant: Started pnpm dev in term-11 ''web dev'' under feat/web-shell; ready line says Local: http://localhost:5173 and the probe returned 200.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: stop the server you started, I'm done with it
+    history:
+      - 'user: start the dev server for feat/checkout in a side terminal'
+      - 'assistant: term-14 ''checkout dev'' is running pnpm dev in ~/proj-checkout; listening on :5174, PID 50122 has that worktree as its cwd.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: is it up yet? what port did it land on?
+    history:
+      - 'user: open a terminal in the api worktree and run the server with npm start'
+      - 'assistant: Opened term-12 in feat/api-v2 and sent npm start; nothing past the banner yet, I''ll read it again shortly.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run it again with --verbose so we can see where it dies
+    history:
+      - 'user: open a terminal in the main checkout and run npm install'
+      - 'assistant: term-3 finished: rc=1, tail shows ''npm ERR! code ERESOLVE'' on @types/node.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also tail logs/server.log in a second panel next to it
+    history:
+      - 'user: start the api dev server in feat/queue so I can watch it'
+      - 'assistant: term-9 ''queue api'' is up: ''listening on 0.0.0.0:8080'', curl returned 200, serving PID cwd is ~/proj-queue.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: start the dev server in a terminal I can watch and just leave it running
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, now start the dev server for feat/billing in a terminal I can watch
+    history:
+      - 'user: run the local checks on feat/billing'
+      - 'assistant: Ran typecheck and unit tests at a1b2c3d in ~/proj-billing: typecheck pass, 212/212 tests pass.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great, now bring the dev server back up in the main checkout so I can see it
+    history:
+      - 'user: port 3000 is taken, free it'
+      - 'assistant: It was my own term-4 from earlier; closed it, and after 20 s lsof shows no listener on 3000.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: while that runs, tail the api log for the pagination worktree in a side panel
+    history:
+      - 'user: have claude add cursor pagination to the orders endpoint in feat/pagination'
+      - 'assistant: Launched claude-2 ''Pagination'' in ~/proj-pagination with notify and handback; ending my turn.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now open a terminal in the main checkout and run the production build so I can watch it
+    history:
+      - 'user: merge PR #412'
+      - 'assistant: Merged #412 into main by squash (merge commit 9e4d2f1); all required checks were green and the forge confirms it merged.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run pnpm install in it in a terminal I can see
+    history:
+      - 'user: make me a worktree for feat/search-v2'
+      - 'assistant: Created feat/search-v2 at ~/proj-search-v2 off main; no recipe or agent launched.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, unrelated — start the storybook watcher for the ui worktree in a side panel
+    history:
+      - 'user: how much Claude usage have I got left?'
+      - 'assistant: Claude''s /usage view: 38% of the five-hour window used, resets at 16:00; weekly at 61%.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now start the dev server again in the billing worktree so I can watch it
+    history:
+      - 'user: 3000 is taken, free it'
+      - 'assistant: It was my term-4 in feat/billing; closed it and the recheck shows nothing listening on 3000.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful

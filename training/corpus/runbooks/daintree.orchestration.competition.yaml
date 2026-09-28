@@ -47,7 +47,6 @@ positives:
   - run the fact contest with terminal 4, 7 and 9 — 9 might be dead, if it is just do it with the other two
   - I've got four agents up from earlier. I want each one to give me a single sentence describing what this repo actually does, no talking to each other. Then show them all four anonymised and have them pick the most accurate one, and tell me the score.
   - your tally's wrong, B got two votes not one. recount and give me the winner again
-  - winner gets to write its own acceptance speech, send it over
   - two of them voted for their own entry. redo the ballot properly so nobody can see who wrote what
   - 'planning a little contest: 5 agents, one refactor idea each for the payments module, blind peer vote, winner''s idea is what we build'
   - each agent picks the most cursed line in this repo and then they vote on the worst one
@@ -385,6 +384,36 @@ boundaries:
   - query: Have Claude and Codex each implement the cache rewrite in their own worktree, then tell me whose is better.
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries
+  - query: Claude and Codex each wrote their own version of the cache layer; compare the two and pick the better one.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Claude and Codex each write their own version of the dedupe function; pick the better one.
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: Have Codex judge Claude's and Gemini's separate versions of the importer and declare a winner.
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: 'claude vs codex: both implement the csv export however they like, pick the winner'
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: Claude, Codex and Gemini each write their own version of the rate limiter, then have them vote on whose is best.
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: have all three agents do their own take on the landing page copy and judge which one wins
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: Have claude and codex each write their own faster diff algorithm, then benchmark them and pick a winner.
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: gemini and codex both wrote a parser, have them blind vote on the best
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: have claude and codex each write their own formatCurrency, then vote on which is better
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Claude and Gemini both implement the debounce hook their own way; judge the two entries and name a winner
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it going?
     history:
@@ -580,10 +609,6 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: winner gets to write its own acceptance speech, send it over
-    history:
-      - 'user: still awake?'
-      - 'assistant: Still here. What do you need?'
   - query: lets do a little tournament, everyone submits a tagline and they score eachother
     history:
       - 'user: sup'
@@ -612,6 +637,22 @@ topic_shifts:
       - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
     active: [daintree.orchestration.competition]
     run: 2026-09-24-selector-hardening
+  - query: actually, have claude and codex each write their own full version of the importer and have them vote on the better one
+    history:
+      - 'user: spike papaparse vs csv-parse on the importer'
+      - 'assistant: claude-2 on spike/papaparse and codex-3 on spike/csv-parse are building the import scenario.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: they're both attempts at the same thing — have them judged and pick the better one
+    history:
+      - 'user: diff claude-5''s worktree against codex-2''s'
+      - 'assistant: Both rewrote the tokenizer independently: 11 overlapping files, different approaches; trial merge conflicts in 9.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: winner gets to write its own acceptance speech, send it over
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
 wakes:
   - query: '[terminal.awaitAll returned: 4 submissions in]'
     history:

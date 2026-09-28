@@ -131,6 +131,28 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: How is config loaded here — env vars, yaml, or both, and which wins?
     run: 2026-09-28-agent-queries-2
+  - query: how is the order subtotal computed, including discounts and tax?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where does the app decide which shipping rate applies
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Explain how session tokens are refreshed in the api service, with file references; read-only
+    run: 2026-09-28-catalog-expansion-refine
+  - query: trace how a stripe webhook flows through to the ledger
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Find where feature flags are evaluated and how overrides work
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does search ranking work in this repo
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Map the request lifecycle in the Go server from router to DB, citing files; change nothing
+    run: 2026-09-28-catalog-expansion-refine
+  - query: whats this repo do? just cloned it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Locate the code that sends password reset emails and explain its retry behaviour
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how are permissions checked on the admin routes
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Orientation before work starts: explain the module boundaries of packages/ in the monorepo'
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: where in the codebase do we parse slash commands typed into the terminal
     confusable_with: [daintree.foundation]
@@ -202,8 +224,6 @@ boundaries:
   - query: Explain how ordinary git worktree cleanup works in this repository.
     confusable_with: [daintree.worktree.manage-resource]
   - query: Explore the React source and explain how routing is implemented; do not change files.
-    confusable_with: [daintree.runtime.debug-web-app]
-  - query: Run a general read-only audit of the frontend architecture.
     confusable_with: [daintree.runtime.debug-web-app]
   - query: Explain how the frontend router works in this repository.
     confusable_with: [daintree.runtime.debug-web-app]
@@ -360,6 +380,18 @@ boundaries:
   - query: Explain how the cart state flows between components in the web app
     confusable_with: [daintree.runtime.debug-web-app]
     run: 2026-09-28-agent-queries
+  - query: Where is the discount applied in the checkout flow?
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: how does the CSV exporter decide where one row ends and the next begins? explain only, no changes
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: how does the cache invalidation in src/cache actually work?
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: how does the auth flow work end to end?
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: hows it going?
     history:
@@ -661,7 +693,6 @@ topic_shifts:
       - 'user: remember that saved filters live in localstorage not the session table'
       - 'assistant: Saved.'
     active: [daintree.memory.manage-project-memory, daintree.foundation]
-  - theres an intermittent panic in the queue worker. no issue for it yet, help me scope it
   - quick bug - tooltip renders behind the modal. wheres the z-index set
   - got a bug in the date parser. quick - what does this repo use for dates, moment or dayjs
   - query: where do the migrations actually live in this repo

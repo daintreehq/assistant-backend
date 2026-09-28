@@ -19,7 +19,6 @@ positives:
   - is there a recipe that sets up the preview environment?
   - worktree.createWithRecipe off main, branch perf/spans, recipeId the perf one
   - apply the qa recipe to wt-3
-  - run that one in the other worktree too
   - create a worktree called spike/websockets and start my usual dev recipe in it
   - load the onboarding recipe
   - start my usual setup in here
@@ -117,14 +116,46 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Provide a new worktree on chore/lint that boots the 'backend' recipe's terminals
     run: 2026-09-28-agent-queries-2
+  - query: Set up a team recipe that starts a Claude agent, `pnpm dev` and `pnpm test --watch` whenever someone uses it.
+    run: 2026-09-28-catalog-expansion-late
+  - query: swap the agent in our 'Bugfix' recipe from claude to gemini
+    run: 2026-09-28-catalog-expansion-late
+  - query: Write .daintree/recipes/review.json with a Codex reviewer terminal and a shell running `gh pr checks {{pr_number}}`.
+    run: 2026-09-28-catalog-expansion-late
+  - query: add a dev-preview terminal running `npm run storybook` to the team 'Frontend' recipe
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'new team recipe ''issue-start'': claude with the prompt ''read issue {{issue_number}} and propose a plan'', plus a shell running make deps'
+    run: 2026-09-28-catalog-expansion-late
+  - query: The Fullstack recipe file I committed doesn't appear in Daintree's recipe list — get it fixed so it shows all four terminals.
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Create a repo-tracked recipe that opens three terminals: the api server, the queue worker and a psql shell.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: remove the storybook terminal from our 'UI' team recipe, it's too slow
+    run: 2026-09-28-catalog-expansion-late
+  - query: Edit the triage recipe so its claude terminal's saved prompt applies labels instead of just summarising issues.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Add an env map to the 'Integration' recipe setting NODE_ENV=test and DATABASE_URL to the test database.
+    run: 2026-09-28-catalog-expansion-late
+  - query: can you make a recipe so everyone on the team gets the same terminals (api, worker, claude) when they open a new worktree
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'recipe file for docs work: claude terminal + mkdocs serve as a dev-preview'
+    run: 2026-09-28-catalog-expansion-late
+  - query: Put {{branch_name}} into the Release recipe's agent prompt so the agent knows which branch it is on.
+    run: 2026-09-28-catalog-expansion-late
+  - query: make a copy of the 'Work' recipe with codex instead of claude and call it 'Work (Codex)'
+    run: 2026-09-28-catalog-expansion-late
+  - query: Rename the team recipe 'misc' to 'Nightly checks' and add a terminal running `make audit`.
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Author a PR-review recipe: a claude agent told to review {{pr_number}} and a terminal running the playwright suite.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: make me a recipe for the api + web terminals
+    run: 2026-09-28-catalog-expansion-refine
+  - query: create a worktree for feat/export using the Full Stack recipe
+    run: 2026-09-28-catalog-expansion-refine
+  - query: change the Work recipe to open Codex instead of Claude
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: open a checkout with my usual terminal layout
-    confusable_with: [daintree.worktree.provision-local-environment]
-    run: 2026-09-22-provision-boundary-fix
-  - query: start the dev server in this checkout
-    confusable_with: [daintree.worktree.provision-local-environment]
-    run: 2026-09-22-provision-boundary-fix
-  - query: run the linter here
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-22-provision-boundary-fix
   - query: run the release recipe in a new worktree
@@ -346,6 +377,36 @@ boundaries:
   - query: 'worktree + recipe for feat/search: the one with vite and the api'
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-agent-queries-2
+  - query: run the full-stack workspace recipe in a new worktree
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Run the 'full stack' recipe for the orders worktree so the api, web and worker terminals all come up.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Start the web and worker terminals for the orders worktree from its saved setup.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Instead of me starting the dev server and the watcher by hand each time, put them in a recipe the team can use.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: add `docker compose up db` as a terminal in our Backend recipe
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: The dev server command in the 'Web' recipe is wrong — it should be pnpm dev --port 5174; fix the recipe file.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: I keep creating worktrees and opening the same three terminals by hand — save that setup as a team recipe.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'write a recipe for hotfix worktrees: a claude agent and a terminal tailing logs/app.log'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-late
+  - query: run the Fullstack recipe in the new search worktree
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+  - query: create a worktree with the Work recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: is it done yet?
     history:
@@ -640,10 +701,6 @@ topic_shifts:
     history:
       - 'user: hows it going'
       - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: run that one in the other worktree too
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: actually make another for feat/ui-refresh but use the 'frontend' recipe on it
     history:
       - 'user: create a worktree for chore/deps-bump'
@@ -656,6 +713,16 @@ topic_shifts:
       - 'assistant: 3 recipes: `fullstack` (api+web+claude), `backend` (api+worker+db), `docs` (mkdocs serve).'
     active: [daintree.recipe.run-or-create]
     run: 2026-09-24-selector-hardening
+  - query: now run the full-stack recipe for the api worktree
+    history:
+      - 'user: get Daintree to pick up my plugin change'
+      - 'assistant: Reloaded: acme.metrics is active and the open panel remounted (scheduled).'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run that one in the other worktree too
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
 wakes:
   - query: '[watcher w_808 fired: recipe agent t_0808 finished setup]'
     history:

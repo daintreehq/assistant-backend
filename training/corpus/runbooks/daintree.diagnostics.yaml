@@ -94,6 +94,8 @@ positives:
     run: 2026-09-28-agent-queries
   - query: notifications stopped showing up in daintree, pretty sure stuff finished. is it broken
     run: 2026-09-28-agent-queries
+  - query: show me Daintree's recent errors and notifications
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: i tried to file something and nothing happened at all, the forge tools aren't even showing up
     confusable_with: [daintree.forge.manage-issue]
@@ -302,6 +304,30 @@ boundaries:
   - query: The Daintree window itself is frozen and panels won't open
     confusable_with: [daintree.runtime.debug-web-app]
     run: 2026-09-28-agent-queries
+  - query: Daintree stopped responding to agent launches. What's wrong with it?
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: Daintree isn't responding and none of my agents will launch.
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: Daintree's MCP keeps disconnecting and none of its tools respond in my agent.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Show me the recent Daintree error log so I can attach it to a bug report.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Daintree says its MCP server is disconnected, so my agent can't see any Daintree tools at all.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Daintree is frozen, nothing responds when I click a panel.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: The Daintree MCP shows disconnected and none of its tools respond, including the skill ones.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Show me Daintree's recent error log, the plugin panel keeps flashing an error.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: and the key thing too?
     history:
@@ -551,6 +577,12 @@ topic_shifts:
       - 'assistant: Error log shows `mcp: bridge not ready`. Try reloading the Daintree window, then tell me if status changes.'
     active: [daintree.diagnostics]
     run: 2026-09-24-selector-hardening
+  - query: actually Daintree itself is throwing errors on every launch right now, look at that
+    history:
+      - 'user: what went wrong with the failed spawn yesterday?'
+      - 'assistant: errors.recent shows MCP disconnects at the time of the launch.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[watcher fired: MCP link back up]'
     history:

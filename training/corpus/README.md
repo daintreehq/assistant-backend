@@ -113,6 +113,11 @@ These are measured findings, not preferences. Fuller detail in
   from; `docs:` says what the classifier should learn. Conflating them is how 64
   documentation questions got labelled `is_docs: false`, which measured 113/120
   docs recall cold against 5/120 with a runbook loaded.
+- **Project work is never `[]`.** The caller is Daintree's orchestration layer, so a
+  request to change code, fix, refactor or investigate the project routes to the runbook
+  that delegates it — `daintree.edits.spawn-visible-agent` when nothing more specific owns
+  it. `[]` is for chatter, general knowledge and off-topic requests (2026-09-28; about 80 old
+  `near_miss` code-change rows were relabelled).
 - **Label the specific runbook alone.** Never "specific + `daintree.foundation`":
   the backend pairs the domain foundation downstream, and a row teaching the
   classifier to do it as well is teaching a job something else already does.
@@ -123,8 +128,9 @@ These are measured findings, not preferences. Fuller detail in
   one is `confusable_with`, every fence runs one way only.
 - **Never read `benchmarks/runbook_selection/cases/`.** It is the held-out
   evaluation set and the only evidence any of this works. `compile_corpus`
-  measures the overlap rather than trusting anyone about it, and drops
-  collisions — including ones in `history`.
+  drops EXACT collisions (query or `history`) rather than trusting anyone
+  about it; a near-duplicate still gets through, so screen generated rows,
+  history included, with difflib > 0.8 against every case suite first.
 
 ## Removing a bad generation run
 

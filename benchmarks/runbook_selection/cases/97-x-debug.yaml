@@ -1,0 +1,480 @@
+# Debug and checks (catalog expansion batch B7): reproduce a reported bug, bisect a
+# regression, hunt a flaky test, run the project's checks, run an e2e suite against a
+# worktree's own server, and measure performance before and after a change.
+#
+# Each new runbook has an agent-phrased and a user-phrased positive, a routing trap
+# where it is right next to a neighbour, and a trap per declared neighbour where the
+# NEIGHBOUR is right and the new runbook must not be picked.
+
+cases:
+  # --- daintree.debug.reproduce-bug -------------------------------------------------
+  - id: x-reproduce-bug-agent-issue
+    category: single-runbook
+    note: Agent phrasing; a forge issue to turn into red evidence, explicitly not fixed.
+    messages:
+      - role: user
+        content: Reproduce the bug described in GitHub issue 412 as a failing automated test in a scratch worktree, and do not fix it
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-bug-user-casual
+    category: single-runbook
+    note: Casual user phrasing; "is it even real" is a reproduction ask, not a fix.
+    messages:
+      - role: user
+        content: a user says CSV export drops the last row. is that even real? write me a failing test for it first
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-bug-not-start-work
+    category: routing-trap
+    note: >-
+      Names an issue number, which pulls toward start-work-on-issue, but the ask is a
+      reproduction on main, not an implementer.
+    messages:
+      - role: user
+        content: before anyone picks up issue 88, check whether the timezone crash it describes still happens on main
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-trap-diagnose-and-fix
+    category: routing-trap
+    note: A test is already red and the user wants it green; that is diagnose-and-fix, not a repro.
+    messages:
+      - role: user
+        content: test_export_totals has been failing since this morning, fix it so the suite is green again
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-trap-start-work-on-issue
+    category: routing-trap
+    note: A settled bug issue to be implemented by an agent; reproducing is not the deliverable.
+    messages:
+      - role: user
+        content: start work on issue 412, the CSV export bug; set up a worktree and put claude on fixing it
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-trap-debug-web-app
+    category: routing-trap
+    note: A runtime error visible in an open dev preview belongs to debug-web-app.
+    messages:
+      - role: user
+        content: the dev preview is showing a white screen and the console says cannot read properties of undefined, debug it
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-trap-explore-repository
+    category: routing-trap
+    note: Understanding how the export works, with no symptom to reproduce.
+    messages:
+      - role: user
+        content: explain how the CSV export pipeline works and where the rows get written
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.bisect-regression ------------------------------------------------
+  - id: x-bisect-agent-tag-range
+    category: single-runbook
+    note: Agent phrasing with explicit good and bad anchors and a named failing test.
+    messages:
+      - role: user
+        content: Bisect between tag v2.3.0 (good) and develop (bad) to find the commit that made test_login_redirect start failing, using a separate worktree
+    expect:
+      required: [daintree.git.bisect-regression]
+      optional: [daintree.foundation]
+
+  - id: x-bisect-user-casual
+    category: single-runbook
+    note: Casual user phrasing; "when did this break" is a history search.
+    messages:
+      - role: user
+        content: login redirect worked last month and now it doesn't. when did this break? find the commit
+    expect:
+      required: [daintree.git.bisect-regression]
+      optional: [daintree.foundation]
+
+  - id: x-bisect-slowdown-not-measure
+    category: routing-trap
+    note: >-
+      A slowdown across a range of commits is a bisect with a timing threshold, not a
+      two-revision measurement.
+    messages:
+      - role: user
+        content: startup got slow at some point in the last two weeks, figure out which commit did it
+    expect:
+      required: [daintree.git.bisect-regression]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-trap-bisect
+    category: routing-trap
+    note: >-
+      The repro exists already and a known-good release is named; the ask is the
+      culprit commit, not another reproduction.
+    messages:
+      - role: user
+        content: scripts/repro.sh fails on main but passed on the 1.4 release; run git bisect with it and tell me the first bad commit
+    expect:
+      required: [daintree.git.bisect-regression]
+      optional: [daintree.foundation]
+
+  - id: x-bisect-trap-diagnose-and-fix
+    category: routing-trap
+    note: The build is broken now and the user wants it fixed, not localized in history.
+    messages:
+      - role: user
+        content: the build broke after I pulled, npm run build errors in the tokenizer, get it building again
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-bisect-trap-find-issue-work
+    category: routing-trap
+    note: Finding past PRs by their text is find-issue-work, not a bisect.
+    messages:
+      - role: user
+        content: find the merged PRs that touched the login redirect code over the last quarter
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  # --- daintree.ci.hunt-flaky-test ---------------------------------------------------
+  - id: x-flaky-agent-measure-rate
+    category: single-runbook
+    note: Agent phrasing; repeated runs to measure a failure rate and find the trigger.
+    messages:
+      - role: user
+        content: Run test_session_expiry 50 times, report the failure rate and whether it only fails under parallel workers or a particular test order
+    expect:
+      required: [daintree.ci.hunt-flaky-test]
+      optional: [daintree.foundation]
+
+  - id: x-flaky-user-casual
+    category: single-runbook
+    note: Casual user phrasing of an intermittent CI failure.
+    messages:
+      - role: user
+        content: the websocket reconnect test randomly fails in CI like one run in ten. hunt it down, no sleeps or retries
+    expect:
+      required: [daintree.ci.hunt-flaky-test]
+      optional: [daintree.foundation]
+
+  - id: x-flaky-polluter-not-diagnose
+    category: routing-trap
+    note: >-
+      Order-dependent failure: finding the polluting test is the flaky hunt, not a
+      straight fix of a red test.
+    messages:
+      - role: user
+        content: checkout.spec only fails when it runs after the cart specs, find which test is polluting it
+    expect:
+      required: [daintree.ci.hunt-flaky-test]
+      optional: [daintree.foundation]
+
+  - id: x-reproduce-trap-hunt-flaky
+    category: routing-trap
+    note: An existing test that fails intermittently; not a bug report to reproduce.
+    messages:
+      - role: user
+        content: test_parallel_import passes locally but fails intermittently in CI, find out why it is flaky
+    expect:
+      required: [daintree.ci.hunt-flaky-test]
+      optional: [daintree.foundation]
+
+  - id: x-flaky-trap-diagnose-and-fix
+    category: routing-trap
+    note: Fails on every run, so it is a plain failing test.
+    messages:
+      - role: user
+        content: test_invoice_rounding fails every single time now, fix it
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-flaky-trap-reproduce-bug
+    category: routing-trap
+    note: A user's bug report with no test yet; the first step is a reproduction.
+    messages:
+      - role: user
+        content: a customer says saving a draft sometimes loses the title; write a test that reproduces their report before we touch anything
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-flaky-trap-run-local-checks
+    category: routing-trap
+    note: Just running the suite once and reporting; nothing is known to be intermittent.
+    messages:
+      - role: user
+        content: run the unit tests in this worktree and tell me if they pass
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  # --- daintree.ci.run-local-checks --------------------------------------------------
+  - id: x-local-checks-agent-one-worktree
+    category: single-runbook
+    note: Agent phrasing; named checks in a named worktree, report only.
+    messages:
+      - role: user
+        content: Run the project's lint, typecheck and unit tests in worktree feat-auth and report which pass, against which commit, without fixing anything
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-user-all-worktrees
+    category: single-runbook
+    note: Casual multi-worktree sweep; a green/red matrix, no single agent's claim.
+    messages:
+      - role: user
+        content: run the tests in all the agent worktrees and tell me which ones are green
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-what-checks-exist
+    category: routing-trap
+    note: >-
+      Discovery of the project's checks plus a run; test vocabulary pulls toward
+      diagnose-and-fix but nothing is failing.
+    messages:
+      - role: user
+        content: what checks does this project even have? run the fast ones and tell me if anything is red before I push
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-diagnose-and-fix
+    category: routing-trap
+    note: A known-red CI check to make green.
+    messages:
+      - role: user
+        content: the typecheck job is red on my PR, fix the errors
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-verify-agent-work
+    category: routing-trap
+    note: Checking one agent's "tests pass" claim is verify-agent-work.
+    messages:
+      - role: user
+        content: the refactor agent says it's done and all tests pass, confirm that before I merge
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-prep-branch
+    category: routing-trap
+    note: Checks as a step toward committing and opening a PR.
+    messages:
+      - role: user
+        content: get this branch ready for review and open the PR
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-follow-up-on-issue
+    category: routing-trap
+    note: Reading a PR's CI on the forge, not running checks locally.
+    messages:
+      - role: user
+        content: what does CI say on PR 231, did the checks pass there?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-watch-outcome
+    category: routing-trap
+    note: Running the suite at a later time is a deferred action.
+    messages:
+      - role: user
+        content: in half an hour run the test suite and let me know how it went
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-run-visible-command
+    category: routing-trap
+    note: The user wants to watch the build in a terminal, not get a result table.
+    messages:
+      - role: user
+        content: open a terminal in the payments worktree and run npm run build there so I can watch it
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
+
+  # --- daintree.ci.run-e2e-suite -----------------------------------------------------
+  - id: x-e2e-agent-playwright-own-server
+    category: single-runbook
+    note: Agent phrasing; e2e against this worktree's own server with artifacts.
+    messages:
+      - role: user
+        content: Run the Playwright suite for worktree feat-checkout against its own dev server and report failures with their trace paths
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-user-casual
+    category: single-runbook
+    note: Casual phrasing of an e2e run on a branch.
+    messages:
+      - role: user
+        content: run the e2e tests on my branch
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-integration-not-local-checks
+    category: routing-trap
+    note: >-
+      "Tests" wording pulls toward run-local-checks, but these need the server and
+      database up.
+    messages:
+      - role: user
+        content: start the API and the test database for this worktree, run the integration tests that need them, then shut down what you started
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: x-local-checks-trap-run-e2e
+    category: routing-trap
+    note: Cypress needs the app running; not a plain check run.
+    messages:
+      - role: user
+        content: run the Cypress suite headless against the review worktree's app
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-trap-diagnose-and-fix
+    category: routing-trap
+    note: A known-failing e2e spec to make pass.
+    messages:
+      - role: user
+        content: the login e2e spec keeps failing on the redirect assertion, fix it
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-trap-provision-local-environment
+    category: routing-trap
+    note: Worktrees colliding over one port and database is a provisioning problem.
+    messages:
+      - role: user
+        content: my worktrees all fight over port 3000 and the same test database, give each one its own
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-trap-debug-web-app
+    category: routing-trap
+    note: Interactive debugging in the dev preview, not a suite run.
+    messages:
+      - role: user
+        content: the checkout page in the dev preview throws a console error when I click pay, debug it
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-trap-run-visible-command
+    category: routing-trap
+    note: Only starting a dev server and leaving it running.
+    messages:
+      - role: user
+        content: start the dev server for the api worktree in a terminal and leave it running
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
+
+  # --- daintree.runtime.measure-performance ------------------------------------------
+  - id: x-perf-agent-branch-vs-main
+    category: single-runbook
+    note: Agent phrasing; two revisions, a benchmark tool, a noise-aware verdict.
+    messages:
+      - role: user
+        content: Benchmark the parser on branch perf/tokenizer against main with hyperfine and report whether the difference is outside the noise
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation]
+
+  - id: x-perf-user-casual
+    category: single-runbook
+    note: Casual phrasing of a before/after speed question.
+    messages:
+      - role: user
+        content: is my branch actually faster than main?
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation]
+
+  - id: x-perf-claimed-speedup-not-verify
+    category: routing-trap
+    note: >-
+      A measurable claim from an agent; verify-agent-work would accept a single
+      timing, this needs a measurement.
+    messages:
+      - role: user
+        content: the agent claims its change made the import job 30% faster, measure both revisions and tell me if that's real
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation]
+
+  - id: x-bisect-trap-measure-performance
+    category: routing-trap
+    note: Two known revisions compared on size; no commit range to search.
+    messages:
+      - role: user
+        content: how much did the production bundle grow between v1.8 and HEAD?
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation]
+
+  - id: x-perf-trap-verify-agent-work
+    category: routing-trap
+    note: A finished agent's work checked against its task, no performance claim.
+    messages:
+      - role: user
+        content: check that the cleanup agent actually did what I asked before I merge it
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: x-perf-trap-competition
+    category: routing-trap
+    note: Rival agents each optimising, winner picked; the contest owns it.
+    messages:
+      - role: user
+        content: have claude and codex each write their own optimised version of the parser, then tell me which one wins
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-bisect-trap-reproduce-bug
+    category: routing-trap
+    note: >-
+      Something broke but nobody has a reproduction yet; the user asks for the
+      failing test first, which is the step before any bisect.
+    messages:
+      - role: user
+        content: the PDF export broke somewhere recently but nobody can reproduce it reliably; get a failing test for it first, from the bug report
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-e2e-trap-run-local-checks
+    category: routing-trap
+    note: Unit tests and typecheck with no app needed are a plain check run.
+    messages:
+      - role: user
+        content: run the fast checks in the checkout worktree, just unit tests and typecheck
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]

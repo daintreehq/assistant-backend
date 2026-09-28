@@ -1,0 +1,127 @@
+# Training examples whose answer is `daintree.context.feed-running-agent` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.context.feed-running-agent
+run: 2026-09-28-catalog-expansion
+positives:
+  - Give the Claude agent in terminal 3 the payments module source as context before it continues with the refund work.
+  - Point the running codex agent at src/billing/ and tests/billing/ so it has the relevant code loaded; don't launch a new agent.
+  - Load the RFC in docs/rfcs/0042-sync.md plus the sync engine files into the implementer agent that's already open.
+  - Feed claude-2 the GraphQL schema and resolvers under api/graphql before it starts on the pagination change.
+  - 'Existing Gemini pane in the feature/search worktree needs the indexer code as context: crates/indexer and its tests.'
+  - can you get the auth stuff into codex's context, it keeps guessing how sessions work
+  - Make a CopyTree bundle of the notifications service in the main worktree and have the open Claude agent in the mobile worktree read it.
+  - Bundle the migration files and the ORM models and feed that bundle to the agent already running in wt-orders.
+  - 'The Codex agent already working on #512 lacks context on the rate limiter; have it read lib/ratelimit/*.ts before it continues.'
+  - paste the whole worktree context into terminal 5
+  - 'Before the running Claude continues, give it the relevant files for the checkout flow: web/checkout, server/orders, shared/types/order.ts.'
+  - claude in the api wt doesn't know our error-handling conventions, point it at docs/errors.md and pkg/errs
+  - Hand the already-open reviewer agent the design doc and the three files it touches as context; leave its task as it is.
+  - Inject the active worktree's full context into the idle Codex terminal, then ask it to summarize the data layer.
+  - 'Give claude-3 context: the websocket gateway code in services/gateway plus the load-test notes in perf/ws.md.'
+  - load the spec + related code into the implementer, then tell it to carry on
+  - Existing agent on branch fix/timezones needs the date utils and their tests as context; confirm it actually read them.
+  - Supply the running Gemini agent with the Terraform modules under infra/modules as reference before it edits the staging stack.
+  - codex is idle in terminal 2, feed it the files for the upload pipeline
+  - Get the Stripe webhook handler and its fixtures into the open Claude session's context, then have it reply with what it read.
+  - The agent I already have in the docs worktree should get the component library source as context. It lives in the ui-kit worktree, so bundle it across.
+  - 'Share the relevant parts of the codebase with the running agent: the cache layer in src/cache and the Redis config. No new agent.'
+  - the claude that's working on the importer needs to see the csv parsing code first, get it that context once it's idle
+  - Give the implementer agent in terminal 7 the OpenAPI spec and the generated client as context so it can match the real endpoints.
+  - Provide the already-launched codex agent with the monorepo's shared tsconfig and eslint config as context for its lint cleanup.
+  - query: give the Codex agent the whole payments module as context
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Load the payments module and the API spec into the running Claude as context before it continues.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Build a CopyTree bundle of the order service and have the Claude agent already in wt-orders read it.
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: curate a context bundle for the notifications module and send it to the codex terminal that's open
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: Put together a reference bundle of the auth code and deliver it to the running implementer agent.
+    confusable_with: [daintree.context.curate-copytree-bundle]
+  - query: The Claude agent in the api worktree already exists; give it the billing module files as context before it continues its change.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: don't start a new agent, the codex one in terminal 4 just needs the schema files loaded
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Get the payments code into the open Gemini agent's context so it can continue the refund fix.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'The agent already working on issue #812 needs the sync protocol spec and client code as context.'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: 'for the agent on #455 that''s already running, load the related parser files into it'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: 'Issue #903''s agent is open and idle; paste the storage module into it as context before it continues.'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: Inject the shared API client context into each of the five agents working the endpoint issues
+    confusable_with: [daintree.context.curate-copytree-bundle, daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+followups:
+  - query: add the session middleware in src/server/session.ts too
+    history:
+      - 'user: give the codex agent the whole auth module as context'
+      - 'assistant: Sent codex-2 the paths under src/auth/ (12 files) with ''read these before you continue''; it replied that it has read them.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's idle now, go ahead
+    history:
+      - 'user: load the billing spec and the related code into the implementer'
+      - 'assistant: claude-4 is working, so I armed a notice to feed it docs/spec/billing.md and src/billing/ once it goes idle.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also the csv fixtures from the api worktree, it doesn't have those
+    history:
+      - 'user: feed claude-5 the relevant files for the importer before it continues'
+      - 'assistant: Pointed claude-5 at src/import/*.ts and tests/import/; it confirmed it read them.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: leave out the generated shader headers, those are huge — redo it without them
+    history:
+      - 'user: give codex-6 the rendering pipeline as context'
+      - 'assistant: Generated a CopyTree bundle ''render-pipeline'' from feature/gpu (scopePaths src/render and src/shaders, 2.1 MB) and am about to send codex-6 its path.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: Give claude-7 the files under src/search/ plus docs/search-design.md as context, then confirm from its reply that it read them.
+    history:
+      - 'user: claude-7 keeps guessing how the search index is built'
+      - 'assistant: claude-7 is idle in feature/search; its last reply guessed the tokenizer lives in src/utils, which is wrong.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now get that into claude-2 so it has it before it continues
+    history:
+      - 'user: bundle everything relevant to the webhook retries'
+      - 'assistant: Wrote webhook-retries bundle (18 files: src/webhooks/, tests/webhooks/, docs/webhooks.md).'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: give it src/auth and the SSO spec in docs/ as context now
+    history:
+      - 'user: launch claude on feature/sso to add SAML login'
+      - 'assistant: Launched claude-3 in feature/sso with notify on; it has just gone idle after exploring the repo and says it is ready for more detail.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: point it at src/config/ and config/schema.ts so it has the actual code
+    history:
+      - 'user: tell claude-4 to stop inventing its own config loader'
+      - 'assistant: Interrupted claude-4 and told it to use the existing loader; it replied that it can''t find one and is idle.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: then feed it the rate limiter module
+    history:
+      - 'user: ask codex-1 what it knows about the rate limiter'
+      - 'assistant: codex-1 says it hasn''t read the rate limiter code yet and is guessing from the call sites.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: inject that into the claude in terminal 5
+    history:
+      - 'user: where does the job queue live?'
+      - 'assistant: It lives in packages/jobs/ (worker.ts, scheduler.ts, retry.ts) with tests in packages/jobs/test.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: paste the worktree context into terminal 3
+    history:
+      - 'user: rename terminal 3 to ''api refactor'''
+      - 'assistant: Renamed claude-3 to ''api refactor''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-catalog-expansion-stateful

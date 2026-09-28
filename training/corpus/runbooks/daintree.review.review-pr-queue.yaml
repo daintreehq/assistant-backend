@@ -1,0 +1,153 @@
+# Training examples whose answer is `daintree.review.review-pr-queue` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.review.review-pr-queue
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Put a separate read-only codex reviewer on each of PRs #412, #415, #418 and #421 and give me a merge-readiness verdict per PR, tied to the commit each reviewer saw.'
+  - 'Triage the 9 open pull requests awaiting review on acme/billing-api: for each, mergeable or needs changes, with file:line evidence. Post nothing to GitHub.'
+  - The open PR backlog on the monorepo needs a first pass - one reviewer agent per PR, verdicts only, no comments left anywhere.
+  - Evaluate every non-draft PR opened against main since Monday; for each one report blocking issues or say it's ready.
+  - 'PR queue review: 6 PRs, base develop, verdict each, read-only.'
+  - Eleven contributor PRs have been sitting unreviewed for two weeks; have agents assess each one and tell me which are mergeable.
+  - For each open PR labelled needs-review in the rust workspace, start a reviewer in that PR's own worktree and summarise the verdicts in one table.
+  - 'Assess PRs #88, #90 and #93 independently - a separate reviewer on each - and flag any that break the public API.'
+  - go through all the open prs and tell me what's mergeable
+  - can you get a reviewer on each pr in the queue? there's like 7 of them, just want verdicts
+  - review everything that came in against release/2.4 this week, one agent per pr please
+  - we have 15 open prs and i have no time. which are good and which need work?
+  - Go through the open pull requests from external contributors (leave the dependabot ones out) and give a per-PR verdict with the top findings; don't comment on any of them.
+  - 'Queue review for PRs #1203 through #1208 in the ios app: verdict per PR (ready / needs changes / can''t assess), no more than 3 reviewers running at once.'
+  - Before tomorrow's release cut, have an agent review each open PR against main and tell me which ones are safe to include - don't merge anything.
+  - 'Security-focused pass over every open PR touching the auth service: one read-only reviewer per PR, a verdict for each with evidence.'
+  - 'Rather than just listing the open PRs, actually review them: each one gets its own reviewer and its own verdict.'
+  - not asking you to merge anything yet - just review the 8 open prs one by one and tell me which are ready
+  - Per-PR review verdicts for all open PRs on org/infra-terraform, with each PR's CI status reported alongside; read-only.
+  - Assign one reviewer agent to each of the PRs waiting on my review and report findings per PR, most severe first.
+  - i've got a pile of prs waiting for my review, can agents take a first look at each one
+  - review queue pls - all open non-draft prs on develop
+  - Work through the open pull requests with reviewers, at most 4 at a time, starting the next PR as each finishes; one verdict per PR.
+  - 'PRs #55, #61 and #64 come from outside contributors - review each one diff-only, no installs, and return a verdict per PR.'
+  - morning! 5 prs came in over the weekend, can you have each one reviewed and tell me which to merge
+  - 'Give every PR in the review queue on the payments repo its own assessment: ready, needs changes, or couldn''t assess, with the head SHA reviewed.'
+boundaries:
+  - query: Review every open PR contributors opened this week and give me a verdict per PR.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: which of the open PRs are ready to merge? review each one, but don't merge anything yet
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Before merging anything this sprint, get a verdict on each of the 5 open PRs.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Review all the open PRs and give me a ready or needs-changes verdict for each.
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: review all 6 open PRs and tell me which are ready to merge
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: One agent per open PR - reviewing, not implementing - and a verdict from each.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Spread the 9 open PRs across review agents, 3 at a time, and report which are mergeable.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: give every PR in the review queue its own agent to assess it
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Put a reviewer agent on each of the 7 open PRs against develop and give me a verdict for each.
+    confusable_with: [daintree.review.cross-review-cohort]
+  - query: go through the review queue, which prs are ready to merge
+    confusable_with: [daintree.review.cross-review-cohort]
+  - query: review the open PRs - all seven of them - each on its own, and tell me which are good
+    confusable_with: [daintree.review.review-change]
+  - query: Code review every PR opened against develop this week, with a separate verdict per PR.
+    confusable_with: [daintree.review.review-change]
+  - query: Is any of the open PRs on the api repo any good? Review each one separately.
+    confusable_with: [daintree.review.review-change]
+  - query: Find the open PRs against develop and review each one - verdict per PR.
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: which open prs are actually good to merge? go through them
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: Search the PRs labelled needs-review and get each one reviewed.
+    confusable_with: [daintree.workflow.find-issue-work]
+followups:
+  - query: 'skip #423, it''s a draft in all but name — just do the other six'
+    history:
+      - 'user: review all the open PRs against develop'
+      - 'assistant: 7 open non-draft PRs. Launched Codex reviewers on #412, #415, #418 and #420, each in its own PR worktree at the recorded head; #421, #422 and #423 follow as slots free.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#418 got a push ten minutes ago — make sure its verdict is for the new head, not the one codex-5 saw'
+    history:
+      - 'user: put an agent on each PR waiting for review'
+      - 'assistant: Reviewers running read-only: codex-3 on #409, codex-4 on #414, codex-5 on #418. Heads recorded; I''ll check each blocking finding against the source when they notify.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'ok post the checked findings as a comment review on #418 and #412 — comments only, no approvals'
+    history:
+      - 'user: go through the review queue and tell me which PRs are good to merge'
+      - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'Sam opened two more this morning, #426 and #427 — give them reviewers too, same criteria'
+    history:
+      - 'user: review all the open PRs against develop'
+      - 'assistant: 7 open non-draft PRs. Launched Codex reviewers on #412, #415, #418 and #420, each in its own PR worktree at the recorded head; #421, #422 and #423 follow as slots free.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: for the ones still queued, add a security pass — anything touching auth gets checked for secrets and injection
+    history:
+      - 'user: review all the open PRs against develop'
+      - 'assistant: 7 open non-draft PRs. Launched Codex reviewers on #412, #415, #418 and #420, each in its own PR worktree at the recorded head; #421, #422 and #423 follow as slots free.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'codex-6 never came back on #417 — ask it once for a recap, and if that''s nothing mark it cannot assess'
+    history:
+      - 'user: review everything opened against develop this week'
+      - 'assistant: 5 PRs. Verdicts in for #410, #411, #413 and #416; codex-6 on #417 went idle without a VERDICT line.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: get an agent reviewing each of the three stacked PRs
+    history:
+      - 'user: turn feat/metrics into stacked PRs'
+      - 'assistant: Published: #720 (base main), #721 (base split/metrics-1), #722 (base split/metrics-2).'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good. now do that for every open PR in the repo — one reviewer each, verdict per PR
+    history:
+      - 'user: review the retry change in the payments worktree'
+      - 'assistant: Codex reviewer in payments-retry found 2 blocking issues: double charge on timeout (src/pay/retry.ts:57) and no test for the idempotency key. Nothing posted.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what about the rest of the open PRs — put a reviewer on each and tell me which are good to merge
+    history:
+      - 'user: merge #210 once it''s green'
+      - 'assistant: #210 squash-merged at 14:02; state MERGED read back.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now the human PRs — review each of the non-bot open PRs against develop
+    history:
+      - 'user: clear out the dependabot PRs'
+      - 'assistant: Batch #530 merged; 11 superseded bot PRs closed and read back. vitest bump left open with its failing output.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: while claude-2 works on that, go through the PR review queue — every PR with review required gets a reviewer
+    history:
+      - 'user: start work on #77'
+      - 'assistant: Created worktree issue-77-rate-limit and launched claude-2 there with the issue as its brief.'
+    active: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: those five in review — get an agent on each one and give me a verdict per PR
+    history:
+      - 'user: write my standup'
+      - 'assistant: Shipped: #402, #405. In review: #409, #411, #414, #418, #420. In progress: issue-77. Nothing posted.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now review everything opened against main this week, one agent per PR
+    history:
+      - 'user: rename the tabs so I can tell them apart'
+      - 'assistant: Renamed claude-2 to "auth refactor" and codex-3 to "search index".'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine — now review the non-bot open PRs, one reviewer each
+    history:
+      - 'user: combine the safe dependency updates into one branch'
+      - 'assistant: claude-5 finished deps/batch-2026-09-28: 11 bumps merged, vitest 2.1→2.2 dropped (tests failed after that merge). Verified each SHA is in the branch and re-ran tests on 44d0b1e: passed.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful

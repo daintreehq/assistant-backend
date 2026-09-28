@@ -100,6 +100,42 @@ positives:
     run: 2026-09-28-agent-queries
   - query: remember we're on pnpm now, and replace the old note that says npm
     run: 2026-09-28-agent-queries-2
+  - query: Add a /triage slash command to the Daintree sidebar assistant for this project that sorts new issues by area label.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Add a rule to AGENTS.md telling agents never to hand-edit files under src/generated/ since protoc regenerates them.
+    run: 2026-09-28-catalog-expansion-late
+  - query: CLAUDE.md says npm and AGENTS.md says pnpm — reconcile the two so every agent gets the same package-manager rule.
+    run: 2026-09-28-catalog-expansion-late
+  - query: the sidebar assistant should know from now on that staging lives at staging.acme.dev — put it in its instructions for this repo
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Add a personal instruction for my Daintree assistant in every project: always reply in British English.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: Remove the outdated 'use yarn 1' rule from AGENTS.md; we moved to pnpm 9 in August 2026.
+    run: 2026-09-28-catalog-expansion-late
+  - query: AGENTS.md and CLAUDE.md duplicate each other word for word; consolidate them without losing any rule.
+    run: 2026-09-28-catalog-expansion-late
+  - query: give the daintree assistant a skill for our release checklist
+    run: 2026-09-28-catalog-expansion-late
+  - query: prune our CLAUDE.md, it's 900 lines and half of it describes the old monolith
+    run: 2026-09-28-catalog-expansion-late
+  - query: Update .daintree/assistant/instructions.md so the sidebar assistant always runs `make lint` before suggesting a PR.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Write a skill for the Daintree assistant covering our Postgres failover checklist, stored in the project so the team gets it once committed.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Create a /standup command for the Daintree assistant that summarises yesterday's merged PRs when I type it.
+    run: 2026-09-28-catalog-expansion-late
+  - query: edit the Daintree assistant's /deploy-check command file so it also checks for pending migrations
+    run: 2026-09-28-catalog-expansion-late
+  - query: Agents keep committing .env.local — add a rule to both CLAUDE.md and AGENTS.md forbidding it and let the agents I launched know.
+    run: 2026-09-28-catalog-expansion-late
+  - query: The review-rubric skill I added under the assistant's .agents/skills folder never gets picked up; have its SKILL.md frontmatter fixed.
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'add to the daintree assistant''s standing instructions: never close agent terminals without asking me first'
+    run: 2026-09-28-catalog-expansion-late
+  - query: add a /triage command to my Daintree assistant
+    run: 2026-09-28-catalog-expansion-refine
+  - query: add a rule to AGENTS.md so agents stop editing generated files
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: remember that we file all bugs against the assistant repo, never the backend
     confusable_with: [daintree.forge.manage-issue]
@@ -173,6 +209,36 @@ boundaries:
   - query: Do you remember why we stopped using the monorepo build tool
     confusable_with: [daintree.orchestration.status-and-resume]
     run: 2026-09-28-agent-queries
+  - query: Some rule in CLAUDE.md makes agents run /compact after every task; find it and remove it.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Add a new /triage slash command for the Daintree sidebar assistant — don't run it, just create it.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: the /release-notes command the daintree assistant has is out of date, rewrite its command file
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: I don't want a plugin — just give the Daintree assistant a standing instruction to check the deploy board before any merge.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-late
+  - query: add a /deploy-status command to the daintree assistant, no plugin, just a command file
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Put our plugin conventions (commit dist/, bump the manifest version) into AGENTS.md so agents follow them.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-late
+  - query: The review-rubric skill I put in the assistant's skills folder doesn't show up; check and fix its frontmatter.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Write a new skill for the Daintree assistant covering our incident-review steps, kept in the project so the team shares it.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-late
+  - query: add a skill to my daintree assistant for reviewing SQL migrations
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'add a rule to AGENTS.md: never edit tests to make them pass'
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: also the node version, 22
     history:
@@ -581,6 +647,12 @@ topic_shifts:
       - 'assistant: Spawned codex in t2, t3, t4, each in its own worktree (issue-410/411/412). All three are working.'
     active: [daintree.orchestration.fan-out-work]
     run: 2026-09-24-selector-hardening
+  - query: 'just remember that rule: never let agents touch db/migrations'
+    history:
+      - 'user: post-mortem last night''s run'
+      - 'assistant: Cause: agent ignored the explicit migrations rule. Proposed prevention: add a memory entry and a brief line.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[async wait returned: memory search complete, 1 near-duplicate found]'
     history:

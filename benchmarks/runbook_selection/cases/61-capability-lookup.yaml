@@ -13,28 +13,24 @@
 
 cases:
   - id: capability-find-named-command
-    category: foundation-only
-    note: >-
-      The user remembers a command by its purpose, not its token. Nothing about it
-      is repository work: a user-level command lives outside the project root, so
-      searching files cannot answer it and an empty search proves nothing.
+    category: single-runbook
+    note: "Finding an agent CLI's command by its purpose goes through daintree.agents.run-agent-command's listing path (since 2026-09-28); nothing about it is repository work."
     messages:
       - role: user
         content: find my design review command
     expect:
-      required: [daintree.foundation]
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
 
   - id: capability-list-custom-commands
-    category: foundation-only
-    note: >-
-      An inventory of an agent CLI's custom commands. The answer comes from
-      Daintree's capability discovery across project and user scope, not from
-      listing .claude/ in the project, which misses everything user-level.
+    category: single-runbook
+    note: "An inventory of an agent CLI's custom commands: daintree.agents.run-agent-command's listing path (since 2026-09-28), from Daintree's discovery across project and user scope."
     messages:
       - role: user
         content: list the custom commands I have for claude
     expect:
-      required: [daintree.foundation]
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
 
   - id: capability-home-config-commands
     category: foundation-only

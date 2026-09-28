@@ -1,0 +1,604 @@
+# Exploratory multi-agent patterns (catalog expansion batch B3): spike-options,
+# hypothesis-split, bug-bash, migration-sweep, cross-review-cohort, postmortem-run.
+#
+# Each new runbook has an agent-phrased and a user-phrased case that requires it, and
+# one routing trap per neighbour its whenToUse fences, phrased close to the new
+# runbook's territory but owned by the neighbour.
+
+cases:
+  # ---------------------------------------------------------------- spike-options
+  - id: x-spike-options-agent-orm
+    category: single-runbook
+    note: "Agent phrasing: assigned options, one worktree each, same scenario, measured recommendation."
+    messages:
+      - role: user
+        content: "Prototype the same data-access scenario with Drizzle, Prisma and Kysely, one agent per library in its own worktree, then measure each spike and recommend one"
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-spike-options-user-ui-variants
+    category: single-runbook
+    note: "User phrasing of the folded-in prototype-variants shape; the user picks, no vote."
+    messages:
+      - role: user
+        content: "mock up 3 different versions of the settings page with a few agents so I can look at them and pick one"
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-spike-options-user-queues
+    category: single-runbook
+    note: "Casual two-option spike with a recommendation."
+    messages:
+      - role: user
+        content: "spike redis vs postgres for the job queue and tell me which one we should go with"
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-competition
+    category: routing-trap
+    note: "Same task done each agent's own way, then a winner judged, is a competition, not assigned options."
+    messages:
+      - role: user
+        content: "have Claude and Codex each write their own version of the retry helper in separate worktrees, then tell me which one is better"
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-poll
+    category: routing-trap
+    note: "Opinions on libraries with nothing built is a poll."
+    messages:
+      - role: user
+        content: "ask Claude, Codex and Gemini whether we should use zod or valibot and show me what each one says"
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-multi-agent
+    category: routing-trap
+    note: "Agents arguing an architecture choice to one synthesized answer, nothing prototyped."
+    messages:
+      - role: user
+        content: "get two agents to debate the queue architecture back and forth until they converge on a single recommendation, no code"
+    expect:
+      required: [daintree.orchestration.multi-agent]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-hypothesis
+    category: routing-trap
+    note: "Rival causes of a bug, not rival options to build."
+    messages:
+      - role: user
+        content: "have three agents each try a different theory for why the export is slow and tell me which theory holds up"
+    expect:
+      required: [daintree.orchestration.hypothesis-split]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-timebox
+    category: routing-trap
+    note: "One agent with a time budget on one approach is a timebox, not a spike matrix."
+    messages:
+      - role: user
+        content: "give Codex twenty minutes to try the valibot migration and stop it there with a report of how far it got"
+    expect:
+      required: [daintree.orchestration.timebox-attempt]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-fan-out
+    category: routing-trap
+    note: "Several unrelated tasks, one agent each, is fan-out work."
+    messages:
+      - role: user
+        content: "put one agent on each of these four unrelated tickets in its own worktree"
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: x-spike-trap-debug-web-app
+    category: routing-trap
+    note: "A broken existing preview of a UI variant is a debug job."
+    messages:
+      - role: user
+        content: "the dashboard variant is already open in the dev preview but it renders blank with a console error, fix it"
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------------------------ hypothesis-split
+  - id: x-hypothesis-split-agent
+    category: single-runbook
+    note: "Agent phrasing: one agent per suspected cause, confirm or refute, no fixes."
+    messages:
+      - role: user
+        content: "Investigate three hypotheses for the intermittent 502s in parallel, one agent each, confirm or refute each with an experiment and do not fix anything yet"
+    expect:
+      required: [daintree.orchestration.hypothesis-split]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-split-user
+    category: single-runbook
+    note: "User phrasing with named suspects."
+    messages:
+      - role: user
+        content: "is it the cache, the query or the serializer? put an agent on each and figure out which one is actually causing the slowdown"
+    expect:
+      required: [daintree.orchestration.hypothesis-split]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-diagnose
+    category: routing-trap
+    note: "A red test with a cause to find and fix is diagnose-and-fix."
+    messages:
+      - role: user
+        content: "the payments test keeps failing in CI, work out what's causing it and fix it"
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-reproduce
+    category: routing-trap
+    note: "A report with no reproduction yet needs red evidence first."
+    messages:
+      - role: user
+        content: "a user says the app crashes when they paste a long URL; write a failing test that reproduces it before we theorise about causes"
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-bisect
+    category: routing-trap
+    note: "When it broke, not why, is a bisect."
+    messages:
+      - role: user
+        content: "this memory leak wasn't there in v2.3, find which commit introduced it"
+    expect:
+      required: [daintree.git.bisect-regression]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-outage
+    category: routing-trap
+    note: "Live production breakage with parallel read-only agents is an incident."
+    messages:
+      - role: user
+        content: "prod started throwing 500s after the 2pm deploy, get some agents looking at logs and recent changes for the cause"
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-multi-agent
+    category: routing-trap
+    note: "Agents discussing a cause toward one agreed answer is collaboration, not split experiments."
+    messages:
+      - role: user
+        content: "have Claude and Codex discuss why the cache misses happen, relaying between them until they agree on one explanation"
+    expect:
+      required: [daintree.orchestration.multi-agent]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-poll
+    category: routing-trap
+    note: "The same question to several agents, answers brought back."
+    messages:
+      - role: user
+        content: "ask three agents what they think is causing the slowdown and show me each answer"
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-spike
+    category: routing-trap
+    note: "Competing approaches to build, not competing causes."
+    messages:
+      - role: user
+        content: "try two different caching approaches in parallel worktrees and recommend the one that performs better"
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-trap-explore
+    category: routing-trap
+    note: "How the code works, no symptom."
+    messages:
+      - role: user
+        content: "explain how the serializer and the cache layer interact in this codebase"
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------------------------------- bug-bash
+  - id: x-bug-bash-agent
+    category: single-runbook
+    note: "Agent phrasing: distinct charters, running product, confirmed deduplicated bugs."
+    messages:
+      - role: user
+        content: "Run a bug bash on the CLI with three agents, each with a different exploratory charter, and return a deduplicated list of bugs you reproduced, ranked by severity"
+    expect:
+      required: [daintree.orchestration.bug-bash]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-user
+    category: single-runbook
+    note: "Casual phrasing before a release."
+    messages:
+      - role: user
+        content: "get a few agents to poke at the app and try to break it before the release"
+    expect:
+      required: [daintree.orchestration.bug-bash]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-red-team
+    category: routing-trap
+    note: "Attacking ONE change is red-teaming."
+    messages:
+      - role: user
+        content: "get an agent to try to break Claude's new parser change and prove any crash it finds"
+    expect:
+      required: [daintree.review.red-team-change]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-review-change
+    category: routing-trap
+    note: "Finding bugs by reading a diff is a review."
+    messages:
+      - role: user
+        content: "look over the diff on this branch and tell me what bugs you see in it"
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-audit
+    category: routing-trap
+    note: "Agents reading existing code through lenses is an audit, not exploratory testing."
+    messages:
+      - role: user
+        content: "have a few agents audit the billing module's code for security and performance problems"
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-e2e
+    category: routing-trap
+    note: "Running the existing e2e suite is not exploration."
+    messages:
+      - role: user
+        content: "run the Playwright suite against my branch before the release and tell me what fails"
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-reproduce
+    category: routing-trap
+    note: "One reported bug to confirm is a reproduction."
+    messages:
+      - role: user
+        content: "QA reported the import dialog crashes on empty files, confirm it's real and give me a repro"
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-debug-web-app
+    category: routing-trap
+    note: "A known broken preview is a debug job."
+    messages:
+      - role: user
+        content: "the app in the dev preview throws a console error on the settings page, find the cause and fix it"
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-trap-file-issues
+    category: routing-trap
+    note: "Filing bug-bash findings is a separate forge job."
+    messages:
+      - role: user
+        content: "file a GitHub issue for each of the bugs the bug bash found, without duplicates"
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------------------------- migration-sweep
+  - id: x-migration-sweep-agent
+    category: single-runbook
+    note: "Agent phrasing: one pattern everywhere, partitions, pilot, residual check."
+    messages:
+      - role: user
+        content: "Replace every call to the deprecated config API across the monorepo using several agents partitioned by package, with a pilot first and a check that no occurrences remain"
+    expect:
+      required: [daintree.orchestration.migration-sweep]
+      optional: [daintree.foundation]
+
+  - id: x-migration-sweep-user
+    category: single-runbook
+    note: "Casual phrasing of a split test-framework conversion."
+    messages:
+      - role: user
+        content: "split the jest to vitest conversion across a few agents by folder"
+    expect:
+      required: [daintree.orchestration.migration-sweep]
+      optional: [daintree.foundation]
+
+  - id: x-migration-trap-fan-out
+    category: routing-trap
+    note: "Unrelated issues across agents, no repeated pattern."
+    messages:
+      - role: user
+        content: "work through these 8 unrelated refactoring issues with agents, one per worktree"
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: x-migration-trap-durable
+    category: routing-trap
+    note: "Ordered dependent phases tracked across sessions is a durable workflow."
+    messages:
+      - role: user
+        content: "plan the auth rewrite as ordered phases with dependencies, track progress, and let me resume it tomorrow"
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: x-migration-trap-upgrade
+    category: routing-trap
+    note: "A version bump with what breaks fixed is an upgrade."
+    messages:
+      - role: user
+        content: "upgrade us to React 19 and fix whatever breaks"
+    expect:
+      required: [daintree.deps.upgrade-dependency]
+      optional: [daintree.foundation]
+
+  - id: x-migration-trap-db
+    category: routing-trap
+    note: "Running schema migrations is not a code sweep."
+    messages:
+      - role: user
+        content: "run the pending database migrations in my feature worktree"
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]
+
+  - id: x-migration-trap-integrate
+    category: routing-trap
+    note: "Only merging branches that already exist."
+    messages:
+      - role: user
+        content: "the agents finished migrating their packages, merge all their branches into one and check it builds"
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  # --------------------------------------------------------- cross-review-cohort
+  - id: x-cross-review-agent
+    category: single-runbook
+    note: "Agent phrasing: a finished fan-out's agents review each other, then fix once."
+    messages:
+      - role: user
+        content: "Have each agent from the finished fan-out review another agent's branch, never its own, then relay the verified findings back to the authors to fix"
+    expect:
+      required: [daintree.review.cross-review-cohort]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-user
+    category: single-runbook
+    note: "Casual phrasing."
+    messages:
+      - role: user
+        content: "make the three agents review each other's work and then fix what their reviewer found"
+    expect:
+      required: [daintree.review.cross-review-cohort]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-trap-review-change
+    category: routing-trap
+    note: "Fresh reviewers on one change, findings only."
+    messages:
+      - role: user
+        content: "get two fresh reviewers to look over this branch and give me their findings, don't change anything"
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-trap-pr-queue
+    category: routing-trap
+    note: "A queue of open PRs, one new reviewer each."
+    messages:
+      - role: user
+        content: "put a reviewer agent on each of the open PRs and tell me which are ready to merge"
+    expect:
+      required: [daintree.review.review-pr-queue]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-trap-relay
+    category: routing-trap
+    note: "One named reviewer, one named fixer."
+    messages:
+      - role: user
+        content: "have Codex review Claude's branch without changing anything and pass its findings to Claude to fix"
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-trap-until-approved
+    category: routing-trap
+    note: "A writer and reviewer looping to approval."
+    messages:
+      - role: user
+        content: "Claude writes, Codex reviews, keep going back and forth until Codex has no blocking issues"
+    expect:
+      required: [daintree.orchestration.review-until-approved]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-trap-competition
+    category: routing-trap
+    note: "Agents judging each other's rival entries to crown one is a competition."
+    messages:
+      - role: user
+        content: "each agent writes its own version of the parser, then they vote on whose is best"
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-trap-verify
+    category: routing-trap
+    note: "Checking one agent's done-claim."
+    messages:
+      - role: user
+        content: "the agent says it finished the migration and all tests pass, check that's actually true before I merge"
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------------------------- postmortem-run
+  - id: x-postmortem-agent
+    category: single-runbook
+    note: "Agent phrasing: a finished run, first divergence, cause class, prevention."
+    messages:
+      - role: user
+        content: "Produce a post-mortem of the closed Codex session that made unwanted changes: find the first point it diverged from its brief, classify the cause and propose prevention"
+    expect:
+      required: [daintree.agents.postmortem-run]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-user
+    category: single-runbook
+    note: "Casual phrasing after the fact."
+    messages:
+      - role: user
+        content: "why did that agent rewrite half the repo last night when I asked for one fix? make sure it doesn't happen again"
+    expect:
+      required: [daintree.agents.postmortem-run]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-recover
+    category: routing-trap
+    note: "Stuck now is a recovery, not a post-mortem."
+    messages:
+      - role: user
+        content: "my Codex agent has been sitting there doing nothing for twenty minutes, is it hung?"
+    expect:
+      required: [daintree.agents.recover-agent]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-steer
+    category: routing-trap
+    note: "A running agent going wrong is steered, not analysed."
+    messages:
+      - role: user
+        content: "Claude is going off the rails rewriting the router right now, tell it to stop and only fix the one bug"
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-verify
+    category: routing-trap
+    note: "Is the claim true, not why it failed."
+    messages:
+      - role: user
+        content: "the agent says it's done with the fix, verify it actually did what I asked"
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-status
+    category: routing-trap
+    note: "What is still in flight since yesterday."
+    messages:
+      - role: user
+        content: "what happened with the agents while I was away and what's still in flight?"
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-outage
+    category: routing-trap
+    note: "A production failure, not an agent run."
+    messages:
+      - role: user
+        content: "checkout started failing in production after last night's deploy, figure out what went wrong"
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-diagnostics
+    category: routing-trap
+    note: "Daintree itself misbehaving."
+    messages:
+      - role: user
+        content: "Daintree keeps failing to launch agents and the notices never arrive, what's wrong with it?"
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-trap-memory
+    category: routing-trap
+    note: "Just saving a rule."
+    messages:
+      - role: user
+        content: "remember that agents must never touch the migrations folder"
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------- traps the new runbooks must win
+  - id: x-spike-wins-not-competition
+    category: routing-trap
+    note: "Each agent is ASSIGNED a different library and the output is a recommendation, not a winner among rival entries."
+    messages:
+      - role: user
+        content: "give each agent a different state library to prototype the cart screen with, then compare what they built and recommend one"
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-hypothesis-wins-not-diagnose
+    category: routing-trap
+    note: "A runtime behaviour with several suspects split across agents, not a red check to fix."
+    messages:
+      - role: user
+        content: "the API gets slow after an hour of uptime; it could be the connection pool, a cache leak or log buffering, so put one agent on each and tell me which it is"
+    expect:
+      required: [daintree.orchestration.hypothesis-split]
+      optional: [daintree.foundation]
+
+  - id: x-bug-bash-wins-not-red-team
+    category: routing-trap
+    note: "The whole running app explored by several agents, not one change attacked."
+    messages:
+      - role: user
+        content: "before the release, have four agents each try to break a different part of the running app and give me only the bugs you could reproduce"
+    expect:
+      required: [daintree.orchestration.bug-bash]
+      optional: [daintree.foundation]
+
+  - id: x-migration-wins-not-fan-out
+    category: routing-trap
+    note: "One repeated pattern everywhere, partitioned across agents, is a sweep, not a batch of unrelated tasks."
+    messages:
+      - role: user
+        content: "use a few agents to replace every use of the old logger across all the packages, one package each, and make sure none are left"
+    expect:
+      required: [daintree.orchestration.migration-sweep]
+      optional: [daintree.foundation]
+
+  - id: x-cross-review-wins-not-review-change
+    category: routing-trap
+    note: "The finished agents review each other rather than fresh reviewers judging one change."
+    messages:
+      - role: user
+        content: "the three agents have finished their branches; rotate reviews so each one reviews another's branch, never its own"
+    expect:
+      required: [daintree.review.cross-review-cohort]
+      optional: [daintree.foundation]
+
+  - id: x-postmortem-wins-not-recover
+    category: routing-trap
+    note: "The run is over and the question is why it failed, not rescuing a stuck agent."
+    messages:
+      - role: user
+        content: "that Claude run finished an hour ago and made a mess of the auth module; work out where it went wrong and what we should change in the brief next time"
+    expect:
+      required: [daintree.agents.postmortem-run]
+      optional: [daintree.foundation]

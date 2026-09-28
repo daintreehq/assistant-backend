@@ -1,0 +1,118 @@
+# Training examples whose answer is `daintree.orchestration.test-first-split` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.test-first-split
+run: 2026-09-28-catalog-expansion
+positives:
+  - tdd this across two agents pls, the password strength meter
+  - 'Split test authoring and implementation: Gemini writes pytest cases for the invoice rounding criteria and commits them, then claude-2 makes them green without touching tests/ or conftest.py.'
+  - one agent writes the specs for the slugify helper, another implements, no editing the specs
+  - Have Claude write red tests for the CSV exporter's quoting rules first, prove they fail for the right reason, freeze them, then launch Codex to implement.
+  - i don't want the implementer grading its own homework. codex does the tests for the refund flow, claude does the code
+  - 'Test-first with separate agents for the rate limiter: tests under tests/ratelimit/ frozen at the author''s commit, and the implementer may not modify them or the vitest config.'
+  - Write acceptance tests with one agent for the date-range picker, then have a different agent build the component to satisfy them unchanged.
+  - 'codex: failing tests for the new GET /v2/search filters. claude: make em pass. tests are off-limits to claude'
+  - Have an agent encode the account-lockout acceptance criteria as failing tests, and a second agent implement lockout against those frozen tests; prove by diff the tests weren't changed.
+  - red tests first from gemini, green code from claude, for the markdown table parser
+  - 'Two-agent TDD for the eviction policy in pkg/lru: the author writes tests only, the implementer may not skip, xfail or edit them.'
+  - The new tax calculation has no tests yet. Have Codex write failing ones from the spec, then have Claude make them pass without touching them.
+  - spawn claude to build the export queue, but codex writes the tests first and claude can't change them
+  - Get failing tests written by one agent for the webhook signature verification feature, then a different agent implements the feature against them.
+  - want codex to write the jest specs for useDebounce first and then have claude write the hook. claude isn't allowed near the specs
+  - 'Tests as the contract: Claude writes and commits the tests for the retry wrapper, Codex implements, and I need proof the test files and pytest.ini are unchanged afterwards.'
+  - Implement the bulk-archive endpoint TDD-style with two different agents so the implementer can't weaken the assertions.
+  - have gemini write tests that fail for the new currency formatting, show me the red output, then codex implements
+  - Codex drafts the failing tests for the permissions matrix, Claude implements; if Claude thinks a test is wrong it must stop and flag it, not change it.
+  - tests written first by a separate agent for the feature flag evaluator, then the code by another, in the ff-eval worktree
+  - One agent specifies the new pagination cursor's behaviour as failing tests; a different agent writes the code to make them pass. No test edits, no special-casing test inputs.
+  - 'Make the new shipping-estimate tests pass. They don''t exist yet: Codex writes them first, then Claude codes against them, tests frozen.'
+  - Separate test-writer and implementer agents for the i18n pluralisation rules; freeze the tests at the writer's commit SHA.
+  - can we do the thing where one agent writes tests and another makes them pass? it's for the image resize service
+  - Have Codex author tests for the new audit-log API from these acceptance criteria and Claude implement; accept it only if the tests and jest config are untouched since Codex's commit.
+boundaries:
+  - query: 'The checkout tax tests don''t exist yet: have Codex write failing ones for the new rules, then Claude makes them pass without editing them.'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: codex writes specs that fail for the new retry policy, claude fixes the code until they're green, no touching the specs
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Get red tests written by Gemini for the refund spec, then have Claude make them pass with the tests frozen.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Write a failing test for the export row bug and then have a different agent make it pass without touching the test.
+    confusable_with: [daintree.debug.reproduce-bug]
+  - query: spin up an agent to implement the discount engine; a different agent writes the tests first and it can't touch them
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: have an agent add the bulk-delete endpoint, with codex writing the tests beforehand that claude has to make pass unedited
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Codex writes failing tests for the loyalty points rules first; Claude implements without touching them.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+followups:
+  - query: ok they're red for the right reason? then freeze them and hand it to claude to make them pass
+    history:
+      - 'user: TDD the refund endpoint across two agents — codex writes the failing tests, claude makes them green'
+      - 'assistant: codex-2 wrote tests under tests/refunds/ in worktree feat/refunds and committed them as 7a1c3e9 (''test: refunds''). It reports 6 failures.'
+      - 'user: [notice] codex-2 is idle'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude says test_partial_refund_rounding is wrong because it expects banker's rounding — don't let it change the test, sort it out
+    history:
+      - 'user: one agent writes the specs for refunds, another implements, no editing the tests'
+      - 'assistant: Tests frozen at 7a1c3e9 (6 tests). claude-3 is implementing in feat/refunds with notify on.'
+      - 'user: [notice] claude-3 stopped with a question'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: two of them fail on an ImportError, that's not a real red — send it back to the test agent
+    history:
+      - 'user: have codex write the failing tests for the new permissions matrix first, then claude implements'
+      - 'assistant: codex-4 committed tests under tests/permissions/ as 91bd2f0 and says 9 fail. Running them myself now in feat/perm-matrix.'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok the test author agreed the timezone test was wrong and fixed it — carry on with claude against that
+    history:
+      - 'user: split TDD for the scheduler: codex writes tests, claude implements'
+      - 'assistant: claude-2 disputed test_dst_boundary; I put it to codex-1 read-only and it agreed the expected hour was off by one. It amended and committed as e02d77a.'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: small feature, just wait on the test writer in this turn instead of ending
+    history:
+      - 'user: tests first by codex, implementation by claude, for the email normaliser util'
+      - 'assistant: Worktree feat/email-normalise is ready, baseline 3f2a019 clean. About to launch codex-3 to write tests under tests/utils/test_email.py.'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: 'for the next piece I want it done properly: codex writes failing tests first, claude makes them pass and isn''t allowed to touch them'
+    history:
+      - 'user: fix the off-by-one in the paginator'
+      - 'assistant: claude-1 fixed it in fix/paginator; one file changed, tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'good plan. but change of approach: have codex write the failing tests from those criteria first and a different agent make them green'
+    history:
+      - 'user: have claude plan the discount engine before anything is written'
+      - 'assistant: claude-2 returned the plan: rules table, evaluator, 5 acceptance criteria. Waiting on your approval.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'now the fix itself: one agent writes a test that fails on the bug, the other fixes it without editing that test'
+    history:
+      - 'user: reproduce the timezone bug from issue #311, don''t fix it'
+      - 'assistant: codex-3 reproduced it: invoices dated 23:30 UTC-5 show the next day. Repro script in scripts/repro_311.py.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok. for the new rate-limit headers, TDD it across two agents — tests from codex, implementation from claude
+    history:
+      - 'user: review the auth branch for security issues'
+      - 'assistant: Review done: one high (token logged in debug path), two low. Findings with file:line are above.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: different thing — the slug util. I want tests written first by one agent, frozen, then another implements against them
+    history:
+      - 'user: is claude-2 stuck? it hasn''t printed anything for ten minutes'
+      - 'assistant: claude-2 was hung on a dead ssh prompt; I interrupted it and it''s back at its prompt.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: next up the currency formatter — codex writes the specs as failing tests, claude implements, no editing the specs
+    history:
+      - 'user: give claude 15 minutes on the chart refactor then stop it'
+      - 'assistant: Stopped claude-1 at the deadline; report and on-disk check are above. Panel left open.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -1,0 +1,152 @@
+# Training examples whose answer is `daintree.orchestration.decompose-work` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.decompose-work
+run: 2026-09-28-catalog-expansion-late
+positives:
+  - Decompose docs/rfc/0012-audit-log.md into independently buildable work items, each with owned modules, acceptance criteria and dependency edges, and present the split for approval before filing anything.
+  - 'Produce a reviewed work breakdown for epic #88 (SAML single sign-on): units with file ownership, checkable acceptance and build order; nothing implemented yet.'
+  - Derive parallelisable units from the product brief in notion-export/checkout-v2.md so five agents can later work without editing the same files; stop at a proposal.
+  - Have a read-only planner turn the multi-tenant billing spec into GitHub issues with acceptance criteria and 'depends on' links, after the user signs off on the split.
+  - 'Work breakdown for the Android offline-drafts feature: propose units, flag shared artifacts like the Room migrations and the Gradle lockfile, order them into waves.'
+  - Split the design doc at design/permissions-v2.md into tickets sized S/M/L with non-goals per ticket, dedupe against open issues, and file them on approval.
+  - 'Codex: break the ''workspace export'' epic into child issues, one per vertical slice, with owned paths and acceptance; file in dependency order once approved.'
+  - Before any agent writes code on the GraphQL gateway rewrite, get the effort carved into disjoint units with a dependency graph and show it to the user.
+  - 'Turn issue #1204 (a 40-item feature request for the admin console) into a set of separately shippable tasks with owners'' file areas and dependencies, reviewed first.'
+  - Plan the task breakdown for the new invoicing module as independent issues, with acceptance per issue; file only after sign-off.
+  - Identify the work units and their order for the real-time presence feature so three agents can build them in parallel later; report overlaps between units.
+  - 'Given PRD docs/prd/referral-program.md, draft child tickets for each component (API, email templates, dashboard widget, fraud checks) with dependencies and file them under epic #310.'
+  - 'Decomposition only: split the Kotlin-to-Swift port of the sync SDK into units that don''t share files, list open questions, and wait for approval.'
+  - Break the observability initiative (tracing, structured logs, SLO dashboards) into GitHub issues with acceptance criteria; check none duplicate what's already open.
+  - 'gemini as planner: carve up the ''teams and roles'' spec into buildable pieces with owned files and a wave order; no issues filed until the user approves.'
+  - 'Epic #57 needs proper child issues before the sprint starts: derive them from the epic body, give each acceptance criteria and depends-on, then create them.'
+  - Create a dependency-ordered breakdown of the search relevance project into units, each testable on its own once its prerequisites land.
+  - can u turn the pricing page PRD into tickets w acceptance criteria? lemme see the list before u file
+  - this epic is a monster (#402 invoices), chop it into issues the agents can pick up
+  - what are the pieces for building the calendar sync thing and what order do they go in? write it up as tickets
+  - i've got a spec for the new onboarding wizard in docs/, need it split into tasks for like 4 agents, no overlap pls, show me first
+  - break down the mobile push notifications spec into github issues, dependencies included
+  - we're kicking off the plugin marketplace next week. figure out the work breakdown and file it under the milestone
+  - hey — can you get someone to split the RFC for rate-limit tiers into separate buildable chunks? don't create anything yet
+  - turn docs/specs/csv-import.md into a proper set of issues. each one should say what files it owns
+  - plan out the tickets for the dark mode rollout, i'll approve and then u can file them
+  - query: break the notifications PRD in docs/prd/notifications.md into units for three agents
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Decompose the billing-v2 epic into independently buildable units with owned files and acceptance criteria, for my approval
+    run: 2026-09-28-catalog-expansion-refine
+  - query: plan the tasks for the search rewrite and file them as issues
+    run: 2026-09-28-catalog-expansion-refine
+  - query: chunk up the onboarding spec so 4 agents can each take a piece, show me the split first
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what are the pieces and their order for building offline mode?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Turn the RFC in rfcs/0012-sync.md into a work breakdown with dependencies, check it for file overlap, then file the approved units
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'break epic #700 into parallelizable tickets'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: here's the spec for the admin dashboard — carve it into agent-sized work items
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Have a planner agent break the move-to-Postgres goal into units; I'll decide afterwards whether to start them
+    run: 2026-09-28-catalog-expansion-refine
+  - query: split this feature doc into issues, one per agent, no overlap
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Produce a decomposition of the mobile checkout PRD into units with owned files; don't start anything until I approve
+    run: 2026-09-28-catalog-expansion-refine
+  - query: decompose the permissions overhaul into issues and open them on github once i ok it
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Create issues from the webhook-retries PRD — the pieces aren't worked out yet, so derive them first with acceptance criteria.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: file tickets for the dark-theme spec, split sensibly, each with what files it touches and what it depends on
+    confusable_with: [daintree.forge.manage-issue]
+  - query: 'Log the pieces of epic #140 as separate issues once you''ve worked out how it breaks down; show me the breakdown first.'
+    confusable_with: [daintree.forge.manage-issue]
+  - query: We'll run agents on the analytics dashboard epic in parallel, but nobody has defined the tasks yet — derive them with owned files and dependencies and let me review before anything launches.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: figure out a no-overlap split of docs/specs/sso.md for the fleet, just the split for now, I'll say go later
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Several agents will build the reporting API eventually; first produce the list of independent units with acceptance and build order, and file them as issues.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Have Claude plan how the permissions overhaul divides into separate tickets for several agents — no code, I'll approve the split.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: 'spec first: break the audit-logging design doc into independently shippable units and I''ll sign off on the list'
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: Plan the work breakdown for API v3 — pieces, dependencies, acceptance per piece — then file them as issues.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+followups:
+  - query: merge 2 and 5 like you suggested and drop the analytics unit, then show me the waves again
+    history:
+      - 'user: break the onboarding revamp spec (docs/specs/onboarding-v3.md) into issues, show me before filing'
+      - 'assistant: Launched a read-only planner in claude-3 on main. Its breakdown came back with 9 units; my overlap check found units 2 and 5 both own src/onboarding/steps.ts, so I propose merging them. Unit 8 (analytics events) is optional per the spec.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: actually cap it at 3 units, we only have 3 agents free this sprint
+    history:
+      - 'user: split the team-billing epic #231 so several agents can build it later'
+      - 'assistant: The planner (codex-2, read-only) proposed 6 units across two waves; the only shared artifact is the Prisma schema, owned by unit 1. Waiting on your go before anything is filed.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: ok file them, and put the epic:billing label on each
+    history:
+      - 'user: work out the tickets for the CSV import spec, with dependencies'
+      - 'assistant: Here is the split: 5 units in 2 waves (parser, validation, mapping UI, error report, docs page). Overlaps resolved; #512 already covers the error report, marked ''exists''. Approve and I''ll file the other four in dependency order.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: unit 4 needs the new webhook table from unit 1 — add that dependency and redo the order
+    history:
+      - 'user: decompose the partner-API PRD into buildable pieces'
+      - 'assistant: claude-4 returned 7 units. Proposed waves: wave 1 = units 1, 3, 4; wave 2 = 2, 5, 6; wave 3 = 7. No file overlaps found.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: have it redo the split as vertical slices instead of layers — right now every unit touches the same three files
+    history:
+      - 'user: carve the reporting-v2 spec into units for parallel agents, I want to review first'
+      - 'assistant: The planner''s split is by layer (db, api, ui); my overlap check shows reports/types.ts and reports/routes.ts in all three units, so they can''t run in parallel as written.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: '#877 already covers the rate-limit headers piece, skip that one and file the rest'
+    history:
+      - 'user: turn the API quotas design doc into github issues once I''ve seen the split'
+      - 'assistant: Planner gemini-1 finished: 6 units (quota store, enforcement middleware, rate-limit headers, admin UI, usage emails, docs). No overlaps. Open question: are usage emails in scope for v1?'
+      - 'user: yes emails are in'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+topic_shifts:
+  - query: 'while those run, work out how epic #301 (billing portal) breaks into tickets for the next batch — don''t start anything'
+    history:
+      - 'user: start agents on #412, #415 and #418, one worktree each'
+      - 'assistant: Launched claude-5, claude-6 and codex-3 in worktrees issue-412, issue-415, issue-418 with notify; all three are working.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: now take docs/specs/team-roles.md and figure out how it splits into issues with dependencies — I want to see the list first
+    history:
+      - 'user: log the flaky login redirect as an issue'
+      - 'assistant: Filed #455 ''Login redirect loops on expired session'' in acme/web and read it back: title, body and bug label confirmed.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: next is the admin console spec — too big for one agent. get it broken into parallel pieces with owned files before anyone codes
+    history:
+      - 'user: have codex plan the rate limiter, I approve, then it builds it'
+      - 'assistant: You approved the plan; codex-1 implemented it and my drift check matched every change to a plan item. Tests pass in feat/rate-limit.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: 'epic #77 is too vague to triage as is — decompose it into real child issues with acceptance criteria instead'
+    history:
+      - 'user: triage the needs-triage issues'
+      - 'assistant: Triage plan for 24 issues: 5 duplicate groups, 3 already fixed, 9 need info. #77 ''Make exports better'' is an epic with no actionable scope.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: ok given that layout, plan how the plugin marketplace rewrite splits into units four agents could build without colliding — just the plan
+    history:
+      - 'user: how is the plugin loader structured?'
+      - 'assistant: The explore agent (claude-2) mapped it: registry in src/plugins/registry.ts, sandbox in src/plugins/sandbox/, manifest validation in src/plugins/manifest.ts; I checked the cited lines.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: Typesense it is. now break the search feature into tickets we can hand out
+    history:
+      - 'user: spike Typesense and Meilisearch on our product catalog and tell me which to use'
+      - 'assistant: Both spikes ran in throwaway worktrees. Typesense indexed 120k products in 41s with better typo tolerance on our queries; I recommend Typesense. Nothing merged.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late-stateful

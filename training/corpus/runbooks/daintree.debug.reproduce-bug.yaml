@@ -1,0 +1,155 @@
+# Training examples whose answer is `daintree.debug.reproduce-bug` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.debug.reproduce-bug
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Reproduce issue #412 (CSV export drops the final row) in a scratch worktree off origin/main and report the failing test and its command; fix nothing.'
+  - 'Get claude to write a minimal failing test for the date-parsing bug described in #88 before anyone touches the parser.'
+  - Confirm whether the null-pointer crash a customer reported in the invoice PDF generator still happens on current main. Reproduction only.
+  - 'repro #1203: websocket disconnects after 60s idle — minimal script, exact command, failure observed on a named SHA'
+  - Have codex build a standalone reproduction of the duplicate-rows pagination bug from the support ticket so it can be attached to the GitHub issue.
+  - The report says v2.4.1 mangles unicode filenames on upload. Branch repro/unicode-upload from the v2.4.1 tag and have an agent demonstrate it with a test.
+  - 'Turn the steps in issue #57 into a red unit test showing the wrong discount total; don''t touch application code and don''t comment on the issue.'
+  - 'Check whether #930 is a genuine bug: attempt a reproduction in a fresh worktree, and if it won''t reproduce, list every condition that was tried.'
+  - 'can u repro #640 before we decide whether it''s worth fixing'
+  - someone on discord says the cli hangs when HOME has a space in it. is that real? just repro it, dont fix anything
+  - need a minimal repro for the timezone bug in the scheduler, want to attach it to the upstream ticket
+  - 'does the double-submit on Save from #221 still happen on main?'
+  - 'Reproduction-only job for gemini: show that the rate limiter lets 11 requests through with a limit of 10, per issue #311, as a failing test on origin/main.'
+  - 'Establish red evidence for the ring-buffer corruption reported in #45, with a test pinned to the reporter''s commit 3f9c2ab.'
+  - 'repro bug #702 (search returns stale results after reindex) — scratch worktree, test file only, no commits'
+  - customer claims exporting to xlsx loses leading zeros on account numbers. prove it with a test or show it cant be reproduced
+  - 'Before #519 is assigned to anyone, have an agent write the smallest test that exhibits the reported off-by-one in the monthly report.'
+  - hey, quick one — bug report from QA says the markdown preview eats trailing backslashes. get me a repro in the docs-editor worktree
+  - 'The login lockout bug in #77 has no failing test yet; get an agent to write one that goes red for the reported reason. The fix comes later, not now.'
+  - 'Pick up issue #455 only as far as reproducing it: branch repro/455, one failing test, no implementation work.'
+  - Users say the retry banner stopped showing at some point; before anyone hunts for the culprit commit we need a reliable reproduction on main — just the repro for now.
+  - 'Issue #390 is a validation error in the React signup form; reproduce it with a component test in a scratch worktree rather than poking at the dev preview.'
+  - One user (not an outage, just a bug report from last week) says password-reset links contain a doubled slash. Reproduce it locally against origin/main.
+  - 'Rather than reading the paginator code to guess, have an agent prove or disprove the reported off-by-one in #288 with a test that exercises it.'
+  - 'Before anyone chases theories about the cache corruption in #614, get one agent to produce a reliable reproduction of the symptom first.'
+  - 'Have claude-2 write just a failing regression test for the bug reported in #301 in a new worktree; the fix is a separate job for later.'
+boundaries:
+  - query: 'CI flagged nothing yet, but #412 says exports lose the last row — get a test written that shows the failure, and leave the fix for later.'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: 'the bug in #88 isn''t covered by any test; I need a red test proving it exists before a fix is attempted'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Confirm the crash in the customer's report is real by making a failing test on main; no fixing.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: A user reports the calendar shows the wrong week at year boundaries; write a failing test for it before anyone fixes it.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: 'Issue #412 says the export crashes on large files — reproduce it with a failing test before anyone fixes it.'
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: 'Have an agent write a failing test for the discount bug in #57, and only the test — no code changes.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: spin up claude in a new worktree to repro the xlsx leading-zero bug a customer reported, dont fix it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'Is the off-by-one in the paginator that #288 describes real? Prove it with a test rather than an explanation.'
+    confusable_with: [daintree.explore.repository]
+  - query: a user says exports broke recently but we have no test showing it — write a failing test that demonstrates it first
+    confusable_with: [daintree.git.bisect-regression]
+  - query: 'can you repro #412 on main? nobody has opened a PR for it yet'
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: 'Confirm the crash reported in #507 is real and make a minimal repro.'
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: 'Write a failing test that reproduces #418 (duplicate emails) before anyone touches the fix.'
+    confusable_with: [daintree.orchestration.hypothesis-split]
+  - query: 'Write a failing test that reproduces #418 (the DST crash). Don''t fix anything.'
+    confusable_with: [daintree.orchestration.test-first-split]
+  - query: 'A user says the parser crashes on emoji input (issue #733) — write a failing test that proves it before anyone fixes it.'
+    confusable_with: [daintree.review.red-team-change]
+  - query: 'Bug #390 reports the signup form rejects valid emails in the web app; write a component test reproducing it, no fix and no dev preview needed.'
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Customer says the dashboard chart renders an empty legend with one series. Reproduce that as a test in a scratch worktree.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: 'Take issue #455 but stop at a failing test that reproduces it; no implementation.'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: 'set up a worktree for #702 and have an agent reproduce the stale search results, nothing more'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: 'Put an agent on ticket #519, reproduction only — I want red evidence before we plan a fix.'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: theres an intermittent panic in the queue worker. no issue for it yet, help me scope it
+    confusable_with: [daintree.explore.repository]
+    run: pre-split
+  - query: write a failing test that reproduces the discount bug first, don't fix it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: the reporter says it only happens with more than 1000 rows — make sure the repro uses that
+    history:
+      - 'user: can you repro #412? the CSV export drops the last row'
+      - 'assistant: Created worktree repro/412 from origin/main at 3f9c2e1 and launched claude-2 as "Repro: 412" with the report, harness rules and test-only scope. I''ll check its result when the notice arrives.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's done — did it actually reproduce, or is it red for some other reason?
+    history:
+      - 'user: can you repro #412? the CSV export drops the last row'
+      - 'assistant: Created worktree repro/412 from origin/main at 3f9c2e1 and launched claude-2 as "Repro: 412" with the report, harness rules and test-only scope. I''ll check its result when the notice arrives.'
+      - 'user: ping me when it''s done'
+      - 'assistant: Notice arrived from claude-2: it reports a failing test in tests/export/csv_rows.test.ts.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the report was against v2.3.1 — does it still happen on main though?
+    history:
+      - 'user: confirm the crash in #519 is real, the one where saving a draft with an emoji title crashes'
+      - 'assistant: Worktree repro/519 is on tag v2.3.1 (a91c0de); codex-1 is writing a minimal test there. Waiting on its notice.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it says it couldn't reproduce — what exactly did it try?
+    history:
+      - 'user: have an agent write a reproduction for #640 in a scratch worktree'
+      - 'assistant: claude-3 finished in repro/640 on origin/main (e4d21b7) and reports could-not-reproduce.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: red is good, but don't fix anything yet — I just want a smaller test I can attach to the issue
+    history:
+      - 'user: write a failing test for the timezone bug in #301 first'
+      - 'assistant: claude-2 in repro/301 wrote a 60-line integration test that fails with ''expected 2026-03-29, got 2026-03-28''. I ran it myself at 5b0f3aa and saw the same output.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: '#198 came back cannot tell — get an agent to reproduce it on main with a failing test'
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok so why is the customer seeing a 500 on /invoices with a zero-quantity line? get an agent to write a failing test for that report first
+    history:
+      - 'user: run the tests in the billing worktree'
+      - 'assistant: billing (main @ 0a9d1e2): `npm test` passed, 412 tests; typecheck and lint passed.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'now have an agent reproduce #588 in a scratch worktree before anyone tries to fix it'
+    history:
+      - 'user: file an issue: importing a .xlsx with merged cells hangs the importer'
+      - 'assistant: Created issue #588 in acme/ledger and read it back: title, body and the ''bug'' label are as you asked.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: someone reported it crashes on 29 February dates — can you get me a minimal repro of that?
+    history:
+      - 'user: how does the date parser work in this repo?'
+      - 'assistant: claude-1 traced it: src/dates/parse.ts normalises through parseLoose() then toUTC(); I checked the cited lines.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#731 looks real — confirm the crash actually happens on main, don''t fix anything'
+    history:
+      - 'user: triage the open bugs labelled needs-triage'
+      - 'assistant: Here is the plan for 14 issues: 3 duplicates, 2 stale, and #731 (crash on login with SSO) unverified. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the reporter says it still happens on 3.1 — does it happen on main? I want a failing test, not a fix
+    history:
+      - 'user: where is #902 at?'
+      - 'assistant: #902 has no linked PR; the last comment (yesterday) from the reporter says the upload still truncates files over 2GB on 3.1.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'separate thing — issue #455, uploads hang at 99%. write a repro test for it before we touch anything'
+    history:
+      - 'user: review PR #220'
+      - 'assistant: Two reviewers read PR #220 at head 6c2f0aa: one blocking finding (unchecked null in mapRow) and two nits, each with file evidence.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful

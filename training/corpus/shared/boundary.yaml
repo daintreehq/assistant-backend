@@ -19,8 +19,6 @@ examples:
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: great, that's a weight off
     confusable_with: [daintree.orchestration.execute-durable-workflow]
-  - query: is our production site down right now
-    confusable_with: [daintree.runtime.debug-web-app]
   - query: whats the current best practice for lazy loading images
     confusable_with: [daintree.runtime.debug-web-app]
   - query: does chrome still support that api or did they drop it
@@ -29,17 +27,9 @@ examples:
     confusable_with: [daintree.runtime.debug-web-app]
   - query: what does a 502 from cloudflare usually mean
     confusable_with: [daintree.runtime.debug-web-app]
-  - query: can you check what the staging url is actually serving right now
-    confusable_with: [daintree.runtime.debug-web-app]
   - query: how do i change the preview panel keybinding in daintree
     confusable_with: [daintree.runtime.debug-web-app]
   - query: roughly how much memory does daintree normally use
-    confusable_with: [daintree.worktree.manage-resource]
-  - query: start the dev server
-    confusable_with: [daintree.worktree.manage-resource]
-  - query: run npm run dev in tab 2
-    confusable_with: [daintree.worktree.manage-resource]
-  - query: spin up the local api on 8080 so i can poke at it
     confusable_with: [daintree.worktree.manage-resource]
   - query: how do worktree remote resources get configured in the first place
     confusable_with: [daintree.worktree.manage-resource]
@@ -68,14 +58,6 @@ examples:
     confusable_with: [daintree.terminals.rename]
   - query: i can't create worktrees at all any more — the worktree tools aren't even showing up for you
     expect: [daintree.diagnostics, daintree.worktree.create-plain-worktree]
-  - query: test the checkout flow on the staging site yourself in the browser
-    confusable_with: [daintree.edits.spawn-visible-agent]
-    run: transcript-2026-09-27-help-release
-  - query: cut the hotfix with git flow and merge it back into develop
-    confusable_with:
-      - daintree.orchestration.runoff-tiebreaker
-      - daintree.orchestration.execute-durable-workflow
-    run: transcript-2026-09-27-help-release
   - query: why didn't you wait for the agent before replying? it was fine, you just moved on
     confusable_with: [daintree.agents.recover-agent]
     run: 2026-09-28-agent-queries
@@ -94,12 +76,6 @@ examples:
   - query: how do i switch daintree to the light theme
     confusable_with: [daintree.diagnostics]
     docs: true
-    run: 2026-09-28-agent-queries
-  - query: rename the variable userId to accountId in utils.ts
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
-    run: 2026-09-28-agent-queries
-  - query: why does our production site at shop.example.com load slowly for users in Asia
-    confusable_with: [daintree.runtime.debug-web-app]
     run: 2026-09-28-agent-queries
   - query: how does renaming a terminal tab work in daintree?
     confusable_with: [daintree.terminals.rename]
@@ -157,3 +133,330 @@ examples:
     confusable_with: [daintree.explore.repository]
     docs: true
     run: 2026-09-28-agent-queries-2
+  - query: thanks for relaying that, super helpful
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: how do LLM agents keep context between turns in general?
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: is claude or codex better at rust in general?
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: what does hitting a context window limit actually mean for an LLM?
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: why do LLM coding agents hallucinate APIs in general?
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: lol that agent really went wild. anyway thanks
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: what does /compact actually do in claude code, in general?
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: cool, the model switch worked, thanks
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between SIGINT and SIGTERM?
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, looks like it took the correction fine
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: why are flaky tests so harmful to a CI pipeline, in general?
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: ugh, flaky tests. anyway thanks for sorting the lint thing earlier
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: is Playwright or Cypress better for a new React project?
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion
+  - query: what does reuseExistingServer actually do in a Playwright config?
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a linter and a type checker?
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, all green, nice
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a context window and a token limit?
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, that context feed worked perfectly
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: what's a good incident severity scale for a small startup?
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: explain what a blameless postmortem is
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: what makes a good minimal reproducible example when filing a bug?
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: haha that bug report is wild, thanks for reading through it with me
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a caret and a tilde range in package.json?
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: is a semver major bump always a breaking change, generally speaking?
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: nice, thanks for sorting the react bump
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: how do you respond to an overly nitpicky reviewer, generally?
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a Comment review and a Request changes review on GitHub?
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: What's the practical difference between Dependabot and Renovate?
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: is pinning exact versions better than caret ranges, in general?
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: what's semver and when should I bump the major version?
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: is keep-a-changelog or conventional-changelog better in general?
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, the notes look great
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: What's a sensible issue triage process for a small open-source project, generally?
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: what do P0 and P1 usually mean in bug priority schemes?
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: how does git bisect actually pick which commit to test next?
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: is it worth learning git bisect run or is doing it by hand fine in general?
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: what does the -x flag on git cherry-pick add to the commit message?
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: cherry-pick vs backport, are those the same thing?
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between an octopus merge and merging branches one at a time?
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, the combined branch looks great
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between git branch -d and -D?
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, the branch list looks much better now
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between stacked PRs and one big PR in general?
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: is a stacked-diff workflow worth it for small teams, generally speaking?
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: what's a good format for a daily standup in general?
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, that weekly update was exactly what I needed
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: what does git shortlog -sn actually count?
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: is rebase or merge better for keeping history clean, generally?
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: what does git rebase --onto do?
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: what does gh pr checkout actually do?
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: is it risky in general to run npm install on a repo you don't trust?
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: what's a bug bash and how do teams usually run one?
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: great bug bash yesterday, thanks all
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: what is contract-first api design and why do teams bother with it?
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: in general is openapi or a graphql schema better for keeping frontend and backend in sync?
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: what makes a hypothesis falsifiable, in the scientific sense?
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, that theory about the cache was spot on
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a codemod and a regex find-and-replace?
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: is jscodeshift or ts-morph better for big refactors in general?
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: what's a good end-of-day routine for developers?
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: is git stash or a wip commit better, in general?
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: night! thanks for all the help today
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: what should a good technical design doc include, in general?
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: is it better to plan before coding or just prototype? curious what you think in general
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: how many review rounds is normal before a PR gets approved at most companies?
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, codex approved it, that's all for now
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between zod and valibot in general?
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: what does 'spike' mean in agile planning?
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: what is red-green-refactor, and does TDD actually pay off?
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: whats the difference between a mock, a stub and a fake
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: what is timeboxing in agile and does it actually help?
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: is 25 minutes really the best length for a pomodoro?
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the point of a plugin architecture in general?
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: how do VS Code extensions differ from JetBrains plugins?
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: explain what a threat model is, in general terms
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: is peer code review actually worth it on small teams?
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, that review round went great
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between red teaming and a penetration test?
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: is fuzzing worth it for a small TypeScript library in general?
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: what's a reasonable number of PRs for one person to review per day, in general?
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: thanks, those PR verdicts were exactly what I needed
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: what does EADDRINUSE mean in node?
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: difference between lsof and ss, in general?
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: is hyperfine better than just using time?
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a migration and a seed?
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: generally, should you squash old migrations or keep all of them?
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: what's a good TDD workflow in general, red green refactor?
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: nice, the checklist skill ran fine, thanks
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between npm ci and npm install?
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: how does tail -f differ from less +F?
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a git worktree and a separate clone?
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: is it bad practice to keep lots of git worktrees around?
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: how does git merge-tree work?
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: what's the difference between a two-dot and three-dot diff in git?
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: is squash or rebase merging better in general?
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
+  - query: in general, what's the difference between an AGENTS.md file and a CONTRIBUTING.md?
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: thanks, the new CLAUDE.md reads so much better
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: is peer voting actually a fair way to judge code quality?
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+  - query: in general, how big should a user story be before you split it?
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: what's the difference between an epic and a story in Jira?
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: which is better in general, Prisma or Drizzle?
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
+  - query: nice, those three mock-ups look great, thanks
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
+  - query: what's the difference between a Makefile and a Procfile anyway?
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: what does a leading ! do in a .gitignore pattern?
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+  - query: is sonnet or opus generally better at coding?
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what is an off-by-one error?
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does a hash map work?
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: night! thanks for the help today
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's the difference between a spike and a proof of concept?
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-refine

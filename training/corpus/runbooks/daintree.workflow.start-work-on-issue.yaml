@@ -154,6 +154,10 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: 'Proceed with issue #64 that we agreed on: create a feature/64 worktree and launch an agent on it'
     run: 2026-09-28-agent-queries-2
+  - query: 'start work on issue #318 in its own worktree and put Claude on it'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: pick up issue 441 with Codex
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: start work on issue 412
     confusable_with: [daintree.worktree.relocate-agents]
@@ -467,6 +471,27 @@ boundaries:
   - query: 'Make a worktree for issue #97 on the usual branch naming and put a Codex agent to work in it.'
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-agent-queries-2
+  - query: 'Start work on #734 and give the agent the relevant sync-engine files as context up front.'
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Pick up issue #619 in a fresh worktree and give the new agent the design doc as context.'
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Start work on #412: create the worktree and put an agent on fixing it.'
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: 'pick up #1123 in a new worktree and put claude on it'
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Start work on issue #610, the dark-mode persistence regression — worktree and an agent to fix it.'
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: 'start work on issue #512, the discount bug'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'create a worktree for issue #88 and put claude on it'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it looking?
     history:
@@ -768,6 +793,12 @@ topic_shifts:
       - 'assistant: Found 4 unassigned: #212 (typo in error msg), #219 (missing 404 on /users/:id), #230 (flaky upload test), #241 (docs link). None have linked PRs or running agents.'
     active: [daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
+  - query: '#245 is the worst one — start work on it in a worktree'
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[supervisor watcher fired: t_9002 idle, agent reports work complete]'
     history:

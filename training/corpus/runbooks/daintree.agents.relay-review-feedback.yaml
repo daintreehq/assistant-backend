@@ -34,7 +34,6 @@ positives:
   - codex is done ripping apart the auth patch. dump its notes into the claude tab
   - the left one just finished reviewing. give what it found to the other one
   - send that review over to the implementer but tell it the reviewer is a small model, verify before changing anything
-  - also tell it to run the test suite once it's applied those fixes
   - forward the review to term-9f and ask it to tell me afterwards whether any of it was actually worth doing
   - the review is way longer than what's visible, page the whole thing and get all of it into the implementer not just the tail
   - take whatever tab 4b said — or 4d, whichever — and pass it to the one doing the migration
@@ -57,7 +56,6 @@ positives:
   - tell it the review is advisory only, it doesn't have to do everything in there
   - term-8821 -> term-4417, the review
   - the implementer is off rewriting stuff the reviewer already said not to touch. get the review in there right now
-  - yeah that one. send it to the other agent
   - query: Codex finished reviewing feature/rate-limit; send its findings to the Claude implementer in that worktree and have it address them
     run: 2026-09-28-agent-queries
   - query: Launch Codex read-only to review src/payments/refund.ts, then pass its findings to Claude and have Claude fix them
@@ -281,6 +279,30 @@ boundaries:
   - query: codex left review notes in its terminal on the auth refactor; send them to claude-1 to address
     confusable_with: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-28-agent-queries
+  - query: Send the Codex reviewer's notes to the Claude implementer to fix.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: Pass the findings sitting in the Codex reviewer's terminal to the Claude implementer and have it fix them.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Codex just finished reviewing the auth worktree in its terminal; pass its findings to claude-2 to fix.
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Codex already reviewed the parser in terminal 3; send its findings to Claude to fix.
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: have gemini review src/auth read-only, then pass its notes to claude and have claude fix them
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: take gemini's review notes and send them to the implementer agent
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: Take the breaks codex already found in the parser and have claude fix them.
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: send the confirmed breaks from codex's red-team terminal to claude to fix
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:
@@ -537,6 +559,12 @@ topic_shifts:
       - 'assistant: Codex /status: 5h window 62% used, resets 14:20; weekly 41% used, resets Monday.'
     active: [daintree.agents.check-usage-limits]
     run: 2026-09-24-selector-hardening
+  - query: send the two confirmed breaks to claude-1 and have it fix them
+    history:
+      - 'user: red-team claude-1''s parser change'
+      - 'assistant: 2 confirmed regressions with repros in redteam/parser-input; 1 claim rejected as reasoning only.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[agent task a_0007 completed]'
     history:

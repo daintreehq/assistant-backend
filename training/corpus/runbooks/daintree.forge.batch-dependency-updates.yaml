@@ -1,0 +1,154 @@
+# Training examples whose answer is `daintree.forge.batch-dependency-updates` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.forge.batch-dependency-updates
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Handle the 14 open Dependabot PRs in acme/web: land the green patch and minor bumps, and leave any majors open with the breaking change named.'
+  - deal with the renovate prs pls
+  - Fold every passing Dependabot patch bump into one deps/batch branch in a fresh worktree, verify the tests on the combined result, then open a single PR.
+  - which of the bot PRs are safe to take?
+  - Clear out the dependency-update PRs piling up on the api repo, about 20 from Renovate.
+  - Combine the open Dependabot npm bumps into one PR and close the originals only after it merges.
+  - 'Sort the Renovate PRs by risk: patch, minor, 0.x, major, security; CI state on each head; a disposition per PR. Read-only for now.'
+  - dependabot opened like 9 PRs overnight, merge the green ones one at a time
+  - Land the safe Renovate bumps on develop; anything that's a major or has red CI stays open with a note saying why.
+  - Go through the bot PRs bumping our GitHub Actions versions and merge the ones with passing required checks.
+  - 'Weekly dependabot pile for the python service (uv lock bumps for httpx, pydantic-core, ruff): batch them into one branch, don''t push yet.'
+  - Several dependabot PRs now conflict on package-lock.json; have an agent merge them into one batch branch, regenerating the lockfile with npm rather than by hand.
+  - renovate has 6 PRs open and 2 are failing, sort out which bumps are fine and which ones break the build
+  - Look over the open dependabot PRs and tell me which are safe to merge and which need a proper upgrade.
+  - Bundle the green Dependabot bumps into one PR. For the eslint 9 major just report the breaking changes it lists; don't attempt that upgrade.
+  - Batch this week's Renovate minor updates for the monorepo, skipping anything that touches react or next.
+  - 'Once the combined deps PR #812 has merged, close the Dependabot PRs it superseded.'
+  - 'Get the dependency bot PRs off the PR list: take what''s safe, report what isn''t.'
+  - gather open app/dependabot PRs on org/cli, rank by risk with security fixes first, propose a strategy and wait for my ok
+  - merge all the green dependabot bumps
+  - 'Renovate lockfile-maintenance and patch PRs: one batch branch in a new worktree, tests re-run on the final commit.'
+  - Update our deps through the open Dependabot PRs rather than bumping anything by hand; take whatever is green.
+  - there are 11 open bot PRs for cargo crates, clear them out, one combined PR is fine
+  - Which of the open dependabot bumps are 0.x minors or majors that need a real look before merging?
+  - 'Dependabot opened 4 security-fix PRs alongside the usual bumps: prioritise those, land them once green, then batch the rest.'
+  - All the dependabot PRs went stale after the refactor merged; get the bot to rebase them and land them in turn.
+boundaries:
+  - query: Three dependabot PRs have red CI; figure out which bumps break the build and take the rest.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: 'renovate PRs failing checks: which are real breakages and which just need a rebase? land the good ones'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Some of the bot dependency bumps fail the test job; sort them and batch the passing ones.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: update our deps, there are 12 renovate PRs open, take the safe ones
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: Bump everything Dependabot has already proposed that has green CI.
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: Take the minor dependency bumps from the open bot PRs into one branch and check nothing broke.
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: fold this week's renovate patch bumps into one PR
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: merge all the green dependabot PRs
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Land the Renovate patch bumps one by one, re-checking each after the previous merge.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Approve and merge the dependency-bot PRs that are safe, leave the majors.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Close the old Dependabot PRs that newer bumps superseded, once the combined deps PR has merged.
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: All the dependabot PRs are behind main now; get them updated and landed.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: the renovate PRs keep conflicting with each other on the lockfile, sort them out into one branch
+    confusable_with: [daintree.git.sync-with-base]
+  - query: Dependabot bumps conflict on yarn.lock after each merge; have an agent fold them into one batch branch.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: Handle the 9 open Dependabot PRs, merging what's safe and flagging the majors.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: put an agent on combining the green renovate bumps into a single branch
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Split the open bot dependency PRs up and deal with them; one combined PR is fine for the safe ones.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: go through the open dependabot PRs and tell me which bumps are safe to take
+    confusable_with: [daintree.review.review-pr-queue]
+  - query: Review the open dependabot PRs and tell me which are safe to take.
+    confusable_with: [daintree.review.review-pr-queue]
+  - query: 'go through the renovate PR queue and give each one a verdict: merge, needs work, or leave'
+    confusable_with: [daintree.review.review-pr-queue]
+  - query: Which of the 15 open PRs from dependabot can I merge without worrying?
+    confusable_with: [daintree.review.review-pr-queue]
+  - query: merge the safe dependabot bumps and close the rest
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: yes, but leave zod out entirely for now
+    history:
+      - 'user: deal with the dependabot PRs'
+      - 'assistant: 14 open Dependabot PRs: 9 patch, 3 minor, 1 0.x minor (zod 0.3→0.4), 1 major (eslint 8→9). Proposal: fold the 12 green patch/minor bumps into deps/batch-2026-09-28 via one agent; zod and eslint on their own. Waiting on your yes.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: why did vitest get dropped? show me the failing output, and leave its PR open
+    history:
+      - 'user: combine the safe dependency updates into one branch'
+      - 'assistant: claude-5 finished deps/batch-2026-09-28: 11 bumps merged, vitest 2.1→2.2 dropped (tests failed after that merge). Verified each SHA is in the branch and re-ran tests on 44d0b1e: passed.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#530 merged — close the bot PRs it replaced'
+    history:
+      - 'user: merge the safe renovate bumps as one PR'
+      - 'assistant: Batch PR #530 (9 Renovate bumps) is open with CI green; the 9 bot PRs are still open.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: actually do them one at a time instead — merge each green one in order
+    history:
+      - 'user: deal with the dependabot PRs'
+      - 'assistant: 14 open Dependabot PRs: 9 patch, 3 minor, 1 0.x minor (zod 0.3→0.4), 1 major (eslint 8→9). Proposal: fold the 12 green patch/minor bumps into deps/batch-2026-09-28 via one agent; zod and eslint on their own. Waiting on your yes.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: include the renovate ones as well, not just dependabot
+    history:
+      - 'user: deal with the dependabot PRs'
+      - 'assistant: 14 open Dependabot PRs: 9 patch, 3 minor, 1 0.x minor (zod 0.3→0.4), 1 major (eslint 8→9). Proposal: fold the 12 green patch/minor bumps into deps/batch-2026-09-28 via one agent; zod and eslint on their own. Waiting on your yes.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the @types bumps are dev-only, put them in the batch too
+    history:
+      - 'user: deal with the dependabot PRs'
+      - 'assistant: 14 open Dependabot PRs: 9 patch, 3 minor, 1 0.x minor (zod 0.3→0.4), 1 major (eslint 8→9). Proposal: fold the 12 green patch/minor bumps into deps/batch-2026-09-28 via one agent; zod and eslint on their own. Waiting on your yes.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now the bot PRs you left out — which are safe to take? combine the safe ones
+    history:
+      - 'user: review all the open PRs'
+      - 'assistant: Verdicts for the 4 human PRs are in; I left the 11 Dependabot PRs out of the review.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now clear out the renovate PRs that piled up while you did that
+    history:
+      - 'user: upgrade us to React 19'
+      - 'assistant: deps/react-19 is done: tests and typecheck pass on 9d1e4a0, baseline vs after compared, 2 migration items deferred.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: there are about 20 dependabot PRs open too — merge the safe ones
+    history:
+      - 'user: merge #401'
+      - 'assistant: #401 squash-merged; MERGED read back.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and deal with the dependabot backlog while you're at it
+    history:
+      - 'user: why is CI red on develop?'
+      - 'assistant: claude-3 fixed the broken import in src/api/index.ts; I re-ran the checks on 1a2b3c4 — green, pushed.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: sort out those dependabot PRs then — batch the patch bumps into one PR
+    history:
+      - 'user: prune the branch list'
+      - 'assistant: Deleted 9 merged branches. Kept 12 dependabot/* branches because their PRs are still open.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: next the dependency-update PRs — fold the green ones into a single branch
+    history:
+      - 'user: triage the open issues'
+      - 'assistant: Applied the approved rows: 6 duplicates closed, 20 issues labelled, all read back.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful

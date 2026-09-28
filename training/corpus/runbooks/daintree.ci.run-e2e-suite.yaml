@@ -1,0 +1,122 @@
+# Training examples whose answer is `daintree.ci.run-e2e-suite` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.ci.run-e2e-suite
+run: 2026-09-28-catalog-expansion
+positives:
+  - Run the Playwright suite headless in the feature/checkout-v2 worktree against that worktree's own dev server; report pass/fail counts and trace paths.
+  - Run Cypress e2e for fix/login-redirect, making sure the server it hits is started from that worktree and not whatever is already on :3000.
+  - Run the API integration tests that need the Express server and Postgres up, in the orders-service worktree.
+  - Run only tests/e2e/checkout.spec.ts headless in the payments-ui worktree and collect screenshots for any failures.
+  - Run the end-to-end suite for claude-2's worktree; another worktree already serves on 5173, so don't reuse that server.
+  - Run e2e against feature/teams and report which base URL the tests actually hit.
+  - Have codex run the Playwright tests in the admin-dashboard worktree and report failures with their trace zip paths.
+  - 'Run the Rails system tests (Capybara, app must be booted) in the worktree for issue #618.'
+  - Cypress headless run for the billing-v3 worktree; stop whatever server it starts once it's done.
+  - Run the integration tests under test/integration that boot the Next.js app, in feature/i18n.
+  - Full e2e run on HEAD of feature/cart-rework, with proof the server under test came from that checkout.
+  - Run the @smoke-tagged Playwright tests against the release-2.4 worktree's own app.
+  - run the playwright tests in this worktree
+  - can you run e2e on my branch
+  - run the cypress suite headless pls
+  - run the integration tests that need the server running, on the api wt
+  - e2e run for feature/search, just tell me what fails + screenshots
+  - kick off the browser tests against wt onboarding
+  - Unit tests are already green in feature/export; now run the Playwright end-to-end suite there against its own server.
+  - The dashboard worktree's preview looks fine; run the Cypress specs headless against that worktree's server and report counts.
+  - Worktrees already have their own ports set up; run the e2e tests in the reports worktree against its port 4012.
+  - Start whatever the browser tests need in feature/profile, run them, then shut the server down again.
+  - Port 3000 belongs to another worktree's server; run the Playwright tests for feature/login without touching it.
+  - Run the e2e suite in the checkout worktree and report which specs fail - no fixing yet.
+  - No exploratory poking needed, just run the existing Playwright suite against the release branch worktree.
+  - playwright on the auth worktree pls - careful, my main checkout's dev server is sitting on 3000
+boundaries:
+  - query: Run the e2e tests in the checkout worktree and just list failures with screenshots, no fixing.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Run the Playwright tests against my branch with the dev server up and report failures with traces.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: Run the Playwright specs in the checkout worktree against that worktree's own dev server.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: Rather than clicking through the preview, run the Playwright suite against the dashboard worktree's own server.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the preview renders fine, run the cypress specs headless against this worktree
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Run the browser integration tests in feature/ssr, making sure they hit that worktree's server and not the preview's.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: 'Run the Playwright tests in wt checkout: start the server it needs, then kill it when done.'
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Before I open the PR, run the Playwright suite for this branch against its own server.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Launch an agent immediately to run the integration suite
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
+    run: 2026-09-09-mission-2-timers
+followups:
+  - query: rerun just those two with tracing on
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: where are the screenshots for the cart failure?
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: are you sure it hit this worktree's server and not main's on 3000?
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now the Cypress suite too, same worktree
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also the API integration tests, the ones that need the db running
+    history:
+      - 'user: run e2e against my branch'
+      - 'assistant: In worktree feat/search (b3d9f02) the Playwright suite passed 31/31 against the server I started on port 4520, verified by its /health build sha.'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now the Playwright tests too — those need the server up
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now the e2e tests — those need the app running
+    history:
+      - 'user: run the unit tests in the cart worktree'
+      - 'assistant: cart (feat/cart-v3 @ 2b9e4f1): `pnpm test` passed, 204 tests.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great — now run the Playwright suite against the billing worktree's own server
+    history:
+      - 'user: billing and main keep fighting over port 3000 and the same database'
+      - 'assistant: Gave billing port 3100 and database app_billing via its .env.local; both servers now boot side by side.'
+    active: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'different task: run the Playwright tests in the onboarding worktree and send me the failures with traces'
+    history:
+      - 'user: close #512, it''s a duplicate of #498'
+      - 'assistant: Closed #512 with a comment linking #498 and read it back: state closed, reason duplicate.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that's fixed — now run the whole Cypress suite headless against that worktree
+    history:
+      - 'user: the profile page in the preview is throwing'
+      - 'assistant: claude-2 fixed the undefined avatar URL in feat/profile; after a reload the preview shows no new console errors on /profile.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run e2e against the rebased branch — Playwright, headless
+    history:
+      - 'user: bring feat/cart up to date with main'
+      - 'assistant: claude-3 rebased feat/cart onto main (now 8c7b6a5) in its worktree; conflicts in cart.ts resolved, unit tests pass.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -12,7 +12,8 @@ whenToUse: >-
   clipboard. Do not use when context is merely an input to launching or feeding an agent —
   select the workflow that owns the agent instead
   (daintree.workflow.start-work-on-issue for one issue,
-  daintree.edits.spawn-visible-agent for one new agent, or
+  daintree.edits.spawn-visible-agent for one new agent,
+  daintree.context.feed-running-agent for an agent that is already open, or
   daintree.orchestration.fan-out-work for injecting context across parallel agents).
 risk: system
 requiredTools:

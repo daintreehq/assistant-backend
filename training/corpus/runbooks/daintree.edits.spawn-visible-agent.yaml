@@ -26,13 +26,11 @@ positives:
   - add rate limiting to the api. delegate it, don't do it yourself
   - there's a TODO in scheduler.go about the leaked ticker, put an agent on it
   - one agent, edit mode, auth worktree — task is delete the legacy session code and update whatever calls it
-  - can u get an agent to bump the deps and fix whatever breaks
   - have an agent go clean up the type errors in the reporting module
   - i need the docs regenerated for the new endpoints, put someone on it
   - do that for the third one as well
   - shoud i just spawn an agnet for the logging cleanup or is that overkill
   - put claude on the rate limiter, it needs retry with backoff
-  - webhook handler is eating events in staging and i need someone on it RIGHT NOW - spin an agent up in the api worktree
   - spwan an agnet to fix the null deref in payemnts/refund.go, its blowing up on partial refunds
   - yeah that one. get an agent on it in the checkout tree
   - have an agent bump the fetch timeout to 30s in http/client.ts. ONLY that. last time it reformatted half the file and i binned the diff
@@ -45,7 +43,6 @@ positives:
   - so the config loader reads the env twice and im fairly sure thats why staging picks up the wrong bucket. i dont want to touch it myself today. can you get something onto it
   - agent. tests for the token refresh path. we have none
   - the same validation block is copy pasted in three handlers, have an agent pull it into one helper and update the callers
-  - the last one gave up halfway through the parser work. dont bother resurrecting it, start a clean agent on the same job
   - Could you have an agent implement cursor-based pagination on /users? It should match how /orders already does it.
   - get an agent to make DELETE /sessions/:id idempotent, second call should come back 404 not a 500
   - the search-rewrite worktree already exists, just drop an agent into it and have it start on the tokenizer
@@ -77,8 +74,6 @@ positives:
     run: 2026-09-28-agent-queries
   - query: one visible coding agent to add retry with exponential backoff to the webhook sender, branch fix/webhook-retries
     run: 2026-09-28-agent-queries
-  - query: Have Claude bump the Django version to 5.1 and fix whatever deprecation warnings the upgrade surfaces, in its own worktree.
-    run: 2026-09-28-agent-queries
   - query: Start a new agent now to write docstrings for every public function in the sdk/ package.
     run: 2026-09-28-agent-queries
   - query: launch claude-2 on the current worktree to strip the unused feature flags out of config/flags.yaml and their call sites
@@ -101,6 +96,48 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Have a Claude agent run the /tidy-imports command in the api worktree, then list the files it changed.
     run: 2026-09-28-agent-queries-2
+  - query: fix a bug in src/orders/tax.ts where tax is applied twice on bundles
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'fix: invoice PDF shows the wrong currency symbol for EUR (src/pdf/render.py)'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the search box doesn't debounce, add a 300ms debounce in SearchBar.tsx
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Have an agent fix the nil pointer in lib/session.go when the cookie is missing
+    run: 2026-09-28-catalog-expansion-refine
+  - query: fix the shipping total ignoring the free-shipping threshold in cart/summary.js
+    run: 2026-09-28-catalog-expansion-refine
+  - query: make the date picker respect the user's locale, it's hardcoded to en-US
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Fix the off-by-one in the paginator where the last page repeats the final item
+    run: 2026-09-28-catalog-expansion-refine
+  - query: patch the CSV exporter so it escapes commas in customer names
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Get a claude agent to fix the coupon expiry check in billing/coupons.rb, which compares dates as strings
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the cart badge count doesnt update after removing an item, fix it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Spawn codex in the web worktree to fix the race where two saves overwrite each other in useAutosave
+    run: 2026-09-28-catalog-expansion-refine
+  - query: add email format validation to the signup form
+    run: 2026-09-28-catalog-expansion-refine
+  - query: launch claude in the api worktree and run /review as its first command
+    run: 2026-09-28-catalog-expansion-refine
+  - query: start a new codex agent with /implement-feature dark-mode as its opening prompt
+    run: 2026-09-28-catalog-expansion-refine
+  - query: open a fresh claude and kick it off with our /triage-bug command on the login crash
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Spawn a Gemini agent in the docs worktree whose first turn is /write-docs for the export module
+    run: 2026-09-28-catalog-expansion-refine
+  - query: new claude agent, first message /plan the webhook retry
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Launch Codex on the payments worktree with our /hardening custom command as its first input
+    run: 2026-09-28-catalog-expansion-refine
+  - query: launch Codex in the search worktree and have it add pagination to the results API
+    run: 2026-09-28-catalog-expansion-refine
+  - query: spawn Claude with the opus preset to fix the date parsing bug in utils
+    run: 2026-09-28-catalog-expansion-refine
+  - query: get a Gemini agent to add tests for the CSV exporter
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: write me a shell script that seeds the database
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -109,9 +146,6 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
   - query: Open a terminal now and have an agent inspect the worker logs
-    confusable_with: [daintree.orchestration.watch-outcome]
-    run: 2026-09-09-mission-2-timers
-  - query: Launch an agent immediately to run the integration suite
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
   - query: spawn a claude to refactor the auth middleware
@@ -158,8 +192,6 @@ boundaries:
     confusable_with: [daintree.worktree.relocate-agents]
   - query: one terminal, one job, clean up the deprecated imports
     confusable_with: [daintree.worktree.relocate-agents]
-  - query: run the db migration
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: put an agent on rewriting the header component
     confusable_with: [daintree.runtime.debug-web-app]
   - query: spawn something in that worktree to look at the auth code
@@ -168,8 +200,6 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
   - query: Start a visible agent to refactor this component without opening a preview.
     confusable_with: [daintree.runtime.debug-web-app]
-  - query: open a terminal and get an agent onto the flaky test
-    confusable_with: [daintree.foundation]
   - query: spin up something in that worktree to look at the auth code
     confusable_with: [daintree.foundation]
   - query: start an agent on the api worktree and make sure it asks me before it touches the schema
@@ -200,8 +230,6 @@ boundaries:
     confusable_with: [daintree.agents.ask-and-relay]
   - query: spawn an agent to dig into why the cache hit rate dropped — i want to watch it and steer as it goes
     confusable_with: [daintree.agents.ask-and-relay]
-  - query: spawn an agent to fix the flaky test in the payments module
-    confusable_with: [daintree.orchestration.fan-out-work]
   - query: get claude going in a new terminal on the readme cleanup
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: spin up an agent in the api worktree to fix the retry logic
@@ -220,8 +248,6 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: put an agent on cleaning up the dead code in utils
     confusable_with: [daintree.workflow.start-work-on-issue]
-  - query: spawn claude in the worktree I made earlier and have it fix the flaky test
-    confusable_with: [daintree.worktree.create-plain-worktree]
   - query: there's already a worktree for perf — put an agent in it to profile the parser
     confusable_with: [daintree.worktree.create-plain-worktree]
   - query: open a coding agent in ~/trees/auth-rewrite and get it refactoring the session code
@@ -230,8 +256,6 @@ boundaries:
     confusable_with: [daintree.context.curate-copytree-bundle]
   - query: open an agent against src/worldgen and src/terrain and have it rework the biome tables
     confusable_with: [daintree.context.curate-copytree-bundle]
-  - query: open a terminal and get an agent to fix the flaky test in auth_test.py
-    confusable_with: [daintree.foundation]
   - query: spawn something in the codec worktree to add the missing tests
     confusable_with: [daintree.foundation]
   - query: add tests for the new parser
@@ -262,14 +286,10 @@ boundaries:
     confusable_with: [daintree.agents.ask-and-relay]
   - query: get an agent to look at the auth module and clean it up, ill steer as it goes
     confusable_with: [daintree.agents.ask-and-relay]
-  - query: spawn an agent to fix the flaky test
-    confusable_with: [daintree.orchestration.multi-agent]
   - query: spin up an agent to fix the retry backoff in the http client
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: one claude in the worktree, tell it to add tests for the parser
     confusable_with: [daintree.orchestration.fan-out-work]
-  - query: open a claude in this worktree and have it fix the flaky retry test
-    confusable_with: [daintree.recipe.run-or-create]
   - query: spawn an agent here to refactor the config loader, i'll watch it
     confusable_with: [daintree.recipe.run-or-create]
   - query: spawn a claude in the api worktree and call it 'auth refactor'
@@ -340,9 +360,6 @@ boundaries:
     confusable_with: [daintree.agents.ask-and-relay]
     run: 2026-09-28-agent-queries
   - query: The previous agent finished cleanly and was closed; spawn a new Claude agent to add the CSV importer.
-    confusable_with: [daintree.agents.recover-agent]
-    run: 2026-09-28-agent-queries
-  - query: launch a fresh codex agent to fix the flaky date test, visible so i can watch
     confusable_with: [daintree.agents.recover-agent]
     run: 2026-09-28-agent-queries
   - query: Start an agent in a terminal to refactor the logger module; nothing is running yet.
@@ -459,9 +476,6 @@ boundaries:
   - query: new wt off main + a codex agent inside it to fix the csv encoding
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-agent-queries
-  - query: Launch a new agent in the existing release/3.1 worktree to backport the security patch.
-    confusable_with: [daintree.worktree.create-plain-worktree]
-    run: 2026-09-28-agent-queries
   - query: Set up a worktree for spike/edge-runtime and start a gemini agent there to prototype the edge handler.
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-agent-queries
@@ -493,9 +507,6 @@ boundaries:
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries
   - query: give me an agent working in its own isolated worktree on the i18n extraction
-    confusable_with: [daintree.worktree.relocate-agents]
-    run: 2026-09-28-agent-queries
-  - query: Launch Codex in the chore/deps worktree and have it upgrade eslint to v9.
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries
   - query: one new agent on a separate branch/worktree to fix the flaky upload, nothing else running needs to change
@@ -546,9 +557,6 @@ boundaries:
   - query: new worktree + new gemini agent to prototype the graphql schema
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries-2
-  - query: Create a worktree for branch chore/deps and launch an agent there to bump the dependencies
-    confusable_with: [daintree.worktree.relocate-agents]
-    run: 2026-09-28-agent-queries-2
   - query: spin up an agent in the existing api-v3 worktree to port the handlers
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries-2
@@ -561,6 +569,516 @@ boundaries:
   - query: 'fresh agent, fresh worktree perf-cache, task: implement the LRU cache'
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries-2
+  - query: Add an endpoint to the worker service that returns the running job's current status when queried.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Build an /ask command in our Slack bot that forwards a question to whoever is on call.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a handoff endpoint in the support service that transfers a chat from the bot to a human agent.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: Add logic to our job queue that reassigns unfinished jobs from a dead worker to a healthy one.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: Revert the bad changes the last agent made to src/config/loader.ts and restore the original behaviour.
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a test that fails if the parser accepts an empty header; the last run broke that.
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: Launch a new Claude agent in the api worktree whose first turn is /review.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Start a new codex agent in wt-auth and have it run /init as its very first turn.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a /healthcheck subcommand to our own CLI tool in cmd/cli.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a new .claude/commands/deploy-check.md command file that runs our smoke tests.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a cancellation handler to our job worker so a running task can be stopped cleanly when it receives SIGINT.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Implement a redirect option in the client router so an in-flight navigation can be cancelled and pointed at another route.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Add pytest-rerunfailures to the dev dependencies and configure CI to retry failed tests twice.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a script in scripts/ that reruns a given pytest node N times and prints the pass rate.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a Playwright test covering the password reset flow.
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion
+  - query: add a cypress config for the admin app that reads baseUrl from an env var
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a pre-commit hook that runs eslint and prettier on staged files.
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: write unit tests for the date-range parser in src/utils/range.ts
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: Launch a new Claude agent with the payments module as context and have it add idempotency keys to refunds.
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: spin up codex in the api wt with the rate limiter files loaded and have it add a burst limit
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Add the missing request-context parameter to every handler in services/api/handlers.
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: fix the React context provider so the theme doesn't reset on navigation
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a /healthz endpoint to the orders service that checks the database connection.
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: add request-id logging to every handler in the checkout service so incidents are easier to trace
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: Add regression tests for unicode filename handling in upload.py next to the existing upload tests.
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: have an agent patch the scheduler so it stops ignoring DST transitions
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: have codex add unit tests for the discount calculator, it has none
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a thin wrapper around the axios client so we could swap HTTP libraries later.
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: Remove the unused lodash imports from src/utils.
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: Replace our hand-rolled retry loop in src/jobs with the p-retry package we already depend on.
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a CODEOWNERS file so the backend team is auto-requested as reviewers on server/ changes.
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Build a panel in the admin UI that shows review comments threaded under each changed file.
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a renovate.json that groups all @typescript-eslint packages into a single PR.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: Set up dependabot.yml so it checks pip and npm weekly and targets develop.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: Bump the version string in package.json and pyproject.toml to 2.5.0.
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a CONTRIBUTING section explaining our conventional-commit prefixes.
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a bug report issue template with a severity dropdown under .github/ISSUE_TEMPLATE.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a GitHub Actions workflow that auto-labels new issues based on the package paths they mention.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a regression test so the nested-list flattening in the markdown renderer can't come back.
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: Extend tools/bisect_helper.py to accept a --good flag and print the step count.
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a release script that cherry-picks PRs labelled 'backport' onto their release branches automatically.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: Fix the label parsing bug in scripts/release/backport_labels.py that ignores 'backport-2.x'.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a script in tools/ that merges a list of branches into a temp branch and prints any conflicts.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Fix mergeConfigs in src/config/merge.ts so nested arrays from both sources are kept instead of overwritten.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a GitHub Actions job that deletes the head branch automatically after a PR merges.
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a script in tools/ that prints branches with no commits in 90 days.
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Split the 900-line src/utils.ts into smaller modules by concern and update the imports.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: Break the giant OrderService class into smaller services and fix up its callers.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a tools/standup.py script that prints the current user's merged PRs for a given date.
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a make target that dumps commit counts per author into stats/commits.csv.
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a GitHub Actions workflow that auto-updates open PR branches whenever main changes.
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: Implement a 'sync with upstream' option in our CLI's repo subcommand that fetches and fast-forwards.
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a CI job that runs the test suite on every pull request.
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a script that checks out a PR by number into a temp directory and runs the tests.
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: Fix the double-submit bug on the checkout button that the bug bash found.
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a QA smoke script at scripts/smoke.sh that runs every CLI subcommand once.
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: Add example payloads and error cases to the OpenAPI spec in docs/api.yaml.
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Update the shared API types in packages/contracts/src/order.ts with the new discount field and fix the call sites that break.
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: The leak is the listener in ws-client.ts. Have an agent fix it and add a regression test.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Add Hypothesis property-based tests for the parser in utils/parse.py.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Replace the deprecated `moment()` call in src/utils/date.ts with date-fns.
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: write a jscodeshift codemod that converts our old logger calls, but don't run it across the repo yet
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a pause button to the job-queue admin page that stops workers at a safe point.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a hook that saves draft form state to localStorage before the tab closes.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: Spawn Claude to rename the helpers in lib/strings.ts to camelCase; no need to show me anything first.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: write a docs/PLANNING.md describing our branch naming conventions
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: update the implementation plan checklist in ROADMAP.md to tick off SSO
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: rename the reviewer field to approver in the models and serializers
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: add an approved_by column to the reviews table with a migration
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: Replace our hand-rolled validation in the signup form with zod.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: Build the dense dashboard variant we picked yesterday into the real analytics page.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: add unit tests for the date parser in src/utils/dates.ts
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: bump test coverage for the retry module to 90%
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: have claude write the tests and the implementation for the webhook signature check
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a 20-minute timeout to the job runner so long-running tasks get killed.
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: Implement a deadline option in the fetch wrapper so requests abort after 10 seconds.
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a plugin to our Vite config that inlines SVG imports.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a Babel plugin that strips console.log calls from production builds.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Write an eslint plugin rule that bans default exports in src/.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: Remove the unused exports in src/legacy/exporter.ts.
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: Add aria-labels to the icon-only buttons in the toolbar.
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: Fix the null-handling bug a colleague spotted in src/cart/total.ts.
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: add a section to CONTRIBUTING.md describing our peer review rules
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: add property-based tests with fast-check for the new date parser
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: Harden the CSV importer against malformed rows so it skips and logs them instead of throwing.
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a pull_request_template.md to .github with a reviewer checklist section.
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a script in tools/ that lists open PRs older than two weeks and posts them to Slack.
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: Make the dev server fall back to the next free port when 3000 is taken.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: Change the API's default port from 8080 to 8090 in config/server.ts.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: Make the search endpoint faster - add an index or caching, whatever works.
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: add a benchmark script for the tokenizer to package.json
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: Fix the seed script so it stops creating duplicate admin users.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: Launch a new Claude agent in wt-parser whose first turn is /tdd on the tokenizer bug.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: spin up codex in the docs worktree and have its first message be /write-adr caching
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a skills section to our README describing the TDD procedure the team follows.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Write unit tests for the checklist parser in src/checklist/parse.ts.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Have Claude add rate limiting to the /login endpoint in the auth worktree.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a scripts/dev.sh that starts the dev server and tails the app log side by side.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a --watch flag to the build script in tools/build.ts.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Write a script under scripts/ that lists git worktrees with no commits in 30 days.
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: update CONTRIBUTING.md to document our worktree naming convention
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: Refactor the diff utility in src/compare/ to support three-way comparison.
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a merge-conflict warning banner to the PR detail page in our web app.
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: can you check what the staging url is actually serving right now
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: test the checkout flow on the staging site yourself in the browser
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-27-help-release
+  - query: cut the hotfix with git flow and merge it back into develop
+    confusable_with:
+      - daintree.orchestration.execute-durable-workflow
+      - daintree.orchestration.runoff-tiebreaker
+    run: transcript-2026-09-27-help-release
+  - query: rename the variable userId to accountId in utils.ts
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: write a bash one-liner that prints each local branch with its last commit date
+    run: 2026-09-28-agent-queries
+  - query: Rename the Recipe model to Formula in the cooking app's models.py and update the serializer.
+    run: 2026-09-28-agent-queries
+  - query: write a github actions workflow that runs pytest on push
+    run: 2026-09-28-agent-queries
+  - query: rename the interview table to interviews in the prisma schema
+    run: 2026-09-28-agent-queries
+  - query: fix the typo in the conversation component's placeholder text
+    run: 2026-09-28-agent-queries
+  - query: add a README section explaining how our multi-agent SDK passes messages between agents
+    run: 2026-09-28-agent-queries
+  - query: Write a function that computes instant-runoff voting results from ranked ballots.
+    run: 2026-09-28-agent-queries
+  - query: write a python script that fans out http requests with asyncio and a semaphore of 6
+    run: 2026-09-28-agent-queries
+  - query: add a cleanup() method to the WorkspaceManager class that closes open file handles
+    run: 2026-09-28-agent-queries
+  - query: our supervisor process restarts workers when they crash, can you add exponential backoff
+    run: 2026-09-28-agent-queries
+  - query: Convert the date utilities from moment to date-fns
+    run: 2026-09-28-agent-queries
+  - query: Add cursor-based pagination to the /orders endpoint
+    run: 2026-09-28-agent-queries
+  - query: Refactor UserService to take its repository through constructor injection
+    run: 2026-09-28-agent-queries
+  - query: Implement exponential backoff with jitter in the HTTP client wrapper
+    run: 2026-09-28-agent-queries
+  - query: Add type hints to the parsing module until mypy --strict passes
+    run: 2026-09-28-agent-queries
+  - query: Multi-stage Dockerfile for a FastAPI service
+    run: 2026-09-28-agent-queries
+  - query: Replace the hand-rolled LRU cache with functools.lru_cache
+    run: 2026-09-28-agent-queries
+  - query: Add zod validation to the signup form fields
+    run: 2026-09-28-agent-queries
+  - query: Eliminate the N+1 query in the posts listing view
+    run: 2026-09-28-agent-queries
+  - query: Rename the `terminal` variable in logger.ts to `sink` everywhere it is used
+    run: 2026-09-28-agent-queries
+  - query: Write a helper that parses `git worktree list --porcelain` output into structs
+    run: 2026-09-28-agent-queries
+  - query: Add a Recipe model with an ingredients relation to the Django cooking app
+    run: 2026-09-28-agent-queries
+  - query: Update the pull request template markdown to include a testing checklist
+    run: 2026-09-28-agent-queries
+  - query: Implement an Agent base class with an async run() method for our chatbot framework
+    run: 2026-09-28-agent-queries
+  - query: Add a --worktree flag to our CLI's argparse setup
+    run: 2026-09-28-agent-queries
+  - query: Unit tests for the issue-number parser in the changelog generator
+    run: 2026-09-28-agent-queries
+  - query: Make the embedded terminal emulator component support 256 colors
+    run: 2026-09-28-agent-queries
+  - query: GitHub Actions workflow YAML that runs eslint on every pull_request event
+    run: 2026-09-28-agent-queries
+  - query: Rename the React component RecipeCard to MealCard and update its imports
+    run: 2026-09-28-agent-queries
+  - query: Implement a Go worker pool capped at 6 concurrent jobs that picks up the next job when one finishes
+    run: 2026-09-28-agent-queries
+  - query: Add an assignee field to the Issue model in our tracker app and expose it in the serializer
+    run: 2026-09-28-agent-queries
+  - query: Convert the prompt templates in agents/ from f-strings to Jinja
+    run: 2026-09-28-agent-queries
+  - query: Write a migration adding a merged_at column to the pull_requests table
+    run: 2026-09-28-agent-queries
+  - query: add a dark mode toggle to the settings page
+    run: 2026-09-28-agent-queries
+  - query: set up eslint with the airbnb config
+    run: 2026-09-28-agent-queries
+  - query: python script to dedupe csv rows by id
+    run: 2026-09-28-agent-queries
+  - query: add a user agent header to outgoing requests
+    run: 2026-09-28-agent-queries
+  - query: write a function that renames files in a folder to kebab-case
+    run: 2026-09-28-agent-queries
+  - query: parse the co-authored-by trailers out of commit messages in the release script
+    run: 2026-09-28-agent-queries
+  - query: add an in-memory cache for the recipe search results
+    run: 2026-09-28-agent-queries
+  - query: debounce the terminal resize handler
+    run: 2026-09-28-agent-queries
+  - query: make the branch name validation error message clearer
+    run: 2026-09-28-agent-queries
+  - query: make the navbar sticky on scroll
+    run: 2026-09-28-agent-queries
+  - query: add a loading spinner to the upload button
+    run: 2026-09-28-agent-queries
+  - query: rename getUser to fetchUser across the api folder
+    run: 2026-09-28-agent-queries
+  - query: write a recipe scaler that multiplies ingredient quantities by servings
+    run: 2026-09-28-agent-queries
+  - query: add a 'terminal' log level between warn and error
+    run: 2026-09-28-agent-queries
+  - query: turn this for loop into a list comprehension
+    run: 2026-09-28-agent-queries
+  - query: add retry to the s3 upload
+    run: 2026-09-28-agent-queries
+  - query: makefile target that runs all the linters
+    run: 2026-09-28-agent-queries
+  - query: add an index on orders.created_at
+    run: 2026-09-28-agent-queries
+  - query: convert the settings page layout to css grid
+    run: 2026-09-28-agent-queries
+  - query: make the agent names bold in our chat ui
+    run: 2026-09-28-agent-queries
+  - query: store the worktree path in the config struct instead of recomputing it each call
+    run: 2026-09-28-agent-queries
+  - query: Refactor the OrderService class to extract the tax calculation into its own module.
+    run: 2026-09-28-agent-queries-2
+  - query: Add TypeScript types to the untyped helpers in src/utils/date.js.
+    run: 2026-09-28-agent-queries-2
+  - query: Create a multi-stage Dockerfile for the Go API that produces a distroless image.
+    run: 2026-09-28-agent-queries-2
+  - query: bash one-liner to find all files over 50MB in the repo and sort by size
+    run: 2026-09-28-agent-queries-2
+  - query: Fix the typo 'recieve' across the docs folder.
+    run: 2026-09-28-agent-queries-2
+  - query: Convert the callback-based file reader in lib/io.js to async/await.
+    run: 2026-09-28-agent-queries-2
+  - query: Add a unit test for the parseDuration function covering negative inputs.
+    run: 2026-09-28-agent-queries-2
+  - query: Rename the userId column to accountId in the Prisma schema and update the queries that use it.
+    run: 2026-09-28-agent-queries-2
+  - query: Implement debounce for the search input in the Header component.
+    run: 2026-09-28-agent-queries-2
+  - query: make the login form accessible - labels, aria attributes, focus order
+    run: 2026-09-28-agent-queries-2
+  - query: Replace moment.js with date-fns throughout the frontend.
+    run: 2026-09-28-agent-queries-2
+  - query: Write a GitHub Actions step that caches pip dependencies between runs.
+    run: 2026-09-28-agent-queries-2
+  - query: Add pagination to the GET /products endpoint using cursor-based paging.
+    run: 2026-09-28-agent-queries-2
+  - query: Remove the unused imports flagged by ruff in the services package.
+    run: 2026-09-28-agent-queries-2
+  - query: Write a Python script that dedupes rows in contacts.csv by email, keeping the newest.
+    run: 2026-09-28-agent-queries-2
+  - query: extract the magic numbers in the pricing module into named constants
+    run: 2026-09-28-agent-queries-2
+  - query: Add a CHECK constraint so order quantity can never be negative, with a migration.
+    run: 2026-09-28-agent-queries-2
+  - query: Make the ImageCard component lazy-load its image.
+    run: 2026-09-28-agent-queries-2
+  - query: Add structured JSON logging to the worker process using pino.
+    run: 2026-09-28-agent-queries-2
+  - query: split the 900-line utils.py into smaller modules by concern
+    run: 2026-09-28-agent-queries-2
+  - query: Add retry with exponential backoff to the HTTP client wrapper.
+    run: 2026-09-28-agent-queries-2
+  - query: Fix the off-by-one in the pagination helper so the last page isn't dropped.
+    run: 2026-09-28-agent-queries-2
+  - query: Add a README section documenting the environment variables the server reads.
+    run: 2026-09-28-agent-queries-2
+  - fix it
+  - query: Have an agent rewrite the README's install section for pnpm and Node 22.
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Have an agent add streaming support to the CSV exporter we merged last week.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Split src/services/InvoiceService.ts into three smaller classes by responsibility and keep the tests green.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: break up the 1800-line utils.py into modules by concern, no behaviour change
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Have an agent write an ADR recording why we chose Kysely.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Launch Claude in the payments worktree to fix the refund rounding bug.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Have an agent add a `dev:all` npm script that starts api and web together with concurrently.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: launch a new claude agent in the auth worktree and have its first turn be /review
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: start a fresh codex with /plan-feature as its opening command
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: fix how the cart total is calculated so discounts apply
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: implement formatMoney with Intl.NumberFormat in src/utils/money.ts
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it going?
     history:
@@ -775,10 +1293,6 @@ topic_shifts:
       - 'user: resume the box on the perf worktree'
       - 'assistant: Resumed; status came back running.'
     active: [daintree.worktree.manage-resource]
-  - query: the last one gave up halfway through the parser work. dont bother resurrecting it, start a clean agent on the same job
-    history:
-      - 'user: sup'
-      - 'assistant: Not much — nothing running. What do you need?'
   - query: use claude-cod, or whatever the anthropic one is actually called - have it rewrite the csv importer to stream instead of loading the whole file
     history:
       - 'user: yo'
@@ -847,6 +1361,58 @@ topic_shifts:
       - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
     active: [daintree.edits.spawn-visible-agent]
     run: 2026-09-24-selector-hardening
+  - query: spin up a new codex in feature/search-ui to build the results page
+    history:
+      - 'user: give claude-4 the search code'
+      - 'assistant: Pointed claude-4 at src/search/; it confirmed it read the files.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: we're going with Drizzle — have an agent build it properly in the orders module
+    history:
+      - 'user: spike Drizzle and Prisma for orders'
+      - 'assistant: Measured both: Drizzle passed the scenario test with 38 fewer lines and no codegen step; Prisma failed the transaction case. Recommendation: Drizzle.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great, it's the listener. have an agent fix it in the worker
+    history:
+      - 'user: three theories for the leak, one agent each'
+      - 'assistant: H1 (listener never removed) is supported by my re-run: heap stays flat with it removed. H2 and H3 refuted. Nothing was fixed.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good, now get an agent to redo the fix properly in that worktree with the tighter brief
+    history:
+      - 'user: why did it rewrite half the repo?'
+      - 'assistant: Cause: brief with no scope limit. Proposed brief line: ''Change only src/pager.ts and its test; report anything else you think needs changing.'''
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: get an agent to fix the path traversal in upload.ts:142
+    history:
+      - 'user: audit src/files for security'
+      - 'assistant: Verified High: user-controlled filename joined to the upload root at upload.ts:142, reachable from POST /files.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now get claude to add a loading spinner to the orders page in that worktree
+    history:
+      - 'user: start the test watcher for feat/orders in a side terminal'
+      - 'assistant: term-16 is running vitest --watch in ~/proj-orders; ''Waiting for file changes'' shown, 88 tests passing.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: have an agent fix the dev script in feat/billing so it stops leaving orphan servers behind
+    history:
+      - 'user: free 4000'
+      - 'assistant: Unknown owner, cwd ~/proj-billing; with your go-ahead I sent TERM to PID 7781 and the recheck shows 4000 free.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now write a migration adding an archived_at column to invoices
+    history:
+      - 'user: run the migrations in feat/invoices'
+      - 'assistant: Applied; artisan migrate:status shows no pending migrations, and the worktree''s own database is proven isolated.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the last one gave up halfway through the parser work. dont bother resurrecting it, start a clean agent on the same job
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
 wakes:
   - query: '[watcher fired: t_1414 idle, agent reports the refactor is complete]'
     history:

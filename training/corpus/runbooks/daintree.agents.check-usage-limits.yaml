@@ -78,6 +78,10 @@ positives:
     run: 2026-09-28-agent-queries
   - query: Check Claude Code and Codex remaining allowance and when each resets.
     run: 2026-09-28-agent-queries-2
+  - query: check how much Codex usage I've got left this week
+    run: 2026-09-28-catalog-expansion-refine
+  - query: when does my Claude five-hour limit reset?
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: check my claude usage before you start anything
     confusable_with: [daintree.agents.ask-and-relay]
@@ -192,6 +196,18 @@ boundaries:
   - query: Open a fresh Codex pane and read its /status screen so I know how much of the weekly limit is left.
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: 2026-09-28-agent-queries-2
+  - query: How much of Claude's weekly allowance is left, and when does it reset?
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: How much of Claude's weekly limit is left? check in the open pane
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: Check Codex's five-hour usage and when it resets.
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: run /usage in claude and tell me how close I am to the cap
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: now do grok
     history:
@@ -278,3 +294,15 @@ topic_shifts:
       - 'assistant: Collected 4 submissions, relayed them blind. Tally: codex 3, gemini 2, claude 1, grok 0. Codex wins.'
     active: [daintree.orchestration.competition]
     run: 2026-09-24-selector-hardening
+  - query: when does claude's limit reset, by the way?
+    history:
+      - 'user: claude hit its limit, have codex finish the export'
+      - 'assistant: Launched codex-2 in feature/export with the handoff brief; claude-1 is stopped and left open.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: hold on, before the plan comes back — how close am I to my Claude usage limit today?
+    history:
+      - 'user: have codex plan the session store move, show me before anything changes'
+      - 'assistant: codex-3 is planning in feat/session-store (read-only). Waiting for its plan.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful

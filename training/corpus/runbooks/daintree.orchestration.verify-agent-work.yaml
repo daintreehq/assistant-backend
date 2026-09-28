@@ -97,6 +97,8 @@ positives:
     run: 2026-09-28-agent-queries
   - query: it says it ran the migrations and everything passed — can you confirm thats actually true
     run: 2026-09-28-agent-queries
+  - query: did the agent actually do it? check its work before I merge
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: check what that agent actually changed before i trust it
     confusable_with: [daintree.worktree.relocate-agents]
@@ -323,6 +325,30 @@ boundaries:
   - query: Codex says the webhook handler is finished; confirm it against the acceptance criteria, using a separate reviewer agent if needed.
     confusable_with: [daintree.review.review-change]
     run: 2026-09-28-agent-queries-2
+  - query: The codex agent says the tests pass. Check that's actually true before I merge.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Confirm the finished agent actually added the tests it says it added.
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: 'did codex really fix #88 like it says?'
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: claude-2 says its branch fixes the crash and the tests pass - confirm that before I merge.
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: Check that the finished agent really implemented all four acceptance criteria before I trust it.
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: Codex says it added the rate-limit tests and they pass — confirm that before I merge.
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: claude-2 says it refactored the parser with no behaviour change; check it actually did that.
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: codex says it fixed the bug and the tests pass, verify that before I merge
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's that going?
     history:
@@ -661,6 +687,18 @@ topic_shifts:
       - 'assistant: Sent ''use uuid primary keys'' to claude in t1; it resumed and finished: ''migration 0043 added, tests green''.'
     active: [daintree.agents.answer-waiting-agent]
     run: 2026-09-24-selector-hardening
+  - query: I don't believe it — check that yourself before I merge
+    history:
+      - 'user: ask codex-1 whether it ran the tests'
+      - 'assistant: codex-1 says yes, all 212 pass, and it has finished its task.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: check that it really did it before I merge
+    history:
+      - 'user: swap claude-4 for codex on the invoice fix'
+      - 'assistant: codex-3 took over in fix/invoices from the handoff brief and now reports ''all tests pass, feature complete''.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[async verdict returned: unverified — no commits on the branch]'
     history:

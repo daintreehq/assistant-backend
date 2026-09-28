@@ -99,6 +99,40 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: the rails worktrees keep clobbering each other's migrations on the shared dev db
     run: 2026-09-28-agent-queries-2
+  - query: every new worktree comes up without the .env — make them get it copied from main automatically
+    run: 2026-09-28-catalog-expansion-late
+  - query: Worktrees created from Daintree have no node_modules; get a pnpm install to happen as each worktree is created.
+    run: 2026-09-28-catalog-expansion-late
+  - query: the new wt is missing .env.local and the certs in ./certs, make future ones get them
+    run: 2026-09-28-catalog-expansion-late
+  - query: Configure .worktreeinclude so .env and config/master.key land in each new worktree.
+    run: 2026-09-28-catalog-expansion-late
+  - query: New worktrees won't boot because vendor/ is empty — have `composer install` run on creation.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Have `uv sync` run automatically as part of creating each worktree for this repo.
+    run: 2026-09-28-catalog-expansion-late
+  - query: The .env never shows up in new worktrees even though it's listed in .worktreeinclude — find out why and fix it.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Worktree setup keeps failing at `bundle install`; read why it fails and get the lifecycle config fixed.
+    run: 2026-09-28-catalog-expansion-late
+  - query: When a worktree is created, run `npm ci` and `npx prisma generate` so agents can start straight away.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Agents launched in fresh worktrees waste their first ten minutes installing deps and hunting for API keys; have that provisioned at creation instead.
+    run: 2026-09-28-catalog-expansion-late
+  - query: copy our local SSL certs and .env.development into each worktree automatically, but never commit them
+    run: 2026-09-28-catalog-expansion-late
+  - query: Add `poetry install` to the worktree setup for this repo on my machine only, not for the whole team.
+    run: 2026-09-28-catalog-expansion-late
+  - query: The feature-x worktree Daintree made has no .env and no node_modules; make sure future worktrees don't come up like that.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Set things up so a brand-new worktree can run `pnpm test` with no manual steps — env files and install included.
+    run: 2026-09-28-catalog-expansion-late
+  - query: missing .env in every worktree is killing me, can worktree setup just handle it
+    run: 2026-09-28-catalog-expansion-late
+  - query: new worktrees lack the gitignored config/local.yml and installed gems; provision both on create
+    run: 2026-09-28-catalog-expansion-late
+  - query: add a worktree setup script that copies .env and runs pnpm install for every new worktree
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: get an agent to write the provisioning scripts for me
     confusable_with: [daintree.edits.spawn-visible-agent]
@@ -180,6 +214,42 @@ boundaries:
   - query: Agents are already separated into worktrees, but the WordPress docroot is shared so they overwrite each other's plugin; give each worktree its own docroot.
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries
+  - query: Every worktree's e2e run fights over port 3000 and one Postgres. Give each worktree its own port and database.
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion
+  - query: Two worktrees fight over port 3000 every single time; give each worktree its own port for good.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: Set up the worktree setup script so each new worktree gets a unique PORT in its .env.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: Every worktree migrates the same local postgres and they keep clobbering each other. Give each one its own database.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: Add a worktree setup script that creates and seeds a fresh database whenever a worktree is created.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: Rebuild the per-worktree setup so deleting a worktree also drops its database.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: I don't want a recipe for this — just have pnpm install run whenever a worktree is created.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: the Work recipe starts claude before node_modules exists; get dependencies installed as part of worktree setup instead
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: New worktrees made with the Fullstack recipe are missing .env; fix the worktree config so it gets copied in.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: stop making me run npm install in every new worktree — have it happen when the worktree is created
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-late
+  - query: worktrees I create come up bare, no .env and no deps; make creation handle both
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-late
+  - query: After creating a worktree I always have to copy .env and run yarn; automate that for every new one.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-late
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:
@@ -217,3 +287,21 @@ topic_shifts:
       - 'assistant: I can write a setup script that creates db_<branch> and a teardown that drops it. Want both, and should I also allocate a port per worktree?'
     active: [daintree.worktree.provision-local-environment]
     run: 2026-09-24-selector-hardening
+  - query: checkout-v2 and main keep hitting the same postgres database — give each worktree its own
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: this keeps happening — give each worktree its own port for good
+    history:
+      - 'user: port 3000 in use again'
+      - 'assistant: feat/cart and feat/search both default to 3000; freed it once (my own term-8), but the next start of either will collide again.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: set it up so every worktree gets its own database from now on
+    history:
+      - 'user: migrate feat/invoices'
+      - 'assistant: claude-4 stopped: feat/invoices and main both resolve to localhost:5432/app_dev, so running it would change main''s schema too.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful

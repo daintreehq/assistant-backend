@@ -147,6 +147,32 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Beta tester writeup on sync conflicts silently dropping edits is above. file it and assign @sync-bot
     run: 2026-09-28-agent-queries-2
+  - query: File each of the five findings from this security audit as its own issue in acme/api, checking every one against open issues first.
+    run: 2026-09-28-catalog-expansion
+  - query: turn the bug bash results into issues, one per confirmed bug
+    run: 2026-09-28-catalog-expansion
+  - query: We agreed on four follow-ups in this discussion; log all of them as separate issues in the cli repo.
+    run: 2026-09-28-catalog-expansion
+  - query: Create an issue for every TODO item in the review summary above, deduping against what's already open.
+    run: 2026-09-28-catalog-expansion
+  - query: log these 3 bugs we found today as issues, label them bug
+    run: 2026-09-28-catalog-expansion
+  - query: The postmortem listed six action items; open one issue per item in org/infra and read each back.
+    run: 2026-09-28-catalog-expansion
+  - query: File the seven accessibility problems from the audit as issues, skipping any that already have an open issue.
+    run: 2026-09-28-catalog-expansion
+  - query: make issues out of all of the review findings codex just gave us
+    run: 2026-09-28-catalog-expansion
+  - query: Open separate issues for the three regressions described in this thread, each with its repro steps, in daintree/app.
+    run: 2026-09-28-catalog-expansion
+  - query: From the list of flaky-test observations above, file one issue per test that isn't already tracked.
+    run: 2026-09-28-catalog-expansion
+  - query: Log each item in this punch list as a new issue in widgets/core and assign them all to me.
+    run: 2026-09-28-catalog-expansion
+  - query: the planning notes have 5 follow-ups, create issues for them, but ask me about any that look like dupes
+    run: 2026-09-28-catalog-expansion
+  - query: log this crash as an issue
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: reopen issue 91, it's come back
     confusable_with: [daintree.forge.land-pull-request]
@@ -199,6 +225,27 @@ boundaries:
   - query: File an issue for the Windows path bug since none exists
     confusable_with: [daintree.workflow.find-issue-work]
     run: 2026-09-28-agent-queries
+  - query: log this stack trace as a new issue in the api repo
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: File these three confirmed bugs from yesterday's bug bash as GitHub issues with the bug label.
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: log the SSRF in the upload handler as an issue
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: 'File these two as GitHub issues exactly as written: ''Export button misaligned on Safari'' and ''CSV export drops UTF-8 BOM'', both labelled bug.'
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: log the three follow-ups from the retro as separate issues, titles and bodies are in the thread above
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: file an issue for the cart discount bug so we can get to it later
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: file an issue titled 'Add CSV export' with this body
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: actually make it p1 not p2
     history:
@@ -487,6 +534,74 @@ topic_shifts:
       - 'assistant: Two reviewers read the diff. Findings: HIGH missing index on orders.created_at makes the report query scan; LOW unused import in report.ts.'
     active: [daintree.review.review-change]
     run: 2026-09-24-selector-hardening
+  - query: log an issue for each of those three findings
+    history:
+      - 'user: follow the migration-review skill on feature/orders-table'
+      - 'assistant: codex-4 followed acme-qa/migration-review; its report covers every step and lists 3 findings: missing down-migration, no index on customer_id, unbounded backfill.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: file the confirmed cause as an issue so we can schedule the fix
+    history:
+      - 'user: one agent per theory for the empty exports'
+      - 'assistant: H1 (flush race) supported by my re-run: 7/20 empty files without the await, 0/20 with it. H2, H3 refuted.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: file the top three as issues with the repro steps
+    history:
+      - 'user: bug bash the beta with three agents'
+      - 'assistant: Confirmed list: 1) crash on 10k-row paste (critical), 2) billing total off by tax on refunds (high), 3) onboarding skips step 3 on back (medium). Each reproduced by a non-reporter.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: file a new issue for the export crash triage-b found that nobody has reported yet
+    history:
+      - 'user: triage the open issues'
+      - 'assistant: Listed the 50 oldest open issues (hasMore true — the rest is a later pass). Launched 3 read-only checkers (triage-a, triage-b, triage-c) on the bug slices in the main worktree; waiting on their notices.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: log that flaky login test from the blocked list as an issue so we don't lose it
+    history:
+      - 'user: what did the team ship this sprint?'
+      - 'assistant: 22 PRs shipped; blocked: #944, held by a flaky test_login_redirect in CI.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: file the two High findings as issues and label them security
+    history:
+      - 'user: security audit of src/auth'
+      - 'assistant: Verified 2 High (path traversal in upload.ts:142, missing authz on /admin/export) and 3 Medium; dropped 1 unsupported claim.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's mitigated. log the cache-timeout bug as an issue for next sprint
+    history:
+      - 'user: checkout 500s since the deploy'
+      - 'assistant: Timeline and suspects below; the root cause is the Redis timeout change in #954.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: file an issue for that commit with the evidence and label it regression
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+      - 'assistant: Verified: export.spec fails on a1b2c3d and passes on its parent 5f6e7d8.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: open an issue describing the root cause so the team knows about the shared mock
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+      - 'assistant: claude-4 traced it to a shared WebSocket mock server that the session tests close early; evidence checked.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: file an issue to add dark mode to the deploy board later
+    history:
+      - 'user: the deploy button in my plugin does nothing'
+      - 'assistant: Fixed the (ctx, args) handler; after reload clicking Deploy dispatches and diagnostics are clean.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'unrelated — reopen #412 and assign it to me'
+    history:
+      - 'user: file the approved breakdown for the loyalty spec'
+      - 'assistant: Filed #501-#506 in dependency order, each read back with its ''Depends on'' line and the epic link.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
 wakes:
   - query: '[user returned after confirmation interruption]'
     active: [daintree.forge.manage-issue]

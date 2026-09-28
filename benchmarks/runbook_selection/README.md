@@ -24,10 +24,11 @@ four different fixes. Every missing runbook is attributed to the stage that lost
 | `cardinality_short` | the count head asked for fewer | the count head |
 | `cap_full` | the answer was already at `max_active_runbooks` | the cap |
 
-`candidate_miss` is the one to watch as the catalog grows. It is nearly unreachable at ~40 runbooks
-against `k=32` — 84% of the catalog is on the ballot regardless — and it is the
-first number to move as the catalog grows, which is exactly why it is gated at
-zero now rather than after it starts happening.
+`candidate_miss` is the one to watch as the catalog grows. At ~40 runbooks it was nearly
+unreachable against `k=32` (84% of the catalog on the ballot regardless); at 87 (2026-09-28)
+the ballot is 37% of the catalog and it is still zero. It is the first number to move as
+the catalog grows, which is exactly why it is gated at zero rather than after it starts
+happening.
 
 Latency is decomposed the same way (`sync`, `retriever`, `search`, `ranker`,
 `head`, `docs`), because one aggregate cannot separate a tokenizer regression

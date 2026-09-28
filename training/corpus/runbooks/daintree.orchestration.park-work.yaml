@@ -1,0 +1,178 @@
+# Training examples whose answer is `daintree.orchestration.park-work` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.park-work
+run: 2026-09-28-catalog-expansion
+positives:
+  - Bring every running agent to a clean stopping point and record where each one stopped; the user is done for the day.
+  - Pause the three agents in the billing worktree without closing their sessions, and write a resume note for each.
+  - 'User is shutting their laptop: get claude-2 and codex to stop at a safe point and WIP-commit their work, no push.'
+  - 'Shelve the search-reindex worktree until next week: agents stopped, uncommitted files listed, nothing torn down.'
+  - 'End-of-day wrap: ask each agent what is done, half-done and uncommitted, and leave notes the next session can resume from.'
+  - Checkpoint each agent worktree's uncommitted work as a wip commit and push it to origin, leaving every panel open.
+  - 'We''re parking for the night: interrupt the working agents now, confirm each stopped from its screen, and capture their next step without closing anything.'
+  - 'Park the auth-refactor work with no commits: agents to a stopping point, resume record written outside the repo.'
+  - Before the user's flight, make sure no agent is mid-edit and every worktree's state is written down with its exact next step.
+  - Save everything in flight before the machine reboots for the OS update; don't close any terminals.
+  - Stop the whole fleet at a resumable point for the night and tag each panel with its resume record.
+  - Wind down all agents in the payments worktree for the weekend; WIP commit allowed, no push.
+  - Get gemini and claude-3 to finish their current step and then stop for today; report per worktree what is uncommitted.
+  - 'User is on leave for a week: shelve the migration work without deleting any worktree and leave notes for whoever picks it up.'
+  - Pause the durable workflow's running units for the night so nothing dispatches, recording where each unit stopped.
+  - 'Wrap up the codex agent in the feat/export worktree for today: have it summarise progress and commit as wip, leave it open.'
+  - ok im done for today, get everyone to a stopping point
+  - wrap up for the day pls, dont close anything
+  - gotta run, park the agents and tell me where each got to
+  - pause everything but keep the sessions, back tomorrow
+  - can you save everyone's work before i shut the lid
+  - shelving the search stuff till monday, make sure nothing gets lost
+  - thx all. call it a night, wip commit is fine, no push
+  - leave notes so whoever picks this up tomorrow knows the next step, then have the agents stop
+  - going offline for the weekend, stop the agents cleanly
+  - query: calling it a night — get the agents to a stopping point and leave notes
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Park all running agents cleanly: record where each stopped, checkpoint uncommitted work as WIP commits, keep every panel open'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: pause everything, I'm off till monday, don't close anything
+    run: 2026-09-28-catalog-expansion-refine
+  - query: shelve the search-rewrite worktree until next week with a resume note
+    run: 2026-09-28-catalog-expansion-refine
+  - query: about to shut my laptop, make everything safe
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Bring the three agents to a clean stop and tell me where each one is; no teardown
+    run: 2026-09-28-catalog-expansion-refine
+  - query: done for today. stop the agents at a good point pls
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Park the payments work: stop the codex agent between steps, note uncommitted files, leave the worktree standing'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: end of day, leave notes so tomorrow's agent can pick it up
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Put the fleet to bed for the weekend without killing any sessions
+    run: 2026-09-28-catalog-expansion-refine
+  - query: wrap things up, i'll come back to it after the holiday
+    run: 2026-09-28-catalog-expansion-refine
+  - query: wrap up for the day, get everyone to a stopping point and leave notes
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Pause the agents and leave resume notes so tomorrow's session can pick things up; keep everything open.
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: Get every running agent to a clean stopping point for tonight and note where each one stopped; keep the sessions.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Write down where each agent is and what's uncommitted so I can resume tomorrow, then have them stop.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Record resume notes for every worktree before I leave and get the agents to a clean stop.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Make sure tomorrow's session can pick up exactly where each agent stops tonight.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Sweep the agents and get each one to a stopping point for the night.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: check on everyone and have them wind down, i'm leaving
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: Go through all the running agents, pause them safely before I log off and tell me their state.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: 'Wrap up for the day: get every agent to a stopping point and tell me where each one is.'
+    confusable_with: [daintree.orchestration.timebox-attempt]
+  - query: I'm heading out; rather than waking me later, get the agents to stop at a safe point and save their work.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: Overnight I don't want anything running; park the agents and note their next steps.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: Before I go offline, have every agent stop at its next prompt and wip-commit.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: 'Tidy up for the day: agents to a stopping point and wip commits, but leave every panel and worktree open.'
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: Shut things down for the weekend in the sense of pausing; the worktrees and sessions must survive.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: Before I close the laptop, make everything safe; I don't want any worktree deleted or terminal closed.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: Commit the half-done work on feat/export as wip and leave it, no PR, I'm done for today.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Push a wip checkpoint of each agent's branch before I log off, not for review.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: save my unfinished branches before the weekend, don't open anything for review
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Wrap up for the day — get the agents to a stopping point and keep their worktrees.
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: checkpoint this, i'm closing the laptop
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: pre-split
+  - query: park that, i'll come back to it
+    run: pre-split
+  - query: wrap up for the day but keep everything open
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: remind claude-4 again, it's still going
+    history:
+      - 'user: get everyone to a stopping point and tell me where each is'
+      - 'assistant: claude-2 and codex-1 stopped clean (both have uncommitted files in feat/search and feat/api-v2); claude-4 is still working in feat/billing.'
+    active: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: leave codex-1 running though, it's nearly through the test suite
+    history:
+      - 'user: stop them all now, I''m shutting the laptop'
+      - 'assistant: Interrupting claude-2, codex-1 and claude-4, then reading their screens before I send the parking message.'
+    active: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: push those wip commits to origin as well
+    history:
+      - 'user: save everything before I go'
+      - 'assistant: WIP commits made: feat/search 3f9a1c2, feat/api-v2 81bd0e4; nothing pushed, since you only allowed commits.'
+    active: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and the api worktree too, same deal
+    history:
+      - 'user: pause the agents in the search worktree but keep their sessions'
+      - 'assistant: Sent claude-2 in feat/search the parking message; it will read it when its current turn ends.'
+    active: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: ok I'm done for the day — get everything to a stopping point and leave resume notes
+    history:
+      - 'user: hand claude-5''s search task to gemini'
+      - 'assistant: gemini-1 is working in feature/search from the handoff brief; claude-5 is stopped and open.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wrap up for today, get both agents to a stopping point and leave me notes
+    history:
+      - 'user: split TDD for the scheduler: codex writes tests, claude implements'
+      - 'assistant: Freeze at e02d77a; claude-2 is still implementing against it in feat/scheduler.'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: I'm out for the evening — pause both agents safely and leave me notes on where each one is
+    history:
+      - 'user: split notifications: API and client in parallel against a committed schema'
+      - 'assistant: Contract at d18c6a0; both sides launched and working in notifications-api and notifications-ui.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok I'm out for the night — get them all to a stopping point and tell me where each is
+    history:
+      - 'user: sweep the agents'
+      - 'assistant: claude-2, codex-1 and claude-4 are working; nothing is waiting or failed.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: pause them all but keep their sessions, I'll pick this up Monday
+    history:
+      - 'user: start work on issues #201 to #204, one agent each'
+      - 'assistant: Launched 4 agents in their own worktrees (issue-201 … issue-204), each with notify and handback.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: save everything before I shut my laptop
+    history:
+      - 'user: have claude refactor the billing service in feat/billing-refactor'
+      - 'assistant: Launched claude-2 ''Billing refactor'' in ~/proj-billing-refactor; ending my turn.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: never mind, I'm done for today — park it all again with notes for tomorrow
+    history:
+      - 'user: what''s still in flight from yesterday?'
+      - 'assistant: From the checkpoint and live state: feat/search (claude-2, working), feat/api-v2 (codex-1, idle with uncommitted files).'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: stop everyone at a clean point and leave notes so tomorrow's agent can carry on
+    history:
+      - 'user: compare main and feat/cache for request latency'
+      - 'assistant: codex-3 and claude-4 are building both revisions in their own worktrees; the interleaved runs start after warmup.'
+    active: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion-stateful

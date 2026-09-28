@@ -148,6 +148,12 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Unsubscribe from completion notices for every agent in the payments worktree, keeping them all running.
     run: 2026-09-28-agent-queries-2
+  - query: let me know when the build terminal finishes
+    run: 2026-09-28-catalog-expansion-refine
+  - query: keep an eye on the Codex agent and ping me when it's done
+    run: 2026-09-28-catalog-expansion-refine
+  - query: run the migration agent overnight and wake me when it stops
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: keep checking that one agent every ten minutes and tell me the moment it's done — nothing else to start after it
     confusable_with: [daintree.orchestration.fan-out-work]
@@ -504,6 +510,30 @@ boundaries:
   - query: 'Let me know when PR #233 finally merges, I''m heading out'
     confusable_with: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-28-agent-queries
+  - query: In 30 minutes, run the test suite in the reports worktree and ping me with the result.
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: let me know when all the agents finish, i'm heading out
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: Ping me when the overnight agent run finishes.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: In 20 minutes, spawn claude and have it run the migration tests.
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: Let me know when codex finishes the refactor, I'm stepping out for half an hour.
+    confusable_with: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion
+  - query: wait until 2am then run the migrations in the billing worktree
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: in 20 minutes open a terminal and run the nightly export script
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: 'ping me when #611 and #612 have merged'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:
@@ -931,6 +961,30 @@ topic_shifts:
       - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
     active: [daintree.orchestration.watch-outcome]
     run: 2026-09-24-selector-hardening
+  - query: forget the clock — in an hour, start the full e2e run and wake me when it's done
+    history:
+      - 'user: give claude 15 minutes on the chart refactor then stop it'
+      - 'assistant: Stopped claude-1 at 11:05; report and diff check above. Panel left open.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'ping me when #420''s CI goes green'
+    history:
+      - 'user: go through the review queue and tell me which PRs are good to merge'
+      - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: let me know when maria re-approves it
+    history:
+      - 'user: fix what the reviewer asked for on #88'
+      - 'assistant: Verified claude-2''s 5 commits against the threads, re-ran tests and lint on a91c3e0 (passed), pushed to feature/token-refresh. #88 head is now a91c3e0; CI pending. No replies posted yet.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'tell me when #530''s CI finishes'
+    history:
+      - 'user: combine the safe dependency updates into one PR'
+      - 'assistant: Opened #530 from deps/batch-2026-09-28 listing the 11 included bot PRs; CI running.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[watcher pr_482 fired: state changed open -> merged]'
     history:

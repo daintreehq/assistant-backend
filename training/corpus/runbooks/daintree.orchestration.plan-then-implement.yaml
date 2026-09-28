@@ -1,0 +1,145 @@
+# Training examples whose answer is `daintree.orchestration.plan-then-implement` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.plan-then-implement
+run: 2026-09-28-catalog-expansion
+positives:
+  - Have Codex draft an implementation plan for adding optimistic locking to the orders service, show it to the user for sign-off, then have Codex implement exactly that plan.
+  - plan first pls. i want to see how it'd restructure the notification queue before anyone touches code, then it can build it
+  - Claude plans the move of the settings page to React Query, Codex approves the plan, then Claude implements it in the settings-rq worktree.
+  - Get a written design for the webhook retry backoff approved by the user before any files change, then implement it and check the result matches the design.
+  - spec first, I sign off, then build. it's the CSV import dedupe in apps/admin
+  - don't let it write anything until I've seen the plan. adding multi-currency to invoices
+  - 'Plan-gated change: have Claude produce a plan for replacing the hand-rolled JWT parsing with jose, wait for my approval, then implement strictly to plan.'
+  - Codex should plan the Redis cache invalidation change and Claude should review the plan; only after Claude approves does Codex start coding.
+  - can you get claude to write up how it'd split UserService into smaller classes, let me approve, then have it do it exactly like that
+  - 'Two-step: read-only planning pass on the search indexer refactor, user approval gate, then implementation checked against the plan for unplanned files.'
+  - you decide whether codex's plan for the rate-limit middleware is good enough, then have it build what was approved
+  - Before touching packages/billing, have an agent propose the change set (files, risks, test plan) for proration support; implement only after I approve it.
+  - plan mode first on the graphql schema cleanup, then build it
+  - Codex writes the plan, Gemini approves or requests changes, Claude implements the approved plan in the feature/audit-log worktree.
+  - i'd like a plan i can red-line before claude implements the offline sync thing
+  - Get an approved design for the dark-mode token refactor in the design-system package, then have the same agent implement it and report any drift from the design.
+  - have claude think through the approach for moving cron jobs onto the queue worker, check with me, then go
+  - 'Pagination for /v1/reports must follow a user-approved plan: Claude plans with no edits, I approve, then Claude implements.'
+  - Ask Codex for a plan to add S3 multipart uploads, and once I've approved it, have Codex carry it out as written.
+  - 'Spawn Claude on the email templating rewrite but gate it: plan first, my approval, then code.'
+  - Lay out the steps for switching our logger to pino, let me approve them, then have claude do exactly those steps and nothing more
+  - for the stripe webhook handler rewrite i want the plan reviewed by codex before claude writes a line of code, then claude builds it
+  - Plan, user approval, then implementation for adding soft-delete to the documents model; flag anything implemented that wasn't in the plan.
+  - claude should come up with the approach for drag-and-drop reordering on the kanban board and wait for me to OK it before making changes, then finish it
+  - One agent designs the retry policy for the payment client and I approve the design; then Claude builds that design in the current worktree, no deviations without asking.
+  - Get a sign-off-able plan from Gemini for extracting the PDF renderer into its own module, then have Gemini implement it once approved and diff the result against the plan.
+boundaries:
+  - query: Ask Codex to come up with a plan for the websocket reconnect logic, and once I approve it, have Codex build it.
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: get claude to propose how it would restructure the config loader. if I like it, it goes ahead exactly as proposed
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: Ask an agent how it would add pagination to /orders, show me before it changes anything, then let it implement.
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: ask claude what its plan is for the retry design, have codex approve or push back on that plan, then claude codes it
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: Spawn Claude to add SSO login, but it has to show me a plan and wait for my go before editing anything.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Have codex write a plan for the API redesign, I approve it, then claude implements it alone.
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: Have Codex lay out the steps for the feature-flag cleanup; I approve the steps, then it does them exactly as written.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: i want a plan i can approve before any code changes for the audit log retention job, then have claude build it to the plan
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Draft an implementation plan for the webhook v2 handler, get my sign-off, then implement it and check the diff for drift from the plan.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Codex drafts the plan for the rate limiter, Claude approves the plan, then Codex builds it.
+    confusable_with: [daintree.orchestration.review-until-approved]
+  - query: have codex write a plan, test plan included, for the retry wrapper; I approve it, then claude builds it
+    confusable_with: [daintree.orchestration.test-first-split]
+  - query: set the plan up first before you touch a single file
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: pre-split
+  - query: Get Claude to write a plan for the webhook retry backoff without editing anything, I approve it, then Claude implements exactly that plan.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: plan first for the cache eviction fix — codex plans, i sign off, codex builds it
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: have codex plan the notifications feature and claude build it after I approve the plan
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: ok, approved — answer to Q1 is keep the per-tenant limit in Redis, Q2 no admin override. go ahead and build it
+    history:
+      - 'user: have codex plan the rate limiter for the public API before anything gets written, I want to sign off'
+      - 'assistant: Codex (codex-1, worktree feat/rate-limit) returned a plan: token bucket middleware in api/middleware/ratelimit.ts, config in settings.ts, two open questions — where per-tenant counters live and whether admins bypass. Nothing changed on disk.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: actually get claude-2 to review that plan instead of me, it knows the middleware stack better
+    history:
+      - 'user: plan first for moving session storage off cookies, show me before it touches anything'
+      - 'assistant: Planner codex-3 in worktree feat/session-store replied with a plan (7 files, open questions: none). Waiting on your approval.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: step 3 of the plan says drop the legacy column — take that out, we still need it for the export job. then let it run
+    history:
+      - 'user: Claude plans, Codex approves, then Claude codes — the soft-delete change for invoices'
+      - 'assistant: claude-1 planned it; Codex (codex-2) reviewed and returned VERDICT: APPROVE on revision 1. Before I send the go: the plan''s step 3 removes invoices.deleted_legacy.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it stopped saying the plan's approach won't work because the queue client is sync — what now?
+    history:
+      - 'user: plan-then-build the retry wrapper for the webhook sender, I''ll approve'
+      - 'assistant: You approved the plan; I sent it to claude-4 in feat/webhook-retry to implement exactly as approved. Ending turn until it reports.'
+      - 'user: [notice] claude-4 is idle'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: done? check it didn't wander off the plan before I look
+    history:
+      - 'user: spec first on the pagination rewrite, I sign off, then implement'
+      - 'assistant: Plan approved by you with answers to both questions; go sent to codex-5 in worktree fix/pagination. I''ll check the diff against the plan when it reports.'
+      - 'user: [notice] codex-5 finished'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: you decide on the approval, just make sure every criterion is in there
+    history:
+      - 'user: have codex plan the CSV importer before writing anything — criteria: streaming, per-row errors, 50MB cap'
+      - 'assistant: codex-1 in feat/csv-import sent back a plan: streaming parser, per-row error list, no mention of the size cap; open questions: none.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: for the next one — the retry policy rewrite — I want a plan from codex first and I'll sign off before claude builds it
+    history:
+      - 'user: add a debug log line when the webhook retries'
+      - 'assistant: Launched claude-1 in the current worktree with the change; it finished, one file changed, tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok good. now the actual fix — have claude write up a plan first, codex approves it, then claude implements exactly that
+    history:
+      - 'user: ask codex what it thinks is causing the double-charge in checkout'
+      - 'assistant: codex-2 (read-only) says the idempotency key is regenerated on retry in checkout/pay.ts:140. Its answer is above.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before anyone writes code for the search rewrite I want to see a plan and approve it
+    history:
+      - 'user: are the auth and search worktrees touching the same files?'
+      - 'assistant: Only src/config.ts overlaps; a trial merge is clean. Suggested order: auth, then search.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: forget the three-way spike, we're going with Kysely. have claude plan the migration, show me the plan, then build it once I ok it
+    history:
+      - 'user: spike Drizzle, Prisma and Kysely on the orders queries'
+      - 'assistant: All three spikes are in; Kysely was fastest to write and kept raw SQL escape hatches. Recommendation: Kysely. Nothing merged.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: next task on this branch is the export endpoint — plan mode first please, nothing written until I approve
+    history:
+      - 'user: open a PR for feat/reports'
+      - 'assistant: Pushed feat/reports and opened PR #418 against develop with the summary and test results.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good. for the follow-up refactor of the parser, codex plans, you check the plan covers the criteria, then codex builds it
+    history:
+      - 'user: did claude actually finish the tokenizer change it claimed?'
+      - 'assistant: Verified claude-2''s work in feat/tokenizer: diff matches the ask, tests pass when I run them.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -188,6 +188,10 @@ positives:
     run: 2026-09-28-agent-queries
   - query: have the pinned agents vote on options A/B/C for the cache key format and if its a tie use their runner-up picks
     run: 2026-09-28-agent-queries-2
+  - query: ask Claude, Codex and Gemini what they think of this schema and show me each answer
+    run: 2026-09-28-catalog-expansion-refine
+  - query: have the pinned agents vote on the three naming options and tally it
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: ask each of my pinned agents what they think of this API
     confusable_with: [daintree.worktree.relocate-agents]
@@ -554,6 +558,15 @@ boundaries:
   - query: Poll Claude, Codex, Gemini and Grok on the three deployment strategies, and settle any tie with each voter's second choice.
     confusable_with: [daintree.orchestration.runoff-tiebreaker]
     run: 2026-09-28-agent-queries-2
+  - query: Ask Claude, Codex and Gemini each which ORM they would pick and show me all three answers.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Ask claude, codex and gemini whether we should use Prisma or Drizzle and tally their votes.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: ask claude, codex and gemini whether we should use decimal.js or big.js, just their opinions
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it going?
     history:
@@ -813,6 +826,12 @@ topic_shifts:
       - 'assistant: Polled claude, codex, gemini and grok. 3 of 4 say drop it now (EOL, blocking the fetch refactor); grok says wait one minor release. Consensus: drop it.'
     active: [daintree.agents.poll-pinned-agents]
     run: 2026-09-24-selector-hardening
+  - query: don't build anything — just ask Claude, Codex and Gemini which queue they'd pick and tally it
+    history:
+      - 'user: spike BullMQ vs a pg queue'
+      - 'assistant: I''ll create two spike worktrees from develop and launch an agent per option.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[terminal.awaitAll returned: 5 finished]'
     history:

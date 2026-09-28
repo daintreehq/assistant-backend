@@ -1,0 +1,179 @@
+# Training examples whose answer is `daintree.agents.ask-running-agent` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.ask-running-agent
+run: 2026-09-28-catalog-expansion
+positives:
+  - Ask the Claude agent doing the session-token refactor why it went with opaque tokens rather than JWTs, and relay its answer.
+  - Find out from codex in terminal 4 whether it ran the integration tests before it reported done.
+  - What did the gemini agent in wt-search decide about the index schema? Quote it.
+  - 'Get the implementer on #742 to list what is still left, without derailing its task.'
+  - Read claude-2's last reply and tell me what it said about the cache invalidation bug.
+  - Ask the codex agent on the Kafka consumer which offset-commit strategy it settled on and why.
+  - 'Question for the running Claude on feat/billing-v2: does its plan touch the proration logic? Relay with attribution.'
+  - Ask the agent that's been doing the data migration what it considers the riskiest remaining step.
+  - Report back what the Claude agent in terminal 9 concluded about the memory leak.
+  - Without interrupting codex-1, find out which files it expects to touch for the rate limiter once its current turn ends.
+  - Ask the agent that wrote the webhook retry logic why it capped retries at five.
+  - What did the codex agent say in its earlier message about the flaky upload test, the one before its latest reply?
+  - 'Put the user''s question to the existing Claude on the payments worktree: did it consider idempotency keys for refunds?'
+  - Ask the running implementer which approaches it has already ruled out for the N+1 query on the orders page.
+  - Get the Codex terminal's own explanation of why it disabled the no-floating-promises rule in eslint.config.js.
+  - 'Don''t start a new agent: ask the Claude that has been on the auth refactor all morning what it makes of the session expiry bug.'
+  - Ask the running Claude why it is editing the migrations. Don't tell it to stop, I only want its reasoning.
+  - Just ask the codex agent whether it thinks the refactor is finished; this is its opinion, not a verification.
+  - 'Only the Claude already working on the parser: ask it which grammar approach it prefers. No other agents.'
+  - Not a fleet check. Ask the codex in terminal 6 how far through the migration checklist it is.
+  - Ask claude-3, which has the whole checkout flow in its context, where it found the discount being applied.
+  - codex isn't asking me anything, i want to ask IT why it removed the fallback branch
+  - what was codex's last message? i missed it while i was in a meeting
+  - ask the claude doing the stripe stuff why it used webhooks instead of polling
+  - yo can u ask terminal 3 if it actually ran the migrations locally
+  - ping the gemini agent and ask how it plans to handle the timezone thing, dont stop it
+  - query: ask the Claude doing the auth refactor why it chose JWT
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Codex hasn't asked me anything. I want to ask it which fixtures it relied on for the new tests.
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: the claude pane is idle at its prompt, not asking anything. find out from it why it gave up on the streaming approach
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: Ask the Claude that's already working on the auth module what it makes of the token refresh race.
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: Get the codex already open in terminal 3 to tell me what it found in the retry logic. Don't launch another.
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: what does the existing gemini agent think are the risks of its own schema change?
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: Ask the Claude on the importer what it has left to do.
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: Ask the Codex reviewer agent which issue in its own review it thinks is most serious.
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: Don't forward any findings, just ask the Claude implementer what it plans to change next.
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: Ask the Claude doing the auth refactor why it switched to JWT; don't change what it's working on.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Don't spin anything up. Ask the Claude already on the importer why it chose streaming parsing.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'The codex that''s still open on the cache work: what did it decide about the key format? Ask it.'
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Not the whole fleet, just ask claude-4 what it has left on the export task.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: Before I check anything, ask the codex agent which tests it ran and relay what it says.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Ask the Claude that finished the refactor why it left the old adapter in place.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: 'put a question to one of the agents for me: does the golden snapshot flow make sense as written? want its answer this turn, not later'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: pre-split
+  - query: have claude-2 look at the session middleware and tell me if it thinks the timeout logic is sound
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: ask claude-2 if the websocket reconnect logic handles laptop sleep properly
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: ask claude in tab 3 how the retry logic works and tell me what it says
+    confusable_with: [daintree.agents.ask-and-relay, daintree.explore.repository]
+    run: pre-split
+  - query: just pass one question to that agent for me and bring back what it says
+    confusable_with: [daintree.agents.ask-and-relay, daintree.orchestration.conversation]
+    run: pre-split
+  - query: ask the claude in tab 2 what it makes of the diff and just tell me what it says
+    confusable_with: [daintree.agents.ask-and-relay, daintree.review.review-change]
+    run: pre-split
+  - query: ask claude in tab 2 what it makes of the retry logic
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: pre-split
+  - query: quick one - ask the codex agent if the selector prompt is too long
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: pre-split
+  - query: there's no competition here and nobody is judging anything. ask claude-2 what it makes of the backoff logic and tell me what it says.
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: pre-split
+  - query: yep ask it
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: pre-split
+  - query: just read out what that agent said in terminal 2
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: pre-split
+  - query: whats it saying
+    run: pre-split
+  - query: Read the last message the codex agent in wt bugfix/tz-offsets left at its prompt.
+    run: 2026-09-28-agent-queries-2
+  - query: winner gets to write its own acceptance speech, send it over
+    confusable_with: [daintree.orchestration.competition]
+    run: pre-split
+followups:
+  - query: ask it how it plans to handle refresh tokens then
+    history:
+      - 'user: ask the claude doing the auth refactor why it chose JWT over sessions'
+      - 'assistant: From claude-2''s last reply (read without sending anything): it chose JWT because the mobile client can''t hold cookies. It said nothing about refresh tokens.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and what did it say before that, about the indexes?
+    history:
+      - 'user: what did codex decide about the orders schema?'
+      - 'assistant: codex-1''s last message says it kept orders.status as a string enum and wrote migration 0042_orders_status.sql.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: no, that can't wait — interrupt it and ask now
+    history:
+      - 'user: ask terminal 4 whether it ran the tests'
+      - 'assistant: claude-4 is mid-turn, so I didn''t interrupt it; I armed a notice and will put the question to it when it goes idle.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask it which of those two it thinks is riskier
+    history:
+      - 'user: ask the implementer what''s left to do'
+      - 'assistant: claude-6 answered: the webhook retry path and two failing tests in billing.spec.ts are left. Its task is still running.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and ask claude-3 in the web worktree the same thing
+    history:
+      - 'user: ask the codex in the api worktree whether it touched any env files'
+      - 'assistant: Asked codex-2 at its idle prompt; it says no, it only changed src/ and tests/.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask it what exactly was unclear about the spec
+    history:
+      - 'user: what did claude-7 say last?'
+      - 'assistant: claude-7''s last reply: ''Done with the pagination change; I skipped the cursor encoding because the spec was unclear.'''
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: ask it why it didn't use that helper in the first place
+    history:
+      - 'user: tell claude-2 to use the existing formatDate helper'
+      - 'assistant: Sent the correction; claude-2 acknowledged and switched to src/lib/format.ts.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask claude-9 which store it picked for the counters, redis or in-memory
+    history:
+      - 'user: start claude on feature/rate-limit to add per-user rate limiting'
+      - 'assistant: Launched claude-9 in feature/rate-limit with notify on; it has been working for 20 minutes.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask the codex in that worktree whether it already changed the vite config
+    history:
+      - 'user: start the dev server for the web worktree'
+      - 'assistant: Dev server running in a visible terminal on the web worktree, ready at http://localhost:5173.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask the claude that did the search rewrite why it dropped fuzzy matching
+    history:
+      - 'user: what landed on develop this week?'
+      - 'assistant: 23 commits on develop since Monday: shipped the search rewrite (claude-4, still open), billing retries, and the settings page; two PRs in review.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask codex-4 what it meant by 'unsafe cast' in finding 2
+    history:
+      - 'user: pass codex-4''s review findings to claude-1 and have it fix them'
+      - 'assistant: Pointed claude-1 at codex-4''s three findings; claude-1 is fixing them.'
+    active: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ask the claude that's been debugging login what it has found so far, so I can add it to the issue
+    history:
+      - 'user: log an issue for the flaky login e2e test'
+      - 'assistant: Opened #512 ''Flaky login e2e on CI'' with the failing run linked.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-stateful

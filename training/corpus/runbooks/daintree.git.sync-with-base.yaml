@@ -1,0 +1,189 @@
+# Training examples whose answer is `daintree.git.sync-with-base` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.sync-with-base
+run: 2026-09-28-catalog-expansion
+positives:
+  - Rebase feature/oauth-pkce onto the current origin/main in its worktree and rerun the test suite on the new HEAD; the branch has never been pushed.
+  - 'PR #742 shows merge conflicts against develop; resolve them in the PR''s worktree, keeping both sides'' changes, and don''t push until told.'
+  - Merge the latest develop into the billing-v2 worktree; codex is idle there, so tell it the base moved once done.
+  - Bring the i18n branch, which is 63 commits behind main, back up to date and confirm npm test passes afterwards.
+  - Update every non-main worktree with the newest main before the agents resume tomorrow.
+  - catch fix/null-deref up to origin/release-3.1, merge not rebase, rerun go test ./...
+  - 'Dependabot PR #88 conflicts with main on package-lock.json; regenerate the lockfile on top of main and make that one PR mergeable again.'
+  - 'GitHub says #1204 can''t be merged because of conflicts. Fix the conflicts locally against its base; merging the PR itself comes later.'
+  - The auth worktree is behind main; rebase it so the branch is current. Do not open the PR yet.
+  - Sync worktree payments-retry with upstream main; claude-3 is still working there, so wait until it goes idle first.
+  - Resolve the conflicts that stop feature/editor-toolbar from rebasing onto develop, preserving both the toolbar refactor and develop's new shortcuts.
+  - 'Merge origin/main into the branch behind PR #415 and push the merge commit to that branch once the checks pass.'
+  - Bring the three stale agent worktrees up to date with main in parallel and report which ones hit conflicts.
+  - Branch dark-mode diverged from main two weeks ago; get main's changes into it and make sure the Storybook build still works.
+  - Rebase spike/wasm onto the new main and force-push with lease; the user approved the push.
+  - Pull the latest trunk into the codex worktree so it stops coding against outdated APIs.
+  - my pr has conflicts w/ develop again ugh. can u sort it
+  - rebase the auth wt on main pls
+  - this branch is way behind, catch it up before claude keeps going
+  - main moved a lot overnight, update all my worktrees with it
+  - '#512 says ''this branch has conflicts that must be resolved'', fix it but dont push'
+  - merge develop into my branch and make sure tests still pass
+  - can you get feature/export current with main? it's like 80 commits back
+  - 'Before I review #77 it needs rebasing on main. Do only the rebase, no review yet.'
+  - Sync the search-ranking worktree with origin/develop, rebasing since it's local-only, and run pytest on the result.
+  - Update the gemini agent's worktree branch with develop's new migrations so its schema work sits on top of them, then rerun the migration tests.
+boundaries:
+  - query: Lint fails on my branch only because it predates the new eslint config on main; bring the branch up to date with main.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Have an agent rebase my worktree onto the latest main and fix the conflicts.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'Get an agent to resolve the merge conflicts in PR #230 against develop.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'My feature PR #340 conflicts with develop in package-lock.json, resolve it.'
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: '#742 can''t be merged, GitHub shows conflicts; resolve them on the branch and I''ll merge it later.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'The merge button on #1102 is disabled because it''s out of date with main; update the branch locally with a merge.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Rebase feature/calendar on the latest main so it picks up everything main has.
+    confusable_with: [daintree.git.cherry-pick-changes]
+  - query: Merge latest main into the feature/checkout worktree so it stops being behind.
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: feat/legacy-export is 200 commits behind develop, rebase it onto develop
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: feat/queue-workers is 40 commits behind main, rebase it and sort out the conflicts
+    confusable_with: [daintree.git.split-into-stacked-prs]
+  - query: Several of my parallel agents' worktrees are behind main; catch each one up with main.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: The PR can't be opened cleanly because feature/export conflicts with main; resolve that on the branch. I'll open the PR myself.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: was going to ready my branch for review but it's 30 commits behind main, just catch it up for now
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Rebase the billing worktree onto main, it's 40 commits behind.
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: feature/search is 40 commits behind main and conflicts in two files; rebase it and resolve them.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: rebase the search worktree on the latest main and fix the conflicts
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: i've got 6 prs open and half are stale. put an agent on each of the four that need rebasing
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: pre-split
+  - query: rebase the fix/login-redirect branch onto main
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: ok push it — with the lease like you said
+    history:
+      - 'user: rebase feat/rate-limit onto main'
+      - 'assistant: claude-3 rebased feat/rate-limit onto origin/main at 0e7a44d. I verified: base is an ancestor of HEAD, the conflicted middleware.ts keeps both sides, and tests pass when I re-ran them. Not pushed yet.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok and now do the same for the api worktree
+    history:
+      - 'user: merge the latest develop into the web worktree'
+      - 'assistant: claude-2 merged develop at 71f3c09 into feat/web-settings; one conflict in routes.tsx resolved, and my re-run of the checks is green.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: use a merge instead, that branch already has an open PR
+    history:
+      - 'user: bring feat/import-wizard up to date with main, it''s 40 commits behind'
+      - 'assistant: Preflight done: feat/import-wizard is 40 behind origin/main at b812c0d, tree clean, no agent working there. I was going to brief claude-6 to rebase it.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: keep both — the new validation from main and our extra field
+    history:
+      - 'user: my PR #431 has merge conflicts, sort them out'
+      - 'assistant: claude-4 is merging main into feat/profile-fields and asks about src/forms/profile.ts: main added validation to the same function where the branch added a nickname field. Which should win?'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude-2 is free now, go ahead with the rebase
+    history:
+      - 'user: rebase the search worktree on develop'
+      - 'assistant: claude-2 is still working in the search worktree, so I armed a notice for when it goes idle and will brief it then.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what happened to the tests after the rebase? they were green before
+    history:
+      - 'user: catch feat/queue-retry up with main'
+      - 'assistant: claude-7 finished the rebase onto main at 4d0e3b9. My re-run of the checks shows 2 failures in retry.spec.ts that were not failing on the old HEAD.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: main moved a lot while this ran — rebase migrate/vitest onto latest main
+    history:
+      - 'user: jest to vitest, split by folder'
+      - 'assistant: All partitions merged into migrate/vitest; residual count 0. main is 57 commits ahead of its base.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it says the branch is behind main by 23 commits — rebase it first
+    history:
+      - 'user: is feat/audit-log ready to push?'
+      - 'assistant: Readiness verdict: tests pass, but feat/audit-log is 23 commits behind origin/main and GitHub will show conflicts in audit/writer.ts.'
+    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: then resolve the conflicts on that branch locally so it can merge
+    history:
+      - 'user: squash-merge #502 once it''s ready'
+      - 'assistant: #502 cannot merge: GitHub reports it conflicts with main in config/schema.json. Required checks are green on the current head.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: catch the three that are way behind up with main before the agents carry on
+    history:
+      - 'user: audit my worktrees'
+      - 'assistant: 9 worktrees classified. feat/sso, feat/export and feat/billing-v2 are each 60+ commits behind main with agents idle in them; two others are merged.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, just bring the payments branch up to date with main then
+    history:
+      - 'user: will payments and main conflict?'
+      - 'assistant: Trial merge of feat/payments against origin/main at 3a1f09c: conflicts in src/payments/charge.ts and package.json. Nothing changed.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before it goes further, merge the latest develop into that worktree
+    history:
+      - 'user: spawn a claude in the notifications worktree to add digest emails'
+      - 'assistant: Launched claude-11 in feat/notif-digest. It''s reading the code now.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and my feature branch is stale too, rebase it on develop
+    history:
+      - 'user: backport the null-check fix to release/2.4'
+      - 'assistant: claude-5 picked 6ab019e onto backport/518-to-release-2.4 with no conflicts; I verified the range-diff and the release tests pass. Not pushed.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: release/2.4 moved on since — rebase the backport branch onto it
+    history:
+      - 'user: cherry-pick the auth fix onto release/2.4'
+      - 'assistant: backport/601-to-release-2.4 verified at 4e2a9b1. Meanwhile origin/release/2.4 got 6 new commits.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: keep feat/sso, but it's way behind — rebase it on main
+    history:
+      - 'user: what branches can I delete?'
+      - 'assistant: Inventory ready. feat/sso is an abandoned candidate: 5 months old, 7 unique commits, 212 behind main.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, rebase feat/ledger on main and sort those conflicts out
+    history:
+      - 'user: will feat/ledger conflict with main?'
+      - 'assistant: Trial merge against origin/main: conflicts in src/ledger/post.ts and migrations/0042.sql.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#88 conflicts with develop now that the auth PR merged — sort out the conflicts'
+    history:
+      - 'user: fix what the reviewer asked for on #88'
+      - 'assistant: Verified claude-2''s 5 commits against the threads, re-ran tests and lint on a91c3e0 (passed), pushed to feature/token-refresh. #88 head is now a91c3e0; CI pending. No replies posted yet.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#530 conflicts with develop now — resolve it'
+    history:
+      - 'user: combine the safe dependency updates into one PR'
+      - 'assistant: Opened #530 from deps/batch-2026-09-28 listing the 11 included bot PRs; CI green on 44d0b1e.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: rebase feat/billing on main, it's 60 behind
+    history:
+      - 'user: audit my worktrees'
+      - 'assistant: feat/billing: in review (#933), 60 behind origin/main, clean.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful

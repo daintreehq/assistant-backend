@@ -1,0 +1,162 @@
+# Training examples whose answer is `daintree.forge.triage-issue-backlog` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.forge.triage-issue-backlog
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Triage the 38 open issues labelled needs-triage in acme/storefront: group duplicates, check which bugs still reproduce on main, propose labels and priority.'
+  - go thru the untriaged issues on the cli repo and label them
+  - Sweep open bugs older than six months in org/billing-api and say which are already fixed, naming the commit or PR that fixed each.
+  - Find the duplicate crash reports in the tracker and close them against the canonical issue.
+  - our issue tracker is a mess, like 120 open. can you clean it up? start with the oldest 50
+  - 'Backlog grooming for the mobile repo: propose a P0-P3 priority for every open bug using only the priority labels that already exist.'
+  - 'Check which of issues #210 through #245 are still valid on the default branch; close the already-fixed ones with a comment naming the fix.'
+  - prioritise the backlog pls
+  - Dedupe the 'login redirect loop' reports, there are at least five open issues describing the same thing.
+  - Put read-only agents on the open bug reports in widgets/core, about ten bugs per agent, to check each against current main; bring back one triage plan before closing anything.
+  - Label every unlabeled open issue in daintree/docs-site with the repo's area labels. Don't invent new label names.
+  - 'which of these bugs are already fixed? #88 #91 #104 #117 #130'
+  - Go through bug issues opened before 2025 and mark the ones missing reproduction steps needs-info, with a comment asking the reporter for them.
+  - 'Triage pass on the rust-sdk tracker, read-only for now: just the plan, no labels or closures yet.'
+  - close the dupes and the already-fixed ones in the tracker, leave everything else for me to decide
+  - Many open issues in acme/api look like they were answered in the comments months ago; sweep them and propose which to close and why.
+  - 'Tracker cleanup for acme/web before sprint planning: duplicate groups, fixed-already, needs-info, and a proposed priority for each remaining bug.'
+  - hey, before planning tmrw can you triage what's open in the payments repo
+  - Group the 30 open performance complaints by area, find the duplicates among them, and propose one canonical issue per group.
+  - Apply area/* and priority/* labels to the untriaged issues in org/api, then read each issue back to confirm.
+  - 'Not looking for something to work on. I want the backlog itself tidied: dupes closed, dead issues closed, the rest labelled.'
+  - Check the needs-triage queue against closed issues too; some are probably duplicates of bugs we already fixed.
+  - 'Issues only, not branches or PRs: close the open issues the v3 rewrite made obsolete, after showing me the list.'
+  - 'Triage issues filed in org/infra in the last month: label, prioritise, and flag anything that needs more info from the reporter.'
+  - Walk the oldest 50 open issues, have agents verify each bug against main, and close the confirmed duplicates. I've already approved closing those.
+  - Rather than fixing anything, have a couple of agents check which of the open 'export fails' bugs still happen and give me a verdict per issue.
+boundaries:
+  - query: Label every open issue that has no labels yet with the right area label.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: 'Close all the issues that are duplicates of #300 or of each other in the auth area.'
+    confusable_with: [daintree.forge.manage-issue]
+  - query: Go through the 40 issues in needs-triage and set a priority label on each.
+    confusable_with: [daintree.forge.manage-issue]
+  - query: which of our open bug issues are already fixed? close those
+    confusable_with: [daintree.forge.manage-issue]
+  - query: 'Clean up the issue tracker: close issues that are obsolete or already resolved, with evidence.'
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: Have a few read-only agents check which open bugs still reproduce on main, then give me a triage plan.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Search the tracker for issues that duplicate each other and close the dupes.
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: Find which open bugs are already fixed on main and close them with the fixing PR.
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: look through the 40 oldest open issues and propose labels and priorities for each
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: Why are so many of these old bugs still open? Check which are actually fixed and close those.
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: Go through all the open issues waiting on reporters and comment asking for repro steps where they're missing.
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: did anyone ever reply on the 20 oldest issues? close the dead ones and label the rest
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: triage the backlog
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: pre-split
+  - query: half the backlog is probably stale. find open issues that already have a merged pr against them
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: pre-split
+  - query: Triage open issues with no labels in the mobile repo and group them by area
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: triage the backlog for me, half of it must be stale by now
+    confusable_with: [daintree.forge.manage-issue, daintree.workflow.find-issue-work]
+    run: pre-split
+  - query: triage the backlog for me, anything untouched since june
+    confusable_with: [daintree.forge.manage-issue, daintree.workflow.find-issue-work]
+    run: pre-split
+  - query: Find stale issues with no reply in 60 days that could be closed
+    confusable_with: [daintree.workflow.find-issue-work, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Go through the 45 open issues labelled epic:checkout, group duplicates, mark which are already fixed and propose priorities.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: triage the open issues and close the duplicates
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: also check last month's closed issues when you look for duplicates
+    history:
+      - 'user: triage the open issues'
+      - 'assistant: Listed the 50 oldest open issues (hasMore true — the rest is a later pass). Launched 3 read-only checkers (triage-a, triage-b, triage-c) on the bug slices in the main worktree; waiting on their notices.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: close the duplicates and the fixed ones, leave the needs-info rows for now
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: use priority/p1 to p3, not high/medium — that's what CONTRIBUTING says
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#233 isn''t a dupe of #118, different stack trace — pull it out of that group'
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: do the next 50 too
+    history:
+      - 'user: triage the backlog'
+      - 'assistant: Applied the approved rows for issues #12–#96: 9 closed as duplicate or fixed, 31 labelled, 5 needs-info comments posted, each read back. The listing had more beyond these 50.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: post the questions you drafted on the needs-info ones
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: honestly the tracker's a mess — dedupe it and label everything untriaged first
+    history:
+      - 'user: what should I pick up next?'
+      - 'assistant: Shortlist of 5 small unassigned bugs: #244, #251, #260, #262, #270.'
+    active: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: while you're in there, go through all the needs-triage issues — dupes, labels, priority
+    history:
+      - 'user: log the export crash as an issue'
+      - 'assistant: Filed #612 "CSV export crashes on empty rows" with label bug; read back.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: there are probably loads like that — find which open bugs are already fixed and close them
+    history:
+      - 'user: comment on #300 that it''s fixed and close it'
+      - 'assistant: Commented "Fixed by #298" and closed #300 as completed; read back.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: while they work, prioritise the rest of the backlog — labels and priority on every open issue
+    history:
+      - 'user: put an agent on each of #244, #251, #260 and #262'
+      - 'assistant: Launched claude-2, claude-3, codex-4 and codex-5, one worktree per issue; waiting on notices.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and triage the 30 bugs that came in this week
+    history:
+      - 'user: weekly update for the team'
+      - 'assistant: Drafted the update: 6 PRs shipped, 3 in review, 30 new bug reports opened. Nothing posted.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before filing anything, clean the backlog up — ~40 stale untriaged issues, find the dupes and close the dead ones
+    history:
+      - 'user: break the notifications center PRD into tickets'
+      - 'assistant: The split is ready: 7 units, 3 waves, no overlaps. Two units look similar to old open issues, so I''d like to dedupe before filing.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful
+  - query: triage the backlog
+    history:
+      - 'user: hello'
+      - 'assistant: Hello. Everything''s idle — what would you like to do?'
+    run: pre-split

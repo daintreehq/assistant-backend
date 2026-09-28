@@ -1,0 +1,139 @@
+# Training examples whose answer is `daintree.git.cherry-pick-changes` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.cherry-pick-changes
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Backport the fix from PR #512, already merged to main, onto release/2.4 and release/2.3, each in its own worktree, with the regression test passing on both.'
+  - Apply commit 9c3e1f0 to the lts/1.x branch only; adapt it to the older API if it conflicts.
+  - Port the XSS sanitizer fix (commits a1b2c3d..f9e8d7c) from develop into the release-5.0 worktree and run that branch's tests.
+  - Claude fixed the timezone bug in the hotfix-tz worktree but hasn't committed; carry that uncommitted diff over to the feature/calendar worktree without touching the source.
+  - Take only the retry-backoff commit from codex's branch and put it on feature/sync; the rest of codex's branch stays out.
+  - Cherry-pick the three version-pin commits from main onto release/4.2 and open a backport PR against release/4.2.
+  - Get the CVE-2026-1123 patch onto release/3.0, 3.1 and 3.2 as backport branches, but don't push.
+  - 'Squash-merged PR #880 needs to land on the stable branch too; pick its single commit onto stable with -x provenance.'
+  - backport 7d2e4aa -> release/1.9, run that branch's own check cmd (make check, not npm test)
+  - Move the logging fix commit from the experiment worktree onto the hotfix branch; the experiment branch must stay untouched.
+  - Copy the two schema fix commits from gemini's worktree into claude-2's worktree, where claude-2 is idle, and have it rerun the migration tests.
+  - Apply the null-check fix from main to the long-term-support branch v2-maintenance without merging main into it.
+  - 'Pick the hotfix commits from #901 onto release/2.4 and open one backport PR targeting that release branch.'
+  - Carry over just the CSS fix Codex made in wt/theme-refresh to the landing-page worktree, nothing else from that branch.
+  - 'Backport the merge commit of PR #455 to release/2025.12 using the mainline parent.'
+  - Port single commit e41f0b2 from the Rust core branch into the embedded-target branch, where the APIs are older.
+  - Ship the auth-bypass fix to the 5.2, 5.1 and 5.0 release lines as separate backport branches.
+  - '#977 needs to go into release/6.x too, backport it'
+  - can u cherry pick 3f09bd1 onto the staging branch
+  - claude fixed it in the other wt, i want that same fix on my branch but not the rest of its junk
+  - put the login fix on the 2.x branch too, just that commit
+  - we need yesterday's hotfix on release/8 as well. make a backport pr
+  - grab codex's uncommitted patch from wt-perf and apply it over in wt-main-feature, leave wt-perf alone
+  - the startup crash fix (a91c0de) should also go into the lts branch, dont push yet
+  - only take commits 12ab34c and 56cd78e from feature/x into my branch, not a full merge
+  - The migration fix that landed on main last week has to reach release/2.7 as well; it may need rewriting for the old ORM there.
+boundaries:
+  - query: Tests fail on release/2.4 only because the fix from main was never backported; port commit c0ffee1 there.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Spin up Claude to backport the null-pointer fix to release/1.8.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: '#512 merged to main; backport it to release/2.4 as its own PR.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Take just commit 4f1a2c9 from the payments agent's branch and apply it to the refunds worktree.
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: Take commit 9f3c2e1 from feat/sso and apply only that onto release/3.1.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+  - query: Apply the hotfix commit from main onto release/2.8 without taking anything else from main.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: Codex won the contest; now apply its winning commit to release/3.0 as well.
+    confusable_with: [daintree.orchestration.competition]
+  - query: The batch is done, and the fix one agent made to the shared http client should be cherry-picked into the other five worktrees.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'Create a backport branch of #512 for release/2.4 and open its backport PR.'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: I saw the fix commit in the hotfix worktree's log; apply that one commit onto my branch.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: Port the null-check fix from the codex-hotfix worktree onto feat/profile.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: Move the commit Claude made in wt-a over to wt-b's branch.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Transfer the fix from the scratch worktree onto the feature worktree's branch; the agent itself stays where it is.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Launch a new agent in the existing release/3.1 worktree to backport the security patch.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+followups:
+  - query: ok and now do the same for release/2.2
+    history:
+      - 'user: backport #512 to release/2.4 and 2.3'
+      - 'assistant: Both done and verified: backport/512-to-release-2.4 and backport/512-to-release-2.3 each carry the pick with its cherry-picked-from line, only the fix''s files changed, and the release tests pass. Not pushed.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: yes, open the backport PRs for both
+    history:
+      - 'user: cherry-pick the CSRF fix onto the two supported release branches'
+      - 'assistant: claude-4 and claude-5 applied 1f9e2c7 to release/5.1 and release/5.0; I verified each range-diff and ran the checks on both: green. Want me to push and open one PR per target?'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait — pick the whole range, the follow-up commit is needed too
+    history:
+      - 'user: port commit abc1234 into develop''s worktree'
+      - 'assistant: Pinned abc1234; about to brief claude-3 in the develop worktree to pick it with -x. Note that ef56789 right after it touches the same function.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: was it already on 2.4 then? show me the evidence
+    history:
+      - 'user: get the security fix onto every supported release: 2.5, 2.4 and 2.3'
+      - 'assistant: Picked onto release/2.5 and release/2.3 and verified. release/2.4 was skipped as already containing the commit.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: actually also backport just the retry fix commit from that integration branch to release/3.1
+    history:
+      - 'user: merge the api and worker branches together'
+      - 'assistant: integrate/api-worker is verified: both merges clean, full suite green. It contains the retry fix commit 8c21f0e from feat/worker.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately, backport the timezone fix commit 5e7c1d2 to release/4.2
+    history:
+      - 'user: merge main into feat/calendar-sync'
+      - 'assistant: claude-3 merged origin/main at 88a01bc into feat/calendar-sync; conflicts resolved, my check run is green. Not pushed.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: no, don't merge codex-1's whole branch — only take its commit that fixes the parser and put that on my branch
+    history:
+      - 'user: combine claude-2''s and codex-1''s work into one branch'
+      - 'assistant: Forecast shows codex-1''s feat/parser-alt conflicts heavily with feat/parser. Before I create the integration worktree: do you want both whole branches merged?'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's merged, now get that fix onto the LTS branch as well
+    history:
+      - 'user: merge #733 once checks pass'
+      - 'assistant: #733 squash-merged into main as a4be912; I read back the merged state from the forge.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the revert of that is in main already — cherry-pick the revert onto release/1.9 too
+    history:
+      - 'user: find which commit made startup slow'
+      - 'assistant: First bad commit is 7c3e0f4 (#690), proven against its parent. It was reverted on main in 2dd8a11.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: nice, and put that exact fix onto the release/3.0 branch too
+    history:
+      - 'user: spawn an agent to fix the null deref in the uploader'
+      - 'assistant: claude-7 fixed it in commit 3b90e5f on fix/uploader-null in its worktree; I checked the diff and the tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: take the winning version's commit and apply it onto develop
+    history:
+      - 'user: have claude and codex both write the cache eviction change, then pick the better'
+      - 'assistant: Blind votes pick codex-2''s entry (commit d41f7a0 on compete/evict-codex) over claude-4''s.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the fix went in as 9e8d7c6 on main — backport it onto release/2.3
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+      - 'assistant: Verified: export.spec fails on a1b2c3d and passes on its parent 5f6e7d8.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful

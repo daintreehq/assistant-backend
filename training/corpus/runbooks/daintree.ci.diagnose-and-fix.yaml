@@ -11,7 +11,6 @@ positives:
   - the build broke, sort it out
   - pytest is throwing 14 failures under tests/unit and I have no idea when it started — work out what's actually wrong, get an agent on it, and don't tell me it's fixed until something other than that agent has run it
   - fix the failing test
-  - is this flaky?
   - the typecheck job keeps failing but every test passes locally, figure out what's different
   - mypy --strict is red on src, get it clean
   - somethign is wrong with the lint step, it wont pass no matter what i do
@@ -23,7 +22,6 @@ positives:
   - getting a segfault in the integration tests, dig into it
   - coverage gate is failing, we dropped under the floor somewhere — find what regressed and fix it
   - why did the docker build fail
-  - test_selector keeps flapping, passes on rerun. is it genuinely broken or just flaky
   - somethign broke the golden tests after that last commmit, fnd it and fix it
   - get it green
   - the e2e suite is timing out on main and nobody knows why, put an agent on the diagnosis and then actually verify whatever fix comes out of it
@@ -37,7 +35,6 @@ positives:
   - so i pulled develop this morning and now three tests in the codec suite blow up with some signature mismatch, i havent touched that file in weeks, can you work out whats going on and get it back to green
   - that one's still red, sort it
   - PR 412 has a failing check, get it passing
-  - this test passes like half the time whats up with that
   - mypy is screaming about the new provider module, fix it
   - ruff is failing in CI but its clean locally?? make it make sense
   - the coverage gate dropped us under the floor and the build wont pass, deal with it
@@ -48,7 +45,6 @@ positives:
   - agent said its fixed but the suite is still red. take over and actually sort it
   - third time this check has failed. can you actually get to the bottom of it this time
   - the check called lint-and-types or whatever its actually named is red on my branch, fix it
-  - renovate bumped pydantic and now half the contract tests explode. figure out whats needed
   - tests pass on my mac and fail on the linux runner. figure out why
   - two checks failing, i reckon its the same root cause. one fix if so, two rounds if not
   - rebased onto main and now the migration test fails. was fine before the rebase
@@ -58,12 +54,9 @@ positives:
   - PR 88s checks are red. dig in and get them green
   - cant open the PR, the pre-push hook keeps dying on the type check
   - the test command errors out straight away with exit 127, nothing even runs
-  - is this flaky or actually broken? dont patch anything until we know
   - the failure only shows up in the actions logs which i dont think you can read. work out what you can from here and tell me what youre guessing at
   - whatever it did fixed the one test and broke four others. unwind that and do it properly
   - query: 'The GitHub Actions ''typecheck'' job on PR #522 fails after the zod upgrade; find the cause and get it green'
-    run: 2026-09-28-agent-queries
-  - query: test_invoice_rounding fails intermittently on CI but never locally; decide whether it's flaky and fix it
     run: 2026-09-28-agent-queries
   - query: cargo build broke on the release branch after merging the feature-gate change; restore a passing build
     run: 2026-09-28-agent-queries
@@ -86,8 +79,6 @@ positives:
   - query: tests are failing again on main, can you fix
     run: 2026-09-28-agent-queries
   - query: the build broke after my last commit :( help
-    run: 2026-09-28-agent-queries
-  - query: is this test flaky or actually broken? test_retry_backoff keeps failing
     run: 2026-09-28-agent-queries
   - query: fix the failing check on my pr pls
     run: 2026-09-28-agent-queries
@@ -112,8 +103,6 @@ positives:
   - query: 'panic: runtime error: index out of range [3] with length 3 in TestShardAssign -- fix'
     run: 2026-09-28-agent-queries-2
   - query: 'thread ''tests::roundtrip'' panicked at ''assertion failed: left == right'' in cargo test. get it green'
-    run: 2026-09-28-agent-queries-2
-  - query: 'ERROR: test_migrations (tests.test_db.MigrationTests) fails only on CI, not locally. flaky? fix it'
     run: 2026-09-28-agent-queries-2
   - query: x unit-tests (node 20) Failing after 2m. can you figure out why and fix
     run: 2026-09-28-agent-queries-2
@@ -140,8 +129,6 @@ boundaries:
     confusable_with: [daintree.forge.land-pull-request]
   - query: that test only fails in CI. get it passing
     confusable_with: [daintree.forge.land-pull-request]
-  - query: is the failing check on that PR flaky or real
-    confusable_with: [daintree.forge.land-pull-request]
   - query: the issue-sync test is red again
     confusable_with: [daintree.forge.manage-issue]
   - query: the migration test is failing in CI, sort it out
@@ -151,8 +138,6 @@ boundaries:
   - query: npm test is red, three snapshot failures
     confusable_with: [daintree.runtime.debug-web-app]
   - query: the build broke after i bumped react
-    confusable_with: [daintree.runtime.debug-web-app]
-  - query: vitest keeps failing on the date utils, is it flaky?
     confusable_with: [daintree.runtime.debug-web-app]
   - query: webpack build fails with a module not found, fix it
     confusable_with: [daintree.runtime.debug-web-app]
@@ -194,8 +179,6 @@ boundaries:
     confusable_with: [daintree.runtime.debug-web-app]
   - query: This check won't pass. It's web-e2e. The preview panel is perfectly happy. Work out what's actually failing and fix it.
     confusable_with: [daintree.runtime.debug-web-app]
-  - query: is the browser test flaky or actually broken? it passes locally every time.
-    confusable_with: [daintree.runtime.debug-web-app]
   - query: the css build task exits 1 in CI. nothing visibly wrong when i run the app.
     confusable_with: [daintree.runtime.debug-web-app]
   - query: vite build fails in the pipeline but dev mode is fine. that's a build problem, go find it.
@@ -210,8 +193,6 @@ boundaries:
     confusable_with: [daintree.forge.manage-issue]
   - query: The PR build is red, diagnose the failure and fix the branch.
     confusable_with: [daintree.forge.land-pull-request]
-  - query: Start the frontend development server and run its bounded tests.
-    confusable_with: [daintree.worktree.manage-resource]
   - query: The unit tests fail in a non-browser package; diagnose and fix them.
     confusable_with: [daintree.runtime.debug-web-app]
   - query: The PR's browser test check is red in CI; diagnose and repair the check.
@@ -220,8 +201,6 @@ boundaries:
     confusable_with: [daintree.forge.manage-issue]
   - query: Fix the failed unit-test check on PR 42.
     confusable_with: [daintree.forge.land-pull-request]
-  - query: Run the project's bounded lint check.
-    confusable_with: [daintree.worktree.manage-resource]
   - query: The unit tests fail in CI, with no browser runtime symptom.
     confusable_with: [daintree.runtime.debug-web-app]
   - query: Run the backend test suite and fix its failures.
@@ -288,8 +267,6 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: checks aren't green on this one, sort it out
     confusable_with: [daintree.review.review-change]
-  - query: one test on this PR keeps flaking, can you figure out what's going on
-    confusable_with: [daintree.review.review-change]
   - query: the check on 412 is red, work out why and fix it
     confusable_with: [daintree.workflow.find-issue-work]
   - query: the nightly went red overnight, work out why and get it green
@@ -305,8 +282,6 @@ boundaries:
   - query: ci is red on 412, work out why and get it green
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: the build broke after that merge, fix it
-    confusable_with: [daintree.workflow.follow-up-on-issue]
-  - query: that check on 88 keeps failing, is it flaky? sort it out
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: ci's red on main, lint job
     confusable_with: [daintree.diagnostics]
@@ -343,9 +318,6 @@ boundaries:
     run: 2026-09-24-selector-hardening
   - query: 'the lint job on #230 keeps going red on a file nobody touched, why'
     confusable_with: [daintree.workflow.follow-up-on-issue]
-    run: 2026-09-24-selector-hardening
-  - query: is test_upload_resume flaky? it fails like 1 in 5 on ci
-    confusable_with: [daintree.explore.repository]
     run: 2026-09-24-selector-hardening
   - query: 'FAILED tests/test_billing.py::test_proration_rounding - AssertionError: assert 1999 == 2000 === 1 failed, 412 passed in 38.2s === this started after the decimal change, fix it'
     confusable_with: [daintree.explore.repository]
@@ -413,6 +385,96 @@ boundaries:
   - query: the integration test in orders_spec keeps failing - work out why and hand the fix to a claude agent
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: 2026-09-28-agent-queries-2
+  - query: test_invoice_rounding fails every single run since the decimal refactor — fix it.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: 'CI is red on main: lint plus three unit tests failing. Get it green.'
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: the e2e job is failing every time on the login step since this morning, make it pass
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: test_orders fails every time with a KeyError since this morning; get it passing.
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion
+  - query: The Playwright login spec fails on every run in feature/sso; make it pass.
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion
+  - query: the typecheck in feature/orgs is failing with 14 errors, get it green
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: CI is red on main since the last merge — the integration tests fail, get them green.
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: the orders unit test fails every run on develop, fix it
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: test_invoice_totals has failed on every CI run since yesterday; get it green again.
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: 'We already have a red test reproducing #412 — have an agent fix the exporter so it passes.'
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: The typecheck on main was already failing before anyone started the React upgrade; fix that existing error.
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: npm ci fails in the CI checkout job because of lockfile drift; figure out why it's red and fix it.
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: '#88''s typecheck job is red and nobody has commented on it - get it green.'
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: 'The e2e check on #640 started failing after the last push; work out why and fix it.'
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: The lint job fails on main and no dependency changed; find out why and get it green.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: the build broke after yesterday's merges, get it building again
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: CI has been red since the lodash bump landed, fix it
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: why is CI red? figure out what's wrong and fix it
+    confusable_with: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion
+  - query: test_invoice_totals has been failing on main since yesterday, well before any rebase; find out why and fix it.
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: The payments integration test fails on every run since this morning. Figure out why and get it green.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: CI is red on main with a TypeError in the serializer spec, fix it
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: tests/test_checkout.py has three failures since this morning's merge. Get them green.
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: CI is red on feat/slug because the slugify spec fails; have an agent fix the code.
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: CI's npm audit step is failing, get it green
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: the parser unit tests went red after claude's change, get them passing again
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: the startup benchmark is failing with a timeout assertion in CI, fix it
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-catalog-expansion
+  - query: 'The migration test is red on CI for PR #902, fix it.'
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: npm run build fails in the auth-refresh worktree with a missing export. Get it building again.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: the cart tests are failing in CI, fix them
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the tests on the coupon-codes branch are failing, get them green
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it going?
     history:
@@ -579,7 +641,6 @@ topic_shifts:
   - query: tab 3 is full of red — work out what broke and get it passing
     active: [daintree.foundation]
   - the suite went red right after that merge, dig into it and fix it
-  - is that flaky or actually broken? either way i want it green by lunch
   - query: that failing check has been red for two days, someone needs to actually fix it
     active: [daintree.foundation]
   - verify it... no, scratch that, i already watched it fail. test_state_token_expiry is red. get it green.
@@ -738,6 +799,81 @@ topic_shifts:
       - 'assistant: Ran recipe fullstack: api, web and worker terminals are up, db container healthy.'
     active: [daintree.recipe.run-or-create]
     run: 2026-09-24-selector-hardening
+  - query: the tests in ci are red on main though — something unrelated, test_invoice_totals. get that fixed
+    history:
+      - 'user: codex writes failing tests for refunds, claude makes them green'
+      - 'assistant: Tests frozen at 7a1c3e9 in feat/refunds; claude-3 is implementing.'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the paste crash is a failing check now in CI — get it green
+    history:
+      - 'user: QA the importer with agents'
+      - 'assistant: Confirmed: paste of 10k rows crashes the grid. I added nothing; the reporter''s test is in its scratch dir.'
+      - 'user: I committed that test to main'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the lint failure was already there before the sync — get it fixed
+    history:
+      - 'user: merge develop into the reports worktree'
+      - 'assistant: Merge done and verified. One lint error remains in reports/table.ts, but it also fails on the old HEAD, so the sync did not cause it.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the e2e job went red on the new head and it's nothing to do with the review — find out why and fix it
+    history:
+      - 'user: fix what the reviewer asked for on #88'
+      - 'assistant: Verified claude-2''s 5 commits against the threads, re-ran tests and lint on a91c3e0 (passed), pushed to feature/token-refresh. #88 head is now a91c3e0; CI pending. No replies posted yet.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the release branch CI just went red on the build job - fix that first
+    history:
+      - 'user: write the notes for 5.0'
+      - 'assistant: Range v4.9.1 (1c2d3e4)..release/5.0 (8f9a0b1). Writer claude-4 is running.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good, it's red for the right reason — now get that test passing
+    history:
+      - 'user: can you repro #412? the CSV export drops the last row'
+      - 'assistant: Created worktree repro/412 from origin/main at 3f9c2e1 and launched claude-2 as "Repro: 412" with the report, harness rules and test-only scope. I''ll check its result when the notice arrives.'
+      - 'assistant: Verified: tests/export/csv_rows.test.ts fails at 3f9c2e1 with ''expected 1001 rows, got 1000''. Only the test file changed.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, first bad commit is a1b2c3d — now get the test green on main
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+      - 'assistant: Verified: export.spec fails on a1b2c3d and passes on its parent 5f6e7d8; 2 commits skipped (unbuildable).'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's failing every single run since the rebase, not flaky any more — just get it green
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: typecheck's red on session.ts — get it fixed
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: cart.spec fails every time — get an agent to make it pass
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fix those errors and get the build green
+    history:
+      - 'user: run the build in a terminal so I can see it'
+      - 'assistant: term-7 finished: rc=2, tail shows 4 TypeScript errors in src/billing/invoice.ts.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fix that lint failure on main first, then we'll come back to it
+    history:
+      - 'user: move us to eslint 10'
+      - 'assistant: codex-2''s baseline on main was already red: lint fails in src/legacy/format.ts before any bump.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[watcher w_88 fired: rerun complete, 0 failures]'
     history:
@@ -761,7 +897,6 @@ wakes:
     active: [daintree.orchestration.supervise-fleet, daintree.foundation]
 near_misses:
   - why is CI red on my branch
-  - is that auth test flaky or did i break it? get it green
 docs:
   - ci is red again, sort it out
   - tests are failing on ci, sort it out
@@ -780,12 +915,10 @@ foundation_boundaries:
   - the build broke after that merge, sort it out
   - mypy is screaming on this branch, fix the errors
   - three tests are failing in the auth module, get to the bottom of it
-  - is that test flaky or genuinely broken? either way make it pass
   - the lint job keeps failing on the pr, fix it and prove it's green
   - why is the docker build failing and can you make it stop
   - the golden snapshots are red, sort them out properly not by deleting them
   - coverage gate is failing in ci, deal with it
   - the migration test only fails in ci, passes locally — find out why and fix it
-  - something in the last commit broke the suite, bisect it and get it passing
   - the e2e run keeps timing out, diagnose it and fix
   - why is ci red

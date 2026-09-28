@@ -1,0 +1,205 @@
+# Training examples whose answer is `daintree.agents.steer-running-agent` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.steer-running-agent
+run: 2026-09-28-catalog-expansion
+positives:
+  - Interrupt the Claude agent in the payments worktree and tell it to leave the Alembic migrations alone; the rest of its refactor still applies.
+  - 'Redirect codex in terminal 7 mid-task: it is writing a fresh retry loop in src/net/client.ts and must reuse the existing retryWithBackoff helper instead.'
+  - 'Add a requirement for the running claude-2 agent: /v1/orders must stay backward compatible while it renames the response fields. No need to interrupt it.'
+  - Stop gemini's current turn in the docs worktree but keep its pane open; it should not carry on after that.
+  - 'Send one correction to all three agents working the i18n branches: install packages with pnpm, never npm.'
+  - 'Tell the agent working on issue #884 to drop the new date-parsing dependency it is adding and use date-fns, which we already ship.'
+  - Codex on feat/search-index is rewriting the entire indexer file. Interrupt it now and limit it to the tokenizer function.
+  - 'Correct the running implementer: integration tests belong in tests/integration/, not next to the source files. Everything else it was doing stands.'
+  - Halt claude-3's turn immediately, it is about to run the seed script against the shared staging database.
+  - Once the Claude agent on the session refactor finishes its current step, have it also cover the password-reset flow.
+  - 'The agent on #1203 keeps hand-editing generated files in src/gen/. Send it a correction to change the .proto sources and regenerate instead.'
+  - 'running agent in wt-logger: stop touching .github/workflows, keep the logger refactor going'
+  - Tell the working Claude that it must not push or force-push anything; commits stay local until the user has looked.
+  - Nudge claude-1 to keep the old CLI flags as deprecated aliases while it renames them, without stopping its turn.
+  - Interrupt Codex and switch its test commands from jest to vitest; the repo moved over last week.
+  - Claude isn't asking anything, it's just building a custom ORM layer nobody wanted. Interrupt it and tell it to call Prisma directly.
+  - 'Codex is healthy and busy, just on the wrong package: stop it and point it at packages/api instead of packages/web.'
+  - Keep the same Claude agent on the caching task, only tell it to abandon the Redis approach and use the in-memory LRU.
+  - Don't ask the codex agent why, just tell it to stop using `any` in the new types and carry on.
+  - 'Not a slash command: tell the agent in plain words to stop running the full suite after every edit and run only the affected test file.'
+  - Leave the agent in its current worktree, but tell it to put the new checkout flow behind the NEW_CHECKOUT feature flag.
+  - ugh claude is in the migrations folder again. make it stop
+  - tell codex to use pnpm pls, it keeps creating package-lock.json
+  - it's going off on its own tangent, make it use the fetchJson helper in utils/fetch.ts like i said
+  - can you pause what claude-2 is doing rn? don't close it, i need to think about what to tell it next
+  - hey the gemini one is rewriting the whole README, i only wanted the install section changed. rein it in
+  - query: interrupt Codex and tell it to use pnpm
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Claude isn't waiting on anything, but I want it to stop writing mocks and use the real test database. Send that.
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: The codex agent is mid-turn with no prompt showing; tell it to skip the Windows path handling for now.
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: Tell the running claude to stop touching the migrations and use the existing schema file.
+    confusable_with: [daintree.agents.ask-running-agent]
+  - query: Tell the Claude on the auth task to use the existing session helper instead and keep going.
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: Claude is rewriting the whole module right now. Stop it and tell it to only fix the parser.
+    confusable_with: [daintree.agents.postmortem-run]
+  - query: tell codex to quit touching the lockfile, it's still going
+    confusable_with: [daintree.agents.postmortem-run]
+  - query: claude-2 isn't stuck, just busy on the wrong file. Redirect it to src/api/routes.ts.
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the agent looks slow but it's fine. i want it told to also update the changelog
+    confusable_with: [daintree.agents.recover-agent]
+  - query: 'No reviewer involved: tell the Claude implementer in my words to stop adding a comment to every line.'
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: Tell Claude in plain words to stop regenerating the lockfile on every change.
+    confusable_with: [daintree.agents.run-agent-command]
+  - query: Tell the Claude in terminal 4 to stop refactoring the router and just fix the null check.
+    confusable_with: [daintree.agents.run-agent-command]
+  - query: Tell the Claude agent in terminal 3 to stop editing the migrations and use the existing helper instead.
+    confusable_with: [daintree.context.feed-running-agent]
+  - query: codex is going the wrong way, make it keep the v1 api working
+    confusable_with: [daintree.context.feed-running-agent]
+  - query: Don't launch a new agent for this. Tell the Claude already refactoring the router to also add the 404 fallback.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Stop codex's current turn, it's editing the migrations, but keep its panel open and have it use the new schema instead.
+    confusable_with: [daintree.orchestration.park-work]
+  - query: Of the agents running, tell codex-2 to stop touching package.json.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: The agent on the auth refactor has been going a while; stop its turn now but keep the panel open.
+    confusable_with: [daintree.orchestration.timebox-attempt]
+  - query: tell codex to stop what it's doing and just report where it got
+    confusable_with: [daintree.orchestration.timebox-attempt]
+  - query: 'The Claude on #77 hasn''t finished yet, it''s just heading the wrong way. Tell it to keep the public API unchanged.'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Keep claude in its current worktree but tell it to stop editing files outside packages/core.
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: also tell it to run the test suite once it's applied those fixes
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: pre-split
+  - query: yeah that one. send it to the other agent
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: pre-split
+  - query: tell them to drop the test talk and get back to the schema, then carry on
+    confusable_with: [daintree.orchestration.conversation]
+    run: pre-split
+  - query: send this message to all four agents
+    confusable_with: [daintree.orchestration.supervise-fleet, daintree.worktree.relocate-agents]
+    run: pre-split
+  - query: Codex is editing src/generated right now — tell it to stop and leave those files alone.
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: the agent is rewriting the tests right now, tell it to fix the code instead
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: interrupt codex, it's modifying the test file instead of the parser, make it fix parser.ts
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: tell the running claude to stop editing migrations and use the existing helper
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: also tell it to keep the old /v1/users response shape working
+    history:
+      - 'user: tell claude-2 to stop editing the migrations, it should only touch the service layer'
+      - 'assistant: Interrupted claude-2, confirmed from its screen it is back at its prompt, and sent the correction: leave db/migrations alone, keep going on the service layer. It acknowledged and resumed.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: hmm, it's still writing its own backoff loop. interrupt it properly this time
+    history:
+      - 'user: codex-1 is going the wrong way, make it use the existing retryWithBackoff helper instead of writing a new one'
+      - 'assistant: Sent the correction to codex-1 at its input without interrupting; it was mid-turn and I can''t tell yet whether it read it.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait — don't have it delete the lockfile, just tell it to leave that file alone
+    history:
+      - 'user: interrupt Claude in the auth worktree and tell it to use pnpm not npm'
+      - 'assistant: Interrupted claude-3, confirmed it is idle at its input, and sent: use pnpm for everything and delete the package-lock.json you created. It is working again.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'ok now send it: finish the tests only, no more refactoring'
+    history:
+      - 'user: stop claude-4''s turn but keep the pane open'
+      - 'assistant: Interrupted claude-4; its screen shows the input line with the conversation intact. Nothing else sent.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: interrupt claude-6 then and resend it
+    history:
+      - 'user: the three agents on feature/billing-v2 are all adding a new config file, make them use config/billing.yaml instead'
+      - 'assistant: Sent the correction to claude-5, claude-6 and codex-2 in one batch. claude-5 and codex-2 acknowledged; claude-6 is still mid-turn and its screen shows it creating config/billing-new.ts.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: did it actually switch course? check its screen
+    history:
+      - 'user: claude-7 keeps rewriting the parser from scratch, stop it and make it patch the existing tokenizer instead'
+      - 'assistant: Interrupted claude-7, confirmed the stop, and sent the correction to patch src/parser/tokenizer.ts. It started a new turn a few seconds ago.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now it's rewriting the fixture loader instead — stop that, tell it to leave the loader alone
+    history:
+      - 'user: claude-2 is asking whether to overwrite the fixtures, tell it no'
+      - 'assistant: Answered claude-2''s question with ''no, keep the existing fixtures''; it is working again.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: no, tell it to use a JSON column instead, we don't need the join table
+    history:
+      - 'user: ask the codex doing the schema work why it chose a join table for tags'
+      - 'assistant: codex-1''s last reply says it chose a join table because tags are many-to-many and it wanted to avoid JSON columns. It is still working on the schema.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude-1 in that worktree is still changing billing — stop its turn, it must not touch billing until these are green
+    history:
+      - 'user: run the test suite in a terminal on the api worktree so I can watch'
+      - 'assistant: Started pnpm test in a visible terminal on the api worktree; 14 failures so far, all in billing.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok then tell claude-3 to stop running the full e2e suite on every change, unit tests only
+    history:
+      - 'user: how much claude usage do I have left?'
+      - 'assistant: Claude Code''s usage screen shows 82% of the weekly limit used; it resets Thursday.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the docs sweep one is editing CHANGELOG.md — tell it not to touch that file
+    history:
+      - 'user: rename those three claude terminals by what they''re doing'
+      - 'assistant: Renamed claude-1 ''auth refactor'', claude-2 ''billing tests'', claude-3 ''docs sweep''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also make it keep the existing XLSX export working — tell it now before it gets far
+    history:
+      - 'user: spin up claude in feature/export-csv and have it add CSV export to the reports page'
+      - 'assistant: Launched claude-8 in feature/export-csv with the brief and notify on; it is working and I''ve ended my turn until it finishes.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: we already use valibot — tell it to switch to valibot and drop zod
+    history:
+      - 'user: ask claude-2 why it''s adding a new dependency'
+      - 'assistant: claude-2 says it added zod for request validation because nothing else validates bodies. It is still working.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's now ignoring the spec and adding endpoints anyway — stop it and make it stick to the spec
+    history:
+      - 'user: feed codex-3 the api spec'
+      - 'assistant: codex-3 read docs/api.yaml and confirmed, then carried on working.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's started rewriting the router — stop that, tell it to only fix the 404 handler
+    history:
+      - 'user: switch claude-4 to sonnet'
+      - 'assistant: Sent /model and picked Sonnet; claude-4''s screen shows the model changed and it resumed its task.'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's started fixing things instead of just reviewing — stop it and tell it report only
+    history:
+      - 'user: have claude-2 follow the security-review skill on feature/sso'
+      - 'assistant: Loaded sec-tools/security-review and briefed claude-2 with its id; it is working through the steps.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the ui agent's going the wrong way on styling — tell it to use the existing Table component, not a new one
+    history:
+      - 'user: backend and frontend agents on billing at the same time, schema first'
+      - 'assistant: Contract 31fe0a2; claude-2 on billing-api and codex-4 on billing-ui are working.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful

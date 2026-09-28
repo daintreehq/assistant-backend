@@ -238,8 +238,6 @@ examples:
     expect: [daintree.agents.poll-pinned-agents, daintree.edits.spawn-visible-agent]
   - query: launch an agent on the socket reconnect bug and wake me if it hasn't finished within the hour
     expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
-  - query: have an agent go fix the flaky e2e login spec, and set something up so I get pinged the moment it's done — I'm heading out
-    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
   - query: begin work on ticket 905 and leave something running overnight so I hear about it in the morning
     expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.watch-outcome]
   - query: load the e2e recipe into that worktree and let me know when the stack is actually up
@@ -316,8 +314,6 @@ examples:
     expect: [daintree.orchestration.status-and-resume, daintree.workflow.start-work-on-issue]
   - query: what was I in the middle of last session, and how are the agents running right now doing — deal with anything that needs me
     expect: [daintree.orchestration.status-and-resume, daintree.orchestration.supervise-fleet]
-  - query: catch me up on the week, and note down that we've settled on the queue-per-tenant design
-    expect: [daintree.orchestration.status-and-resume, daintree.memory.manage-project-memory]
   - query: sweep the agents and tell me who's stuck, then rename the tabs — they're all called Claude and I can't tell them apart
     expect: [daintree.orchestration.supervise-fleet, daintree.terminals.rename]
   - query: check on everyone running, act on whatever's waiting, and shut down the ones that already finished
@@ -446,11 +442,6 @@ examples:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
     expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
-  - query: have an agent go fix the flaky e2e login spec, and set something up so I get pinged the moment it's done — I'm heading out
-    history:
-      - 'user: hey'
-      - 'assistant: Hey! What are we working on?'
-    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
   - query: get an agent to tell me what it makes of the cache invalidation, and store whatever it concludes as a project note
     history:
       - 'user: How are you?'
@@ -885,11 +876,6 @@ examples:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
     expect: [daintree.orchestration.multi-agent, daintree.orchestration.workspace-cleanup]
-  - query: open an issue for the flaky auth test, then work out why it's flaky
-    history:
-      - 'user: wait an hour and then run the backfill'
-      - 'assistant: There''s no unattended path for starting work later — a timer can''t spawn an agent. Either I start it now and watch it, or I schedule a reminder and the spawn waits for you.'
-    expect: [daintree.forge.manage-issue, daintree.ci.diagnose-and-fix]
   - query: debug the preview, and when it's fixed close the two extra panels I opened
     history:
       - 'user: did the agent do what it claimed'
@@ -1240,3 +1226,23 @@ examples:
     active: [daintree.forge.manage-issue]
     expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
     run: 2026-09-24-selector-hardening
+  - query: prep said conflicts. get someone on it and then put the pr up
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+    expect: [daintree.git.sync-with-base, daintree.workflow.prep-branch-for-review]
+  - query: there's a merge conflict blocking the prep — get someone to sort it out and then carry on and open the PR
+    history:
+      - 'user: good morning'
+      - 'assistant: Good morning. Everything''s idle. Where do we start?'
+    expect: [daintree.git.sync-with-base, daintree.workflow.prep-branch-for-review]
+  - query: have an agent go fix the flaky e2e login spec, and set something up so I get pinged the moment it's done — I'm heading out
+    history:
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+    expect: [daintree.ci.hunt-flaky-test, daintree.orchestration.watch-outcome]
+  - query: open an issue for the flaky auth test, then work out why it's flaky
+    history:
+      - 'user: wait an hour and then run the backfill'
+      - 'assistant: There''s no unattended path for starting work later — a timer can''t spawn an agent. Either I start it now and watch it, or I schedule a reminder and the spawn waits for you.'
+    expect: [daintree.ci.hunt-flaky-test, daintree.forge.manage-issue]

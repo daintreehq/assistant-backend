@@ -1,0 +1,127 @@
+# Training examples whose answer is `daintree.git.prune-stale-branches` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.prune-stale-branches
+run: 2026-09-28-catalog-expansion
+positives:
+  - Delete all my local branches that are already merged into main.
+  - we've got ~200 branches on origin, figure out which are merged (squash merges count) and propose which to delete
+  - What branches can I safely delete in this repo? Inventory only, delete nothing.
+  - 'Prune origin''s branch list: classify each branch as merged, abandoned or active with evidence, then delete the ones I approve.'
+  - Close the open PRs nobody has touched in three months, once I've seen the list.
+  - git branch shows 80 branches, half from 2024. clean that up
+  - Find branches squash-merged into develop via PRs whose tips match the merged head, and propose deleting them locally and on origin.
+  - 'Stale PR sweep on acme/web: open PRs not updated since June 30 with author and last activity. Don''t close any yet.'
+  - Drop remote-tracking refs for branches deleted upstream and list local branches whose upstream is gone.
+  - Which feature/* branches on origin have unmerged commits and haven't moved in six months? Flag them as abandoned candidates with what would be lost.
+  - 'Branch hygiene before the v4 release: delete merged branches locally and on the remote, keep release/* and hotfix/*.'
+  - clean up my gp/* branches, the ones i've already merged
+  - List branches merged into main versus not, with full SHAs, so I can decide what to delete.
+  - close the old contractor draft PRs older than 120 days and tell me which branches they leave behind
+  - Delete remote branches whose PRs merged last quarter; skip anything still checked out in a worktree.
+  - prune branches but keep main, develop and anything protected
+  - 'Delete feature/old-onboarding locally and on origin; it was squash-merged as #412, so verify that first.'
+  - 'Not the worktrees or terminals, just the git branches: delete everything already merged into main.'
+  - clean up old branches in the repo, the agent worktrees are already gone
+  - Several of these branches no longer have a worktree at all. Which of them are merged and can go?
+  - which branches (not worktrees) are fully merged and deletable?
+  - close the ancient PRs from 2025 in bulk, they're all dead
+  - Close every PR with no activity in 90 days and delete its head branch, after I approve the list.
+  - Don't review the open PRs; just tell me which ones have sat untouched for months so I can close them.
+  - Rather than checking one PR's status, list every open PR with no activity since March and propose closing them.
+  - Remove the merged dependabot/* and renovate/* branches still hanging around on origin.
+boundaries:
+  - query: Close the PRs nobody has touched in three months and delete their branches.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: close every open PR that hasn't been updated in 90 days
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Close the abandoned PRs from 2025 in bulk, but show me the list with authors and last activity first.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: close out all the dead PRs and delete the branches behind them, list first
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Close the open PRs nobody has touched since March and delete merged remote branches.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+  - query: clean up all the old merged branches on origin, the ones from last year's sprints
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: 'Tidy up the repo: delete every local branch already merged into main. None of them have worktrees.'
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: Clean up the stale PRs nobody has touched since spring, after showing me the list.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: delete my merged local and remote branches
+    confusable_with: [daintree.worktree.audit-worktrees]
+followups:
+  - query: delete the merged ones, keep the abandoned for now
+    history:
+      - 'user: what branches can I delete?'
+      - 'assistant: 14 merged (9 by ancestry, 5 squash-merged via PR), 6 abandoned candidates older than 4 months, and main, develop and release/* kept. Full SHAs listed above.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what's on feat/old-importer that isn't in main?
+    history:
+      - 'user: clean up old remote branches'
+      - 'assistant: Classified 38 remote branches. feat/old-importer is an abandoned candidate: not merged, last commit in March.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, force-delete the squash-merged ones too
+    history:
+      - 'user: prune the branch list'
+      - 'assistant: Deleted 8 ancestry-merged branches. git branch -d refused feat/tag-cloud, feat/csv-export and fix/login-race: they were squash-merged (#301, #317, #322), so their tips aren''t ancestors of main.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: use 60 days as the cutoff instead of 90
+    history:
+      - 'user: which of our open PRs are stale?'
+      - 'assistant: Using the proposed 90-day cutoff, 3 open PRs qualify. Coverage is complete.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: all the layers merged — delete every merged branch in the repo, the split ones included
+    history:
+      - 'user: make a PR stack out of feat/tokens'
+      - 'assistant: The stack #680 to #682 has now fully merged into main.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok and beyond worktrees, delete all my local branches that are already merged
+    history:
+      - 'user: which worktrees can I get rid of?'
+      - 'assistant: 4 worktrees are merged, 2 hold unpushed work; recommendations listed. Nothing removed.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now clean up the old remote branches on origin too
+    history:
+      - 'user: shut it all down after the fan-out'
+      - 'assistant: Closed 6 agent terminals and deleted their 6 worktrees after your go-ahead; checkpoint closed.'
+    active: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and while you're at it, close every PR that's been idle since spring
+    history:
+      - 'user: merge #455'
+      - 'assistant: #455 merged into main as 0b7e3a2, read back from the forge.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: there are loads of dead branches in that list — which can I delete?
+    history:
+      - 'user: what did I ship this week?'
+      - 'assistant: Weekly summary written: 5 PRs merged, 2 in review, 1 blocked, each cited.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the rest are ancient, nobody's touched them in months — close them
+    history:
+      - 'user: review all the open PRs'
+      - 'assistant: 4 PRs reviewed with verdicts. 9 others have had no activity since before June and weren''t reviewed.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: unrelated, but the branch list is a mess — prune the merged ones
+    history:
+      - 'user: split #600 into stacked PRs'
+      - 'assistant: Stack #701 to #703 published and read back.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: also delete my merged remote branches that have no worktree
+    history:
+      - 'user: which worktrees are merged?'
+      - 'assistant: 3 merged worktrees; proposed for removal.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -95,6 +95,8 @@ positives:
     run: 2026-09-28-agent-queries
   - query: can u pick up where we left off before the crash
     run: 2026-09-28-agent-queries
+  - query: where were we? catch me up on what was in flight yesterday
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: where were we with the fleet
     confusable_with: [daintree.worktree.relocate-agents]
@@ -416,6 +418,41 @@ boundaries:
   - query: pick back up the issue 88 work i had going yesterday before my laptop died
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-28-agent-queries
+  - query: what was i working on yesterday? catch me up
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Resume the Claude session I closed yesterday on the billing worktree.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-catalog-expansion
+  - query: what was I working on yesterday before I closed Daintree?
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion
+  - query: where were we on the auth refactor from yesterday's session? pick it back up
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: Resume the migration run I left in flight last night and tell me what's still open.
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
+  - query: back from the weekend, where did we leave the auth work?
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: Resume the search-reindex work we parked on Friday.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: catch me up on what was in flight when I left yesterday
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: where were we? what was I working on yesterday before I closed Daintree
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - do you remember our last session
+  - whered we leave off in this chat
+  - query: where were we with the instruction-file cleanup yesterday? catch me up
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: where were we yesterday?
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: close the stale ones
     history:

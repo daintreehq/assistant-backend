@@ -23,7 +23,7 @@ no permission. Keep the two connections distinct: `daintree-runbooks` for this o
 
 | argument | type | |
 |---|---|---|
-| `query` | string, 1–8,192 chars, required | the outcome wanted, in natural language — "ask one agent a question and bring back its answer", not keywords, not a transcript, terminal output or secrets |
+| `query` | string, 1–8,192 chars, required | the outcome wanted, in natural language — "ask one agent a question and bring back its answer", not keywords, not a transcript, terminal output or secrets — keeping how the user wants it done (several agents, a time limit, a running agent, a review loop), which decides the procedure |
 | `max_results` | integer 1–20, default 3 | the most ranked runbooks to return; supporting runbooks come on top |
 
 The search is the local two-stage selector (`runbooks/local/`): a cosine shortlist

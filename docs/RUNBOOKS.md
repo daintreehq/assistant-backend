@@ -19,9 +19,15 @@ connected to two separate things:
   `terminal.getStatus`, `terminal.getOutput`, `terminal.sendCommandOwned`,
   `terminal.notifyWhenIdle`, `worktree.createWithRecipe`, and so on.
 
-So a runbook never says "you have no shell" or "never edit files yourself". It says
-when to do the work directly and when the user wants a visible Daintree agent. It
-never invents an app action or argument. It never assumes a background supervisor,
+The reader follows a runbook as **Daintree's orchestration layer**, and a runbook is
+built around a Daintree workflow. Its own hands read Daintree state, run Daintree
+operations (launch, send, notify, worktrees, recipes, checks, previews) and verify what
+agents did. The work itself (editing code, resolving conflicts, rebasing, bisecting,
+upgrading, migrating, reproducing, writing) goes to a visible agent in the right
+worktree. The runbook's know-how for that kind of work goes into the agent's brief and
+into the orchestrator's verification. It does the work directly only when the user asks
+it to. So a runbook never says "you have no shell", and it never invents an app action or
+argument. It never assumes a background supervisor,
 timer, queue or scratch store: those belonged to the retired Daintree Assistant
 CLI, and `tests/unit/test_runbook_migration.py` fails any runbook that names one.
 

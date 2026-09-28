@@ -1,0 +1,144 @@
+# Training examples whose answer is `daintree.git.integrate-agent-branches` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.integrate-agent-branches
+run: 2026-09-28-catalog-expansion
+positives:
+  - Merge the branches from the three finished Codex agents (feat/rate-limit, feat/audit-log, feat/webhooks) into a single integration branch and confirm the test suite passes after each merge.
+  - Integrate worktrees issue-412, issue-415 and issue-419 into one branch based on develop, running pytest after every merge; do not push.
+  - Combine claude-1's parser rewrite and claude-2's CLI flag work into one branch and check that cargo build and cargo test still pass together.
+  - Fold the outputs of all five fan-out agents into a single branch off main, one merge at a time, so any breakage can be traced to the branch that introduced it.
+  - Create an integration worktree that merges the api-schema branch first, then the two client branches that depend on it, running the type checker at each step.
+  - 'stack agent branches together: payments-refactor + stripe-webhook + invoice-pdf -> one branch, tsc and vitest after each merge'
+  - Bring the backend and mobile worktrees' commits together on one integration branch and see whether the combined app still builds for iOS.
+  - Merge gemini's i18n branch and codex's date-format branch together; both touch locales/, so resolve the conflicts and run the jest suite on the result.
+  - 'Integration pass over the six logging-cleanup worktrees: merge each into integrate/logging-oct at its current commit, record conflicts per branch, nothing pushed.'
+  - Combine the finished work from worktrees auth-oauth and auth-mfa into one branch ahead of a single PR; only the combined branch for now, no PR yet.
+  - 'The contract-first split is done: merge the api-side and ui-side branches together and run the end-to-end tests against the combined tree.'
+  - I already know the four worktrees clash in package.json, go ahead and actually merge them into one branch and resolve it.
+  - Merge every agent branch from last night's batch into one branch on top of main and tell me which one, if any, breaks the build.
+  - Assemble one branch from feature/search-index, feature/search-ui and feature/search-analytics, merged in dependency order, with lint and unit tests after each.
+  - Merge the Claude and Codex branches together, keeping both since they changed different modules, and verify the Go tests pass on the combined code.
+  - 'Take the branches the parallel agents produced for #231, #232 and #240 and merge them into integrate/sprint-14 in a fresh worktree.'
+  - can you smash the frontend + backend worktrees into one branch and run the tests
+  - combine what claude-2 and claude-3 did pls, i want one branch w/ both
+  - merge the 3 wt's together before i open a pr, don't push anything
+  - nice, all green. now glue the five agent branches together and check nothing broke once combined
+  - merge the refactor branch and the new-endpoint branch into one and run the suite, wanna see if they play nice together
+  - the swarm finished, roll all their branches up into one integration branch
+  - merge codex's and gemini's worktrees into a fresh branch, not into main
+  - Merge the branches of the agents launched this morning into one branch, run the full suite on the merged result, and hand back any conflict that changes behaviour.
+  - Join the kotlin-migration and gradle-upgrade branches from two agents into one worktree branch and confirm ./gradlew check is still green after both merges.
+boundaries:
+  - query: 'The build broke after I merged two agents'' branches by hand. Redo it properly: merge them one at a time into a fresh integration branch with checks after each so we know which one breaks it.'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Launch an agent to merge the three finished worktrees together into one branch.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Combine codex's and gemini's whole branches into one branch and run the tests.
+    confusable_with: [daintree.git.cherry-pick-changes]
+  - query: Merge the agent/api, agent/ui and agent/db branches into one integration branch and check it builds after each merge.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+  - query: Merge the four agents' branches into one branch and check the combined build.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: Claude and Codex didn't compete, they built different halves. Merge both branches into one and test it.
+    confusable_with: [daintree.orchestration.competition]
+  - query: The two agents' implementations are complementary, not rivals; combine both worktrees into one branch.
+    confusable_with: [daintree.orchestration.competition]
+  - query: The api-agent and web-agent branches for the invites feature are both finished; merge them into one integration branch and check it builds.
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: All six fan-out agents finished their issues; now merge their six branches into one branch and check it builds.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: The four agents that did the logger migration are all finished. Merge their branches into one integration branch one at a time and check the build after each.
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: combine the frontend and backend worktrees into one branch and see if it still builds
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: Get the four agent branches into one branch so I can open a single PR later myself.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: The billing and auth worktrees will conflict in routes.ts, as forecast; now merge both into one branch and resolve it.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: You forecast conflicts between the three agent branches earlier; go ahead and combine them for real.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: Merge all four agents' branches into one integration branch, running the tests after each merge.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: Combine the four agents' branches into one integration branch and check it builds before anything is opened.
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Combine the best parts of Claude's and Codex's entries into one branch and check it builds.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: ok, the codex one is committed now, add feat/search-index as the last merge
+    history:
+      - 'user: merge the four fan-out branches into one so I can open a single PR'
+      - 'assistant: Created worktree integrate/q3-search at base 4f1c2ab and launched claude-5 there. feat/search-api and feat/search-ui are merged with checks green; feat/search-index is held back because its worktree has uncommitted changes and codex-3 was still working.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, merge the backend branch before the ui one, not after
+    history:
+      - 'user: put the frontend and backend branches together and check it still builds'
+      - 'assistant: Forecast done: feat/api-v2 and feat/web-v2 both touch src/shared/types.ts. I''m about to create integrate/v2 off develop at 91ab3e0 and launch the integrating agent with the order feat/web-v2, then feat/api-v2.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the second merge broke the tests, is that the auth branch's fault or was it already red?
+    history:
+      - 'user: integrate the three auth worktrees into one branch'
+      - 'assistant: claude-4 reports it finished in integrate/auth-overhaul: baseline green, merge 1 feat/auth-tokens green, merge 2 feat/auth-sessions has 3 failing tests in session.spec.ts, merge 3 not started.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: don't push it, just give me the merge log and final test result
+    history:
+      - 'user: integrate the fan-out results from this morning into one branch'
+      - 'assistant: All five sources are merged into integrate/morning-run in order, each at its frozen SHA. I''ve verified one merge per source on the first-parent log and I''m re-running the full suite myself now.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: merge feat/refunds with the other agents' branches into one integration branch and see if it builds
+    history:
+      - 'user: tests first by codex, implementation by claude, for refunds'
+      - 'assistant: Done in feat/refunds: frozen tests pass unchanged, full suite green. claude-3 and codex-2 panels idle.'
+    active: [daintree.orchestration.test-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now merge all three branches together into one and check it builds
+    history:
+      - 'user: have the agents review each other''s work and fix'
+      - 'assistant: Fix round verified: all findings fixed or rebutted with evidence; tests pass on each branch.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: all six are done — now merge their branches together into one and check it still passes
+    history:
+      - 'user: fan out issues #210-#215, one agent each in its own worktree'
+      - 'assistant: Launched claude-1 to claude-6, one per issue worktree. All six have now reported done with their commits on issue-210 to issue-215.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good, do it in that order — actually combine them into one integration branch
+    history:
+      - 'user: will the payments, ledger and invoices branches conflict if I merge them?'
+      - 'assistant: Trial merges: payments and ledger conflict in src/ledger/post.ts; invoices merges cleanly with both. Suggested order: ledger, invoices, payments. Nothing was changed.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now take feat/export-csv and feat/export-pdf and the one you just synced and merge all three into one branch
+    history:
+      - 'user: rebase feat/export-core onto the latest main'
+      - 'assistant: claude-2 rebased feat/export-core onto main at c03d1f2 with one conflict in exporter.ts resolved; I re-ran the tests: green. Not pushed.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great, then combine claude-3's and codex-2's branches into one and prove they work together
+    history:
+      - 'user: check claude-3 actually finished the parser rewrite'
+      - 'assistant: Verified: feat/parser-v2 has the rewrite, the diff matches its claim and the parser tests pass when I ran them. codex-2''s feat/parser-errors was verified earlier.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok they've both stopped. merge the two worktrees' branches into a fresh integration branch and run the build
+    history:
+      - 'user: tell claude-8 and claude-9 to stop and commit what they have'
+      - 'assistant: Both stopped their turns and committed: feat/onboarding-flow at 2a9b7c1 and feat/onboarding-emails at e4410d0.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good — now actually merge them in that order into one branch
+    history:
+      - 'user: what order should I merge these five in?'
+      - 'assistant: Suggested order from pairwise trials: feat/schema, feat/api, feat/jobs, feat/ui, feat/docs. Nothing merged.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful

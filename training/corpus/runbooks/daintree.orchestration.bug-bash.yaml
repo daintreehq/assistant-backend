@@ -1,0 +1,130 @@
+# Training examples whose answer is `daintree.orchestration.bug-bash` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.bug-bash
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Bug bash the 4.0 release candidate with three agents: one on onboarding, one on billing, one throwing weird inputs at the forms. Confirmed bugs ranked by severity.'
+  - have a few agents poke at the app and try to break it before friday's launch
+  - 'QA the CLI with three agents before we ship v2: one on flags and config, one on interrupting long commands, one on huge input files.'
+  - 'Exploratory testing of the mobile web build: a keyboard-only user, a slow 3G connection, and a first-time signup. One charter per agent, no code changes.'
+  - Run a multi-agent bug bash on the new team-invites feature in the release/2.8 worktree; I want de-duplicated repro steps.
+  - Get codex, claude and gemini hammering the local app at localhost:5173 on different areas (search, uploads, settings) and bring back the bugs you could reproduce.
+  - throw some agents at the kanban board and see what breaks. drag/drop, concurrent edits, offline
+  - Before tagging 1.12, have four agents do exploratory testing on the desktop app, each with its own area and attack style, and give me a severity-ranked list.
+  - 'Pre-launch break-it session on the checkout flow: invalid cards, double submit, back button mid-payment, coupon edge cases. One agent per charter, all against develop@9f3e1b.'
+  - 'Charters for a bug bash on the admin panel: bulk actions, permissions as a read-only user, very long names and unicode. Find what breaks, don''t fix.'
+  - 'i want a QA sweep of the api with agents: auth edge cases, pagination, malformed json. dedupe and verify whatever they find'
+  - Stress the import wizard hands-on with several agents (a 100k-row CSV, wrong encodings, cancelling halfway) and report confirmed bugs only.
+  - Exploratory-test the new offline mode with agents, each simulating a different network failure pattern.
+  - 'Organise a bug hunt across the whole app before the investor demo: three agents, different areas, and reproduce anything they report.'
+  - Have agents act as first-time users of the acme CLI (install, init, deploy --dry-run), each trying to break a different subcommand.
+  - bug bash pls. the local build is running in the qa worktree
+  - 'Not just the new parser PR, the whole running app: have agents try to break every part of the editor experience.'
+  - Rather than reviewing the diff, have agents actually use the release build and find bugs in it.
+  - Don't read the code. Have three agents exercise the running app and hunt for crashes, one per area.
+  - The Playwright suite passes but I don't trust it; have agents explore the app by hand and find what the tests miss.
+  - Users keep grumbling about billing but nothing specific; have several agents explore billing, subscriptions and invoices to surface reproducible bugs.
+  - Nothing's broken that I know of; get agents poking at the running app to find bugs, one on forms, one on navigation, one on auth.
+  - Bug bash the notifications center with agents; I'll decide later which findings get filed as issues.
+  - Split exploratory testing across agents by area (search, sharing, export) and merge duplicate findings into one ranked list.
+  - 'No specific bug yet: have agents explore the sync feature from different angles and see what they can break.'
+  - Instead of asking agents what they think might be buggy, have them actually drive the CLI and try to break it, each with its own focus.
+boundaries:
+  - query: Instead of asking the agents what might be broken in the release, have them each explore a different area of the running app and report bugs.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: All tests are green but I'm sure the release has bugs; get agents trying to break the running app, one charter each.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Get three agents to poke at the release build and try to break onboarding, billing and settings.
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: Have three agents poke at the staging app and find bugs before the release.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+  - query: 'Fan out exploratory testing: one agent per area of the running app (auth, billing, uploads), and give me only reproduced bugs.'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: have three agents bash on the running app and find bugs before release
+    confusable_with: [daintree.review.audit-codebase]
+  - query: Get three agents poking at the app running locally — one on onboarding, one on billing, one on weird inputs — and give me a deduplicated bug list.
+    confusable_with: [daintree.review.red-team-change]
+  - query: Look over the release, not the diff but the running build, with a few agents each attacking a different area.
+    confusable_with: [daintree.review.review-change]
+  - query: 'Check v5.0 for bugs by having agents use it exploratory-style: one on import, one on sharing, one on settings.'
+    confusable_with: [daintree.review.review-change]
+  - query: before we merge the release branch, have agents click through the built app looking for breakage and reproduce what they find
+    confusable_with: [daintree.review.review-change]
+  - query: The web app runs fine in the qa worktree; have three agents explore it for bugs with different charters.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: app works, nothing in the console, but i want agents probing forms, uploads and auth to find what breaks
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: get three agents to bug bash the whole app before release, one on onboarding, one on billing, one on weird inputs
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: 'add a fourth charter: keyboard only, whole app'
+    history:
+      - 'user: bug bash the new release with a few agents before we ship'
+      - 'assistant: Target is release/2.6 at 8f3a1d0 on localhost:5173. Charters: onboarding as a first-time user, billing with invalid and huge input, uploads with interrupt and retry. Launching claude-2, codex-3 and claude-4.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: codex says it found a crash on paste — does that reproduce for anyone else?
+    history:
+      - 'user: QA the CLI with three agents before we ship'
+      - 'assistant: All three reports are in: 11 bug reports total across the flags, config and weird-input charters. Merging duplicates next.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude-4 edited src/upload.ts — that wasn't allowed, right? what do we do
+    history:
+      - 'user: bug bash uploads and sharing with two agents'
+      - 'assistant: Both charter reports are back. claude-4''s worktree shows a modified src/upload.ts.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok just give me the confirmed list ranked by severity
+    history:
+      - 'user: exploratory testing on the v3 beta: search, sharing, weird inputs'
+      - 'assistant: 9 reports merged into 6 bugs; cross-reproduced 4 through agents that didn''t file them, 1 not reproduced, 1 needs a real SSO account.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: they'll all write to the same sqlite file — give each its own worktree and db before you start
+    history:
+      - 'user: have three agents try to break the desktop app''s sync'
+      - 'assistant: Charters: offline then reconnect, two windows editing at once, huge notes. Planning to run all three in the main worktree.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: ok it merged. before release, have three agents bash the whole app — one on onboarding, one on billing, one throwing weird inputs
+    history:
+      - 'user: land #640 once checks are green'
+      - 'assistant: #640 squash-merged into main at 2b7d9e4; required checks were green.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: not just this PR — have a few agents explore the whole running app and try to break it
+    history:
+      - 'user: have codex try to break claude''s new parser'
+      - 'assistant: codex-3 is attacking feat/parser-v2; only demonstrated breaks with a runnable test will count.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: suite's green but I don't trust it — have agents QA the CLI by hand, one on flags, one on config files, one on bad input
+    history:
+      - 'user: run the e2e suite against release/2.6'
+      - 'assistant: Playwright against localhost:4310 (proved to be release/2.6''s server): 86 passed, 0 failed.'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'now let''s find bugs: exploratory testing with a few agents on the checkout flow before Friday'
+    history:
+      - 'user: which worktrees can I get rid of?'
+      - 'assistant: 4 merged, 2 with unpushed work, 1 parked. Proposed removal: the 4 merged ones.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: rather than read the code, put agents on the running app to find bugs in onboarding and settings
+    history:
+      - 'user: audit the settings screens for accessibility'
+      - 'assistant: About to launch a read-only reviewer on src/settings with the accessibility lens.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that's one. now bug bash the rest of the release with three agents so we find the others before users do
+    history:
+      - 'user: repro #702, the crash on empty project name'
+      - 'assistant: Reproduced on release/2.6 at 8f3a1d0: tests/repro/702.spec.ts fails with the reported TypeError.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful

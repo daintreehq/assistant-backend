@@ -171,8 +171,6 @@ boundaries:
     confusable_with: [daintree.worktree.relocate-agents]
   - query: parallelise this across worktrees, spawn an agent in each one
     confusable_with: [daintree.worktree.relocate-agents]
-  - query: split the migration into per-directory chunks and launch an agent for each chunk
-    confusable_with: [daintree.worktree.relocate-agents]
   - query: for each of those worktrees create a new claude code terminal and run /work with the issue number it's on
     confusable_with: [daintree.worktree.relocate-agents]
   - query: i've got four independent tickets, get four agents going, one each
@@ -404,9 +402,6 @@ boundaries:
   - query: 'give claude #412 and codex #415, separate worktrees, they dont touch the same files'
     confusable_with: [daintree.orchestration.multi-agent]
     run: 2026-09-24-selector-hardening
-  - query: split the logging refactor up so each agent owns a different package and nobody collides
-    confusable_with: [daintree.orchestration.multi-agent]
-    run: 2026-09-24-selector-hardening
   - query: spin up agents for 301 302 303 304, one each
     confusable_with: [daintree.orchestration.multi-agent]
     run: 2026-09-24-selector-hardening
@@ -440,9 +435,6 @@ boundaries:
   - query: 'give each of three agents its own issue from the backlog, #101, #102 and #103, in separate worktrees'
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-28-agent-queries
-  - query: Inject the shared API client context into each of the five agents working the endpoint issues
-    confusable_with: [daintree.context.curate-copytree-bundle]
-    run: 2026-09-28-agent-queries
   - query: 'one agent per issue for #201-#205, each primed with the SDK context'
     confusable_with: [daintree.context.curate-copytree-bundle]
     run: 2026-09-28-agent-queries
@@ -453,9 +445,6 @@ boundaries:
     confusable_with: [daintree.orchestration.competition]
     run: 2026-09-28-agent-queries
   - query: Plan and run the eight independent lint-rule fixes, one agent per worktree, all at once
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
-    run: 2026-09-28-agent-queries
-  - query: split the icon migration into disjoint per-package tasks and launch them in parallel
     confusable_with: [daintree.orchestration.execute-durable-workflow]
     run: 2026-09-28-agent-queries
   - query: 'Run issues #301, #305 and #311 through implement, review and PR, each in its own worktree and chain'
@@ -530,6 +519,78 @@ boundaries:
   - query: 'Start an agent for each of issues #201-#205 in its own worktree.'
     confusable_with: [daintree.worktree.relocate-agents]
     run: 2026-09-28-agent-queries
+  - query: 'For issues #310, #311 and #315, open a Codex terminal each and run /implement, then /review, then /pr in order.'
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: open a claude per issue for the five bugs labelled p1 and have each run /fix then /pr
+    confusable_with: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Launch one agent per issue for #201, #202 and #207, each preloaded with the context of the module it touches.'
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Three separate upgrades, the Sentry SDK, the Stripe SDK and the AWS SDK, one agent each in its own worktree.
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Give each of these four tickets its own agent: #310 bump the logging lib, #311 fix date parsing, #312 add CSV export, #313 docs typo.'
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: Give each of these five refactor tasks its own agent and worktree.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: Start an agent on each of the eight issues labelled ready-for-dev, one worktree per issue.
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Launch one agent per issue for #501 through #505, each in its own worktree.'
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Launch one agent per issue for #412, #415 and #420; they touch unrelated modules.'
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Split the dashboard cleanup into independent per-folder tasks and give each folder to its own agent in parallel.
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Launch an agent per issue for #412, #415, #419 and #430, each in its own worktree, and let them run in parallel.'
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: work through these 20 bug tickets, max 4 agents at once, start the next when one finishes
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: Split the settings page redesign into disjoint file-scoped tasks (header, sidebar, form) and give each to its own agent.
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Put an agent on each of issues #401, #402 and #405, one worktree each, all at once.'
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Spin up agents for #212, #215 and #219, one worktree each.'
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Implement issues #501, #502 and #507 in parallel, one agent per issue in its own worktree.'
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: Work through these 12 bug issues, no more than 4 agents at a time, starting the next as each finishes.
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: 'For #120, #121 and #124, one Codex terminal each running /implement then /review.'
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Six issues, one agent each; every terminal runs /tdd and then /pr in order.
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Issues #611, #612, #614 and #620 are the already-agreed pieces of the export epic; launch one agent per issue in its own worktree, three at a time.'
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: We split the i18n work last week into 5 tickets (#71-#75). Start them all in parallel now.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: chop the settings-page rework into 3 file-disjoint chunks and get agents going on them right away, no need to show me
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Start five worktrees for issues #401 to #405 with a Claude agent in each.'
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'start agents on issues #41, #42 and #43 in parallel'
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: yeah all of them except the docs one
     history:
@@ -658,7 +719,6 @@ topic_shifts:
       - 'user: take 88 90 and 93 and put an agent on each'
       - 'assistant: All three are unassigned and touch different directories, so they can run in parallel. Worktrees and one agent each — go?'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - i've got 6 prs open and half are stale. put an agent on each of the four that need rebasing
   - query: yeah go
     history:
       - 'user: i''ve got 6 prs open and half are stale. put an agent on each of the four that need rebasing'
@@ -832,6 +892,12 @@ topic_shifts:
       - 'assistant: Started #601–#604 in t1–t4 and set a 10-minute check to refill as they finish.'
     active: [daintree.orchestration.fan-out-work]
     run: 2026-09-24-selector-hardening
+  - query: put an agent on each of the still-valid p1 bugs
+    history:
+      - 'user: go through the needs-triage issues'
+      - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[watcher w_1190 fired: t_8821 exited 0, suite green]'
     history:

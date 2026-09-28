@@ -1,0 +1,351 @@
+# New territory claimed by six existing runbooks:
+#   daintree.memory.manage-project-memory — durable instructions: Daintree's assistant
+#     instructions, commands and skills under .daintree/assistant/, AGENTS.md / CLAUDE.md
+#     edits, host memory;
+#   daintree.recipe.run-or-create — writing or editing a team recipe through an agent;
+#   daintree.worktree.provision-local-environment — a new worktree lacking .env or
+#     installed dependencies (.worktreeinclude plus a setup install);
+#   daintree.forge.land-pull-request — landing several PRs in order;
+#   daintree.orchestration.competition and daintree.orchestration.spike-options —
+#     adopting the winner.
+#
+# Per runbook: two requests phrased as a calling agent describes the outcome, one as a
+# user types it, and routing traps where the words pull toward the runbook but a declared
+# neighbour is the one defensible answer.
+
+cases:
+  # --- daintree.memory.manage-project-memory ---------------------------------------
+
+  - id: x-gap-memory-assistant-command-and-skill-agent
+    category: single-runbook
+    note: Daintree's own assistant gains a slash command and a skill under .daintree/assistant/, written by an agent and checked.
+    messages:
+      - role: user
+        content: Add a /triage slash command and a release-checklist skill to the Daintree assistant's project folder under .daintree/assistant/, have an agent write them in the main checkout, check the frontmatter in the diff, and tell the user when the assistant will pick them up
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: x-gap-memory-reconcile-agents-claude-md-agent
+    category: single-runbook
+    note: A durable rule for every agent, made consistent across AGENTS.md and CLAUDE.md with the stale contradicting rule replaced.
+    messages:
+      - role: user
+        content: Make AGENTS.md and CLAUDE.md agree that agents never edit files under src/generated/, replacing the stale rule that contradicts it, verify the diff, and tell the agents we launched that the instructions changed
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: x-gap-memory-sidebar-instructions-casual
+    category: single-runbook
+    note: The user wants Daintree's sidebar assistant to follow a standing rule from now on.
+    messages:
+      - role: user
+        content: can you make the daintree assistant always run the linter before it tells me something's done? like put it in its instructions permanently
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: x-gap-memory-trap-steer-running-agent
+    category: routing-trap
+    note: >-
+      "stop editing generated files" is the AGENTS.md example, but here it is a correction
+      to one agent working now, which is daintree.agents.steer-running-agent.
+    messages:
+      - role: user
+        content: the claude agent in the api worktree keeps touching the generated files, tell it to stop and leave src/generated alone
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-gap-memory-trap-run-agent-command
+    category: routing-trap
+    note: >-
+      A project slash command that already exists is RUN in an open agent, not written:
+      daintree.agents.run-agent-command.
+    messages:
+      - role: user
+        content: run our /triage command in the Claude pane that's already open
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
+
+  # --- daintree.recipe.run-or-create -----------------------------------------------
+
+  - id: x-gap-recipe-create-team-recipe-agent
+    category: single-runbook
+    note: A new team recipe written as a file by an agent, then confirmed in Daintree's recipe listing.
+    messages:
+      - role: user
+        content: Create a team workspace recipe named "Full stack" that opens Claude, the dev server and the test watcher; have an agent write it as a .daintree/recipes file in the main checkout and confirm Daintree's recipe list shows it with three terminals
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: x-gap-recipe-edit-existing-recipe-agent
+    category: single-runbook
+    note: An existing team recipe edited to use a different agent, verified by its listed terminal count.
+    messages:
+      - role: user
+        content: Edit the team recipe "Work" so its agent terminal launches Codex instead of Claude, then verify the recipe list still shows it with the same number of terminals
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: x-gap-recipe-make-recipe-casual
+    category: single-runbook
+    note: The casual ask to save a multi-terminal setup as a recipe.
+    messages:
+      - role: user
+        content: make me a recipe that opens codex plus a terminal running npm run dev, I keep setting that up by hand
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: x-gap-recipe-trap-plain-worktree
+    category: routing-trap
+    note: >-
+      "worktree" and "recipe" both appear, but the user rules the recipe out: a plain
+      worktree is daintree.worktree.create-plain-worktree.
+    messages:
+      - role: user
+        content: create a worktree for a new branch feature/search off main, no recipe, don't start anything in it
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]
+
+  - id: x-gap-recipe-trap-setup-script
+    category: routing-trap
+    note: >-
+      Commands that run whenever a worktree is created are lifecycle setup, not a recipe's
+      startup terminals: daintree.worktree.provision-local-environment.
+    messages:
+      - role: user
+        content: I want pnpm install to run automatically every time a worktree gets created, can you set that up?
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  # --- daintree.worktree.provision-local-environment ------------------------------
+
+  - id: x-gap-provision-worktreeinclude-env-agent
+    category: single-runbook
+    note: The new territory in full — ignored .env copied via .worktreeinclude, dependencies installed by setup, proved on a fresh worktree.
+    messages:
+      - role: user
+        content: New worktrees in this project come up without the .env file or node_modules; configure .worktreeinclude so the ignored .env and local certificates are copied, add an install to the worktree setup commands, and prove it on one fresh worktree
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: x-gap-provision-env-local-and-install-agent
+    category: single-runbook
+    note: Every new worktree gets the main checkout's local env file and an install, through Daintree's worktree lifecycle config.
+    messages:
+      - role: user
+        content: Make every newly created worktree receive the main checkout's .env.local and run pnpm install automatically through Daintree's worktree setup config, then verify it on one new worktree and list the existing worktrees that still lack them
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: x-gap-provision-no-env-casual
+    category: single-runbook
+    note: The symptom as a user states it.
+    messages:
+      - role: user
+        content: every time I make a new worktree the app won't start because there's no .env and nothing's installed, can you fix that so it just works?
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: x-gap-provision-trap-run-install-once
+    category: routing-trap
+    note: >-
+      Installing dependencies once, in one worktree, in a panel the user watches is a
+      plain shell command: daintree.terminals.run-visible-command.
+    messages:
+      - role: user
+        content: open a terminal in the auth worktree and run npm install so I can watch it
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
+
+  - id: x-gap-provision-trap-seed-own-database
+    category: routing-trap
+    note: >-
+      The worktree already has its own database; seeding it now is
+      daintree.runtime.migrate-worktree-database.
+    messages:
+      - role: user
+        content: the new search worktree has its own database already, just run the migrations and seed it
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]
+
+  # --- daintree.forge.land-pull-request --------------------------------------------
+
+  - id: x-gap-land-merge-train-agent
+    category: single-runbook
+    note: A merge train after a fan-out — several PRs landed one at a time, gated fresh after each merge.
+    messages:
+      - role: user
+        content: "Merge the three PRs the fan-out agents opened (#88, #91, #93) one at a time in dependency order, re-reading mergeability and required checks after each merge, and stop at the first one that fails the gate"
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-gap-land-two-in-order-agent
+    category: single-runbook
+    note: Two PRs landed in a stated order, the second re-validated against the moved base.
+    messages:
+      - role: user
+        content: "Land PR #140 and then #141 in that order with a head-commit guard; after #140 merges, read #141's mergeability and required checks again before merging it, and report each merge as read back from the forge"
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-gap-land-one-after-another-casual
+    category: single-runbook
+    note: The casual merge-train ask.
+    messages:
+      - role: user
+        content: merge the agents' PRs one after another, oldest first, and stop if any of them isn't green
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-gap-land-trap-integrate-branches
+    category: routing-trap
+    note: >-
+      "merge all the agents' work" pulls toward landing PRs, but combining branches into
+      one integration branch is daintree.git.integrate-agent-branches.
+    messages:
+      - role: user
+        content: merge all four agents' branches together into one integration branch and check it still builds before I open a single PR
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: x-gap-land-trap-dependabot-batch
+    category: routing-trap
+    note: >-
+      Several PRs merged, but they are dependency-bot PRs:
+      daintree.forge.batch-dependency-updates.
+    messages:
+      - role: user
+        content: go through the open dependabot PRs and merge the safe ones one by one
+    expect:
+      required: [daintree.forge.batch-dependency-updates]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.competition ------------------------------------------
+
+  - id: x-gap-competition-judge-and-adopt-agent
+    category: single-runbook
+    note: Code entries judged by the caller, then the winner's worktree adopted as a PR and the loser's cleaned up.
+    messages:
+      - role: user
+        content: Have Claude and Codex each write their own version of the webhook retry change in separate worktrees, compare the two diffs and pick the better one, then open a PR from the winning worktree and clean up the losing worktree
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-gap-competition-peer-vote-and-adopt-agent
+    category: single-runbook
+    note: A blind peer-vote contest over code entries, ending in adoption of the winner.
+    messages:
+      - role: user
+        content: Run a blind peer-vote contest among Claude, Codex and Gemini where each implements the CSV export in its own worktree; once a winner is declared, turn its worktree into a PR and remove the other entrants' worktrees
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-gap-competition-ship-winner-casual
+    category: single-runbook
+    note: The casual contest-then-ship ask.
+    messages:
+      - role: user
+        content: let claude and codex both have a go at the pagination fix, pick whichever version is better and ship that one
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-gap-competition-trap-combine-best-parts
+    category: routing-trap
+    note: >-
+      Two agents' versions exist, but the user wants them combined rather than a winner
+      picked: daintree.git.integrate-agent-branches.
+    messages:
+      - role: user
+        content: don't pick between Claude's and Codex's branches, merge both of them into one branch and make sure the tests pass together
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: x-gap-competition-trap-assigned-approaches
+    category: routing-trap
+    note: >-
+      Each agent is ASSIGNED a different approach to prototype and compare — that is
+      daintree.orchestration.spike-options, not a contest over one task.
+    messages:
+      - role: user
+        content: have one agent build the sync with a job queue and another with plain polling, each in a throwaway worktree, then measure both and recommend one
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.spike-options ----------------------------------------
+
+  - id: x-gap-spike-recommend-and-adopt-agent
+    category: single-runbook
+    note: Technical spikes measured and recommended, then the picked one shipped as a prototype PR and the rest cleaned up.
+    messages:
+      - role: user
+        content: Spike Drizzle and Kysely for the orders repository in throwaway worktrees, measure each yourself and recommend one; after the user picks, open the chosen spike as a PR flagged as a prototype and clean up the other spike's worktree
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-gap-spike-design-pick-and-adopt-agent
+    category: single-runbook
+    note: Design variants for the user to pick, then one pick adjusted by its own agent and adopted.
+    messages:
+      - role: user
+        content: Prototype a minimal, a dense and a playful version of the settings page in separate worktrees for the user to choose from; after the pick, have variant B's agent take A's header, then open B as a PR and clear away the other variants
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-gap-spike-keep-winner-casual
+    category: single-runbook
+    note: The casual try-both-then-keep-one ask.
+    messages:
+      - role: user
+        content: try zod and valibot on the signup form, tell me which one's nicer, then keep that one and bin the other
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-gap-spike-trap-same-task-vote
+    category: routing-trap
+    note: >-
+      Every agent does the SAME task its own way and the entries are voted on:
+      daintree.orchestration.competition.
+    messages:
+      - role: user
+        content: have Claude and Codex both write the same caching layer their own way, then get them to vote on whose is better
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-gap-spike-trap-cleanup-only
+    category: routing-trap
+    note: >-
+      The spikes are over and nothing is adopted; the user explicitly asks for teardown:
+      daintree.orchestration.workspace-cleanup.
+    messages:
+      - role: user
+        content: we're done with the spike worktrees, close their terminals and delete all of them
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]

@@ -6,25 +6,9 @@
 runbook: daintree.foundation
 run: pre-split
 positives:
-  - query: what custom commands have I set up for claude
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: list every slash command I can use right now
-    run: 2026-09-11-mission-9-capability-lookup
   - query: which commands do I have installed globally
     run: 2026-09-11-mission-9-capability-lookup
-  - query: do I have any user-level commands for writing release notes
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: what commands does the codex agent have access to
-    run: 2026-09-11-mission-9-capability-lookup
   - query: is there a command on my machine for reviewing designs
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: tell me which commands the agent in terminal 3 supports
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: does the claude agent over there have a command for changelogs
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: what is the invocation token for my deploy command
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: how do I call my code-review command from codex
     run: 2026-09-11-mission-9-capability-lookup
   - what terminals are open
   - list worktrees
@@ -51,7 +35,6 @@ positives:
   - switch focus to the backend tab
   - queue digest
   - is there anything scheduled — timers, waits, watchers, that kind of thing? just curious what's still armed
-  - git pulse on this worktree
   - worktree list
   - show me the last bit of output in the tab called api-refactor
   - close term_8f2a, im done with it
@@ -79,36 +62,6 @@ positives:
   - what is each of these tabs called at the moment
   - 'give me the full picture: terminals, worktrees, watchers, queue'
 boundaries:
-  - query: I wrote a claude command for triaging bugs, where did I put it
-    confusable_with: [daintree.explore.repository]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: find the command I made for UI critique, I cannot remember what I called it
-    confusable_with: [daintree.explore.repository]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: which slash commands are available to the codex agent in this worktree
-    confusable_with: [daintree.explore.repository]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: locate my global slash command for design reviews
-    confusable_with: [daintree.explore.repository]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: somewhere I have a claude command that reviews screenshots, can you track it down
-    confusable_with: [daintree.explore.repository]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: what is the right syntax to invoke my changelog command in claude
-    confusable_with: [daintree.recipe.run-or-create]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: how do I trigger my release command, what do I type
-    confusable_with: [daintree.recipe.run-or-create]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: give me the exact syntax to run my review command in the codex terminal
-    confusable_with: [daintree.recipe.run-or-create]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: is a /code-review command available to the agent here
-    confusable_with: [daintree.review.review-change]
-    run: 2026-09-11-mission-9-capability-lookup
-  - query: can the claude agent run /design-review in this project
-    confusable_with: [daintree.review.review-change]
-    run: 2026-09-11-mission-9-capability-lookup
   - query: Show the timers that are currently pending
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
@@ -179,7 +132,7 @@ boundaries:
   - query: what terminals and worktrees exist right now
     confusable_with: [daintree.diagnostics]
   - query: list my worktrees
-    confusable_with: [daintree.orchestration.status-and-resume]
+    confusable_with: [daintree.orchestration.status-and-resume, daintree.worktree.compare-worktrees]
   - query: what terminals do i have open right now
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: anything in the attention queue?
@@ -232,8 +185,6 @@ boundaries:
     confusable_with: [daintree.agents.recover-agent]
   - query: which terminals are open right now and what state is each one in?
     confusable_with: [daintree.agents.answer-waiting-agent]
-  - query: just read out what that agent said in terminal 2
-    confusable_with: [daintree.agents.ask-and-relay]
   - query: which terminals are actually in that debate cohort again?
     confusable_with: [daintree.orchestration.debate-elimination]
   - query: what worktrees do i have
@@ -272,8 +223,6 @@ boundaries:
     confusable_with: [daintree.terminals.rename]
   - query: focus the one titled docs pass
     confusable_with: [daintree.terminals.rename]
-  - query: which terminals have worktrees with uncommitted stuff right now
-    confusable_with: [daintree.workflow.prep-branch-for-review]
   - query: what worktrees do i have open right now?
     confusable_with: [daintree.worktree.create-plain-worktree]
   - query: which branch is my current worktree on?
@@ -656,7 +605,6 @@ topic_shifts:
   - anything alive in the background right now or is it all quiet
   - what's the path of the worktree i'm sitting in — i want to cd there myself
   - am i still on the branch i cut this morning
-  - are there uncommitted changes anywhere i should know about before i start moving around
   - quick one, how many worktrees am i up to now
   - show me what's in the queue but leave it alone for now, i just want to see
   - is that needs-attention badge showing something real or is it stale
@@ -702,7 +650,6 @@ topic_shifts:
   - just read me the last error line out of tab 3, i'll deal with it myself
   - give me the last ten lines only, i'm reading this on my phone
   - pop the review terminal up on screen, i'll skim it
-  - work out which worktrees have no terminal attached — those are the ones i've abandoned
   - group my terminals by worktree so i can see where the crowding is
   - tell me which of these agents i spawned by hand and which a workflow attached on its own
   - roughly how long has each of these been idle? rank them worst first
@@ -711,7 +658,6 @@ topic_shifts:
   - which branches have worktrees and which don't — i want the gaps
   - are any two of my agents working in the same worktree right now? that'd be bad
   - open me a plain terminal, i want to run something myself
-  - i need a shell in the docs worktree, can you give me one
   - keep terminal 4 in mind as the release one for the rest of this session
   - 'note for this session only: the second tab is the one i actually care about'
   - work out which of these terminals i could close without losing anything — don't close them, just tell me
@@ -1019,7 +965,6 @@ foundation:
   - what's the last few lines in tab 2
   - show me what that terminal printed
   - read the tail of the deploy one
-  - whats it saying
   - dump the last 50 lines of t_882
   - what did the claude tab output
   - read that terminal for me
@@ -1107,7 +1052,6 @@ foundation:
   - list open terminals with their titles
   - is there anything watching right now
   - what agents are configured
-  - recent commits on this branch?
   - how many worktrees are there
   - whats open at the moment
   - any of my terminals still busy
@@ -1181,7 +1125,6 @@ foundation:
   - any uncommitted changes in here?
   - what worktrees do i have open and what branch is each on
   - am i on develop or did i end up on some feature branch
-  - give me the project pulse for this checkout
   - how far ahead of main is this branch
   - is the working tree clean or have i got junk lying around
   - which worktree is active
@@ -1240,14 +1183,11 @@ foundation:
   - what's terminal 3 showing on its last line
   - read the tail of the terminal where the agent said it was done
   - work out roughly what this session has cost me in tokens so far
-  - cross-reference my open worktrees against the branches on origin and tell me what's orphaned
-  - rank my worktrees by how stale they are
   - compare how long each of the last three agent runs took
   - draft me a written handoff protocol for how two agents should pass work between them
   - figure out how many agents this machine can sensibly run at once
   - build me a checklist for kicking off a parallel run from scratch
   - work out a rule of thumb for when to use a watcher versus an async wait, for me to follow
-  - sort my open worktrees into ones i still care about and ones i've abandoned
   - audit which of my terminals have been idle longest and rank them
   - tally up how many agents i've spawned today
   - give me a rough timeline of this session from whatever you can read
@@ -1509,8 +1449,6 @@ foundation:
   - query: are there any shells open in the main checkout
     run: 2026-09-28-agent-queries-2
   - query: Check whether the terminal 'e2e-runner' still exists or was closed.
-    run: 2026-09-28-agent-queries-2
-  - query: Read the last message the codex agent in wt bugfix/tz-offsets left at its prompt.
     run: 2026-09-28-agent-queries-2
   - query: 'Which of my open terminals is the one titled ''bench: cold start''?'
     run: 2026-09-28-agent-queries-2

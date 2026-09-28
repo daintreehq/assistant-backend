@@ -126,6 +126,8 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: 'status of the pr for #77 pls'
     run: 2026-09-28-agent-queries-2
+  - query: is PR 88 green?
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: is that PR green
     confusable_with: [daintree.forge.land-pull-request]
@@ -340,14 +342,11 @@ boundaries:
   - query: is pr 61 green, and if the reviewer asked for anything forward it to the agent still on it
     confusable_with: [daintree.agents.relay-review-feedback]
     run: 2026-09-24-selector-hardening
-  - query: 'pull the review comments off PR #231 and get the agent to address them'
-    confusable_with: [daintree.agents.relay-review-feedback]
-    run: 2026-09-24-selector-hardening
   - query: what did the reviewer say on the auth refactor PR
     confusable_with: [daintree.review.review-change]
     run: 2026-09-24-selector-hardening
   - query: 'is #512 green yet'
-    confusable_with: [daintree.workflow.find-issue-work]
+    confusable_with: [daintree.git.summarize-activity, daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
   - query: did anyone reply on issue 88
     confusable_with: [daintree.workflow.find-issue-work]
@@ -469,6 +468,21 @@ boundaries:
   - query: 'the reviewer left change requests on PR #33 on github, forward them to the codex agent still working on that branch'
     confusable_with: [daintree.agents.relay-review-feedback]
     run: 2026-09-28-agent-queries-2
+  - query: 'did CI pass on PR #519?'
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Is #217 approved yet, or still sitting on changes requested?'
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: 'why is #640 still open? wasn''t it fixed last sprint?'
+    confusable_with: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-catalog-expansion
+  - query: 'is #512 still open? what''s blocking it'
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: What did the reviewer say on PR 318, and is CI passing on it?
+    confusable_with: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: and the review?
     history:
@@ -900,6 +914,12 @@ topic_shifts:
       - 'assistant: Created 3 worktrees, filed t1/t2/t3 under them and told each agent to continue in its new directory.'
     active: [daintree.worktree.relocate-agents]
     run: 2026-09-24-selector-hardening
+  - query: '#930 is in the blocked section - is its CI still red?'
+    history:
+      - 'user: summarise my week'
+      - 'assistant: Shipped 6 PRs, in review 2, blocked 1: #930 (failing checks, changes requested).'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[wake: t_6001 responded, agent has picked up the review blockers]'
     history:

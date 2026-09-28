@@ -120,6 +120,40 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Add @priya as a reviewer on PR 9 and mark it ready for review.
     run: 2026-09-28-agent-queries-2
+  - query: 'Merge the four agents'' PRs one after another — #611, #612, #614, #615 — re-checking each after the previous one lands.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'land #88 then #91, 91 depends on 88'
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Merge train: the fan-out produced PRs #1203 through #1206; land them in dependency order and stop at the first that fails its required checks.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: squash-merge the three docs PRs in the order I opened them
+    run: 2026-09-28-catalog-expansion-late
+  - query: Land the backend PR first and the frontend PR after it, once the frontend's checks have rerun on the new base.
+    run: 2026-09-28-catalog-expansion-late
+  - query: The cohort's PRs are all approved — merge them sequentially, rebasing each on the last if it falls behind.
+    run: 2026-09-28-catalog-expansion-late
+  - query: merge 402, 405 and 407. in that order pls
+    run: 2026-09-28-catalog-expansion-late
+  - query: After the fan-out, merge each agent's PR into develop one at a time; nothing with a pending required check goes in.
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'The stacked PRs #77 -> #78 -> #79 are approved; merge them bottom-up.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: Merge the three refactor PRs from the claude agents; they touch the same module, so re-read mergeability after each merge.
+    run: 2026-09-28-catalog-expansion-late
+  - query: land all of today's approved PRs from the codex worktrees, oldest first
+    run: 2026-09-28-catalog-expansion-late
+  - query: please merge the api and sdk PRs — api has to go in before the sdk one
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Sequentially rebase-merge #230 and #231 into main and report which merged and where it stopped.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'The five PRs from this morning''s agents: merge them one by one, halt if any goes DIRTY.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Two PRs are ready, the schema change #340 and the endpoint #341 that uses it. Merge them in the right order.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: Land my three feature PRs back to back into release/2.3 with squash, confirming each merge on the forge before the next.
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'squash and merge #203 once it''s ready'
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: merge 447 once the checks pass
     confusable_with: [daintree.worktree.relocate-agents]
@@ -260,6 +294,72 @@ boundaries:
   - query: 'PR #212 is approved and green - approve it from my side too and merge with rebase.'
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-agent-queries-2
+  - query: 'The bump-to-node-22 PR #91 is green, squash and merge it.'
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: 'The reviewer approved #88 - squash-merge it.'
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: 'merge the dependabot axios bump, #77, it''s green'
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion
+  - query: 'merge the release PR #402 once checks pass'
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: Squash-merge PR 77, the 2.5 release PR, and delete the branch.
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Merge backport PR #990 into release/2.4 on GitHub.'
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Squash-merge #610 on GitHub now that its checks passed.'
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: 'close PR #455, it''s superseded by #470'
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Squash-merge #801, the bottom PR of the billing stack, once its required checks are green.'
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Rebase-merge #742 on GitHub now that it''s approved.'
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Approve #412 and squash-merge it.'
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Merge PR #77, the Renovate bump for eslint — it''s green and approved.'
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'the dependabot PRs are already sorted; just land #301 then #302 in that order'
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Merge the lockfile-refresh PR first and then the Node 22 bump PR, re-checking the second after the first lands.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Each agent already has its own PR — just merge them one at a time, no integration branch.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-late
+  - query: merge the four agents' PRs sequentially onto main
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'The stack is approved; merge #77, #78 and #79 bottom-up.'
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-late
+  - query: land the stacked PRs now that review is done, base of the stack first
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Merge the three layers of the payments stack in order, stopping if any fails its required checks.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'Merge PR #512 for the winning CSV exporter now that checks are green.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'The PRs are open and approved; land #20 then #21.'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'merge PR #77 now that the checks pass'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: squash
     history:
@@ -580,6 +680,68 @@ topic_shifts:
       - 'assistant: Renamed t1 ''cart: claude'', t2 ''tax fix: claude'', t3 ''docs: claude''.'
     active: [daintree.terminals.rename]
     run: 2026-09-24-selector-hardening
+  - query: 'merge PR #402'
+    history:
+      - 'user: plan-then-build the pagination rewrite'
+      - 'assistant: Done: implemented as approved in fix/pagination, drift check clean. You pushed it and opened PR #402; CI is green and it has one approval.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'approved — now land PR #377, squash it'
+    history:
+      - 'user: keep iterating the pagination fix until codex approves'
+      - 'assistant: APPROVED on round 3; my run of the tests passes. PR #377 is open with green CI.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'CI is green on the new head — squash-merge #377'
+    history:
+      - 'user: my PR #377 has conflicts, sort them out'
+      - 'assistant: claude-3 merged main into feat/tags-filter, conflicts kept both sides, checks green, pushed. #377 now shows mergeable.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: CI passed on both backport PRs — merge them
+    history:
+      - 'user: backport #512 to release/2.4 and 2.3'
+      - 'assistant: Pushed both and opened #540 and #541 against the release branches; read back from the forge.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#701 is approved — merge it'
+    history:
+      - 'user: split #600 into stacked PRs'
+      - 'assistant: Opened #701, #702 and #703 as a stack, bottom first; CI green on all three.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#412 is ready — approve it and squash-merge'
+    history:
+      - 'user: go through the review queue and tell me which PRs are good to merge'
+      - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: threads are all resolved — squash-merge it
+    history:
+      - 'user: fix what the reviewer asked for on #88'
+      - 'assistant: Verified claude-2''s 5 commits against the threads, re-ran tests and lint on a91c3e0 (passed), pushed to feature/token-refresh. #88 head is now a91c3e0; CI pending. No replies posted yet.'
+      - 'user: reply and resolve'
+      - 'assistant: Replied on 5 threads and resolved them; all 9 threads now resolved, CI green on a91c3e0.'
+    active: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it works, approve and merge it
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'now squash-merge the release PR #951'
+    history:
+      - 'user: write the 2.5 release notes into CHANGELOG.md'
+      - 'assistant: claude-5 updated CHANGELOG.md (uncommitted): 19 PRs, 4 plain commits, verified against v2.4.0..release/2.5.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'nothing confirmed then - approve and merge #742'
+    history:
+      - 'user: red-team PR #742'
+      - 'assistant: Both attackers done: no confirmed breaks, 3 rejected claims (reasons below).'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[forge activity: pull request changed]'
     active: [daintree.forge.land-pull-request]

@@ -111,6 +111,8 @@ positives:
     run: 2026-09-28-agent-queries
   - query: Review the diff on feature/sso with Codex and Gemini as independent read-only reviewers, one for security and one for error handling, and merge their findings into one list.
     run: 2026-09-28-agent-queries-2
+  - query: review the branch in the auth worktree
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: review this PR properly before i approve anything
     confusable_with: [daintree.forge.land-pull-request]
@@ -137,8 +139,6 @@ boundaries:
   - query: code review the css refactor on this branch
     confusable_with: [daintree.runtime.debug-web-app]
   - query: look over what the agent wrote in the components folder
-    confusable_with: [daintree.runtime.debug-web-app]
-  - query: check this page component for accessibility problems
     confusable_with: [daintree.runtime.debug-web-app]
   - query: security review the new browser storage code before it ships
     confusable_with: [daintree.runtime.debug-web-app]
@@ -421,6 +421,72 @@ boundaries:
   - query: What are the weak spots in the branch I'm about to open a PR for?
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-agent-queries
+  - query: 'Review the Next 15 upgrade PR #233 that Sam opened and tell me what''s risky in it.'
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Review PR #88 and tell me what''s wrong with it.'
+    confusable_with: [daintree.forge.address-pr-review]
+    run: 2026-09-28-catalog-expansion
+  - query: The fix Claude made on main is fine; now review it for security problems before anything else happens.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Code review PR #640 for correctness and security issues and give me findings with file references.'
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: is this 2k line pr any good? review it
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Review #340''s diff for security problems.'
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: review the release branch diff for bugs before we ship
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: Review the diff on feat/export and give me findings with file references.
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion
+  - query: 'review PR #88 for security problems'
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: Code review the feature/sso branch before I merge it.
+    confusable_with: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion
+  - query: Get two fresh read-only reviewers to look over feat/checkout and give me de-duplicated findings.
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: review the diff on my branch for security problems
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Review PR #412 for code quality and security issues and give me findings with file references.'
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: look over what claude wrote on the auth branch and tell me if it's any good
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Code review PR #412 for correctness and security, with two independent reviewers on it.'
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: 'is #88 any good? review it'
+    confusable_with: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Review the migration PR #640 for problems.'
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion
+  - query: Review the diff in the billing worktree for bugs and give me findings.
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: 'review PR #90''s changes to the cart total'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'review the two formatMoney implementations in PR #212 and list the problems'
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: review the coupon-codes branch and give me findings with file refs
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: review the winning entry's diff for bugs and give me findings
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: how's it going?
     history:
@@ -770,6 +836,30 @@ topic_shifts:
       - 'assistant: 3 findings so far from the handler diff; I haven''t looked at the test changes yet.'
     active: [daintree.review.review-change]
     run: 2026-09-24-selector-hardening
+  - query: before anything else, get a code review of the combined branch for security issues
+    history:
+      - 'user: integrate the auth and session branches'
+      - 'assistant: claude-5 merged both into integrate/auth at 5be0a17; I verified the log and the tests pass.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: have someone review the 2.3 backport, the adaptation there worries me
+    history:
+      - 'user: backport 9d03aa1 to release/2.3'
+      - 'assistant: Done: claude-6 adapted the fix to the old logger on release/2.3; the range-diff shows that one changed line, checks green.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok it works — now have Codex review the code properly, findings with severity
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: get two reviewers on the upgrade branch before I merge it
+    history:
+      - 'user: upgrade pydantic to v2'
+      - 'assistant: claude-3 is done on chore/upgrade-pydantic-2; bump, codemods and fixes are separate commits and my re-run of the tests passes.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[terminal.awaitAll returned: t_2201 finished, t_2202 finished]'
     history:

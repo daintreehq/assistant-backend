@@ -363,17 +363,16 @@ cases:
     - daintree.foundation
 - id: hG-p2-red-tests
   category: single-runbook
-  note: 'Project tests failing after an upgrade: ci.diagnose-and-fix.'
+  note: "Tests failing after a dependency upgrade: daintree.deps.upgrade-dependency (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: I bumped React to the latest version and now a bunch of my tests are failing :( Could you
       help me get them passing again?
   expect:
-    required:
-    - daintree.ci.diagnose-and-fix
-    optional:
-    - daintree.foundation
+    required: [daintree.deps.upgrade-dependency]
+    optional: [daintree.foundation]
+
 - id: hG-p2-howto-setting
   category: no-task
   note: A plain how-to about a Daintree setting is a documentation question; retrieved docs answer it
@@ -742,7 +741,7 @@ cases:
     - daintree.foundation
 - id: hG-p3-flaky-or-real
   category: single-runbook
-  note: Asking whether a pasted check failure is flaky is part of ci.diagnose-and-fix.
+  note: "Whether a pasted check failure is flaky or real: daintree.ci.hunt-flaky-test (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
@@ -755,10 +754,9 @@ cases:
 
       '
   expect:
-    required:
-    - daintree.ci.diagnose-and-fix
-    optional:
-    - daintree.foundation
+    required: [daintree.ci.hunt-flaky-test]
+    optional: [daintree.foundation]
+
 - id: hG-p3-merge-then-start
   category: multi-runbook
   note: 'Two separate procedures: land one PR, and start work on a different issue.'

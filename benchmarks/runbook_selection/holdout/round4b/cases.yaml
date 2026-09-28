@@ -444,15 +444,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W1-071
-  category: no-task
-  note: Generic refactor, nothing Daintree-specific.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Rename the userId parameter to accountId across the billing service
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W1-077
   category: no-task
   note: Generic coding task.
@@ -512,15 +513,16 @@ cases:
     - daintree.foundation
     optional: []
 - id: r4-W2-018
-  category: no-task
-  note: generic tooling change, no Daintree workflow
+  category: single-runbook
+  note: "A dependency or tooling upgrade: daintree.deps.upgrade-dependency (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: migrate .eslintrc.json to eslint v9 flat config
   expect:
-    required: []
-    optional: []
+    required: [daintree.deps.upgrade-dependency]
+    optional: [daintree.foundation]
+
 - id: r4-W2-019
   category: single-runbook
   note: create, label, assign an issue
@@ -690,15 +692,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W2-057
-  category: no-task
-  note: a code change the caller makes itself; no agent, no Daintree
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: convert callback-based fs calls in scripts/build.js to fs/promises async/await
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W2-059
   category: routing-trap
   note: synthesis target -> multi-agent, not conversation
@@ -1286,25 +1289,27 @@ cases:
     required: []
     optional: []
 - id: r4-W3-075
-  category: no-task
-  note: Generic code change done directly.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: add a docstring to every public function in utils/date.py
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W3-077
-  category: no-task
-  note: Generic refactor done directly.
+  category: single-runbook
+  note: "Plain project work: the orchestration layer delegates it through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: convert fetchOrders to async/await pls, the callback nesting is gross
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W3-078
   category: no-task
   note: Generic question about a warning; nothing failing to fix.
@@ -1671,16 +1676,16 @@ cases:
     optional:
     - daintree.foundation
 - id: r4-W4-075
-  category: no-task
-  note: 'keyword bait: ''worktree'' is a variable name; an ordinary code edit with no agent requested matches no
-    runbook'
+  category: single-runbook
+  note: "Keyword bait: 'worktree' is a variable name. An ordinary code edit, delegated through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: rename the worktreePath variable to worktreeDir in src/git/paths.ts
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]
+
 - id: r4-W4-077
   category: no-task
   note: 'fence: terminals.rename says explaining HOW renaming works is a documentation question; no runbook is needed'
@@ -1692,12 +1697,12 @@ cases:
     required: []
     optional: []
 - id: r4-W4-078
-  category: no-task
-  note: 'keyword bait: ''agent fleet'' is a class name; a one-line edit done directly matches no runbook'
+  category: single-runbook
+  note: "Keyword bait: 'agent fleet' is a class name. A one-line edit, delegated through daintree.edits.spawn-visible-agent (relabelled 2026-09-28)."
   active: []
   messages:
   - role: user
     content: Fix the typo 'recieve' in the docstring of the AgentFleet class in fleet.py
   expect:
-    required: []
-    optional: []
+    required: [daintree.edits.spawn-visible-agent]
+    optional: [daintree.foundation]

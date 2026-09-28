@@ -25,7 +25,6 @@ positives:
   - ask one of the configured agents what it would name this module and just give me the answer
   - is there a way to get an agent to check if there's a race in the speculation handshake and just report back? i dont want it fixing anything
   - ask claude whether the awaitAll retry loop is correct. i want its verdict not a patch
-  - 'put a question to one of the agents for me: does the golden snapshot flow make sense as written? want its answer this turn, not later'
   - ask an agent whats it think of our naming in the runbooks dir
   - spawn an agent, ask it to explain what this repo does in one paragraph, relay it verbatim
   - can you ask something read-only to confirm the coverage floors actually ratchet and tell me what it found?
@@ -102,8 +101,6 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Get Gemini's take on whether our Redis key naming scheme will collide across tenants, and bring back what it says.
     run: 2026-09-28-agent-queries-2
-  - query: have claude-2 look at the session middleware and tell me if it thinks the timeout logic is sound
-    run: 2026-09-28-agent-queries-2
   - query: 'One question for Codex: is the pagination in /api/orders off by one? Report its answer with attribution.'
     run: 2026-09-28-agent-queries-2
   - query: Ask Codex whether it would split the billing service before or after the Postgres upgrade, and relay its reasoning.
@@ -119,8 +116,6 @@ positives:
   - query: Have claude weigh in on whether the feature-flag cleanup can ship this week; I only want its answer.
     run: 2026-09-28-agent-queries-2
   - query: Put one question to Codex — does the lockfile bump pull in any breaking transitive change — and report back what it finds.
-    run: 2026-09-28-agent-queries-2
-  - query: ask claude-2 if the websocket reconnect logic handles laptop sleep properly
     run: 2026-09-28-agent-queries-2
   - query: Consult Codex on whether the new ORM hooks introduce N+1 queries; no edits, just its judgement.
     run: 2026-09-28-agent-queries-2
@@ -161,8 +156,6 @@ boundaries:
     confusable_with: [daintree.agents.poll-pinned-agents]
   - query: spawn codex read-only, ask if this migration is safe, relay the answer to me
     confusable_with: [daintree.agents.poll-pinned-agents]
-  - query: ask claude in tab 3 how the retry logic works and tell me what it says
-    confusable_with: [daintree.explore.repository]
   - query: get codex to explain the migration system and bring back what it reckons
     confusable_with: [daintree.explore.repository]
   - query: spawn an agent to check whether we still use redis anywhere and tell me
@@ -174,8 +167,6 @@ boundaries:
   - query: ask claude what it makes of the retry logic and relay the answer back to me
     confusable_with: [daintree.orchestration.conversation]
   - query: spawn something read-only to look at the auth module and tell me what it says
-    confusable_with: [daintree.orchestration.conversation]
-  - query: just pass one question to that agent for me and bring back what it says
     confusable_with: [daintree.orchestration.conversation]
   - query: get an agent to look at the caching layer and report back what it thinks
     confusable_with: [daintree.review.review-change]
@@ -225,8 +216,6 @@ boundaries:
     confusable_with: [daintree.orchestration.interview]
   - query: have one agent look at the three implementations on those branches and tell me which is best
     confusable_with: [daintree.orchestration.interview]
-  - query: ask the claude in tab 2 what it makes of the diff and just tell me what it says
-    confusable_with: [daintree.review.review-change]
   - query: spawn one read-only agent to look over the diff and tell me what it says back
     confusable_with: [daintree.review.review-change]
   - query: get gpt to have a quick look at the change and relay whatever it comes back with
@@ -438,6 +427,24 @@ boundaries:
   - query: ask codex what it thinks the risks of the billing refactor are and tell me its answer
     confusable_with: [daintree.review.review-change]
     run: 2026-09-28-agent-queries
+  - query: Spawn a Claude to read the retry logic and tell me what it thinks.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Launch codex read-only and ask it what the risks of the queue rewrite are.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Ask Codex how it would approach splitting the monolithic reports module. I just want its plan relayed back; nothing gets built.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: get claude to sketch an approach for caching the pricing API and tell me what it thinks, no changes
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: Ask Codex what plan it would use to shard the jobs table. Just the plan, nothing gets built.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: ask codex what it thinks of the cart total logic and relay its answer
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: hows it going
     history:
@@ -530,8 +537,6 @@ topic_shifts:
       - 'user: get claude to look at the invoice rounding and tell me if its right'
       - 'assistant: Asked a read-only agent. It says rounding is applied per line item then summed, which matches the spec, but tax is rounded a second time at the total.'
     active: [daintree.agents.ask-and-relay]
-  - ask claude in tab 2 what it makes of the retry logic
-  - quick one - ask the codex agent if the selector prompt is too long
   - query: one sec — get an agent to look at the config loader and tell me if theres a race in there
     history:
       - 'user: take 88 90 and 93 and put an agent on each'
@@ -560,7 +565,6 @@ topic_shifts:
     active: [daintree.foundation]
   - ask claude what it makes of the caching layer and tell me what it says
   - ask claude what it makes of the new retry code and just tell me what it says
-  - there's no competition here and nobody is judging anything. ask claude-2 what it makes of the backoff logic and tell me what it says.
   - ask an agent what it makes of the queue backpressure and tell me what it says
   - query: ask claude what it makes of that final diff
     history:
@@ -649,6 +653,12 @@ topic_shifts:
       - 'assistant: Created worktree issue-733-retry-uploads and spawned claude in t6 with a supervisor watcher.'
     active: [daintree.workflow.start-work-on-issue]
     run: 2026-09-24-selector-hardening
+  - query: get a fresh codex to read the cache module and tell me whether that key is actually safe
+    history:
+      - 'user: ask claude-5 why it chose that cache key'
+      - 'assistant: claude-5 says the key includes the tenant id to avoid cross-tenant leaks.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[agent a_3021 completed]'
     history:
@@ -661,7 +671,6 @@ wakes:
       - 'assistant: Read-only agent up in t_4455 with that exact question. I''ll relay its answer once it lands.'
     active: [daintree.agents.ask-and-relay, daintree.foundation]
 docs:
-  - yep ask it
   - query: yep ask it
     history:
       - 'user: hi'

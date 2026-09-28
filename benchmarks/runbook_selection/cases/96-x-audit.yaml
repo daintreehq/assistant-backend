@@ -1,0 +1,504 @@
+# Reports and audits (batch B6): worktree audit, activity summary, release notes,
+# codebase audit, red-teaming a change, production incident investigation.
+#
+# Each new runbook has an agent-phrased and a user-phrased recall case, one
+# routing-trap case of its own (phrased beside a neighbour's territory), and one
+# routing trap per existing neighbour where the neighbour is right.
+
+cases:
+  # ---- daintree.worktree.audit-worktrees ----
+  - id: x-audit-worktrees-agent
+    category: single-runbook
+    note: Agent phrasing of the read-only worktree audit with a per-worktree class and evidence.
+    messages:
+      - role: user
+        content: Classify every worktree in this project as merged, in review, parked or at risk of losing work, with the evidence for each, and propose which could be removed without deleting anything
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-audit-worktrees-user
+    category: single-runbook
+    note: Casual "which can I get rid of" is a question about worktree state, not a cleanup order.
+    messages:
+      - role: user
+        content: i've got like 15 worktrees now, which ones are already merged and safe to get rid of?
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-audit-worktrees-before-cleanup
+    category: routing-trap
+    note: >-
+      Mentions cleaning up, but asks only which worktrees hold unsaved work; the
+      audit answers it and workspace-cleanup must not be loaded yet.
+    messages:
+      - role: user
+        content: before I clean anything up, tell me which worktrees still have uncommitted or unpushed work in them
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-trap-cleanup-merged-worktrees
+    category: routing-trap
+    note: An explicit order to delete merged worktrees is teardown, not an audit.
+    messages:
+      - role: user
+        content: delete all the worktrees whose PRs have merged, I've already checked them
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: x-trap-supervise-agents-in-worktrees
+    category: routing-trap
+    note: The state of the agents running now is fleet triage, not a worktree audit.
+    messages:
+      - role: user
+        content: which of the agents in my worktrees are stuck or waiting on me right now?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: x-trap-resume-worktree-session
+    category: routing-trap
+    note: Reconstructing earlier sessions to continue them is status-and-resume.
+    messages:
+      - role: user
+        content: what was I in the middle of across these worktrees before Daintree restarted yesterday? pick it back up
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: x-trap-plain-worktree-list
+    category: routing-trap
+    note: A plain list of worktrees with no judgement asked is the foundation alone.
+    messages:
+      - role: user
+        content: list the worktrees in this project
+    expect:
+      required: [daintree.foundation]
+
+  # ---- daintree.git.summarize-activity ----
+  - id: x-summarize-activity-agent
+    category: single-runbook
+    note: Agent phrasing of a dated standup built from PRs, commits and reviews.
+    messages:
+      - role: user
+        content: Summarise my merged PRs, direct commits and code reviews from the last 7 days as standup notes, split into shipped, in review and in progress, with every item linked
+    expect:
+      required: [daintree.git.summarize-activity]
+      optional: [daintree.foundation]
+
+  - id: x-summarize-activity-user
+    category: single-runbook
+    note: The shortest real ask.
+    messages:
+      - role: user
+        content: write my standup for today
+    expect:
+      required: [daintree.git.summarize-activity]
+      optional: [daintree.foundation]
+
+  - id: x-summarize-activity-agents-landed
+    category: routing-trap
+    note: >-
+      Mentions agents and worktrees, but the deliverable is a written account of
+      what landed today; supervise-fleet and status-and-resume must stay out.
+    messages:
+      - role: user
+        content: write up for the team what the agents actually landed on main today versus what is still sitting in worktrees
+    expect:
+      required: [daintree.git.summarize-activity]
+      optional: [daintree.foundation]
+
+  - id: x-trap-catch-me-up-resume
+    category: routing-trap
+    note: '"Where were we" to continue work is status-and-resume, not an activity report.'
+    messages:
+      - role: user
+        content: catch me up, where were we on the auth work before I closed everything last night?
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: x-trap-did-we-ship-feature
+    category: routing-trap
+    note: Whether one thing ever shipped is a PR lookup, not a period report.
+    messages:
+      - role: user
+        content: did we ever ship the CSV export? find the PR for it
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: x-trap-one-pr-status
+    category: routing-trap
+    note: One PR's CI and review state is follow-up-on-issue.
+    messages:
+      - role: user
+        content: what's the CI and review status on PR 412 right now?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: x-trap-how-are-agents-doing
+    category: routing-trap
+    note: How the running agents are doing now is fleet triage.
+    messages:
+      - role: user
+        content: how are all my agents doing, has anyone finished or got stuck?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  # ---- daintree.forge.draft-release-notes ----
+  - id: x-release-notes-agent
+    category: single-runbook
+    note: Agent phrasing with an explicit tag range and no publishing.
+    messages:
+      - role: user
+        content: Draft release notes for v2.5.0 from the PRs merged into main since tag v2.4.0, grouped by type with breaking changes first, and do not tag or publish anything
+    expect:
+      required: [daintree.forge.draft-release-notes]
+      optional: [daintree.foundation]
+
+  - id: x-release-notes-user
+    category: single-runbook
+    note: Casual phrasing.
+    messages:
+      - role: user
+        content: release notes for 2.5 pls
+    expect:
+      required: [daintree.forge.draft-release-notes]
+      optional: [daintree.foundation]
+
+  - id: x-release-notes-changelog
+    category: routing-trap
+    note: >-
+      "Everything merged since" sounds like an activity summary; a CHANGELOG entry
+      anchored to the last tag is release notes.
+    messages:
+      - role: user
+        content: update CHANGELOG.md with everything that's been merged since the last tag
+    expect:
+      required: [daintree.forge.draft-release-notes]
+      optional: [daintree.foundation]
+
+  - id: x-trap-weekly-update-not-notes
+    category: routing-trap
+    note: A weekly update of what got done is an activity summary, not release notes.
+    messages:
+      - role: user
+        content: what did I get done this week? put together my weekly update
+    expect:
+      required: [daintree.git.summarize-activity]
+      optional: [daintree.foundation]
+
+  - id: x-trap-merge-release-pr
+    category: routing-trap
+    note: Merging the release PR is land-pull-request.
+    messages:
+      - role: user
+        content: merge the 2.5 release PR once its checks are green
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-trap-did-fix-ship
+    category: routing-trap
+    note: Checking whether one fix shipped is a lookup.
+    messages:
+      - role: user
+        content: did the fix for the login timeout ever get merged? find the PR
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  # ---- daintree.review.audit-codebase ----
+  - id: x-audit-codebase-agent
+    category: single-runbook
+    note: Agent phrasing of a lens audit of existing code.
+    messages:
+      - role: user
+        content: Perform a security audit of the existing authentication module with read-only specialist reviewers and report verified findings with file:line evidence and what was not covered
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: x-audit-codebase-user
+    category: single-runbook
+    note: Casual accessibility audit with agents.
+    messages:
+      - role: user
+        content: get a couple of agents to do an a11y audit of the settings screens
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: x-audit-codebase-dead-code
+    category: routing-trap
+    note: >-
+      A whole folder as it stands, not a diff: audit-codebase, not review-change.
+    messages:
+      - role: user
+        content: find dead code in src/legacy, the whole folder as it is now, not just recent changes
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: x-trap-review-branch-security
+    category: routing-trap
+    note: Security problems in a branch's diff are a change review.
+    messages:
+      - role: user
+        content: review the diff on this branch for security problems before I open the PR
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-trap-explain-auth-flow
+    category: routing-trap
+    note: Explaining how existing code works is exploration, not an audit.
+    messages:
+      - role: user
+        content: explain how the auth module issues and refreshes tokens
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  - id: x-trap-lint-failing
+    category: routing-trap
+    note: A failing check is diagnose-and-fix.
+    messages:
+      - role: user
+        content: the lint job is failing on main, can you fix it
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  # ---- daintree.review.red-team-change ----
+  - id: x-red-team-agent
+    category: single-runbook
+    note: Agent phrasing of the attack; only proven breaks, each checked against base.
+    messages:
+      - role: user
+        content: Launch an adversarial agent against the new input-validation change and report only the breaks it proves with a failing test, each one checked against the base branch
+    expect:
+      required: [daintree.review.red-team-change]
+      optional: [daintree.foundation]
+
+  - id: x-red-team-user
+    category: single-runbook
+    note: Casual cross-model attack.
+    messages:
+      - role: user
+        content: get codex to try and break claude's fix
+    expect:
+      required: [daintree.review.red-team-change]
+      optional: [daintree.foundation]
+
+  - id: x-red-team-prove-it
+    category: routing-trap
+    note: >-
+      Sounds like a review of a PR, but the deliverable is executed proof of
+      breakage, so review-change must not be picked.
+    messages:
+      - role: user
+        content: red-team the rate limiter PR and prove anything you find with a repro I can run
+    expect:
+      required: [daintree.review.red-team-change]
+      optional: [daintree.foundation]
+
+  - id: x-trap-code-review-pr
+    category: routing-trap
+    note: Findings from reading a PR are a change review.
+    messages:
+      - role: user
+        content: code review this PR and tell me what you would change
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-trap-verify-tests-pass
+    category: routing-trap
+    note: Checking an agent's done-claim is verify-agent-work.
+    messages:
+      - role: user
+        content: the agent says the tests pass on its fix, confirm that before I merge
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: x-trap-relay-review-to-fixer
+    category: routing-trap
+    note: A named reviewer whose findings go to a named fixer is relay-review-feedback.
+    messages:
+      - role: user
+        content: have Codex review the parser change without editing anything, then pass its findings to Claude to fix
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: x-trap-suite-red-after-change
+    category: routing-trap
+    note: A red suite after a change is a failing check to fix.
+    messages:
+      - role: user
+        content: the test suite went red after the parser change, fix it
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  # ---- daintree.debug.investigate-outage ----
+  - id: x-outage-agent
+    category: single-runbook
+    note: Agent phrasing of a read-only incident investigation.
+    messages:
+      - role: user
+        content: Investigate a production outage that started after today's deploy using parallel read-only agents on the logs, the deploy diff and the stack trace, and build a timeline and ranked suspects without taking any mitigation action
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: x-outage-user
+    category: single-runbook
+    note: Casual incident.
+    messages:
+      - role: user
+        content: prod is on fire, 500s everywhere since the 2pm deploy. get some agents on it
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: x-outage-what-changed
+    category: routing-trap
+    note: >-
+      "Failing" and "fix" vocabulary is diagnose-and-fix's, but the failure is in
+      production after a release, not a check.
+    messages:
+      - role: user
+        content: checkout has been failing in production since this morning's release, what changed?
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: x-trap-ci-red-on-main
+    category: routing-trap
+    note: Red CI is diagnose-and-fix, not an incident.
+    messages:
+      - role: user
+        content: CI went red on main right after the last merge, why?
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-trap-dev-preview-blank
+    category: routing-trap
+    note: A broken local dev preview is debug-web-app.
+    messages:
+      - role: user
+        content: the dev preview is showing a blank page with errors in the console, debug it
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: x-trap-daintree-down
+    category: routing-trap
+    note: Daintree itself not responding is diagnostics.
+    messages:
+      - role: user
+        content: Daintree has stopped responding and the MCP looks disconnected
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: x-trap-agents-converge
+    category: routing-trap
+    note: Agents converging on one answer is multi-agent, not an incident.
+    messages:
+      - role: user
+        content: have claude and codex work through whether our retry design is sound and converge on one answer
+    expect:
+      required: [daintree.orchestration.multi-agent]
+      optional: [daintree.foundation]
+
+  # ---- traps against sibling runbooks written in the same expansion ----
+  - id: x-trap-rebase-behind-worktrees
+    category: routing-trap
+    note: Catching behind worktrees up with main is sync-with-base, not an audit.
+    messages:
+      - role: user
+        content: three of my worktrees are way behind main, rebase them onto it and sort out any conflicts
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: x-trap-worktrees-same-files
+    category: routing-trap
+    note: Overlap and conflict forecasting between worktrees is compare-worktrees.
+    messages:
+      - role: user
+        content: are any of my worktrees touching the same files, and will they conflict when I merge them?
+    expect:
+      required: [daintree.worktree.compare-worktrees]
+      optional: [daintree.foundation]
+
+  - id: x-trap-delete-merged-remote-branches
+    category: routing-trap
+    note: Branch and remote-branch hygiene with no worktree involved is prune-stale-branches.
+    messages:
+      - role: user
+        content: delete my merged branches on the remote and prune the old ones nobody has touched in months
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: x-trap-upgrade-vulnerable-dep
+    category: routing-trap
+    note: Upgrading a dependency is upgrade-dependency, not a dependency audit.
+    messages:
+      - role: user
+        content: upgrade lodash to the latest major and make sure nothing breaks
+    expect:
+      required: [daintree.deps.upgrade-dependency]
+      optional: [daintree.foundation]
+
+  - id: x-trap-file-audit-findings
+    category: routing-trap
+    note: Filing a list of findings as issues is manage-issue (batch filing).
+    messages:
+      - role: user
+        content: file an issue for each finding in that security audit you just did
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: x-trap-bug-bash-release
+    category: routing-trap
+    note: Several agents exploring the running app is a bug bash, not red-teaming one change.
+    messages:
+      - role: user
+        content: bug bash the new release with a few agents, one on onboarding and one on billing
+    expect:
+      required: [daintree.orchestration.bug-bash]
+      optional: [daintree.foundation]
+
+  - id: x-trap-repro-reported-crash
+    category: routing-trap
+    note: Reproducing a reported bug with no live incident is reproduce-bug.
+    messages:
+      - role: user
+        content: a user reported a crash when saving an empty form, write a failing test that reproduces it first
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-trap-which-commit-broke
+    category: routing-trap
+    note: Finding the commit behind a locally reproducible regression is bisect-regression.
+    messages:
+      - role: user
+        content: startup worked fine in v2.3 and is slow now, find which commit broke it
+    expect:
+      required: [daintree.git.bisect-regression]
+      optional: [daintree.foundation]

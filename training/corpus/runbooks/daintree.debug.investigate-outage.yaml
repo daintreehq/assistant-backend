@@ -1,0 +1,147 @@
+# Training examples whose answer is `daintree.debug.investigate-outage` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.debug.investigate-outage
+run: 2026-09-28-catalog-expansion
+positives:
+  - Production checkout is returning 500s since the 14:05 deploy of api v2.41. Launch read-only agents on the deploy diff, the Cloud Run logs and the checkout code path, and give me ranked suspects.
+  - prod is down. get some agents on it
+  - 'Live incident: p99 latency on the orders service tripled after this morning''s release. Build a timeline and suspects; don''t roll anything back.'
+  - 'Staging has been throwing 502s for the last 20 minutes since PR #884 was deployed there — investigate with agents, mitigation options only.'
+  - errors spiked right after we shipped 3.12.0, what changed?? nobody touch prod
+  - 'Incident triage for payments-worker: the dead-letter queue has been filling since deploy sha 9e1f2d7. Pin the code to that SHA and fan out investigators on logs and diff.'
+  - Pin a worktree to the deployed revision of the web frontend (last known good is v5.3.1) and have agents check what shipped since then against the login failures users are reporting in production.
+  - Not CI — production. The signup endpoint 500s on every request since the deploy an hour ago. Get agents on the logs and the diff.
+  - Customers can't log in on prod since tonight's release and we can't reproduce it locally. Work out which commits in the deploy are the likely cause from the logs and diff, read-only.
+  - The deployed site at app.acme.io shows a blank page with a chunk-load error in users' consoles since the 3pm release — not the local preview. Investigate the incident.
+  - Our production API (not Daintree) stopped responding after the migration deploy; health checks fail on every pod. Triage it with agents.
+  - Get codex and claude on the prod outage in parallel, one on the logs and one on the deploy diff, and pull it into one timeline with ranked suspects.
+  - 'It''s live, not a bug report: every PDF export in production has failed since Tuesday''s deploy. Find the suspect commits and give me mitigation options.'
+  - prod memory climbs until the pods OOM since the 2.9 rollout — might be the cache, the new ORM or the image resizer. investigate the incident
+  - 'incident: /api/cart 500s, started 09:12 UTC, deployed 4c7e0a1, last good 81bd3f2. read-only investigators, timeline + suspects + mitigations'
+  - help me triage this, webhook deliveries to stripe are all failing in prod since the deploy
+  - Edge function errors jumped from 0.1% to 12% after Friday's release of the notifications service. Investigate what changed without redeploying or touching config.
+  - The production search cluster started returning empty results after release r482. Fan out agents on the diff, the logs I'll paste, and the query path.
+  - prod on fire. 500s on checkout. sentry is full of NullPointerExceptions from CartService. get agents on it
+  - What changed in yesterday's deploy that broke password reset emails in production? Timeline and suspects, plus rollback versus feature-flag options with blast radius.
+  - Mobile clients get 401s from the production gateway since the auth service deploy at 11:40. Investigate read-only; I'll run any mitigation myself.
+  - the eu region is down after the rollout, us is fine. can you get agents looking at the recent deploys + logs
+  - The build is green and the tests pass, but the deployed billing job has crashed in production on every run since the 1.8.0 release. Investigate the live failure.
+  - Queue consumers in production are crash-looping after deploy 2026-09-27.3; get investigators on the diff from 2026-09-26.1 and on the error logs.
+  - 'customer reports flooding in that uploads fail on prod, started around when we shipped PR #1201. triage the incident and propose mitigations'
+  - Nothing is loading on our production dashboard at dash.internal — it's our Next.js app, not the Daintree app. Get agents triaging the outage.
+boundaries:
+  - query: prod has been throwing 500s since the 3pm deploy, get agents on it
+    confusable_with: [daintree.agents.postmortem-run]
+  - query: It's not a CI failure — prod is failing for real users since the deploy. Get agents on the logs and the deploy diff.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: checkout is broken, but in production, not the tests. errors started with release 4.2. triage it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Why is it failing? The jobs service in production has thrown TimeoutErrors since the 10:30 deploy.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Since this morning's deploy, prod checkout returns 500s for everyone — get agents on it.
+    confusable_with: [daintree.debug.reproduce-bug]
+  - query: nothing is responding — our production API, not Daintree — since the deploy at noon
+    confusable_with: [daintree.diagnostics]
+  - query: Why can't customers sign in? Our auth service went down in production after this morning's release.
+    confusable_with: [daintree.diagnostics]
+  - query: Show me the recent errors from the production orders service since the deploy and work out what broke it.
+    confusable_with: [daintree.diagnostics]
+  - query: Errors spiked right after the 14:00 deploy and checkout is down — get agents looking at what changed.
+    confusable_with: [daintree.git.bisect-regression]
+  - query: prod is throwing 500s on checkout since the 14:00 deploy, get agents on the logs and the diff
+    confusable_with: [daintree.orchestration.hypothesis-split]
+  - query: Console errors on the live production site since today's deploy — not the dev preview. Investigate.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the deployed web app renders blank for customers after the release, find what changed
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Users see a React error overlay on production checkout since the 2pm push; get agents on the logs and the diff.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Production API is returning 502s since the 14:00 deploy; get agents on the logs and recent diffs.
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: Production API latency jumped 10x at 14:00; find out what's going on.
+    confusable_with: [daintree.runtime.measure-performance]
+  - query: Production migrations failed mid-deploy and checkout has been throwing 500s since. Triage it.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: webhook handler is eating events in staging and i need someone on it RIGHT NOW - spin an agent up in the api worktree
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: pre-split
+  - query: is our production site down right now
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: pre-split
+  - query: why does our production site at shop.example.com load slowly for users in Asia
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: prod checkout is throwing 500s since this morning's deploy
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: the payments service is throwing timeouts too - add that to the logs lens
+    history:
+      - 'user: prod is down, checkout has been 500ing since 14:10'
+      - 'assistant: Deployed 8a9b0c1, last good 3d4e5f6. Created incident/8a9b0c1 and launched diff, logs and code-path investigators (claude-1, codex-2, claude-3), all read-only.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: tell the logs one to check whether it's only us-east1
+    history:
+      - 'user: errors spiked after the deploy, get some agents on it'
+      - 'assistant: Logs lens (codex-2) reports: first error 14:08 UTC, ''pool exhausted'' in coupon-service, about 40/s. Diff and code-path lenses still out.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: just give me what you have now, I need to decide in 5 minutes
+    history:
+      - 'user: prod is on fire - what changed that broke checkout?'
+      - 'assistant: Suspect window 3d4e5f6..8a9b0c1 is 6 commits. Diff lens flagged #954 (Redis timeout 5s to 500ms). Logs and code-path lenses are still running.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what would rolling back to rev 3d4e5f6 take out besides the suspect?
+    history:
+      - 'user: API 500s since the 09:30 deploy'
+      - 'assistant: Provisional: #954 is the top suspect (timeout change, errors start 2 minutes after deploy). Mitigation options: revert #954, or roll back to revision 3d4e5f6.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'Update from the user: last known good revision is daintree-api-00412-xyz, deployed yesterday 17:30 UTC - unblock the diff lens.'
+    history:
+      - 'user: prod is returning 502s on /api/cart'
+      - 'assistant: Deployed SHA ba16ea7 pinned in incident/ba16ea7; last good unknown, so the diff lens is blocked. Logs and code-path investigators launched.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: wait, now prod checkout is throwing 500s since the deploy — get agents on the logs and the deploy diff
+    history:
+      - 'user: split the investigation on the flaky sidebar render'
+      - 'assistant: Two probes running: claude-2 on re-render storm, codex-3 on CSS transitions.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: drop that - prod is on fire, errors spiked right after the 15:00 deploy. get some agents on it
+    history:
+      - 'user: the unit tests are failing on develop'
+      - 'assistant: codex-1 is fixing the failing date test in the develop worktree.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: never mind the preview - production checkout is returning 500s since this morning's deploy
+    history:
+      - 'user: the dev preview shows a blank page'
+      - 'assistant: claude-2 is looking at the preview console error in feat/cart.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: since that went out the API error rate in prod has tripled - what changed that broke it?
+    history:
+      - 'user: merge #960'
+      - 'assistant: Merged #960 into main an hour ago; the deploy pipeline picked it up.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: scrap that, the prod deploy just broke login for everyone - help me triage
+    history:
+      - 'user: write my standup'
+      - 'assistant: Launched compiler claude-2 for yesterday; ending the turn until it reports.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: this isn't one user any more - prod has been throwing 502s on /api/cart for 20 minutes since the deploy
+    history:
+      - 'user: can you repro #412?'
+      - 'assistant: claude-1 is writing a reproduction for #412 in a scratch worktree off main.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful

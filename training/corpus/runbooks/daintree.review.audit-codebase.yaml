@@ -1,0 +1,139 @@
+# Training examples whose answer is `daintree.review.audit-codebase` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.review.audit-codebase
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Security audit of src/auth: authz on every route, injection, secrets in config. Findings only, don''t fix anything.'
+  - threat model the webhook ingestion service
+  - 'Accessibility audit of the settings screens under app/settings: labels, focus order, contrast, keyboard traps.'
+  - find dead code in packages/legacy-billing
+  - Check our Python deps for known vulnerabilities and anything not compatible with Apache-2.0. No upgrades.
+  - Have codex and claude audit the payment path, one with a security lens and one with a performance lens.
+  - Look for N+1 queries and unbounded payloads in the orders API as it stands on main.
+  - audit the upload handler for path traversal and ssrf
+  - Could anything in services/gateway leak secrets? Audit it as it is today, not a PR.
+  - license check on the npm deps - we ship Apache-2.0, flag anything GPL-ish
+  - 'Dead-code sweep of the old admin panel: which exports have no callers, dynamic imports and templates included?'
+  - cargo audit the rust workspace and tell me which advisories are actually reachable, read-only
+  - Put a read-only security reviewer on the GraphQL resolvers; I want severity and file:line per finding.
+  - a11y pass on the checkout flow components, report only
+  - 'How exposed is our session handling? Want a proper threat model: assets, entry points, trust boundaries, abuse paths.'
+  - audit the api package pls
+  - 'Performance audit of the report generator: blocking I/O on hot paths, missing indexes, loops over every row.'
+  - pip-audit lists 40 advisories. Which ones hit code we actually run? Don't bump anything yet.
+  - Check the existing crypto usage in lib/tokens for misuse - current code, not a change under review.
+  - Before we open-source the repo, check it for committed secrets and dependencies with incompatible licences.
+  - audit src/legacy for stuff nobody calls anymore so we can plan a cleanup - don't delete anything
+  - Security and accessibility audit of the onboarding module in the develop worktree, a separate agent per lens.
+  - Our SOC2 assessor wants a security review of the admin API as it is at HEAD, with exploit scenarios for each finding.
+  - Scan the Go services for SQL and shell injection and confirm every hit in the source.
+  - osv-scanner the monorepo and tell me which vulns matter
+  - Check the React components for ARIA misuse and keyboard traps; findings only, nothing fixed and nothing filed.
+boundaries:
+  - query: check our deps for known CVEs and GPL licences, don't upgrade anything
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: launch codex to do an accessibility audit of the settings pages, report only
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: get an agent to audit our dependencies for bad licences
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Map the trust boundaries and entry points of the upload service and what an attacker could do with them.
+    confusable_with: [daintree.explore.repository]
+  - query: find the code nobody calls anymore in src/legacy
+    confusable_with: [daintree.explore.repository]
+  - query: which parts of utils/ are unused?
+    confusable_with: [daintree.explore.repository]
+  - query: Check our npm dependencies for known CVEs and licence problems without upgrading anything.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: 'Security audit of the auth module: read the code and list the vulnerabilities.'
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: Do a security audit of the existing billing module as it stands, not any particular PR.
+    confusable_with: [daintree.review.red-team-change]
+  - query: Check the auth module for security problems - the code as it is on main, no diff involved.
+    confusable_with: [daintree.review.review-change]
+  - query: Look over the existing billing code for injection bugs.
+    confusable_with: [daintree.review.review-change]
+  - query: security review of the whole api/ directory, not a PR
+    confusable_with: [daintree.review.review-change]
+  - query: Run a general read-only audit of the frontend architecture.
+    confusable_with: [daintree.explore.repository, daintree.runtime.debug-web-app]
+    run: pre-split
+  - query: check this page component for accessibility problems
+    confusable_with: [daintree.review.review-change, daintree.runtime.debug-web-app]
+    run: pre-split
+  - query: security audit the checkout code
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: security audit the payments module as it stands today
+    confusable_with: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: add a performance lens on the same paths too
+    history:
+      - 'user: do a security audit of src/auth'
+      - 'assistant: Revision 4c1d2e0, clean tree. Launched codex-1 as ''Audit: security (src/auth)'' in the main worktree, read-only; ending the turn.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and threat-model it while you're at it - assets, entry points, trust boundaries
+    history:
+      - 'user: security audit of the payments service please'
+      - 'assistant: Scope: services/payments at 7a8b9c0. codex-2 is running the security lens read-only; I''ll verify each finding against the source when it stops.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the dead-code one only looked at src/legacy - extend it to src/utils as well
+    history:
+      - 'user: find dead code in src/legacy'
+      - 'assistant: codex-1 reported 9 candidates; my own negative searches, including dynamic imports and templates, confirmed 7. Report below with the searched scope.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: check the licences against Apache-2.0 too, not just vulnerabilities
+    history:
+      - 'user: check our dependencies for vulnerable packages'
+      - 'assistant: Launched claude-2 on the dependencies lens at 2d3e4f5: npm audit --omit=dev plus a reachability trace per advisory, read-only.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: drop the hardening advice from the report, I only want real defects
+    history:
+      - 'user: have a few agents audit the checkout path for security and performance'
+      - 'assistant: Both lenses back (codex-1 security, claude-3 performance). Verified 4 findings including an N+1 in cart/load.ts:62; dropped 2 without evidence. 6 hardening suggestions listed separately.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'Continue the audit: the user also wants src/webhooks covered under the security lens, same revision.'
+    history:
+      - 'user: security audit of src/api, please'
+      - 'assistant: Revision 91ab2cd. codex-1 is auditing src/api under the security lens; ending the turn until it reports.'
+    active: [daintree.review.audit-codebase]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: 'separate thing: audit the whole payments module as it stands for security, not just this PR'
+    history:
+      - 'user: review PR #612'
+      - 'assistant: codex-1 reviewed #612: one medium (missing idempotency key check at pay/charge.ts:55).'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now check all our dependencies for vulnerable or GPL-licensed packages - report only, don't upgrade anything
+    history:
+      - 'user: upgrade to React 19'
+      - 'assistant: claude-2 upgraded React on feat/react-19; checks match the baseline, 2 migration items deferred.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, now threat-model that service - entry points, trust boundaries, abuse paths
+    history:
+      - 'user: how does the webhook service authenticate callers?'
+      - 'assistant: From the explorer: HMAC signature checked in webhooks/verify.ts, secrets from env, retries via the queue worker.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: find dead code in src/legacy - just the list, don't delete anything
+    history:
+      - 'user: log the retry bug as an issue'
+      - 'assistant: Filed #967 ''Retry backoff ignores max delay'', labelled bug.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: have a few agents audit the checkout path for N+1 queries and blocking I/O as it stands
+    history:
+      - 'user: the tests are failing'
+      - 'assistant: codex-1 fixed the stale fixture in tests/cart.spec.ts; the suite passes on 2b3c4d5.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful

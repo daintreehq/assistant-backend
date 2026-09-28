@@ -1,0 +1,133 @@
+# Decomposing a spec, PRD or epic into parallel work units before any code is written
+# (daintree.orchestration.decompose-work).
+#
+# Two requests phrased as a calling agent would describe the outcome, one as a user
+# types it, plus a trap per declared neighbour where the neighbour is right and the
+# decomposition runbook must stay out: units already defined, one plan for one
+# implementer, two sides of an agreed interface, dependent phases tracked over time,
+# issues whose content is settled, cleaning up existing issues, and rival options.
+
+cases:
+  - id: x-decompose-prd-into-issues-agent
+    category: single-runbook
+    note: The core shape from a calling agent — a spec file broken into units with owned files, acceptance and dependencies, approved, then filed.
+    messages:
+      - role: user
+        content: Break docs/specs/team-invites.md into independently buildable work units with owned files, acceptance criteria and dependencies, check they don't overlap, get the user's sign-off, then file each unit as a GitHub issue
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-epic-for-parallel-agents-agent
+    category: single-runbook
+    note: An epic split so several agents can work at once; the split itself is the ask, nothing is defined yet.
+    messages:
+      - role: user
+        content: "Epic #412 (offline sync) needs splitting into pieces three agents can build in parallel without touching the same files; propose the units and their dependency order before any code is written"
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-casual-user
+    category: single-runbook
+    note: The casual user phrasing — "chop it up into tickets".
+    messages:
+      - role: user
+        content: can you chop the billing redesign doc up into tickets? want to see the split before anything gets filed
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-fan-out-defined-units
+    category: routing-trap
+    note: The units are already listed; only running them in parallel is left, which is fan-out-work.
+    messages:
+      - role: user
+        content: "issues #301, #302, #305 and #309 are ready to go, put an agent on each in its own worktree"
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-plan-then-implement
+    category: routing-trap
+    note: One plan approved and then built by one implementer; no split into units.
+    messages:
+      - role: user
+        content: have claude write up a plan for the rate limiter first, I'll sign off, then it implements it
+    expect:
+      required: [daintree.orchestration.plan-then-implement]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-contract-first
+    category: routing-trap
+    note: Two sides of one feature built at once against an interface agreed first.
+    messages:
+      - role: user
+        content: Agree the shape of the /exports API first, then have one agent build the endpoint and another build the web client against it at the same time
+    expect:
+      required: [daintree.orchestration.contract-first-split]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-durable-workflow
+    category: routing-trap
+    note: Dependent phases executed and tracked across sessions, not a breakdown to approve.
+    messages:
+      - role: user
+        content: Run the three-phase Postgres migration — schema, backfill, cutover — as a tracked plan where each phase waits on the previous one, and let me resume it tomorrow
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-manage-issue
+    category: routing-trap
+    note: The issues' content is settled; only filing is asked.
+    messages:
+      - role: user
+        content: file these three as issues, titles and bodies as written below, and label them "frontend"
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-triage-backlog
+    category: routing-trap
+    note: Existing open issues grouped, deduped and labelled; nothing is being decomposed.
+    messages:
+      - role: user
+        content: go through the open issues tagged roadmap, find the duplicates and propose priorities
+    expect:
+      required: [daintree.forge.triage-issue-backlog]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-trap-spike-options
+    category: routing-trap
+    note: Options tried hands-on before deciding, not a work breakdown.
+    messages:
+      - role: user
+        content: before we plan the search feature, prototype it with Meilisearch and with Postgres full-text and tell me which to go with
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-not-manage-issue
+    category: routing-trap
+    note: >-
+      "Turn into issues" sounds like filing, but nothing is worked out yet: the spec must
+      be split into units first. manage-issue files settled content only.
+    messages:
+      - role: user
+        content: turn the notifications PRD in docs/prd/notifications.md into github issues with acceptance criteria and the order they should be built in
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]
+
+  - id: x-decompose-not-fan-out
+    category: routing-trap
+    note: >-
+      Agents are mentioned, but the units do not exist yet and the user wants to see
+      them first; fan-out-work runs units already defined.
+    messages:
+      - role: user
+        content: I want four agents on the reporting rewrite eventually, but first work out how to carve it up so none of them step on each other's files, and show me
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]

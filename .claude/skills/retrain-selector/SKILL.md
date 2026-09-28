@@ -126,6 +126,21 @@ say whether each is a Daintree documentation question** — product questions ar
 `docs: true`; a brief that forgot it relabelled 17 of them not-docs and failed the
 docs floor.
 
+Three more rules from the 40 → 87 expansion (2026-09-28, `training/EXPERIMENTS.md`):
+- **Project work is never `[]`.** The caller is Daintree's orchestration layer: a request to
+  change code routes to the runbook that delegates it (else `spawn-visible-agent`). A brief
+  that asks for "nothing applies" rows must say so, or it teaches the opposite; `[]` is for
+  chatter, general knowledge and off-topic requests.
+- **A big single-turn batch needs multi-turn rows beside it.** 2,300 stateless rows pushed
+  two shortcut guards in `test_training_corpus_guards.py` over (docs-vs-history ratio,
+  cardinality-vs-active-set). Follow-ups and topic shifts for the new runbooks fixed both —
+  and are real coverage the head otherwise lacks.
+- **Refresh the digest before verifying data for runbooks whose routing text just changed.**
+  The blind labeller reads the digest; a stale one threw away 58 correct rows.
+- **Screen HISTORY lines too.** `compile_corpus` drops exact collisions only; a generated
+  follow-up whose history near-duplicated three sealed round-5b cases got through (difflib
+  > 0.8 on queries and every history line, against cases/ and every holdout round).
+
 `--init-seed` gives every seed the same head initialisation, so the seeds of one recipe
 can be averaged into one model (`python -m training.soup_setwise <dirs> --out <dir>`).
 Measured: a soup scores at the seed mean — it removes the lottery at 3x training cost,

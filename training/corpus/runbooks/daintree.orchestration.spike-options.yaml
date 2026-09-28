@@ -1,0 +1,165 @@
+# Training examples whose answer is `daintree.orchestration.spike-options` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.spike-options
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Spike Drizzle, Prisma and Kysely on the orders service: each agent builds the same read-order-with-lines query plus a test in its own worktree, then recommend one.'
+  - Prototype both caching approaches for the pricing endpoint (Redis vs an in-process LRU) in separate throwaway worktrees and compare the latency you measure.
+  - try zod vs valibot on our signup + checkout forms and tell me which one to go with
+  - Mock up three versions of the settings page (minimal, dense, playful), each in its own worktree, so the user can look at them side by side. Nothing merged.
+  - Assign one agent per state library (Zustand, Jotai, Redux Toolkit) to rebuild the cart store on a spike branch; measure bundle size and test pass for each.
+  - hand-rolled websocket vs socket.io vs SSE for live notifications. build each one throwaway, measure, recommend
+  - Before we commit to a job queue, have codex try BullMQ and claude try pg-boss on the email-send job, same scenario, then give me a comparison matrix.
+  - can you get a couple agents to prototype the new onboarding flow as a wizard vs one long form? i want to click through both before deciding
+  - Evaluate tRPC against plain REST with openapi-typescript by building the /projects list endpoint and its client call both ways in spike worktrees off develop@a41c9e2.
+  - Three layout directions for the analytics page, one agent each, existing design tokens only, no new deps. I'll choose.
+  - 'spike options: vitest vs jest+swc for the monorepo test runner, measure cold run time on packages/core'
+  - We can't decide between Tauri and Electron for the desktop shell. One agent builds the open-a-window-and-read-a-file scenario in each; report bundle size and startup time.
+  - Throwaway comparison of pdfkit, puppeteer and react-pdf for rendering invoice PDFs from our fixture order. Which should we adopt?
+  - have agents try two ways to do the permissions model, RBAC tables vs casbin policies, same 3 test cases each. don't merge anything
+  - Build two alternative empty-state designs for the inbox (illustration-led vs text-led) on spike branches and give me the command to run each.
+  - Compare SQLite FTS5 and Meilisearch for product search by prototyping both against the seed catalog; report index time and query latency from your own runs.
+  - i'd like to see a dark-first and a light-first take on the pricing page before choosing. variants pls
+  - Try both approaches for splitting the users table, dual-write vs backfill-then-cutover, as spikes on scratch branches and recommend one.
+  - Give claude-2 the Prisma option and gemini the Drizzle option (they don't get to choose); each builds the same repository layer in its own worktree, then you measure both.
+  - Rather than asking the agents which they'd prefer, htmx or React for the admin panel, have one actually build each and measure the result.
+  - Launch agents in parallel worktrees, each implementing the same image-resize endpoint with a different assigned library (sharp, jimp, squoosh), and recommend one on measured throughput.
+  - Give the lucia and auth.js prototypes about 30 minutes each in their own worktrees, same login scenario, then compare what each got working.
+  - Instead of having the agents argue GraphQL vs REST, have each one prototype its option against the same three screens so we can compare real code.
+  - 'Not a bug hunt, we''re choosing a date library: spike date-fns, dayjs and the Temporal polyfill on the scheduling module and measure the bundle impact.'
+  - Build two variants of the checkout redesign (stepper vs single page) on spike branches and tell me how to run each one locally so I can pick.
+  - 'Not a contest: assign codex the Kysely approach and claude raw SQL for the reporting queries, measure both spikes yourself and recommend one.'
+  - query: i like variant B but give it the sidebar from variant A
+    run: 2026-09-28-catalog-expansion-late
+  - query: Take the dense dashboard variant, but borrow the playful variant's empty-state illustration.
+    run: 2026-09-28-catalog-expansion-late
+  - query: The Prisma spike wins, but have its agent pull in the transaction helper from the Drizzle spike's diff first.
+    run: 2026-09-28-catalog-expansion-late
+  - query: Have variant C's agent adopt variant A's toolbar — C is the one I'm choosing.
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'I''ve looked at all three landing-page variants: go with the playful one, but with the minimal one''s hero copy.'
+    run: 2026-09-28-catalog-expansion-late
+  - query: Of the three design variants I'm picking C; have it take variant B's colour palette.
+    run: 2026-09-28-catalog-expansion-late
+  - query: spike two implementations of parseDuration in parallel, each in its own throwaway worktree, and recommend one
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Prototype both approaches to cache invalidation — event-driven vs TTL — in separate worktrees, benchmark them, and tell me which to adopt
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'implement and compare two slugify approaches: regex-based vs Intl.Segmenter'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: spike redux toolkit vs zustand for the cart store, one agent each, recommend
+    run: 2026-09-28-catalog-expansion-refine
+  - query: try luxon and date-fns on our invoice formatting, measure bundle size of each, recommend one, merge nothing
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can u have two agents each try a different way of doing the csv export (streaming vs buffered) and tell me which is better
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Build throwaway prototypes of the orders pagination using cursor and offset approaches, one agent per approach, and compare them
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'two parallel spikes: roundCurrency via Math.round vs decimal.js; recommend'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: we can't decide between tRPC and plain REST for the admin api — spike both on the users route and tell me which
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Assign Codex the worker-thread approach and Claude the child-process approach for the image resizer, each in a scratch worktree, then compare throughput and recommend
+    run: 2026-09-28-catalog-expansion-refine
+  - query: mock up three layouts for the pricing page — compact, card grid, comparison table — so i can pick
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Explore two designs for the retry helper hands-on (backoff class vs functional wrapper), build each against the same webhook scenario, recommend one; nothing merged
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Don't just ask the pinned agents which ORM they prefer; have each build a small prototype with a different one.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+  - query: Don't explain the search code to me; have agents each prototype a different search backend against it so I can choose.
+    confusable_with: [daintree.explore.repository]
+  - query: Each agent builds the same billing screen in a different assigned direction (calm, dense, bold) and I'll pick myself; no judging or voting.
+    confusable_with: [daintree.orchestration.competition]
+  - query: 'Pit sharp against jimp for thumbnails: one agent per library, same benchmark scenario, you measure both and recommend.'
+    confusable_with: [daintree.orchestration.competition]
+  - query: Two agents, two libraries (Temporal vs Luxon), same scheduling scenario each in its own worktree; give me the measured comparison.
+    confusable_with: [daintree.orchestration.competition]
+  - query: Prototype a REST version and a GraphQL version of the orders API in parallel and tell me which one to use.
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: Launch three agents, one worktree each, on the same request logger with a different assigned library (pino, winston, bunyan); compare and recommend, merge nothing.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Try Redis and Memcached for the session cache on spike branches and tell me which to use.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+  - query: Rather than agents arguing Svelte vs Solid for the widget, have each build the widget in one and measure them.
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: Spend 20 minutes each prototyping Zustand and Jotai in separate worktrees and tell me which to use.
+    confusable_with: [daintree.orchestration.timebox-attempt]
+  - query: Mock up three versions of the pricing page in separate spike worktrees so I can compare them before we choose one.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Before we break down the offline mode, have agents prototype CRDT merging versus last-write-wins on our notes model and recommend one.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: add Kysely as a third option too, same scenario
+    history:
+      - 'user: spike Drizzle and Prisma on the order-with-lines read and tell me which to use'
+      - 'assistant: Created spike/drizzle and spike/prisma from develop at 4c1e9a2 and launched claude-2 and codex-3, one per option, same scenario with a test, 45 minutes each.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: can you measure cold start and bundle size for each as well before you recommend
+    history:
+      - 'user: try zod vs valibot on our real signup and checkout forms'
+      - 'assistant: Launched claude-4 on spike/zod and claude-5 on spike/valibot from main at 91be07d. Criteria so far: lines of schema code, type inference quality, test pass.'
+      - 'user: ok'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok both are back — which one do you recommend?
+    history:
+      - 'user: spike tRPC and plain REST handlers for the billing endpoints, same two routes'
+      - 'assistant: codex-2 (spike/trpc) and claude-3 (spike/rest) are building both routes with tests; I''ll run each test suite myself before comparing.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the playful one looks off — have that agent use only our existing tokens like the brief said, then show me all three again
+    history:
+      - 'user: mock up a minimal, a dense and a playful take on the settings page and let me look'
+      - 'assistant: Three variants are up in spike/settings-minimal, spike/settings-dense and spike/settings-playful. The playful one added a new font dependency, which breaks the shared constraints.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: give them 20 minutes each instead of an hour
+    history:
+      - 'user: prototype both approaches for the upload queue — BullMQ vs a Postgres SKIP LOCKED table — and tell me which'
+      - 'assistant: I''ll create spike/bullmq and spike/pg-queue from develop at e03f5d1 and launch one agent per option with a one-hour bound. Starting now.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: before we commit to one, spike Drizzle, Prisma and Kysely on the orders read and tell me which to use
+    history:
+      - 'user: have Claude, Codex and Gemini tell me which ORM they''d pick for this repo'
+      - 'assistant: Polled all three: Claude and Gemini said Drizzle, Codex said Kysely. Tally is 2-1 for Drizzle.'
+    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now give me three different takes on the dashboard — minimal, dense, playful — each in its own worktree so I can look
+    history:
+      - 'user: the dashboard preview is throwing a hydration error'
+      - 'assistant: Fixed via claude-2: the date formatter differed between server and client. Preview reloaded, console is clean.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: forget the vote — assign one agent to zod and one to valibot, have each build our checkout form, and measure them yourself
+    history:
+      - 'user: have claude and codex each write their own version of the form validation and pick the better one'
+      - 'assistant: I''ll give both the same task in separate worktrees and then run a blind peer vote.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately, I can't decide between SSE and websockets for live updates — prototype both on the notifications feed and compare
+    history:
+      - 'user: run the tests in the api worktree'
+      - 'assistant: api worktree at 7a21c0e: 412 passed, 0 failed; lint and typecheck clean.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: rather than one agent for an hour, try both caching approaches side by side — Redis vs in-process LRU — and tell me which wins
+    history:
+      - 'user: give codex 30 minutes to try adding a cache to the pricing lookup'
+      - 'assistant: I was about to launch codex-3 with a 30-minute time box on the pricing cache.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'ok the leak''s found. next thing: spike pino vs winston for the logger rewrite, one agent each, same scenario'
+    history:
+      - 'user: three agents, one per theory for the memory leak'
+      - 'assistant: H2 (event listener never removed) is supported by my re-run; H1 and H3 refuted. Nothing was fixed.'
+    active: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion-stateful

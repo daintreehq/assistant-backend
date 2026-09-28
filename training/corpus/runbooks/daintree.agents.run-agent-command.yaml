@@ -1,0 +1,202 @@
+# Training examples whose answer is `daintree.agents.run-agent-command` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.run-agent-command
+run: 2026-09-28-catalog-expansion
+positives:
+  - Compact the Claude agent's context in terminal 4, keeping focus on the OAuth refresh work.
+  - /clear claude-2 and rebrief it on the CSV importer task afterwards
+  - Run our project's /deploy-check command in the Claude agent that's open in wt-release.
+  - claude's context is nearly full, compact it but keep the migration notes
+  - Have the existing Gemini terminal run its /init command for this repo.
+  - List the custom slash commands Claude Code sees in this repo, including the ones in .claude/commands.
+  - Start a fresh conversation in the codex terminal with /new, then give it the lint-cleanup brief again.
+  - change claude in terminal 2 to opus
+  - Run /review in the Codex terminal against its current diff and read back what it reports.
+  - Execute the project's /changelog-check slash command in the idle Claude pane and tell me the output.
+  - use /model in the codex pane and pick the high-reasoning option
+  - Clear the reviewer agent's context instead of handing the task to someone else; same agent, just reset.
+  - Compact codex's history in terminal 6. Don't give it a new task, just the compaction.
+  - which slash commands does gemini have here?
+  - Run /doctor in the open Claude terminal and read back what it says.
+  - Make the claude agent in wt-payments run our /regen-types command.
+  - The Codex agent is idle; send it /compact before it continues so its context doesn't overflow.
+  - rerun the /test-affected project command in the claude terminal that's already open
+  - Run /diff in the codex terminal and read back what it shows.
+  - Swap the model in the gemini pane to flash for the rest of this session.
+  - In the existing Claude pane, run the /check-migrations command defined in .claude/commands and show me its output.
+  - Reset claude-1's conversation with /clear; I'll brief it myself afterwards.
+  - Does the Claude agent here have a /deploy-check command? If so run it in terminal 2.
+  - query: switch the codex pane to gpt-6-sol
+    run: 2026-09-28-catalog-expansion-refine
+  - query: change the model of the claude agent in terminal 2 to Opus
+    run: 2026-09-28-catalog-expansion-refine
+  - query: compact claude-2's context, keep the focus on the billing work
+    run: 2026-09-28-catalog-expansion-refine
+  - query: run /review in the codex terminal on the api worktree
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Have the already-open Claude agent run our /lint-fix project command and read back what it did
+    run: 2026-09-28-catalog-expansion-refine
+  - query: /clear the gemini agent and brief it fresh on the logging task
+    run: 2026-09-28-catalog-expansion-refine
+  - query: set the running codex agent's model to the cheaper one via its model menu
+    run: 2026-09-28-catalog-expansion-refine
+  - query: which slash commands does the claude in the docs worktree offer?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: swap model to haiku on that agent
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Run /init in the open Claude pane so it writes a CLAUDE.md for this repo
+    run: 2026-09-28-catalog-expansion-refine
+  - query: pls run /compact on the claude that's been going all day
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Trigger the project's /deploy-check command inside the existing Claude terminal and report its output
+    run: 2026-09-28-catalog-expansion-refine
+  - query: run /compact in Claude's pane, keep the auth work
+    run: 2026-09-28-catalog-expansion-refine
+  - query: /clear that agent's context and brief it fresh on the export bug
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Compact Claude's context in terminal 2; it's near the context limit, nothing to do with quota.
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: switch the codex pane to a lighter model for the rest of the session
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: What slash commands does Codex have here? The full list, not just the usage one.
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: /clear the claude in terminal 5 and rebrief it on the export job
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: Run /compact in the Claude pane, focusing on the billing work.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Compact the context of the Claude agent in terminal 3, keeping the auth work.
+    confusable_with: [daintree.context.feed-running-agent]
+  - query: The Claude agent in wt-auth is already open; run our /deploy-check command in it rather than starting a new one.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: run /review in the existing codex pane on its branch, no new agent
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'Just one agent, already running in terminal 5: have it run the /review command on its own work.'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'only the claude pane on #310, run /pr-ready in it; no other issues'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Run /review in the Codex pane, the CLI's built-in one.
+    confusable_with: [daintree.skills.use-plugin-skill]
+  - query: what custom commands have I set up for claude
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: list every slash command I can use right now
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: do I have any user-level commands for writing release notes
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: what commands does the codex agent have access to
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: tell me which commands the agent in terminal 3 supports
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: does the claude agent over there have a command for changelogs
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: what is the invocation token for my deploy command
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: how do I call my code-review command from codex
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: I wrote a claude command for triaging bugs, where did I put it
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: find the command I made for UI critique, I cannot remember what I called it
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: which slash commands are available to the codex agent in this worktree
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: locate my global slash command for design reviews
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: somewhere I have a claude command that reviews screenshots, can you track it down
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: what is the right syntax to invoke my changelog command in claude
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: how do I trigger my release command, what do I type
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: give me the exact syntax to run my review command in the codex terminal
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: is a /code-review command available to the agent here
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: can the claude agent run /design-review in this project
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-11-mission-9-capability-lookup
+  - query: run our /triage command in the claude-2 pane
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: run /compact in the claude that's already open
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: do the same for claude-3, focus on the billing tests
+    history:
+      - 'user: compact claude''s context, focusing on the auth work'
+      - 'assistant: Sent /compact keep the auth refactor decisions to claude-2 at its idle prompt; its screen shows the conversation compacted.'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: astra
+    history:
+      - 'user: switch the codex pane to another model'
+      - 'assistant: slashCommands.list has /model for codex-1; I sent it and codex-1 is showing a menu with gpt-6-sol and gpt-6-astra. Which one?'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: hold on — compact it instead, I want it to keep the gist
+    history:
+      - 'user: /clear claude-4 and brief it fresh on the exporter'
+      - 'assistant: About to send /clear to claude-4; that wipes its whole conversation, including the exporter decisions it made this morning.'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that's fine, staging is disposable — send it
+    history:
+      - 'user: run our /seed-db command in the api claude'
+      - 'assistant: /seed-db is a local command (.claude/commands/seed-db.md); reading it, it also drops and recreates the staging database, which goes beyond what you asked, so I haven''t sent it.'
+    active: [daintree.agents.run-agent-command]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: its context must be huge by now — /compact it once it's idle, keep the pagination work
+    history:
+      - 'user: tell claude-5 to stop going down the caching rabbit hole'
+      - 'assistant: Interrupted claude-5 and redirected it back to the pagination fix; it confirmed and is working on it.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok switch codex-1 to the cheaper model then
+    history:
+      - 'user: how much of codex''s allowance is left?'
+      - 'assistant: Codex''s usage screen shows 64% of the weekly limit used, resetting Monday.'
+    active: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: its context is bloated from all that — compact it, focus on the API work
+    history:
+      - 'user: stop claude-2 wandering into the UI code'
+      - 'assistant: Interrupted and redirected claude-2 to the API layer; it has since finished that turn and is idle.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run /review in codex-3 now
+    history:
+      - 'user: launch codex in fix/null-cart to fix the empty cart crash'
+      - 'assistant: codex-3 finished in fix/null-cart and is idle; it reports the fix and a new test.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that blew its context — run /compact on it and keep only the API docs
+    history:
+      - 'user: feed claude-6 the entire docs folder'
+      - 'assistant: Sent claude-6 the paths under docs/ (140 files); it read them and is idle.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now run /model in the claude pane on that worktree and switch it to opus
+    history:
+      - 'user: run the build in a terminal so I can see it'
+      - 'assistant: Build ran in a visible terminal on feature/perf and exited 0.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately, switch codex-2 to the astra model
+    history:
+      - 'user: use the plugin''s review skill on feature/sso'
+      - 'assistant: Loaded sec-tools/security-review and briefed codex-1 with its id; it is on step 2.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful

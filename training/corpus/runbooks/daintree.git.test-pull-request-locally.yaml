@@ -1,0 +1,151 @@
+# Training examples whose answer is `daintree.git.test-pull-request-locally` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.test-pull-request-locally
+run: 2026-09-28-catalog-expansion
+positives:
+  - 'Check out PR #340 in its own worktree and run the unit tests at its head commit; report pass or fail per command.'
+  - 'Pull down the contributor''s PR #512 (it''s from a fork) and see whether the build works - screen its install scripts before running anything.'
+  - 'Does #77 actually fix the date-picker crash? Run the reproduction on the base and on the PR head and compare.'
+  - 'spin up #340 so i can click around the new settings page'
+  - can you try out that pr from the new guy and see if it even runs
+  - 'grab #1021 locally and see if the migrations run'
+  - 'Get PR #88''s head into a worktree, run cargo test -p parser there, and leave the worktree standing for me.'
+  - 'Try PR #2290 hands-on: install, build, bring the dev server up via the project recipe, and tell me whether it boots.'
+  - '#615 adds new tests - run them against the base and against the PR to confirm they fail before and pass after.'
+  - 'PR 403 from an external fork: screen postinstall and lockfile changes, then run the tests if clean.'
+  - 'Not a code review - I want #340 actually executed: tests and a build at its head, results per command.'
+  - 'Before I merge #901, run it locally and make sure the CLI still starts.'
+  - 'Someone opened #455 claiming it fixes the memory blowup in issue #430; reproduce #430 with and without the PR on this machine.'
+  - 'Run lint and the test suite on PR #767''s code, not my branch - it''s a contributor''s PR.'
+  - 'Create a worktree for PR #88 and run its smoke script in a visible terminal so I can watch it.'
+  - 'Get PR #340''s head running on this machine so the designer''s layout changes can be poked at in the browser.'
+  - 'External PR #58 touches package.json scripts; tell me what installing it would execute, then run the tests once I say go.'
+  - 'does the fix in #612 actually work for me? i still see the bug on main'
+  - 'pull #940 locally and make sure storybook still builds'
+  - 'Test-drive PR #1310 (the new onboarding flow) on this machine: bring it up with the dev recipe and report whether the app starts cleanly.'
+  - 'Validate PR #221 locally at its head commit - tests plus a manual run of bin/import --dry-run; nothing gets pushed or commented.'
+  - 'hey can you get #88 running? want to try it before i approve'
+  - 'Reproduce the bug described in #377''s PR body on the base branch, then confirm the PR head makes it go away.'
+  - 'try out #640 from that fork for me - but check nothing sketchy runs on install first'
+  - 'The code looks fine to me on GitHub, but I want #88 actually run: fresh worktree, full test suite, results bound to its head.'
+  - 'Put the head of PR #1502 in a Daintree worktree and run pnpm test --filter web there; keep the worktree afterwards.'
+boundaries:
+  - query: 'Pull down contributor PR #233 and run its tests on this machine.'
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: 'check out PR #733 and see if it actually fixes the upload bug for me'
+    confusable_with: [daintree.debug.reproduce-bug]
+  - query: 'Before I approve #340 I want it run locally - tests and the app starting.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'The contributor says #455 fixes the leak - verify that on this machine by running it.'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: 'Confirm #77 really fixes the bug by running the repro before and after the PR.'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: 'i don''t trust the description on #612, run it and see'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: 'don''t read the code, just run #340 and tell me whether it works'
+    confusable_with: [daintree.review.review-change]
+  - query: 'Instead of reading #512''s diff, check it out and run its tests on this machine.'
+    confusable_with: [daintree.review.review-change]
+  - query: 'check out #340 and run the test suite to see if it actually works'
+    confusable_with: [daintree.review.review-pr-queue]
+  - query: 'PR #340 isn''t checked out anywhere yet - get it up and running so I can inspect the new UI in a browser.'
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: 'want to visually check #1310''s new nav before merging; nothing''s running for it yet'
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: 'Pull down the contributor''s frontend PR #88 and bring the app up from it so I can look around.'
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: 'make a worktree for PR #340 and run its tests'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: 'Check out #512 as a worktree and try the app to see if the new flow works.'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: 'set up a worktree for #88 and see if the build passes'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: 'check out #340 and run its tests to see if it works'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: pull down PR 77 and spin it up so i can click around
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: yeah that's the sharp prebuilt, it's fine — go ahead
+    history:
+      - 'user: pull down #340 from that contributor and run the tests'
+      - 'assistant: #340 is from a fork (dev-anya). Its diff adds a postinstall in package.json that runs scripts/fetch-binary.js, which downloads a prebuilt binary during setup. Running it would execute that. Go ahead?'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now spin it up so I can click around the settings page
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'does it actually fix the crash from #331 though? check it against develop as well'
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the tests passed — also run the build in that same worktree, I want to know it compiles at that commit
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, before it installs anything, show me exactly what the new prepare script runs
+    history:
+      - 'user: pull down #340 from that contributor and run the tests'
+      - 'assistant: #340 is from a fork (dev-anya). Its diff adds a postinstall in package.json that runs scripts/fetch-binary.js, which downloads a prebuilt binary during setup. Running it would execute that. Go ahead?'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: I approved setup on the worktree card, carry on
+    history:
+      - 'user: try PR #502 locally, run its tests'
+      - 'assistant: Created worktree pr-502; setup is at needs-approval because the PR changes .daintree/setup commands. Approve it on the worktree card and I''ll continue.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: '#415 couldn''t be assessed — pull it down and run its tests so I can see whether it actually works'
+    history:
+      - 'user: go through the review queue and tell me which PRs are good to merge'
+      - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'check out #415 and actually run it — see if the upload works'
+    history:
+      - 'user: go through the review queue and tell me which PRs are good to merge'
+      - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'fine, but does #77 actually work? pull it down and run the tests'
+    history:
+      - 'user: review #77'
+      - 'assistant: Codex found one medium issue (missing timeout at src/net/client.ts:31); otherwise the change matches its description. Nothing posted.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'try #340 on my machine and see if it really fixes it for me'
+    history:
+      - 'user: did anyone reply on #331?'
+      - 'assistant: Yes — dev-anya opened PR #340 saying it fixes the crash; no maintainer reply yet.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'now put PR #502 in its own worktree and run its test suite'
+    history:
+      - 'user: make me a worktree for feature/search'
+      - 'assistant: Created worktree feature-search off develop; it''s ready.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'there''s a PR for it, #419 — pull it down and see if the repro passes there'
+    history:
+      - 'user: can you repro #412'
+      - 'assistant: Reproduced on develop at 8f3a2c1: tests/upload.test.ts::large_file fails with the reported EPIPE. claude-4 wrote it in scratch worktree repro-412.'
+    active: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: '#288 from the contractor is in review — run it here and tell me if it works'
+    history:
+      - 'user: what did we ship this week?'
+      - 'assistant: Shipped #402, #405; in review #288, #409; blocked: none.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful

@@ -69,7 +69,7 @@ cases:
           Ask the claude agent whether the migration script handles rollbacks,
           and tell me what it says.
     expect:
-      required: [daintree.agents.ask-and-relay]
+      required: [daintree.agents.ask-running-agent]
       optional: [daintree.foundation]
 
   - id: poll-pinned-fleet

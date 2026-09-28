@@ -1,0 +1,125 @@
+# Training examples whose answer is `daintree.runtime.free-busy-port` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.runtime.free-busy-port
+run: 2026-09-28-catalog-expansion
+positives:
+  - port 3000 already in use when starting the web app in the checkout worktree, find out what's holding it
+  - EADDRINUSE :::8080 in the api worktree. Free it if it turns out to be one of ours.
+  - what's running on 5173?
+  - 'Identify which worktree''s server is listening on port 4000. Read-only: don''t stop anything.'
+  - There's a zombie node process from a terminal I closed yesterday still sitting on 3001, get rid of it
+  - Something grabbed 9229 so the node debugger can't attach. Who owns that port?
+  - Port 6006 busy, storybook won't start. Attribute the listener to a Daintree terminal and worktree.
+  - The server claude-2 started in its worktree is squatting on 8000 and main needs it. Find it and give the user the options without killing it.
+  - 'rails s: ''Address already in use - bind(2) for 127.0.0.1 port 3000''. figure out which checkout holds it'
+  - is anything listening on 5432 right now, or is the port free?
+  - free up port 8888, an old jupyter from a terminal i closed is stuck on it
+  - The dev server the user asked for won't come up because 3000 is held by something that isn't ours. Find the holder and its worktree.
+  - Dev Preview for the site worktree errors with 'port in use'; the holder is not the preview panel's own server. Track down the process.
+  - 'Just for today: the payments worktree''s server has 3000 and I need to boot main on it. Deal with the clash.'
+  - Daintree itself is fine, but my project's server can't bind 8081. What has it?
+  - lsof shows a node process on 3000 but nobody knows which worktree started it. Map it to a terminal and owner.
+  - vite keeps falling back to 5174 because 5173 is taken. whats on 5173 and is it mine?
+  - kill whatever's on 3000
+  - Which Daintree terminal owns the process listening on 127.0.0.1:7000?
+  - 'webpack-dev-server: EADDRINUSE 0.0.0.0:8080. Is it docker, another worktree, or something else?'
+  - Gemini's agent reports it cannot start the backend because port 5000 is taken. Find out who holds 5000.
+  - port 4200 busy (angular). find the pid, its cwd and which worktree it belongs to
+  - Is port 3306 held by a container or by a process from one of our checkouts?
+  - free 8080, pretty sure it's the old api server from a panel i trashed earlier
+  - stop the server on port 3000 — I didn't start it and neither did you, as far as I know
+  - Before touching anything, report which process and worktree hold port 5000 and whether it's an agent's server or the user's.
+  - npm start dies with 'Something is already running on port 3000'. Find what it is.
+boundaries:
+  - query: EADDRINUSE on 3000 when the e2e server starts. What's holding it? free it
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: Daintree is working fine; it's my project's server that can't bind 4000. What's holding it?
+    confusable_with: [daintree.diagnostics]
+  - query: what process is on 9000? it isn't daintree
+    confusable_with: [daintree.diagnostics]
+  - query: Daintree's healthy. My app just says the port is taken. Track down the listener.
+    confusable_with: [daintree.diagnostics]
+  - query: Have an agent figure out which process is sitting on port 3001 and whether it belongs to one of our worktrees.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'The Dev Preview can''t start: port 5173 is taken by some other process, not the preview. Find who holds it.'
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: can't start the dev server, EADDRINUSE on 4000 — find what's holding it
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Right now something is holding port 3000 and blocking main. Find it; I'm not after a permanent setup.
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: which worktree's server is on 8080 at the moment?
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: Port 3000 is held by a zombie node process; free it.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: it's mine actually, I forgot about it — go ahead and kill it
+    history:
+      - 'user: port 3000 is already in use, what''s on it?'
+      - 'assistant: PID 48211 ''node next dev'', cwd ~/proj-billing, started 09:12; no Daintree terminal lists it, not even in trash or background. Owner unknown, so I left it.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: check again that 5173 is really free now
+    history:
+      - 'user: something is holding 5173, free it'
+      - 'assistant: It was term-6, a dev server I opened earlier; closed it with terminal.closeOwned (closedIds has term-6). The process is killed about 20 s after the panel goes to trash.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: can't you just kill it?
+    history:
+      - 'user: postgres won''t start, 5432 is taken'
+      - 'assistant: 5432 is held by com.docker.backend, so it''s a container port forward (container ''app-db''), not a project process.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: yeah that's a zombie from a tab I closed yesterday, kill it
+    history:
+      - 'user: EADDRINUSE on 4000 again'
+      - 'assistant: PID 7781 ''node server.js'', cwd ~/proj-old-auth, started yesterday 17:40; no listed terminal matches it, trash and background included.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the TERM didn't take, it's still listening — force it
+    history:
+      - 'user: ok kill the one on 4000'
+      - 'assistant: Re-read PID 7781 (same command, cwd and start time) and sent kill 7781; rechecking the listener in a few seconds.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: the server won't come up, it says port 4312 is already in use — find out what's holding it
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: something else is holding 8080 — who owns it?
+    history:
+      - 'user: start the api server in feat/api-v2 in a terminal'
+      - 'assistant: term-12 exited: ''EADDRINUSE 0.0.0.0:8080''. Nothing in feat/api-v2 is listed on that port.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separate thing — what's running on port 6006?
+    history:
+      - 'user: the preview shows a TypeError on load, fix it'
+      - 'assistant: claude-3 fixed the undefined user guard; I reloaded the preview and the new navigation logged no errors.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: my server won't start now, port 3000 is already in use — free it
+    history:
+      - 'user: rebase feat/cart onto main'
+      - 'assistant: claude-5 rebased feat/cart onto main at 4a1c9e0; I re-ran the tests on the new HEAD and they pass.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: which worktree's server is on 8080 right now?
+    history:
+      - 'user: which of my worktrees can go?'
+      - 'assistant: feat/old-auth is merged, feat/search holds uncommitted work, feat/api-v2 is in use by claude-2.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'unrelated: EADDRINUSE on 5173 in my main checkout, what''s holding it?'
+    history:
+      - 'user: upgrade to Vite 6'
+      - 'assistant: Launched claude-4 ''Upgrade: vite 6'' in chore/upgrade-vite-6 with the baseline-first brief; ending my turn.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful

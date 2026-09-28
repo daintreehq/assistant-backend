@@ -4,7 +4,8 @@
 > ```
 > stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
 > stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
-> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 13,153 rows
+> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 16,396 rows
+>            trained (16,702 now: refine rows added, 43 leaking rows removed, see the foot)
 > train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
 >            stage 2: --epochs 10 --ordering equivariant --seed 41 --init-seed 41
 >            both: doc_max_length 512, content-keyed split; stage 2 also permutation
@@ -13,11 +14,11 @@
 > serve      ONNX int8 ranking encoder + fp32 retriever + fp32 head, ~470-480 MB
 >            whole-process RSS, BONUS_FLOOR 0.55 / NEWCOMER_FLOOR 0.75
 > ```
-> **Current (2026-09-28): shipped int8 measures 270/286 on the benchmark, 138/139 on
-> sealed holdout round 4b (the artifact it replaced: 130/139) and 133/138 on round 4a,
-> the suite shaped like `search_runbooks` traffic. Over dev + rounds 1-3 + round 4a the
-> recipe averages 863.7 over three seeds against 843.7 for the recipe it replaced.
-> p50 ~10 ms. See "Agent-written queries" at the foot.
+> **Current (2026-09-28, catalog 87): shipped int8 measures 659/687 on the benchmark
+> (strict 602, QUALITY GATE pass, candidate_miss 0) and 126/133 on sealed holdout round 5b (123/130 without three cases whose text leaked into training history) —
+> the 47 new runbooks — against 112/133 for the artifact it replaced. Over dev + rounds
+> 1-4b + 5a the recipe averages 1516 over three seeds against 1443 for the old weights on
+> the same suites. p50 ~11 ms. See "Catalog 40 → 87" at the foot.
 > Numbers older than that entry were measured on different suites and corpora.**
 >
 > The denominator moved 169 → 172 → 177 across two rounds on 2026-08-20, as docs
@@ -1446,3 +1447,133 @@ unaffected; the trainer now seeds only the CPU generator for the head.
   `[]`, since the runbook claims requests that ask for a visible agent. The answer depends on
   the caller — the sidebar assistant cannot edit, an agent pane can — and the query does not
   say which. Left as written; the new data leans `[]`, and the shipped artifact now misses it (p=0.013).
+
+# Catalog 40 → 87, and the caller becomes the orchestration layer (2026-09-28)
+
+The catalog grew from 40 selectable runbooks to 87 in one round, and the user set the
+principle the new runbooks — and six old ones — were rebuilt around: **the caller is
+Daintree's orchestration layer**. It reads Daintree state, runs Daintree operations and
+verifies; the work itself (code, git, environment, writing) goes to a visible agent in the
+right worktree, briefed with the runbook's know-how for that work (`docs/RUNBOOKS.md`,
+`CLAUDE.md`, the foundation's first line). This settles the `edit-not-explore` conflict
+recorded above: a plain code change routes to `daintree.edits.spawn-visible-agent`, not `[]`.
+
+## How the runbooks were made
+
+Six ideation agents (one per domain, each seeded by Ask Google) proposed 72 candidates; 47
+survived dedupe; eight authoring agents wrote them with cases and traps against the pane
+action schema; eight Codex reviews (four gpt-6-astra max, four gpt-6-sol high) checked
+each against `pane-core.json` and the app source; fix agents applied the findings under the
+principle. `file-issues-batch` was dropped (no Daintree role; batch filing moved into
+`manage-issue`) and a coverage-gap pass added `decompose-work` and extended five runbooks
+(memory → Daintree's `.daintree/assistant/` store; recipe authoring; `.worktreeinclude`;
+merge trains; adopting a contest winner). Reverse fences were written into 33 established
+runbooks.
+
+## Data
+
+| run | rows | how verified |
+|---|---|---|
+| `2026-09-28-catalog-expansion` | 2,321 compiled single-turn (positives, both-direction boundaries, pairs) | blind gpt-6-sol, 2,380/2,384 agreed |
+| `…-stateful` | 705 compiled follow-ups / topic shifts | blind gpt-6-sol with history, 707/736 |
+| `…-late`, `…-late-stateful` | 217 (decompose-work, gap-fixed territory) | 207/247 (adopt-the-winner rows dropped: the routing text does not claim them) |
+| `…-refine` | ~350 (trial-found weak spots; docs-vs-action contrast) | 372/372 |
+| blind relabel | 206 corpus rows + 26 benchmark/holdout cases | sol, then astra on disagreements; changed only where both agreed AND the new label was a new runbook or project work leaving `[]` |
+
+The multi-turn rows were not optional: 2,300 single-turn rows alone pushed two corpus
+shortcut guards over (docs label 2.19x likelier with history; cardinality TV 0.069 between
+active and inactive rows). Generating follow-ups and topic shifts for the new runbooks fixed
+both honestly. A generator brief that asks for `[]` rows must now also say project work is
+not `[]` (the principle) — the audit moved about 80 old `near_miss` code-change rows off `[]`.
+
+Round 5 (266 cases, 133 dev / 133 sealed) was written against the grown catalog by four
+read-only writers and labelled blind by sol and astra: 270/270 unanimous.
+
+## Round 1 retrain ("expand": stage 1 + three stage-2 seeds, settled recipe)
+
+| | dev | r1 | r2 | r3 | r4a | r4b | r5a | total |
+|---|---|---|---|---|---|---|---|---|
+| shipped (40-runbook weights, new catalog) | 632/687 | 91 | 175 | 181 | 121 | 130 | 113 | 1443 |
+| s41 | 659 | 99 | 175 | 189 | 132 | 134 | 130 | 1518 |
+| s42 | 657 | 96 | 178 | 190 | 134 | 137 | 130 | 1522 |
+| s43 | 656 | 97 | 174 | 185 | 130 | 135 | 131 | 1508 |
+
+Stage 1: r@32 0.999, r@1 0.849 at 87 runbooks; candidate_miss 0 on every suite. s42 had the
+best total but failed the docs gate (4/26 missed lookups > 0.12): the new imperative data
+pulled "How do I create a worktree from a pull request?" onto `create-plain-worktree`. s41
+passed (23/26). New-runbook cases (x-*): 395-397/401.
+
+## Round 2 retrain ("refine": +350 rows aimed at trial-found weak spots and the docs boundary)
+
+| | dev | r1 | r2 | r3 | r4a | r4b | r5a | total | docs |
+|---|---|---|---|---|---|---|---|---|---|
+| s41 | 661 | 97 | 174 | 184 | 131 | 137 | 133 | 1517 | 24/26 |
+| s42 | 662 | 97 | 174 | 186 | 133 | 137 | 129 | 1518 | 25/26 |
+| s43 | 655 | 98 | 175 | 187 | 131 | 136 | 130 | 1512 | 25/26 |
+
+Mean 1515.7 against round 1's 1516.0. The rule written before this retrain replaced round 1
+only on a mean at least as high, so **round 1's s41 ships**: the recipes tie, and a rule
+chosen before the numbers is not reopened after them by a third of a case. The refine rows
+stay in the corpus — they are verified, and they fixed the docs boundary in every seed
+(24-25/26 against 22-23/26) — so the NEXT retrain inherits them. **The shipped weights were
+trained on the corpus before them** (16,396 rows; the journal keeps them).
+
+## Shipped, and the sealed check
+
+Round 1 s41: bench local QUALITY GATE pass, 659/687 recall-pass, strict 602, extra 82,
+docs 23/26, candidate_miss 0, p50 ~11 ms. Sealed round 5b, scored once:
+
+| round 5b (133) | recall-pass | strict | extra |
+|---|---|---|---|
+| previous artifact (40-runbook weights) | 112 (84.2%) | 82 | 44 |
+| **shipped** | **126 (94.7%)** | **115** | **17** |
+
+**Leakage, found by review after scoring:** the dedupe screened queries but not history
+lines, and four training rows' HISTORY near-duplicated three 5b cases (`r5-W1-026`,
+`r5-W4-037`, `r5-W1-048`, difflib 0.84-0.88). The shipped model passes all three; without
+them 5b is **123/130 (94.6%)**. 43 such rows (queries or history, any suite) were removed
+from the corpus afterwards; the shipped weights saw them. `compile_corpus` only drops EXACT
+collisions, so the next round must screen history too.
+
+Real Haiku queries from the live trials, before → after: plain code changes ("Add input
+validation to subtotal()…", "convert the utils folder to TypeScript") now select
+`spawn-visible-agent` at 0.999; "give an agent 3 minutes…", "standup summary…", "which of my
+worktrees can I get rid of", "wrap up for today…", "run the dev server in a terminal I can
+watch", "use the plugin's TDD skill", "launch multiple agents to test a CLI…" all select
+their runbook at ≥0.98. Still wrong: "spike two approaches … and recommend one" (nothing),
+"red-team the coupon-codes branch" (create-plain-worktree), "switch agent model to Sonnet"
+(spawn), "how does the cart total get calculated" (nothing) — each has refine rows waiting
+for the next retrain.
+
+## What the live trials said (isolated Daintree, Claude Haiku orchestrating)
+
+Five runners exercised 44 runbooks in ~90 trials (harness: an isolated Daintree build on its
+own MCP port, a throwaway repo per run, transcripts found by the pane's `agentSessionId`).
+The mechanics hold — Haiku picks the runbook, launches visible agents in their own
+worktrees with notify+handback, ends its turn and resumes on the notice. What fails is the
+orchestrator's own judgment:
+- it reports the child's claims as its own verification (fixed where re-run by "before any
+  report, verify yourself" steps; now also in the foundation);
+- it falls back to Claude Code's native subagents (foundation: "never through a native
+  subagent");
+- it paraphrases briefs and drops rules even when told "verbatim";
+- it writes the search query about the WORK ("convert to TypeScript") not the orchestration
+  ("give an agent 3 minutes…"), so mechanism runbooks lose (tool description and client
+  instruction now say keep how the user wants it done);
+- destructive slips before fixes: committing on main unasked, `kill -9` on another
+  checkout's server, checking out old commits in the main checkout.
+Forge-heavy runbooks (PR queue, PR review threads, triage, Dependabot batches, release
+notes) were NOT run: they need a real GitHub repository.
+
+## Still open
+
+- Five forge runbooks unverified live; `hunt-flaky-test`, `run-e2e-suite`, `postmortem-run`,
+  `prune-stale-branches` (keep-list ignored) and several gated patterns carry body fixes no
+  trial has confirmed.
+- App: `terminal.readLastMessageOwned` returns `terminal-unknown` for panes the caller
+  launched or was handed; `terminal.new` returns the same panel for identical calls within
+  two minutes, undocumented; `terminal.list` shows an idle agent as `waiting`.
+- Haiku sometimes loops on ToolSearch and never calls `search_runbooks` on long
+  multi-agent prompts — a host behaviour, not routing.
+- `fan-out-work` (510/512 tokens) and `competition` (505/512) have no room left in their
+  routing text: the next fence there needs a trim or domain foundations (TODO).

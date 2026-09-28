@@ -100,6 +100,12 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: 3 agents are all stuck asking stuff - answer each one and tell me the results
     run: 2026-09-28-agent-queries-2
+  - query: the agent in terminal 3 is asking something, tell it yes
+    run: 2026-09-28-catalog-expansion-refine
+  - query: three agents are stuck on permission prompts, approve them
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Claude's asking whether to trust the folder, answer it
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: The agent in worktree wt_api is asking whether to overwrite the generated file; answer its question and let it continue.
     confusable_with: [daintree.worktree.relocate-agents]
@@ -260,6 +266,18 @@ boundaries:
   - query: Three agents are asking whether to proceed with the migration; answer yes to all of them
     confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-28-agent-queries
+  - query: The codex agent is asking whether to overwrite package-lock.json. Answer yes.
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: Claude is sitting on a prompt asking whether it may delete the old fixtures. Tell it yes.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: codex wants approval to run npm install in its pane, approve it
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: The agent is asking whether it should read the whole src folder; tell it yes.
+    confusable_with: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: how's it going?
     history:
@@ -570,6 +588,26 @@ topic_shifts:
       - 'assistant: Read t3 — codex isn''t hung, it''s waiting on ''Allow write to .env? (y/n)''.'
     active: [daintree.agents.recover-agent]
     run: 2026-09-24-selector-hardening
+  - query: it's now asking whether it can also delete the old debug.ts — tell it yes
+    history:
+      - 'user: tell claude-2 to use the existing logger instead of console.log'
+      - 'assistant: Sent the correction; claude-2 acknowledged and resumed.'
+      - 'user: ok'
+      - 'assistant: claude-2 has stopped and is waiting on a question: ''Delete src/debug.ts too? (y/n)'''
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: tell it yes
+    history:
+      - 'user: ask claude-3 what''s left'
+      - 'assistant: Before I could ask, claude-3 stopped on a question of its own: ''Should I also update the OpenAPI spec? (y/n)'''
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: tell it no
+    history:
+      - 'user: load the migrations into claude-5'
+      - 'assistant: claude-5 is waiting on a question, ''Run the migrations against the dev DB? (y/n)'', so I haven''t fed it yet.'
+    active: [daintree.context.feed-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[watcher fired: t_0022 stopped again — askingQuestion, wants a second confirmation]'
     history:

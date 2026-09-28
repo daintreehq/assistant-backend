@@ -24,7 +24,6 @@ positives:
   - prep branch for review on the feat/watchers worktree
   - i've finished the changes locally on feat/watchers-v2 — can you take it from committing all the way through to a PR on develop, with a sensible title and a body that says what changed?
   - 'the agent''s done on the auth worktree so i want the whole wrap-up: commit whatever''s outstanding, push it up, and open the pull request so the team can look at it in the morning'
-  - there's a merge conflict blocking the prep — get someone to sort it out and then carry on and open the PR
   - stage everything, commit with a decent message, push, and put the PR up
   - ok that's finished, wrap it up for review
   - do the same for the other two worktrees
@@ -38,7 +37,6 @@ positives:
   - cna you preo the branhc for reveiw pls
   - put that one up
   - third time asking — push the damn branch and open the PR, base is develop not main
-  - prep said conflicts. get someone on it and then put the pr up
   - check if the branch is clean before i push, i think there's stray stuff in there
   - i think there's already a pr on this branch? check then open one if not
   - this branch has never been pushed, push it and open a draft pr
@@ -95,6 +93,32 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: commit whats on fix/timezone-parse and push it, no PR yet
     run: 2026-09-28-agent-queries-2
+  - query: codex won the contest, open a PR from its worktree
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Adopt the winning competition entry: commit claude-2''s version in its worktree, push, and open a PR'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the competition is done, ship the winner's branch as a PR
+    run: 2026-09-28-catalog-expansion-refine
+  - query: ok go with gemini's entry, turn its worktree into a pr
+    run: 2026-09-28-catalog-expansion-refine
+  - query: we picked the valibot spike, open a PR for it as built, flagged as a prototype
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Take the winning variant''s worktree to review: readiness check, then commit, push and open the PR'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'wrap up #45 for review'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: finish off the auth branch — commit, push and open the pr
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Get feat/csv-export ready for review and open a draft PR
+    run: 2026-09-28-catalog-expansion-refine
+  - query: is the billing branch ready to push? if so open the PR
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Prep the agent''s branch in the search worktree for review: readiness verdict, then commit, push, PR'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: open a pr for what claude did in the docs worktree
+    run: 2026-09-28-catalog-expansion-refine
+  - query: open a PR for the export worktree
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: get the branch ready for review and open the PR
     confusable_with: [daintree.worktree.relocate-agents]
@@ -253,7 +277,7 @@ boundaries:
   - query: wrap up 88 for review and push it
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: is my branch ready to push?
-    confusable_with: [daintree.review.review-change]
+    confusable_with: [daintree.orchestration.park-work, daintree.review.review-change]
     run: 2026-09-24-selector-hardening
   - query: claude says it's done on feat/csv-export, get it committed pushed and a PR up
     confusable_with: [daintree.review.review-change]
@@ -309,6 +333,45 @@ boundaries:
   - query: 'The agent on issue #412 is finished; commit its work and open the PR'
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-28-agent-queries
+  - query: 'Wrap up feature/oauth-scopes: commit, push and open a PR for review.'
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion
+  - query: open a PR from release/2.5 to main for the release
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion
+  - query: Open a pull request for my feature/sync branch; the work is finished.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion
+  - query: Open a PR for the integrate/sprint-14 branch.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: feat/exports is done and tests pass. Commit, push and open a PR against develop.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: open a pr for the search branch, it's small, no need to split anything
+    confusable_with: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion
+  - query: Commit the agent's finished work on feature/search and open a PR; it's already up to date with main.
+    confusable_with: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion
+  - query: Wrap up the export feature and open a PR for review.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: Open a PR for the auth worktree's branch.
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Check whether the export-fix branch is ready to push and open its PR.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Open a PR for the search-filters branch.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
+  - query: 'wrap up issue #45''s branch for review and open the PR'
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: ready the auth branch and open a PR
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: yeah go ahead
     history:
@@ -587,10 +650,6 @@ topic_shifts:
       - 'user: give the running agents their own worktrees'
       - 'assistant: Three worktrees created off develop, all three agents redirected.'
     active: [daintree.worktree.relocate-agents]
-  - query: prep said conflicts. get someone on it and then put the pr up
-    history:
-      - 'user: hey, you around?'
-      - 'assistant: Around. What''s the task?'
   - query: branch prep pls
     history:
       - 'user: you there?'
@@ -623,10 +682,6 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: there's a merge conflict blocking the prep — get someone to sort it out and then carry on and open the PR
-    history:
-      - 'user: good morning'
-      - 'assistant: Good morning. Everything''s idle. Where do we start?'
   - query: the studio-02 worktree has finished work sitting uncommitted. get it into a PR
     history:
       - 'user: thanks for yesterday'
@@ -673,6 +728,85 @@ topic_shifts:
       - 'assistant: Console showed an undefined map in ProductList; claude fixed the null guard, I reloaded and new navigation is clean.'
     active: [daintree.runtime.debug-web-app]
     run: 2026-09-24-selector-hardening
+  - query: looks right. open a PR for it
+    history:
+      - 'user: plan first on the webhook retry, I approve, then build'
+      - 'assistant: claude-4 implemented the approved plan in feat/webhook-retry. Drift check: every change maps to a plan item, tests pass. Branch not pushed.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: approved, nice. push it and open a PR against develop
+    history:
+      - 'user: have codex review claude''s auth refactor until codex is happy'
+      - 'assistant: APPROVED in round 2 on revision b7e0; my own test run in feat/auth-refactor passes. Nits collected above.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: both sides are done and integrated. open a PR from integrate/orders
+    history:
+      - 'user: orders API and orders UI in parallel against a contract'
+      - 'assistant: integrate/orders has both sides merged; the boundary test passes when I run it. Nothing pushed.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good enough. push the branch and open a PR with what it got done
+    history:
+      - 'user: time-box codex on the i18n extraction, ten minutes'
+      - 'assistant: codex-3 stopped at the deadline; 22 of 22 components extracted, tests pass on disk. Branch chore/i18n not pushed.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now open a PR from migrate/logger
+    history:
+      - 'user: replace the deprecated logger across the monorepo'
+      - 'assistant: migrate/logger integrated; residual rg count is 0 except 2 listed exceptions in scripts/. Checks green on the combined tree.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: open PRs for all three now
+    history:
+      - 'user: cross-review the cohort'
+      - 'assistant: All three units reviewed, fixed and checked by me.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: looks good — push the integration branch and open the PR against develop
+    history:
+      - 'user: merge the three search branches into one'
+      - 'assistant: Verified integrate/search in its own worktree: one merge per source in order, full suite green. Nothing pushed yet.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great, now open a PR for it against main
+    history:
+      - 'user: rebase feat/dark-mode onto main'
+      - 'assistant: claude-8 rebased it onto main; I verified the ancestry and checks. Pushed with lease at your request; remote now matches HEAD 90cd2e1. There is no PR for this branch yet.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fix holds, 100 in a row — commit it, push and open the PR
+    history:
+      - 'user: reconnect.spec is flaky in CI, fails maybe one run in ten'
+      - 'assistant: Launched claude-4 as "Flake: reconnect" in worktree flake/reconnect at 2d7e9a1 to measure the failure rate over 50 runs serial and 50 parallel. I''ll read its numbers on the notice.'
+      - 'assistant: Verified: claude-4''s change passed 100 consecutive parallel runs in my own run; only test/reconnect.spec.ts and src/ws/mockServer.ts changed.'
+    active: [daintree.ci.hunt-flaky-test]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: all green — commit it, push and open the PR
+    history:
+      - 'user: run lint, typecheck and tests in the auth worktree'
+      - 'assistant: auth (feat/auth-refresh @ 7c1d2e0): lint, typecheck and 318 tests all passed; the tree has 4 uncommitted files.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: good — open a PR for feat/invoices
+    history:
+      - 'user: seed feat/invoices'
+      - 'assistant: claude-4 seeded 200 invoices; I queried the worktree''s database myself and the rows are there.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: open the PR for it
+    history:
+      - 'user: upgrade us to React 19'
+      - 'assistant: claude-5 finished on chore/upgrade-react-19; I re-ran typecheck and tests there: no new failures, 2 pre-existing ones unchanged.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: open a PR with the plugin changes
+    history:
+      - 'user: build a deploy-board plugin'
+      - 'assistant: acme.deploy-board is active, exercised from its panel, and dist/ is committed with the source on feat/deploy-board.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[agent a_3390 completed: readiness verdict ready]'
     history:
@@ -685,7 +819,6 @@ wakes:
       - 'assistant: Waiting on t_9002 to finish, then I''ll do the prep pass and open it. Watcher armed.'
     active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
 near_misses:
-  - rebase my branch onto develop and get it review ready
   - is this branch ready
   - am i good to push
 docs:

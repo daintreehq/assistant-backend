@@ -2,7 +2,7 @@
 id: daintree.forge.manage-issue
 title: Create and maintain a forge issue
 summary: Create, edit, reopen, label or assign an issue against the exact repository, then read it back so public forge state is never inferred from a successful call.
-whenToUse: 'Use when the user asks to file, log or create an issue ("log this as an issue", "log it for later", "turn this bug into an issue"), change an issue title or body, reopen an issue, add or remove labels, or assign or unassign an account, as in "label and assign this ticket". Logging an issue for later is filing it now, not a later wake (not daintree.orchestration.watch-outcome). Do not use to search the backlog for work (use daintree.workflow.find-issue-work), start implementation (use daintree.workflow.start-work-on-issue), read an issue or PR''s current status, ask why an issue is still open, or add a closing comment and close it (use daintree.workflow.follow-up-on-issue), or create a pull request (use daintree.workflow.prep-branch-for-review).'
+whenToUse: 'Use when the user asks to file, log or create an issue ("log this as an issue", "log it for later", "turn this bug into an issue"), change an issue title or body, reopen an issue, add or remove labels, or assign or unassign an account, as in "label and assign this ticket". Logging an issue for later is filing it now, not a later wake (not daintree.orchestration.watch-outcome). Do not use to search the backlog for work (use daintree.workflow.find-issue-work), start implementation (use daintree.workflow.start-work-on-issue), read an issue or PR''s current status, ask why an issue is still open, or add a closing comment and close it (use daintree.workflow.follow-up-on-issue), create a pull request (use daintree.workflow.prep-branch-for-review), dedupe, label or close many existing issues at once (use daintree.forge.triage-issue-backlog), or derive issues from a spec or epic not yet broken into pieces (use daintree.orchestration.decompose-work).'
 risk: system
 requiredTools:
   - forge.getIssue
@@ -27,6 +27,8 @@ Daintree only reads issues. Writes go through the host tool (`gh`) with `--repo 
 7. Read back every requested field (`gh issue view N --repo <r> --json title,body,state,labels,assignees,url`; `bypassCache:true` when re-listing). Report each as confirmed, not applied or unknown.
 
 Uncertain create: a lost or ambiguous create reply is searched for in the same repository before any retry: the exact title, closed included, `author:@me created:>=<date>`, `bypassCache:true`; confirm a match by its body. The host tool has no idempotency key.
+
+Several issues from one discussion or findings list: list the candidates first, dedupe each against open issues (step 3), then file the clear ones the request covers one at a time and read each back by number; ask only about likely duplicates or unclear ones. After a partial failure, re-read what exists before filing the rest.
 
 Closing and its comment are daintree.workflow.follow-up-on-issue; filing an issue is not a request to start it (daintree.workflow.start-work-on-issue).
 

@@ -1,0 +1,506 @@
+# Forge work over many items: a PR review queue, addressing forge review threads,
+# trying a PR locally, backlog triage, filing a batch of issues, and dependency-bot
+# PR batches. Each new runbook has an agent-phrased and a user-phrased case, and a
+# routing trap per declared neighbour where the neighbour is right.
+
+cases:
+  # --- daintree.review.review-pr-queue ---
+  - id: x-pr-queue-agent
+    category: single-runbook
+    note: Agent phrasing of the core ask - one read-only reviewer per open PR, a verdict per PR.
+    messages:
+      - role: user
+        content: Review each open non-draft pull request awaiting review with one read-only agent per PR, each in the PR's own worktree, and report a verdict per PR bound to its head commit
+    expect:
+      required: [daintree.review.review-pr-queue]
+      optional: [daintree.foundation]
+
+  - id: x-pr-queue-user
+    category: single-runbook
+    note: Casual user phrasing of reviewing the whole PR queue.
+    messages:
+      - role: user
+        content: get agents on the PR backlog and tell me which ones are good to merge
+    expect:
+      required: [daintree.review.review-pr-queue]
+      optional: [daintree.foundation]
+
+  - id: x-pr-queue-trap-one-pr
+    category: routing-trap
+    note: One PR with several reviewers is a single change review, not a queue.
+    messages:
+      - role: user
+        content: have two reviewers look over PR 88, one for security and one for correctness, and combine their findings into one list
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-pr-queue-trap-cross-review
+    category: routing-trap
+    note: Agents reviewing each other's PRs is a cohort cross-review, not fresh reviewers per PR.
+    messages:
+      - role: user
+        content: the three agents each opened a PR; have them review each other's PRs and fix what their reviewer found
+    expect:
+      required: [daintree.review.cross-review-cohort]
+      optional: [daintree.foundation]
+
+  - id: x-pr-queue-trap-land
+    category: routing-trap
+    note: Merging a PR that was already reviewed is landing, not reviewing the queue.
+    messages:
+      - role: user
+        content: the review on PR 41 came back clean, approve it and squash merge it
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-pr-queue-trap-list-only
+    category: routing-trap
+    note: Listing PRs with no review is a search.
+    messages:
+      - role: user
+        content: list the open PRs against develop that are waiting on review, just the list
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: x-pr-queue-trap-fan-out
+    category: routing-trap
+    note: One agent per issue to implement is fan-out work, not a review queue.
+    messages:
+      - role: user
+        content: put an agent on each of issues 12, 15 and 19 in its own worktree and have each open a PR
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  # --- daintree.forge.address-pr-review ---
+  - id: x-address-review-agent
+    category: single-runbook
+    note: Agent phrasing - fetch unresolved forge threads, fix each, push, account per thread.
+    messages:
+      - role: user
+        content: Fetch all unresolved review threads on pull request 88, fix each one in its worktree, push, and list what was done per thread without posting replies
+    expect:
+      required: [daintree.forge.address-pr-review]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-user
+    category: single-runbook
+    note: Casual phrasing about bot review comments on the forge.
+    messages:
+      - role: user
+        content: coderabbit left like 20 comments on my PR, fix the ones that actually matter
+    expect:
+      required: [daintree.forge.address-pr-review]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-relay
+    category: routing-trap
+    note: Findings in a reviewer agent's terminal go through relay-review-feedback, not the forge.
+    messages:
+      - role: user
+        content: codex just finished reviewing in its terminal, pass its findings to the claude agent and have it fix them
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-read
+    category: routing-trap
+    note: Only reading what the reviewer said is a follow-up read.
+    messages:
+      - role: user
+        content: what did the reviewer say on PR 88? did they request changes?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-write-review
+    category: routing-trap
+    note: Producing a review of the PR is review-change, not addressing one.
+    messages:
+      - role: user
+        content: review PR 88 and tell me what you would change before I approve it
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-ci
+    category: routing-trap
+    note: A failing check with no reviewer comment is diagnose-and-fix.
+    messages:
+      - role: user
+        content: nobody has reviewed PR 88 yet but its test job is red, figure out why and fix it
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-loop
+    category: routing-trap
+    note: A writer agent and reviewer agent iterating until approval is review-until-approved.
+    messages:
+      - role: user
+        content: have codex review claude's change and keep them going back and forth until codex has no blocking comments
+    expect:
+      required: [daintree.orchestration.review-until-approved]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-conflicts
+    category: routing-trap
+    note: Merge conflicts with the base are a sync, not review feedback.
+    messages:
+      - role: user
+        content: my PR has merge conflicts with main now, rebase it and sort them out
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: x-address-review-trap-merge
+    category: routing-trap
+    note: After the feedback is handled, requesting a merge is landing.
+    messages:
+      - role: user
+        content: all the review comments on 88 are resolved and it's approved, merge it with a squash
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.test-pull-request-locally ---
+  - id: x-try-pr-agent
+    category: single-runbook
+    note: Agent phrasing - PR head in its own worktree, screened, tests run, bound to the head SHA.
+    messages:
+      - role: user
+        content: Check out external contributor PR 402 in a new worktree, screen its install and build scripts before running anything, run its test suite and report the results against its head commit
+    expect:
+      required: [daintree.git.test-pull-request-locally]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-user
+    category: single-runbook
+    note: Casual phrasing of trying a PR hands-on.
+    messages:
+      - role: user
+        content: try out PR 340 on my machine and see if it actually works
+    expect:
+      required: [daintree.git.test-pull-request-locally]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-plain-worktree
+    category: routing-trap
+    note: A worktree for a PR with nothing run is the plain creator.
+    messages:
+      - role: user
+        content: make me a worktree for PR 340, don't run or launch anything in it
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-review
+    category: routing-trap
+    note: Judging a PR's code quality is a review, not a hands-on try.
+    messages:
+      - role: user
+        content: read through PR 340 and tell me if the code is any good
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-queue
+    category: routing-trap
+    note: Many PRs each reviewed is the review queue.
+    messages:
+      - role: user
+        content: go through the review queue, one reviewer per open PR, and give me a verdict on each
+    expect:
+      required: [daintree.review.review-pr-queue]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-local-checks
+    category: routing-trap
+    note: Running the checks on our own worktrees, no PR involved, is run-local-checks.
+    messages:
+      - role: user
+        content: run lint and the tests in each of my three worktrees and tell me which pass
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-reproduce
+    category: routing-trap
+    note: Reproducing a reported bug with no PR involved is reproduce-bug.
+    messages:
+      - role: user
+        content: can you repro issue 412 on main and write a failing test for it first
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-verify
+    category: routing-trap
+    note: Checking an agent's own claim about its work is verify-agent-work.
+    messages:
+      - role: user
+        content: the agent says its branch passes all the tests now, confirm that before I trust it
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-trap-preview
+    category: routing-trap
+    note: A preview already open with console errors is debug-web-app.
+    messages:
+      - role: user
+        content: the dev preview I opened for that PR's worktree is throwing console errors, debug it
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  # --- daintree.forge.triage-issue-backlog ---
+  - id: x-triage-agent
+    category: single-runbook
+    note: Agent phrasing - bounded set, duplicate groups, already-fixed evidence, a plan before writes.
+    messages:
+      - role: user
+        content: Triage the 40 oldest open issues labelled needs-triage - group duplicates, mark the ones already fixed with evidence, and propose labels and closures as a plan before changing anything
+    expect:
+      required: [daintree.forge.triage-issue-backlog]
+      optional: [daintree.foundation]
+
+  - id: x-triage-user
+    category: single-runbook
+    note: Casual phrasing of cleaning up the tracker.
+    messages:
+      - role: user
+        content: our issue tracker is a mess, close the dupes and label the rest
+    expect:
+      required: [daintree.forge.triage-issue-backlog]
+      optional: [daintree.foundation]
+
+  - id: x-triage-trap-pick-next
+    category: routing-trap
+    note: Picking something to work on is find-issue-work.
+    messages:
+      - role: user
+        content: look through the open issues and find me a small unassigned bug to pick up next
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: x-triage-trap-one-issue
+    category: routing-trap
+    note: Labelling and assigning ONE issue is manage-issue.
+    messages:
+      - role: user
+        content: add the bug and p1 labels to issue 57 and assign it to me
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: x-triage-trap-close-one
+    category: routing-trap
+    note: Commenting on and closing one issue is follow-up-on-issue.
+    messages:
+      - role: user
+        content: issue 57 was fixed by the PR that merged yesterday, comment that and close it
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: x-triage-trap-branches
+    category: routing-trap
+    note: Stale branches and abandoned PRs are branch hygiene, not issue triage.
+    messages:
+      - role: user
+        content: clean up the repo - delete merged branches and close PRs nobody has touched in months
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: x-triage-trap-implement
+    category: routing-trap
+    note: Starting agents on a batch of triaged issues is fan-out work.
+    messages:
+      - role: user
+        content: the triage is done, now start an agent on each of the six p1 bugs in its own worktree
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  # --- daintree.forge.manage-issue ---
+  - id: x-file-issues-agent
+    category: single-runbook
+    note: Agent phrasing - one issue per finding, deduped, approved, filed once each.
+    messages:
+      - role: user
+        content: File one GitHub issue per finding from the security audit report, check each against existing issues for duplicates first, and add a tracking issue that links them
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-user
+    category: single-runbook
+    note: Casual phrasing of turning a conversation into several issues.
+    messages:
+      - role: user
+        content: turn everything we just discussed into issues
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-trap-one
+    category: routing-trap
+    note: One issue is manage-issue.
+    messages:
+      - role: user
+        content: log that crash we just found as an issue
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-trap-triage
+    category: routing-trap
+    note: Deduping issues that already exist is triage.
+    messages:
+      - role: user
+        content: there are loads of duplicate issues already in the tracker, find them and close the copies
+    expect:
+      required: [daintree.forge.triage-issue-backlog]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-trap-audit
+    category: routing-trap
+    note: Producing the findings is the audit; filing them comes after.
+    messages:
+      - role: user
+        content: do a security audit of the auth module and give me the findings with severity
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-trap-review
+    category: routing-trap
+    note: Reviewing a diff for findings is review-change.
+    messages:
+      - role: user
+        content: review the diff on this branch and list the problems you find
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-trap-search
+    category: routing-trap
+    note: Searching the tracker for past work is find-issue-work.
+    messages:
+      - role: user
+        content: did we ever file an issue about the retry logic? search the tracker
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: x-file-issues-trap-start
+    category: routing-trap
+    note: Starting agents on the issues just filed is fan-out work.
+    messages:
+      - role: user
+        content: now that the five issues are filed, launch an agent on each one in parallel
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  # --- daintree.forge.batch-dependency-updates ---
+  - id: x-dep-batch-agent
+    category: single-runbook
+    note: Agent phrasing - classify bot PRs by semver risk and combine the safe ones.
+    messages:
+      - role: user
+        content: List the open Dependabot pull requests, classify them by semver risk, and combine the patch and minor bumps into one batch branch with the tests passing
+    expect:
+      required: [daintree.forge.batch-dependency-updates]
+      optional: [daintree.foundation]
+
+  - id: x-dep-batch-user
+    category: single-runbook
+    note: Casual phrasing of clearing out bot PRs.
+    messages:
+      - role: user
+        content: clear out the dependabot PRs, merge the safe ones
+    expect:
+      required: [daintree.forge.batch-dependency-updates]
+      optional: [daintree.foundation]
+
+  - id: x-dep-batch-trap-upgrade
+    category: routing-trap
+    note: One framework upgrade done and fixed by us is upgrade-dependency.
+    messages:
+      - role: user
+        content: upgrade us to React 19 and fix whatever breaks
+    expect:
+      required: [daintree.deps.upgrade-dependency]
+      optional: [daintree.foundation]
+
+  - id: x-dep-batch-trap-land
+    category: routing-trap
+    note: Merging one named PR is landing it.
+    messages:
+      - role: user
+        content: PR 530 is green and approved, merge it
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: x-dep-batch-trap-ci
+    category: routing-trap
+    note: A red check with no dependency bump behind it is diagnose-and-fix.
+    messages:
+      - role: user
+        content: the lint job on main started failing this morning, find out why and fix it
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-dep-batch-trap-queue
+    category: routing-trap
+    note: Reviewing the team's open PRs is the review queue, not dependency bumps.
+    messages:
+      - role: user
+        content: review all the PRs the team opened this week, one agent each, and tell me which need work
+    expect:
+      required: [daintree.review.review-pr-queue]
+      optional: [daintree.foundation]
+
+  - id: x-dep-batch-trap-fan-out
+    category: routing-trap
+    note: Unrelated tasks split across agents is fan-out work.
+    messages:
+      - role: user
+        content: split these four refactors across four agents, each in its own worktree
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  # --- traps where the new runbook must win against a neighbour ---
+  - id: x-address-review-beats-follow-up
+    category: routing-trap
+    note: >-
+      The reviewer's asks live on the forge and the user wants them fixed, not read
+      or relayed: address-pr-review, not follow-up-on-issue or relay-review-feedback.
+    messages:
+      - role: user
+        content: the reviewer requested changes on my PR, go through their inline comments and sort them out
+    expect:
+      required: [daintree.forge.address-pr-review]
+      optional: [daintree.foundation]
+
+  - id: x-try-pr-beats-plain-worktree
+    category: routing-trap
+    note: >-
+      A worktree for a PR plus running it is the hands-on try, not the plain creator
+      that stops at the checkout.
+    messages:
+      - role: user
+        content: make a worktree for PR 340 and run its tests so I know whether it works
+    expect:
+      required: [daintree.git.test-pull-request-locally]
+      optional: [daintree.foundation]

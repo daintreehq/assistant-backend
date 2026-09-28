@@ -1,0 +1,128 @@
+# Training examples whose answer is `daintree.orchestration.contract-first-split` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.contract-first-split
+run: 2026-09-28-catalog-expansion
+positives:
+  - Build the new invoices endpoint and the React table that consumes it with two agents at once; pin down the JSON response shape first so they can't drift.
+  - Agree the OpenAPI spec for /v2/orders, commit it, then have codex implement the Go handler while claude builds the Swift client against it concurrently.
+  - one agent on the fastapi side one on the vue side for the export feature, same time, lock the pydantic schema first
+  - Define the protobuf for the telemetry ingest service first, then run the Rust producer and the Python consumer as two simultaneous agents in separate worktrees.
+  - Split the notifications feature across a backend agent and a frontend agent working simultaneously, with a shared TypeScript types file frozen up front.
+  - Freeze the GraphQL schema for team invites, then codex on the resolvers and gemini on the Apollo client, in parallel, each in its own worktree.
+  - 'Contract-first: commit the Kafka message schema for order.shipped, then a producer agent and a consumer agent build their halves at the same time.'
+  - the sdk and the api both need the new pagination cursor. can you get two agents doing both halves together without them inventing different field names
+  - Have claude-2 draft the plugin host interface (types, example payloads, error codes), get my sign-off, then put the host and the sample plugin on two agents in parallel.
+  - 'Parallelise the billing webhook work: one agent on the Stripe webhook receiver, one on the dashboard that shows its events, both coding against a JSON schema committed first.'
+  - Launch two agents concurrently for file uploads, the Express route and the Next.js uploader, after committing the request/response types and error cases on a contract branch.
+  - i want api and ui built in parallel for the search filters. schema first pls, then both agents go
+  - 'Library and consumer at once: design the public interface of the new rate-limiter crate, commit it, then one agent implements the crate while another wires the gateway to it.'
+  - 'These aren''t independent tasks: the mobile app and the auth API both change for passkey login. Agree the endpoints first, then run an agent on each side at the same time.'
+  - Get the backend and frontend of saved views built by separate agents against an agreed schema, then merge both halves and run a test across the boundary.
+  - I don't want one implementer following a plan; I want the interface for audit exports approved by me, then codex on the server and claude on the client building simultaneously.
+  - 'Not a phased rollout: the gRPC service and its CLI client can be built concurrently once the .proto is committed. Set that up with two agents.'
+  - Add a comments feature, Django REST endpoint plus the Svelte component, two agents in parallel, contract committed first so their fixtures come from its example payloads.
+  - contract/audit-log branch with shared types, then parallel api + web agents off it, integrate/audit-log to check both together
+  - 'Thumbnail job: lock the queue message payload in a commit, then run an agent on the producer and one on the worker simultaneously.'
+  - frontend and backend agents on the theme preference sync at the same time, dont let them drift on the payload
+  - Put the export feature on two agents, server endpoint and client download button, but they share a response format, so commit that interface before either starts.
+  - Design the event schema between the ingestion lambda and the analytics consumer, get it committed, and have two agents build the two sides in parallel worktrees.
+  - Before anything gets merged, I want the API and web halves of refunds built simultaneously against one frozen types file, then combined and tested together.
+  - 'Not TDD across agents: agree the interface between the payments service and the checkout page first, then have separate agents code both sides at once.'
+  - Two worktrees branched from a commit holding only the CSV import endpoint types; claude builds the endpoint, codex builds the import wizard, same time.
+boundaries:
+  - query: Have one agent build the REST endpoint and another the React form at the same time against a schema we agree first.
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: 'Set up the checkout redesign: an interface commit first, then an API agent and a UI agent working at the same time, verified together at the end.'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Organise the sync service work so the server agent and the desktop client agent code concurrently against a .proto we commit before either starts.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Coordinate saved searches so the backend and frontend agents build against one agreed JSON schema simultaneously rather than one after the other.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: 'Run parallel agents on the new reporting feature: one on the /reports API, one on the chart UI that calls it, sharing a response schema agreed first.'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'Hand these out to agents in their own worktrees: the webhook sender and the webhook receiver for the same event. They need a frozen payload format between them.'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: split the chat feature across 2 agents, server and client, simultaneously; commit the socket message types before they start
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Agree the OpenAPI schema for /v2/invoices first, then have one agent build the endpoint and another the React client at the same time.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: Freeze the protobuf for the ingestion events first, then one agent builds the producer and another the consumer at the same time.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
+  - query: One agent on the REST API and one on the React client at the same time, against a schema we agree first.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
+  - query: one agent on the API, one on the UI at the same time, agree the schema first
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-refine
+followups:
+  - query: contract looks right, go ahead and start both sides
+    history:
+      - 'user: one agent on the orders API, one on the dashboard UI, in parallel — agree the schema first'
+      - 'assistant: codex-1 wrote the contract on contract/orders (commit 5e8b21c): shared/orders.schema.ts, example payloads and the 404/409 error cases. Only contract paths changed. Want to review it before I branch the two sides?'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: both done, now put them together and run something across the boundary
+    history:
+      - 'user: build the search API and the search box in parallel against an agreed contract'
+      - 'assistant: Both sides verified: search-api HEAD 2c1a9f0 and search-ui HEAD 77de013, each clean and inside its lane against contract a90b3e4.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the frontend agent edited the schema file itself instead of asking — send it back
+    history:
+      - 'user: one agent does the billing API, one the billing settings page, parallel, contract first'
+      - 'assistant: Checking codex-4''s finish in billing-ui: git diff against contract 31fe0a2 shows it changed shared/billing.schema.ts as well as ui files.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: I'm happy for you to decide the interface details, don't wait on me
+    history:
+      - 'user: split the notifications feature: API and client built at the same time against a schema you agree first'
+      - 'assistant: Contract branch contract/notifications is ready. I''m about to launch the contract author; I''ll show you the schema before either side starts.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: next feature is bigger — the orders API and the orders page. agree the schema first, then one agent per side at the same time
+    history:
+      - 'user: fix the date picker overflow'
+      - 'assistant: claude-2 fixed it in fix/datepicker; one file changed.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: these two aren't independent though — the client needs the API's shapes. commit the interface first and build both halves in parallel against it
+    history:
+      - 'user: fan out issues #210 and #211 to two agents'
+      - 'assistant: I''m about to launch one agent per issue: #210 (notifications API) and #211 (notifications panel).'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: no, I don't want one implementer doing it all in sequence — define the event contract, then producer and consumer agents in parallel
+    history:
+      - 'user: plan the audit events feature first, I approve, then build'
+      - 'assistant: claude-1''s plan covers both the producer and the consumer; waiting on your approval.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok the webhook payload spec is settled. now have one agent build the sender and one the receiver simultaneously against it, no drift on field names
+    history:
+      - 'user: ask codex what a good webhook payload shape would be for order events'
+      - 'assistant: codex-3 suggests {id, type, occurred_at, data} with a signature header; answer above.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'new thing: search backend and search box, two agents working at the same time, schema agreed before either starts'
+    history:
+      - 'user: clean up the finished worktrees from yesterday'
+      - 'assistant: Removed 4 merged worktrees and closed their terminals; 2 with uncommitted work left alone.'
+    active: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'forget comparing libraries, pick zod. now: the API and the settings form built in parallel by two agents off a zod schema committed first'
+    history:
+      - 'user: spike zod vs valibot on our real forms'
+      - 'assistant: Both spikes done; zod integrates with the existing resolver, valibot is smaller. Recommendation: zod.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: scrap the breakdown. just agree the order-events schema first and have one agent build the API while another builds the web client against it
+    history:
+      - 'user: split the order tracking feature into units for agents'
+      - 'assistant: The planner is reading the spec in claude-7 (read-only); I''ll check its split for overlap when it reports.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late-stateful

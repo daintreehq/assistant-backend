@@ -16,7 +16,6 @@ positives:
   - 'ordering matters on this one: bump the shared lib, wait for it to publish, then update the three consumers, then delete the vendored copy. do it in that order and don''t get ahead of yourself'
   - delegate each of these then check it actually landed before moving on. six changes and the last three won't build until the first ones are in
   - i want proper progress tracking on this. x of y done, what's blocked, not you just telling me it went fine at the end
-  - set the plan up first before you touch a single file
   - can you actually do dependency tracking on something this size or is that not a thing here
   - the schema step failed. put it back to ready and try it again, don't tear the whole plan down and start over
   - scope just changed, we're doing both regions not only us-east. redo the plan on top of the one that's already there
@@ -31,7 +30,6 @@ positives:
   - is workflow intelligence even switched on in this build? if it is, plan this properly.
   - i'm fairly sure there's already an open plan for this. don't go creating a second one.
   - before anything else, write down what has to happen in what order so we don't do these out of sequence and wreck the branch
-  - checkpoint this, i'm closing the laptop
   - i want the evidence trail kept on this one. when we come back i want to be able to see why each step got marked done rather than trusting it.
   - node 22 upgrade across all four services. can't be simultaneous, the shared client has to go first and the rest pick it up after.
   - make the plan, run whatever's runnable, and come back to me at the first thing that needs a decision from me
@@ -196,6 +194,24 @@ boundaries:
   - query: Delegate the parser rewrite to an agent, verify its output, then have a second agent update the docs that depend on it
     confusable_with: [daintree.orchestration.fan-out-work]
     run: 2026-09-28-agent-queries
+  - query: Plan the multi-phase schema migration (add columns, backfill, switch reads, drop old) and track it across sessions with its dependencies.
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Plan the auth rewrite as dependent phases (schema first, then the session service, then the UI) and track progress so we can resume it next week.
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: set up a workflow graph for moving billing to stripe, each step depends on the previous one and it has to survive restarts
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Set up a tracked, resumable plan for the Postgres 16 move: schema change, backfill, dual-write, cutover, with dependencies between phases so we can pick it up across sessions.'
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion
+  - query: Plan the MySQL-to-Postgres move in phases (schema, dual-write, backfill, cutover) and track it across sessions.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion
+  - query: Execute the phased tenant-sharding plan in docs/sharding-plan.md, tracking each phase's dependencies and resuming across sessions until cutover.
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-catalog-expansion-late
 followups:
   - query: run the next one
     history:
@@ -401,18 +417,10 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: checkpoint this, i'm closing the laptop
-    history:
-      - 'user: hey, you around?'
-      - 'assistant: Around. What''s the task?'
   - query: Preview the reconcile patch before applying it to the workflow.
     history:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
-  - query: set the plan up first before you touch a single file
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: agents are fine, i don't need a fleet report. i need to know which phase we're actually on and whether the next one can start.
     history:
       - 'user: sup'
@@ -463,6 +471,14 @@ topic_shifts:
       - 'assistant: Polled 4 agents. 3 said yes (runtime validation at the API edge), 1 said not yet. Consensus: adopt at boundaries.'
     active: [daintree.agents.poll-pinned-agents]
     run: 2026-09-24-selector-hardening
+  - query: checkpoint this, i'm closing the laptop
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+  - query: set the plan up first before you touch a single file
+    history:
+      - 'user: you there?'
+      - 'assistant: Here. What do you need?'
 wakes:
   - query: '[watcher completed: implementation agent exited]'
     active: [daintree.orchestration.execute-durable-workflow]

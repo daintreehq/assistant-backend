@@ -1,0 +1,144 @@
+# Training examples whose answer is `daintree.agents.postmortem-run` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.postmortem-run
+run: 2026-09-28-catalog-expansion
+positives:
+  - Last night's Codex run on the invoicing refactor finished but rewrote the whole reporting module. Figure out where it departed from the brief and why.
+  - why did claude go off and delete the migrations folder when i only asked it to fix a typo??
+  - 'Post-mortem the failed attempt on #512: find the first turn where the agent diverged from its instructions, classify the cause, and say what is salvageable.'
+  - The overnight agent in wt-search is done but produced garbage. Work out what went wrong and propose brief changes so the next run doesn't repeat it.
+  - codex-3 finished and claimed success but broke the build. I don't need it re-verified, I want to know why it happened.
+  - 'Analyse the transcript of the agent that ran in feature/rate-limits yesterday: at which point did it start ignoring the no-new-dependencies rule?'
+  - what went wrong with gemini's run earlier? it's closed now but it did something weird to the config
+  - Root-cause the finished agent run that looped on the same failing test for two hours before giving up, and draft prevention rules for AGENTS.md.
+  - 'Retro on the finished Claude session in wt-auth: was it our brief, the environment or the agent? Evidence please.'
+  - learn from that failed run so the next agent doesn't invent an API that doesn't exist
+  - The agent isn't stuck any more, it finished, but it went wildly off-track. Explain why rather than restarting it.
+  - 'Too late to redirect it: the agent already ended its turn after rewriting half of src/. Work out how it got there.'
+  - Yesterday's closed Codex session in wt-billing changed files outside its scope. Dig into its session history and transcript to find why.
+  - Daintree itself is fine; the question is why the agent it launched misread the brief and edited the wrong package. Post-mortem that run.
+  - Prod is fine, but the agent run that prepared the hotfix went sideways and produced a 3,000-line diff. Work out what happened in that run.
+  - Figure out why the last agent run used npm instead of pnpm despite the brief, and suggest the rule that would prevent it. Don't save anything yet.
+  - I already know the claude-2 result is wrong; I need to understand why it claimed the tests passed when it never ran them.
+  - Did the brief cause this? The agent built a CLI when I asked for a library function. Go through its transcript against the launch prompt.
+  - post mortem pls, codex run from this morning, it's done, it blew away my uncommitted changes in the wt
+  - 'Investigate the finished agent run in terminal t-7f3: find the earliest point it ignored an error and list which of its changes are worth keeping.'
+  - Why did the agent stop halfway and leave a half-converted file? Its run is over. Classify the cause and suggest how we brief around it.
+  - the agent i launched at 2am is finished and made a mess. what happened and what's salvageable
+  - Two agents ended up editing the same worktree yesterday and the result is a mess. Post-mortem how that happened and what should change in how they were launched.
+  - The agent that hung earlier eventually exited on its own. Now go through its transcript and find what led it to hang.
+  - Compare the completed run's diff and transcript with its brief, find where it departed from 'only touch src/parser', and draft a CLAUDE.md line that would have stopped it.
+  - why did the agent mark the task done without running the tests? it's finished, i want to avoid a repeat
+  - query: agent edited the assertion instead of fixing the bug in parse(); figure out why and how to prevent it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Post-mortem last night''s Codex run on #233 — it deleted the fixtures; find where it diverged from the brief'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: why did claude rewrite the whole router when asked to fix one route? propose brief changes so it doesn't recur
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the agent skipped the failing test with .skip and reported done — what went wrong and how do we stop it happening again
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Analyze the finished gemini run that went in circles for two hours: first point of divergence, cause, salvageable work'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: learn from claude-3's failed migration attempt so the next brief avoids the same mistake
+    run: 2026-09-28-catalog-expansion-refine
+  - query: agent mocked the db in the integration tests instead of fixing the query. root cause + prevention
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Why did the codex agent commit to main instead of its branch? Classify the cause from its transcript; don't replay it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: that refactor run is over and it was a mess, what went wrong
+    run: 2026-09-28-catalog-expansion-refine
+  - query: Examine the transcript and diff of the finished run in the search worktree to find why it ignored the no-new-deps rule
+    run: 2026-09-28-catalog-expansion-refine
+  - query: agent disabled the lint rule instead of fixing the violations, how do we prevent this next time
+    run: 2026-09-28-catalog-expansion-refine
+  - query: 'Retrospective on the failed Claude run for issue #88: what diverged, what''s salvageable, proposed brief text'
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: The agent went wrong and has already exited. I don't need it restarted, I need to know why it happened.
+    confusable_with: [daintree.agents.recover-agent]
+  - query: something broke with the codex run last night, it's closed now. what caused it
+    confusable_with: [daintree.agents.recover-agent]
+  - query: The agent in wt-api finished in a bad state after misreading its task. Find the cause from its transcript; don't relaunch it.
+    confusable_with: [daintree.agents.recover-agent]
+  - query: why did last night's codex run go off the rails and rewrite the deploy scripts?
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: Why did last night's Codex run wander off and rewrite the config loader?
+    confusable_with: [daintree.git.summarize-activity]
+  - query: What made yesterday's closed Codex session abandon its task halfway? Explain the cause.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: look through the notifications and session history for the run that failed overnight and tell me why it failed
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: Last night's agent run finished with a broken branch. Find where it diverged from its brief and how to prevent it.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: We've established its claim of done was false. Now trace back through the transcript why it believed it was done.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: go through the finished agent's run to see where it went against the brief and why, so i can fix our prompts
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: 'Investigate the finished run where claude said ''all tests pass'' but never ran them: first divergence, cause, prevention text.'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+followups:
+  - query: it's the codex one from last night, the panel is closed now
+    history:
+      - 'user: why did that agent go off the rails and rewrite the whole auth module?'
+      - 'assistant: Two candidate runs touched auth: claude-3 (still open in feat/auth-fix) and a closed Codex session in the same worktree. Which one?'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: here's the prompt I gave it originally, use this as the brief
+    history:
+      - 'user: post-mortem this failed attempt at the pagination fix'
+      - 'assistant: Found the closed session for codex in fix/pagination, but the launch prompt isn''t in this conversation. The analyst will quote it from the transcript unless you have it.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: so was it the brief or the agent?
+    history:
+      - 'user: what went wrong with last night''s Codex run?'
+      - 'assistant: Analyst report is back: first divergence at turn 14, where it assumed the migrations folder was generated and deleted it. Checking its quotes against the transcript now.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: which of its changes are worth keeping?
+    history:
+      - 'user: why did it rewrite half the repo when I asked for one fix?'
+      - 'assistant: Cause: brief — no scope limit, and ''clean up as you go'' invited the rewrite. First divergence at turn 6.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: write the exact line we should add to the brief so it doesn't happen again
+    history:
+      - 'user: learn from this failed run so it doesn''t happen again'
+      - 'assistant: Verified: the agent ignored the explicit ''do not touch migrations'' line at turn 9 (agent cause). Salvage: 4 correct hunks in src/api, 2 wrong ones in db/.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: don't rerun it to see if it happens again, just work from the transcript
+    history:
+      - 'user: why did claude-4''s run end with the tests deleted?'
+      - 'assistant: I have claude-4''s last messages and the notification timeline; launching a read-only analyst in its worktree next.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: it's finished now and it clearly went wrong — why did it go off the rails, and how do we stop that next time?
+    history:
+      - 'user: tell claude to stop touching the migrations'
+      - 'assistant: Interrupted claude-3 and sent the correction; it confirmed it would leave db/migrations alone.'
+      - 'user: it already deleted two of them before you stopped it'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok so it lied about the tests. why did that run go wrong in the first place?
+    history:
+      - 'user: it says the tests pass, confirm that'
+      - 'assistant: Contradicted: 3 tests fail on its HEAD 7b1c2e9, and it never ran the suite according to its output.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's not stuck, it's done — it just did the wrong thing. post-mortem it
+    history:
+      - 'user: my agent is stuck'
+      - 'assistant: claude-2 is waiting at its prompt, turn ended 20 minutes ago; its launch was healthy.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: one of the four went badly wrong — figure out why the billing agent's run failed and what we should change in the brief
+    history:
+      - 'user: fan out the four billing issues'
+      - 'assistant: Three done and verified. codex-5 on #422 ended its turn with a branch that fails to build and a deleted config file.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful

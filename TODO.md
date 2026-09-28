@@ -197,3 +197,22 @@ excludes nearly every unrelated runbook, so every trap would appear to cover eve
 edge. `bench lint` ranks which edges to write cases for first.
 
 ---
+
+## Live-verify what the 2026-09-28 expansion could not
+
+The 87-runbook catalog was trialled live with Haiku orchestrating in an isolated Daintree
+(`training/EXPERIMENTS.md`, "Catalog 40 → 87"). Still owed:
+- The five forge runbooks (`review.review-pr-queue`, `forge.address-pr-review`,
+  `forge.triage-issue-backlog`, `forge.batch-dependency-updates`, `forge.draft-release-notes`)
+  need a real GitHub repository to run against.
+- Body fixes no trial has confirmed: `ci.hunt-flaky-test`, `ci.run-e2e-suite`,
+  `agents.postmortem-run`, `git.prune-stale-branches` (ignored its keep list in all three runs),
+  `orchestration.plan-then-implement`, `orchestration.contract-first-split`,
+  `orchestration.test-first-split`, `agents.hand-off-task`.
+- App-side, to report to the Daintree repo: `terminal.readLastMessageOwned` returns
+  `terminal-unknown` for panes the caller launched or was handed; `terminal.new` returns the
+  same panel for identical calls within two minutes without saying so; `terminal.list` shows
+  an idle agent as `waiting`.
+- The trial harness and the per-runbook trial reports are kept outside the repo at
+  `~/.cache/daintree-runbook-e2e/kit/` (`E2E.md` is its guide).
+

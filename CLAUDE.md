@@ -22,6 +22,13 @@ runbooks launch or prompt an agent with `notify`, end the turn, and resume on th
 Daintree types into the caller's pane. `docs/agents/DAINTREE_RUNBOOK_CLIENT.md` is the
 host-side setup.
 
+**The caller is the orchestration layer.** Runbooks are Daintree workflows: the caller
+reads Daintree state, runs Daintree operations and verifies. The work itself (code, git,
+environment, writing) goes to a visible agent in the right worktree, briefed with the
+runbook's know-how for that work. The caller does it directly only when the user asks.
+A proposed runbook with no Daintree role once framed this way does not belong in the
+catalog (`docs/RUNBOOKS.md`).
+
 This repository used to be the Daintree Assistant Server (model orchestration, prompt
 assembly, accounts, entitlement, bring-your-own-key, utility tasks). All of that was
 retired and deleted; git history has it. **Do not reintroduce any of it incidentally** —

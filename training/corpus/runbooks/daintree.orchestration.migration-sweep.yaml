@@ -1,0 +1,134 @@
+# Training examples whose answer is `daintree.orchestration.migration-sweep` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.migration-sweep
+run: 2026-09-28-catalog-expansion
+positives:
+  - Replace every call to the deprecated `logger.warnOnce` helper with `log.warn` across all 14 packages in the monorepo, split between four agents, and confirm nothing references the old helper afterwards.
+  - Convert the whole test suite from Jest to Vitest, about 600 spec files under packages/*. Split it by package across several Codex agents, with one pilot package first.
+  - migrate all our class components to hooks, theres like 200 of them, get a few agents on it by folder
+  - 'Codemod sweep: swap `lodash/get` for optional chaining everywhere in apps/web and apps/admin, parallel agents, zero remaining imports at the end.'
+  - Move off moment onto date-fns across the repo, one agent per workspace package, then merge it all into one branch with no moment imports left.
+  - 'Roll the new no-floating-promises lint rule out across the backend services: enable it centrally once, have agents fix the violations per service in parallel, and finish with a clean lint run.'
+  - Rename `User.fullname` to `User.displayName` in every consumer across the 9 services; pilot it on the billing service first so the other agents follow the same pattern.
+  - we're dropping styled-components for tailwind classes in every component under src/ui, can you split that between agents and make sure nothing's left
+  - Replace the old `httpGet` wrapper with `apiClient.get` at all ~180 call sites using several agents; integrate on a migrate/api-client branch.
+  - swap all the old i18n t('key') calls for the typed msg.key accessor across the frontend. partition by route dir, pilot one first
+  - Convert every Go handler registration from `http.HandleFunc` to the chi router form, one partition per service directory, and prove zero old-style registrations remain on the combined tree.
+  - Convert all CommonJS `require` calls under packages/ to ESM imports with a few parallel agents; the shared tsconfig and package.json changes should land once up front.
+  - Remove every use of the deprecated `FeatureFlags.isOn` API in favour of `flags.enabled()` across the monorepo with 5 agents, integrate their branches, and list anything that couldn't be converted.
+  - hey can we get all the PropTypes out of the react components and into TS interfaces? it's every file in components/, farm it out
+  - Wrap every raw `throw new Error(...)` in services/* with the new `AppError` class, split across agents, with a rulebook written from a pilot service.
+  - Replace SCSS `@import` with `@use` in all 90 stylesheets, partitioned by feature folder across agents, with a residual search at the end.
+  - The pydantic v2 bump is already merged; now sweep every model file for `.dict()` -> `.model_dump()` and `class Config` -> `model_config`, several agents by package, until the search count is zero.
+  - Fan agents out across the 12 apps so each replaces the old react-query v3 `useQuery(key, fn)` calls with the v5 object form. Same change everywhere; pilot one app first.
+  - Run the TypeScript enum-to-union conversion across all packages with parallel agents, merge their partitions into migrate/enums, and check the residual `enum ` count is zero on the combined branch.
+  - 'Swap every `console.log` in src for the structured logger: about 900 hits across 40 dirs. Spread it over 4 agents and give me before/after counts.'
+  - Migrate all 30 ORM model files from Sequelize `define()` to class-based models, split by domain between agents, same conversion for each.
+  - 'Add explicit return types to every exported function in packages/core, packages/sdk and packages/cli: three agents, one per package, one shared rule for all.'
+  - can u get agents to replace all the var with let/const across the legacy js dir, its huge
+  - React Router v6 is already installed; convert every `<Switch>` and `useHistory` usage across the 60 route files, partitioned among agents with a golden example to copy.
+  - 'repo-wide mechanical migration: unittest.TestCase classes -> pytest functions, tests/ split by subpackage, parallel agents, residual grep must be 0'
+  - 'Last time each agent invented its own translation. Redo the `Result<T>` -> `Either<E,T>` migration properly: pilot one module, write the rules down, then do the remaining modules in parallel.'
+boundaries:
+  - query: Replace every import of moment with dayjs across all 40 packages, with a few agents splitting it by package.
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: Move moment to date-fns across all packages, one agent per package.
+    confusable_with: [daintree.forge.batch-dependency-updates]
+  - query: 'Multi-step, multi-agent job: convert every callback-style fs call to fs/promises across the codebase, partitioned by directory, integrated, and verified with a residual count of zero.'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: 'big migration, maybe over several sessions: every @Input() decorator to signal inputs across all the angular libs, a few agents, same rule everywhere'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: 'Plan and run the removal of the old `EventBus.emit` API from every module in parallel: one pattern repeated, ending with no remaining calls.'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: 'Launch one agent per package to replace `import * as _ from ''lodash''` with per-method imports: the same transform in all 11 packages, and zero barrel imports left.'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: run a batch of agents, one per service folder, each doing the identical datetime.utcnow() -> datetime.now(UTC) swap, then combine and count leftovers
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Parallel agents across apps/*, each converting its Enzyme tests to Testing Library the same way, with a pilot app first.
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: split the migration into per-directory chunks and launch an agent for each chunk
+    confusable_with: [daintree.orchestration.fan-out-work, daintree.worktree.relocate-agents]
+    run: pre-split
+  - query: split the logging refactor up so each agent owns a different package and nobody collides
+    confusable_with: [daintree.orchestration.fan-out-work, daintree.orchestration.multi-agent]
+    run: 2026-09-24-selector-hardening
+  - query: split the icon migration into disjoint per-package tasks and launch them in parallel
+    confusable_with: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+followups:
+  - query: exclude the vendored packages from the count
+    history:
+      - 'user: replace all uses of the deprecated logger across the monorepo'
+      - 'assistant: Inventory with rg: 412 call sites and 88 imports across 9 packages, including packages/vendor. Integration branch migrate/logger created.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: pilot looks good — fan out the rest, max 4 at a time
+    history:
+      - 'user: move moment to date-fns, one agent per package'
+      - 'assistant: Pilot on packages/ui is verified: 37 call sites migrated, tests pass, rulebook drafted with 6 forms. Golden commit c81f2e0 on migrate/date-fns-ui.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the api partition agent touched the lockfile — hold it, don't merge
+    history:
+      - 'user: convert the tests from jest to vitest, split by folder'
+      - 'assistant: Partitions web, api and shared are running from migrate/vitest. api''s notice just came in.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what's the residual count on the combined branch now?
+    history:
+      - 'user: migrate every component off the old Modal API'
+      - 'assistant: All five partitions integrated into migrate/modal one at a time; checks green after each merge.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the forms agent left three TODO(migration) comments — add those forms to the rulebook and send it back once
+    history:
+      - 'user: roll the no-floating-promises lint rule out everywhere with a few agents'
+      - 'assistant: forms partition done with 3 TODO(migration) for promises returned from event handlers; rulebook doesn''t cover that form.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the checkout package uses the migrated api client from core — don't start it until core is merged
+    history:
+      - 'user: switch every fetch call to the new apiClient, one agent per package'
+      - 'assistant: Partitions: core, checkout, admin, marketing. Launching all four from migrate/api-client after the pilot.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: the React 19 bump is in; now sweep every class component that uses the removed lifecycles, one agent per package
+    history:
+      - 'user: upgrade to React 19'
+      - 'assistant: codex-2 upgraded in deps/react-19; baseline vs after: typecheck adds 140 errors, all from componentWillReceiveProps in 6 packages.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'these aren''t separate issues — it''s the same change everywhere: replace every request() call with the new client across all packages'
+    history:
+      - 'user: fan out #301 to #306, one agent each'
+      - 'assistant: Six worktrees ready. Reading them, all six are ''migrate package X off request()''.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'next: convert all the tests from jest to vitest, split by folder across a few agents'
+    history:
+      - 'user: what does the test setup look like in this repo?'
+      - 'assistant: claude-2 read it: jest with ts-jest, 214 test files under 7 folders, custom matchers in test/setup.ts.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: that was the only one? fine — now roll the rule out across the whole monorepo with a few agents and get it to zero
+    history:
+      - 'user: add the no-restricted-imports rule for lodash in the web package'
+      - 'assistant: claude-3 added it in feat/lodash-rule; 23 violations fixed in web, lint green.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'rather than one phased plan, it''s really one pattern: every useQuery v4 call to the v5 object form, split across agents'
+    history:
+      - 'user: plan the data-layer rewrite as a durable workflow'
+      - 'assistant: Drafted phases: 1) query client config, 2) hooks migration, 3) remove legacy fetchers. Phase 2 is 300 useQuery call sites.'
+    active: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now apply the renamed router API across all 14 packages, split over a few agents
+    history:
+      - 'user: bump Next to 16'
+      - 'assistant: Upgrade verified on chore/upgrade-next-16 for the web app; the guide''s useRouter rename is deferred in the other packages.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-catalog-expansion-stateful

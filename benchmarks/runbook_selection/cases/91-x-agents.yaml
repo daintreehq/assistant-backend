@@ -1,0 +1,416 @@
+# Agents that already exist: steer, ask, hand off, feed context, drive with a CLI
+# command, and use a plugin skill (catalog expansion batch B1).
+#
+# Each new runbook has an agent-phrased and a user-phrased case requiring it, one
+# routing trap requiring it against its nearest neighbour, and a trap per declared
+# neighbour where the NEIGHBOUR is the answer. Traps between the six new runbooks
+# serve both directions.
+
+cases:
+  # --- daintree.agents.steer-running-agent ---
+  - id: x-steer-interrupt-and-redirect
+    category: single-runbook
+    note: Agent-phrased redirect of a working agent, with the rest of its task kept.
+    messages:
+      - role: user
+        content: Interrupt the Codex agent in terminal t-41 that is rewriting the whole config loader and redirect it to change only the parseEnv function, keeping the rest of its task.
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-steer-stop-it-casual
+    category: single-runbook
+    note: The casual stop-and-correct a user types while watching an agent go wrong.
+    messages:
+      - role: user
+        content: stop it, it's rewriting the whole file — tell it to just change the one function
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-steer-extra-requirement-not-answer
+    category: routing-trap
+    note: >-
+      An added requirement for a working agent that asked nothing: a steer, not an
+      answer to a waiting agent and not a question put to it.
+    messages:
+      - role: user
+        content: tell the claude that's working on the export feature it also has to keep the old CSV format working
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-steer-trap-answer-waiting
+    category: routing-trap
+    note: The agent is ASKING; answering it is answer-waiting-agent, not a steer.
+    messages:
+      - role: user
+        content: the codex agent is asking whether it should use pnpm or npm, tell it pnpm
+    expect:
+      required: [daintree.agents.answer-waiting-agent]
+      optional: [daintree.foundation]
+
+  - id: x-steer-trap-recover
+    category: routing-trap
+    note: A frozen agent is broken, not in need of a course change.
+    messages:
+      - role: user
+        content: the claude agent has been sitting on the same screen for 40 minutes, is it hung or just slow?
+    expect:
+      required: [daintree.agents.recover-agent]
+      optional: [daintree.foundation]
+
+  - id: x-steer-trap-relay-review
+    category: routing-trap
+    note: Findings from a reviewer agent to a fixer are a relay, not a correction from the user.
+    messages:
+      - role: user
+        content: take the codex reviewer's findings and send them to the claude implementer so it fixes them
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: x-steer-trap-park-work
+    category: routing-trap
+    note: Stopping everyone at a clean point for the day is park-work, not an interrupt of one turn.
+    messages:
+      - role: user
+        content: I'm done for the day, get all the agents to a clean stopping point and don't close anything
+    expect:
+      required: [daintree.orchestration.park-work]
+      optional: [daintree.foundation]
+
+  - id: x-steer-trap-cleanup
+    category: routing-trap
+    note: Closing the agents is teardown, not stopping a turn.
+    messages:
+      - role: user
+        content: shut it all down, close every agent terminal from this session
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: x-steer-trap-relocate
+    category: routing-trap
+    note: Moving a running agent to its own worktree is relocation, not a change of task.
+    messages:
+      - role: user
+        content: move the running claude into its own worktree so it stops colliding with codex, and have it carry on there
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]
+
+  # --- daintree.agents.ask-running-agent ---
+  - id: x-ask-running-why
+    category: single-runbook
+    note: Agent-phrased question to an existing agent that holds the context, without interrupting it.
+    messages:
+      - role: user
+        content: Ask the Claude agent already working in terminal t-12 why it replaced the retry loop, without interrupting its current work, and relay its answer.
+    expect:
+      required: [daintree.agents.ask-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-ask-running-what-it-said
+    category: single-runbook
+    note: Casual "what did it say" about an existing agent; answered from its record.
+    messages:
+      - role: user
+        content: what did the codex one say at the end?
+    expect:
+      required: [daintree.agents.ask-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-ask-running-not-new-agent
+    category: routing-trap
+    note: >-
+      "ask" plus an agent that already exists: the existing agent answers, not a fresh
+      launch (ask-and-relay) and not a fleet sweep.
+    messages:
+      - role: user
+        content: ask the implementer that's been on issue 88 all morning what it still has left to do
+    expect:
+      required: [daintree.agents.ask-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-ask-running-trap-ask-and-relay
+    category: routing-trap
+    note: A NEW agent launched to answer is ask-and-relay.
+    messages:
+      - role: user
+        content: spin up claude and ask it what it makes of our retry logic
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.foundation]
+
+  - id: x-ask-running-trap-poll
+    category: routing-trap
+    note: One question to several agents is a poll.
+    messages:
+      - role: user
+        content: ask all my pinned agents which logging library they would pick and tally it
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: x-ask-running-trap-supervise
+    category: routing-trap
+    note: A status sweep of every agent is supervise-fleet, not a question to one.
+    messages:
+      - role: user
+        content: how are all the agents getting on, does anything need me?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: x-ask-running-trap-verify
+    category: routing-trap
+    note: Checking an agent's claim is verification, not asking it again.
+    messages:
+      - role: user
+        content: the codex agent says the tests pass now — check that it actually did what I asked
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  # --- daintree.agents.hand-off-task ---
+  - id: x-hand-off-usage-limit
+    category: single-runbook
+    note: Agent-phrased handoff to a different CLI in the same worktree after a usage limit.
+    messages:
+      - role: user
+        content: Continue the half-finished payment-webhook task from the Claude agent in terminal t-17 with a Codex agent in the same worktree, because Claude hit its usage limit.
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: x-hand-off-context-full
+    category: single-runbook
+    note: Casual fresh-session handoff when the context is exhausted.
+    messages:
+      - role: user
+        content: context is shot on that one, start a fresh agent and carry on where it left off
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: x-hand-off-going-in-circles
+    category: routing-trap
+    note: >-
+      A looping agent replaced by a different one is a handoff, not a recovery of the
+      same agent and not a correction.
+    messages:
+      - role: user
+        content: codex keeps going in circles on the retry bug, give the task to claude instead
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: x-hand-off-trap-status-resume
+    category: routing-trap
+    note: Reopening the SAME earlier session is status-and-resume.
+    messages:
+      - role: user
+        content: pick up the claude session I had going yesterday on the billing branch
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: x-hand-off-trap-usage
+    category: routing-trap
+    note: Reading the remaining allowance does nothing about the task.
+    messages:
+      - role: user
+        content: how much of my claude usage is left this week and when does it reset?
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: x-hand-off-trap-spawn
+    category: routing-trap
+    note: New work with nothing carried over is a plain spawn.
+    messages:
+      - role: user
+        content: start a claude agent to add pagination to the users endpoint
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  # --- daintree.context.feed-running-agent ---
+  - id: x-feed-module-context
+    category: single-runbook
+    note: Agent-phrased request to give an existing agent a module's code as context.
+    messages:
+      - role: user
+        content: Give the Codex agent already running in terminal t-9 the payment module and its tests as context before it continues.
+    expect:
+      required: [daintree.context.feed-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-feed-inject-casual
+    category: single-runbook
+    note: Casual request for Daintree's context injection into an open agent.
+    messages:
+      - role: user
+        content: inject the worktree context into that claude
+    expect:
+      required: [daintree.context.feed-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-feed-not-bundle-file
+    category: routing-trap
+    note: >-
+      The context goes INTO an agent that is already open; the bundle file is only a
+      means, so curate-copytree-bundle and spawn are wrong.
+    messages:
+      - role: user
+        content: bundle up the rendering pipeline code and load it into the implementer agent that's already open
+    expect:
+      required: [daintree.context.feed-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-feed-trap-curate-bundle
+    category: routing-trap
+    note: The deliverable is the bundle file on the clipboard, no agent involved.
+    messages:
+      - role: user
+        content: make me a copytree bundle of the terrain system with its tests and copy it to my clipboard
+    expect:
+      required: [daintree.context.curate-copytree-bundle]
+      optional: [daintree.foundation]
+
+  - id: x-feed-trap-fan-out
+    category: routing-trap
+    note: Context for several NEW agents, one per issue, is fan-out-work.
+    messages:
+      - role: user
+        content: launch an agent per issue for issues 12, 14 and 19, each in its own worktree with its issue's code as context
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: x-feed-trap-start-issue
+    category: routing-trap
+    note: Starting one issue with context is start-work-on-issue.
+    messages:
+      - role: user
+        content: start work on issue 212 in a new worktree with an agent
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+
+  # --- daintree.agents.run-agent-command ---
+  - id: x-command-compact
+    category: single-runbook
+    note: Agent-phrased CLI command in an open agent.
+    messages:
+      - role: user
+        content: Run /compact in the Claude agent in terminal t-5, keeping the focus on the database migration task, and confirm it compacted.
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
+
+  - id: x-command-list-casual
+    category: single-runbook
+    note: Casual discovery of an agent CLI's slash commands.
+    messages:
+      - role: user
+        content: what slash commands does codex have in this project?
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
+
+  - id: x-command-clear-not-handoff
+    category: routing-trap
+    note: >-
+      Clearing the SAME agent's context is its own CLI command, not a handoff to a
+      fresh agent.
+    messages:
+      - role: user
+        content: clear that claude's context with /clear and then brief it fresh on the logging cleanup
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
+
+  - id: x-command-trap-spawn-first-turn
+    category: routing-trap
+    note: A command as a NEW agent's first turn belongs to spawn-visible-agent.
+    messages:
+      - role: user
+        content: launch codex on this branch and have it run /review as its first prompt
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: x-command-trap-plugin-skill
+    category: routing-trap
+    note: A plugin skill is not a CLI slash command.
+    messages:
+      - role: user
+        content: use the TDD skill from our daintree plugin to add tests for the parser
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation]
+
+  # --- daintree.skills.use-plugin-skill ---
+  - id: x-skill-find-and-follow
+    category: single-runbook
+    note: Agent-phrased search, load and follow of a plugin skill.
+    messages:
+      - role: user
+        content: Find a plugin-contributed skill for reviewing database migrations and follow it on the current branch.
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation]
+
+  - id: x-skill-list-casual
+    category: single-runbook
+    note: Casual listing of what plugin skills exist.
+    messages:
+      - role: user
+        content: what skills do my daintree plugins give me?
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation]
+
+  - id: x-skill-relay-to-running-agent
+    category: routing-trap
+    note: >-
+      A plugin skill handed to an agent that is already open: not a slash command in
+      that agent and not a new launch.
+    messages:
+      - role: user
+        content: have the running claude follow the security-review skill from our plugin on this branch
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation]
+
+  - id: x-skill-trap-run-command
+    category: routing-trap
+    note: A project slash command in an open agent is run-agent-command.
+    messages:
+      - role: user
+        content: run our /deploy-check command in that claude terminal
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
+
+  - id: x-skill-trap-diagnostics
+    category: routing-trap
+    note: A plugin that is broken or missing is diagnostics.
+    messages:
+      - role: user
+        content: my daintree plugin isn't showing up anymore, something's broken
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: x-skill-trap-develop-plugin
+    category: routing-trap
+    note: Building a plugin is develop-project-plugin.
+    messages:
+      - role: user
+        content: help me build a daintree plugin for this project and load it so I can test it
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]

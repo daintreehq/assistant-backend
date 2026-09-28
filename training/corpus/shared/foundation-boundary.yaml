@@ -13,7 +13,6 @@ examples:
   - you running on sonnet or opus?
   - whats your context window
   - how many tokens can you hold before you start dropping stuff
-  - do you remember our last session
   - do you keep anything between sessions or is it a clean slate every time
   - whats your training cutoff
   - how current is your knowledge
@@ -86,12 +85,10 @@ examples:
   - is there a limit to how many agents you can run
   - can you talk to github
   - do you handle git stuff or is that on me
-  - can you make a worktree
   - how do watchers actually work
   - what can you actually do
   - give me the tldr on what youre for
   - are you able to merge things or is that manual
-  - can you run tests
   - do you need me to approve stuff before you do it
   - so you never touch the code yourself?
   - can you use codex too or just claude
@@ -115,7 +112,6 @@ examples:
   - you still there?
   - you still with me
   - ok never mind then
-  - whered we leave off in this chat
   - sorry that came out wrong let me redo it
   - youre quick
   - sorry my bad

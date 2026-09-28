@@ -127,6 +127,10 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: free up the workspace — kill the terminals that aren't doing anything anymore
     run: 2026-09-28-agent-queries-2
+  - query: delete the payments-refactor worktree, we're done with it
+    run: 2026-09-28-catalog-expansion-refine
+  - query: close all the terminals from the competition and delete their worktrees
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: tear down the checkouts for everything that already landed
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -393,6 +397,42 @@ boundaries:
   - query: once those three agents are done, close their terminals
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-28-agent-queries-2
+  - query: Close all the agent panels left over from this morning's fan-out, they're finished.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: delete that worktree for feat/old-login, i'm done with it
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: Tear down the competition workspace, terminals and worktrees both.
+    confusable_with: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion
+  - query: shut it all down, i'm finished with this session
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: 'Tidy up: close the terminals from today''s competition and remove their worktrees.'
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion
+  - query: remove all the worktrees whose branches are merged
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: clean up — delete the worktrees from yesterday's competition
+    confusable_with: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion
+  - query: Delete all three competition worktrees, we're not using any of them.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-catalog-expansion-late
+  - query: Delete every spike worktree; we're not going with any of them.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
+  - query: delete the spike worktree and close its terminals
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-catalog-expansion-late
+  - query: close all the terminals and delete the worktrees, we're done with this
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: delete the losing entries' worktrees and close their terminals
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-catalog-expansion-refine
 followups:
   - query: actually delete the last one, i don't need that task
     history:
@@ -858,6 +898,73 @@ topic_shifts:
       - 'assistant: Generated search-context.md (14 files, 38KB) with src/search/*, its tests and the ranking config.'
     active: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
+  - query: those spikes are done, tear down all the spike worktrees and close their terminals
+    history:
+      - 'user: prototype the three dashboard directions'
+      - 'assistant: You picked the dense variant. spike/dash-minimal, spike/dash-dense and spike/dash-playful are still standing with claude-2, claude-3 and codex-4 idle.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now close the source agents and delete their worktrees, I only need the integration one
+    history:
+      - 'user: combine the four agents'' branches into one'
+      - 'assistant: integrate/dashboard holds all four sources, each check green, verified by me. The source worktrees and their agents claude-1 to claude-4 are still open.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: close the split worktree and its agent now, I'm done with it
+    history:
+      - 'user: break #655 into smaller PRs'
+      - 'assistant: Stack pushed and PRs #660 to #663 open; claude-3 is idle in the split worktree.'
+    active: [daintree.git.split-into-stacked-prs]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: all done — close the reviewer panels and delete the review worktrees
+    history:
+      - 'user: go through the review queue and tell me which PRs are good to merge'
+      - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: done with it — delete the pr-340 worktree
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: delete the feat/old-search and fix/typo worktrees, they're done
+    history:
+      - 'user: weekly update please'
+      - 'assistant: Summary for Mon-Fri below. Parked and not listed: feat/old-search, fix/typo, exp/cache.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: remove the redteam worktrees and branches now
+    history:
+      - 'user: try to break the rate limiter change'
+      - 'assistant: 1 confirmed pre-existing break. Worktrees redteam/rl-input and redteam/rl-concurrency left in place.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: we're done - close the investigator terminals and delete the incident worktree
+    history:
+      - 'user: help me triage this incident'
+      - 'assistant: Final report below; you rolled back to 3d4e5f6 and errors are gone.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: approved - remove the four merged ones
+    history:
+      - 'user: which worktrees can I get rid of?'
+      - 'assistant: Proposed removal set: feat/onboarding, chore/deps, fix/header, docs/api (merged, clean, no terminals).'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: done with that — tear down the bisect worktree and close claude-3
+    history:
+      - 'user: the invoice export worked in v2.3 and it''s broken now — when did this break?'
+      - 'assistant: Worktree bisect/export on main; claude-3 is bisecting between v2.3 (good, proven passing) and main (bad, proven failing) with `npm test -- export.spec`. Waiting for its notice.'
+      - 'assistant: Verified: export.spec fails on a1b2c3d and passes on its parent 5f6e7d8.'
+    active: [daintree.git.bisect-regression]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: actually just close all those terminals and delete the merged worktrees
+    history:
+      - 'user: park everything'
+      - 'assistant: Parked: claude-2 and codex-1 stopped clean, nothing committed, all panels left open.'
+    active: [daintree.orchestration.park-work]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[wake: both worktree deletes completed]'
     history:

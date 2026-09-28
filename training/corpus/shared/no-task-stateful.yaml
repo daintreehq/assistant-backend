@@ -1768,7 +1768,6 @@ examples:
       - 'user: spawn an agent on the docs cleanup'
       - 'assistant: Ready to launch in the docs worktree — go ahead?'
     active: [daintree.edits.spawn-visible-agent]
-  - park that, i'll come back to it
   - not now
   - cancel that, i'll just do it myself
   - query: stop
@@ -1846,7 +1845,6 @@ examples:
   - the usual please
   - and the other one?
   - go ahead
-  - fix it
   - can you handle that?
   - whatever you think is best
   - just deal with it, i'm going for lunch

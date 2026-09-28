@@ -1239,3 +1239,284 @@ examples:
       - 'user: Assign ticket 22 to me.'
       - 'assistant: This surface cannot resolve your forge login.'
     docs: false
+  - query: what's the difference between a worktree and a branch in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree make a worktree automatically when I start an issue?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I link a worktree to a GitHub issue in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: if I delete a worktree in Daintree does the branch go too?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does the worktrees overview actually show?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can Daintree run a setup script automatically whenever a worktree gets created?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree give each worktree its own port automatically?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree have a way to tell if two worktrees will conflict?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I move an agent into a different worktree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's a worktree remote resource / devbox in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what is a recipe?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where are team recipes stored, and do they get committed?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can a recipe launch an agent or only shell terminals?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's the difference between a global recipe and a project recipe?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what can a Daintree project plugin actually do?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where do project plugins live in the repo?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: why do Daintree plugins need a committed dist folder?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does 'Staged' mean in the plugin manager?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does the plugin trust model work in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where do plugin skills live?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how are plugin-contributed skills different from Claude's own skills?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can a Daintree plugin ship skills that agents can use?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I run slash commands in an agent from Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does Daintree know which slash commands an agent CLI has?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does /clear in an agent pane close the Daintree terminal?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I change which model an agent launches with in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where do I put custom slash commands for the Daintree assistant?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what is instructions.md in .daintree/assistant for?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does the Daintree assistant read my project's CLAUDE.md?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can project-level assistant skills run hooks or MCP servers?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I launch a Codex agent in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what are agent presets and how do I make one?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: which agent CLIs does Daintree support?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what is a Daintree notice?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does notify work when you launch an agent?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can Daintree tell me when an agent finishes overnight?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what shows up in the notification inbox?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does it mean when an agent shows as waiting?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I jump to the next waiting agent?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's the difference between waiting on a question and waiting on approval?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does arming a terminal do?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does 'Join the fleet' mean in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: is there a way to accept all armed waiting agents at once?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I open a dev preview panel?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does the dev preview reload by itself when files change?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's the difference between the browser panel and dev preview?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does Copy tree context do, and how big can the output get?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I inject worktree context into an agent that's already running?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I rename a terminal tab?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can agents rename their own tabs?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I close a terminal without killing what's running in it?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I open a plain shell terminal in a specific worktree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does 'Move all sessions to grid' do?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree keep terminal scrollback after a restart?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I hand a task from Claude to Codex in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what happens to the conversation if I swap agents mid-task?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree save my agents' sessions when I quit the app?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: if I close my laptop, do running agents keep going?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does Daintree resume a closed agent session?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree itself track token usage or cost per agent?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what happens in Daintree when an agent hits its rate limit?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree have a built-in code review feature?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where can I see what files an agent changed in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can two agents review each other's work in Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree detect my project's test commands on its own?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree work with GitLab issues or only GitHub?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can Daintree open the PR for me when an agent's done?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where does Daintree show a PR's CI status?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I merge a pull request from inside Daintree?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree have an issue browser?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how many agents can Daintree run at the same time?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I ask a running agent something without interrupting its task?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I stop an agent's turn without closing the pane?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does 'Restart all armed agents' do?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I send the same prompt to several agents at once?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what are pinned agents?
+    run: 2026-09-28-catalog-expansion-refine
+  - query: btw, how do recipes get shared with the rest of the team?
+    history:
+      - 'user: run the tests in the api worktree'
+      - 'assistant: All 412 tests passed in api at a1b2c3d.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: unrelated, but what's the keyboard shortcut to switch worktrees?
+    history:
+      - 'user: what branch is the billing worktree on?'
+      - 'assistant: billing is on feat/invoice-pdf, 3 commits ahead of main.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I get a closed terminal back if I shut it by mistake?
+    history:
+      - 'user: close terminal 4'
+      - 'assistant: Closed terminal 4 (the old test watcher).'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's the dock for, vs the grid?
+    history:
+      - 'user: which terminals are open right now?'
+      - 'assistant: Five: two Claude, one Codex, the dev server and a shell in auth.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree clean up the worktree automatically after a merge?
+    history:
+      - 'user: is PR 150 merged?'
+      - 'assistant: Yes, #150 was squash-merged into develop this morning.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I set a default title format for new agent tabs?
+    history:
+      - 'user: rename terminal 2 to ''api tests'''
+      - 'assistant: Renamed terminal 2 to ''api tests''.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's the portal panel?
+    history:
+      - 'user: how many worktrees do I have?'
+      - 'assistant: Seven worktrees in this project, including main.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree support voice input for prompts?
+    history:
+      - 'user: what''s Claude doing in terminal 1?'
+      - 'assistant: It''s editing src/export/csv.ts and running the exporter tests.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: is there a shortcut to stage and commit from Daintree?
+    history:
+      - 'user: show me the git status in the search worktree'
+      - 'assistant: Two modified files, nothing staged: results.ts and results.test.ts.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do I set which agent Daintree launches by default?
+    history:
+      - 'user: which agent is in the payments worktree?'
+      - 'assistant: A Codex agent, idle at its prompt since its last turn.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does the diagnostics dock show?
+    history:
+      - 'user: is the dev server still up?'
+      - 'assistant: Yes, it''s serving on http://localhost:5173 in terminal 3.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I split the grid so two panels sit side by side?
+    history:
+      - 'user: focus the Codex terminal'
+      - 'assistant: Focused terminal 5 (Codex, auth worktree).'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: does Daintree support Bitbucket as a forge?
+    history:
+      - 'user: list the open PRs'
+      - 'assistant: Four open: #201, #203, #207 and #210.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what's a Daintree project vs a worktree?
+    history:
+      - 'user: what did the last commit on develop change?'
+      - 'assistant: It bumped the lockfile and fixed a typo in README.md.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where does Daintree keep its settings file?
+    history:
+      - 'user: read the output of terminal 6'
+      - 'assistant: The last lines show the build finished with 0 errors.'
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what does the waiting badge on a tab actually mean?
+    history:
+      - 'user: how''s everyone doing?'
+      - 'assistant: Two agents finished, one is waiting on a question, one still working.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: out of curiosity, what contribution points can a plugin use?
+    history:
+      - 'user: my deploy-board plugin isn''t loading'
+      - 'assistant: Its manifest failed validation: ''panels[0].entry'' points at a missing dist file.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how do agent notices get into my pane — does Daintree type them?
+    history:
+      - 'user: have Claude add retries to the webhook sender'
+      - 'assistant: Launched Claude in the webhooks worktree with notify on; I''ll check its diff when it stops.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: where does Daintree put worktrees on disk?
+    history:
+      - 'user: make a worktree for feat/search-filters'
+      - 'assistant: Created worktree search-filters on a new branch feat/search-filters from main.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: is there a setting to auto-approve prompts like that?
+    history:
+      - 'user: the Codex agent is asking something, tell it yes'
+      - 'assistant: Answered ''yes'' to its migration prompt; it''s working again.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: what formats can CopyTree output besides XML?
+    history:
+      - 'user: bundle the auth module and its tests into a CopyTree file'
+      - 'assistant: Generated auth-context.xml with 23 files, about 41k tokens.'
+    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: how does Daintree decide a terminal is idle?
+    history:
+      - 'user: ping me when the build terminal finishes'
+      - 'assistant: Armed a notice on terminal 4; I''ll report when it goes idle.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: can I open dev tools for the preview panel myself?
+    history:
+      - 'user: the preview is blank, check the console'
+      - 'assistant: The console shows ''Cannot read properties of undefined (reading map)'' in ResultsList.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-catalog-expansion-refine
+  - query: do those names stick if I restart Daintree?
+    history:
+      - 'user: rename the Claude tabs so I can tell them apart'
+      - 'assistant: Renamed them to ''auth refactor'', ''csv exporter'' and ''search API''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-catalog-expansion-refine

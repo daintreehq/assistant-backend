@@ -1,0 +1,347 @@
+# Gated multi-agent patterns: plan-then-implement, test-first-split,
+# review-until-approved, contract-first-split, timebox-attempt.
+#
+# Each pattern has one request phrased as a calling agent would describe the outcome
+# and one as a user types it, plus a trap per declared neighbour where the neighbour
+# is the right answer and the gated pattern must stay out.
+
+cases:
+  # --- daintree.orchestration.plan-then-implement ---
+  - id: x-gated-plan-then-implement-agent
+    category: single-runbook
+    note: The core shape — a planner agent, an approval gate, then implementation of the approved plan.
+    messages:
+      - role: user
+        content: Have a Codex agent write an implementation plan for the caching layer without editing files, get my approval, then have Claude implement exactly the approved plan and check it for drift
+    expect:
+      required: [daintree.orchestration.plan-then-implement]
+      optional: [daintree.foundation]
+
+  - id: x-gated-plan-then-implement-user
+    category: single-runbook
+    note: Casual phrasing of the user as the approver.
+    messages:
+      - role: user
+        content: make claude show me a plan before it touches any code, then let it build it once i say ok
+    expect:
+      required: [daintree.orchestration.plan-then-implement]
+      optional: [daintree.foundation]
+
+  - id: x-gated-plan-then-implement-reviewer-gate
+    category: single-runbook
+    note: A reviewer agent is the approver instead of the user.
+    messages:
+      - role: user
+        content: claude plans the refactor, codex has to approve the plan, and only then claude writes the code
+    expect:
+      required: [daintree.orchestration.plan-then-implement]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-plan-only-is-ask-and-relay
+    category: routing-trap
+    note: The plan is the whole deliverable; nothing is implemented, so it is a question relayed.
+    messages:
+      - role: user
+        content: ask codex how it would approach adding a caching layer and tell me what it says, I don't want anything built yet
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-plan-no-gate-is-spawn
+    category: routing-trap
+    note: One agent told to plan and then just do it, with no approval step, is an ordinary visible-agent task.
+    messages:
+      - role: user
+        content: spawn claude to add the export button; tell it to think it through first and then implement it
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-durable-plan-is-workflow
+    category: routing-trap
+    note: A multi-phase plan with dependencies tracked across sessions is the durable workflow, not an approval gate.
+    messages:
+      - role: user
+        content: track this five-phase migration as a durable plan with dependencies between phases and resume it across sessions
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.test-first-split ---
+  - id: x-gated-test-first-split-agent
+    category: single-runbook
+    note: Test author and implementer as different agents, with the tamper check stated.
+    messages:
+      - role: user
+        content: Have one agent write failing tests for the rate limiter, verify they fail for the right reason, then have a different agent implement it without modifying those tests
+    expect:
+      required: [daintree.orchestration.test-first-split]
+      optional: [daintree.foundation]
+
+  - id: x-gated-test-first-split-user
+    category: single-runbook
+    note: Casual TDD-with-two-agents phrasing.
+    messages:
+      - role: user
+        content: codex writes the tests first, then claude makes them pass, no cheating by editing the tests
+    expect:
+      required: [daintree.orchestration.test-first-split]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-tests-first-then-plan-gate
+    category: routing-trap
+    note: Writing first and approving before implementation, but what is written is a plan, not tests.
+    messages:
+      - role: user
+        content: before any code, have codex write up a design for the parser change for me to sign off, then claude implements it
+    expect:
+      required: [daintree.orchestration.plan-then-implement]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-red-tests-are-diagnose
+    category: routing-trap
+    note: Tests that are already red and should pass are a failure to fix, not an intentional red phase.
+    messages:
+      - role: user
+        content: the parser tests went red after the last merge, get an agent to fix them
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-one-agent-with-tests-is-spawn
+    category: routing-trap
+    note: One agent writing the code and its own tests has no split.
+    messages:
+      - role: user
+        content: launch claude to implement the csv export and write tests for it
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-bug-repro-test-is-reproduce
+    category: routing-trap
+    note: A failing test that reproduces a reported bug is reproduction, not a test-first feature split.
+    messages:
+      - role: user
+        content: users say the date picker crashes on leap days; get an agent to reproduce it as a failing test before anyone fixes it
+    expect:
+      required: [daintree.debug.reproduce-bug]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.review-until-approved ---
+  - id: x-gated-review-until-approved-agent
+    category: single-runbook
+    note: The loop with a cap and an approval stop.
+    messages:
+      - role: user
+        content: Loop Codex reviews and Claude fixes on the payment branch until the reviewer reports no blocking findings, at most three rounds
+    expect:
+      required: [daintree.orchestration.review-until-approved]
+      optional: [daintree.foundation]
+
+  - id: x-gated-review-until-approved-user
+    category: single-runbook
+    note: Casual "until it signs off".
+    messages:
+      - role: user
+        content: make them go back and forth till codex signs off on claude's changes
+    expect:
+      required: [daintree.orchestration.review-until-approved]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-one-pass-is-relay
+    category: routing-trap
+    note: One review pass handed to a fixer, with no loop and no approval condition.
+    messages:
+      - role: user
+        content: have codex review the retry module, then pass its findings to claude to fix
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-findings-only-is-review-change
+    category: routing-trap
+    note: A review whose deliverable is findings, with nobody fixing.
+    messages:
+      - role: user
+        content: get a couple of agents to review this branch and give me the findings
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-claim-check-is-verify
+    category: routing-trap
+    note: Checking one finished agent's claim, not iterating on the change.
+    messages:
+      - role: user
+        content: claude says the fix is done and all tests pass, check that before I merge
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-rival-versions-is-competition
+    category: routing-trap
+    note: Two agents each writing their own version to be compared, not a writer and a reviewer.
+    messages:
+      - role: user
+        content: have claude and codex each write their own version of the retry logic and tell me which is better
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-break-it-is-red-team
+    category: routing-trap
+    note: An agent attacking the change to find reproducible breaks, not a review loop.
+    messages:
+      - role: user
+        content: get an agent to try to break the new auth change and only report breaks it can actually reproduce
+    expect:
+      required: [daintree.review.red-team-change]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.contract-first-split ---
+  - id: x-gated-contract-first-split-agent
+    category: single-runbook
+    note: Coupled sides built in parallel behind an agreed schema.
+    messages:
+      - role: user
+        content: Build the comments feature with one agent on the API and another on the UI in parallel, against a schema agreed and committed first, then check both halves together
+    expect:
+      required: [daintree.orchestration.contract-first-split]
+      optional: [daintree.foundation]
+
+  - id: x-gated-contract-first-split-user
+    category: single-runbook
+    note: Casual backend/frontend split.
+    messages:
+      - role: user
+        content: one agent does the backend and one does the frontend at the same time, agree the api shape first so they don't drift
+    expect:
+      required: [daintree.orchestration.contract-first-split]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-independent-units-is-fan-out
+    category: routing-trap
+    note: Parallel agents on units that share nothing need no contract.
+    messages:
+      - role: user
+        content: put one agent on each of these four unrelated bugs in parallel, each in its own worktree
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-finished-branches-is-integrate
+    category: routing-trap
+    note: The two sides are already built; only merging them remains.
+    messages:
+      - role: user
+        content: the api agent and the ui agent have both finished on their branches, merge them into one integration branch and run the tests after each merge
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-ordered-phases-is-workflow
+    category: routing-trap
+    note: Dependent steps done one after another across turns, not two sides at once.
+    messages:
+      - role: user
+        content: first migrate the schema, then the backend, then the frontend, each only after the previous is verified; keep a plan I can resume
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.timebox-attempt ---
+  - id: x-gated-timebox-attempt-agent
+    category: single-runbook
+    note: A time bound enforced by an interrupt and a report at the deadline.
+    messages:
+      - role: user
+        content: Let an agent attempt the dependency upgrade for at most 20 minutes, then stop it and report how far it got
+    expect:
+      required: [daintree.orchestration.timebox-attempt]
+      optional: [daintree.foundation]
+
+  - id: x-gated-timebox-attempt-user
+    category: single-runbook
+    note: Casual time box.
+    messages:
+      - role: user
+        content: see if claude can fix this in 10 minutes, if not just tell me where it got
+    expect:
+      required: [daintree.orchestration.timebox-attempt]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-later-start-is-watch
+    category: routing-trap
+    note: A time in the request, but it is when to start, not how long to try.
+    messages:
+      - role: user
+        content: in 20 minutes spawn claude and have it try the dependency upgrade
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-stuck-agent-is-recover
+    category: routing-trap
+    note: An agent that has been going too long is a hang to triage, not a time box.
+    messages:
+      - role: user
+        content: the upgrade agent has been sitting there for 40 minutes with no output, is it hung?
+    expect:
+      required: [daintree.agents.recover-agent]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-stop-now-is-steer
+    category: routing-trap
+    note: Stopping one agent's current turn and redirecting it, with no time bound.
+    messages:
+      - role: user
+        content: stop what the claude agent is doing right now and tell it to work on the login bug instead
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-parallel-spikes-is-spike-options
+    category: routing-trap
+    note: Several approaches prototyped side by side, not one attempt under a clock.
+    messages:
+      - role: user
+        content: spike three different approaches to the offline cache with separate agents and give me a trade-off recommendation
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-open-ended-is-spawn
+    category: routing-trap
+    note: The same task with no time bound is an ordinary visible agent.
+    messages:
+      - role: user
+        content: spawn an agent to try adding dark mode to the settings page
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  # --- traps where the gated pattern is right against a tempting neighbour ---
+  - id: x-gated-trap-failing-tests-on-purpose
+    category: routing-trap
+    note: >-
+      "Failing tests" and "make them pass" are diagnose-and-fix words, but the red is
+      intentional and written by a separate agent first.
+    messages:
+      - role: user
+        content: get codex to write failing tests for the new quota rule, then have claude implement until those failing tests pass without editing them
+    expect:
+      required: [daintree.orchestration.test-first-split]
+      optional: [daintree.foundation]
+
+  - id: x-gated-trap-parallel-worktrees-shared-contract
+    category: routing-trap
+    note: >-
+      Parallel agents in their own worktrees reads like fan-out, but the two halves
+      are coupled through a shared interface.
+    messages:
+      - role: user
+        content: split the export feature between two agents in parallel worktrees, one on the endpoint and one on the client that calls it, sharing a typed contract
+    expect:
+      required: [daintree.orchestration.contract-first-split]
+      optional: [daintree.foundation]

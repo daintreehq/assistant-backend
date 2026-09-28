@@ -120,6 +120,8 @@ positives:
     run: 2026-09-28-agent-queries
   - query: can you ssh me into the worktree's remote machine
     run: 2026-09-28-agent-queries
+  - query: pause the devbox on the staging-fix worktree
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: how's the cloud box for this checkout doing
     confusable_with: [daintree.worktree.provision-local-environment]

@@ -1,0 +1,613 @@
+# B8 runtime and environment runbooks: visible shell commands, busy ports, worktree
+# database migrations, dependency upgrades, project plugins and parking work.
+# Each new runbook has agent- and user-phrased cases that require it, a routing trap
+# that requires it near a neighbour's territory, and traps where a declared
+# neighbour is right and the new runbook must not be picked.
+
+cases:
+- id: x-rvc-agent-build-visible
+  category: single-runbook
+  note: 'Agent phrasing: a finite shell command the user watches, read back by exit code.'
+  messages:
+  - role: user
+    content: Run the production build in a visible Daintree terminal in worktree feature/auth and report
+      whether it passed, with its exit code.
+  expect:
+    required:
+    - daintree.terminals.run-visible-command
+    optional:
+    - daintree.foundation
+- id: x-rvc-user-dev-server
+  category: single-runbook
+  note: 'User phrasing: a long-lived server in a plain shell, no preview panel asked for.'
+  messages:
+  - role: user
+    content: spin up the dev server for the api worktree in a terminal
+  expect:
+    required:
+    - daintree.terminals.run-visible-command
+    optional:
+    - daintree.foundation
+- id: x-rvc-user-tail-logs
+  category: single-runbook
+  note: A log tail in a visible shell.
+  messages:
+  - role: user
+    content: open a terminal in the payments worktree and tail the logs
+  expect:
+    required:
+    - daintree.terminals.run-visible-command
+    optional:
+    - daintree.foundation
+- id: x-rvc-stop-own-server
+  category: routing-trap
+  note: Stopping a server this caller opened is run-visible-command's step, not a port hunt or a workspace
+    teardown.
+  messages:
+  - role: user
+    content: kill the dev server you started for me earlier
+  expect:
+    required:
+    - daintree.terminals.run-visible-command
+    optional:
+    - daintree.foundation
+- id: x-rvc-trap-spawn-agent
+  category: routing-trap
+  note: Terminal words, but the deliverable is an AI agent doing code work.
+  messages:
+  - role: user
+    content: open a codex agent in a new terminal and have it add pagination to the users endpoint
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: x-rvc-trap-recipe
+  category: routing-trap
+  note: Several terminals from a saved recipe, not one shell command.
+  messages:
+  - role: user
+    content: run our saved full-stack recipe in the api worktree so the server, worker and watcher terminals
+      all start
+  expect:
+    required:
+    - daintree.recipe.run-or-create
+    optional:
+    - daintree.foundation
+- id: x-rvc-trap-dev-preview
+  category: routing-trap
+  note: A Dev Preview panel and its console, not a plain shell.
+  messages:
+  - role: user
+    content: the dev preview panel shows a blank page, check its browser console and fix it
+  expect:
+    required:
+    - daintree.runtime.debug-web-app
+    optional:
+    - daintree.foundation
+- id: x-rvc-trap-local-checks
+  category: routing-trap
+  note: A pass/fail verdict from the project's checks; no visible panel asked for.
+  messages:
+  - role: user
+    content: run the tests, lint and typecheck for this worktree and tell me whether they pass
+  expect:
+    required:
+    - daintree.ci.run-local-checks
+    optional:
+    - daintree.foundation
+- id: x-rvc-trap-fix-build
+  category: routing-trap
+  note: A failing build to fix, not a command to run.
+  messages:
+  - role: user
+    content: the build fails with a type error when I run it in the terminal, fix it so it passes
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: x-rvc-trap-deferred
+  category: routing-trap
+  note: A command at a later time is a deferred action.
+  messages:
+  - role: user
+    content: in 20 minutes open a terminal and run npm test, then tell me how it went
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+- id: x-port-agent-eaddrinuse
+  category: single-runbook
+  note: 'Agent phrasing: identify the holder, act by ownership.'
+  messages:
+  - role: user
+    content: The dev server fails with EADDRINUSE on port 3000; find which process and worktree hold it
+      and free it only if it is ours.
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    optional:
+    - daintree.foundation
+- id: x-port-user-whats-on
+  category: single-runbook
+  note: 'Casual: who holds a port.'
+  messages:
+  - role: user
+    content: what's on 5173
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    optional:
+    - daintree.foundation
+- id: x-port-user-in-use
+  category: single-runbook
+  note: The plainest EADDRINUSE complaint.
+  messages:
+  - role: user
+    content: npm run dev says port 3000 is already in use, find what's holding it
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    optional:
+    - daintree.foundation
+- id: x-port-zombie-server
+  category: routing-trap
+  note: An orphaned process holding a port, not Daintree misbehaving and not starting a server.
+  messages:
+  - role: user
+    content: there's a zombie dev server from a terminal I closed still holding 8080, get rid of it
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    optional:
+    - daintree.foundation
+- id: x-port-trap-provision
+  category: routing-trap
+  note: 'The structural fix: per-worktree ports via setup scripts.'
+  messages:
+  - role: user
+    content: every worktree fights over port 3000, set it up so each new worktree gets its own port automatically
+  expect:
+    required:
+    - daintree.worktree.provision-local-environment
+    optional:
+    - daintree.foundation
+- id: x-port-trap-start-server
+  category: routing-trap
+  note: Starting the server once the port is free is run-visible-command.
+  messages:
+  - role: user
+    content: port 3000 is free now, start the api server in a visible terminal in the api worktree
+  expect:
+    required:
+    - daintree.terminals.run-visible-command
+    optional:
+    - daintree.foundation
+- id: x-port-trap-preview-restart
+  category: routing-trap
+  note: A Dev Preview panel's own server.
+  messages:
+  - role: user
+    content: the dev preview is stuck compiling and never loads, restart its server
+  expect:
+    required:
+    - daintree.runtime.debug-web-app
+    optional:
+    - daintree.foundation
+- id: x-port-trap-diagnostics
+  category: routing-trap
+  note: Daintree's own connection failing, not a project port clash.
+  messages:
+  - role: user
+    content: my agents say the connection to Daintree's MCP is refused, why can't they reach Daintree?
+  expect:
+    required:
+    - daintree.diagnostics
+    optional:
+    - daintree.foundation
+- id: x-db-agent-apply-migrations
+  category: single-runbook
+  note: 'Agent phrasing: migrate one worktree''s database, version read back.'
+  messages:
+  - role: user
+    content: Apply pending migrations in worktree feat-orders to its own database and report the resulting
+      schema version.
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: x-db-user-reset
+  category: single-runbook
+  note: Casual destructive reset of a worktree's local database.
+  messages:
+  - role: user
+    content: reset the worktree db and reseed it
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: x-db-user-migrate-branch
+  category: single-runbook
+  note: Plain migration request for a named worktree.
+  messages:
+  - role: user
+    content: run the pending migrations against the billing worktree's database
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: x-db-check-target
+  category: routing-trap
+  note: Proving the target before migrating is this runbook's guard, not a provisioning redesign.
+  messages:
+  - role: user
+    content: before running migrations here, check which database this worktree's .env points at and make
+      sure it isn't the main checkout's
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: x-db-trap-provision
+  category: routing-trap
+  note: A shared database needs per-worktree provisioning first.
+  messages:
+  - role: user
+    content: my feature branches keep clobbering each other's migrations on the one shared dev database,
+      give each worktree its own
+  expect:
+    required:
+    - daintree.worktree.provision-local-environment
+    optional:
+    - daintree.foundation
+- id: x-db-trap-ci
+  category: routing-trap
+  note: A red CI check, not a local migration run.
+  messages:
+  - role: user
+    content: the migration test is failing in CI on this PR, fix it
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: x-db-trap-write-migration
+  category: routing-trap
+  note: Writing a migration is code work for an agent.
+  messages:
+  - role: user
+    content: have an agent write a new migration that adds an archived_at column to orders
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: x-db-trap-durable
+  category: routing-trap
+  note: A multi-phase plan tracked across sessions.
+  messages:
+  - role: user
+    content: plan a phased migration of the old billing tables into the new schema, with dependent steps
+      tracked so we can resume it across sessions
+  expect:
+    required:
+    - daintree.orchestration.execute-durable-workflow
+    optional:
+    - daintree.foundation
+- id: x-dep-agent-react19
+  category: single-runbook
+  note: 'Agent phrasing: one framework upgrade with baseline and bans.'
+  messages:
+  - role: user
+    content: Upgrade react and react-dom to 19 in a new worktree, run the official codemods, fix type
+      and test failures without editing test assertions, and report baseline versus after.
+  expect:
+    required:
+    - daintree.deps.upgrade-dependency
+    optional:
+    - daintree.foundation
+- id: x-dep-user-next
+  category: single-runbook
+  note: Casual framework upgrade.
+  messages:
+  - role: user
+    content: upgrade next to latest and make it work
+  expect:
+    required:
+    - daintree.deps.upgrade-dependency
+    optional:
+    - daintree.foundation
+- id: x-dep-node-runtime
+  category: routing-trap
+  note: A runtime bump proven by checks; checks passing is the proof, not a failure to fix.
+  messages:
+  - role: user
+    content: bump us to Node 24 and make sure the build and tests still pass
+  expect:
+    required:
+    - daintree.deps.upgrade-dependency
+    optional:
+    - daintree.foundation
+- id: x-dep-trap-dependabot
+  category: routing-trap
+  note: A batch of bot PRs already open.
+  messages:
+  - role: user
+    content: there are 12 open dependabot PRs, work through them and merge the safe ones
+  expect:
+    required:
+    - daintree.forge.batch-dependency-updates
+    optional:
+    - daintree.foundation
+- id: x-dep-trap-red-main
+  category: routing-trap
+  note: Something already failing, no upgrade involved.
+  messages:
+  - role: user
+    content: CI on main has been red since yesterday's merge, figure out why and fix it
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+- id: x-dep-trap-review-bump
+  category: routing-trap
+  note: Judging someone else's upgrade PR.
+  messages:
+  - role: user
+    content: review the renovate PR that bumps express to v5 and tell me what could break
+  expect:
+    required:
+    - daintree.review.review-change
+    optional:
+    - daintree.foundation
+- id: x-dep-trap-land
+  category: routing-trap
+  note: Merging the bump PR.
+  messages:
+  - role: user
+    content: the React 19 upgrade PR is approved, squash and merge it
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    optional:
+    - daintree.foundation
+- id: x-dep-trap-fanout
+  category: routing-trap
+  note: Several independent units each with its own agent.
+  messages:
+  - role: user
+    content: upgrade these five unrelated packages in parallel, one agent and worktree each
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+- id: x-dep-trap-sweep
+  category: routing-trap
+  note: A mechanical codebase-wide change, no version bump.
+  messages:
+  - role: user
+    content: replace every call to our old logger.warn helper with log.warning across the whole codebase,
+      all packages
+  expect:
+    required:
+    - daintree.orchestration.migration-sweep
+    optional:
+    - daintree.foundation
+- id: x-plugin-agent-build-panel
+  category: single-runbook
+  note: 'Agent phrasing: author and prove a project plugin loads.'
+  messages:
+  - role: user
+    content: Write a Daintree project plugin that adds a panel listing open deploys, and verify Daintree
+      loads it.
+  expect:
+    required:
+    - daintree.plugins.develop-project-plugin
+    optional:
+    - daintree.foundation
+- id: x-plugin-user-button
+  category: single-runbook
+  note: 'Casual: the most common first-plugin bug.'
+  messages:
+  - role: user
+    content: my plugin's button does nothing
+  expect:
+    required:
+    - daintree.plugins.develop-project-plugin
+    optional:
+    - daintree.foundation
+- id: x-plugin-user-pick-up
+  category: single-runbook
+  note: Reload after a change.
+  messages:
+  - role: user
+    content: I changed the plugin, get daintree to pick it up
+  expect:
+    required:
+    - daintree.plugins.develop-project-plugin
+    optional:
+    - daintree.foundation
+- id: x-plugin-staged
+  category: routing-trap
+  note: A plugin state question, not Daintree itself misbehaving.
+  messages:
+  - role: user
+    content: the plugin manager shows my project plugin as Staged, is it broken?
+  expect:
+    required:
+    - daintree.plugins.develop-project-plugin
+    optional:
+    - daintree.foundation
+- id: x-plugin-trap-diagnostics
+  category: routing-trap
+  note: Daintree's own errors with no plugin of the user's named.
+  messages:
+  - role: user
+    content: Daintree keeps showing an error toast whenever I open a project, show me the recent errors
+  expect:
+    required:
+    - daintree.diagnostics
+    optional:
+    - daintree.foundation
+- id: x-plugin-trap-preview
+  category: routing-trap
+  note: A web app in Dev Preview, not a plugin panel.
+  messages:
+  - role: user
+    content: the dev preview of our React app renders a blank panel, check its console
+  expect:
+    required:
+    - daintree.runtime.debug-web-app
+    optional:
+    - daintree.foundation
+- id: x-plugin-trap-recipe
+  category: routing-trap
+  note: Running a saved recipe.
+  messages:
+  - role: user
+    content: run the watcher recipe in the main worktree
+  expect:
+    required:
+    - daintree.recipe.run-or-create
+    optional:
+    - daintree.foundation
+- id: x-plugin-trap-skill
+  category: routing-trap
+  note: Using a plugin-contributed skill, not building a plugin.
+  messages:
+  - role: user
+    content: find the release-notes skill one of my installed plugins adds and follow it
+  expect:
+    required:
+    - daintree.skills.use-plugin-skill
+    optional:
+    - daintree.foundation
+- id: x-park-agent-stopping-point
+  category: single-runbook
+  note: 'Agent phrasing: pause and record, no teardown.'
+  messages:
+  - role: user
+    content: Bring all running implementer agents to a clean stopping point, record where each one stopped,
+      and close nothing.
+  expect:
+    required:
+    - daintree.orchestration.park-work
+    optional:
+    - daintree.foundation
+- id: x-park-user-wrap-up
+  category: single-runbook
+  note: Casual end-of-day.
+  messages:
+  - role: user
+    content: wrap up for today
+  expect:
+    required:
+    - daintree.orchestration.park-work
+    optional:
+    - daintree.foundation
+- id: x-park-user-shelve
+  category: single-runbook
+  note: Shelving one worktree.
+  messages:
+  - role: user
+    content: park this worktree, I'll come back to it next week
+  expect:
+    required:
+    - daintree.orchestration.park-work
+    optional:
+    - daintree.foundation
+- id: x-park-save-before-laptop
+  category: routing-trap
+  note: Making work safe without closing, not a workspace teardown or a review PR.
+  messages:
+  - role: user
+    content: 'save everything before I shut my laptop: WIP commits and push, but don''t close any terminals'
+  expect:
+    required:
+    - daintree.orchestration.park-work
+    optional:
+    - daintree.foundation
+- id: x-park-trap-cleanup
+  category: routing-trap
+  note: Teardown, explicitly asked.
+  messages:
+  - role: user
+    content: we're done with the auth work, close all those agent terminals and delete the worktree
+  expect:
+    required:
+    - daintree.orchestration.workspace-cleanup
+    optional:
+    - daintree.foundation
+- id: x-park-trap-prep
+  category: routing-trap
+  note: Finished work readied for review, not parked.
+  messages:
+  - role: user
+    content: the search feature is finished, commit it, push and open a PR for review
+  expect:
+    required:
+    - daintree.workflow.prep-branch-for-review
+    optional:
+    - daintree.foundation
+- id: x-park-trap-resume
+  category: routing-trap
+  note: Picking parked work back up.
+  messages:
+  - role: user
+    content: morning, where did we leave off yesterday?
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+- id: x-park-trap-steer
+  category: routing-trap
+  note: Changing one running agent's course.
+  messages:
+  - role: user
+    content: tell the auth agent to drop what it's doing and use the new session API instead
+  expect:
+    required:
+    - daintree.agents.steer-running-agent
+    optional:
+    - daintree.foundation
+- id: x-park-trap-handoff
+  category: routing-trap
+  note: Moving a task to a different agent.
+  messages:
+  - role: user
+    content: Claude hit its usage limit mid-task, move its work over to Codex with a proper handoff
+  expect:
+    required:
+    - daintree.agents.hand-off-task
+    optional:
+    - daintree.foundation
+- id: x-park-trap-watch
+  category: routing-trap
+  note: Being told later, nothing paused.
+  messages:
+  - role: user
+    content: let me know when the agents finish what they're on
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+- id: x-park-trap-supervise
+  category: routing-trap
+  note: A triage sweep of running agents.
+  messages:
+  - role: user
+    content: 'quick sweep of the running agents: is anyone blocked or waiting on me?'
+  expect:
+    required:
+    - daintree.orchestration.supervise-fleet
+    optional:
+    - daintree.foundation

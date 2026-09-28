@@ -1,0 +1,166 @@
+# Training examples whose answer is `daintree.orchestration.review-until-approved` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.review-until-approved
+run: 2026-09-28-catalog-expansion
+positives:
+  - Have Codex review Claude's changes to billing proration and send blocking findings back to Claude, repeating until Codex approves (max 3 rounds).
+  - keep them going back and forth till codex is happy with the auth refactor
+  - 'Review/fix loop in the feat/search-filters worktree: reviewer gemini, implementer claude-2, stop when approved or after 4 rounds.'
+  - claude writes, codex reviews, repeat until there's nothing blocking. it's the websocket reconnect change
+  - Run an iterative review loop on Claude's session-timeout change with Codex as the read-only reviewer; only correctness and security findings block, nits don't.
+  - Iterate the CSV importer change between the implementer and a reviewer agent until the reviewer signs off; report each round's blocking findings.
+  - don't stop until codex approves claude's changes to the migration script
+  - 'Loop on the payments retry branch: the reviewer checks the current revision, the implementer fixes blocking issues, the reviewer re-checks. Cap at 3 rounds.'
+  - claude just finished the rate limiter. have gemini review and keep bouncing fixes back until gemini says approved
+  - Take Codex's review of the parser to Claude, have Claude fix, then Codex re-reviews; repeat until Codex has no blocking findings.
+  - keep iterating till it passes codex's review. the date util rewrite in wt dates-v2
+  - Have a reviewer agent other than Claude judge Claude's diff against main and send only the blocking issues back, looping until approval.
+  - 'Code review until approved: Codex reviews the diff on the export-queue branch, Claude fixes, repeat.'
+  - i want codex to sign off on claude's work before we move on. loop review and fixes until it does
+  - Put the GraphQL resolver change through review rounds with Gemini until it's approved; Claude does the fixes and must not skip tests to get past a finding.
+  - Launch Claude on adding request tracing, then have Codex review it and loop fixes until Codex approves.
+  - review, fix, re-review cycle between claude-3 and codex on the cache key change, up to 5 rounds
+  - before I trust that it's done, codex should review and claude should fix the blocking stuff until codex is satisfied
+  - Get the terraform module changes approved by a reviewer agent through repeated review and fix rounds; the implementer terminal is claude-1.
+  - codex keeps pushing back on claude's approach? fine, keep looping them till it approves or they stall, then tell me
+  - 'Have Codex act as the gatekeeper on Claude''s pagination change: blocking findings go back to Claude, re-review, until APPROVED.'
+  - Iterate between writer and reviewer agents on the onboarding email template code until the reviewer is happy; stop if the same finding survives two fixes.
+  - have codex judge claude's refactor of the order service, send back only what blocks, and repeat until it passes
+  - Loop Gemini's review of Claude's accessibility fixes in the settings screens until Gemini approves; collect nits but don't fix them.
+  - Keep Claude and Codex in a review loop on the logging change, Claude fixing whatever Codex marks blocking, until Codex approves. Don't open a PR.
+  - ok so claude's done with the upload handler. codex reviews, claude fixes, until clean. max 2 rounds
+  - query: have Codex review Claude's change and keep looping until Codex is happy
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Have Codex review Claude's refactor and pass the findings to Claude; repeat until Codex has no blocking issues.
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: send gemini's review to the implementer and keep bouncing it back and forth until gemini approves
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: Take Codex's review notes to Claude to fix, then have Codex re-check, as many rounds as needed up to 3.
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: relay codex's findings to claude, then back to codex for a re-review, until codex says APPROVED
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: Launch Claude on the export refactor and have Codex review each revision until it signs off.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'have codex review claude''s fix on #88 and keep looping until codex approves it'
+    confusable_with: [daintree.forge.address-pr-review]
+  - query: Claude builds the caching layer and Codex judges it; loop the fixes until Codex approves.
+    confusable_with: [daintree.orchestration.competition]
+  - query: have codex score claude's implementation and send back the blocking issues until it passes
+    confusable_with: [daintree.orchestration.competition]
+  - query: Have Gemini judge Claude's single version of the importer, fixes going back each round, until Gemini approves.
+    confusable_with: [daintree.orchestration.competition]
+  - query: Claude already implemented the cache layer; have Codex review it and loop fixes back until Codex approves.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: Claude wrote the discount engine and its tests; have Codex review and send blocking findings back until it approves.
+    confusable_with: [daintree.orchestration.test-first-split]
+  - query: don't trust claude's done. have codex review it and send fixes back until codex approves
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Before merging, have Codex check Claude's work and keep bouncing it back until no blocking findings remain.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Claude says the parser rewrite is finished; run a review-and-fix loop with Codex until it passes review.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: keep iterating the fix between the two agents till the reviewer approves it
+    confusable_with: [daintree.review.cross-review-cohort]
+  - query: 'Claude writes, codex reviews, and keep looping until codex has no blocking findings on PR #230.'
+    confusable_with: [daintree.review.red-team-change]
+  - query: Review Claude's branch with Codex, and have Claude fix whatever blocks until Codex says approved.
+    confusable_with: [daintree.review.review-change]
+  - query: 'code review loop on feat/search: codex reviews, claude fixes, stop when clean'
+    confusable_with: [daintree.review.review-change]
+  - query: have gemini look over what claude wrote and keep iterating till gemini approves it
+    confusable_with: [daintree.review.review-change]
+  - query: have the reviewer and the implementer go back and forth until they agree on the fix
+    confusable_with: [daintree.agents.relay-review-feedback, daintree.orchestration.multi-agent]
+    run: pre-split
+followups:
+  - query: codex found B1 and B2, both blocking — send just those to claude and have it fix them
+    history:
+      - 'user: have Codex review Claude''s work on the auth refactor and keep going until Codex is happy'
+      - 'assistant: Round 1: codex-2 reviewed revision a3f1 in feat/auth-refactor against base 8c0d1e2 — CHANGES REQUESTED, B1 (token refresh race, auth/session.ts:88) and B2 (missing test for revoked tokens), plus three nits.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: claude says B2 is wrong, the revoked path is covered in session.spec.ts — push back on the reviewer with that
+    history:
+      - 'user: loop review and fix on the auth branch until there are no blocking issues'
+      - 'assistant: Round 2 fix sent to claude-1 with B1 and B2; ending turn.'
+      - 'user: [notice] claude-1 replied'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: next round
+    history:
+      - 'user: Claude writes, Codex reviews, repeat until clean — the billing webhook handler'
+      - 'assistant: claude-3 finished the fixes for B3 and B4 in feat/billing-webhook and says it touched webhooks/handler.ts and handler.test.ts. Round 3 of 3 is next.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: make it 5 rounds max, not 3
+    history:
+      - 'user: keep iterating the cache invalidation change until codex approves it'
+      - 'assistant: Rules set: implementer claude-2 in feat/cache-inval, reviewer codex-1, base 4d9e0a1, blocking = correctness, security, missing tests; cap 3 rounds. Freezing revision 1 now.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: codex says APPROVED — are we done? run the tests yourself first
+    history:
+      - 'user: have codex review claude''s pagination fix and keep going until it''s clean'
+      - 'assistant: Round 2 re-check sent to codex-3 (B1 re-check, review of changed files).'
+      - 'user: [notice] codex-3 replied'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, the nits about naming — don't send those, only the blocking stuff
+    history:
+      - 'user: loop codex review on claude''s rate limiter work until approved'
+      - 'assistant: codex-4 returned CHANGES REQUESTED: B1 (limit counter not reset on window roll) and four NITs on naming. About to send the round-1 fixes to claude-5.'
+    active: [daintree.orchestration.review-until-approved]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: don't just hand it over once — keep going back and forth between them until codex has no blocking findings
+    history:
+      - 'user: get codex to review the cache change and pass its findings to claude'
+      - 'assistant: codex-2 found B1 (stale read on invalidate) and two nits; I sent them to claude-3, which is fixing now.'
+    active: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the plan's built. now codex reviews the implementation, claude fixes, repeat till clean
+    history:
+      - 'user: claude plans, codex approves, claude codes — the invoice soft delete'
+      - 'assistant: claude-1 implemented the approved plan in feat/soft-delete; drift check clean, tests pass.'
+    active: [daintree.orchestration.plan-then-implement]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine. now loop a codex review on claude's branch until there's nothing blocking, max 4 rounds
+    history:
+      - 'user: did claude actually run the migration tests it claims passed?'
+      - 'assistant: Yes — I ran them in feat/migrate-users: 14 pass. The diff matches what it described.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok — the one agent already building it is claude-4 in feat/pdf-export; have codex review and iterate with it until it approves
+    history:
+      - 'user: catch me up — what was I working on yesterday and what''s still in flight?'
+      - 'assistant: From yesterday: claude-4 finished the PDF export in feat/pdf-export (uncommitted, tests passing); the CSV importer workflow is parked at phase 2 of 3.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'interesting. now the real thing: codex reviews claude''s fix for it, claude addresses blockers, round and round until approved'
+    history:
+      - 'user: have codex try to break the new rate limiter'
+      - 'assistant: codex-3 confirmed one break: burst of 2x limit at window rollover, reproduced and failing on the change. Nothing fixed.'
+    active: [daintree.review.red-team-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before we integrate, have codex review the api branch and claude fix, loop until approved
+    history:
+      - 'user: build the search API and search box in parallel against an agreed contract'
+      - 'assistant: search-api verified at 2c1a9f0 (clean, in lane, tests pass); search-ui still working.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok it's done early. have codex review what it did and loop fixes with claude until codex approves
+    history:
+      - 'user: 20 minutes for claude on the pagination refactor'
+      - 'assistant: claude-1 finished early at 10:12, before the 10:25 deadline. Verified on disk: 4 files, tests pass.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: for feat/search just loop codex and claude review-and-fix until codex approves
+    history:
+      - 'user: swap reviews among the three'
+      - 'assistant: Fix round done. feat/search still has one high finding its author disputes.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful

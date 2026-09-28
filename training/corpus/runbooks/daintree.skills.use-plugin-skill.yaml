@@ -1,0 +1,127 @@
+# Training examples whose answer is `daintree.skills.use-plugin-skill` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.skills.use-plugin-skill
+run: 2026-09-28-catalog-expansion
+positives:
+  - Is there a plugin skill for reviewing database migrations?
+  - Have the running Claude agent in terminal 3 follow the Daintree plugin's security-review skill on the auth branch.
+  - Follow the plugin's release checklist on the release/3.2 branch using the agent already open there.
+  - list every skill the installed daintree plugins contribute
+  - Find the Daintree plugin skill for accessibility review and have codex-1, already open, apply it to the settings screens.
+  - Is there a Daintree plugin skill for writing ADRs? If so, have the Claude in wt-docs use it for the caching decision.
+  - Apply the team plugin's code-review rubric skill to branch feat/export via the agent already running there.
+  - which plugin skills mention terraform?
+  - load the plugin's i18n-audit skill and have the open gemini follow it on src/ui
+  - Have the idle Codex agent follow the Daintree plugin's dependency-review skill on the lockfile changes.
+  - 'Not a slash command: the plugin skill called release-checklist. Have the Claude pane on release/2.9 work through it.'
+  - Search the plugin skills for anything about onboarding docs.
+  - Our Daintree plugin ships a TDD skill; get the agent already working on the parser to follow it for its next change.
+  - Show me the id and description of the plugin skill for migration reviews.
+  - have claude-2 follow the pr-hygiene skill from our daintree plugin before it opens anything, but no pushing
+  - Find the plugin-contributed commit-message skill and have the running agent in wt-web apply it to its pending commits.
+  - does any daintree plugin give us a skill for schema reviews
+  - Use the Daintree plugin skill acme.review/api-design on the new endpoints, via the Codex already open in terminal 8.
+  - The plugin I installed yesterday adds a bug-triage skill. What does it cover, and can the open claude-3 apply it to docs/crash-0412.md?
+  - Have the reviewer agent that's already running follow the plugin's security-review skill step by step and report each step's result.
+  - plugin skills list pls, all of them
+  - Is the release-checklist skill from a Daintree plugin or from Claude Code itself? Use the plugin one on the rc branch with the open agent.
+  - Get the open Codex terminal to follow the plugin's migration-safety skill against db/migrations/2026_09_*.
+  - look up the exact id of the plugin's changelog skill before anyone guesses it
+  - Is there a Daintree plugin skill for load-test planning? Just tell me what's available, don't run anything.
+  - query: follow the plugin's release checklist on release/3.1
+    run: 2026-09-28-catalog-expansion-refine
+  - query: use the plugin's TDD skill on the parser change
+    run: 2026-09-28-catalog-expansion-refine
+  - query: have the running Codex follow our plugin's security-review skill
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Have the running agent follow the Daintree plugin's migration-review skill on this branch.
+    confusable_with: [daintree.agents.run-agent-command]
+  - query: why can't I find a skill for migration reviews? does any daintree plugin ship one?
+    confusable_with: [daintree.diagnostics]
+  - query: is the plugins' security-review skill available here? if so have the open claude use it
+    confusable_with: [daintree.diagnostics]
+  - query: Before any agent touches the code, find out whether a Daintree plugin ships a skill for reviewing migrations.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: The claude already in wt-billing should follow the plugin's TDD skill for the proration fix.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: look up the exact id of the plugin release-checklist skill and have the running codex follow it on release/4.0
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'Only the one agent already running on #120: have it follow the Daintree plugin''s TDD skill.'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Use the release-checklist skill our plugin ships on the v2.4 branch.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+  - query: follow the plugin's release-checklist skill on the release/4.2 branch
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: actually yes, include the publish step too
+    history:
+      - 'user: follow the plugin''s release checklist on release/2.4'
+      - 'assistant: Loaded release-kit/release-checklist. Its step 7 publishes to npm, which you didn''t ask for, so the brief tells the agent to skip it and report it as skipped.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the acme-qa one
+    history:
+      - 'user: use the plugin''s TDD skill for the date parser fix'
+      - 'assistant: Two close matches: acme-qa/tdd (red-green-refactor with a failing test first) and testing-pack/red-green (same idea, JS only). Which one?'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: when it reports, check that every step of the skill is actually covered
+    history:
+      - 'user: have the running agent follow the security-review skill'
+      - 'assistant: Loaded sec-tools/security-review (9 steps) and sent claude-2 the id with instructions to follow it on feature/sso; it is on step 3.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: try 'schema' then
+    history:
+      - 'user: is there a skill for reviewing migrations?'
+      - 'assistant: skills.search for ''migration review'' found nothing, and a broader search for ''migration'' found nothing either.'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: Load acme-qa/api-contract-check and have codex-3 in feature/orders-api follow it within this request only, then check its report step by step.
+    history:
+      - 'user: we need the orders API contract checked before merge'
+      - 'assistant: skills.search ''api contract'' found acme-qa/api-contract-check (''Compare OpenAPI spec against handlers'').'
+    active: [daintree.skills.use-plugin-skill]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: run the plugin's migration-review skill on it as well
+    history:
+      - 'user: review the diff on feature/orders-table'
+      - 'assistant: codex-5 reviewed it read-only: 3 findings, one high (missing index on orders.customer_id).'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great — have claude-2 follow its tdd skill for the parser bug
+    history:
+      - 'user: my acme-qa plugin isn''t loading'
+      - 'assistant: Reloaded the project plugins; acme-qa is now Active and its skills are registered.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: have it follow the plugin's TDD skill while it does it
+    history:
+      - 'user: launch claude in fix/date-parse to fix the timezone bug'
+      - 'assistant: Launched claude-3 in fix/date-parse with notify on; it is exploring the parser.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now follow the release-kit plugin's release checklist on develop
+    history:
+      - 'user: land #88'
+      - 'assistant: #88 squash-merged into develop; CI on develop is green.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: is there a plugin skill for writing changelogs?
+    history:
+      - 'user: what did we ship this week?'
+      - 'assistant: This week: search rewrite (#81), billing retries (#84), settings page (#88); two PRs still in review.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now follow the release-checklist skill the plugin ships, on feat/release
+    history:
+      - 'user: my plugin isn''t loading'
+      - 'assistant: Fixed: acme.release-tools is active after reload, and diagnostics show its skill release-checklist registered.'
+    active: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion-stateful

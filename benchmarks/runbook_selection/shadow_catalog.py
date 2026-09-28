@@ -129,6 +129,26 @@ _FACETS = (
     "when nothing has been set up yet",
 )
 
+#: The facet for the `unrelated` shape. The shared `_FACETS` are phrased in the
+#: catalog's own register ("request", "review", "failed"), and at 87 real
+#: runbooks that register covered enough of an unrelated document to leave it
+#: only 20% foreign at the median: the easy half had stopped being easy. These
+#: keep the variation while staying in the foreign domain's world.
+_FOREIGN_FACETS = (
+    "for a returning customer",
+    "after the fiscal year rollover",
+    "during the annual stocktake",
+    "for a supplier invoiced in euros",
+    "once the courier has collected",
+    "for a franchise location",
+    "if the payroll run is pending",
+    "for a seasonal hire",
+    "ahead of the tax filing deadline",
+    "for a wholesale account",
+    "while the receptionist is away",
+    "for a lapsed subscriber",
+)
+
 _FORMS = ("written report", "checklist", "summary note", "audit trail")
 
 _REPHRASINGS = (
@@ -275,8 +295,8 @@ def _collision(real: Runbook, n: int, seq: int) -> tuple[str, str, str, str]:
 def _unrelated(n: int, seq: int) -> tuple[str, str, str, str]:
     domain, topic, job = _FOREIGN_DOMAINS[seq % len(_FOREIGN_DOMAINS)]
     qualifier = _QUALIFIERS[(seq // len(_FOREIGN_DOMAINS)) % len(_QUALIFIERS)]
-    facet = _FACETS[
-        (seq // (len(_FOREIGN_DOMAINS) * len(_QUALIFIERS))) % len(_FACETS)
+    facet = _FOREIGN_FACETS[
+        (seq // (len(_FOREIGN_DOMAINS) * len(_QUALIFIERS))) % len(_FOREIGN_FACETS)
     ]
     return (
         f"shadow.{domain}.{topic}-{n:04d}",

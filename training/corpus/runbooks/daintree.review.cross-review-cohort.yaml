@@ -1,0 +1,124 @@
+# Training examples whose answer is `daintree.review.cross-review-cohort` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.review.cross-review-cohort
+run: 2026-09-28-catalog-expansion
+positives:
+  - The three agents that each built a separate endpoint are done. Have each one review another's branch without telling it whose it is, then let each author fix what its reviewer found.
+  - swap reviews between claude-1 and codex, then have them fix whatever the other one found
+  - Rotate code reviews across the five fan-out worktrees so no agent checks its own work, with one round of fixes after.
+  - 'Peer review round: gemini reviews the #88 branch, codex reviews #91, claude reviews #93, each one someone else''s, blind, then each author fixes.'
+  - now that all 4 are finished can they check each others work? then fix
+  - 'Cross-review the parallel agents'' units: each reviews a peer''s frozen commit read-only, and findings reach the authors only after they''re verified.'
+  - before i merge anything get the agents to go over each others prs and fix what comes up
+  - Rather than fresh reviewers, have the four agents that wrote the payment, shipping, tax and invoice modules review one another's diffs, then address the findings.
+  - Three open PRs came from three different agents in this session. Have each of those agents review one of the other two PRs, then fix its own.
+  - Pair up the six finished agents so each reviews a peer's worktree, and get the findings relayed to the right author for fixes.
+  - 'One round only, no looping: every agent in the cohort reviews a peer''s unit, then each author fixes or rebuts once.'
+  - The agents built different features, not rival versions, so no winner is needed. Just have them review each other's work and fix what's found.
+  - codex and claude each did a separate half of the refactor in their own worktrees; have them trade and review the other's half, then fix.
+  - 'Blind peer review across the cohort: shuffle the assignment, prefer a Codex reviewer for Claude-authored work and vice versa, then a fix round.'
+  - after the fan-out finishes each agent should review a different agent's unit, nobody their own, and then address the comments
+  - Get agents A, B and C to critique each other's implementations of their tickets and respond with fixes or rebuttals.
+  - Mutual review between the frontend agent and the backend agent on each other's branch, then each applies the findings to its own.
+  - can the 3 claudes review each other before we integrate? round robin
+  - Have the finished worktree agents (wt-search, wt-filters, wt-export) cross-review each other read-only at their current commits, then send the confirmed findings back to each author.
+  - Review the PRs my five agents opened today, but use the agents themselves as reviewers in rotation, each fixing its own PR afterwards.
+  - Set it up so codex reviews claude's branch and claude reviews codex's, and each fixes what the other finds.
+  - round of peer review among the agents that just finished their issues, fix whatever is valid
+  - Each of the 4 agents should look over another's diff for bugs and missed acceptance criteria. Don't reveal authors; relay the confirmed findings back for one fix pass.
+  - i want the agents to grade each others work and then fix whatever their grader found, no voting on a winner
+  - 'Cross-check: codex-2 reviews claude-3''s worktree and claude-3 reviews codex-2''s, both read-only, then each patches its own branch.'
+  - 'Set up reciprocal reviews among the agents that handled #201, #204, #207 and #210 and have each address the issues its reviewer raised.'
+boundaries:
+  - query: 'Pass review findings between the agents: each of the four reviews a peer''s unit and the findings go to that unit''s author to fix.'
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: have codex and claude review each other's work and relay the findings both ways so each fixes its own
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: 'Relay feedback in a ring: agent 1 reviews 2, 2 reviews 3, 3 reviews 1, and each author then addresses what it got.'
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: The agents each built a different module. Have them judge each other's work; no winner, each fixes what its judge found.
+    confusable_with: [daintree.orchestration.competition]
+  - query: send each agent another agent's finished unit to critique, then have them fix. not a contest
+    confusable_with: [daintree.orchestration.competition]
+  - query: Peer-judging round among the cohort, but each worked a separate ticket, so the output is fixes per ticket rather than a ranking.
+    confusable_with: [daintree.orchestration.competition]
+  - query: Review the three agents' branches, but have each of those agents review another's branch, then fix its own.
+    confusable_with: [daintree.review.review-change]
+  - query: 'code review round for the fan-out work: the agents review each other, not new reviewers, and they fix what they''re told'
+    confusable_with: [daintree.review.review-change]
+  - query: Look over what the four agents wrote by having them review one another's diffs blind, then act on the verified findings.
+    confusable_with: [daintree.review.review-change]
+  - query: The three agents have finished their PRs - have each one review another agent's PR, then fix what its reviewer found.
+    confusable_with: [daintree.review.review-pr-queue]
+followups:
+  - query: don't tell them whose branch it is
+    history:
+      - 'user: swap reviews between the three worktrees'
+      - 'assistant: Frozen feat/a at 1e0c3d2, feat/b at 9aa71f4, feat/c at 44bd0e8. Assigning reviewers so nobody gets its own.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: feat/search has uncommitted changes — let its author commit first, then freeze
+    history:
+      - 'user: rotate the reviews so nobody checks their own work'
+      - 'assistant: feat/export and feat/tags are clean; feat/search shows 4 modified files in git status.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: reviews are in — are those findings real? check them before sending anything to the authors
+    history:
+      - 'user: have the agents review each other''s PRs'
+      - 'assistant: Review round sent to claude-2, codex-3 and claude-5, each on a peer''s frozen commit, read-only.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: yes, send each author its verified findings for one fix round
+    history:
+      - 'user: each agent reviews another one''s branch'
+      - 'assistant: Verified 7 findings (2 high, 3 medium, 2 nits); dropped 2 with no evidence. Should the authors fix them?'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the tags author pushed back on the null-check finding — who's right?
+    history:
+      - 'user: swap reviews, then fix round'
+      - 'assistant: Fix round sent. feat/export and feat/search fixed theirs; feat/tags replied with a rebuttal for finding 2.'
+    active: [daintree.review.cross-review-cohort]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: all four are done — now have them review each other's branches, nobody their own
+    history:
+      - 'user: fan out #410 through #413, one agent each'
+      - 'assistant: All four finished: claude-2, codex-3, claude-4 and codex-5 each committed on their issue branch and report tests passing.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: instead of a fresh reviewer, have the three agents swap and review one another's work
+    history:
+      - 'user: review the three feature branches'
+      - 'assistant: Planning one read-only reviewer per branch: feat/a, feat/b, feat/c.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before I integrate, have the api agent and the ui agent review each other's side and fix what the other found
+    history:
+      - 'user: one agent on the API, one on the UI, against the schema'
+      - 'assistant: Contract committed at 3f1ab20; claude-2 (api) and codex-3 (ui) both conform and report done.'
+    active: [daintree.orchestration.contract-first-split]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: those are all ours though — have the agents who wrote them review each other's PRs instead
+    history:
+      - 'user: review all the open PRs'
+      - 'assistant: Four open PRs: #501-#504, each from one of the agents I launched earlier (claude-2, codex-3, claude-4, codex-5).'
+    active: [daintree.review.review-pr-queue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it's all three of them, not one pair — rotate reviews so each reviews another's branch, then each fixes
+    history:
+      - 'user: have codex review claude''s branch and pass the findings to claude'
+      - 'assistant: I''ll launch codex read-only on feat/export and relay its findings to claude-2.'
+      - 'user: wait, the other two finished as well'
+    active: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, everyone's done. swap reviews between the worktrees now
+    history:
+      - 'user: how''s everyone doing?'
+      - 'assistant: claude-2, codex-3 and claude-4 are waiting at the prompt with their units committed; nothing needs you.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful

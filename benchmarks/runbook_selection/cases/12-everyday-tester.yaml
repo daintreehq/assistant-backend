@@ -160,14 +160,12 @@ cases:
 
   - id: ci-flaky-suspicion
     category: single-runbook
-    note: >-
-      Flaky is a different diagnosis from broken, and the runbook owns both — the
-      distinction is made inside the runbook, not by routing elsewhere.
+    note: "Suspected flakiness (fails sometimes, passes on re-run) is daintree.ci.hunt-flaky-test since the 2026-09-28 expansion; ci.diagnose-and-fix keeps checks that fail consistently."
     messages:
       - role: user
         content: >-
           Same test fails maybe one run in four, passes if I just re-run it.
           Nothing's changed in that file for weeks.
     expect:
-      required: [daintree.ci.diagnose-and-fix]
+      required: [daintree.ci.hunt-flaky-test]
       optional: [daintree.foundation]

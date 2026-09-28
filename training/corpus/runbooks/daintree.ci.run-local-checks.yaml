@@ -1,0 +1,146 @@
+# Training examples whose answer is `daintree.ci.run-local-checks` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.ci.run-local-checks
+run: 2026-09-28-catalog-expansion
+positives:
+  - Run pytest in the billing-refactor worktree and report the result at its current HEAD; fix nothing.
+  - Run the test suite in each agent's worktree (claude-1, claude-2, codex) and tabulate which are green.
+  - Does the monorepo still build after the tsconfig change on chore/ts-5.6? Run the build there and report.
+  - List the test, lint, typecheck and build commands this project defines without running any of them.
+  - 'cargo clippy + cargo test in the worktree for issue #812, report only, quote failing lines if any'
+  - Run locally whatever .github/workflows/ci.yml runs, in the current worktree, and report each step's outcome.
+  - Run go vet and go test ./... across the three agent worktrees one at a time, since they share a Postgres test database.
+  - eslint on the api-gateway worktree only; report error count and file names
+  - Typecheck all four worktrees and report which ones come back clean.
+  - Run the Jest unit tests in feature/invoice-pdf, stopping at the first red check.
+  - Run npm run build in the search worktree and report exit status, with the output tail if it fails.
+  - Run mypy --strict and ruff on feature/export-csv; read-only, no fixes, no commits.
+  - run the tests pls
+  - can u run lint + tsc in the auth wt
+  - does it still build?
+  - before i push, run the checks on this branch
+  - what test/lint commands does this repo even have
+  - run phpunit in the wp-plugin worktree and tell me if its green
+  - hey quick one - run rspec on my branch, dont touch anything
+  - Nobody has claimed anything yet; just run the unit tests in all five agent worktrees and report green or red per worktree.
+  - Rather than waiting on GitHub Actions, run the same lint and test jobs locally in the feature/webhooks worktree and report.
+  - Run lint, types and tests on feature/sso before I open the PR myself; don't commit or push anything.
+  - Run tsc and eslint in the mobile worktree and just give me pass/fail, no terminal panel needed.
+  - Unit tests only in feature/cart - skip the Playwright suite - and report the result.
+  - Nothing is known to be broken; run the build and unit tests now in wt payments and report what you see, fixing nothing.
+  - query: run lint and typecheck in the auth worktree
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Nothing's failing that I know of; run the build and tests in wt docs and tell me if anything breaks.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Run the test suite on feature/tax and report failing lines if there are any; fixing is a separate request.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: run the test suite in the api worktree and tell me pass or fail
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: did the checks pass in every agent's worktree? just run them and report
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: run jest unit tests and tsc in wt checkout, no browser stuff
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: run the tests and lint in my auth worktree before I push
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: run the unit tests in the payments worktree and tell me what's red
+    confusable_with: [daintree.orchestration.test-first-split]
+  - query: No agent has reported anything; just run the tests in each agent worktree and say which pass.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Run the test suite in the perf branch worktree and tell me whether it's green.
+    confusable_with: [daintree.runtime.measure-performance]
+  - query: just give me pass/fail for tsc and eslint in the api worktree, I don't need to watch it
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Run the build in the mobile worktree and report whether it passes; no panel needed.
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Run lint and typecheck in the search-v2 worktree and report pass/fail per check; no panel needed.
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: run the checks before i push, i'll push and open the PR myself
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Is feature/auth green locally? Run lint, types and tests; no commits.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Run the project's bounded lint check.
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.worktree.manage-resource]
+    run: pre-split
+  - query: run the linter here
+    confusable_with: [daintree.recipe.run-or-create, daintree.worktree.provision-local-environment]
+    run: 2026-09-22-provision-boundary-fix
+  - query: can you run tests
+    run: pre-split
+followups:
+  - query: and the unit tests?
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok now do the same for the api worktree
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: does it still build though?
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: don't fix the typecheck, just paste me the failing lines
+    history:
+      - 'user: run lint and typecheck in the auth worktree'
+      - 'assistant: In auth (feat/auth-refresh @ 7c1d2e0): lint passed; typecheck failed with 3 errors in src/session.ts (lines 41, 88, 102).'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run the test suite in every agent's worktree, not just this one, and tell me which are green
+    history:
+      - 'user: run the tests in the payments worktree'
+      - 'assistant: payments (feat/refunds @ 91ab3c4): `pnpm test` passed, 412 tests.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what other checks does this project have? run those too
+    history:
+      - 'user: run the tests before I push'
+      - 'assistant: In main-wt (main @ c0ffee1) `npm test` passed, 238 tests. That''s the only check I ran.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: what checks does this project have? run them all on main and tell me what passes
+    history:
+      - 'user: what does this repo do?'
+      - 'assistant: claude-1 read it: a Rust CLI plus a TypeScript web dashboard sharing a proto package; I checked its citations.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run the tests and typecheck in it — nothing's broken, I just want a baseline
+    history:
+      - 'user: make a worktree for feature/export-v2'
+      - 'assistant: Created worktree export-v2 on existing branch feature/export-v2 at 6d0a1b2; no recipe or agent launched.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: run the test suite in each of those three and tell me which are green
+    history:
+      - 'user: compare the three agent worktrees'
+      - 'assistant: feat/a, feat/b and feat/c all touch src/api/routes.ts; b and c conflict in a merge-tree check, a merges clean.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok — run lint and typecheck in the payments worktree
+    history:
+      - 'user: remember that we deploy from the release branch, not main'
+      - 'assistant: Saved that as a project memory and read it back.'
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now the unit tests and lint, no server needed for those
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: does main still build? just run the build and tell me
+    history:
+      - 'user: rename the terminals by what they''re doing'
+      - 'assistant: Renamed 4 terminals: ''Auth refresh'', ''Repro 412'', ''Dev server'', ''Flake: reconnect''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-catalog-expansion-stateful

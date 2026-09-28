@@ -1,0 +1,125 @@
+# Training examples whose answer is `daintree.orchestration.timebox-attempt` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.timebox-attempt
+run: 2026-09-28-catalog-expansion
+positives:
+  - Give codex 20 minutes on getting the websocket reconnect working, then stop it and tell me how far it got.
+  - try the vite migration for 15 min max then report back where it got
+  - Time-box a claude agent to 30 minutes on converting the settings page to server components; interrupt it at the deadline and check what it left on disk.
+  - Let gemini have ten minutes at shrinking the Docker image, and when the time is up stop it and collect a progress report.
+  - half an hour on the pdf export perf, no more. then i want to know where it stands
+  - Spend at most 25 minutes of an agent's time on the i18n string extraction in the feat/i18n worktree; halt it at 25 and summarise what's done.
+  - Start an agent on the ESLint flat-config migration now and cut it off after 20 minutes, then tell me what it finished.
+  - Spawn claude on adding keyboard shortcuts to the editor but only give it 15 minutes; stop it then and check the partial diff.
+  - Launch codex on the retry refactor with a hard 10-minute budget and interrupt it at the limit if it's still going.
+  - Give one agent a fixed 20 minutes to see whether swapping axios for fetch is feasible here, then stop it and report.
+  - 15-minute budget for an agent to attempt the Tailwind v4 bump in a throwaway worktree; stop it when time runs out and list what broke.
+  - 'Timeboxed attempt: codex, 40 minutes, port the payments module from callbacks to async/await; report done, not done and next steps at the cutoff.'
+  - got a meeting in 20 mins. let claude hack on the login redirect bug until then and stop it, i'll read the report after
+  - Can an agent get the monorepo building on Bun in 30 minutes? Run it with that limit and report how far it got.
+  - Have an agent work on the onboarding copy rewrite for just 10 minutes, then stop it with a report of what's left, panel left open so I can continue.
+  - No agent is stuck; I just want a fresh codex attempt at the GraphQL N+1 fix capped at 20 minutes, stopped and reported at the cap.
+  - 'Budget: 12 minutes. Agent tries removing the lodash dependency from utils/. Stop at budget and verify the partial changes against the starting commit.'
+  - see how far claude gets on the mobile nav in 20 min
+  - Kick off an agent right now on the CSV parser rewrite and pull the plug after 30 minutes with a status on where it is.
+  - Try the Python 3.13 compatibility fixes with codex for a strict 15 minutes; at the end I want done/not done, confidence and any half-edited files.
+  - one agent, 20 min timebox, attempt to get storybook running for the design-system package
+  - Give claude-2 a fresh task, trimming the bundle size, with a 10-minute deadline, and interrupt it when the time's up.
+  - 'quick 10 min experiment: can an agent get the e2e setup working with playwright''s new fixtures? stop it after and tell me'
+  - Allow an agent up to 25 minutes to start the move off the deprecated Redis client in its own worktree; after that, stop it and check what compiles.
+  - Have an agent add dark mode to the marketing site, but I only want to spend 15 minutes of its time on it. Stop and report at 15.
+  - Put codex on the ffmpeg thumbnail bug with a 20-minute cap, then stop it and verify on disk what it changed.
+boundaries:
+  - query: Give Codex twenty minutes to try splitting the GraphQL schema, then interrupt it and report how far it got.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Launch codex on the hydration mismatch and interrupt it if it's still working after 20 minutes; get its report.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Start gemini on the feature-flag cleanup and stop its turn after ten minutes, keep the panel open, summary of what's done.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: new agent on the queue retry logic, and stop it at the 25 min mark whether or not it's finished
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: Have claude fix the date parsing bug in utils/date.ts, but stop it after 15 minutes regardless.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: spin up codex on the README restructure, cap it at 10 min
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Launch an agent to add CSV export to the reports page with a 20-minute ceiling and a progress report at the end.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Give codex 20 minutes to try swapping moment for date-fns and stop it at the deadline if it isn't done.
+    confusable_with: [daintree.orchestration.spike-options]
+  - query: Start codex on the cache invalidation work and in 30 minutes stop it and tell me how far it got.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: Set claude going on the logger cleanup now; at 15:40 halt it and bring me its progress.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: Launch an agent on the form validation now and after 15 minutes interrupt it and report progress, even if unfinished.
+    confusable_with: [daintree.orchestration.watch-outcome]
+followups:
+  - query: still going? it's past 14:35, stop it and get the report
+    history:
+      - 'user: try the flaky websocket fix for 15 minutes then tell me where it got'
+      - 'assistant: claude-3 launched at 14:20 in fix/ws-reconnect with a 14:35 deadline; my wait came back with outcome timeout at 14:36.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: make it half an hour instead
+    history:
+      - 'user: time-box claude on the chart component refactor, 20 minutes'
+      - 'assistant: Worktree refactor/charts ready, baseline 6e0f3a2 clean. About to start the clock and launch claude-1.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what did it actually leave on disk? check nothing's half-edited
+    history:
+      - 'user: give it ten minutes on the i18n extraction then stop it'
+      - 'assistant: Deadline 09:40 passed; claude-2 was working so I interrupted it and confirmed it''s at its prompt. Its report: 14 of 22 components extracted, Header.tsx mid-edit.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, give it another ten from now
+    history:
+      - 'user: 15 minutes for codex on the pdf export spike, then stop'
+      - 'assistant: Stopped codex-1 at 11:05 as planned. Report: renderer works for single pages, pagination not done. Diff verified: 3 files changed, tests pass. Panel left open.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: my host can't hold a call that long — just ask it to watch its own clock
+    history:
+      - 'user: give codex 45 minutes on the storybook 8 migration, stop it at the deadline'
+      - 'assistant: A 45-minute box is longer than one held wait (30 min cap). I can keep holding with waitUntilIdle past the launch wait, if your host allows it.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: 'hmm, it''s taking forever. new attempt: give codex 15 minutes on it, then stop and tell me where it got'
+    history:
+      - 'user: have claude look into why the bundle is 4MB'
+      - 'assistant: claude-2 (read-only) says moment and three icon sets account for 2.9MB; answer above.'
+    active: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, the react 19 bump — give claude 20 minutes max on it and stop it wherever it is
+    history:
+      - 'user: which of my dependencies are out of date?'
+      - 'assistant: Dependabot has 6 open PRs; the big one is react 18→19, which it can''t update automatically.'
+    active: [daintree.forge.batch-dependency-updates]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: scrap the three-way spike. just give codex half an hour on the Prisma approach and stop it at the deadline
+    history:
+      - 'user: spike drizzle, prisma and kysely on the orders queries'
+      - 'assistant: About to create three throwaway worktrees and launch one agent per option.'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: try the dark mode toggle for 10 minutes, then stop it and report how far it got
+    history:
+      - 'user: rename claude-3 to ''charts'''
+      - 'assistant: Renamed claude-3 to ''charts''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'ok that''s in. next: codex gets a quarter of an hour on the flaky upload test, and I want it stopped if it''s not done'
+    history:
+      - 'user: add a loading spinner to the upload button'
+      - 'assistant: claude-1 finished in feat/upload-spinner; one component changed, tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: got it. separately, time-box claude on the docs site upgrade — 25 minutes, then a report
+    history:
+      - 'user: remind me in an hour to check the deploy'
+      - 'assistant: Set: I''ll be woken in an hour and ping you about the deploy.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-catalog-expansion-stateful

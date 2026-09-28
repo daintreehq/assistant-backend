@@ -95,15 +95,7 @@ cases:
 
   - id: merge-it-not-another-status-read
     category: routing-trap
-    note: >-
-      The two neighbours land-pull-request names first are both baited: the user's whole
-      vocabulary is CI and review status, which is daintree.workflow.follow-up-on-issue's
-      one-off read, and "later" belongs to daintree.orchestration.watch-outcome. Neither is
-      being asked for — the user already holds the evidence and refuses a ping — so what is
-      left is the write. land-pull-request claims it ("merge, squash or rebase it") and
-      fences both neighbours by name ("Do not use merely to read PR, CI, review or comment
-      status ... or to watch for a later state transition"). Every declared neighbour is
-      left out of required AND optional.
+    note: "Rebase then land: the rebase is daintree.git.sync-with-base and the merge daintree.forge.land-pull-request. The CI and review vocabulary baits daintree.workflow.follow-up-on-issue, which the user explicitly declines."
     messages:
       - role: user
         content: >-
@@ -111,7 +103,7 @@ cases:
           don't need any of that read back to me and I don't want a ping later. Rebase it
           onto main and land it.
     expect:
-      required: [daintree.forge.land-pull-request]
+      required: [daintree.forge.land-pull-request, daintree.git.sync-with-base]
       optional: [daintree.foundation]
 
   - id: stamp-approval-not-a-code-review

@@ -1,0 +1,138 @@
+# Training examples whose answer is `daintree.forge.draft-release-notes` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.forge.draft-release-notes
+run: 2026-09-28-catalog-expansion
+positives:
+  - Draft release notes for v2.5.0 covering everything since v2.4.3, breaking changes first, into RELEASE_NOTES.md.
+  - update CHANGELOG.md for the 3.1 release
+  - what changed since the last tag? want it written up as user-facing notes
+  - Create a draft GitHub release for tag v1.8.0 with notes built from what merged since v1.7.2; do not publish.
+  - Write the 'What's new in 5.0' copy for the announcement from what's on release/5.0 versus 4.x.
+  - Changelog entry for the upcoming 0.9.0 from main, Keep a Changelog format matching the existing file, left uncommitted.
+  - summarise the merged PRs between v2.2 and v2.3 for the announcement post
+  - Notes for the 4.0.0-rc.1 prerelease starting from 3.9.2, include the earlier rc tags in the range.
+  - Release notes for mobile app 7.12, users only; drop CI and refactor churn and tell me what you left out.
+  - The v10.0.0 tag was cut yesterday; write its notes against v9.4.1.
+  - changelog v1.4.0..HEAD, group feat/fix/perf, cite PR numbers
+  - 'Breaking-changes section of the 6.0 release notes: every breaking change and required migration since the last 5.x tag.'
+  - the release PR for 2.7 is open - before anyone merges it, write the notes for what's going in
+  - Which PRs landed between v3.3.0 and v3.4.0? Turn them into the changelog section for 3.4.0.
+  - not my weekly update - I need the actual changelog for version 1.12 since 1.11
+  - Draft notes for release/2026.10 against the previous calendar-version tag, with author credits since our changelog does that.
+  - write whats new for 0.3.0 pls, same style as the other entries in CHANGELOG.md
+  - Last tag is v2.9.1 and main becomes v2.10.0 next. Produce the release notes from first-parent history, dropping reverted PRs.
+  - Prepare the GitHub release body for v5.2.0 as a draft; we'll press publish ourselves.
+  - Hotfix 4.1.1 needs changelog lines for the fixes that went onto release/4.1 since 4.1.0.
+  - Send an agent into the release-branch worktree to write the v3.0 release notes, no commit.
+  - can you have codex write up the changelog for 1.5, just the file edit, no commit or tag
+  - Release notes for SDK 0.20.0 with the renamed public APIs flagged at the top.
+  - what's in this release vs the last one? need notes for the 2.6 announcement
+  - Turn every merged PR since the v8.0.0 tag into customer-facing release notes; leave out internal chores and list the exclusions.
+  - 'We''re about to merge #410 (release 3.2) - draft the changelog first, don''t merge it.'
+  - Write release notes for the CLI v1.0 launch from v0.9.4, saved to docs/releases/1.0.md.
+boundaries:
+  - query: get an agent to write the changelog for 4.4 since the 4.3 tag
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Have claude update CHANGELOG.md with the 0.8 release section.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Before merging the 2.5 release PR, write its release notes into CHANGELOG.md.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'Release PR #402 is approved - draft the GitHub release notes for it, don''t merge anything.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: draft the v2.5 release on GitHub but don't publish it
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Write the CHANGELOG.md section for v4.2.0, starting from the previous tag.
+    confusable_with: [daintree.git.summarize-activity]
+  - query: which PRs shipped between v1.2 and v1.3? write them up as release notes
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: Find all merged PRs since the last tag and turn them into the changelog for 2.1.
+    confusable_with: [daintree.workflow.find-issue-work]
+followups:
+  - query: actually put them in CHANGELOG.md under a 2.5.0 heading instead of the reply
+    history:
+      - 'user: write the release notes for 2.5'
+      - 'assistant: Range anchored: v2.4.0 (a1b2c3d) to release/2.5 (9f8e7d6). Launched writer claude-5 in the main worktree with the destination set to reply text; ending the turn.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: start from v2.4.1, not v2.4.0 - we shipped a patch in between
+    history:
+      - 'user: what changed since the last tag? draft the notes for 2.5'
+      - 'assistant: The highest tag on the line is v2.4.0 (a1b2c3d), so the range is v2.4.0..main (e4f5a6b). Writer claude-2 is compiling.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: leave the CI and refactor items in, this one is for the dev audience
+    history:
+      - 'user: update CHANGELOG.md for 3.0'
+      - 'assistant: claude-3 wrote the 3.0.0 section: 1 breaking change, 9 features, 14 fixes. It excluded 11 internal items (CI, refactors, tests). I verified every #n is in v2.9.3..release/3.0; only CHANGELOG.md changed.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine - also draft the GitHub release with those notes
+    history:
+      - 'user: write the release notes for v1.8.0 into notes/1.8.0.md'
+      - 'assistant: Range v1.7.2 (0c1d2e3)..v1.8.0 (5f6a7b8). claude-1 wrote notes/1.8.0.md: 17 PRs, 3 plain commits, 2 reverted pairs dropped. Nothing tagged or published.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: it filed the session-token change under fixes - that's breaking, move it to the top
+    history:
+      - 'user: draft the notes for 4.2'
+      - 'assistant: Writer claude-4 finished: 6 features, 12 fixes, nothing marked breaking. I''m checking the range subjects for BREAKING and !: items now.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok, and put the author after each line like the older entries do
+    history:
+      - 'user: summarise the merged PRs for the 2.6 announcement'
+      - 'assistant: Range v2.5.3..main. Notes from claude-2: 3 features, 8 fixes, 1 perf item, each ending with its PR number. Verified all 12 against the range.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: now write the release notes for 2.4.3 including that fix
+    history:
+      - 'user: backport the three crash fixes to release/2.4'
+      - 'assistant: All three picked onto release/2.4, verified, pushed and merged via #612.'
+    active: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok now turn everything merged since v2.4.0 into a CHANGELOG.md entry for 2.5
+    history:
+      - 'user: write my standup'
+      - 'assistant: Yesterday (AEST): shipped #901 and #904, in review #915, in progress feat/search-v2. Nothing was posted.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now write the release notes for 3.1, from v3.0.2 to main
+    history:
+      - 'user: merge the release PR'
+      - 'assistant: Merged #940 (release/3.1 into main) as a merge commit; main is now at 6b7c8d9.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: thanks - separately, update CHANGELOG.md for the 2.6 release
+    history:
+      - 'user: write my standup'
+      - 'assistant: Yesterday: shipped #950 and #952, in review #955. Window and sources below.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: looks fine. what changed since the last tag? I need a what's-new for the announcement
+    history:
+      - 'user: review release/4.0 before we cut it'
+      - 'assistant: claude-1 found no blocking issues on release/4.0; 2 low findings in docs strings.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: ok it's green - draft the GitHub release for v1.8.0 as a draft, notes from the merged PRs
+    history:
+      - 'user: the release branch build is failing'
+      - 'assistant: codex-1 fixed the missing env var in the build script; checks pass on release/1.8 at 4e5f6a7.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: pause that. summarise the merged PRs between v0.9.0 and v0.10.0 into release notes for users
+    history:
+      - 'user: what branches can I delete?'
+      - 'assistant: Inventory: 14 merged branches, 3 with closed-unmerged PRs, 2 untouched for 90 days. Nothing deleted yet.'
+    active: [daintree.git.prune-stale-branches]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: incident's over. write the changelog entry for the 4.2.1 hotfix, v4.2.0 to the hotfix tag
+    history:
+      - 'user: prod checkout is 500ing'
+      - 'assistant: Provisional: #954 is the top suspect; you reverted it and error rates are back to baseline.'
+    active: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful

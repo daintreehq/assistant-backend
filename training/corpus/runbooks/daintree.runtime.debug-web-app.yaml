@@ -118,6 +118,12 @@ positives:
     run: 2026-09-28-agent-queries
   - query: Start a dev preview for the dashboard worktree and check the browser console for errors.
     run: 2026-09-28-agent-queries-2
+  - query: start a dev preview for the web worktree and check the console
+    run: 2026-09-28-catalog-expansion-refine
+  - query: the preview is blank, find what's throwing in the console and get it fixed
+    run: 2026-09-28-catalog-expansion-refine
+  - query: reload the dev preview after that CSS fix and tell me if the errors are gone
+    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: the preview is throwing console errors after the last change
     confusable_with: [daintree.orchestration.execute-durable-workflow]
@@ -219,6 +225,42 @@ boundaries:
   - query: 'Warning: Each child in a list should have a unique key prop, then the dashboard in the preview freezes on click. fix the runtime problem'
     confusable_with: [daintree.ci.diagnose-and-fix]
     run: 2026-09-28-agent-queries-2
+  - query: The dev preview panel is blank and the console shows a hydration error; debug it.
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: The dashboard dev preview throws 'Cannot read properties of undefined' in the console; debug it.
+    confusable_with: [daintree.debug.reproduce-bug]
+    run: 2026-09-28-catalog-expansion
+  - query: 'The dev preview I have open for #340 shows a white screen with console errors - debug it.'
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: The preview panel for the checkout worktree is throwing hydration errors after the last reload; find the cause.
+    confusable_with: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion
+  - query: The dev preview shows a white screen and a console error after the router change, fix it.
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion
+  - query: the settings page preview went blank after my change, check the console and fix it
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: The React app in the Dev Preview panel is blank and the console shows a hydration error.
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: 2026-09-28-catalog-expansion
+  - query: The dev preview for the landing worktree is hung; restart its server and reload it.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: open a dev preview panel for the web worktree
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-catalog-expansion
+  - query: open a dev preview for the dashboard worktree and check the browser console for errors
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: reload the dev preview after the css fix and check the console is clean
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion
+  - query: the dev preview for the checkout page shows a blank white screen, fix it
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion-late
 followups:
   - query: and the second one?
     history:
@@ -526,6 +568,26 @@ topic_shifts:
       - 'assistant: refresh() in src/auth/session.ts checks expiry, then issue() mints a new token; middleware in api/auth.ts calls it on every request.'
     active: [daintree.explore.repository]
     run: 2026-09-24-selector-hardening
+  - query: the preview panel just went white with a console error, look at that first
+    history:
+      - 'user: have agents poke at the app and find bugs'
+      - 'assistant: Three charters running against the dev preview on localhost:5173.'
+    active: [daintree.orchestration.bug-bash]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the preview's console is full of hydration errors on /settings — dig into that
+    history:
+      - 'user: check out #340 and see if it works'
+      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
+      - 'user: spin it up so I can click around'
+      - 'assistant: Dev Preview "Preview #340" is running in pr-340.'
+    active: [daintree.git.test-pull-request-locally]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: the checkout page open in the preview panel is throwing a console error — debug that
+    history:
+      - 'user: run the Playwright tests in the checkout-v2 worktree'
+      - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
+    active: [daintree.ci.run-e2e-suite]
+    run: 2026-09-28-catalog-expansion-stateful
 wakes:
   - query: '[agent completed: frontend fix]'
     active: [daintree.runtime.debug-web-app]

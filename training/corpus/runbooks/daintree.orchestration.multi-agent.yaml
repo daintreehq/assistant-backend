@@ -107,8 +107,6 @@ boundaries:
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: Ask three agents to propose UI architectures.
     confusable_with: [daintree.runtime.debug-web-app]
-  - query: have the reviewer and the implementer go back and forth until they agree on the fix
-    confusable_with: [daintree.agents.relay-review-feedback]
   - query: keep bouncing the findings between those two until they converge on one plan
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: have the three of them work this out between them until they agree on one answer
@@ -361,6 +359,15 @@ boundaries:
   - query: question the three agents about the payments refactor and assemble one answer from them rather than picking one
     confusable_with: [daintree.orchestration.interview]
     run: 2026-09-28-agent-queries
+  - query: Have claude and codex debate whether we should move from REST to gRPC until they converge on one recommendation.
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion
+  - query: Have claude and codex discuss the memory leak back and forth and converge on one explanation together.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-09-28-catalog-expansion
+  - query: Get three agents to debate monorepo vs polyrepo until they agree on one recommendation.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
 followups:
   - query: how's it going?
     history:

@@ -1,0 +1,134 @@
+# Training examples whose answer is `daintree.runtime.migrate-worktree-database` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.runtime.migrate-worktree-database
+run: 2026-09-28-catalog-expansion
+positives:
+  - Run the pending Prisma migrations in the feat/teams worktree against its own local database and report the migration head afterwards.
+  - seed the db for the onboarding-v2 branch
+  - roll back the last alembic migration in the reporting worktree, take a backup first
+  - Reset the SQLite database in the mobile-sync worktree and reseed it; back it up before wiping.
+  - which database does the payments-refactor worktree actually point at if i run migrations there?
+  - Apply `php artisan migrate` in the laravel-11 worktree and confirm the schema version matches the branch's newest migration.
+  - Migrate db, worktree issue-771, rails. Report db:version before and after. Commit nothing.
+  - Apply the migration that just landed in the search-index worktree and check it runs cleanly against that worktree's database.
+  - Drop and recreate the local postgres for feat/audit-log from migrations plus seeds. Yes, I'm fine losing the data.
+  - Run `python manage.py migrate` for the django-orders worktree, but first prove its DATABASE_URL is not the one main uses.
+  - Load the demo seed data into the local db of the marketing-site worktree.
+  - Roll the knex migrations in the api-v3 worktree back to 20260801_add_invoices and report the resulting version.
+  - Before running migrations in the hotfix worktree, find out which database it would hit. Read-only, run nothing.
+  - run db:migrate in gemini's worktree then seed it
+  - Apply the Drizzle migrations to the local database of the dark-mode worktree without touching the migration files.
+  - 'reset the db for #488''s worktree pls, don''t care about the data in it'
+  - Undo exactly one sequelize migration in the legacy-api worktree and confirm which migration is now the latest applied.
+  - Get an agent to run `flask db upgrade` in the flask-auth worktree against its own database and read back `flask db current`.
+  - the feature/ledger worktree's local schema is behind the branch, bring its db up to head
+  - Seed 50 fake users into the load-test worktree's database with the project's own seeder.
+  - rollback then re-run the latest migration in the notifications worktree so I can see the down migration works
+  - Wipe and re-migrate the local Postgres for worktree feat/multitenancy; pg_dump it first.
+  - Every worktree already has its own database now. Run the migrations in the new tenant-billing one.
+  - The migration passes in CI; now apply it to the reports branch's local worktree db.
+  - 'Just this one step, now: run the backfill migration in the users-split worktree''s local database.'
+  - run `rails db:migrate` in the admin worktree
+  - Run migrate-mongo up for the analytics worktree's local database and report status afterwards.
+boundaries:
+  - query: The migration is fine in CI; just apply it to my local db in the reports worktree.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Have an agent run the new migrations against the feature-flags worktree's local db and report the schema version.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: get claude to reseed the database for the onboarding branch
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Run the pending Prisma migrations against the feat/orders worktree's local database and report the schema version.
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: roll back the last migration on the payments branch db
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: Run the migrations in the billing worktree's local db now and report the version after.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: Run the pending migrations against the billing worktree's local database and report the schema version.
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: The invoices worktree already has its own database; run its pending migrations.
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: reseed the db for the search worktree, it has its own schema already
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: run the db migration
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.execute-durable-workflow]
+    run: pre-split
+  - query: seed the database in the search worktree
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-late
+followups:
+  - query: did it prove the database isn't the same one main uses?
+    history:
+      - 'user: run the migrations in the feat/invoices worktree'
+      - 'assistant: Launched claude-4 ''DB: feat/invoices'' in ~/proj-invoices with notify and handback; it checks isolation before running anything. Ending my turn.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: yes go ahead, back it up first and then drop it
+    history:
+      - 'user: run the pending migrations on feat/invoices'
+      - 'assistant: claude-4 reports its own SQLite file ~/proj-invoices/storage/db.sqlite (no other checkout resolves to it), 3 pending, and 2026_09_20 drops column legacy_total. It''s waiting for your word on that.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: now seed it too
+    history:
+      - 'user: apply the new migrations in feat/reports'
+      - 'assistant: Verified: prisma migrate status in ~/proj-reports shows no pending migrations and head 20260925_add_report_index, matching what claude-6 reported.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: roll that last one back, it's the wrong column type
+    history:
+      - 'user: migrate the feat/tags worktree''s db'
+      - 'assistant: Done: alembic current in ~/proj-tags reads 7c1e2a (head), up from 5ab903; the database is the worktree''s own tags_feat schema.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: fine, just tell me which database it would hit — don't run anything
+    history:
+      - 'user: reset my worktree''s database for feat/search'
+      - 'assistant: claude-2 stopped before resetting: feat/search resolves to localhost:5432/app_dev, the same server and database the main checkout uses.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: same for the payments worktree
+    history:
+      - 'user: run the migrations in feat/invoices'
+      - 'assistant: Applied and checked: php artisan migrate:status in ~/proj-invoices shows all 41 ran; backup at ~/db-backups/invoices-0928.sql.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: run the pending migrations for that worktree
+    history:
+      - 'user: start the dev server for feat/orders so I can see it'
+      - 'assistant: term-15 is serving on :5175 in ~/proj-orders, but requests log ''no such table: order_items_v2''.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: great, now reset and reseed feat/search's database
+    history:
+      - 'user: branches keep clobbering one shared database, fix that'
+      - 'assistant: claude-6''s setup and teardown scripts are committed; I created a scratch worktree and it got its own app_scratch database.'
+    active: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: seed the database for this branch
+    history:
+      - 'user: make me a worktree for feat/reports'
+      - 'assistant: Created feat/reports at ~/proj-reports off main; no recipe or agent launched.'
+    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: apply the new migration in that worktree and check it works
+    history:
+      - 'user: have claude write a migration adding an index on orders.created_at in feat/perf'
+      - 'assistant: claude-2 committed 20260927_add_orders_created_at_index on feat/perf; the diff is only the migration file.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: 'different thing: roll back the last migration on feat/tags'
+    history:
+      - 'user: file an issue for the flaky search results'
+      - 'assistant: Created acme/app#301 ''Search results reorder between refreshes'', labelled bug, and read it back.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: which database will the schema-change worktree migrate if I run it there?
+    history:
+      - 'user: ask the codex doing the schema change why it split the users table'
+      - 'assistant: codex-2 says it split users to keep auth columns out of the profile query path; quoted from its last reply.'
+    active: [daintree.agents.ask-running-agent]
+    run: 2026-09-28-catalog-expansion-stateful

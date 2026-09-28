@@ -1,0 +1,131 @@
+# Training examples whose answer is `daintree.worktree.compare-worktrees` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.worktree.compare-worktrees
+run: 2026-09-28-catalog-expansion
+positives:
+  - How do the payments-v2 and checkout-redesign worktrees differ? Changed files per worktree and where they overlap.
+  - Are claude-1, claude-2 and codex stepping on the same files in their worktrees?
+  - Forecast whether feat/tax-rules and feat/invoice-pdf will conflict when merged. Trial merge only, touch no working tree.
+  - five agent branches finished, what order should i merge them in to keep conflicts down
+  - 'Read-only: for each pair of the four fan-out worktrees, list shared files and whether a trial merge reports conflicts.'
+  - diff worktree ui-polish against worktree ui-perf
+  - will the search worktree merge cleanly into develop right now? don't rebase it, just tell me
+  - What did codex's branch do that claude's didn't? Show the diff from their fork point.
+  - 'overlap check across all my worktrees: which files are being touched by more than one'
+  - 'Compare the two migration worktrees: do both add a migration that touches the users table, and would they conflict?'
+  - branches feat/a and feat/b, any conflicts between them? no merging
+  - Per-worktree change summary for the six agent worktrees, plus which pairs would conflict.
+  - is it safe to merge gemini's and codex's branches in either order, or will one conflict with the other
+  - Conflict forecast for release-prep, feat/new-pricing and hotfix/rounding, pairwise and each against main.
+  - What changed in the docs-overhaul worktree versus the api-rename worktree, and would they clash?
+  - Check whether the uncommitted edits in the frontend worktree overlap with what the backend worktree has committed.
+  - Don't merge anything yet. Tell me whether the four agent branches would conflict if integrated, and in what order to take them.
+  - before I combine the fan-out results, which branches overlap and which merge cleanly pairwise?
+  - don't rebase anything, just tell me whether feat/reporting conflicts with current main
+  - Claude and Codex each worked in their own worktree and I'm keeping both; show what differs between the two branches, no winner needed.
+  - 'Not a code review: just which files the auth and sessions branches both touch and whether they''d merge.'
+  - Of my worktrees, which ones are touching the same files as each other?
+  - claude-2 and claude-3 are in separate worktrees now; are their branches going to conflict with each other?
+  - suggest a merge order for the 5 finished agent branches, nothing merged
+  - Which of the three agent worktrees would conflict with origin/main as it stands? Report files, change no branch or index.
+  - Predict collisions between feat/cart, feat/wishlist and the codex-refactor worktree before anyone merges.
+  - query: will the auth and billing worktrees conflict when I merge them?
+    run: 2026-09-28-catalog-expansion-refine
+boundaries:
+  - query: Show me what differs between the hotfix worktree and my feature worktree, read-only.
+    confusable_with: [daintree.git.cherry-pick-changes]
+  - query: Will the three agent branches conflict if I merge them? Just tell me, don't merge anything.
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: what order should i merge claude-1, claude-2 and codex's branches in? read only
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: Will split/billing-3 conflict with feat/tax-rules when both merge? Forecast only, change nothing.
+    confusable_with: [daintree.git.split-into-stacked-prs]
+  - query: Forecast whether feature/oauth will conflict with main when merged; read-only, no rebase.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: Claude's and Codex's worktrees both touched the router. Show which files overlap and whether they'd merge cleanly; I'm keeping both.
+    confusable_with: [daintree.orchestration.competition]
+  - query: diff the two agents' branches against each other so i can see what codex did that claude didn't
+    confusable_with: [daintree.orchestration.competition]
+  - query: Compare what each of the four agents changed in their worktrees, files and overlaps. No winner needed, all of it gets merged.
+    confusable_with: [daintree.orchestration.competition]
+  - query: Will the frontend and backend worktrees conflict if I merge them? Read-only, don't change anything.
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: Look over the auth and billing worktrees and tell me which files both touched and whether they'll conflict. Not a code review.
+    confusable_with: [daintree.review.review-change]
+  - query: check the three agent branches for merge conflicts with each other before I merge them
+    confusable_with: [daintree.review.review-change]
+  - query: Review whether feat/a and feat/b collide when merged; trial-merge the pair and name the files.
+    confusable_with: [daintree.review.review-change]
+  - query: Will the auth and billing worktrees conflict if I merge both into main?
+    confusable_with: [daintree.worktree.audit-worktrees]
+followups:
+  - query: ok and now do the same for the api worktree against billing
+    history:
+      - 'user: what''s the difference between the auth and billing worktrees?'
+      - 'assistant: auth changed 14 files since forking from main, billing 9; they share src/users/model.ts. Trial merge auth x billing: clean.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: so which order should I merge them in?
+    history:
+      - 'user: will the five agent branches conflict with each other?'
+      - 'assistant: Pairwise trial merges: feat/a x feat/c conflict in router.ts; feat/d x feat/e conflict in schema.sql; every other pair and each against main merge cleanly.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: show me exactly what billing did that auth didn't
+    history:
+      - 'user: diff worktree auth against worktree billing'
+      - 'assistant: git diff --stat between the two tips: 23 files, +610/-140. Notable hunks in payment/charge.ts and users/model.ts.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: and against develop instead of main?
+    history:
+      - 'user: will feat/ledger conflict with main?'
+      - 'assistant: Trial merge of feat/ledger against origin/main at 5e0bd11: clean. Overlap with main''s later changes: none.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+topic_shifts:
+  - query: before they finish — are any two of them touching the same files?
+    history:
+      - 'user: fan out issues #301 to #305'
+      - 'assistant: claude-1 to claude-5 are working, one per issue worktree.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: hold on, will claude-3's and claude-6's branches conflict when I merge them? don't change anything
+    history:
+      - 'user: check on the fleet'
+      - 'assistant: 6 agents: 4 working, 1 idle done (claude-6), 1 waiting. claude-3 and claude-6 both mentioned editing the API client.'
+    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: before you rebase the others, just tell me which of them would even conflict with main
+    history:
+      - 'user: catch all my branches up with main'
+      - 'assistant: Preflight: 5 non-main worktrees are behind origin/main at 9a0c7e3. Starting with feat/export.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: what's the actual difference between the two parked ones?
+    history:
+      - 'user: audit my worktrees'
+      - 'assistant: feat/cart-v1 and feat/cart-v2 are both parked with committed work, neither merged.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: separately — diff feat/api-v2 against feat/api-v3 and tell me which files both touched
+    history:
+      - 'user: review feat/api-v3'
+      - 'assistant: Two reviewers returned 6 findings, deduplicated, with file evidence.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, is that going to collide with what claude-2 is doing in the auth worktree? predict it, don't touch either
+    history:
+      - 'user: spawn a claude to rework session handling'
+      - 'assistant: Launched claude-7 in feat/session-rework; it committed its first change to src/auth/session.ts.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: will feat/auth and feat/billing conflict if I merge both?
+    history:
+      - 'user: I have 12 worktrees, what are they all?'
+      - 'assistant: Classified: feat/auth and feat/billing in review, 4 merged, 6 parked.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-catalog-expansion-stateful
