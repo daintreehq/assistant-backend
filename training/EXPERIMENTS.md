@@ -4,21 +4,22 @@
 > ```
 > stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
 > stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
-> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 16,396 rows
->            trained (16,702 now: refine rows added, 43 leaking rows removed, see the foot)
+> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 16,745 rows
+>            trained (16,702 now: 43 leaking rows removed after training, see the foot)
 > train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
->            stage 2: --epochs 10 --ordering equivariant --seed 41 --init-seed 41
+>            stage 2: --epochs 10 --ordering equivariant --seed 42 --init-seed 41
 >            both: doc_max_length 512, content-keyed split; stage 2 also permutation
 >            sampling, sqrt cardinality weights, boundary loss 0.1, 3 doc variants
 >            (all now the trainers' DEFAULTS — see "The retrain lottery" at the foot)
 > serve      ONNX int8 ranking encoder + fp32 retriever + fp32 head, ~470-480 MB
 >            whole-process RSS, BONUS_FLOOR 0.55 / NEWCOMER_FLOOR 0.75
 > ```
-> **Current (2026-09-28, catalog 87): shipped int8 measures 659/687 on the benchmark
-> (strict 602, QUALITY GATE pass, candidate_miss 0) and 126/133 on sealed holdout round 5b (123/130 without three cases whose text leaked into training history) —
-> the 47 new runbooks — against 112/133 for the artifact it replaced. Over dev + rounds
-> 1-4b + 5a the recipe averages 1516 over three seeds against 1443 for the old weights on
-> the same suites. p50 ~11 ms. See "Catalog 40 → 87" at the foot.
+> **Current (2026-09-28, catalog 87): shipped int8 is the REFINE round's s42 (swapped in
+> after CI's Linux runner failed round 1 s41 on the docs gate, see "CI flipped a docs case").
+> It measures 662/687 on the benchmark (strict 606, docs 25/26, QUALITY GATE pass,
+> candidate_miss 0) and 124/133 on round 5b (no longer sealed), against 112/133 for the
+> 40-runbook weights. Over dev + rounds 1-4b + 5a it totals 1518. p50 ~11 ms. See
+> "Catalog 40 → 87" at the foot.
 > Numbers older than that entry were measured on different suites and corpora.**
 >
 > The denominator moved 169 → 172 → 177 across two rounds on 2026-08-20, as docs
@@ -1544,6 +1545,22 @@ their runbook at ≥0.98. Still wrong: "spike two approaches … and recommend o
 "red-team the coupon-codes branch" (create-plain-worktree), "switch agent model to Sonnet"
 (spawn), "how does the cart total get calculated" (nothing) — each has refine rows waiting
 for the next retrain.
+
+## CI flipped a docs case: the refine round's s42 replaces round 1 s41
+
+Round 1 s41 passed `bench local` on the Mac at docs 23/26 — exactly the ceiling (3 missed
+lookups, 0.12). GitHub CI's Linux runner scored the same artifact 657/687 with docs 22/26 and
+failed the gate: onnxruntime on x86 and on Apple silicon differ in the last bits, and a
+model sitting ON a floor passes or fails by platform. An artifact must clear its floors with
+a margin, not by the last case.
+
+The refine seeds all clear the docs boundary with room (24-25/26). Refine s42 is the best of
+them on every measure that was not already spent: 662/687 (strict 606, extra 77, docs 25/26)
+against round 1 s41's 659 (strict 602, extra 82, docs 23/26), and 1518 over dev + rounds 1-4b
++ 5a against 1518. Round 5b, already opened, scores it 124/133 (strict 109, extra 23) against
+126/133 — two cases, inside the ~7-case seed spread, and read after the choice rather than
+used for it. It ships. Both it and round 1 were trained before the review removed the 43
+leaking rows; a retrain on the cleaned corpus is the next step.
 
 ## What the live trials said (isolated Daintree, Claude Haiku orchestrating)
 

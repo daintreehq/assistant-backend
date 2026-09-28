@@ -17,7 +17,7 @@
   "ema": 0.0,
   "doc_aug": 3,
   "cand_noise": 0.0,
-  "seed": 41,
+  "seed": 42,
   "init_seed": 41,
   "llrd": 1.0,
   "epochs": 10,
