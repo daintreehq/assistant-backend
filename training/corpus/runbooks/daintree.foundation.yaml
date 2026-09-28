@@ -323,6 +323,36 @@ boundaries:
   - query: keep in mind t4 is the codex one for now
     confusable_with: [daintree.memory.manage-project-memory]
     run: 2026-09-24-selector-hardening
+  - query: Check the Daintree MCP link is up in this pane before I start; nothing seems wrong
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: quick sanity check that daintree is connected, all good so far
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: Keep track of the three reviewer terminal ids for the rest of this task
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: note that we're on step 3 of 5 in this migration so you don't lose count this session
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: Which worktrees exist right now?
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: List the agent terminals that exist right now, just the names, nothing else
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: is the test terminal still running right now?
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: close the codex terminal
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: list the terminal names that are open right now
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: What are the tabs currently titled? Just read them, don't change anything
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
 followups:
   - query: read the last 20 lines of the third one
     history:
@@ -1276,3 +1306,211 @@ foundation:
   - any timers left over from yesterday? just list them
   - read the top of the build tab
   - list the branches daintree knows about in this project
+  - query: list the agent terminals currently open and which worktree each sits in
+    run: 2026-09-28-agent-queries
+  - query: is there already a worktree for feature/tags?
+    run: 2026-09-28-agent-queries
+  - query: Close the terminal named storybook.
+    run: 2026-09-28-agent-queries
+  - query: which agent terminals are open right now?
+    run: 2026-09-28-agent-queries
+  - query: list the agents currently running and which worktree each one is in
+    run: 2026-09-28-agent-queries
+  - query: is there a codex terminal open in the feature/search worktree
+    run: 2026-09-28-agent-queries
+  - query: Which agent terminals are open right now and which worktree is each in?
+    run: 2026-09-28-agent-queries
+  - query: is the codex terminal still running? just a status read, nothing's wrong
+    run: 2026-09-28-agent-queries
+  - query: List the worktrees that currently exist and the branch each is on.
+    run: 2026-09-28-agent-queries
+  - query: list the worktrees Daintree knows about
+    run: 2026-09-28-agent-queries
+  - query: Read the last output of the claude-2 terminal
+    run: 2026-09-28-agent-queries
+  - query: Read the last 60 lines printed by the dev-server terminal
+    run: 2026-09-28-agent-queries
+  - query: List worktrees and which terminals are attached to each
+    run: 2026-09-28-agent-queries
+  - query: Which agent CLIs are configured and available in Daintree
+    run: 2026-09-28-agent-queries
+  - query: Check whether terminal t-44 is still running right now
+    run: 2026-09-28-agent-queries
+  - query: Focus the codex terminal in the api worktree
+    run: 2026-09-28-agent-queries
+  - query: Close the terminal the user named scratch-shell
+    run: 2026-09-28-agent-queries
+  - query: Show which branch each worktree has checked out
+    run: 2026-09-28-agent-queries
+  - query: Read the test terminal's output to get the final summary line
+    run: 2026-09-28-agent-queries
+  - query: List all open terminals with their titles and worktrees, read-only
+    run: 2026-09-28-agent-queries
+  - query: Confirm the Daintree connection is up before starting; nothing has gone wrong
+    run: 2026-09-28-agent-queries
+  - query: Get the terminal id of the gemini agent pane
+    run: 2026-09-28-agent-queries
+  - query: Is the claude agent in the docs worktree idle or working at this moment
+    run: 2026-09-28-agent-queries
+  - query: Read what the migration terminal printed after it exited
+    run: 2026-09-28-agent-queries
+  - query: Which worktree is the currently focused terminal in
+    run: 2026-09-28-agent-queries
+  - query: Count the agent terminals that are open
+    run: 2026-09-28-agent-queries
+  - query: Show the current project's worktrees without changing anything
+    run: 2026-09-28-agent-queries
+  - query: Get the working directory of the terminal titled 'server'
+    run: 2026-09-28-agent-queries
+  - query: List terminals in the main worktree only
+    run: 2026-09-28-agent-queries
+  - query: Read the most recent output of the build terminal and report it verbatim
+    run: 2026-09-28-agent-queries
+  - query: Close the single terminal called old-logs
+    run: 2026-09-28-agent-queries
+  - query: Which agents exist right now and in which worktrees, no action needed
+    run: 2026-09-28-agent-queries
+  - query: Look up whether a worktree already exists for branch feat/search
+    run: 2026-09-28-agent-queries
+  - query: Bring the reviewer terminal to the front
+    run: 2026-09-28-agent-queries
+  - query: Is the terminal running npm test still going
+    run: 2026-09-28-agent-queries
+  - query: What agent type is running in the terminal titled 'fixer'
+    run: 2026-09-28-agent-queries
+  - query: what did the server tab print
+    run: 2026-09-28-agent-queries
+  - query: is daintree connected? just curious
+    run: 2026-09-28-agent-queries
+  - query: close the scratch terminal
+    run: 2026-09-28-agent-queries
+  - query: show me the tail of the codex terminal
+    run: 2026-09-28-agent-queries
+  - query: what agents do i have available
+    run: 2026-09-28-agent-queries
+  - query: which branch is the hotfix wt on
+    run: 2026-09-28-agent-queries
+  - query: switch to the claude tab
+    run: 2026-09-28-agent-queries
+  - query: how many terminals are open
+    run: 2026-09-28-agent-queries
+  - query: is the test run still going
+    run: 2026-09-28-agent-queries
+  - query: what's in the logs terminal, just the last bit
+    run: 2026-09-28-agent-queries
+  - query: which worktree has the gemini agent
+    run: 2026-09-28-agent-queries
+  - query: do i have a worktree for feat/login already?
+    run: 2026-09-28-agent-queries
+  - query: whats the id of the terminal running docker
+    run: 2026-09-28-agent-queries
+  - query: focus the one running vite
+    run: 2026-09-28-agent-queries
+  - query: what did codex print last
+    run: 2026-09-28-agent-queries
+  - query: close the tab called temp
+    run: 2026-09-28-agent-queries
+  - query: any worktrees besides main?
+    run: 2026-09-28-agent-queries
+  - query: whats the storybook terminal showing
+    run: 2026-09-28-agent-queries
+  - query: which terminals are in the payments worktree
+    run: 2026-09-28-agent-queries
+  - query: is claude-2 working right now or idle
+    run: 2026-09-28-agent-queries
+  - query: list the configured agents pls
+    run: 2026-09-28-agent-queries
+  - query: show the last 20 lines from the worker tab
+    run: 2026-09-28-agent-queries
+  - query: what's attached to the api wt
+    run: 2026-09-28-agent-queries
+  - query: Read the last 40 lines of output from the terminal named 'api-server' and summarise what it printed.
+    run: 2026-09-28-agent-queries-2
+  - query: what did the migrations tab spit out at the end
+    run: 2026-09-28-agent-queries-2
+  - query: Show the most recent output of the codex terminal working in the checkout-flow worktree.
+    run: 2026-09-28-agent-queries-2
+  - query: Fetch the tail of terminal t-4821 so I can see the final error message it printed.
+    run: 2026-09-28-agent-queries-2
+  - query: whats the last thing claude-2 printed
+    run: 2026-09-28-agent-queries-2
+  - query: Report what the 'storybook' shell printed after the last rebuild, read-only.
+    run: 2026-09-28-agent-queries-2
+  - query: Grab the final screen of the gemini pane without sending it anything.
+    run: 2026-09-28-agent-queries-2
+  - query: Quote the closing lines of the lint terminal's output back to the user.
+    run: 2026-09-28-agent-queries-2
+  - query: Check whether the codex agent in the ledger-export worktree is still working or back at its prompt.
+    run: 2026-09-28-agent-queries-2
+  - query: is gemini still going?
+    run: 2026-09-28-agent-queries-2
+  - query: Determine if the claude terminal handling the i18n strings is currently busy or idle; no action needed.
+    run: 2026-09-28-agent-queries-2
+  - query: 'Is the agent titled ''fix: webhook retries'' running right now?'
+    run: 2026-09-28-agent-queries-2
+  - query: quick one - is claude-3 still chugging away or has it stopped
+    run: 2026-09-28-agent-queries-2
+  - query: 'Current state of the terminal running the load test: working, waiting, or exited?'
+    run: 2026-09-28-agent-queries-2
+  - query: Which worktree is the reviewer terminal attached to?
+    run: 2026-09-28-agent-queries-2
+  - query: Find out what worktree and branch the codex-2 agent is sitting in.
+    run: 2026-09-28-agent-queries-2
+  - query: where's the pytest terminal running from, which wt
+    run: 2026-09-28-agent-queries-2
+  - query: Identify the worktree that terminal t-190 belongs to.
+    run: 2026-09-28-agent-queries-2
+  - query: Tell me which checkout the 'docs-agent' pane is operating in.
+    run: 2026-09-28-agent-queries-2
+  - query: Focus the terminal named 'dev-server'.
+    run: 2026-09-28-agent-queries-2
+  - query: Switch the user's view to the claude-2 terminal.
+    run: 2026-09-28-agent-queries-2
+  - query: Reveal the gemini pane I launched a minute ago so I can type into it.
+    run: 2026-09-28-agent-queries-2
+  - query: jump me to the db-migrate shell
+    run: 2026-09-28-agent-queries-2
+  - query: close claude-2's tab
+    run: 2026-09-28-agent-queries-2
+  - query: Shut the npm-dev terminal; it's no longer needed.
+    run: 2026-09-28-agent-queries-2
+  - query: Close terminal t-3319.
+    run: 2026-09-28-agent-queries-2
+  - query: kill the gemini pane
+    run: 2026-09-28-agent-queries-2
+  - query: Close the single reviewer terminal launched earlier in this conversation.
+    run: 2026-09-28-agent-queries-2
+  - query: 'Please close the tab titled ''fix: flaky upload test''.'
+    run: 2026-09-28-agent-queries-2
+  - query: close the build-watch shell, i'm done with it
+    run: 2026-09-28-agent-queries-2
+  - query: List every terminal open in Daintree right now with its title and state.
+    run: 2026-09-28-agent-queries-2
+  - query: Enumerate the agent terminals currently open, read-only, no triage.
+    run: 2026-09-28-agent-queries-2
+  - query: Which branches are checked out across the current worktrees?
+    run: 2026-09-28-agent-queries-2
+  - query: Is Daintree connected to this session? Nothing seems wrong, just confirming before starting.
+    run: 2026-09-28-agent-queries-2
+  - query: how many agents are open atm
+    run: 2026-09-28-agent-queries-2
+  - query: List the terminals in the search-rewrite worktree.
+    run: 2026-09-28-agent-queries-2
+  - query: Show which agent CLI each open agent terminal is running (claude, codex, gemini).
+    run: 2026-09-28-agent-queries-2
+  - query: Name the worktree that is currently active in the Daintree window.
+    run: 2026-09-28-agent-queries-2
+  - query: which terminal ids belong to the payments worktree
+    run: 2026-09-28-agent-queries-2
+  - query: Read the title and state of the terminal I just launched in the infra worktree.
+    run: 2026-09-28-agent-queries-2
+  - query: Does a worktree for branch feat/csv-import already exist?
+    run: 2026-09-28-agent-queries-2
+  - query: are there any shells open in the main checkout
+    run: 2026-09-28-agent-queries-2
+  - query: Check whether the terminal 'e2e-runner' still exists or was closed.
+    run: 2026-09-28-agent-queries-2
+  - query: Read the last message the codex agent in wt bugfix/tz-offsets left at its prompt.
+    run: 2026-09-28-agent-queries-2
+  - query: 'Which of my open terminals is the one titled ''bench: cold start''?'
+    run: 2026-09-28-agent-queries-2

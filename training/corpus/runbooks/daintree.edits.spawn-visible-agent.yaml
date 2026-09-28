@@ -59,6 +59,48 @@ positives:
   - spawn an agent for the sqlite migration and background it with a watcher, im not sitting here for 40 minutes
   - dont write it yourself, delegate it. the throttle helper needs a max-attempts arg
   - spin up a read only agent in a tab and have it trace how a request gets from the router down to the db. leave it open, i'll follow along
+  - query: Launch a visible Claude agent in a fresh worktree to replace the hand-rolled date parsing in src/utils/dates.ts with date-fns.
+    run: 2026-09-28-agent-queries
+  - query: Start one Codex agent on the main worktree to add unit tests for the invoice rounding logic in billing/totals.py.
+    run: 2026-09-28-agent-queries
+  - query: visible agent to migrate the Express routes in server/api from callbacks to async/await, new branch refactor/async-routes
+    run: 2026-09-28-agent-queries
+  - query: Spin up claude in a new worktree to rename the UserProfile component to AccountProfile everywhere and fix the imports.
+    run: 2026-09-28-agent-queries
+  - query: Put a gemini agent on updating the README install section for the new pnpm workspace layout; I want to watch it work.
+    run: 2026-09-28-agent-queries
+  - query: single agent, own worktree, implement dark-mode toggle in the settings page using the existing theme context
+    run: 2026-09-28-agent-queries
+  - query: Open a Codex terminal and have it fix the off-by-one in pagination.go where the last page is dropped. No issue exists for this.
+    run: 2026-09-28-agent-queries
+  - query: Launch an agent to convert the remaining class components under app/legacy to hooks, keeping behaviour identical.
+    run: 2026-09-28-agent-queries
+  - query: one visible coding agent to add retry with exponential backoff to the webhook sender, branch fix/webhook-retries
+    run: 2026-09-28-agent-queries
+  - query: Have Claude bump the Django version to 5.1 and fix whatever deprecation warnings the upgrade surfaces, in its own worktree.
+    run: 2026-09-28-agent-queries
+  - query: Start a new agent now to write docstrings for every public function in the sdk/ package.
+    run: 2026-09-28-agent-queries
+  - query: launch claude-2 on the current worktree to strip the unused feature flags out of config/flags.yaml and their call sites
+    run: 2026-09-28-agent-queries
+  - query: can you get codex to refactor the auth middleware into smaller functions? just one agent is fine
+    run: 2026-09-28-agent-queries
+  - query: spin up an agent to add a --dry-run flag to our deploy script pls
+    run: 2026-09-28-agent-queries
+  - query: have claude fix the typo'd env var names in docker-compose.yml, give it its own wt
+    run: 2026-09-28-agent-queries
+  - query: i want an agent working on the csv export feature, new branch, go
+    run: 2026-09-28-agent-queries
+  - query: 'thanks! next: launch gemini and have it write e2e tests for the checkout flow'
+    run: 2026-09-28-agent-queries
+  - query: get an agent to swap moment for dayjs across the frontend, i'll keep an eye on it
+    run: 2026-09-28-agent-queries
+  - query: Launch a visible Codex agent to add input validation to the signup form, and when it reports back, check its diff and tests yourself.
+    run: 2026-09-28-agent-queries-2
+  - query: spin up claude in a new worktree off develop and have it write tests for the rate limiter
+    run: 2026-09-28-agent-queries-2
+  - query: Have a Claude agent run the /tidy-imports command in the api worktree, then list the files it changed.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: write me a shell script that seeds the database
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -285,12 +327,240 @@ boundaries:
   - query: give claude the relevant files for the auth bug and have it fix it
     confusable_with: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
-  - query: "have claude fix the three bugs I listed above in the parser"
+  - query: have claude fix the three bugs I listed above in the parser
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "start a new claude in a fresh worktree and have it fix the date bug"
+  - query: start a new claude in a fresh worktree and have it fix the date bug
     confusable_with: [daintree.worktree.relocate-agents]
     run: transcript-2026-09-26-competition-relocate
+  - query: spawn codex to fix the retry backoff in api/client.py
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: launch claude in a new worktree to implement the throttle config option, I want to watch it
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: The previous agent finished cleanly and was closed; spawn a new Claude agent to add the CSV importer.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: launch a fresh codex agent to fix the flaky date test, visible so i can watch
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Start an agent in a terminal to refactor the logger module; nothing is running yet.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: The earlier agent's launch worked fine and it's done — now start another agent to write docs for the new flags.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: spin up a gemini agent to investigate why the bundle grew, read-only, and let me steer it
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Open a new visible agent to implement the retry backoff in the http client.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: new agent please — add unit tests for utils/slug.ts
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Launch Claude to rename the config keys across the project and update the docs; show it in a pane.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: i closed the stuck one myself already. just start a new codex to do the settings page fix
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Kick off a Codex agent now to explore the auth module read-only and walk through how sessions expire.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Spawn a Claude agent with the payments context loaded to refactor the refund service
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: launch codex and feed it the auth module context so it can add tests
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: Launch an agent to find where rate limiting is enforced and raise the limit for the /search endpoint.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: have claude work out how the permission checks work and then refactor them into one policy module
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Start a visible Codex agent to locate the password reset email code and switch it to the new template.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Spawn an agent to survey the analytics export and then speed it up by batching the queries.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: get an agent to trace the checkout flow and fix the double-submit bug it finds
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: 'Put a Claude agent on the caching layer: understand it, then replace the in-memory cache with Redis.'
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Launch gemini to map the event bus handlers and add structured logging to each one.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: agent in its own worktree to dig into the feature flag code and delete flags that are fully rolled out
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Have one agent explore the build pipeline and migrate it from tsup to tsdown.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: spin up codex to figure out what touches the payments module and add a second provider
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Spawn a claude agent now in the ui worktree to fix the navbar overflow
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Launch Claude in the feature/billing worktree to wire up the invoice PDF; no recipe needed.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: just start one codex agent in the current wt to fix the stripe listener, skip the recipe
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: New worktree for feature/notifications with a Claude agent in it to build the email digest.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Start one agent in the qa worktree to write regression tests for the export bug.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: open a gemini agent in the docs worktree to rewrite the quickstart
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Launch claude in a new worktree and have it refactor the logging module to use structured fields
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Spin up an agent in a fresh worktree to add unit tests for utils/date.ts
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: put gemini in its own worktree and have it rename the config keys across the repo
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Create an isolated worktree and launch codex there to upgrade the eslint config
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: new wt + agent to clean up the dead feature flags please
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Spawn an agent to implement OpenTelemetry spans in the queue worker, dedicated worktree, no ticket for it
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: agent in a fresh worktree to fix the typo-ridden README, nothing filed for it
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Launch a visible Claude agent on branch chore/bump-deps to update the lockfile
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Have codex implement the retry backoff we just discussed, in its own checkout, and let me watch it work
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: start an agent in a worktree that migrates the jest tests to vitest
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree on a new branch feature/audit-log and launch Claude in it to implement the audit log.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: new wt off main + a codex agent inside it to fix the csv encoding
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Launch a new agent in the existing release/3.1 worktree to backport the security patch.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Set up a worktree for spike/edge-runtime and start a gemini agent there to prototype the edge handler.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: make a worktree for docs/api-v2 and get claude writing the endpoint docs in it
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Worktree for perf/bundle-split plus one agent to do the code-splitting work.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Launch a new Claude agent in its own worktree to fix the session-expiry bug.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: open a fresh codex in a new wt called refactor/logger and have it replace console.log calls
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Start a gemini agent in the existing feature/search worktree to add fuzzy matching.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: 'New agent, new worktree off develop, task: move the pricing page to the new design system.'
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: rather than move the old one, just spin up a new claude in its own wt for the nav fix
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Put a new agent into the db-migrations worktree to write the down migrations.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Spawn claude into a worktree of its own branch so it won't collide with my edits on main, and have it add pagination to /orders.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: give me an agent working in its own isolated worktree on the i18n extraction
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Launch Codex in the chore/deps worktree and have it upgrade eslint to v9.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: one new agent on a separate branch/worktree to fix the flaky upload, nothing else running needs to change
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Launch an agent in a new worktree to add request-level caching to the pricing service
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: spin up claude in a fresh wt and have it refactor the auth middleware
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Start a codex agent on a new branch to migrate the date helpers from moment to dayjs
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: go ahead and start on the rename of UserStore to AccountStore with an agent
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Put an agent on implementing the CSV export we just discussed, in its own worktree
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Kick off gemini to write unit tests for src/billing/proration.ts
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: have claude fix the misspelled env var name in docker-compose.yml
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Begin work on the new onboarding banner component with a visible agent on branch feat/onboarding-banner
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: start the one we sketched out, the retry wrapper around fetchJson, with codex
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Launch claude to implement pagination for the /orders endpoint; there's no ticket for this one
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: launch a new agent in a new worktree called fix-auth to fix the session expiry bug
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: Spawn a fresh Claude in its own worktree on feat/search-v2 and have it implement fuzzy matching
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: open a new codex in a new wt and have it add the retry wrapper
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: Start another agent in a separate worktree to write tests for the parser, leave the current one alone
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: new worktree + new gemini agent to prototype the graphql schema
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: Create a worktree for branch chore/deps and launch an agent there to bump the dependencies
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: spin up an agent in the existing api-v3 worktree to port the handlers
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: I want a second agent, in its own worktree, doing the README rewrite
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: Open a new Claude terminal in a new worktree off main and have it build the export endpoint
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: 'fresh agent, fresh worktree perf-cache, task: implement the LRU cache'
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: how's it going?
     history:

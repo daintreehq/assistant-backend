@@ -230,9 +230,9 @@ _ARTIFACT = (
 
 
 def _artifact_present() -> bool:
-    """True when both int8 graphs are real bytes, not unfetched LFS pointers."""
+    """True when both served encoder graphs are real bytes, not unfetched LFS pointers."""
     graphs = [
-        _ARTIFACT / "retriever" / "model_int8.onnx",
+        _ARTIFACT / "retriever" / "model.onnx",
         _ARTIFACT / "ranking" / "model_int8.onnx",
         _ARTIFACT / "head.onnx",
     ]
@@ -948,3 +948,37 @@ def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
 # The seam and the production selector must stay the same shape.
 # ---------------------------------------------------------------------------
 
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_table_built_by_the_int8_retriever_is_not_adopted(tmp_path: Path) -> None:
+    """The retriever became fp32 on 2026-09-28; a table stamped plain "int8" predates it.
+
+    Its retrieval vectors came from the int8 retriever, so reusing them against fp32
+    queries would compare two different functions with no error anywhere. The stamp
+    is what refuses it; the shipped table, stamped by the current export, is adopted.
+    """
+    from daintree_assistant_server.runbooks.local.setwise import (
+        RunbookTable,
+        _load_table,
+        save_table,
+    )
+
+    shipped = _load_table(_ARTIFACT / "vectors.npz")
+    assert shipped is not None and shipped.precision == "int8-ranker"
+    assert SetwiseClassifier(_ARTIFACT)._cached is not None
+
+    for part in _ARTIFACT.iterdir():
+        (tmp_path / part.name).symlink_to(part)
+    (tmp_path / "vectors.npz").unlink()
+    save_table(
+        tmp_path / "vectors.npz",
+        RunbookTable(
+            ids=shipped.ids,
+            retrieval=shipped.retrieval,
+            ranking=shipped.ranking,
+            digests=shipped.digests,
+            precision="int8",
+        ),
+    )
+    assert SetwiseClassifier(tmp_path)._cached is None

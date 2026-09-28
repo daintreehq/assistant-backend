@@ -61,6 +61,74 @@ positives:
   - is this flaky or actually broken? dont patch anything until we know
   - the failure only shows up in the actions logs which i dont think you can read. work out what you can from here and tell me what youre guessing at
   - whatever it did fixed the one test and broke four others. unwind that and do it properly
+  - query: 'The GitHub Actions ''typecheck'' job on PR #522 fails after the zod upgrade; find the cause and get it green'
+    run: 2026-09-28-agent-queries
+  - query: test_invoice_rounding fails intermittently on CI but never locally; decide whether it's flaky and fix it
+    run: 2026-09-28-agent-queries
+  - query: cargo build broke on the release branch after merging the feature-gate change; restore a passing build
+    run: 2026-09-28-agent-queries
+  - query: Make the failing pytest in tests/integration/test_sync.py pass without skipping it, then verify independently
+    run: 2026-09-28-agent-queries
+  - query: The lint check on the dependency-bump PR is red with import-order errors across twelve files; fix and confirm
+    run: 2026-09-28-agent-queries
+  - query: Docker image build step in cloudbuild fails at pip install; diagnose from the log and repair
+    run: 2026-09-28-agent-queries
+  - query: Jest snapshot tests for the Header component started failing on main after the theme refactor
+    run: 2026-09-28-agent-queries
+  - query: Playwright e2e job on PR 88 times out on the checkout spec in CI; figure out why and fix it
+    run: 2026-09-28-agent-queries
+  - query: go vet fails in the monorepo pipeline for services/ledger; evidence first, then a fix
+    run: 2026-09-28-agent-queries
+  - query: Coverage gate dropped below 90% on the payments PR and blocks the check; get it passing honestly
+    run: 2026-09-28-agent-queries
+  - query: Mypy strict errors are failing the pre-merge check after the pydantic upgrade — resolve them
+    run: 2026-09-28-agent-queries
+  - query: tests are failing again on main, can you fix
+    run: 2026-09-28-agent-queries
+  - query: the build broke after my last commit :( help
+    run: 2026-09-28-agent-queries
+  - query: is this test flaky or actually broken? test_retry_backoff keeps failing
+    run: 2026-09-28-agent-queries
+  - query: fix the failing check on my pr pls
+    run: 2026-09-28-agent-queries
+  - query: why does test_invoice_totals fail on ci but not locally - fix it and rerun the whole suite to confirm
+    run: 2026-09-28-agent-queries-2
+  - query: 'FAILED tests/test_orders.py::test_refund_partial - AssertionError: 40 != 45 -- fix this'
+    run: 2026-09-28-agent-queries-2
+  - query: 'CartSummary > renders discount line: expect(received).toBe(expected) Expected: "10%" Received: "0.1". can you get this passing'
+    run: 2026-09-28-agent-queries-2
+  - query: '--- FAIL: TestParseConfig (0.00s) config_test.go:48: unexpected nil. fix it'
+    run: 2026-09-28-agent-queries-2
+  - query: '`build / lint (ubuntu-latest)` is red on my branch, sort it out'
+    run: 2026-09-28-agent-queries-2
+  - query: 'E ModuleNotFoundError: No module named ''pydantic_settings'' -- every CI job started failing with this, please fix'
+    run: 2026-09-28-agent-queries-2
+  - query: 'CI job ''test-e2e'' fails with ''Timeout 30000ms exceeded waiting for selector #checkout''; diagnose and fix the failing test'
+    run: 2026-09-28-agent-queries-2
+  - query: FAIL src/utils/date.test.ts > formatRange > handles DST. make this pass again
+    run: 2026-09-28-agent-queries-2
+  - query: 'Check ''typecheck'' failing: TS2345 Argument of type ''string | undefined'' in src/api/client.ts; fix and verify it goes green'
+    run: 2026-09-28-agent-queries-2
+  - query: 'panic: runtime error: index out of range [3] with length 3 in TestShardAssign -- fix'
+    run: 2026-09-28-agent-queries-2
+  - query: 'thread ''tests::roundtrip'' panicked at ''assertion failed: left == right'' in cargo test. get it green'
+    run: 2026-09-28-agent-queries-2
+  - query: 'ERROR: test_migrations (tests.test_db.MigrationTests) fails only on CI, not locally. flaky? fix it'
+    run: 2026-09-28-agent-queries-2
+  - query: x unit-tests (node 20) Failing after 2m. can you figure out why and fix
+    run: 2026-09-28-agent-queries-2
+  - query: 'rspec ./spec/models/invoice_spec.rb:112 # Invoice#total rounds half up -- fix pls'
+    run: 2026-09-28-agent-queries-2
+  - query: 'FAILED test_api.py::test_rate_limit_headers[429] KeyError: ''Retry-After''. Diagnose and fix the regression on branch feat/limits'
+    run: 2026-09-28-agent-queries-2
+  - query: 'CI ''vet'' step: go vet reports ''copylocks: call of fn copies lock value''; fix it and rerun the check'
+    run: 2026-09-28-agent-queries-2
+  - query: Header.test.tsx snapshot mismatch keeps failing in CI after the icon change, fix it
+    run: 2026-09-28-agent-queries-2
+  - query: java.lang.NullPointerException at OrderServiceTest.testCancel(OrderServiceTest.java:77) - gradle check is red, please fix
+    run: 2026-09-28-agent-queries-2
+  - query: 'error: Incompatible return value type (got "None", expected "str") [return-value] -- the mypy step blocks the PR, fix it'
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: the merge is blocked because a check is failing. work out why
     confusable_with: [daintree.forge.land-pull-request]
@@ -291,6 +359,60 @@ boundaries:
   - query: 'FAILED tests/test_parser.py::test_unicode_headers - UnicodeDecodeError: ''utf-8'' codec can''t decode byte 0xff in position 0 FAILED tests/test_parser.py::test_bom_stripped - AssertionError: assert ''\ufeffid'' == ''id'' ========= 2 failed, 318 passed in 41.22s ========= thats pytest on main, been failing since yesterdays merge. find out why and fix it'
     confusable_with: [daintree.runtime.debug-web-app]
     run: 2026-09-24-selector-hardening
+  - query: pytest in the api worktree fails with import errors after the rebase; get it green
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: build broke after merging main, why is ci red
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: why is the auth integration test failing on CI?
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: PR 88 can't merge because the lint check fails; fix the lint errors
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: PR 318's unit tests are failing; find out why and fix them
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: vitest suite fails on the ProductList snapshot after the markup change
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: next build fails in CI with a type error in app/cart/page.tsx
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: The Playwright job on the admin PR is red — the table spec times out in CI
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: npm run build breaks after the Tailwind upgrade; get the build passing
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: eslint check fails on react-hooks/exhaustive-deps in the settings page after my change
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: the frontend unit tests are failing on main since the date formatting change
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: Storybook build step in the pipeline fails with a missing module error
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: Cypress component test for AddToCart is failing; fix it and verify it's not flaky
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: tsc errors are blocking the web app's PR check, fix them
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: Lighthouse budget check on the marketing site PR went red after adding the hero video
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: The typecheck job on PR 145 is red; figure out why and get it passing
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Tests fail on my branch so I can't open the PR; fix them
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: the integration test in orders_spec keeps failing - work out why and hand the fix to a claude agent
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: how's it going?
     history:

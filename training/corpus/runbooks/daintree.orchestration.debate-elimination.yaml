@@ -62,6 +62,46 @@ positives:
   - is there a way to have a few agents argue something and then like... vote one of them out? want to narrow down the three deploy options
   - that debate was useless, they all said the same thing. do it again with actually different agents and eliminate the weakest at the end
   - debate, then elimination vote, then give me the tally and who's out
+  - query: Launch Claude, Codex and Gemini to debate whether the event bus should be replaced with direct calls, collect final positions, then have them vote off the weakest.
+    run: 2026-09-28-agent-queries
+  - query: Three-agent debate on Postgres vs SQLite for the desktop sync store; after closing arguments each agent votes to eliminate one position, report the tally.
+    run: 2026-09-28-agent-queries
+  - query: The agents are mid-debate on the retry policy; the user now wants the weakest position voted out before continuing.
+    run: 2026-09-28-agent-queries
+  - query: 'debate among codex, claude-2, gemini re: tRPC vs REST, elimination vote at end, show who got knocked out'
+    run: 2026-09-28-agent-queries
+  - query: Run an argument between four agents about whether to adopt strict null checks everywhere, then a peer vote removes the least persuasive agent.
+    run: 2026-09-28-agent-queries
+  - query: Stage a debate over the release cadence (weekly vs continuous) among the pinned agents and eliminate the weakest stance by majority vote.
+    run: 2026-09-28-agent-queries
+  - query: Have the fleet argue the merits of event sourcing for the audit log, gather each agent's final stance, and run a blind vote to drop the weakest.
+    run: 2026-09-28-agent-queries
+  - query: agents argue monolith vs microservices for billing, 2 rounds, then vote one out and report counts
+    run: 2026-09-28-agent-queries
+  - query: Continue the ongoing agent debate on logging verbosity, but end this round by having each participant nominate the weakest argument for elimination.
+    run: 2026-09-28-agent-queries
+  - query: 'Organise a survival-style debate: Claude, Codex and Gemini defend a state-management library each, and one is voted off per round until one remains.'
+    run: 2026-09-28-agent-queries
+  - query: Debate between two Claude instances and Codex on whether to vendor the protobuf definitions; afterwards identify the weakest position via peer vote.
+    run: 2026-09-28-agent-queries
+  - query: elimination debate on test pyramid vs testing trophy with the three agents already open, tally the vote-off
+    run: 2026-09-28-agent-queries
+  - query: Facilitate a debate about moving CI from GitHub Actions to Buildkite among the running agents, then eliminate the agent whose case held up worst.
+    run: 2026-09-28-agent-queries
+  - query: get claude codex and gemini to debate whether we even need redis, then vote off the weakest one
+    run: 2026-09-28-agent-queries
+  - query: ok stop the debate there. have them each vote on whose argument was the weakest and kick that one out
+    run: 2026-09-28-agent-queries
+  - query: can u run a debate on vim vs emacs keybindings for the editor between the agents and then eliminate someone lol
+    run: 2026-09-28-agent-queries
+  - query: 'agents debate: is our error boundary strategy good enough? after that i want the weakest take voted out'
+    run: 2026-09-28-agent-queries
+  - query: have the 4 agents argue about the folder structure then do an elimination round
+    run: 2026-09-28-agent-queries
+  - query: 'debate + vote off. topic: should we drop IE11 polyfills. use the pinned agents'
+    run: 2026-09-28-agent-queries
+  - query: they keep going back and forth on the schema design — make them vote out the weakest position now and tell me the tally
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: have them debate it and then vote off the weakest position
     confusable_with: [daintree.agents.poll-pinned-agents]
@@ -128,6 +168,75 @@ boundaries:
   - query: morning all. lets have the three agents debate tabs vs spaces and then vote one of them off
     confusable_with: [daintree.orchestration.conversation]
     run: 2026-09-24-selector-hardening
+  - query: Have Claude, Codex and Gemini argue tabs vs spaces for a few rounds, then each votes off the weakest position.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: debate between the three agents on graphql vs rest for the new api, then eliminate whoever made the weakest case
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Agents debate whether to rewrite the scheduler in Go; after final positions, run a peer vote to remove the least convincing one and report the tally.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: they've been debating the ORM choice for two rounds now — time to vote someone off
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Hold a structured argument among four agents on feature flags vs long-lived branches, gather closing statements, then eliminate the weakest stance by vote.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Multi-round debate on the caching layer design between claude-2 and codex and gemini, ending with an elimination vote.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: get the agents to argue about whether we need kubernetes, then knock out the worst argument
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Stage a debate among the fleet about SSR versus client rendering and have them vote out the weakest agent afterwards.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Debate-then-eliminate format: agents defend competing error-handling philosophies, then peers vote off one position per round until one remains.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: claude vs codex vs gemini debating the test strategy — which of their positions is weakest? have them vote on it
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: have claude, codex and gemini debate the ORM choice, then vote off the weakest position
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: have the agents debate the architecture and then vote out the weakest position
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: agents debate the schema design, then vote off the weakest position
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: The agents have debated the queue design for two rounds; now vote off the weakest position.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: debate between the finalists about the API style, then eliminate the weaker argument
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Have the agents argue for their positions on ORM choice and, once they've made their closing statements, vote out the weakest.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Nobody tied — just run the debate on monorepo tooling and eliminate the least convincing agent at the end.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: agents debate caching strategy, vote someone off each round till one's left
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Hold a debate between Claude, Codex and Gemini on deployment strategy, ending with a peer vote that removes the weakest stance.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: they're mid-debate on the test strategy; i want an elimination vote now
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Debate-and-eliminate on whether the job runner should be rewritten; report which agent got voted off and the counts.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Stage a debate on the i18n approach among four agents and knock out the weakest argument by vote.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: argue it out then vote off the worst take — topic is whether to keep jest or move to vitest
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

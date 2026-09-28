@@ -33,6 +33,72 @@ positives:
   - the agents keep swapping which copy is active so they can test, i want that to stop
   - one of them switched the shared install over to its own branch and now the others are testing the wrong code
   - make it so nobody has to deactivate anyone else's build to look at theirs
+  - query: Two Laravel worktrees share one MySQL database, so running migrations on one branch breaks the other; give each worktree its own database.
+    run: 2026-09-28-agent-queries
+  - query: Configure a Daintree setup command that copies .env.example to .env and assigns a unique APP_PORT per worktree.
+    run: 2026-09-28-agent-queries
+  - query: per-worktree postgres schema created on worktree create, dropped on delete via teardown
+    run: 2026-09-28-agent-queries
+  - query: The second checkout of the Next.js app fails to boot because the first holds port 3000; make each worktree pick its own port.
+    run: 2026-09-28-agent-queries
+  - query: Feature branch seed data keeps appearing in the main worktree's local site; separate the databases so branches can run side by side.
+    run: 2026-09-28-agent-queries
+  - query: Add teardown to .daintree/config.json that stops and removes the worktree's docker compose project when the worktree is deleted.
+    run: 2026-09-28-agent-queries
+  - query: Each worktree should get its own hostname like <branch>.test via the local proxy so I can open several branches in the browser at once.
+    run: 2026-09-28-agent-queries
+  - query: Existing worktree setup script is failing with needs-approval and a psql error; figure out why and get per-worktree provisioning working.
+    run: 2026-09-28-agent-queries
+  - query: WordPress worktrees all symlink into the same docroot; give every worktree its own docroot and wp database.
+    run: 2026-09-28-agent-queries
+  - query: Provision a dedicated Redis database index and cache prefix for each worktree so queued jobs don't cross branches.
+    run: 2026-09-28-agent-queries
+  - query: 'setup/teardown scripts for worktrees: own compose project name, own volumes, release them on delete'
+    run: 2026-09-28-agent-queries
+  - query: 'Make new worktrees provision themselves automatically: install deps, create a test DB, write a .env.local with their own port.'
+    run: 2026-09-28-agent-queries
+  - query: my worktrees all share one local site, can each branch get its own?
+    run: 2026-09-28-agent-queries
+  - query: two worktrees fighting over port 8000 again 🙃 fix it properly
+    run: 2026-09-28-agent-queries
+  - query: need a teardown script that drops the db when i delete a worktree
+    run: 2026-09-28-agent-queries
+  - query: every wt needs its own database, how do we set that up in daintree
+    run: 2026-09-28-agent-queries
+  - query: when i make a new worktree can it spin up its own docker containers automatically
+    run: 2026-09-28-agent-queries
+  - query: migrations on one branch keep clobbering the other branch's db, sort it out
+    run: 2026-09-28-agent-queries
+  - query: my worktrees all hit the same postgres db so running tests in one wipes the other's data
+    run: 2026-09-28-agent-queries-2
+  - query: Two worktrees both try to bind port 3000 and the second dev server fails; give each worktree its own port
+    run: 2026-09-28-agent-queries-2
+  - query: each branch needs its own database - migrations on feat/a are breaking feat/b's tests
+    run: 2026-09-28-agent-queries-2
+  - query: Configure a worktree setup script that creates a per-worktree MySQL schema, and a teardown that drops it
+    run: 2026-09-28-agent-queries-2
+  - query: the second checkout can't boot because the redis container name is already taken by the first
+    run: 2026-09-28-agent-queries-2
+  - query: Worktrees share one .env pointing at the same local site; make each get its own hostname and database
+    run: 2026-09-28-agent-queries-2
+  - query: running pytest in two worktrees at once deadlocks on the shared test database
+    run: 2026-09-28-agent-queries-2
+  - query: seed data from my feature branch keeps showing up in the main worktree's app
+    run: 2026-09-28-agent-queries-2
+  - query: Make new worktrees provision their own docker compose project and port range automatically
+    run: 2026-09-28-agent-queries-2
+  - query: can't run two dev servers side by side across worktrees, both want localhost:8080 and the same sqlite file
+    run: 2026-09-28-agent-queries-2
+  - query: Add a teardown hook so deleting a worktree removes its database and frees its port
+    run: 2026-09-28-agent-queries-2
+  - query: WordPress worktrees all serve from one docroot; give every worktree its own local URL
+    run: 2026-09-28-agent-queries-2
+  - query: Jest integration tests collide across worktrees because they share the same Mongo database name
+    run: 2026-09-28-agent-queries-2
+  - query: Set up per-worktree environment so parallel branches each get a separate DATABASE_URL and APP_PORT
+    run: 2026-09-28-agent-queries-2
+  - query: the rails worktrees keep clobbering each other's migrations on the shared dev db
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: get an agent to write the provisioning scripts for me
     confusable_with: [daintree.edits.spawn-visible-agent]
@@ -75,6 +141,45 @@ boundaries:
   - query: every time i run the second checkout it tries to reuse the first one's postgres
     confusable_with: [daintree.worktree.manage-resource]
     run: 2026-09-24-selector-hardening
+  - query: The dev server the recipe starts in each worktree grabs port 5173 and the second one crashes; give each worktree its own port.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: New worktrees keep reusing the main checkout's database; make worktree creation set up a separate one.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Each local worktree needs its own Postgres database and port; write setup and teardown scripts for that.
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: My two worktrees both point at the same local Postgres database and migrations clobber each other; give each worktree its own database.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: agents in separate worktrees still fight over port 3000 when they start the dev server
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Add a Daintree setup script so every new worktree gets its own .env with a unique port and DB name.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: isolating the worktrees isn't enough, they all share one redis and one docker container. fix that per worktree
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Write a teardown script that drops the worktree's schema when the worktree is deleted.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Each branch's seed data leaks into the others because every worktree uses the same sqlite file; separate them.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: second worktree won't boot because the first already holds the pid file and port 8080
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Give each worktree its own local hostname so I can run feature branches side by side in the browser.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: make new worktrees provision their own mysql db automatically on create
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Agents are already separated into worktrees, but the WordPress docroot is shared so they overwrite each other's plugin; give each worktree its own docroot.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:

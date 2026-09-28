@@ -62,6 +62,98 @@ positives:
   - start 77 off staging
   - begin 305. actually not claude, use the gpt one, it did better on the last serializer ticket
   - jan says 771 is blocking her, spin it up
+  - query: 'Begin implementation of GitHub issue #812 (rate limiter drops bursts) on a fresh branch in its own worktree'
+    run: 2026-09-28-agent-queries
+  - query: 'Kick off issue 47 in the payments repo: branch off develop and have an agent start on it'
+    run: 2026-09-28-agent-queries
+  - query: 'The user settled on #1290 (dark mode toggle resets on reload); set it up and get it moving'
+    run: 2026-09-28-agent-queries
+  - query: 'Start issue #58 using the repo''s feature/issue-<n> branch convention, no PR until I say so'
+    run: 2026-09-28-agent-queries
+  - query: 'issue 2210: CSV export truncates unicode names. Get work underway on it with codex'
+    run: 2026-09-28-agent-queries
+  - query: 'Take the chosen ticket, #640 ''retry webhook deliveries'', and put it into progress with a branch of its own'
+    run: 2026-09-28-agent-queries
+  - query: Begin the GitLab issue 77 about the broken pagination cursor, run /plan first then implement
+    run: 2026-09-28-agent-queries
+  - query: 'Set things up so issue #15 in acme/api is being worked on, based on release/2.4 instead of main'
+    run: 2026-09-28-agent-queries
+  - query: 'start on #903 pls'
+    run: 2026-09-28-agent-queries
+  - query: 'ok lets do the one about the flaky websocket reconnect, #481. go'
+    run: 2026-09-28-agent-queries
+  - query: 'Get issue 1177 started: read it fully, check nobody already has a branch for it, then begin'
+    run: 2026-09-28-agent-queries
+  - query: 'Open a working branch for issue #29 on the existing branch fix/login-redirect and start on it there'
+    run: 2026-09-28-agent-queries
+  - query: i've decided on 552, can you get it started and ping me when the agent stops
+    run: 2026-09-28-agent-queries
+  - query: 'Begin ticket #3005 (migrate cron jobs to the new scheduler) with claude, scope limited to the jobs/ package'
+    run: 2026-09-28-agent-queries
+  - query: grab issue 88 off the board and start it, dont assign me though
+    run: 2026-09-28-agent-queries
+  - query: 'Launch claude in a new worktree for issue #412 and have it implement the fix described there'
+    run: 2026-09-28-agent-queries
+  - query: Spin up a worktree plus an agent for GitHub issue 96, handing it the issue body as its brief
+    run: 2026-09-28-agent-queries
+  - query: 'put gemini on issue #1502 in its own worktree, implement and run the tests, no push'
+    run: 2026-09-28-agent-queries
+  - query: Create an isolated worktree for issue 73 and launch codex there to work the ticket
+    run: 2026-09-28-agent-queries
+  - query: 'new wt + agent for #260 please'
+    run: 2026-09-28-agent-queries
+  - query: 'Spawn an agent to implement issue #1834 (add OpenTelemetry spans to the queue worker) in a dedicated worktree'
+    run: 2026-09-28-agent-queries
+  - query: agent on issue 19 in a fresh worktree, use the /implement-issue command first
+    run: 2026-09-28-agent-queries
+  - query: 'Launch a visible Claude agent against issue #711 on branch feature/issue-711-sso-timeout'
+    run: 2026-09-28-agent-queries
+  - query: Have codex tackle forge issue 5521 in its own checkout and notify me when it finishes
+    run: 2026-09-28-agent-queries
+  - query: 'worktree for issue #64 and start an agent working it, same as we usually do'
+    run: 2026-09-28-agent-queries
+  - query: 'Create a worktree for issue #42 and put Codex on it, assigning the issue to me.'
+    run: 2026-09-28-agent-queries-2
+  - query: 'start #318 w/ claude and have it run our /implement-issue command first'
+    run: 2026-09-28-agent-queries-2
+  - query: 'go with #88'
+    run: 2026-09-28-agent-queries-2
+  - query: ok start the one you found
+    run: 2026-09-28-agent-queries-2
+  - query: 'Start work on issue #88, the flaky S3 upload retry, with claude on a fresh branch'
+    run: 2026-09-28-agent-queries-2
+  - query: the second issue you listed looks right, kick it off with codex
+    run: 2026-09-28-agent-queries-2
+  - query: 'Pick up GitHub issue 1043 (dark mode toggle resets on reload): create its worktree and put codex on it'
+    run: 2026-09-28-agent-queries-2
+  - query: lets do 'Export CSV drops unicode headers' - spin it up
+    run: 2026-09-28-agent-queries-2
+  - query: 'Begin implementation of ticket #57 in its own worktree using the claude agent and get notified when it stops'
+    run: 2026-09-28-agent-queries-2
+  - query: Set up a branch and worktree for issue 309 and hand it to gemini to implement
+    run: 2026-09-28-agent-queries-2
+  - query: 'yeah #221 is the one, get an agent going on it'
+    run: 2026-09-28-agent-queries-2
+  - query: Start the issue titled 'Retry budget ignores 429s' with Claude in an isolated worktree
+    run: 2026-09-28-agent-queries-2
+  - query: 'Take issue 76 from the tracker and begin work: new worktree, agent launched, tell me when it goes idle'
+    run: 2026-09-28-agent-queries-2
+  - query: the pagination bug you just picked - go ahead and start it
+    run: 2026-09-28-agent-queries-2
+  - query: 'User settled on #412 (webhook signature mismatch after key rotation); start work on it with codex'
+    run: 2026-09-28-agent-queries-2
+  - query: put claude on issue 18 in a new wt pls
+    run: 2026-09-28-agent-queries-2
+  - query: issue 505 please. new branch, agent, the usual
+    run: 2026-09-28-agent-queries-2
+  - query: 'Kick off work on the chosen issue #733 with the default agent and a dedicated worktree'
+    run: 2026-09-28-agent-queries-2
+  - query: Start implementing issue 1290 in a separate worktree off develop; use claude-2
+    run: 2026-09-28-agent-queries-2
+  - query: open a worktree for the 'login redirect loop' issue and let codex fix it
+    run: 2026-09-28-agent-queries-2
+  - query: 'Proceed with issue #64 that we agreed on: create a feature/64 worktree and launch an agent on it'
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: start work on issue 412
     confusable_with: [daintree.worktree.relocate-agents]
@@ -294,6 +386,87 @@ boundaries:
   - query: 'start issue #412 and feed the agent the relevant context'
     confusable_with: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
+  - query: 'Gather context for issue #812 and put an agent on it in a new worktree'
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: 'set up #455 in a wt with the relevant context and start claude on it'
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on issue #512 with an agent in its own worktree.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Set up a worktree for issue #812 and put claude on it'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'pick up #455 in its own wt with codex'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Begin the ticket about the broken CSV export (#3021) with an agent on a fresh branch
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on the one issue we chose, #77, and run its implement command'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: put an agent on the login-redirect issue, just that one
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Create a branch and worktree for issue #1290 and launch gemini there'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'go ahead and start #58'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Kick off implementation of the pagination bug issue in an isolated worktree with claude
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Use startWorkOnIssue for #604 and report when the agent is running'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: that issue we picked earlier — get an agent going on it in its own worktree
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on issue #640 in a new worktree with claude'
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: 'Set up a worktree for issue #418 and have an agent start on it.'
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on issue #3301 now that it''s clear nobody has it'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: Start work on issue 1177 in a new branch
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: 'Create a worktree and branch for issue #733 and put an agent on it.'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: '#342: export fails with >500 rows (repro in the issue). ok that''s the one, get an agent fixing it in a worktree'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Issue 871 says 'retry queue races under load'. start work on it with claude
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Here''s the ticket text for #1219 - nightly export skips Sundays. Put codex on it in its own branch'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Bug #1066: theme resets on reload, steps are in the issue. go fix it, new worktree + agent'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'pasting issue 58''s body: ''tooltip overlaps close button at 125%''. begin work on 58'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'From the tracker, #414: webhook signature mismatch after key rotation. Launch an agent in a worktree to implement the fix for that issue'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Issue #735 (search reindex blocks deploys) is decided. Kick it off with gemini.'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: GH-507 'Windows build EPERM on .cache' - take it, spin up a worktree and an agent
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Make a worktree for issue #97 on the usual branch naming and put a Codex agent to work in it.'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: how's it looking?
     history:

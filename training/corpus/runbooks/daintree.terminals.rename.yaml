@@ -61,6 +61,90 @@ positives:
   - some of these are agents and some are just shells i opened. title whatever you can figure out
   - number the tabs 1 through 5 in the names, keep the rest of the title
   - two tabs have the exact same name and its driving me nuts, make them different
+  - query: Retitle the four Claude tabs so each one shows what it is working on
+    run: 2026-09-28-agent-queries
+  - query: Rename terminal t-12 to 'reviewer'
+    run: 2026-09-28-agent-queries
+  - query: Five agent panes are all called Codex; read each one's recent output and give it a short descriptive tab title
+    run: 2026-09-28-agent-queries
+  - query: Give the dev-server terminal a clearer tab title, e.g. 'api server :8080'
+    run: 2026-09-28-agent-queries
+  - query: Every tab just says zsh; inspect each shell and label it by the task it is running
+    run: 2026-09-28-agent-queries
+  - query: Change the gemini tab's title to 'docs rewrite'
+    run: 2026-09-28-agent-queries
+  - query: Name the codex agent I just launched 'lint sweeper' — the terminal id is from the launch result
+    run: 2026-09-28-agent-queries
+  - query: Tell the three identical 'Claude' panes apart by giving each a title from its current task, no status report needed
+    run: 2026-09-28-agent-queries
+  - query: 'retitle agent tabs: fixer, tester, docs — in that order left to right'
+    run: 2026-09-28-agent-queries
+  - query: Set a descriptive title on the terminal that is tailing the nginx logs
+    run: 2026-09-28-agent-queries
+  - query: Relabel the six agent terminals with at most six words each describing their work
+    run: 2026-09-28-agent-queries
+  - query: Swap the generic 'Terminal 2' title for 'db console'
+    run: 2026-09-28-agent-queries
+  - query: can you rename these tabs, i can't tell which claude is which
+    run: 2026-09-28-agent-queries
+  - query: call the codex one 'migrations' pls
+    run: 2026-09-28-agent-queries
+  - query: all my terminals say Claude lol give them real names
+    run: 2026-09-28-agent-queries
+  - query: retitle tab 3 to flaky test hunt
+    run: 2026-09-28-agent-queries
+  - query: hey figure out what each terminal is up to and name them accordingly
+    run: 2026-09-28-agent-queries
+  - query: rename the one running storybook to storybook
+    run: 2026-09-28-agent-queries
+  - query: The 'full-stack' recipe opened three terminals all named Terminal; rename them after what each runs
+    run: 2026-09-28-agent-queries
+  - query: After the dev recipe ran, the tabs are untitled — title them server, worker and tests
+    run: 2026-09-28-agent-queries
+  - query: In the feature/checkout worktree, rename the two Claude agents so I can tell them apart
+    run: 2026-09-28-agent-queries
+  - query: Rename the agents across my three worktrees after the issue each one is working
+    run: 2026-09-28-agent-queries
+  - query: recipe launched 4 shells all called bash, pls rename them
+    run: 2026-09-28-agent-queries
+  - query: the terminals in the hotfix wt all say Codex, give them titles
+    run: 2026-09-28-agent-queries
+  - query: Retitle the terminal the startup recipe opened for the queue worker to 'queue worker'
+    run: 2026-09-28-agent-queries
+  - query: Each worktree has a tab named 'Claude'; retitle each one after its branch
+    run: 2026-09-28-agent-queries
+  - query: Don't rerun the recipe, just rename the tabs it opened
+    run: 2026-09-28-agent-queries
+  - query: rename the watcher terminal from the recipe to tsc watch
+    run: 2026-09-28-agent-queries
+  - query: Give each agent in the refactor worktrees a tab title saying what it is refactoring
+    run: 2026-09-28-agent-queries
+  - query: the recipe named its tab 'npm' — change it to 'frontend dev'
+    run: 2026-09-28-agent-queries
+  - query: that recipe's done — now rename the tabs to match the branches
+    run: 2026-09-28-agent-queries-2
+  - query: ok the fan-out kicked off fine. rename the four claude tabs after the issue each one is working on
+    run: 2026-09-28-agent-queries-2
+  - query: Thanks for merging the lint fix. Next, give the open terminals proper titles; they're all called 'Codex'.
+    run: 2026-09-28-agent-queries-2
+  - query: The migration agent finished cleanly. Retitle each agent tab with a short description of its current task.
+    run: 2026-09-28-agent-queries-2
+  - query: cool, tests are green. can you relabel the terminals so i can tell the three claudes apart
+    run: 2026-09-28-agent-queries-2
+  - query: 'Good, the worktrees exist now. Rename each terminal to the ticket number it''s handling (#401, #402, #417).'
+    run: 2026-09-28-agent-queries-2
+  - query: I read the review summary, looks fine. Now read what each open agent is doing and name its tab accordingly.
+    run: 2026-09-28-agent-queries-2
+  - query: 'The PR is up. Rename the reviewer tab to ''review: #588'' and the implementer to ''impl: #588''.'
+    run: 2026-09-28-agent-queries-2
+  - query: deploy went out ok btw. the tabs are a mess though — give them titles that say what each does
+    run: 2026-09-28-agent-queries-2
+  - query: 'Codex answered the question already. Change its tab title to ''codex: schema advice''.'
+    run: 2026-09-28-agent-queries-2
+  - query: Standup's over. Retitle the gemini and claude terminals in the search worktree so the names reflect their work.
+    run: 2026-09-28-agent-queries-2
+  - query: all six agents are running now, nice. rename them by the package each is refactoring
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: rename these tabs so i can tell them apart
     confusable_with: [daintree.worktree.relocate-agents]
@@ -150,6 +234,24 @@ boundaries:
   - query: four tabs all called Claude and ive got no idea which is which
     confusable_with: [daintree.foundation]
     run: 2026-09-24-selector-hardening
+  - query: List the terminals, then rename the ones called 'Claude' by what they are doing
+    confusable_with: [daintree.foundation]
+    run: 2026-09-28-agent-queries
+  - query: rename the single terminal named scratch to sql console
+    confusable_with: [daintree.foundation]
+    run: 2026-09-28-agent-queries
+  - query: all my agents are called Claude, look at what each is doing and give the tabs proper names
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Go through all the running agents and retitle each tab after its current task
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: look at every agent and give them names so i can tell them apart
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: figure out what each of the open terminals is working on and give it a matching tab title
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: rename the tabs to match the branches
     history:

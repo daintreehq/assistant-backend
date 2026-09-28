@@ -83,6 +83,70 @@ positives:
   - Reopen the closed ticket and add the regression label.
   - Make issue 71 belong to the backend team account.
   - Create a tracking issue from this incident summary and tell me its URL.
+  - query: File a GitHub issue in acme/web describing the Safari scroll jank we just reproduced, with repro steps
+    run: 2026-09-28-agent-queries
+  - query: Record the flaky upload timeout as a new bug in the tracker so it isn't forgotten
+    run: 2026-09-28-agent-queries
+  - query: 'Add the ''regression'' and ''p1'' labels to issue #2044 and drop ''needs-triage'''
+    run: 2026-09-28-agent-queries
+  - query: Assign issue 316 to @marco and unassign me, then confirm the assignees on the forge
+    run: 2026-09-28-agent-queries
+  - query: 'Reopen issue #955; the crash came back in 4.2'
+    run: 2026-09-28-agent-queries
+  - query: Retitle issue 480 to 'Export fails for workspaces over 10k rows' and tidy up its body
+    run: 2026-09-28-agent-queries
+  - query: Create a tracking issue for the Postgres 16 upgrade with a checklist of the services involved
+    run: 2026-09-28-agent-queries
+  - query: Open an issue against the exact upstream repo, not our fork, for the broken retry header
+    run: 2026-09-28-agent-queries
+  - query: Turn the TODO about leaking file handles in storage/fs.go into a filed issue with the code reference
+    run: 2026-09-28-agent-queries
+  - query: 'Put the ''good first issue'' label on #71 and #74'
+    run: 2026-09-28-agent-queries
+  - query: Update issue 1203's description with the stack trace we captured and the affected versions
+    run: 2026-09-28-agent-queries
+  - query: log this as an issue for later
+    run: 2026-09-28-agent-queries
+  - query: can u make an issue for that memory leak we found, label it bug
+    run: 2026-09-28-agent-queries
+  - query: assign 2044 to me
+    run: 2026-09-28-agent-queries
+  - query: 'reopen #955 its broken again ugh'
+    run: 2026-09-28-agent-queries
+  - query: 'file a ticket: login button misaligned on mobile'
+    run: 2026-09-28-agent-queries
+  - query: File an issue for the broken OAuth redirect on Firefox, label it bug and assign it to me, after checking nobody filed it already.
+    run: 2026-09-28-agent-queries-2
+  - query: 'Steps: 1) open /cart 2) apply code SAVE10 twice 3) total goes negative. Expected: rejected. -- file this as a bug'
+    run: 2026-09-28-agent-queries-2
+  - query: 'notes from standup: search index rebuild takes 40min and blocks deploys, need incremental reindex. log this as an issue for later'
+    run: 2026-09-28-agent-queries-2
+  - query: 'User report: ''Exported PDFs are missing the footer on page 2+'' (Safari 17, macOS). Create an issue in acme/reports with this'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Crash on startup when HOME has spaces: ENOENT ''/Users/Jane Doe/.cfg''. turn this into an issue and label it bug'
+    run: 2026-09-28-agent-queries-2
+  - query: 'More detail from QA: repro only happens with >500 rows. Add it to the body of issue #342'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Customer email: ''webhooks are firing twice since Tuesday''. open a ticket and assign it to @marco'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Repro: npm run build on Windows fails with EPERM on .cache. please file it against daintree-app with the windows label'
+    run: 2026-09-28-agent-queries-2
+  - query: 'TODO from the review: drop the legacy /v1 endpoints once clients migrate. log it so we don''t forget'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Sentry: TypeError in checkout/confirm, 312 events in 24h. Create an issue with that summary and tag it p1'
+    run: 2026-09-28-agent-queries-2
+  - query: 'The title on #88 is wrong, it''s actually a race in the retry queue, not the uploader. rename it and replace the description with what I pasted'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Bug: tooltip overlaps the close button at 125% zoom. file it, assign me'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Pasted from Slack: ''the nightly export job skipped Sunday again''. Reopen issue #219 and append this to its description'
+    run: 2026-09-28-agent-queries-2
+  - query: Create a forge issue from the user's pasted repro (dropdown loses selection after a filter change in Firefox) with labels bug and ui
+    run: 2026-09-28-agent-queries-2
+  - query: 'Draft notes: ''rate limiter counts retries as new requests, see logs 09-24''. Log these notes as an issue in the gateway repo'
+    run: 2026-09-28-agent-queries-2
+  - query: Beta tester writeup on sync conflicts silently dropping edits is above. file it and assign @sync-bot
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: reopen issue 91, it's come back
     confusable_with: [daintree.forge.land-pull-request]
@@ -120,15 +184,21 @@ boundaries:
   - query: hey hope ur well. can u file an issue for the flaky date parsing on windows and label it bug
     confusable_with: [daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
-  - query: "open a ticket about the flaky upload test, we'll get to it next sprint"
+  - query: open a ticket about the flaky upload test, we'll get to it next sprint
     confusable_with: [daintree.orchestration.watch-outcome]
     run: transcript-2026-09-27-help-release
-  - query: "put the slow startup on the tracker as a bug so it isn't forgotten"
+  - query: put the slow startup on the tracker as a bug so it isn't forgotten
     confusable_with: [daintree.orchestration.watch-outcome]
     run: transcript-2026-09-27-help-release
-  - query: "log it as an issue: the export button does nothing on empty projects"
+  - query: 'log it as an issue: the export button does nothing on empty projects'
     confusable_with: [daintree.workflow.find-issue-work]
     run: transcript-2026-09-27-help-release
+  - query: log it as an issue for later so we don't forget the retry bug
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: File an issue for the Windows path bug since none exists
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
 followups:
   - query: actually make it p1 not p2
     history:

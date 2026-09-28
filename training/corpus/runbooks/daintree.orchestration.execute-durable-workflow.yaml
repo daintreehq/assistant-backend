@@ -82,6 +82,46 @@ positives:
   - Reconcile this stale graph against recent failures before doing anything again.
   - Link the PR and worktree to their exact workflow node.
   - Continue the wfg workflow from its stored next action, but re-check live state first.
+  - query: Move the ORM from Sequelize to Prisma in ordered phases — schema, repositories, services, then remove the old layer — with each phase verified before the next starts
+    run: 2026-09-28-agent-queries
+  - query: 'Plan the Postgres 16 upgrade as dependent steps that survive restarts: dump, provision, migrate, verify, cut over'
+    run: 2026-09-28-agent-queries
+  - query: Have codex implement the rate limiter, then have claude verify it, then open the PR only after verification, tracking progress across turns
+    run: 2026-09-28-agent-queries
+  - query: 'dependency plan for the monorepo split: extract shared lib first, then the two apps that depend on it, resumable later'
+    run: 2026-09-28-agent-queries
+  - query: Build a node graph for the design-token rollout with acceptance evidence per node and pick it back up after async waits
+    run: 2026-09-28-agent-queries
+  - query: Track the three-stage API versioning change so it can be resumed tomorrow without redoing finished steps
+    run: 2026-09-28-agent-queries
+  - query: 'Carry the feature-flag removal through: delete flags, update tests, regenerate snapshots, each step depending on the previous'
+    run: 2026-09-28-agent-queries
+  - query: Set up a durable plan with dependsOn edges for the payments cutover and dispatch whatever is ready
+    run: 2026-09-28-agent-queries
+  - query: 'delegate-then-verify chain: agent writes the migration, second agent reviews, then run it against staging'
+    run: 2026-09-28-agent-queries
+  - query: Keep a checkpointed workflow for replacing the logging library across services, where the core package must land before consumers
+    run: 2026-09-28-agent-queries
+  - query: Orchestrate the i18n extraction, translation import and UI wiring as ordered phases that can wait on agents between turns
+    run: 2026-09-28-agent-queries
+  - query: 'Reconcile the saved rollout plan after an agent''s notice: record the node''s evidence and dispatch the nodes it unblocks'
+    run: 2026-09-28-agent-queries
+  - query: multi-phase rewrite of the build pipeline, webpack to vite, tracked with progress and dependencies
+    run: 2026-09-28-agent-queries
+  - query: can you make a proper plan for the db migration with dependencies and track it, we'll resume tmrw
+    run: 2026-09-28-agent-queries
+  - query: do the auth rewrite in stages, each one has to pass before the next
+    run: 2026-09-28-agent-queries
+  - query: i want a workflow graph for this refactor
+    run: 2026-09-28-agent-queries
+  - query: get codex to build it, then claude to check it, then pr — dont lose track if i restart
+    run: 2026-09-28-agent-queries
+  - query: track progress on this upgrade across sessions pls
+    run: 2026-09-28-agent-queries
+  - query: break the monolith extraction into phases that depend on each other and run them
+    run: 2026-09-28-agent-queries
+  - query: step 1 schema, step 2 backfill, step 3 switch reads. keep it durable
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: track this multi-phase migration as a workflow with dependencies so we can resume it later
     confusable_with: [daintree.worktree.relocate-agents]
@@ -126,6 +166,36 @@ boundaries:
   - query: 'build a workflow graph for the release: changelog depends on version bump, publish depends on both'
     confusable_with: [daintree.orchestration.status-and-resume]
     run: 2026-09-24-selector-hardening
+  - query: Do the Redux-to-Zustand migration as ordered phases — store, selectors, components — each waiting on the last to pass
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: have codex write the importer, then once it's done have claude verify it, then open the pr; track it across sessions
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Plan the three dependent changes to the billing schema with dependsOn edges and resume after restarts
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'workflow graph for the service extraction: shared lib node first, then the two consumers'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Carry the Node 22 upgrade through checkpointed steps: bump engines, fix native deps, update CI, verify'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: i need the steps done in order and tracked, the second one can't start before the first lands
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Set up a durable plan for the data backfill: script, dry run, verify counts, real run'
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Dependency-aware rollout of the new auth provider where each phase is verified by evidence before dispatching the next
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: track this multi-step plan so we can pick it up tomorrow — migrate config, then update callers, then delete legacy
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Delegate the parser rewrite to an agent, verify its output, then have a second agent update the docs that depend on it
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
 followups:
   - query: run the next one
     history:

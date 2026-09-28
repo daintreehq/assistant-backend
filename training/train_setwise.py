@@ -53,8 +53,10 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -88,6 +90,39 @@ DATA = ROOT / "training" / "data"
 MODELS = ROOT / "training" / "models"
 
 ORDERINGS = ("equivariant", "positional", "blind")
+
+if TYPE_CHECKING:
+    import torch
+
+
+def _encoder_param_groups(
+    backbone: torch.nn.Module, lr: float, decay: float
+) -> list[dict[str, object]]:
+    """The encoder's optimiser groups: one group at ``lr``, or one per layer.
+
+    With ``decay < 1`` the top transformer layer trains at ``lr`` and each layer
+    below it at a further factor of ``decay``, embeddings lowest. Layers are
+    found by the ``layer.<i>.`` / ``layers.<i>.`` segment BERT and ModernBERT
+    both use; anything after the last layer (a final norm) trains at ``lr``.
+    """
+    params = list(backbone.named_parameters())
+    if decay >= 1.0:
+        return [{"params": [p for _, p in params], "lr": lr}]
+    pattern = re.compile(r"(?:^|\.)layers?\.(\d+)\.")
+    depth = {n: int(m.group(1)) for n, _ in params if (m := pattern.search(n))}
+    if not depth:
+        raise SystemExit("--llrd: no `layer.<i>.` / `layers.<i>.` parameters in this backbone")
+    top = max(depth.values())
+    by_scale: dict[float, list[torch.nn.Parameter]] = {}
+    for name, p in params:
+        if name in depth:
+            scale = decay ** (top - depth[name])
+        elif "embed" in name:
+            scale = decay ** (top + 1)
+        else:
+            scale = 1.0
+        by_scale.setdefault(scale, []).append(p)
+    return [{"params": ps, "lr": lr * s} for s, ps in sorted(by_scale.items())]
 
 
 def main() -> int:
@@ -190,8 +225,25 @@ def main() -> int:
         "distilled into this run (same stage 1, encoder and doc cap)",
     )
     ap.add_argument("--distill-weight", type=float, default=0.5)
+    ap.add_argument(
+        "--init-seed",
+        type=int,
+        default=None,
+        help="seed the head's initialisation separately from --seed, so several "
+        "seeds share one starting point and their weights can be averaged "
+        "(training/soup_setwise.py). Unset = the head draws from --seed.",
+    )
+    ap.add_argument(
+        "--llrd",
+        type=float,
+        default=1.0,
+        help="layer-wise LR decay for the encoder: layer l of L trains at "
+        "lr * llrd**(L - l), embeddings at lr * llrd**(L + 1) (1.0 = off)",
+    )
     ap.add_argument("--out", default=str(MODELS / "setwise"))
     args = ap.parse_args()
+    if not 0.0 < args.llrd <= 1.0:
+        raise SystemExit("--llrd must be in (0, 1]; 1.0 is off")
     if args.sampling == "permutation" and args.balance_power != 0.0:
         raise SystemExit("--sampling permutation draws uniformly; use --balance-power 0")
     if args.doc_aug and args.doc_refresh <= 0:
@@ -382,12 +434,22 @@ def main() -> int:
     tok = AutoTokenizer.from_pretrained(args.base_model)
     backbone = AutoModel.from_pretrained(args.base_model).to(dev)
     hidden_size = backbone.config.hidden_size
+    # CPU generator only: the head is built on CPU and moved after, and
+    # `torch.manual_seed` would also re-seed CUDA/MPS, which `set_rng_state`
+    # does not restore — every seed's device-side dropout would then follow
+    # --init-seed instead of --seed.
+    rng_state = torch.get_rng_state()
+    if args.init_seed is not None:
+        torch.default_generator.manual_seed(args.init_seed)
     head = SetwiseHead(
         hidden_size,
         d_model=args.d_model,
         layers=args.layers,
         rank_positions=k if args.ordering == "positional" else 0,
     ).to(dev)
+    if args.init_seed is not None:
+        # Everything after the head (dropout, sampling) still follows --seed.
+        torch.set_rng_state(rng_state)
     use_retrieval_feats = args.ordering != "blind"
     shuffle_candidates = args.ordering != "positional"
     print(
@@ -685,12 +747,9 @@ def main() -> int:
     card_weight = torch.tensor(card_w, device=dev, dtype=torch.float32)
     card_loss = torch.nn.CrossEntropyLoss(weight=card_weight)
 
-    opt = torch.optim.AdamW(
-        [
-            {"params": backbone.parameters(), "lr": args.lr},
-            {"params": head.parameters(), "lr": args.head_lr},
-        ]
-    )
+    groups = _encoder_param_groups(backbone, args.lr, args.llrd)
+    groups.append({"params": list(head.parameters()), "lr": args.head_lr})
+    opt = torch.optim.AdamW(groups)
     from collections import Counter
 
     sources = [r.get("source", "?") for r in train_rows]
@@ -701,7 +760,7 @@ def main() -> int:
     steps_per_epoch = (len(train_rows) + args.batch_size - 1) // args.batch_size
     sched = torch.optim.lr_scheduler.OneCycleLR(
         opt,
-        max_lr=[args.lr, args.head_lr],
+        max_lr=[g["lr"] for g in groups],
         total_steps=args.epochs * steps_per_epoch,
         pct_start=0.1,
     )
@@ -985,6 +1044,8 @@ def main() -> int:
                 "doc_aug": args.doc_aug,
                 "cand_noise": args.cand_noise,
                 "seed": args.seed,
+                "init_seed": args.init_seed,
+                "llrd": args.llrd,
                 "epochs": args.epochs,
             },
             indent=2,

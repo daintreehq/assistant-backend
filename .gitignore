@@ -93,8 +93,10 @@ training/results/
 #                       would justify LFS or DVC.
 
 # Local runbook selection (serving side). Model GRAPHS are tracked via Git LFS
-# (.gitattributes). fp32 graphs are NOT tracked: they exist only so the exporter
-# can measure what quantisation costs, and only the served precision ships.
+# (.gitattributes). Only the served precision ships: the int8 ranking encoder and
+# the fp32 RETRIEVER (served fp32 since 2026-09-28 — see SetwiseClassifier). The
+# fp32 ranking graph exists only so the exporter can measure what quantisation
+# costs, and stays untracked.
 #
 # vectors.npz IS tracked — unlike the index the abandoned bi-encoder design kept,
 # it cannot go stale in a way that matters. Every row is keyed by the digest of
@@ -102,6 +104,7 @@ training/results/
 # reuses the rest; committing it just means the first turn after a deploy does
 # not pay for embedding a catalog that usually has not changed.
 src/daintree_assistant_server/runbooks/local/artifacts/**/model.onnx
+!src/daintree_assistant_server/runbooks/local/artifacts/selector/retriever/model.onnx
 # vocab.txt is a ~30k-line side-file the exporter emits beside tokenizer.json,
 # which is self-contained and is what `_tokenizer` actually loads
 # (Tokenizer.from_file). Verified by removing both from a checkout: the token ids
@@ -129,8 +132,8 @@ src/daintree_assistant_server/runbooks/local/artifacts/docs_head.npz
 
 # The pre-rename package path. `skills/` -> `runbooks/` moved every TRACKED file
 # out via `git mv`; it never touches the untracked fp32 export intermediates
-# (`model.onnx`, `vocab.txt` — the shipped artifact is `model_int8.onnx` +
-# `tokenizer.json` under runbooks/) that a local export run had already dropped
+# (`model.onnx`, `vocab.txt` — the shipped artifact is the int8 ranker, the fp32
+# retriever and `tokenizer.json` under runbooks/) that a local export run had already dropped
 # there. Nothing loads them and nothing ever should: nothing under the old
 # package path is a real source location any more, so the whole directory is
 # ignored rather than pattern-matched file by file, which is what let these

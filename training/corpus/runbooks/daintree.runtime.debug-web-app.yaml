@@ -84,6 +84,40 @@ positives:
   - The existing dev server changed configuration; restart its preview deliberately.
   - Verify only messages from the new navigation after reloading.
   - Tell me what this Assistant can actually prove about the visual preview.
+  - query: The Next.js app in the Dev Preview panel for worktree feature/cart renders a blank screen; diagnose from console errors and fix
+    run: 2026-09-28-agent-queries
+  - query: Inspect browser console output in the open preview after the auth redirect loop started; find the source
+    run: 2026-09-28-agent-queries
+  - query: Fix the 'Maximum update depth exceeded' error the preview shows on the settings page, then reload and confirm on a new navigation
+    run: 2026-09-28-agent-queries
+  - query: Start a dev preview for the marketing-site worktree so we can see whether it renders
+    run: 2026-09-28-agent-queries
+  - query: Hydration mismatch warnings in the preview console after the date formatting change — locate the component and fix it
+    run: 2026-09-28-agent-queries
+  - query: The Vite dev server behind the preview panel is stuck after a dependency change; restart it deliberately and verify
+    run: 2026-09-28-agent-queries
+  - query: After the Tailwind upgrade, the preview's styles are missing entirely; check console and network errors and repair
+    run: 2026-09-28-agent-queries
+  - query: Debug why clicking 'Add to cart' in the running preview throws an unhandled promise rejection
+    run: 2026-09-28-agent-queries
+  - query: Reload the dashboard preview after the chart fix and report only console errors from the fresh load
+    run: 2026-09-28-agent-queries
+  - query: Have a visible agent fix the runtime TypeError the preview console shows in ProductList, then re-check the panel
+    run: 2026-09-28-agent-queries
+  - query: Two previews are open; debug the one for the admin worktree where the table never loads
+    run: 2026-09-28-agent-queries
+  - query: preview's broken, white screen
+    run: 2026-09-28-agent-queries
+  - query: whats in the console on the preview? something's erroring
+    run: 2026-09-28-agent-queries
+  - query: reload the preview i changed the env var
+    run: 2026-09-28-agent-queries
+  - query: the web app in daintree just shows 'Something went wrong' — fix it
+    run: 2026-09-28-agent-queries
+  - query: spin up the dev preview for this wt and see if it loads
+    run: 2026-09-28-agent-queries
+  - query: Start a dev preview for the dashboard worktree and check the browser console for errors.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: the preview is throwing console errors after the last change
     confusable_with: [daintree.orchestration.execute-durable-workflow]
@@ -128,6 +162,63 @@ boundaries:
   - query: 'Uncaught TypeError: Cannot read properties of undefined (reading ''map'') at ProductList (ProductList.tsx:42:18) at renderWithHooks (react-dom.development.js:16305:18) at mountIndeterminateComponent (react-dom.development.js:20074:13) The above error occurred in the <ProductList> component [HMR] connected thats what the console in the daintree preview panel shows, page is just white. can you debug it'
     confusable_with: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
+  - query: The dev preview shows a blank page and the console says 'Cannot read properties of undefined (reading map)'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: Tests pass but the app in the preview panel throws a hydration mismatch error in the browser console; fix it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: the page broke after the router change, preview is just white — fix and reload it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: Build succeeds but the Dev Preview console floods with 404s for the font files; find and fix the cause
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: Checkout page in the running preview crashes when I click Pay; inspect the console errors and fix it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: CI is green but the web app open in Daintree renders the sidebar twice; debug it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: Read the browser console in the dev-preview panel for the dashboard worktree and tell me what's erroring
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: React error boundary triggers on load in the preview after the context refactor; fix it and confirm on a fresh navigation
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: i fixed the css import, reload the preview and check the errors are gone
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: the dev server in the preview panel is wedged after changing vite.config; restart it and verify it renders
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: Start the dev preview for this worktree and check the browser console for errors.
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: 'Uncaught TypeError: Cannot read properties of undefined (reading ''map'') at ProductGrid.tsx:42 -- that''s in the preview console and the page is blank, fix it'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: Hydration failed because the initial UI does not match what was rendered on the server. shows up in dev preview when I open /settings, debug it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: GET http://localhost:5173/api/me 500 (Internal Server Error) in the preview console and the navbar never renders -- debug
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: 'ChunkLoadError: Loading chunk 7 failed. the open preview goes white after navigating to /reports; find the cause and reload'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Unhandled Runtime Error: ReferenceError: window is not defined -- the Next.js app in the preview panel errors on load, fix and verify'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Failed to load module script: server responded with MIME type text/html -- in Dev Preview after the vite config change. debug it'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: Maximum update depth exceeded in the running preview whenever I toggle the sidebar, track it down
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Warning: Each child in a list should have a unique key prop, then the dashboard in the preview freezes on click. fix the runtime problem'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: and the second one?
     history:

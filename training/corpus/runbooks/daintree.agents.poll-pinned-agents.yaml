@@ -150,6 +150,44 @@ positives:
     run: 2026-09-26-same-question-named-agents
   - query: ask claude and gemini separately which component is most bug-prone and show me their two answers next to each other
     run: 2026-09-26-same-question-named-agents
+  - query: Ask Claude, Codex and Gemini independently whether we should adopt tRPC for the internal API, and report each answer plus any consensus
+    run: 2026-09-28-agent-queries
+  - query: Poll the pinned agents on three proposed names for the plugin API and tally the votes
+    run: 2026-09-28-agent-queries
+  - query: 'Same read-only question to every configured agent: is the dedupe logic in fetcher.ts safe under concurrency? Show all verdicts'
+    run: 2026-09-28-agent-queries
+  - query: Launch three agents in parallel to rank four logging libraries without seeing each other's answers, and report the aggregate ranking
+    run: 2026-09-28-agent-queries
+  - query: independent recommendations from codex and claude on nx vs turborepo, side by side
+    run: 2026-09-28-agent-queries
+  - query: Get each agent in the fleet to vote yes or no on shipping the feature-flag cleanup this sprint, and count it
+    run: 2026-09-28-agent-queries
+  - query: 'one question fanned out to gemini, claude-2 and codex: which file in src/billing is riskiest to change? report all three'
+    run: 2026-09-28-agent-queries
+  - query: Ask the pinned agents which of options A, B or C for cache invalidation they prefer, with reasons, and summarise the majority view
+    run: 2026-09-28-agent-queries
+  - query: independent opinions from 4 agents on removing the IE11 polyfills; no agent sees another's reply
+    run: 2026-09-28-agent-queries
+  - query: Have Claude and Codex each give a verdict on whether the error boundary placement in App.tsx is right, then report both
+    run: 2026-09-28-agent-queries
+  - query: Survey the configured agents on the best date format for API responses, tally, and give the most-voted option
+    run: 2026-09-28-agent-queries
+  - query: gather every available agent's take on whether the new onboarding copy reads clearly
+    run: 2026-09-28-agent-queries
+  - query: ask claude codex and gemini what they think of the new folder structure
+    run: 2026-09-28-agent-queries
+  - query: 'get the pinned agents to vote on these 3 accent colours: teal, orange, slate'
+    run: 2026-09-28-agent-queries
+  - query: what do all my agents think about switching to bun? show me each answer
+    run: 2026-09-28-agent-queries
+  - query: 'poll the fleet: squash-merge or rebase-merge?'
+    run: 2026-09-28-agent-queries
+  - query: 'get 3 agents to answer this and show me: why would our lambda cold start be slow'
+    run: 2026-09-28-agent-queries
+  - query: have codex and claude both weigh in on the endpoint naming, separately pls
+    run: 2026-09-28-agent-queries
+  - query: have the pinned agents vote on options A/B/C for the cache key format and if its a tie use their runner-up picks
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: ask each of my pinned agents what they think of this API
     confusable_with: [daintree.worktree.relocate-agents]
@@ -366,15 +404,156 @@ boundaries:
   - query: same question to claude, codex and gemini — which of these two libraries should we use — and tell me how they voted
     confusable_with: [daintree.orchestration.competition]
     run: 2026-09-26-same-question-named-agents
-  - query: "ask claude, grok and codex which of my three release names they prefer and tell me which name got the most votes"
+  - query: ask claude, grok and codex which of my three release names they prefer and tell me which name got the most votes
     confusable_with: [daintree.orchestration.competition]
     run: transcript-2026-09-26-fact-contest-named-agents
-  - query: "have each pinned agent vote yes or no on shipping friday and give me the tally"
+  - query: have each pinned agent vote yes or no on shipping friday and give me the tally
     confusable_with: [daintree.orchestration.competition]
     run: transcript-2026-09-26-fact-contest-named-agents
-  - query: "put my two api designs to claude, gemini and codex, have each pick one, and tell me which design won"
+  - query: put my two api designs to claude, gemini and codex, have each pick one, and tell me which design won
     confusable_with: [daintree.orchestration.competition]
     run: transcript-2026-09-26-fact-contest-named-agents
+  - query: have the pinned agents vote yes or no on whether to keep the deprecated endpoint and tally it
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: Ask Codex, Claude and Gemini each whether the retry backoff in api/client.py is too aggressive and bring back all three answers
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: launch three read-only agents with the same question about our jwt expiry handling and show me each reply side by side
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask the pinned agents whether we should drop node 18 support and report what every one of them says
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: get claude and codex both to tell me what's wrong with the compose healthcheck, separately, and show both
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Put one question to every configured agent — is the prisma 6 upgrade safe here? — and tally the yes/no answers
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: have my pinned agents vote between Redis and Postgres LISTEN/NOTIFY for the job queue
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: 'Relay what codex and gemini each answer to the same question: does the CSV export truncate long cells?'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: 'Consult each of the four agents in the fleet on whether issue #812''s cache key collides, then report the consensus'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask claude, codex and gemini which of my three names for the CLI they like best and count it up
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: same question to two agents independently, is the throttle middleware thread-safe, then report both verdicts
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: get claude, codex and gemini each to give an independent opinion on the refund refactor and show me all three
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: Ask Claude, Codex and Gemini which Node version the repo's CI uses and show me their three answers side by side.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Have the pinned agents vote on my three candidate names for the package — fastq, quickq, qline — and tally the votes.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: ask codex and claude whether we should drop python 3.10 support, just bring back what each says
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Put the same question to every configured agent — is the retry logic in api/client.ts safe under concurrent calls? — and report whether they agree.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Get gemini, codex and claude-2 to each rank these four logging libraries I picked: pino, winston, bunyan, consola; aggregate into one ranking.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'quick fleet poll: which of options A or B for the auth redesign do the agents prefer? score it and tell me the consensus'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Ask the three agents what version of React we're on and compare their answers — I just want to see if they all read package.json the same.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: opinions from claude and gemini on whether the monorepo split is worth it. no need for a winner, just their takes
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Collect independent verdicts from Codex and Claude on whether PR #233''s approach to pagination is sound, one line each.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: have every agent vote yes/no on shipping friday and give me the count
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: ask claude and codex for their views on the ORM separately, no cross-talk, and show both
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: Ask each pinned agent separately whether we should adopt Bun and bring back their answers — no debate between them.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: ask claude, codex and gemini which state library they'd pick and show me each answer
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'one-round poll of the agents: vitest or jest? just tally it'
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: Get Codex, Claude and Gemini to each say whether we should adopt event sourcing, no back-and-forth, just show me all three
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'one round only: pinned agents vote on the three cache invalidation options, tally it'
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: ask claude and codex separately which monorepo tool to use, I'll compare their answers myself
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'the agents mustn''t see each other: collect four independent verdicts on the retry policy draft'
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: have the agents each give their opinion on the logging library and report the majority
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: same question to all three agents about the gateway 502s - likely cause? - bring back each answer
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: independent takes from gemini and claude on the threat model, no synthesis needed
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: Ask each configured agent to rank the four API date formats, then aggregate the rankings
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: quick consensus from the pinned agents on bun vs node, just their votes
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: put 'is billing the riskiest area to refactor?' to every agent and report every answer
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: Poll the pinned agents fresh on which of my two deployment windows they prefer and tally it.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: 'new question for the fleet, nothing to do with the tie earlier: ask each agent if we should enable strict mode and report answers'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: ask codex, claude and gemini what second-order risks this migration has and show me each answer
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: Get Claude, Codex and Gemini each to assess whether the retry wrapper can double-charge, and show me all three answers.
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: have all the pinned agents weigh in on whether the caching layer is overkill
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: Put the question 'is the pagination in /api/orders off by one?' to both codex and claude-2 independently and compare their answers.
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: what do codex and gemini each think of our error boundary approach
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: Ask every configured agent whether the billing split should precede the Postgres upgrade and tally their votes.
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: Poll claude, claude-2 and codex separately on the biggest footgun in the deploy script and report each reply.
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: Get two agents' independent opinions on the websocket reconnect logic, Codex and Gemini, and relay both.
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries-2
+  - query: Poll Claude, Codex, Gemini and Grok on the three deployment strategies, and settle any tie with each voter's second choice.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: how's it going?
     history:

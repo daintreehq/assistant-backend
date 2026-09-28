@@ -61,6 +61,76 @@ positives:
   - which files actually make up billing? not bundling anything yet, i just want the shape of it
   - spawn an explore agent and have it tell me how the scheduler decides what runs next, with file refs
   - review the auth module for me and tell me how it works — i'm not judging it, i just need to understand it
+  - query: Explain what this repository does and how its top-level packages fit together, citing the files that show it.
+    run: 2026-09-28-agent-queries
+  - query: Find where rate limiting is enforced for the public API and describe how the limits are configured.
+    run: 2026-09-28-agent-queries
+  - query: read-only trace of a checkout request from the React form to the orders table, with file:line evidence
+    run: 2026-09-28-agent-queries
+  - query: Which files would need to change to support multiple currencies? Survey only, no edits.
+    run: 2026-09-28-agent-queries
+  - query: Locate the code that builds the nightly analytics export and explain its steps.
+    run: 2026-09-28-agent-queries
+  - query: How does the permission system decide whether a user can edit a document? Walk through the relevant modules.
+    run: 2026-09-28-agent-queries
+  - query: 'Map the event bus: who publishes, who subscribes, and where handlers are registered in this Go service.'
+    run: 2026-09-28-agent-queries
+  - query: 'orientation before starting on the search rewrite: current indexing pipeline, entry points, tests covering it'
+    run: 2026-09-28-agent-queries
+  - query: Where is the retry policy for outbound HTTP calls defined, and is it shared or duplicated?
+    run: 2026-09-28-agent-queries
+  - query: 'Explain the build pipeline in this monorepo: how turbo, tsup and the Dockerfile interact.'
+    run: 2026-09-28-agent-queries
+  - query: Figure out how feature flags are evaluated at runtime and where their defaults come from; do not modify anything.
+    run: 2026-09-28-agent-queries
+  - query: 'Summarise the data model: main tables, relationships, and where migrations live.'
+    run: 2026-09-28-agent-queries
+  - query: what does this repo even do lol
+    run: 2026-09-28-agent-queries
+  - query: where's the code that sends the password reset email
+    run: 2026-09-28-agent-queries
+  - query: how does the auth flow work in here?
+    run: 2026-09-28-agent-queries
+  - query: new to this codebase, give me the lay of the land
+    run: 2026-09-28-agent-queries
+  - query: explain the caching layer to me, don't change anything
+    run: 2026-09-28-agent-queries
+  - query: How does the plugin loader resolve relative paths in this repo?
+    run: 2026-09-28-agent-queries-2
+  - query: walk me through our auth flow from login form to session cookie
+    run: 2026-09-28-agent-queries-2
+  - query: Explain how the job queue retries failed tasks in this codebase, with file references.
+    run: 2026-09-28-agent-queries-2
+  - query: Where is rate limiting enforced for the public API here? Read-only, no changes.
+    run: 2026-09-28-agent-queries-2
+  - query: Trace how an uploaded CSV gets from the controller into the imports table.
+    run: 2026-09-28-agent-queries-2
+  - query: what decides which feature flags a tenant sees? find it in the code
+    run: 2026-09-28-agent-queries-2
+  - query: Map out how the React app hydrates server state on first load in this project.
+    run: 2026-09-28-agent-queries-2
+  - query: Figure out where invoice PDFs are rendered and which template engine they use.
+    run: 2026-09-28-agent-queries-2
+  - query: how does our cache invalidation work when a product is edited
+    run: 2026-09-28-agent-queries-2
+  - query: Identify every module that would need touching to add a second payment provider; nothing edited.
+    run: 2026-09-28-agent-queries-2
+  - query: Explain the event bus in src/events and who subscribes to order.created.
+    run: 2026-09-28-agent-queries-2
+  - query: where do we set the db connection pool size
+    run: 2026-09-28-agent-queries-2
+  - query: Describe how the GraphQL resolvers batch database lookups in this service.
+    run: 2026-09-28-agent-queries-2
+  - query: 'Orient me in this monorepo before I start: what each package does and how they depend on each other.'
+    run: 2026-09-28-agent-queries-2
+  - query: In this codebase, how are websocket connections authenticated after the initial handshake?
+    run: 2026-09-28-agent-queries-2
+  - query: what happens when a user deletes their account - which tables get cleaned up? just explain
+    run: 2026-09-28-agent-queries-2
+  - query: Locate the code that computes shipping estimates and explain its fallback rules.
+    run: 2026-09-28-agent-queries-2
+  - query: How is config loaded here — env vars, yaml, or both, and which wins?
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: where in the codebase do we parse slash commands typed into the terminal
     confusable_with: [daintree.foundation]
@@ -242,6 +312,54 @@ boundaries:
   - query: what would i have to touch to add a csv export? just tell me
     confusable_with: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
+  - query: where does the CSV export truncate long cell values? explain with file references
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Explain how the search feature works across its files
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: Survey the repository and explain how the job queue retries failed jobs, citing files; change nothing.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: where is the stripe webhook signature checked? just need to know, not changing it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Read-only walkthrough of the plugin loader: what it scans, in what order, and where errors are swallowed.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Before anyone refactors the caching layer, map out which modules call it and how, with file references.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: what would we have to touch to add SAML login? don't write code yet
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Orientation pass over this unfamiliar monorepo: what each package does and how they depend on each other.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: find the code that generates the monthly usage emails and explain the flow
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Explain the tenancy model in this codebase: how org ids are propagated from request to query, with evidence.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: how does the websocket reconnect logic actually work here? read-only
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Investigate, without editing anything, where the feature-flag defaults come from and which file wins when two disagree.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: What does the codebase use for loading config?
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: remind me where the retry logic lives in the code
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: How does the session store invalidation actually work in this codebase?
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Explain how the cart state flows between components in the web app
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
 followups:
   - query: hows it going?
     history:

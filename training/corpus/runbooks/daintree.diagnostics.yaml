@@ -58,6 +58,42 @@ positives:
   - i told you to delete that worktree and it's still sitting there. did the call actually go through
   - everything just stopped. why
   - quick sanity check on the setup before i leave this running all night — link, tools, key. all of it
+  - query: Daintree MCP tools vanished from this Claude Code pane after the app auto-updated; find which link failed and give the recovery step
+    run: 2026-09-28-agent-queries
+  - query: Collect Daintree app version, tier, surface hash and the latest error rows for a bug report about panes freezing when switching worktrees
+    run: 2026-09-28-agent-queries
+  - query: terminal.notifyWhenIdle returns ok but no notice ever gets typed into my pane; work out why Daintree is not delivering it
+    run: 2026-09-28-agent-queries
+  - query: Confirm the Codex CLI in this pane is still signed in to its provider before starting an overnight run
+    run: 2026-09-28-agent-queries
+  - query: agent.launch comes back TIER_NOT_PERMITTED from the sidebar; is that a caller permission problem or is Daintree down
+    run: 2026-09-28-agent-queries
+  - query: Show the most recent Daintree error log entries and notification history from the past hour, read-only
+    run: 2026-09-28-agent-queries
+  - query: The Linear plugin in Daintree throws on load; pull its plugin diagnostics and correlate with recent errors
+    run: 2026-09-28-agent-queries
+  - query: worktree.list is not among the actions offered to this session even though it used to be; explain why it is missing
+    run: 2026-09-28-agent-queries
+  - query: codex mcp list shows the daintree server as failed and the pane has no daintree tools; smallest recovery please
+    run: 2026-09-28-agent-queries
+  - query: every agent started in the last 20 minutes prints 401 unauthorized from its provider; determine whether Daintree or sign-in is at fault
+    run: 2026-09-28-agent-queries
+  - query: API-key client gets connection refused talking to the local Daintree MCP server; check whether the server is enabled without printing the key
+    run: 2026-09-28-agent-queries
+  - query: Daintree accepted the new-worktree action but nothing appeared in the sidebar; diagnose what happened
+    run: 2026-09-28-agent-queries
+  - query: i hit the new terminal button and literally nothing happened. whats going on with daintree
+    run: 2026-09-28-agent-queries
+  - query: can u grab the recent daintree errors, want to file a bug
+    run: 2026-09-28-agent-queries
+  - query: why can't i see the copytree tool anymore??
+    run: 2026-09-28-agent-queries
+  - query: before we kick off anything big make sure claude is actually logged in lol
+    run: 2026-09-28-agent-queries
+  - query: mcp says disconnected again. fix?
+    run: 2026-09-28-agent-queries
+  - query: notifications stopped showing up in daintree, pretty sure stuff finished. is it broken
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: i tried to file something and nothing happened at all, the forge tools aren't even showing up
     confusable_with: [daintree.forge.manage-issue]
@@ -224,12 +260,48 @@ boundaries:
   - query: argh, monday. daintree's mcp keeps saying disconnected and none of the tools do anything
     confusable_with: [daintree.foundation]
     run: 2026-09-24-selector-hardening
-  - query: "export the daintree error log so I can attach it to my github report about the crash"
+  - query: export the daintree error log so I can attach it to my github report about the crash
     confusable_with: [daintree.context.curate-copytree-bundle]
     run: transcript-2026-09-27-help-release
-  - query: "the app keeps freezing, gather whatever daintree logs its developers would need"
+  - query: the app keeps freezing, gather whatever daintree logs its developers would need
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: transcript-2026-09-27-help-release
+  - query: Is Daintree's own MCP connection healthy and is the agent CLI signed in to its provider?
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: None of the agents respond and every Daintree action times out; the whole app looks wedged
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: spawns fail for every agent type with the same transport error from the daintree mcp
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Daintree's terminal panel stopped responding and the MCP shows disconnected
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: 'the failing thing is Daintree itself: terminal.sendCommand errors on every call while the project build is fine'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: not the tests — the daintree status indicator went red and tools stopped working, what broke
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: the Daintree MCP disconnected and none of the worktree tools respond
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Is Daintree connected? None of my tool calls have returned anything for five minutes
+    confusable_with: [daintree.foundation]
+    run: 2026-09-28-agent-queries
+  - query: list my terminals — actually the list call just hangs, is daintree ok?
+    confusable_with: [daintree.foundation]
+    run: 2026-09-28-agent-queries
+  - query: back from lunch to resume but daintree's tools have disappeared from this pane, why
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Cannot pick the workflow back up because every Daintree call returns a transport error; diagnose the connection
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: The Daintree window itself is frozen and panels won't open
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
 followups:
   - query: and the key thing too?
     history:

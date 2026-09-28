@@ -273,11 +273,11 @@ steps:
         git config credential.helper \
           '!f() { echo "username=x-access-token"; echo "password=$$GITHUB_TOKEN"; }; f'
         git lfs pull
-        # BOTH encoders are checked. Checking one would let a pointer ship as
+        # BOTH served encoder graphs are checked (fp32 retriever, int8 ranker). Checking one would let a pointer ship as
         # the other: the two stages are separate graphs and LFS can fetch them
         # independently, so a per-file check is the only one that means anything.
         ART=src/daintree_assistant_server/runbooks/local/artifacts/selector
-        for MODEL in "$$ART/retriever/model_int8.onnx" "$$ART/ranking/model_int8.onnx"; do
+        for MODEL in "$$ART/retriever/model.onnx" "$$ART/ranking/model_int8.onnx"; do
           SIZE=$$(stat -c%s "$$MODEL")
           if [ "$$SIZE" -lt 1000000 ]; then
             echo "ERROR: $$MODEL is $$SIZE bytes — an unfetched LFS pointer, not a model."

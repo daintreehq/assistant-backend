@@ -60,6 +60,46 @@ positives:
   - the reviewer terminal is asking whether it should cover the tests as well. tell it yes, everything under src
   - agent asking abt branch name -> tell it feat/rate-limit
   - answer whatever the api-worker terminal is stuck on with the defaults, i don't want to be involved
+  - query: Codex in the feature/search-index worktree is blocked on a yes/no prompt about overwriting its config; answer yes and report once it continues
+    run: 2026-09-28-agent-queries
+  - query: claude-2 stopped with a question about which test runner to use; tell it vitest and wait for it to resume
+    run: 2026-09-28-agent-queries
+  - query: Three agents show waitingReason question after the batch launch; send each the answer it needs and report their results
+    run: 2026-09-28-agent-queries
+  - query: The gemini terminal is waiting for approval to run npm install; approve it and confirm it moved on
+    run: 2026-09-28-agent-queries
+  - query: Agent in the docs worktree is asking whether to trust the folder; accept and let it carry on
+    run: 2026-09-28-agent-queries
+  - query: Reply 'option 2' to the agent sitting at a numbered choice prompt, then report what it did
+    run: 2026-09-28-agent-queries
+  - query: Unblock the agent asking for a database URL by giving it the local postgres URL from .env.example
+    run: 2026-09-28-agent-queries
+  - query: several pane agents are paused on questions, answer each one and keep them moving
+    run: 2026-09-28-agent-queries
+  - query: Codex wants to know whether to keep the deprecated /v1/orders endpoint; answer keep it and report the result when it finishes
+    run: 2026-09-28-agent-queries
+  - query: 'The claude agent on issue #221 is waiting for confirmation before deleting old fixtures; confirm and watch it continue'
+    run: 2026-09-28-agent-queries
+  - query: 'answer the permission prompt codex raised about editing package.json: allow it'
+    run: 2026-09-28-agent-queries
+  - query: 'reply to the pending question in the refactor-auth terminal: yes, rename the module'
+    run: 2026-09-28-agent-queries
+  - query: the agent is asking something, just tell it yes
+    run: 2026-09-28-agent-queries
+  - query: codex is stuck on a prompt asking which branch, say main
+    run: 2026-09-28-agent-queries
+  - query: it wants me to approve something in the gemini pane, go ahead
+    run: 2026-09-28-agent-queries
+  - query: two of them are waiting on questions, sort them out
+    run: 2026-09-28-agent-queries
+  - query: claude asked if it should squash the commits - tell it no
+    run: 2026-09-28-agent-queries
+  - query: the agent in wt-3 wants to know if it can run migrations. yes. then tell me how it went
+    run: 2026-09-28-agent-queries
+  - query: Answer the Codex agent's question about which config file to edit (use config/prod.yaml) and report what it does next.
+    run: 2026-09-28-agent-queries-2
+  - query: 3 agents are all stuck asking stuff - answer each one and tell me the results
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: The agent in worktree wt_api is asking whether to overwrite the generated file; answer its question and let it continue.
     confusable_with: [daintree.worktree.relocate-agents]
@@ -181,6 +221,45 @@ boundaries:
   - query: codex in t3 is asking me something about the migration, answer it — yes use the new column
     confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
+  - query: 'codex is asking me whether to use the v2 API in its pane - answer it: yes'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: the agent I launched earlier is waiting on a question about column naming; reply 'use snake_case'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Claude is paused asking which file to edit; tell it src/auth/session.ts and relay what it does next
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: answer the question the running gemini agent is blocked on and report its result
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: the agent wants approval to read outside the workspace, approve it
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: get back to codex on its prompt, it's asking if it should keep the old snapshot tests. yes
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Reply to the already-running Claude agent that is waiting to hear whether to go ahead with the refactor
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: codex put a question in its pane ten minutes ago; answer it with 'go with option B' and tell me what it comes back with
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: The existing agent in feature/export is stopped at a question about CSV delimiters; answer semicolon and relay the outcome
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: tell the waiting claude agent yes, it can trust the folder
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: The Codex agent is asking whether to trust the folder; tell it yes.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'claude''s stopped and is waiting on a question about which db to use — answer it: postgres'
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Three agents are asking whether to proceed with the migration; answer yes to all of them
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

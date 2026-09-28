@@ -62,6 +62,44 @@ positives:
   - always run the linter before you hand anything back to me — thats a standing rule, keep it
   - did you save something just now? i didnt ask you to
   - where did the 'no direct db access from handlers' rule come from, me or you?
+  - query: 'Save a standing convention: database migrations are generated with alembic autogenerate, never handwritten'
+    run: 2026-09-28-agent-queries
+  - query: Recall what was decided earlier about versioning the public REST API
+    run: 2026-09-28-agent-queries
+  - query: Record that the team uses pnpm, checking first whether an older npm entry exists
+    run: 2026-09-28-agent-queries
+  - query: Delete the saved note claiming staging deploys happen on Fridays; it is outdated
+    run: 2026-09-28-agent-queries
+  - query: 'Correct the stored fact about the default branch: it is trunk now, not main'
+    run: 2026-09-28-agent-queries
+  - query: Review everything saved for this project and pin the testing conventions
+    run: 2026-09-28-agent-queries
+  - query: Look up whether we ever recorded why Redux was dropped from the frontend
+    run: 2026-09-28-agent-queries
+  - query: Persist the preference that commit messages use conventional-commit prefixes
+    run: 2026-09-28-agent-queries
+  - query: Make it known to every teammate and agent that e2e tests need the docker compose stack up first
+    run: 2026-09-28-agent-queries
+  - query: Drop the remembered entry about using yarn workspaces
+    run: 2026-09-28-agent-queries
+  - query: Check saved project facts for the agreed error-handling policy in the payment service
+    run: 2026-09-28-agent-queries
+  - query: Keep a durable note that PR descriptions must link the Linear ticket
+    run: 2026-09-28-agent-queries
+  - query: remember we deploy with fly now, not heroku
+    run: 2026-09-28-agent-queries
+  - query: what did we agree on for the date lib, dayjs or luxon?
+    run: 2026-09-28-agent-queries
+  - query: forget that thing about always squashing
+    run: 2026-09-28-agent-queries
+  - query: that's not true anymore, we moved off jest to vitest — update whatever you saved
+    run: 2026-09-28-agent-queries
+  - query: what do you have saved about this project?
+    run: 2026-09-28-agent-queries
+  - query: pls always run the linter before committing, keep that in mind from now on
+    run: 2026-09-28-agent-queries
+  - query: remember we're on pnpm now, and replace the old note that says npm
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: remember that we file all bugs against the assistant repo, never the backend
     confusable_with: [daintree.forge.manage-issue]
@@ -114,6 +152,27 @@ boundaries:
   - query: you keep suggesting npm, weve been on pnpm since march — make that stick
     confusable_with: [daintree.foundation]
     run: 2026-09-24-selector-hardening
+  - query: What did we agree the API error shape should be — the decision, not what the code does
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: is there a saved note on why the cache layer exists
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: For every future session, keep in mind that migrations are run from the api worktree
+    confusable_with: [daintree.foundation]
+    run: 2026-09-28-agent-queries
+  - query: 'save this naming rule for good: reviewer terminals get a ''rev:'' prefix'
+    confusable_with: [daintree.foundation]
+    run: 2026-09-28-agent-queries
+  - query: remember that we always rebase onto develop, not main
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: what did we decide last week about dropping graphql?
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Do you remember why we stopped using the monorepo build tool
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
 followups:
   - query: also the node version, 22
     history:

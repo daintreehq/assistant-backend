@@ -58,6 +58,74 @@ positives:
   - anything new on 47 since yesterday? theres like 30 comments on it
   - close 176 as not planned and say why in a comment
   - quick pass over my open prs — which ones are green and which are waiting on a review
+  - query: 'Report the current state of PR #233: CI roll-up, review decision, and anything the reviewer asked for'
+    run: 2026-09-28-agent-queries
+  - query: Issue 918 was supposedly fixed last week but is still open; find out what is holding it up
+    run: 2026-09-28-agent-queries
+  - query: Check whether the checks on PR 57 pass for the commit claude-2 just pushed, not an older head
+    run: 2026-09-28-agent-queries
+  - query: 'Read the comment thread on issue #1406 to the newest reply and summarize whether the reporter confirmed the fix'
+    run: 2026-09-28-agent-queries
+  - query: Post a short note on issue 311 saying it shipped in 2.8.1, then close it as completed
+    run: 2026-09-28-agent-queries
+  - query: What did the reviewer say on the auth-refactor PR? Pull the inline comments too
+    run: 2026-09-28-agent-queries
+  - query: 'Forward the change requests from PR #402''s review to the codex agent still working in that worktree'
+    run: 2026-09-28-agent-queries
+  - query: 'One-off status read on the pull request linked to issue 77: is it mergeable, approved, green?'
+    run: 2026-09-28-agent-queries
+  - query: 'Close issue #2019 as not planned, no comment'
+    run: 2026-09-28-agent-queries
+  - query: Tell me which check is failing on PR 145 and paste the relevant log lines; don't fix anything
+    run: 2026-09-28-agent-queries
+  - query: 'Is the PR for issue #660 waiting on review or on CI right now?'
+    run: 2026-09-28-agent-queries
+  - query: is 441 green yet
+    run: 2026-09-28-agent-queries
+  - query: 'did anyone ever answer on #3120? the guy asking about the arm build'
+    run: 2026-09-28-agent-queries
+  - query: whats blocking the pagination pr, its been open forever
+    run: 2026-09-28-agent-queries
+  - query: comment on 87 that we fixed it in the last release and close it out thx
+    run: 2026-09-28-agent-queries
+  - query: hey did ci pass on my branch's pr? pushed like 10 min ago
+    run: 2026-09-28-agent-queries
+  - query: what's happening with PR 431
+    run: 2026-09-28-agent-queries-2
+  - query: 'is #77''s fix merged yet'
+    run: 2026-09-28-agent-queries-2
+  - query: why is 512 still open when the PR landed
+    run: 2026-09-28-agent-queries-2
+  - query: 'Check the CI roll-up and review decision on pull request #431 and report what is blocking it'
+    run: 2026-09-28-agent-queries-2
+  - query: Read the latest comments on issue 290 and summarize whether the reporter confirmed the fix
+    run: 2026-09-28-agent-queries-2
+  - query: did the reviewer approve PR 88 or ask for changes?
+    run: 2026-09-28-agent-queries-2
+  - query: 'Report the current state of PR #1204: checks, reviews, and whether it is mergeable'
+    run: 2026-09-28-agent-queries-2
+  - query: 'has anyone replied on the flaky-login issue #63 since yesterday'
+    run: 2026-09-28-agent-queries-2
+  - query: Issue 918 stayed open after its fix went in; find out whether the merged PR failed to reference it
+    run: 2026-09-28-agent-queries-2
+  - query: is the PR for the cache invalidation issue green now?
+    run: 2026-09-28-agent-queries-2
+  - query: Look up the state of PR 431's required checks; read-only
+    run: 2026-09-28-agent-queries-2
+  - query: 'Post a closing comment on issue #77 linking the merged PR and close it'
+    run: 2026-09-28-agent-queries-2
+  - query: whats the holdup on 2210
+    run: 2026-09-28-agent-queries-2
+  - query: 'Determine which check is still pending on PR #56 and who has been requested to review'
+    run: 2026-09-28-agent-queries-2
+  - query: Summarize the review thread on pull request 1450 and forward the blocking comments to the claude agent still working on it
+    run: 2026-09-28-agent-queries-2
+  - query: 'did CI pass on the dependabot PR #3321?'
+    run: 2026-09-28-agent-queries-2
+  - query: 'Check whether issue #140 got a response from the maintainers after our last comment'
+    run: 2026-09-28-agent-queries-2
+  - query: 'status of the pr for #77 pls'
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: is that PR green
     confusable_with: [daintree.forge.land-pull-request]
@@ -311,15 +379,96 @@ boundaries:
   - query: comment on the issue and close it
     confusable_with: [daintree.forge.manage-issue]
     run: 2026-09-24-selector-hardening
-  - query: "the auth refactor landed on main, did its tracking issue get closed or is it still sitting there"
+  - query: the auth refactor landed on main, did its tracking issue get closed or is it still sitting there
     confusable_with: [daintree.forge.manage-issue]
     run: transcript-2026-09-27-help-release
-  - query: "check whether anyone closed out the ticket for the crash fix we deployed"
+  - query: check whether anyone closed out the ticket for the crash fix we deployed
     confusable_with: [daintree.forge.manage-issue]
     run: transcript-2026-09-27-help-release
-  - query: "is issue 212 closed now that its PR merged, or does it need a closing comment"
+  - query: is issue 212 closed now that its PR merged, or does it need a closing comment
     confusable_with: [daintree.forge.manage-issue]
     run: transcript-2026-09-27-help-release
+  - query: 'PR #488 got changes-requested on GitHub; read what the reviewer said and pass it to the agent still working on it'
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: did the checks pass on pr 88? just tell me
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: 'Is PR #914 mergeable right now? Just tell me, don''t touch it'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: What review decision does pull request 58 have at the moment?
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: is 1340 approved and green?
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'Read the reviewer''s comments on PR #77 and summarise what they want changed'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Why hasn't the lockfile PR merged yet? what's it stuck on
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'Comment on issue 506 that the fix landed in #512 and close the issue'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Check whether the required checks on PR 245 finished for its latest commit
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: did the cache fix pr get any reviews yet
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Relay the requested changes on PR 2201 to the agent that wrote it
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'Status of the release PR: CI counts, review state, any unresolved threads'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'Comment on issue #955 that it''s fixed and close it'
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: why is issue 480 still open? thought we fixed that
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'is PR #331 green yet? just check once'
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: 'What''s the state of PR #3301 — green, approved?'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: Issue 1203 is still open even though its PR merged; find out why
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'did anyone reply on the windows path bug issue, #877'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: Read the review comments left on the billing service merge request !42
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Check whether CI passed on the offline mode PR, #2290'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'what''s blocking the rate limit pr, #1911'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Look at the thread on issue #640 and tell me if the reporter confirmed the fix'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: Find out what the reviewer asked for on the session cookie PR (#1450)
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: is the pr for the dark mode flicker issue passing checks yet
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Close out issue #3301 with a comment pointing at the release notes'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: The PR I opened yesterday — did CI pass on it?
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: 'the reviewer left change requests on PR #33 on github, forward them to the codex agent still working on that branch'
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: and the review?
     history:

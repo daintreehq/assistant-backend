@@ -62,6 +62,68 @@ positives:
   - worktree please, and skip whatever startup recipe it normally wants to run
   - check out origin/feat/search-v2 as its own worktree
   - add worktree branch=bugfix/csv-export base=develop
+  - query: Create a Daintree worktree on a new branch feature/audit-log based on develop; do not launch anything in it.
+    run: 2026-09-28-agent-queries
+  - query: Check out the existing remote branch release/3.1 as its own worktree so I can compare it side by side.
+    run: 2026-09-28-agent-queries
+  - query: new worktree, branch spike/edge-runtime off main, no recipe, no agent
+    run: 2026-09-28-agent-queries
+  - query: Set up an empty worktree for hotfix/csv-encoding; I will open terminals in it myself.
+    run: 2026-09-28-agent-queries
+  - query: Add a worktree for the teammate's branch alice/payment-retries so I can review it locally without touching my current checkout.
+    run: 2026-09-28-agent-queries
+  - query: Make a separate worktree for branch docs/api-v2 from origin/main, nothing started inside.
+    run: 2026-09-28-agent-queries
+  - query: worktree for existing branch chore/upgrade-node20, just the checkout
+    run: 2026-09-28-agent-queries
+  - query: Create two plain worktrees, experiment/a and experiment/b, both off main, with no agents or recipes.
+    run: 2026-09-28-agent-queries
+  - query: Branch perf/bundle-split needs its own worktree off develop; leave it empty for now.
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for a brand-new branch named fix/timezone-dst using Daintree's worktree creator rather than git worktree add.
+    run: 2026-09-28-agent-queries
+  - query: Standalone worktree on the v2-maintenance branch, used only for building old releases.
+    run: 2026-09-28-agent-queries
+  - query: Open the dependabot branch dependabot/npm/axios-1.7 as a worktree, no terminals.
+    run: 2026-09-28-agent-queries
+  - query: can you make a new worktree called feature/tags
+    run: 2026-09-28-agent-queries
+  - query: i need the release-2.4 branch checked out in its own wt, that's all
+    run: 2026-09-28-agent-queries
+  - query: 'quick one: new branch + worktree for the pricing experiment, don''t start anything'
+    run: 2026-09-28-agent-queries
+  - query: make me a worktree off develop named cleanup/old-migrations
+    run: 2026-09-28-agent-queries
+  - query: pls add a worktree for origin/bob/fix-sidebar so i can poke at it
+    run: 2026-09-28-agent-queries
+  - query: just a blank worktree for trying stuff, branch scratch/sept
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for new branch perf/lazy-routes based on origin/develop and wait until its setup is ready; launch nothing.
+    run: 2026-09-28-agent-queries-2
+  - query: create a worktree for branch feat/csv-import
+    run: 2026-09-28-agent-queries-2
+  - query: Check out the existing branch origin/fix-tz as its own worktree
+    run: 2026-09-28-agent-queries-2
+  - query: make a new branch refactor/router in a separate worktree
+    run: 2026-09-28-agent-queries-2
+  - query: Add a Daintree worktree for a new branch called chore/bump-node off develop
+    run: 2026-09-28-agent-queries-2
+  - query: I need a second checkout of main as a worktree to compare against
+    run: 2026-09-28-agent-queries-2
+  - query: New worktree please, branch name spike/wasm
+    run: 2026-09-28-agent-queries-2
+  - query: Set up a worktree for the release/3.0 branch so I can cherry-pick into it
+    run: 2026-09-28-agent-queries-2
+  - query: create a wt from tag v2.1.0 on a new branch hotfix/2.1.1
+    run: 2026-09-28-agent-queries-2
+  - query: Give me a worktree for branch experiment/sqlite-backend based on main
+    run: 2026-09-28-agent-queries-2
+  - query: Open a worktree for my teammate's branch jordan/perf-tweaks
+    run: 2026-09-28-agent-queries-2
+  - query: worktree for docs/api-reference, new branch
+    run: 2026-09-28-agent-queries-2
+  - query: Create a new worktree off develop for bugfix/null-avatar
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: make a checkout for the billing branch
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -210,6 +272,81 @@ boundaries:
   - query: make a worktree for feat/seed-data
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-24-selector-hardening
+  - query: Create a worktree on a new branch feature/export-pdf; don't start any agent in it yet.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: just make me a wt for the release/2.4 branch, i'll put an agent on it myself later
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: New worktree for branch spike/grpc, nothing launched inside it.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Check out the existing hotfix/login-loop branch as its own worktree, empty, no terminals.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: set up a bare worktree off develop called chore/deps, no agent
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for hotfix/rates off develop, without any startup recipe.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: new worktree chore/ts-strict, no recipe no agent
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Check out the existing branch feature/search as a worktree; don't apply the default layout.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: bare worktree for the payments branch, i'll launch things by hand
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Make an empty worktree on new branch spike/bun for a quick experiment.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Create a new worktree for branch infra/terraform-upgrade.
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: Create a new worktree for branch fix/ports off main; nothing else.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Create a plain worktree for branch experiment/rust-core; no agents involved.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: create a worktree for feat/billing but don't run any recipe
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: just a bare worktree for the spike branch, no terminals, no recipe
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: New worktree on hotfix/login only - skip the startup recipe this time
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: check out release/2.4 as a worktree; I'll start things myself
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: Make an empty worktree for chore/lint without launching anything
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: worktree for docs-refresh, plain, no agent no dev server
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: Create a worktree off main named exp-embeddings; do not apply the default workspace recipe
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: Add a worktree for the existing remote branch origin/perf-cache and nothing else
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: plain wt for pr-512 pls, don't kick off the fullstack setup
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: Set up a new branch feat/onboarding in its own worktree with no startup terminals
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: 'I just need the directory: worktree for bugfix/tz, no recipe run'
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: Create a worktree for experiment/rust-port; leave the recipe out, nothing should start
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: nice. do another one off origin/develop, call it spike/cache
     history:

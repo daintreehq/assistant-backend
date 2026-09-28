@@ -59,6 +59,58 @@ positives:
   - just the changes in src/auth/session.py — anything unsafe in there?
   - when you get a moment could you organise a proper review of the branch? severity ranked would be ideal
   - he's introduced a global mutex in this change. get an independent read on whether that's a mistake
+  - query: 'Review PR #318 in acme/api for correctness and concurrency bugs; return de-duplicated findings with file:line evidence'
+    run: 2026-09-28-agent-queries
+  - query: Judge the uncommitted diff in the cache worktree on its merits, read-only
+    run: 2026-09-28-agent-queries
+  - query: Code review of feature/oauth-pkce against main, focusing on token storage and redirect validation
+    run: 2026-09-28-agent-queries
+  - query: Get two independent read-only reviews of the migration in db/migrations/0042 and merge their findings
+    run: 2026-09-28-agent-queries
+  - query: Assess whether the new retry wrapper in net/client.go introduces any regressions; severity-ranked findings
+    run: 2026-09-28-agent-queries
+  - query: 'Security pass over the file upload handler changes: path traversal, MIME sniffing, size limits'
+    run: 2026-09-28-agent-queries
+  - query: Critique the last three commits on develop for API design problems
+    run: 2026-09-28-agent-queries
+  - query: Evaluate the quality of the refactor in src/billing before anyone merges it
+    run: 2026-09-28-agent-queries
+  - query: Fresh-eyes audit of the hotfix branch for second-order effects on the session store
+    run: 2026-09-28-agent-queries
+  - query: Read-only review of the Terraform change in infra/ for anything that would recreate the database
+    run: 2026-09-28-agent-queries
+  - query: Flag maintainability and naming problems in the GraphQL resolver changes, not just typos
+    run: 2026-09-28-agent-queries
+  - query: is pr 318 any good or is it a mess
+    run: 2026-09-28-agent-queries
+  - query: can you look over the diff before i push, anything dumb in there?
+    run: 2026-09-28-agent-queries
+  - query: check my branch for security problems pls
+    run: 2026-09-28-agent-queries
+  - query: what would you change about this pr
+    run: 2026-09-28-agent-queries
+  - query: Review the diff claude-2 produced in the payments worktree and report findings to me
+    run: 2026-09-28-agent-queries
+  - query: Look over what the codex agent wrote for the pagination fix and tell me what's wrong with it
+    run: 2026-09-28-agent-queries
+  - query: Launch a couple of independent reviewer agents on the oauth-pkce branch and merge their findings into one list
+    run: 2026-09-28-agent-queries
+  - query: The agent finished the rate limiter; give its change a proper code review with severities
+    run: 2026-09-28-agent-queries
+  - query: review gemini's refactor in the wt, just findings, i'll decide what to fix
+    run: 2026-09-28-agent-queries
+  - query: Have reviewers go over the migration the agent wrote and return deduplicated findings — no one fixes anything yet
+    run: 2026-09-28-agent-queries
+  - query: Run a fresh reviewer session over the change claude-1 made to the auth middleware and summarise the issues
+    run: 2026-09-28-agent-queries
+  - query: look at what the agent wrote and tell me if its any good
+    run: 2026-09-28-agent-queries
+  - query: Review-only pass on the three commits the codex agent pushed to feature/search, no fixes
+    run: 2026-09-28-agent-queries
+  - query: 'Get findings on the agent''s webhook retry change: correctness, error handling, tests'
+    run: 2026-09-28-agent-queries
+  - query: Review the diff on feature/sso with Codex and Gemini as independent read-only reviewers, one for security and one for error handling, and merge their findings into one list.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: review this PR properly before i approve anything
     confusable_with: [daintree.forge.land-pull-request]
@@ -243,21 +295,132 @@ boundaries:
   - query: review pr 55
     confusable_with: [daintree.forge.land-pull-request]
     run: 2026-09-24-selector-hardening
-  - query: "review the parser changes yourself and list the bugs, nobody needs to fix anything yet"
+  - query: review the parser changes yourself and list the bugs, nobody needs to fix anything yet
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "look over what codex just wrote on this branch and tell me what you'd push back on"
+  - query: look over what codex just wrote on this branch and tell me what you'd push back on
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "have two separate reviewer agents look over the payment changes for regressions, findings only"
+  - query: have two separate reviewer agents look over the payment changes for regressions, findings only
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-27-help-release
-  - query: "get a security-minded agent and a performance-minded agent to each review the caching diff, no edits"
+  - query: get a security-minded agent and a performance-minded agent to each review the caching diff, no edits
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-27-help-release
-  - query: "I want an independent codex review of the migration branch, just findings with file and line"
+  - query: I want an independent codex review of the migration branch, just findings with file and line
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-27-help-release
+  - query: review the diff on feature/rate-limit and give me findings with severity; nobody needs to fix anything yet
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: code review the refund.ts changes for correctness bugs and list them with file references
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: look over what the implementer agent wrote for the migration and tell me what's wrong with it
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: 'is PR #488 any good? findings only'
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: Run independent read-only reviewers over the caching-layer branch and return de-duplicated findings
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: check the upload endpoint change for security problems and report what you find
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: review the changes on fix/session-expiry, I'll decide myself what gets fixed
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: 're-audit the fix for #512 with fresh reviewer sessions looking for second-order effects'
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: what would you change about this diff in the webhooks handler?
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: review the agent's work on feature/export for quality and report the findings to me, not to any agent
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: 'PR #522 passes all checks; review whether the zod migration is well done'
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: Review the diff on branch feature/retry-policy and tell me what's wrong with it.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: 'Review PR #914 for correctness and security issues and give me findings before anyone merges'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: is the lockfile pr any good? read the diff and tell me
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Code review pull request 1340 with a couple of independent reviewers and dedupe their findings
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: What would you change about the diff in PR 58?
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'look over #245 for anything risky in the migration'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Review the diff Codex produced on feature/auth for security problems and give findings with severity.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: look over what the agent wrote in wt/export and tell me what you'd change
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Is Claude's pagination change any good? I want a code review of its branch, not a check of whether it finished.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: code review the branch the agent just finished on — style, correctness, edge cases
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: 'Get independent read-only reviewers on PR #233, the agent''s retry refactor, and merge their findings into one de-duplicated list.'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Re-audit the agent's session-timeout fix with fresh Codex sessions for second-order effects.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: what are the weaknesses in gemini's implementation of the rate limiter? findings with file refs
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Review the change set in wt/deps-upgrade for anything risky in how the agent bumped the dependencies.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Critique the design of the caching layer the agent added — is this the right approach at all?
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: check this diff for performance regressions
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Review the fix/login-redirect branch and list problems with severity and file references
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: look over the diff on my branch and tell me what you'd change, don't commit anything
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Security review of the csv-export branch — injection, path traversal, secrets
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Is the scheduler migration change any good? Get a couple of independent reads on it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: code review what codex wrote in the rate limiter worktree
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Critique the design choices in the search-facets diff before I show it to the team
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Audit the chore/eslint-9 changes for anything that could break the build config
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: give the websocket reconnect diff a proper review, find the bugs
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Re-audit the dark mode fix with fresh reviewer sessions for second-order effects
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: What are the weak spots in the branch I'm about to open a PR for?
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

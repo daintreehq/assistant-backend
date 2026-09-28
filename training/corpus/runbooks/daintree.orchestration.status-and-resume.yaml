@@ -59,6 +59,42 @@ positives:
   - is anything actually still running or is the workflow list lying to me again
   - did any tool calls get denied yesterday afternoon
   - the rows from yesterdays fanout all still say active. which of them actually got anywhere
+  - query: Reconstruct what was in flight from yesterday's session — run checkpoint, live terminals, worktrees and PRs — and rank what needs the user
+    run: 2026-09-28-agent-queries
+  - query: After Daintree restarted, work out which of the earlier session's agent terminals this pane still owns and which units can continue
+    run: 2026-09-28-agent-queries
+  - query: Summarise what happened while the user was away using the recent Daintree notifications alongside the recorded units
+    run: 2026-09-28-agent-queries
+  - query: The run checkpoint still shows the i18n unit as running although its branch merged last night; correct it on evidence
+    run: 2026-09-28-agent-queries
+  - query: Before anything continues, rebuild the in-flight picture from the old pane's checkpoint and say which recorded writes are uncertain
+    run: 2026-09-28-agent-queries
+  - query: List closed agent sessions in the reporting worktree and restore the codex conversation the user was having there
+    run: 2026-09-28-agent-queries
+  - query: 'picking up an interrupted batch from a prior session: reconcile recorded units against live state, report what continuing needs'
+    run: 2026-09-28-agent-queries
+  - query: 'Record PR #577 onto the checkpoint entry for the webhook retry unit and close out entries that are verifiably done'
+    run: 2026-09-28-agent-queries
+  - query: Tell the user what they were working on before the holiday across the monorepo worktrees
+    run: 2026-09-28-agent-queries
+  - query: Forensic read of which notices arrived in the last few hours and which recorded units they belong to
+    run: 2026-09-28-agent-queries
+  - query: Work out why the workflow list still shows three finished tasks as active and tidy them
+    run: 2026-09-28-agent-queries
+  - query: Continue where the previous Codex session left off on the payments rewrite; nothing should be replayed from memory
+    run: 2026-09-28-agent-queries
+  - query: 'Status sweep across sessions: open checkpoints, stopped agents awaiting verification, resumable sessions'
+    run: 2026-09-28-agent-queries
+  - query: ok im back. what was i doing?
+    run: 2026-09-28-agent-queries
+  - query: catch me up on what's still open from friday
+    run: 2026-09-28-agent-queries
+  - query: resume the stuff from last night pls
+    run: 2026-09-28-agent-queries
+  - query: 'why does the list still say #212 is in progress, it merged'
+    run: 2026-09-28-agent-queries
+  - query: can u pick up where we left off before the crash
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: where were we with the fleet
     confusable_with: [daintree.worktree.relocate-agents]
@@ -299,6 +335,87 @@ boundaries:
   - query: honestly no idea what i was in the middle of on friday
     confusable_with: [daintree.memory.manage-project-memory]
     run: 2026-09-24-selector-hardening
+  - query: Reconstruct the paused schema-migration workflow from yesterday and say which steps are left
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: daintree restarted overnight, what was i in the middle of
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: what was i working on last time?
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: Remind me where we left the auth refactor yesterday and what is still open
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: where were we with that migration plan yesterday? just status
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: Catch the user up on what the agents were doing in yesterday's session and what is still open
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: back from the weekend — what was i working on and what's still in flight?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: 'The saved run checkpoint still lists issue #88''s agent as running though it finished; reconcile the stale entries'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Pick up the fan-out from the previous session after the Daintree restart and work out which agents are still ours
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: what happened with the agents while i was at lunch? go through the recent notifications
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Resume the closed claude session from the auth-refactor worktree so it can continue the conversation
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Rebuild the picture of the earlier multi-agent run from the checkpoint and live state, then say what continuing needs
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: where were we with the migration agents before my laptop died
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: 'Record PR #903 onto the workflow entry for the search-indexing unit and tidy entries that are already done'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: 'After-the-fact forensics: which agent notices fired overnight and what did each report'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: What finished while the user was away overnight? Read back the notifications that came in
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: i got pinged a bunch while i was out, what were those about
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: The notice I set yesterday on the build agent — did it ever fire? Reconstruct from the earlier session
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Resume last session's watch-and-report plan after the app restart; work out what we still own
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: catch me up, what's still open from this morning
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: The checkpoint says a wake-up is pending on the export agent but that pane is gone; fix the stale entry
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Pick up where the previous session left off on the three pending PR units
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: what was i waiting on before i closed the laptop
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Mark the workflow entries that are actually complete as done and record their PRs
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Reopen the closed codex session in the api worktree so the user can continue it
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: what was i working on before the weekend? some issue branches were open
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: pick back up the issue 88 work i had going yesterday before my laptop died
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
 followups:
   - query: close the stale ones
     history:

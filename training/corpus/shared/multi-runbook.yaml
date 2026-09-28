@@ -437,3 +437,481 @@ examples:
   - query: 'find me something unassigned in the parser area, and also close #88 with a note that it shipped'
     expect: [daintree.workflow.find-issue-work, daintree.workflow.follow-up-on-issue]
     run: 2026-09-24-selector-hardening
+  - query: Move the two running agents into worktrees of their own, and give each worktree its own local database so their migrations stop colliding.
+    expect: [daintree.worktree.provision-local-environment, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: create a worktree for feature/ml-eval with the gpu recipe, then provision its cloud devbox
+    expect: [daintree.recipe.run-or-create, daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: Explain how the export module works, then launch a Claude agent in its own worktree to add XLSX export.
+    expect: [daintree.edits.spawn-visible-agent, daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: File an issue for the flaky upload timeout, then start an agent on it in its own worktree
+    expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Review PR #318 for bugs and, if you find nothing serious, squash-merge it'
+    expect: [daintree.forge.land-pull-request, daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: fix the failing lint check on my branch and then open the pr
+    expect: [daintree.ci.diagnose-and-fix, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Find a small unassigned bug in acme/web and start work on whichever one you pick
+    expect: [daintree.workflow.find-issue-work, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Open the PR for the csv-export branch and then have it reviewed with independent reviewers
+    expect: [daintree.review.review-change, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: answer the question claude is waiting on (yes, keep the old API), then launch codex read-only to tell me whether the old API has any tests
+    expect: [daintree.agents.answer-waiting-agent, daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: codex's review is done, send its findings to claude to fix; also gemini is stuck on an approval prompt, approve it
+    expect: [daintree.agents.answer-waiting-agent, daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: get claude and codex talking about the plugin API for a few rounds, and separately ask gemini alone what it thinks of the plugin API
+    expect: [daintree.agents.ask-and-relay, daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: Check how much weekly quota Codex and Claude have left, then run a contest where each writes its own version of the cache eviction policy and the better one wins.
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Codex claims it finished #512 but its terminal has been frozen since; figure out if it''s hung, and if it did finish, confirm the tests really pass before merging.'
+    expect: [daintree.agents.recover-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: confirm claude actually committed the export feature it says it finished, then do a proper code review of the diff for security issues
+    expect: [daintree.orchestration.verify-agent-work, daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on issue #512 in its own worktree with Claude, and remember that this repo''s tests need Docker running'
+    expect: [daintree.memory.manage-project-memory, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: File an issue for the flaky login redirect, and save a note that we use Playwright for e2e
+    expect: [daintree.forge.manage-issue, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: 'Squash-merge PR #88 once its required checks are conclusive, then tear down the worktree and terminals from that branch'
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Rename the codex tab to 'nightly build' and wake me when that terminal stops
+    expect: [daintree.orchestration.watch-outcome, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Bundle the auth module into a copytree file, and separately open an issue about the session expiry bug
+    expect: [daintree.context.curate-copytree-bundle, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: Work out why the Daintree MCP dropped in this pane, and remember that Claude panes here need the MCP setting turned on
+    expect: [daintree.diagnostics, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: Review the diff on feat/cache for security problems, then commit, push and open the PR for it
+    expect: [daintree.review.review-change, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Run the dev recipe in the ui worktree, then retitle the tabs it opens as server, tests and storybook
+    expect: [daintree.recipe.run-or-create, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Create a plain worktree for branch spike/wasm and record that spike branches are never merged
+    expect: [daintree.memory.manage-project-memory, daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: 'Check how much weekly Codex usage is left, then launch one Codex agent per issue for #301 through #306'
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Poll Claude, Codex and Gemini on which of the three caching options they prefer, then log the winning option as an issue
+    expect: [daintree.agents.poll-pinned-agents, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Get the red lint check on PR #77 passing, then let me know later when the PR merges'
+    expect: [daintree.ci.diagnose-and-fix, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: 'Check whether PR #640 is green, and save the rule that merges here need two approvals'
+    expect: [daintree.memory.manage-project-memory, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Explain how the job scheduler works, and also produce a copytree bundle of its files
+    expect: [daintree.context.curate-copytree-bundle, daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Answer the claude agent asking whether to overwrite the lockfile with yes, and rename its tab 'deps upgrade'
+    expect: [daintree.agents.answer-waiting-agent, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Sweep the running agents and act on whatever needs it, then close the terminals and delete the worktrees left from yesterday's batch
+    expect: [daintree.orchestration.supervise-fleet, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: 'Verify codex actually added the migration tests it claims, then merge PR #230'
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Pass the reviewer agent's notes on to the implementer agent, and save the standing rule that reviewers never edit files
+    expect: [daintree.agents.relay-review-feedback, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: Have claude and codex each write their own version of the CSV parser and pick a winner; also rename the two old tabs legacy-1 and legacy-2
+    expect: [daintree.orchestration.competition, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Catch me up on what was in flight in yesterday's session, then find an unassigned issue for me to pick up next
+    expect: [daintree.orchestration.status-and-resume, daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: Debug the blank page in the dev preview from its console errors, and file an issue for the missing favicon warning
+    expect: [daintree.forge.manage-issue, daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: Create a plain worktree for feat/tenant, and separately fix the worktree setup script so every checkout gets its own postgres database
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries
+  - query: Pause the cloud devbox on the gpu worktree, and find out why Daintree's notification history stopped updating
+    expect: [daintree.diagnostics, daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: Move the two running claude agents into worktrees of their own, then retitle their tabs after the new branches
+    expect: [daintree.terminals.rename, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: Ask codex what it thinks of the retry logic, and separately make a copytree reference file of the retry module
+    expect: [daintree.agents.ask-and-relay, daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: 'start #99 with claude in a new wt, and also rename the idle codex tab to ''spare'''
+    expect: [daintree.terminals.rename, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: open the pr for this branch and ping me when it merges
+    expect: [daintree.orchestration.watch-outcome, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: is claude signed in properly? and how much of its 5h allowance is left
+    expect: [daintree.agents.check-usage-limits, daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: clean up all the competition worktrees and terminals, and remember we always name contest branches contest/<agent>
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: make a plain wt for fix/nav, and separately spawn claude in main to update the readme
+    expect: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: search the backlog for anything about the upload timeout, and if nothing exists file a new issue for it
+    expect: [daintree.forge.manage-issue, daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'review the pr diff for #412 and log any real bugs you find as issues'
+    expect: [daintree.forge.manage-issue, daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: where are feature flags evaluated in the code? also remember flags must default to off
+    expect: [daintree.explore.repository, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries
+  - query: check codex really did what it said on the refactor, and forget the old note saying we use tabs for indentation
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: run the e2e recipe in the checkout wt, and bundle the checkout code into a copytree for later
+    expect: [daintree.context.curate-copytree-bundle, daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: ask the pinned agents to vote on the three names for the cli, then rename all their tabs 'voter 1/2/3'
+    expect: [daintree.agents.poll-pinned-agents, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: hows everyone doing, anything need me? also save that we never run migrations on friday
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: get claude, codex and gemini talking about the logging redesign, and file an issue for the old log rotation bug
+    expect: [daintree.forge.manage-issue, daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: have the three agents debate tabs vs spaces and vote off the weakest, and remember whatever wins as our convention
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: the gemini spawn gave no terminal id, sort it out; and why can't i see errors.recent in this pane anymore
+    expect: [daintree.agents.recover-agent, daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: track the db migration as a durable plan with dependencies, and record the decision that we keep uuid primary keys
+    expect:
+      - daintree.memory.manage-project-memory
+      - daintree.orchestration.execute-durable-workflow
+    run: 2026-09-28-agent-queries
+  - query: 'have claude and codex collaborate until they converge on one design for the queue, and label issue #77 as ''design'''
+    expect: [daintree.forge.manage-issue, daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: have one agent interview the others and pick my pair programmer, and rename the winner's tab 'pair'
+    expect: [daintree.orchestration.interview, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: the vote tied 2-2, run a runoff with the same agents; also what did we decide last month about the config format?
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Spawn a visible Claude to add tests for the parser, and rename the existing codex tab to 'lint'
+    expect: [daintree.edits.spawn-visible-agent, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: 'Approve and merge PR #310, then create an issue for the follow-up cleanup it deferred'
+    expect: [daintree.forge.land-pull-request, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Read what the reviewer said on PR #58 and whether CI passed, then give me a copytree bundle of the files it touches'
+    expect: [daintree.context.curate-copytree-bundle, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Give every worktree its own port so two dev servers stop colliding on 3000, and save that convention to project memory
+    expect: [daintree.memory.manage-project-memory, daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Debug the hydration error in the open dev preview, and separately fix the failing unit test in utils/date
+    expect: [daintree.ci.diagnose-and-fix, daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: Pick up where we left off last session, and ping me in an hour to check the nightly job
+    expect: [daintree.orchestration.status-and-resume, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on issue #214 (webhook retry jitter) with Claude in a fresh worktree, and separately ask Claude, Codex and Gemini whether we should drop Node 18 support, bringing back each answer.'
+    expect: [daintree.agents.poll-pinned-agents, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'pick up #88 in its own branch w/ codex. also can u get the pinned agents to vote on whether we rename the cli to ''dt'''
+    expect: [daintree.agents.poll-pinned-agents, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Two things: 1) put an agent on GitHub issue 1033 about the broken CSV export, 2) poll Claude and Codex for their take on sqlite vs postgres for the sync cache and tally it.'
+    expect: [daintree.agents.poll-pinned-agents, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Kick off issue #57 in a worktree; while that runs, get three agents to independently rank the logging libraries pino, winston and bunyan.'
+    expect: [daintree.agents.poll-pinned-agents, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: claude-2 is sitting on a question about which migration folder to use, tell it db/migrations. then separately check codex actually made the rate limiter tests pass like it says
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: Answer the Codex terminal that is waiting on 'overwrite fixtures? (y/n)' with n, and verify that the Gemini agent's reported fix for the flaky upload test is real before I merge it.
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: Unblock the agent in the payments worktree that's asking which currency to default to (EUR). Also, the one in feature/search says it's done - confirm its claims against the diff and tests.
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: one of my agents wants approval to run the seed script, yes go ahead. and the other one claims the i18n keys are all migrated, i dont believe it, check
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: Create a plain worktree on a new branch spike/graphql-gateway, and set up the project's worktree setup/teardown scripts so every worktree gets its own Postgres database instead of sharing dev_main.
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries-2
+  - query: my two branches keep stomping on the same mysql schema when i run them side by side, fix that so each wt has its own db. then make me a worktree for the existing branch hotfix/tax-rounding, no agent
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries-2
+  - query: Check out release/2.4 as a Daintree worktree with nothing launched in it; separately, give each worktree its own dev-server port because two of them fight over 5173.
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries-2
+  - query: add a worktree for branch chore/deps-bump off develop. while you're at it, write a teardown script that drops the per-worktree redis container when a worktree is deleted
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries-2
+  - query: File an issue for the memory leak in the websocket reconnect loop with the heap snapshot evidence, and forward the security findings Codex left in its review terminal to Claude so it fixes them.
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'codex finished reviewing auth.ts - send its findings over to claude-1 to fix and have it tell me what it changed. also relabel #402 as ''bug'' + ''p1'' and assign it to me'
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Update the title and body of issue #77 to reflect that it''s a Safari-only bug; then have Gemini review src/player/*.ts read-only and pass whatever it finds to the Claude agent already working there.'
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'reopen #19, it regressed. and the reviewer agent''s notes on the migration PR need to get to the implementer, tell it to weigh them lightly'
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Remember for this project that integration tests need docker compose up first. Then launch a visible Claude agent to add retry backoff to the S3 uploader.
+    expect: [daintree.edits.spawn-visible-agent, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries-2
+  - query: save the fact that we deploy from main only on tuesdays. also can u check how much codex usage i have left this week
+    expect: [daintree.agents.check-usage-limits, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Record that the team switched from yarn to pnpm in August, correcting the old note, and then clean up: close the three competition terminals and delete their worktrees.'
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: forget the note about using node 16, its wrong now. and why is CI red on my branch, fix it
+    expect: [daintree.ci.diagnose-and-fix, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries-2
+  - query: What did we decide last month about API pagination shape? Separately, find me a couple of unassigned small bugs in the tracker nobody has started.
+    expect: [daintree.memory.manage-project-memory, daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries-2
+  - query: Rename the four Claude tabs so I can tell which is which based on what each is doing, and ask Codex what it thinks the riskiest part of the billing refactor is.
+    expect: [daintree.agents.ask-and-relay, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: retitle all these terminals by their task pls. then open a PR for the feature/dark-mode branch
+    expect: [daintree.terminals.rename, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries-2
+  - query: Give the agent tabs meaningful titles; they're all called 'Codex'. Also move the two agents sharing the main checkout into worktrees of their own so they stop clobbering each other.
+    expect: [daintree.terminals.rename, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: name the tabs after what theyre working on. and log a bug issue for the tooltip overflow in the sidebar
+    expect: [daintree.forge.manage-issue, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: Check remaining weekly and five-hour allowance for Claude Code and Codex, then sweep the running agent fleet and tell me who needs me.
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: how's everyone doing? and how close am i to the claude weekly cap
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: Report quota left for Gemini and Grok, and do a triage pass over the six agents running on the refactor batch - anything stuck or finished.
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Merge PR #311 once its required checks are green, and file a follow-up issue for the TODO about pagination it leaves behind.'
+    expect: [daintree.forge.land-pull-request, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: is pr 88 green yet? separately spin up a claude agent to write docs for the new config flags
+    expect: [daintree.edits.spawn-visible-agent, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Bundle every file related to the terrain generator into a CopyTree reference file, and separately explain how the chunk streaming pipeline decides what to unload.
+    expect: [daintree.context.curate-copytree-bundle, daintree.explore.repository]
+    run: 2026-09-28-agent-queries-2
+  - query: the preview panel shows a blank page with a hydration error, debug it. then also review the diff on feature/cart-v2 for security problems
+    expect: [daintree.review.review-change, daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries-2
+  - query: Diagnose why the unit tests fail on feature/oauth-pkce and get them green; afterwards, as a separate job, prepare branch feature/profile-page for review and open its PR.
+    expect: [daintree.ci.diagnose-and-fix, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries-2
+  - query: have Claude and Codex each write their own version of the debounce hook in separate worktrees and pick the better one. also remind me in an hour to check the release notes
+    expect: [daintree.orchestration.competition, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Launch one agent per issue for #401, #402, #405 and #409 in separate worktrees, and in the meantime rename the existing tabs so the old runs are recognisable.'
+    expect: [daintree.orchestration.fan-out-work, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: the codex agent in wt 'infra' has been frozen for 20 min, no output. separately answer the gemini one, it's asking whether to include e2e tests, say yes
+    expect: [daintree.agents.answer-waiting-agent, daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Where were we yesterday on the billing migration? Also, tidy up: delete the worktrees from last week''s spike, they''re merged.'
+    expect: [daintree.orchestration.status-and-resume, daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: Daintree's MCP tools vanished from my pane after the update - diagnose that. Then separately check whether I still have Codex credits left.
+    expect: [daintree.agents.check-usage-limits, daintree.diagnostics]
+    run: 2026-09-28-agent-queries-2
+  - query: run the 'fullstack' recipe in a new worktree for branch feat/notifications. also start a worktree for existing branch fix/login-loop, plain, no terminals
+    expect: [daintree.recipe.run-or-create, daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: Get Claude, Codex and Gemini talking to each other about the plugin API design and see where it goes; separately save the note that plugin ids must be reverse-DNS.
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries-2
+  - query: Let me know when the codex agent finishes the schema migration. And approve and merge PR 57 now, it's been reviewed.
+    expect: [daintree.forge.land-pull-request, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: '1. what did the reviewer say on PR #140 and is CI passing 2. start issue #141 with claude in its own worktree'
+    expect: [daintree.workflow.follow-up-on-issue, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Verify the Claude agent really added the migration rollback it claims, then separately ask Codex a read-only question: is our retry loop in queue/worker.py idempotent?'
+    expect: [daintree.agents.ask-and-relay, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: the pinned agents voted 2-2 on the naming options, run a runoff with the same agents. and separately log an issue to revisit the naming after launch
+    expect: [daintree.forge.manage-issue, daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries-2
+  - query: Plan and track the monorepo split as a durable dependency graph I can resume later, and separately find past PRs that touched the build cache.
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries-2
+  - query: have one agent interview claude, codex and gemini on rust async and pick my pair programmer. while you're at it check how much gemini quota is left
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries-2
+  - query: Move the idle Claude agent into a new worktree called perf-tuning and have it profile the parser there. Separately, write setup scripts so each worktree gets its own Elasticsearch index prefix.
+    expect: [daintree.worktree.provision-local-environment, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: Pause the cloud devbox on the ml-training worktree to save money, and open a plain worktree for branch exp/quantize.
+    expect: [daintree.worktree.create-plain-worktree, daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries-2
+  - query: 'codex says it''s waiting on a trust prompt for the folder - i trust it, answer. also comment on #66 that it''s fixed in 2.3 and close it'
+    expect: [daintree.agents.answer-waiting-agent, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Have Claude and Codex debate monolith vs services for the reporting module until they converge on one recommendation; also, remember that we never use ORMs in the reporting service.
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries-2
+  - query: Three agents should debate the caching strategy and then vote off the weakest position. Separately, rename my tabs by what they're doing.
+    expect: [daintree.orchestration.debate-elimination, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Fix the failing lint check on PR #502, and after that is done independently: poll the configured fleet for whether we should adopt Biome.'
+    expect: [daintree.agents.poll-pinned-agents, daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries-2
+  - query: claude-3 says the refactor is complete and tests pass, verify that. also the agent in 'docs' wt is asking whether to update the changelog - yes
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: Explain where feature flags are evaluated in this codebase; then separately spawn a visible agent to delete the dead 'legacyCheckout' flag.
+    expect: [daintree.edits.spawn-visible-agent, daintree.explore.repository]
+    run: 2026-09-28-agent-queries-2
+  - query: 'start #230 in a new worktree w/ claude. also what''s the codex 5h limit looking like'
+    expect: [daintree.agents.check-usage-limits, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Review the open PR #87 for correctness and edge cases, and relay the findings Gemini already wrote in its terminal on PR #86 to the Codex agent fixing it.'
+    expect: [daintree.agents.relay-review-feedback, daintree.review.review-change]
+    run: 2026-09-28-agent-queries-2
+  - query: Supervise the agents running right now and act on whatever's finished; separately, create an issue tracking the flaky e2e test in checkout.spec.ts.
+    expect: [daintree.forge.manage-issue, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: hey - two separate asks. give every worktree its own sqlite file instead of the shared app.db. and ask the pinned agents whether we should vendor the protobuf definitions
+    expect: [daintree.agents.poll-pinned-agents, daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Relay Codex''s review of the pagination change to Claude and have Claude fix it; then, as a separate task, merge PR #219 with squash once required checks pass.'
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries-2
+  - query: Save that staging DB migrations must run with --dry-run first, and ask Claude and Codex each to independently estimate how long the ORM upgrade will take.
+    expect: [daintree.agents.poll-pinned-agents, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Begin issue #612 (dark-mode contrast) with Codex, then separately get Claude and Gemini to each say which color-token naming scheme they prefer.'
+    expect: [daintree.agents.poll-pinned-agents, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: set up a worktree + agent for ticket 45 and ask all pinned agents what they think of switching to vitest, show me every answer
+    expect: [daintree.agents.poll-pinned-agents, daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: The Claude agent on the importer is paused asking whether to skip malformed rows; tell it to log and skip. Separately confirm the Codex agent's 'all 42 tests pass' before I push its branch.
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: answer the waiting agents (both want to know if they can add deps - no). then check the one on wt search-v2 actually did what it said
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries-2
+  - query: New branch feat/tenant-billing in a plain worktree please. Also our worktrees all share one local WordPress site and docroot; each needs its own hostname and database.
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries-2
+  - query: 'Make PR #903 into a local worktree without launching anything, and configure a setup command that creates a per-worktree schema when worktrees are created.'
+    expect:
+      - daintree.worktree.create-plain-worktree
+      - daintree.worktree.provision-local-environment
+    run: 2026-09-28-agent-queries-2
+  - query: 'assign #310 to sam and add the ''needs-design'' label. then take gemini''s review sitting in its terminal and pass it to the claude agent to act on'
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Turn the crash we just reproduced in the PDF renderer into a GitHub issue; separately, have Codex review the renderer module read-only and send its findings to Claude to fix.
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Remember that we always run `make lint` before pushing. And land PR #77 - approve and merge it.'
+    expect: [daintree.forge.land-pull-request, daintree.memory.manage-project-memory]
+    run: 2026-09-28-agent-queries-2
+  - query: 'note for the project: staging uses the eu-west-2 bucket. separately tell me what agents are waiting on me across the fleet'
+    expect: [daintree.memory.manage-project-memory, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: Remember that API version bumps need a changelog entry. Then make me a worktree for branch feat/v3-endpoints, nothing launched.
+    expect: [daintree.memory.manage-project-memory, daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: Give the terminals descriptive titles, then answer the one asking whether to regenerate snapshots (yes).
+    expect: [daintree.agents.answer-waiting-agent, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: rename the codex tabs - reviewer, fixer, docs. also check if we have any claude usage left today
+    expect: [daintree.agents.check-usage-limits, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Retitle the six agent tabs by their current task, and separately start one agent per issue for #120-#124, each in its own worktree, at most three running at once.'
+    expect: [daintree.orchestration.fan-out-work, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: Sweep the fleet and handle anything that's done or stuck. Also read Codex's /status to see how much of the weekly limit is left before I queue more.
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: anyone stuck? and when does my antigravity quota reset
+    expect: [daintree.agents.check-usage-limits, daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries-2
+  - query: Relay the security reviewer's findings to the implementer agent, and separately create a bug issue for the session-fixation hole it found in the legacy login path.
+    expect: [daintree.agents.relay-review-feedback, daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Why is the build red on feature/queue-backpressure? Fix it. Separately, what''s blocking PR #410 - did the reviewer ask for changes?'
+    expect: [daintree.ci.diagnose-and-fix, daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Ask Gemini what it thinks of our error-handling conventions and relay its answer. Then separately, the Claude agent launched earlier returned no terminal id - figure out whether it started.
+    expect: [daintree.agents.ask-and-relay, daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries-2
+  - query: wake me when claude finishes the backfill. and make a copytree bundle for the notifications module so I can hand it to someone later
+    expect: [daintree.context.curate-copytree-bundle, daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: Catch me up on what was in flight from last session, then file an issue for the half-finished retry work so it isn't lost.
+    expect: [daintree.forge.manage-issue, daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries-2
+  - query: List the recipes in this project and run 'api+db' in the current worktree; separately, ask the pinned agents to vote on the three API versioning options I gave.
+    expect: [daintree.agents.poll-pinned-agents, daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries-2
+  - query: Review what the agent wrote in feature/rbac for correctness, and then separately prep feature/audit-log for review and open a draft PR.
+    expect: [daintree.review.review-change, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries-2
+  - query: put a claude agent on refactoring the date utils to date-fns. separately, show me recent Daintree errors, notifications keep failing to arrive
+    expect: [daintree.diagnostics, daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries-2
+  - query: Move the three Codex agents currently sharing main into worktrees of their own, and verify the finished Claude agent's claim that the parser handles BOM input.
+    expect: [daintree.orchestration.verify-agent-work, daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries-2
+  - query: Find unassigned good-first-issue tickets nobody's picked up; separately check codex and claude usage left this week.
+    expect: [daintree.agents.check-usage-limits, daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries-2
+  - query: The dev preview throws 'Cannot read properties of undefined' on /settings - debug and fix it. Also remember that the preview needs VITE_MOCK_API=1.
+    expect: [daintree.memory.manage-project-memory, daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries-2
+  - query: have claude and codex compete on the best one-line tagline for the release. separately answer claude-4 which is asking about the migration order, say users table first
+    expect: [daintree.agents.answer-waiting-agent, daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries-2
+  - query: Advance the dependency-tracked plan for the auth provider migration to its next ready phase, and separately rename the tabs so each shows its phase.
+    expect: [daintree.orchestration.execute-durable-workflow, daintree.terminals.rename]
+    run: 2026-09-28-agent-queries-2
+  - query: Close the four reviewer terminals from this morning and delete their worktrees, and create a plain worktree off main named exp/winner-polish.
+    expect: [daintree.orchestration.workspace-cleanup, daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2

@@ -68,9 +68,92 @@ examples:
     confusable_with: [daintree.terminals.rename]
   - query: i can't create worktrees at all any more — the worktree tools aren't even showing up for you
     expect: [daintree.diagnostics, daintree.worktree.create-plain-worktree]
-  - query: "test the checkout flow on the staging site yourself in the browser"
+  - query: test the checkout flow on the staging site yourself in the browser
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-27-help-release
-  - query: "cut the hotfix with git flow and merge it back into develop"
-    confusable_with: [daintree.orchestration.runoff-tiebreaker, daintree.orchestration.execute-durable-workflow]
+  - query: cut the hotfix with git flow and merge it back into develop
+    confusable_with:
+      - daintree.orchestration.runoff-tiebreaker
+      - daintree.orchestration.execute-durable-workflow
     run: transcript-2026-09-27-help-release
+  - query: why didn't you wait for the agent before replying? it was fine, you just moved on
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: how do I change the Daintree keybinding for splitting a pane
+    confusable_with: [daintree.diagnostics]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: where's the setting that controls which agent daintree launches by default?
+    confusable_with: [daintree.diagnostics]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: What does the tier option in Daintree settings control
+    confusable_with: [daintree.diagnostics]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: how do i switch daintree to the light theme
+    confusable_with: [daintree.diagnostics]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: rename the variable userId to accountId in utils.ts
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: why does our production site at shop.example.com load slowly for users in Asia
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-agent-queries
+  - query: how does renaming a terminal tab work in daintree?
+    confusable_with: [daintree.terminals.rename]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: Is there a keyboard shortcut for renaming a tab
+    confusable_with: [daintree.terminals.rename]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: Explain why a title I set by hand survives when an agent tries to rename the tab
+    confusable_with: [daintree.terminals.rename]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: can agents rename their own tabs? just explain
+    confusable_with: [daintree.terminals.rename]
+    docs: true
+    run: 2026-09-28-agent-queries
+  - query: What's the keyboard shortcut in Daintree to split a pane?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: How does Daintree decide which worktree a newly launched agent opens in?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: does daintree support tmux style layouts
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: Where does Daintree keep its per-project settings file?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: how do i change the theme in daintree
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: Which agent CLIs does Daintree support out of the box?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: How is Daintree's sidebar assistant different from an agent pane?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: Can Daintree sync its settings between two machines?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: what does the 'directing' state mean in daintree's terminal list
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2
+  - query: How do I pin an agent in Daintree so it stays at the top?
+    confusable_with: [daintree.explore.repository]
+    docs: true
+    run: 2026-09-28-agent-queries-2

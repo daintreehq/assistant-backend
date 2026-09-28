@@ -60,6 +60,38 @@ positives:
   - backlog
   - check the api repo worktree instead — what unassigned issues does it have
   - we said we'd do perf work this cycle. whats open under that
+  - query: Shortlist three small unassigned bugs in acme/api that no worktree or agent is already on
+    run: 2026-09-28-agent-queries
+  - query: Search the tracker for open issues labelled 'performance' touching the image pipeline
+    run: 2026-09-28-agent-queries
+  - query: Find merged pull requests that changed the session cookie handling, to learn when SameSite was set
+    run: 2026-09-28-agent-queries
+  - query: Recommend the next issue to pick up from the v3 milestone, excluding anything with an open PR
+    run: 2026-09-28-agent-queries
+  - query: Look for an existing issue about the Windows path bug before we file a duplicate
+    run: 2026-09-28-agent-queries
+  - query: Which closed PRs mentioned 'rate limit' in the title over the last six months?
+    run: 2026-09-28-agent-queries
+  - query: Screen the good-first-issue list against current worktrees and report what is genuinely free
+    run: 2026-09-28-agent-queries
+  - query: 'Check whether anyone has already started on issue #3301 before I commit to it'
+    run: 2026-09-28-agent-queries
+  - query: Triage open issues with no labels in the mobile repo and group them by area
+    run: 2026-09-28-agent-queries
+  - query: 'GitLab search: open merge requests by me that touch the billing service'
+    run: 2026-09-28-agent-queries
+  - query: Did we ever ship offline mode? find the PR if it exists
+    run: 2026-09-28-agent-queries
+  - query: whats a good small thing for me to work on next
+    run: 2026-09-28-agent-queries
+  - query: any unassigned frontend bugs nobody's on?
+    run: 2026-09-28-agent-queries
+  - query: find me the prs that touched the websocket reconnect logic
+    run: 2026-09-28-agent-queries
+  - query: got an hour, pick me an easy issue from the backlog
+    run: 2026-09-28-agent-queries
+  - query: is there already an issue for the dark mode flicker
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: find me a couple of small unassigned issues i could hand out
     confusable_with: [daintree.worktree.relocate-agents]
@@ -196,6 +228,90 @@ boundaries:
   - query: dig up the old PR where someone ripped out redux, i want to see what it changed
     confusable_with: [daintree.explore.repository]
     run: 2026-09-24-selector-hardening
+  - query: Search for any open issue already covering the Safari scroll jank
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: Which open issues mention the arm build? I want to see if one exists already
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: List PRs that are still open against the pagination module across the repo
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: find the closed PRs where we changed the auth token refresh
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Search the tracker for bugs labelled regression that nobody is assigned to
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: did we ever ship the csv export thing? some PR must have done it
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Before I commit to issue #918, check whether someone is already working on it'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Triage the open backlog in acme/web and suggest three small issues to do next
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: which prs touched the billing webhooks in the last quarter
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Find stale issues with no reply in 60 days that could be closed
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: anything unassigned in the docs label i could grab
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Find me an unassigned good-first-issue in the frontend repo that I could start on
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: find all closed PRs that touched the payment webhook
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: did we ever ship the CSV export? find the PR
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: List open issues mentioning 'timeout' in the ingest repo
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Search pull requests merged last month about rate limiting
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: which PRs changed src/auth/session.ts this quarter
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: any open issues about the upload progress bar? search the tracker
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Find stale bug-labelled issues with no activity for 90 days
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Locate the PR that originally introduced the retry budget config
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: find me something to pick up next, ideally a small bug
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Search the tracker for open issues labeled good-first-issue with no assignee
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: which issue should I start next? look through the backlog
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Look for an unclaimed issue about the upload flow that nobody has a branch for yet
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'is anyone already working on #212? check before I commit to it'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Triage open bugs in the api repo and shortlist three that could be done in a day
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: any unassigned p2 issues worth grabbing? just list them, don't start anything
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Find the issue about the login redirect loop so I can decide whether to take it
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: any of those small enough for an hour?
     history:

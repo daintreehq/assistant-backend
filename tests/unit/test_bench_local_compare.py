@@ -7,6 +7,7 @@ changing, and a case that exists on one side only.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -61,3 +62,26 @@ def test_a_run_without_case_ids_is_refused_rather_than_aligned_by_position() -> 
     del old["case_ids"]
     with pytest.raises(ValueError, match="case ids"):
         print_local_compare(old, _run({"a": ["x"]}, []))
+
+
+@pytest.mark.parametrize(
+    ("doc", "suffix"),
+    [
+        ({"suite": "runbook_selection_local", "meta": {"precision": "int8"}}, "-local-int8.json"),
+        ({"suite": "runbook_selection_scale", "meta": {"seed": 1}}, "-runbook_selection_scale.json"),
+        ({"suite": "x", "meta": {"variant": "v2", "precision": "int8"}}, "-v2.json"),
+    ],
+)
+def test_saved_results_are_named_by_what_tells_runs_apart(
+    doc: dict[str, object], suffix: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`bench local` has no variant and `bench scale` has no precision either.
+
+    Both crashed on save with a KeyError AFTER the whole run had finished, because
+    the name was built from a field only the retired live bench wrote.
+    """
+    from benchmarks.runbook_selection import reporting
+
+    monkeypatch.setattr(reporting, "RESULTS_DIR", tmp_path)
+    path = reporting.save_doc(doc)
+    assert path.parent == tmp_path and path.name.endswith(suffix)

@@ -58,6 +58,42 @@ positives:
   - deep version this time please — judge verifies the claims, extra follow up round, then the call
   - one agent grills the rest on our deploy pipeline until it picks a winner. leave everyone's tabs open after, i want to read them
   - put one of them in the ref seat and have it question the rest about the websocket layer til it can call it
+  - query: Have Claude interview Codex and Gemini about how they'd approach the search reindex, then name the best candidate
+    run: 2026-09-28-agent-queries
+  - query: 'Judge-led interview: codex questions three agents on our auth architecture, checks their claims against the code, narrows to a top 2 and picks a winner'
+    run: 2026-09-28-agent-queries
+  - query: Pick a pair programmer for the payments work by having one agent grill the others and choose
+    run: 2026-09-28-agent-queries
+  - query: One agent acts as interviewer, asks the candidates follow-ups about test strategy, and declares who answered best
+    run: 2026-09-28-agent-queries
+  - query: deep interview where the judge verifies each candidate's claims about the caching layer against the repo before choosing
+    run: 2026-09-28-agent-queries
+  - query: light Q&A interview of the pinned agents by gemini on TypeScript generics, winner at the end
+    run: 2026-09-28-agent-queries
+  - query: Have claude-1 question claude-2, codex and gemini about the migration plan and select the most convincing
+    run: 2026-09-28-agent-queries
+  - query: 'interviewer agent screens candidates for owning the CI pipeline work: hard follow-ups, top two, verdict'
+    run: 2026-09-28-agent-queries
+  - query: Relay questions from the judge agent to each candidate and their answers back until it names a winner on observability
+    run: 2026-09-28-agent-queries
+  - query: 'have codex quiz the others about PR #612''s approach and pick which agent understood it best'
+    run: 2026-09-28-agent-queries
+  - query: Use an interviewer to probe three agents on performance profiling and narrow it down to one
+    run: 2026-09-28-agent-queries
+  - query: Run an interview with Gemini as judge and the other open agents as candidates on the data-model question
+    run: 2026-09-28-agent-queries
+  - query: which of these should be my pair programmer? have one of them interview the rest
+    run: 2026-09-28-agent-queries
+  - query: have claude grill codex and gemini on react hooks and tell me who wins
+    run: 2026-09-28-agent-queries
+  - query: get one agent to interview the others about our db layer, pick the best
+    run: 2026-09-28-agent-queries
+  - query: do a job interview style thing - codex asks, the others answer, pick one
+    run: 2026-09-28-agent-queries
+  - query: i want gemini to question the other 2 about security and choose a winner
+    run: 2026-09-28-agent-queries
+  - query: run an interview competition on rust knowledge among the agents
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: have one agent interview the others and pick the best one to pair with
     confusable_with: [daintree.agents.poll-pinned-agents]
@@ -122,6 +158,69 @@ boundaries:
   - query: i want claude to question the other agents and name a winner
     confusable_with: [daintree.orchestration.conversation]
     run: 2026-09-24-selector-hardening
+  - query: Have Codex interview Claude and Gemini about how they'd structure the plugin API and pick the one it would pair with.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: have claude talk with codex and gemini about testing, then decide which of them should own the test suite
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: let gemini question the other agents about the design system and tell me who knows it best
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: get codex to chat with each candidate agent about rust vs go and name the strongest
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: a conversation where one agent grills the others on our architecture and picks a winner
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: panel discussion, but claude is the host asking the questions and it decides which panelist did best
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: which of these agents should be my pair programmer? have one talk to the others and decide
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: have claude interview the other two about observability, conversationally, then choose one
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: let the agents talk, but codex leads by questioning the others and judging their answers
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: one agent quizzes the rest about the roadmap and declares the most insightful
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: run a chat where gemini asks claude and codex follow-ups about the migration and ranks them down to a top pick
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: have claude question codex and gemini on the search reindex approach and choose the strongest candidate
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: the agents tackle the caching design, but one acts as judge, interviews the others and picks a winner
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: codex grills the other agents about the auth architecture and names who's best
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: let claude-1 interview the rest about migration plans and pick the most convincing one
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: rather than synthesizing, I want one agent to question the others on test strategy and select one of them
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: judge agent verifies each candidate's claims about the CI pipeline against the code, narrows to two, then a winner
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: gemini interviews claude and codex on observability and tells me which should lead it
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: which agent should own the profiling work? have one interview the others
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: have codex ask the others probing questions about the data model and crown a winner
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: interview the three agents on the payments refactor through a lead agent and pick one
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

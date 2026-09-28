@@ -58,6 +58,44 @@ positives:
   - term-8821 -> term-4417, the review
   - the implementer is off rewriting stuff the reviewer already said not to touch. get the review in there right now
   - yeah that one. send it to the other agent
+  - query: Codex finished reviewing feature/rate-limit; send its findings to the Claude implementer in that worktree and have it address them
+    run: 2026-09-28-agent-queries
+  - query: Launch Codex read-only to review src/payments/refund.ts, then pass its findings to Claude and have Claude fix them
+    run: 2026-09-28-agent-queries
+  - query: Point the implementer agent at the notes the reviewer agent left in its terminal and ask it to fix the high-severity items
+    run: 2026-09-28-agent-queries
+  - query: Forward gemini's review output to claude-2, telling it to treat style nits as optional and fix correctness problems, then report what it changed
+    run: 2026-09-28-agent-queries
+  - query: Read the reviewer agent's last message and relay the concrete issues to the codex agent that wrote the migration
+    run: 2026-09-28-agent-queries
+  - query: 'codex reviews the diff read-only, then its list goes to the claude agent working issue #488 to apply'
+    run: 2026-09-28-agent-queries
+  - query: relay review feedback from the codex pane to the claude pane and ask claude to reply with a summary of its fixes
+    run: 2026-09-28-agent-queries
+  - query: Reviewer claude-review flagged five issues; get codex-impl to fix them, weighing claude-review's comments as advisory rather than mandatory
+    run: 2026-09-28-agent-queries
+  - query: take the security findings from the gemini reviewer terminal and send them to the agent that built the upload endpoint
+    run: 2026-09-28-agent-queries
+  - query: Spin up Codex to critique the new caching layer without editing, then feed its critique to the running Claude agent to act on
+    run: 2026-09-28-agent-queries
+  - query: pass the review sitting in the reviewer terminal to the builder terminal and have the builder report which items it addressed
+    run: 2026-09-28-agent-queries
+  - query: The agents are paired, codex reviews and claude fixes; carry codex's latest findings across to claude
+    run: 2026-09-28-agent-queries
+  - query: codex finished its review, tell claude to fix what it found
+    run: 2026-09-28-agent-queries
+  - query: have codex review this file without touching it then get claude to fix the issues
+    run: 2026-09-28-agent-queries
+  - query: send gemini's review notes over to the claude agent pls
+    run: 2026-09-28-agent-queries
+  - query: the reviewer agent found some bugs, pass them to the implementer and have it sort them
+    run: 2026-09-28-agent-queries
+  - query: get claude to fix whatever codex flagged in its pane
+    run: 2026-09-28-agent-queries
+  - query: point codex at claude's review and tell it to fix the important stuff, ignore nits
+    run: 2026-09-28-agent-queries
+  - query: Have Gemini review migrations/0042_split_users.sql without touching anything, then hand its findings to Claude to fix and tell me what Claude changed.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: send the reviewer's notes over to the one doing the implementation
     confusable_with: [daintree.orchestration.execute-durable-workflow]
@@ -153,24 +191,96 @@ boundaries:
   - query: codex's review in t6 is done — forward it to claude in t3
     confusable_with: [daintree.orchestration.verify-agent-work]
     run: 2026-09-24-selector-hardening
-  - query: "get gemini to go over the parser for bugs, read-only, and then have claude fix whatever it flags"
+  - query: get gemini to go over the parser for bugs, read-only, and then have claude fix whatever it flags
     confusable_with: [daintree.review.review-change]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "spin up codex to review my last commit and send what it finds to a fresh claude to patch"
+  - query: spin up codex to review my last commit and send what it finds to a fresh claude to patch
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "let claude do a read-only bug hunt in utils and hand the list to codex to fix, then tell me what codex changed"
+  - query: let claude do a read-only bug hunt in utils and hand the list to codex to fix, then tell me what codex changed
     confusable_with: [daintree.agents.ask-and-relay]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "reviewer is codex, fixer is claude, target is the csv exporter. go"
+  - query: reviewer is codex, fixer is claude, target is the csv exporter. go
     confusable_with: [daintree.review.review-change]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "i want gemini's read on the retry module for bugs, then the claude already in t2 should act on whatever it finds"
+  - query: i want gemini's read on the retry module for bugs, then the claude already in t2 should act on whatever it finds
     confusable_with: [daintree.agents.ask-and-relay]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "have codex audit the migration script without touching it, then a new claude applies its fixes in the same worktree"
+  - query: have codex audit the migration script without touching it, then a new claude applies its fixes in the same worktree
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-26-reviewer-fixer-relay
+  - query: have codex review api/client.py read-only and then have claude fix whatever it finds
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: codex reviewed the diff; send its findings to claude to fix
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: have codex review claude's fix without changing anything, then send its findings to claude to address
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Codex already reviewed the payments change in its pane; send its findings to claude-2 to fix
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Have codex review the pagination fix read-only, then pass what it finds to claude so claude fixes it
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: point the implementer agent at the reviewer agent's notes on the oauth-pkce branch
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Relay gemini's review of the rate limiter to the codex agent that wrote it and ask what it changed
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: take the review claude-1 wrote on the migration and send it to the agent doing the fix
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Launch a reviewer on the auth middleware change and hand its findings to the running claude-3 to address
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: The reviewer agent flagged five issues on feature/search; get them to the implementer, tell it to weigh them skeptically
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: codex's review is done, forward it to claude and have it fix everything
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Pass the reviewer terminal's notes on the webhook retry change to the fixer agent and report back its reply
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: have gemini review the upload handler without touching it and then have claude-2 apply its fixes
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: review the diff on feature/rate-limit with codex, then have claude fix whatever it finds
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: code review of refund.ts where codex reviews read-only and claude applies the findings
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: the reviewer agent already looked over the migration; get its findings to the implementer agent
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: 'have gemini review the branch behind PR #488 and forward the issues to the codex agent that wrote it'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: security review of the upload endpoint by the codex reviewer, fixes by the claude agent
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: codex's review of fix/session-expiry is done in its pane - send it to claude to address
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: review the webhooks handler change via codex and have the implementing agent act on its comments
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: look over what the agent wrote using a second agent, and pass the second agent's notes back to the first to fix
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: have claude review the caching branch, relay its findings to codex for fixes, and tell me what codex changed
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: review feedback from the reviewer terminal should go to the builder terminal
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: codex left review notes in its terminal on the auth refactor; send them to claude-1 to address
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:

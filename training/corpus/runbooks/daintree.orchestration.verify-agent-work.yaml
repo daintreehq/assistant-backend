@@ -59,6 +59,44 @@ positives:
   - check this one properly, and from now on set a definition of done when you spawn them so we dont have to do this every time
   - it says there are zero references to LEGACY_CHECKOUT left anywhere. verify that
   - run whatever check this repo has instead of taking its word that lint is clean
+  - query: 'Codex reports it fixed issue #512 and all tests pass; confirm that against the worktree''s git state and a test run before anything is merged.'
+    run: 2026-09-28-agent-queries
+  - query: Check whether the claude-2 agent in wt/feature-export actually committed the CSV export it says it finished.
+    run: 2026-09-28-agent-queries
+  - query: 'agent claims done on the i18n extraction — prove it: diff, commits, run the check myself'
+    run: 2026-09-28-agent-queries
+  - query: Before pushing branch fix/session-timeout, confirm the agent's claim that it added the regression test and it passes.
+    run: 2026-09-28-agent-queries
+  - query: Gemini says the lint errors are all gone. Run lint in its worktree and see if that's true before closing the issue.
+    run: 2026-09-28-agent-queries
+  - query: 'Test the agent''s ''done'' against the acceptance criteria in issue #88: dark mode toggle persists across reloads and respects system preference.'
+    run: 2026-09-28-agent-queries
+  - query: The codex terminal's last lines show a failing build even though its summary says success; figure out which is true.
+    run: 2026-09-28-agent-queries
+  - query: 'verify claude''s reported migration landed: check the migration file exists, the schema test passes, and nothing is left uncommitted'
+    run: 2026-09-28-agent-queries
+  - query: An agent finished the dependency bump in wt/deps-upgrade; before handing it off to QA, confirm the lockfile changed and the app still builds.
+    run: 2026-09-28-agent-queries
+  - query: Confirm the refactor agent really removed every import of the old logger as it claims, using a search in its worktree rather than trusting the summary.
+    run: 2026-09-28-agent-queries
+  - query: 'Agent says the flaky test is fixed. Run it several times in the agent''s worktree to check before I close #377.'
+    run: 2026-09-28-agent-queries
+  - query: Judge whether the completed agent in terminal 'api-fix' did what it was asked — the endpoint should return 404 for unknown ids — before committing.
+    run: 2026-09-28-agent-queries
+  - query: did it actually do it? claude says it's finished the pagination thing
+    run: 2026-09-28-agent-queries
+  - query: i don't trust that result. codex says tests pass but i've seen that before
+    run: 2026-09-28-agent-queries
+  - query: before i merge can you make sure the agent really did the fix and didnt just say so
+    run: 2026-09-28-agent-queries
+  - query: gemini says done. is it tho? check before i push
+    run: 2026-09-28-agent-queries
+  - query: the agent reckons the docs are updated for the new flags, confirm that please
+    run: 2026-09-28-agent-queries
+  - query: 'claude-2 finished #412 supposedly. verify before i close the issue'
+    run: 2026-09-28-agent-queries
+  - query: it says it ran the migrations and everything passed — can you confirm thats actually true
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: check what that agent actually changed before i trust it
     confusable_with: [daintree.worktree.relocate-agents]
@@ -240,6 +278,51 @@ boundaries:
   - query: the fix in t2 claims it handles the null case but im not convinced the tests even ran
     confusable_with: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
+  - query: the implementer says it fixed all of codex's findings; check it actually did before I merge
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: The agent claims it fixed the failing test — confirm that before I merge
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-agent-queries
+  - query: claude-2 says it finished the cache fix and tests pass — confirm that before I merge
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Before anything is closed, confirm the agent really finished the refactor it claimed
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: The agent says it added the tests and they pass — check that claim before I trust it
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: 'Review what Codex did on #512 — it says tests pass, I just need to know that''s actually true before merging.'
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: look over the agent's branch and confirm it actually committed the changes it claims
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Check the diff in wt/feature-export to see whether the agent really implemented all three acceptance criteria from the issue before I close it.
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Inspect Gemini's change and run the tests yourself — its summary claims zero failures and I want proof.
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: Agent reported the security fix is complete; confirm the vulnerable call site was actually removed before we push.
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: review whether the agent did what i asked — remove the deprecated flags — before it's handed to the release branch
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: The finished agent's summary and its terminal tail disagree about the build; look at the diff and the build to find out which is right.
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: codex finished the refactor. is the diff actually there or did it just say done
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
+  - query: claude-2 says issue 1177 is done and tests pass — verify that's actually true
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Codex says the webhook handler is finished; confirm it against the acceptance criteria, using a separate reviewer agent if needed.
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: how's that going?
     history:

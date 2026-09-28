@@ -58,6 +58,42 @@ positives:
   - hmm. maybe if the two of them actually talked instead of me copy pasting between tabs... yeah. do that, relay between them
   - add the fourth agent into the discussion and catch it up on what the others have said so far
   - you merged both their replies into one blob. do the relay properly, one speaker at a time, and keep going
+  - query: Facilitate a live back-and-forth between Claude and Codex about whether microservices were a mistake for this codebase, relaying each turn
+    run: 2026-09-28-agent-queries
+  - query: Host a three-agent panel on the tradeoffs of React server components, giving each the floor in turn for several rounds
+    run: 2026-09-28-agent-queries
+  - query: Relay a conversation between gemini and claude-2 about naming in the domain model, catching each up on what the other said
+    run: 2026-09-28-agent-queries
+  - query: open-ended dialogue among codex, claude and gemini about where the CLI should go next; no winner, no synthesis
+    run: 2026-09-28-agent-queries
+  - query: Keep the existing agent conversation going for three more rounds
+    run: 2026-09-28-agent-queries
+  - query: Set the agents chatting with each other about their favourite refactoring patterns and let it run
+    run: 2026-09-28-agent-queries
+  - query: Moderate a roundtable between four agents about observability strategy and show the exchange as it unfolds
+    run: 2026-09-28-agent-queries
+  - query: let codex and claude discuss the flaky CI situation with each other, visibly, and see where they take it
+    run: 2026-09-28-agent-queries
+  - query: two agents talk through GraphQL federation pros and cons in a relayed dialogue
+    run: 2026-09-28-agent-queries
+  - query: start a group chat between the pinned agents on what they'd change about our onboarding docs
+    run: 2026-09-28-agent-queries
+  - query: Relay turns between claude and gemini in a casual discussion about error handling styles; I just want to read along
+    run: 2026-09-28-agent-queries
+  - query: 'Continue the agents'' discussion: give codex the floor next and catch it up on claude''s last two messages'
+    run: 2026-09-28-agent-queries
+  - query: get claude and codex talking about rust vs go and see where it goes
+    run: 2026-09-28-agent-queries
+  - query: let the three of them have a chat about our test suite
+    run: 2026-09-28-agent-queries
+  - query: can you run a little panel discussion between the agents about ai pair programming
+    run: 2026-09-28-agent-queries
+  - query: keep them talking, another couple rounds
+    run: 2026-09-28-agent-queries
+  - query: i want gemini and claude to have a conversation about the design system
+    run: 2026-09-28-agent-queries
+  - query: have the agents chat to each other about the roadmap, im just curious
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: get the pinned agents talking to each other about this and see where it goes
     confusable_with: [daintree.agents.poll-pinned-agents]
@@ -142,6 +178,72 @@ boundaries:
   - query: have gemini and claude chat back and forth about the api design, nobody's judging
     confusable_with: [daintree.orchestration.interview]
     run: 2026-09-24-selector-hardening
+  - query: let the pinned agents talk to each other about the colour options and see where it goes
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: get the three agents talking about the roadmap and just see where the conversation goes, no voting
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: have claude and codex interview each other about the roadmap just to see what comes out, no winner
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: let one agent ask the others questions about testing, but it's just a discussion, nobody wins
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: get gemini to chat with claude and codex about the design system, no judging
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: have the agents question each other on rust vs go and let it run
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: a Q&A-style back-and-forth among three agents about observability, open-ended
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: claude asks, codex answers, back and forth about the migration; I just want to watch
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: panel where the agents put questions to one another about AI pair programming, no verdict
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: keep the agents talking and quizzing each other on error handling, it's not a contest
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: facilitate the agents grilling each other on GraphQL federation just for fun, no pick
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: relay a conversation in which codex interviews claude about its approach, no scoring, see where it goes
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: get claude and codex talking about event sourcing and just see where it goes
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: host an open-ended roundtable between three agents on the future of the plugin API, no conclusion needed
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: relay a back-and-forth between gemini and claude about testing philosophy for a few rounds
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: let the two open agents chat freely about the monorepo split, I want to watch the dialogue
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: moderate a panel discussion among the agents on state management; I'm interested in the exchange, not a verdict
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: have codex and claude talk to each other about the p99 regression and keep the conversation going
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: set up a group chat of three agents about naming conventions and let them riff
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: facilitate a live discussion between the agents about the 502s, they don't need to agree
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: keep a dialogue going between claude-1 and codex-2 on the migration, each catching up on the other's points
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: open conversation among the agents about whether TDD is worth it, visible turn by turn
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

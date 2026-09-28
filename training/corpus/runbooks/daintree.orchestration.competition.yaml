@@ -58,6 +58,48 @@ positives:
   - each writes one test-strategy proposal, then peer review — everyone reads everyone's and picks a winner
   - whole fleet, one haiku each about our build system, then vote on the best
   - tally it up, tell me who won, and close everything except the winner's tab
+  - query: Have Claude and Codex each write their own version of the debounce hook for the search bar in separate worktrees, then judge which implementation is better.
+    run: 2026-09-28-agent-queries
+  - query: 'Contest between codex, claude-2 and gemini: each proposes a name for the new CLI package, then they blind-vote on the others'' entries and I get the winner.'
+    run: 2026-09-28-agent-queries
+  - query: Each of the three pinned agents independently rewrites src/parser/tokenize.ts for speed in its own worktree; benchmark results decide the winner.
+    run: 2026-09-28-agent-queries
+  - query: 'rival fixes for issue #718 from two agents in isolated worktrees, then peer judging to pick one'
+    run: 2026-09-28-agent-queries
+  - query: Ask every configured agent to submit one surprising fact about the codebase's history, then send each agent the others' submissions anonymised so they can vote for the best.
+    run: 2026-09-28-agent-queries
+  - query: Run a head-to-head where Claude and Gemini each draft the README intro section on their own, and I act as judge between the two drafts.
+    run: 2026-09-28-agent-queries
+  - query: Two agents each attempt the migration from moment to date-fns on their own branch; score both against the test suite and bundle size and declare a winner or a tie.
+    run: 2026-09-28-agent-queries
+  - query: 'scored contest: each fleet agent writes its own SQL for the monthly revenue report, others rate them 1-10, tally totals'
+    run: 2026-09-28-agent-queries
+  - query: Get Codex and Claude to independently produce a fix for the flaky websocket reconnect test, then have each review the other's fix blind and say which should land.
+    run: 2026-09-28-agent-queries
+  - query: Launch four agents on the same prompt — design a caching strategy for the image service — collect each proposal and run an anonymous peer vote for the strongest.
+    run: 2026-09-28-agent-queries
+  - query: competition among named agents for the best one-line tagline for the release notes, blind voting, report tally
+    run: 2026-09-28-agent-queries
+  - query: Have each agent build its own prototype of the settings page dark-mode toggle in its own worktree, then compare the diffs and pick which approach to keep.
+    run: 2026-09-28-agent-queries
+  - query: Pit claude-2 against codex on writing the retry wrapper for the payments client; whoever's version passes more edge-case tests wins a point.
+    run: 2026-09-28-agent-queries
+  - query: have claude and codex compete - both write a fizzbuzz in rust, weirdest correct one wins
+    run: 2026-09-28-agent-queries
+  - query: let's do a little contest. every agent tells me one thing about our build pipeline i probably don't know, then they vote on whose was best
+    run: 2026-09-28-agent-queries
+  - query: get gemini and codex to each take a crack at the date picker bug, own worktrees, then tell me who did it better
+    run: 2026-09-28-agent-queries
+  - query: 'i want a bake-off on the rate limiter: claude vs codex vs gemini, each does its own version, you judge'
+    run: 2026-09-28-agent-queries
+  - query: each agent pitch a logo concept description, then show everyone the others' pitches and have them pick a favourite that isnt theirs. who wins?
+    run: 2026-09-28-agent-queries
+  - query: run a comp between the pinned agents - best refactor of utils/format.ts, points for readability, tally at the end
+    run: 2026-09-28-agent-queries
+  - query: ok claude and codex both write the onboarding email copy separately and then judge each others. winner gets merged
+    run: 2026-09-28-agent-queries
+  - query: Have Claude and Codex each implement the LRU cache in their own worktree, then have them peer-vote on the better version, breaking any tie by runner-up.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: get the four agents to each pitch a fix for the layout bug then vote on the best
     confusable_with: [daintree.runtime.debug-web-app]
@@ -184,30 +226,165 @@ boundaries:
   - query: 'contest: claude, codex, gemini and opencode each pitch a logo idea, then they score each other''s pitches and we crown a winner'
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-26-same-question-named-agents
-  - query: "claude and gemini should each take a crack at rewriting the date parser in their own worktree, then tell me whose is cleaner"
+  - query: claude and gemini should each take a crack at rewriting the date parser in their own worktree, then tell me whose is cleaner
     confusable_with: [daintree.orchestration.fan-out-work]
     run: transcript-2026-09-26-competition-relocate
-  - query: "let codex and claude both build the retry helper separately, compare the two diffs and pick one"
+  - query: let codex and claude both build the retry helper separately, compare the two diffs and pick one
     confusable_with: [daintree.orchestration.multi-agent]
     run: transcript-2026-09-26-competition-relocate
-  - query: "race three agents on the flaky test fix, each on its own branch, and tell me which fix is best"
+  - query: race three agents on the flaky test fix, each on its own branch, and tell me which fix is best
     confusable_with: [daintree.worktree.relocate-agents]
     run: transcript-2026-09-26-competition-relocate
-  - query: "two agents, same job: speed up the export query. separate worktrees. which one wins?"
+  - query: 'two agents, same job: speed up the export query. separate worktrees. which one wins?'
     confusable_with: [daintree.orchestration.fan-out-work]
     run: transcript-2026-09-26-competition-relocate
-  - query: "ask claude, grok and opencode for one surprising fact each and tell me which agent came up with the best one"
+  - query: ask claude, grok and opencode for one surprising fact each and tell me which agent came up with the best one
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-26-fact-contest-named-agents
-  - query: "get gemini, codex and claude to each pitch a release name, give a point to your top two, let each vote on the others' pitches and say whose won"
+  - query: get gemini, codex and claude to each pitch a release name, give a point to your top two, let each vote on the others' pitches and say whose won
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-26-fact-contest-named-agents
-  - query: "have codex, claude and cursor each write a short customer explanation of the outage, then tell me which agent's is clearest"
+  - query: have codex, claude and cursor each write a short customer explanation of the outage, then tell me which agent's is clearest
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-26-fact-contest-named-agents
-  - query: "ask each pinned agent for one onboarding experiment it would run and tell me whose proposal is best"
+  - query: ask each pinned agent for one onboarding experiment it would run and tell me whose proposal is best
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-26-fact-contest-named-agents
+  - query: have claude and codex each write their own version of the retry helper, then tell me which one is better
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: each of three agents proposes its own name for the new CLI, then they peer-vote on the best entry
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask codex and gemini to each implement the CSV truncation fix in its own worktree and pick the winner
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: get the agents to each come up with a cache key design and judge each other's submissions
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Launch Claude and Codex to race on a fix for the flaky reconnect test, then compare their diffs and declare a winner
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: each agent tells me its most surprising fact about this codebase, then they blind-vote on the best one
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: have every pinned agent write a limerick about the release and vote for the funniest
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: rival README intros from codex and claude, with gemini judging which wins
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask two agents to each draft a migration strategy for the orders table, then score the drafts and tell me who won
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: 'contest: every agent answers ''what is the biggest risk in our auth module'', then award points and name the best answer'
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: have each pinned agent implement its own version of the pagination fix and then vote on the best one
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Ask Claude, Codex and Gemini each for an interesting fact about the repo, then have them vote on whose fact is best.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: ask codex and claude for their version of the regex for the log parser, then judge which one is better
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Poll the pinned agents for a tagline each, then send every agent the others' taglines anonymised to pick a winner.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: get the three agents to each propose a fix for the timezone bug in their own worktree and tell me which fix wins
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Have Gemini and Codex each write a short explanation of the build graph, then score both and name a winner.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Ask claude and codex the same thing — write the SQL for the churn report — and have each grade the other's query blind.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: the pinned agents each come up with a name for the new service, then they vote but not for their own
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Put the same task to Codex, Claude and Gemini — each drafts the error-page copy — and award points to decide whose draft we use.
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: ask each agent for its best one-liner about our architecture and have the fleet pick the funniest entry
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: each agent writes its own ORM wrapper, then they vote on the best one
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: Each agent writes its own one-paragraph argument for the new branching model, no back-and-forth, then blind peer vote on the best paragraph.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: no debate needed — just have claude and codex each write their own version of the config loader and judge which is better
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Have the three agents each submit a position paper on the ORM choice independently and pick the strongest by peer vote.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Instead of arguing, let each agent produce its own fix for the memory leak in the worker pool, then score the fixes and name a winner.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: 'one-shot contest: best argument for switching to pnpm, each agent writes one, vote on the best'
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: 'Scored competition among the pinned agents: each drafts a migration plan for the legacy auth tables, others rate them, highest total wins.'
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: 'claude vs gemini: whose explanation of the race condition in the queue is clearer? each writes its own, then they vote'
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Get Codex, Claude and Gemini to each implement the CSV export in their own worktree and have the others vote for the best implementation.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Independent entries from each agent on how to shard the jobs table, then award points and declare the winner — no rounds of rebuttal.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: each agent pitches its best idea for the hackathon, then they vote on the best pitch
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Have claude and codex each write their own version of the cache layer, then pick the better diff
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: have each agent write its own version of the date parser and have gemini score the entries
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: each agent writes its own solution to the rate limiter and the others peer-vote a winner
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'The last contest tied, but forget that — start a new competition on a different task: each agent writes its own implementation of the pagination helper.'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: 'new round, new task: claude and codex each write their own changelog generator, then judge'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Kick off a fresh bake-off between Gemini and Codex for the image resize function — each in its own worktree — and pick the better version.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Set up a competition among the pinned agents for the best error message wording, with blind peer voting to choose the winner.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: 'I want a contest to find a winner for the landing-page headline: each agent submits one, then the others vote.'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: 'Round one of a new competition: every configured agent writes its own solution to the Advent-style puzzle in puzzles/day7, then score them.'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: 'have claude, codex and gemini each produce a fix for #640, peer judge, winner gets merged'
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Head-to-head between two agents on the cron parser rewrite, scored by the test suite; declare the winner or a tie.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: start a competition — best one-liner explaining our architecture, peer vote
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Launch a scored contest in which each agent drafts its own onboarding checklist and the others award points.
+    confusable_with: [daintree.orchestration.runoff-tiebreaker]
+    run: 2026-09-28-agent-queries
+  - query: Have Claude and Codex each implement the cache rewrite in their own worktree, then tell me whose is better.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

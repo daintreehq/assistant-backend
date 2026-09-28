@@ -59,6 +59,42 @@ positives:
   - i want a pr on daintreehq/assistant for what's in this worktree
   - the branch on the second terminal's worktree — get it review-ready
   - whats the state of this branch, anything uncommitted? if its clean just push
+  - query: 'Commit the finished work in the issue-640 worktree, push the branch and open a PR that closes #640'
+    run: 2026-09-28-agent-queries
+  - query: 'Decide whether feature/search-facets is in a state to push: uncommitted files, tests, stray debug code'
+    run: 2026-09-28-agent-queries
+  - query: Raise a pull request for the csv-export branch against develop with a summary of the changes
+    run: 2026-09-28-agent-queries
+  - query: claude-2 reports it finished issue 1177; get that work into a PR for the team
+    run: 2026-09-28-agent-queries
+  - query: Prepare the current branch for code review — tidy commits, push, and open the PR as a draft
+    run: 2026-09-28-agent-queries
+  - query: Readiness verdict on the fix/login-redirect worktree, then do whatever prep it says is missing
+    run: 2026-09-28-agent-queries
+  - query: Package the scheduler migration branch as a reviewable PR, linking the tracking issue
+    run: 2026-09-28-agent-queries
+  - query: Push the local commits on chore/eslint-9 and create the pull request; nothing else
+    run: 2026-09-28-agent-queries
+  - query: Wrap up the websocket reconnect ticket for review now that the agent has stopped
+    run: 2026-09-28-agent-queries
+  - query: Open a merge request on GitLab for branch feature/issue-77-cursor with the issue referenced
+    run: 2026-09-28-agent-queries
+  - query: Take the codex worktree for the rate limiter, commit its changes with a sensible message and put up the PR
+    run: 2026-09-28-agent-queries
+  - query: ok its done, open a pr
+    run: 2026-09-28-agent-queries
+  - query: is this branch ready to push or am i forgetting something
+    run: 2026-09-28-agent-queries
+  - query: pr this up for review pls, target main
+    run: 2026-09-28-agent-queries
+  - query: commit + push + pr for the dark mode wt
+    run: 2026-09-28-agent-queries
+  - query: can you get my branch ready for review, i want eyes on it tomorrow
+    run: 2026-09-28-agent-queries
+  - query: Run the repo's lint and test commands on feature/export-csv, commit the changes, push, and open a PR against develop.
+    run: 2026-09-28-agent-queries-2
+  - query: commit whats on fix/timezone-parse and push it, no PR yet
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: get the branch ready for review and open the PR
     confusable_with: [daintree.worktree.relocate-agents]
@@ -237,6 +273,42 @@ boundaries:
   - query: '$ git status On branch feat/export-csv Changes not staged for commit: modified: src/export/csv.ts modified: src/export/csv.test.ts $ git log --oneline -3 4d1e9a2 add csv header options b7720c1 csv export skeleton i think its done. commit whats left, push and open the pr'
     confusable_with: [daintree.forge.land-pull-request]
     run: 2026-09-24-selector-hardening
+  - query: Commit what claude-3 wrote on feature/cache-fix, push it and open a PR against develop
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'Get the retry-backoff branch into a reviewable pull request with a closing reference to #640'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Is my current branch ready to push? tell me what's missing before I raise the PR
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: wrap up issue 77 for review — commit, push, PR
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Create the pull request for the lockfile bump branch; don't merge anything
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: The agent says it's done with the migration work; package it up as a PR for review
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Push feature/issue-731 and raise the PR so the team can look at it
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: finish off the dark mode branch and put it up for review
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Readiness check on this worktree's branch, then open the PR if it passes
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: 'The agent''s work on #512 is done and checked; commit it, push, and open the PR.'
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Push the fix branch and open the PR for issue 660
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'The agent on issue #412 is finished; commit its work and open the PR'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
 followups:
   - query: yeah go ahead
     history:

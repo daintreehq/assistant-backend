@@ -61,6 +61,72 @@ positives:
   - reset the workspace back to just main before the next round
   - morning. leftover from yesterday — close whatever agents are still hanging around and delete the merged worktrees
   - there's a couple of stale async waits from the overnight run, cancel those and close the terminals they were on
+  - query: 'The user asked to tear down everything from the competition: close the three entrant terminals and delete their worktrees once confirmed'
+    run: 2026-09-28-agent-queries
+  - query: Close the agent panels from the finished fan-out and remove worktrees whose branches are pushed, leaving dirty ones for the user
+    run: 2026-09-28-agent-queries
+  - query: 'After the batch, delete the worktrees for #221 and #224 — both merged — and keep their branches'
+    run: 2026-09-28-agent-queries
+  - query: Shut down every terminal this conversation launched for the docs sprint
+    run: 2026-09-28-agent-queries
+  - query: Once the two remaining agents finish, close them; the user asked for that cleanup now
+    run: 2026-09-28-agent-queries
+  - query: Disarm all pending notices from the refactor run and close its terminals, user explicitly asked
+    run: 2026-09-28-agent-queries
+  - query: 'clean up after the long session: inventory panels and worktrees, propose what goes, one confirmation'
+    run: 2026-09-28-agent-queries
+  - query: Mark the abandoned workflow entries done and close the panels that belonged to them, at the user's request
+    run: 2026-09-28-agent-queries
+  - query: Close every agent except codex from the ones just launched
+    run: 2026-09-28-agent-queries
+  - query: Remove the experiment/perf-a and experiment/perf-b worktrees the user said were abandoned, plus their local branches
+    run: 2026-09-28-agent-queries
+  - query: 'teardown of the tournament workspace: terminals first, then worktrees, report what was left and why'
+    run: 2026-09-28-agent-queries
+  - query: User wants the whole parallel-fix workspace shut down; classify what is safe to close and what has uncommitted changes
+    run: 2026-09-28-agent-queries
+  - query: ok close all of them
+    run: 2026-09-28-agent-queries
+  - query: tidy up the terminals pls, we're done
+    run: 2026-09-28-agent-queries
+  - query: delete that worktree, the feature got merged
+    run: 2026-09-28-agent-queries
+  - query: nuke the worktrees from the batch, keep the branches
+    run: 2026-09-28-agent-queries
+  - query: clean up everything from the comp
+    run: 2026-09-28-agent-queries
+  - query: Close the terminals from the fan-out and delete their worktrees - they're all merged.
+    run: 2026-09-28-agent-queries-2
+  - query: Close all the terminals whose agents have finished their tasks.
+    run: 2026-09-28-agent-queries-2
+  - query: tidy away the idle shells left over from this morning's fan-out
+    run: 2026-09-28-agent-queries-2
+  - query: 'The competition is over: shut down the entrants'' terminals and delete their worktrees.'
+    run: 2026-09-28-agent-queries-2
+  - query: Remove the worktrees for branches that were already merged, closing their panes first.
+    run: 2026-09-28-agent-queries-2
+  - query: close every agent that's just sitting idle at its prompt
+    run: 2026-09-28-agent-queries-2
+  - query: Retire the sessions from yesterday's issue batch; none of them are in use now.
+    run: 2026-09-28-agent-queries-2
+  - query: we're done with the spike, tear down everything it spun up
+    run: 2026-09-28-agent-queries-2
+  - query: Close out the stale worktrees nobody has touched this week, along with their terminals.
+    run: 2026-09-28-agent-queries-2
+  - query: clean up the finished reviewers
+    run: 2026-09-28-agent-queries-2
+  - query: Shut every terminal in the old-auth worktree and delete that worktree; the branch is abandoned.
+    run: 2026-09-28-agent-queries-2
+  - query: Get rid of the dead panes that exited earlier today.
+    run: 2026-09-28-agent-queries-2
+  - query: 'Close all the codex terminals except the one on #612; the rest have done their bit.'
+    run: 2026-09-28-agent-queries-2
+  - query: prune the unused terminals piling up in the sidebar
+    run: 2026-09-28-agent-queries-2
+  - query: 'Wrap up the session: close everything the fan-out launched and mark the run finished.'
+    run: 2026-09-28-agent-queries-2
+  - query: free up the workspace — kill the terminals that aren't doing anything anymore
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: tear down the checkouts for everything that already landed
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -279,6 +345,54 @@ boundaries:
   - query: delete the worktree for gpu-exp, done with it
     confusable_with: [daintree.worktree.manage-resource]
     run: 2026-09-24-selector-hardening
+  - query: The fan-out from last week is finished; close its terminals and delete its worktrees
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: tear down the worktree the recipe made and close its terminals
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: delete the experiment/a worktree, it's done
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: delete the ml/training-v2 worktree and close everything in it
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: Delete the worktree for the finished spike branch; the devbox teardown can run with it
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: clean up the worktrees from the fan-out, they all have cloud boxes
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: Remove the three worktrees whose PRs merged, after checking none have uncommitted changes
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: shut down all the agent terminals in the remote-env worktrees and delete those worktrees
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: 'Tear down the whole workspace from the benchmark run: panels, worktrees, checkpoint'
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: delete the devbox-test worktree, it's abandoned
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: Close the terminals and remove the worktree for the staging experiment the user said to scrap
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: free up everything from yesterday's competition — terminals and worktrees
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: The user wants the resource-heavy worktrees gone entirely, branches kept
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: wipe the worktrees we made for the cloud migration trial, keep the branches
+    confusable_with: [daintree.worktree.manage-resource]
+    run: 2026-09-28-agent-queries
+  - query: the agents are done, delete their worktrees and close the terminals
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
+  - query: once those three agents are done, close their terminals
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: actually delete the last one, i don't need that task
     history:

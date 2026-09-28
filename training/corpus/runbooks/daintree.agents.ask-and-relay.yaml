@@ -58,6 +58,80 @@ positives:
   - get sonnet-mini to look at the state codec and tell me if the token is signed or just encoded
   - theres no agent up yet is there? spawn one and ask it whether we still need the legacy adapter
   - cba to read this whole file. get an agent to read it and report back what it does
+  - query: Launch Codex read-only to explain why the payment webhook handler retries exactly three times, and bring back its answer with attribution
+    run: 2026-09-28-agent-queries
+  - query: Spawn one agent to read src/auth/session.ts and report whether refresh tokens are ever rotated; it must not edit anything
+    run: 2026-09-28-agent-queries
+  - query: 'single read-only codex: assess the risk of bumping prisma 5 to 6 in this repo, relay its verdict'
+    run: 2026-09-28-agent-queries
+  - query: Have Claude look at db/migrations/0042_split_orders.sql and say whether it is reversible. I only need its answer, no patch.
+    run: 2026-09-28-agent-queries
+  - query: Get Gemini's opinion, from a fresh launch, on whether the token bucket in middleware/throttle.go is safe under concurrent requests
+    run: 2026-09-28-agent-queries
+  - query: Ask a newly launched Codex session what most likely causes the flaky websocket reconnect test, without letting it touch files, and report its reply
+    run: 2026-09-28-agent-queries
+  - query: 'Launch claude-2 in the main worktree to answer one question: is the ''new-checkout'' feature flag still read anywhere? Relay what it says'
+    run: 2026-09-28-agent-queries
+  - query: Spin up Claude to summarise what the legacy billing cron in jobs/nightly_invoice.rb actually does and pass its explanation along, credited to it
+    run: 2026-09-28-agent-queries
+  - query: 'codex, read-only, one question: does issue #812''s proposed cache key collide with the keys session storage already uses? answer only'
+    run: 2026-09-28-agent-queries
+  - query: Consult Codex on the tradeoffs of replacing the Redis job queue with Postgres LISTEN/NOTIFY and bring back what it says
+    run: 2026-09-28-agent-queries
+  - query: read-only gemini launch to check whether the i18n bundle ships locales nobody loads; report its finding
+    run: 2026-09-28-agent-queries
+  - query: Start a Claude agent that answers whether our Dockerfile's multi-stage build leaks dev dependencies into the final image, then relay its conclusion to the user
+    run: 2026-09-28-agent-queries
+  - query: ask codex what it thinks of the retry backoff in api/client.py
+    run: 2026-09-28-agent-queries
+  - query: can u get claude to look at the docker compose file and tell me whats off with the healthcheck
+    run: 2026-09-28-agent-queries
+  - query: spawn something to work out why the web bundle is 40mb bigger than last week and just tell me
+    run: 2026-09-28-agent-queries
+  - query: hey quick one - ask gemini if our jwt expiry handling looks sane
+    run: 2026-09-28-agent-queries
+  - query: get codex to check if we still pull in moment.js anywhere, dont change anything, just tell me
+    run: 2026-09-28-agent-queries
+  - query: have claude tell me what could break if we drop node 18
+    run: 2026-09-28-agent-queries
+  - query: Ask Claude whether the retry wrapper in net/client.ts can double-send, and if it asks you a clarifying question, answer it within scope and bring back its final answer.
+    run: 2026-09-28-agent-queries-2
+  - query: ask codex what second-order risks this migration has
+    run: 2026-09-28-agent-queries-2
+  - query: Launch Claude read-only and ask whether the new retry wrapper can double-charge a customer; relay its answer.
+    run: 2026-09-28-agent-queries-2
+  - query: Get Gemini's take on whether our Redis key naming scheme will collide across tenants, and bring back what it says.
+    run: 2026-09-28-agent-queries-2
+  - query: have claude-2 look at the session middleware and tell me if it thinks the timeout logic is sound
+    run: 2026-09-28-agent-queries-2
+  - query: 'One question for Codex: is the pagination in /api/orders off by one? Report its answer with attribution.'
+    run: 2026-09-28-agent-queries-2
+  - query: Ask Codex whether it would split the billing service before or after the Postgres upgrade, and relay its reasoning.
+    run: 2026-09-28-agent-queries-2
+  - query: what does gemini think of our error boundary approach? just ask it and tell me
+    run: 2026-09-28-agent-queries-2
+  - query: Spin up Claude read-only to assess whether the proposed index on events(created_at) will help the dashboard query; bring its verdict back.
+    run: 2026-09-28-agent-queries-2
+  - query: get codex's opinion on the new caching layer - is it overkill?
+    run: 2026-09-28-agent-queries-2
+  - query: Ask Gemini to estimate how risky removing the legacy XML exporter is, and relay its assessment verbatim.
+    run: 2026-09-28-agent-queries-2
+  - query: Have claude weigh in on whether the feature-flag cleanup can ship this week; I only want its answer.
+    run: 2026-09-28-agent-queries-2
+  - query: Put one question to Codex — does the lockfile bump pull in any breaking transitive change — and report back what it finds.
+    run: 2026-09-28-agent-queries-2
+  - query: ask claude-2 if the websocket reconnect logic handles laptop sleep properly
+    run: 2026-09-28-agent-queries-2
+  - query: Consult Codex on whether the new ORM hooks introduce N+1 queries; no edits, just its judgement.
+    run: 2026-09-28-agent-queries-2
+  - query: Get Gemini's read on the naming of the new public SDK methods and pass it along.
+    run: 2026-09-28-agent-queries-2
+  - query: could you ask codex what it thinks the biggest footgun in our deploy script is
+    run: 2026-09-28-agent-queries-2
+  - query: Launch one Claude agent to judge whether our S3 lifecycle rules match the retention policy doc, then relay what it concludes.
+    run: 2026-09-28-agent-queries-2
+  - query: Ask Codex for its assessment of the thread-safety of the metrics collector; attribute the answer to it.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: ask an agent what it makes of the retry backoff and tell me what it says
     confusable_with: [daintree.worktree.relocate-agents]
@@ -217,15 +291,153 @@ boundaries:
   - query: 'only ask codex this one: is the websocket reconnect safe? bring its answer back'
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-26-same-question-named-agents
-  - query: "ask gemini to review the retry module for bugs and just tell me what it says, don't fix anything"
+  - query: ask gemini to review the retry module for bugs and just tell me what it says, don't fix anything
     confusable_with: [daintree.agents.relay-review-feedback]
     run: transcript-2026-09-26-reviewer-fixer-relay
-  - query: "have codex explain what would break if we dropped the retry queue, and tell me what it says"
+  - query: have codex explain what would break if we dropped the retry queue, and tell me what it says
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-27-help-release
-  - query: "ask claude whether the new rate limiter can starve background jobs and report back"
+  - query: ask claude whether the new rate limiter can starve background jobs and report back
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-27-help-release
+  - query: 'I have a question for Codex: should the old fixtures be deleted? Launch it read-only and relay its answer'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: nothing is running yet, spawn one agent to answer whether we can squash the migration files
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: launch a fresh agent and ask it which test runner suits this repo better, relay the reply
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: get a new codex session to tell me whether anything still calls the deprecated /v1/orders endpoint
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: I need an answer from an agent on whether the permission settings in .claude/settings.json are too loose; spin one up read-only
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: ask gemini (not open yet) what branch naming convention the repo follows and report back
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: Launch Claude to answer one question - does package.json pin a vulnerable axios - and relay its reply
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: Start one read-only agent to answer which config keys in config/default.yml are unused, and bring back its reply
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: ask an agent whether it's safe to run the pending migrations on staging; new launch, answer only
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'spin up codex and ask it yes or no: is the search index rebuild idempotent? tell me what it says'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: Ask Codex how it would reduce our API's rate-limit errors and relay its answer.
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: ask just codex what it thinks of the new retry backoff, not the whole fleet
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Get a single agent's opinion on whether the legacy-search flag can be removed and relay it
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: have gemini alone give its verdict on whether migration 0042 is reversible
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: ask claude by itself whether the auth refactor is worth doing; I don't need the other agents' takes
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Get one agent's recommendation on pino vs winston, relayed back to me
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Launch only Codex and ask whether the lockfile drift on develop matters; report its answer
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: whats claude's take on splitting the monorepo? just claude
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Ask one configured agent whether moving pagination to cursors is sound; answer only
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Get Gemini's opinion on the schema naming, only Gemini, and pass along its reply
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: rather than asking everyone, ask codex whether a 5 minute cache TTL is sensible
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: launch codex to look over the refund module read-only and just tell me what it thinks, no one fixes anything
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-09-28-agent-queries
+  - query: Ask Codex what it thinks the main risk in the retry logic is and bring its answer back to me.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Ask Claude how the auth flow works and relay its answer back to me.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: ask codex which of the two retry helpers in utils/ is better and relay its pick
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: have claude judge whether the old or new pagination implementation wins on readability; report its verdict
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: get gemini to pick the best of my three name ideas for the CLI
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: ask one agent to compare the two draft migration strategies in docs/ and tell me which it prefers
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Launch Codex read-only to score the two caching approaches described in RFC-12 and relay its scores
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Ask Claude which of the two approaches sketched in issue #455 it would choose for the flaky test, and why'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: just get codex's opinion on which logging library wins for us, pino or winston
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: have one agent rate the three README intro drafts I wrote and tell me its favourite
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Ask a single read-only agent to decide between the two candidate schemas in schema/v2 and report its choice
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: get claude to tell me who wins between exponential and fixed retry for our API client
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: ask codex what it thinks of prisma and relay its answer
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: Just ask Codex whether the queue should move to Postgres; the other agents don't need to weigh in
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: one agent's read on the session bug is enough, launch claude read-only and relay what it says
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: instead of getting agents to converge, just ask gemini for the root cause of the 502s and report it
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: ask codex alone to explain the memory growth in the worker pool; bring its answer back
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'single agent: what''s the best caching strategy for the product listing endpoint? relay its reply'
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: don't set up a debate, just ask claude what it thinks of the billing migration plan
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: Launch one read-only agent to list the risks of dropping node 18 and return its list
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: have codex look into why p99 doubled and tell me - one agent is fine
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: Get Claude's single answer on the config file format question, read-only
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: Ask a fresh agent for the root cause of the double-charge bug in the payments module and relay its conclusion
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: ask codex what it thinks the risks of the billing refactor are and tell me its answer
+    confusable_with: [daintree.review.review-change]
+    run: 2026-09-28-agent-queries
 followups:
   - query: hows it going
     history:

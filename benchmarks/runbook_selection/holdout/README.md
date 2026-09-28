@@ -1,6 +1,6 @@
 # Held-out routing suites
 
-Three case suites written OUTSIDE the benchmark, for judging a selector retrain on
+Case suites written OUTSIDE the benchmark, for judging a selector retrain on
 evidence the corpus and the benchmark were never tuned against. Same case format as
 `../cases/`; not part of CI, because none of them should become a gate somebody tunes to.
 
@@ -23,6 +23,13 @@ removed from round 3.
 | 1 | 100 | per-domain: plain requests, traps, state, no-task | **development** — its failures were read |
 | 2 | 189 | confusable fences, conversation state, messy/pasted turns | **development** — its failure SHAPES informed the 2026-09-24 data-generation briefs |
 | 3 | 197 | three personas, goal-phrased requests, long sessions | was **sealed** until the 2026-09-24 decision; scored once. Treat as development from here |
+| 4a | 138 | single messages shaped like `search_runbooks` traffic: Claude- and Codex-written task descriptions, users' own words, both sides of every fence | **development** — its failures were read (2026-09-28) |
+| 4b | 139 | the same population, split at random | was **sealed** until the 2026-09-28 decision; scored once. Treat as development from here |
+
+Round 4 (2026-09-28) was written by four agents on the same read-only rule, and each case
+labelled blind by gpt-6-sol and gpt-6-astra: 319 of 320 were unanimous with the writer. Cases
+near-duplicating a training row (difflib > 0.8) were removed; the remaining 277 were split at
+random into 4a and 4b.
 
 A suite stops being held out the moment someone chooses anything by looking at it. The
 next retrain that wants a clean check needs a fresh round written the same way.

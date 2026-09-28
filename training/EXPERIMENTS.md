@@ -4,19 +4,20 @@
 > ```
 > stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
 > stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
-> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 10,731 rows
+> corpus     training/corpus/**.yaml (SOURCE) → training/data/selection.jsonl @ 13,153 rows
 > train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
->            stage 2: --epochs 10 --ordering equivariant --seed 41
+>            stage 2: --epochs 10 --ordering equivariant --seed 41 --init-seed 41
 >            both: doc_max_length 512, content-keyed split; stage 2 also permutation
 >            sampling, sqrt cardinality weights, boundary loss 0.1, 3 doc variants
 >            (all now the trainers' DEFAULTS — see "The retrain lottery" at the foot)
-> serve      ONNX int8 encoders + fp32 head, ~410 MB whole-process RSS,
->            BONUS_FLOOR 0.55 / NEWCOMER_FLOOR 0.75
+> serve      ONNX int8 ranking encoder + fp32 retriever + fp32 head, ~470-480 MB
+>            whole-process RSS, BONUS_FLOOR 0.55 / NEWCOMER_FLOOR 0.75
 > ```
-> **Current (2026-09-25): shipped int8 measures 200/217 on the benchmark and
-> 185/197 on held-out round 3; with canonical active sets the RECIPE averages
-> 202.8/217 and 186.5/197 over six seeds, against 200.8 and 178.3 for the recipe
-> it replaced. int8 p50 10.5 ms.
+> **Current (2026-09-28): shipped int8 measures 270/286 on the benchmark, 138/139 on
+> sealed holdout round 4b (the artifact it replaced: 130/139) and 133/138 on round 4a,
+> the suite shaped like `search_runbooks` traffic. Over dev + rounds 1-3 + round 4a the
+> recipe averages 863.7 over three seeds against 843.7 for the recipe it replaced.
+> p50 ~10 ms. See "Agent-written queries" at the foot.
 > Numbers older than that entry were measured on different suites and corpora.**
 >
 > The denominator moved 169 → 172 → 177 across two rounds on 2026-08-20, as docs
@@ -492,11 +493,12 @@ seeds — random init per seed — so averaging them is meaningless).
 
 ## Serving-policy decisions (measured, settled)
 
-- **int8 encoders, fp32 head.** The encoders carry ~99% of the parameters and
-  all of the memory pressure; the head is 2.4M parameters (9.5MB fp32), so
-  quantising it would trade numerical slack for memory nobody is short of.
-  Quantisation must be PER-CHANNEL — see Architecture C trap 4. Measured
-  whole-process RSS with both encoders loaded: ~410MB.
+- **int8 ranking encoder, fp32 retriever and head** (retriever fp32 since
+  2026-09-28 — see that entry at the foot). The ranking encoder carries ~80% of
+  the parameters; the head is 2.4M parameters (9.5MB fp32), so quantising it
+  would trade numerical slack for memory nobody is short of. Quantisation must
+  be PER-CHANNEL — see Architecture C trap 4. Measured whole-process RSS with
+  both encoders loaded: ~410MB all-int8, 482MB with the fp32 retriever.
 - **Cloud Run: --cpu=1 --memory=2Gi --concurrency=8.** 1Gi would run today at
   ~55% but leaves no headroom for the 100-200 runbook catalog target plus
   concurrent turn buffers; the second GiB costs ~$7/mo at min-instances=1.
@@ -1287,3 +1289,160 @@ fall from a mean of 18.8 to 10.5.** The shipped artifact is seed 41 (186); it is
 file set that was measured, copied rather than re-exported, because every export redraws
 the int8 graph. On the benchmark it reads 200/217 int8 — inside the recipe's range, and
 the draw the rule dealt; docs-classification is its weakest category (20/24).
+
+
+# Agent-written queries: the corpus was answering the wrong caller (2026-09-28)
+
+Since the service became the `search_runbooks` MCP, almost every query is written by the
+CALLING AGENT — Claude Code or Codex describing "the outcome wanted" in a short imperative
+("Move a running agent to a new worktree and have it implement a code change"). The corpus
+was written for the retired sidebar assistant: of 10,850 rows, **322 (3%)** were bare,
+impersonal task descriptions; the rest were user chat. This round measured that gap, filled
+it, and swept every remaining model-side lever under the same hardware budget.
+
+## A suite shaped like production: holdout round 4
+
+320 single-message cases from four blind writers (Claude-style and Codex-style agent
+queries, users' own words, and every `whenToUse` fence from both sides), each labelled blind
+by gpt-6-sol and gpt-6-astra (319 unanimous with the writer). 43 near-duplicates of training
+rows removed; the remaining 277 split at random into **round4a** (138, development) and
+**round4b** (139, sealed until the decision). Both live in `benchmarks/runbook_selection/holdout/`.
+
+The shipped artifact scored 123/138 on round4a — routing-trap 46/46 and single-runbook 60/60,
+but **no-task 3/15**: an ordinary coding task written as an agent's task description
+("Convert the callbacks in fs_utils.js to async/await", "Add type hints to…") selected
+`spawn-visible-agent` at 0.97-0.99. The sidebar assistant could not edit files, so for it
+"a code change" always meant "launch an agent", and the corpus taught exactly that.
+
+## What moved: verified agent-style data
+
+Six generator agents (catalog digest + runbook files only; never benchmarks, tests or the
+holdouts) wrote ~65% agent-written / ~35% user-words rows per catalog neighbourhood, with
+fences in BOTH directions for the pairs that measurably lose, plus foundation-alone reads,
+nothing-applies coding tasks and two-runbook asks. Every row was relabelled blind by
+gpt-6-sol and kept only where both agreed: **1,792 of 1,802** (run
+`2026-09-28-agent-queries`). A second, smaller round aimed at the new model's remaining
+development misses added **536 of 541** (run `2026-09-28-agent-queries-2`). Rows
+near-duplicating any holdout case (difflib > 0.8) were dropped before ingest. Corpus
+10,850 → 13,155.
+
+Recall-pass summed over dev (286) + rounds 1-3 + round4a, int8 ranker, canonical active sets,
+three seeds (41/7/17) each:
+
+| arm | per seed | mean |
+|---|---|---|
+| shipped artifact (as served) | — | 846 |
+| current recipe, old corpus | 847 / 842 / 842 | 843.7 |
+| + agent-query data (round 1) | 861 / 859 / 856 | 858.7 |
+| … with an fp32 retriever | 867 / 860 / 860 | 862.3 |
+| + round 2 data, fp32 retriever (**chosen**) | 869 / 860 / 862 | **863.7** |
+| + `--llrd 0.85` | 867 / 862 / — | 864.5 against 864.5 for the same two seeds without it |
+
+**+20 over the recipe it replaces, with non-overlapping seed ranges.** Round4a (the
+production-shaped suite) 123 → 134 on the shipped seed, no-task 3/15 → 12/15, and extras
+27 → 8. The second data round is +1.4 at the recipe level — noise, and adaptive (its briefs
+were written from development misses) — but it lowered extras and halved fp32/int8
+decision drift, and the pre-declared rule chose it.
+
+## The fp32 retriever
+
+The int8 "lottery" was mostly the retriever. Re-exporting one checkpoint reproduces the same
+int8 decisions exactly (`quantize_dynamic` is deterministic here), so the variation is a
+property of each retrain's weights. Serving the retriever fp32 and the ranker int8, over
+eight artifacts: 0, 0, 0, +1 on the four old-corpus ones; +6, +1, +4, +4 on the four new ones
+(dev + rounds 1-3 + round4a). It never lost a case. Cost: **+51MB RSS (431 → 482MB) and
++0.5ms** (select p50 9.7 → 10.2ms, one thread). `SetwiseClassifier` now loads
+`retriever/model.onnx` in both modes, stamps tables `int8-ranker` so a table built by the old
+int8 retriever re-embeds instead of being reused, and the exporter no longer writes an int8
+retriever.
+
+## Measured and rejected
+
+| lever | result (same suites) | verdict |
+|---|---|---|
+| gte-modernbert-base stage 2 (149M, +4ms) | 831 vs 847 paired | −16, under-selects |
+| ettin-encoder-150m stage 2 | 831 vs 848 | −17 |
+| snowflake-arctic-embed-m-v1.5 stage 2 (BERT-base) | 862 vs 869 paired | tie at best |
+| e5-base-v2 stage 2 (BERT-base) | 863 vs 869 paired | tie at best |
+| static QDQ int8 (MinMax / 99.99 percentile) | 817 / 820 vs 847 | −27 / −30 |
+| uniform soup of 3 seeds (`--init-seed` shared) | 863 / 862 vs means 862.3 / 863.7 | = the seed mean, no gain |
+| `BONUS_FLOOR` 0.55 → 0.45 | +2 / +2 / 0 for +8 / +3 / +9 extras | not worth a constant tuned on read suites |
+| `--llrd 0.85` (layer-wise LR decay) | −2 / +2 paired on seeds 41 / 7 | neutral; the third seed was stopped when it could no longer change the choice |
+
+Notes worth keeping:
+
+- **bge-base's retrieval pre-training beats newer general encoders here.** ModernBERT-family
+  models score higher on GLUE and lower on this task; both under-selected (fewer extras,
+  more misses). The ONNX export of ModernBERT needs `attn_implementation="eager"` —
+  `export_two_stage` now does that for non-BERT backbones.
+- **Soups need a shared head init, and then they work** — unlike the random-init soup
+  recorded above, `--init-seed` soups score at the seed mean. They remove the lottery at
+  3x training cost; they do not beat it. `training/soup_setwise.py` refuses unaligned heads.
+- **Static int8 calibrates activation ranges the dynamic path measures per input**, and
+  512-token runbook documents blow those ranges for 40-token queries. Dynamic per-channel
+  with `reduce_range` stays.
+
+## The sealed result
+
+Decision rule written before any arm was scored: mean over seeds 41/7/17 of int8 recall-pass
+on dev + rounds 1-3 + round4a; ship the winner's seed-41 artifact only if round4b beats the
+shipped artifact (as served) by ≥ 2 and the dev mean is no more than 2 below it.
+
+Round 4b, scored once, int8, canonical active sets:
+
+| | recall-pass | strict | extras | no-task |
+|---|---|---|---|---|
+| artifact shipped before this entry (as served, both encoders int8) | 130/139 | 111 | 28 | 6/15 |
+| chosen recipe, seed 41 | **138/139** | 128 | 11 | 14/15 |
+
++8 against a required +2, and the chosen recipe's dev mean (268.0) is above the old
+artifact's 266. The artifact that SHIPS is that recipe's seed 41 retrained once more after
+the docs-label fix below (stage 2 only): 270/98/178/188/133 = 867 on the development suites
+against 869 before the fix, 138/139 on round 4b (strict 126, extras 12), docs 24/26, shortlist
+ablation 0/282, whole-process RSS 469MB. Round 4b is development data from here.
+
+Cases this retrain was owed and now passes: `host-issue-agent-worktree` ("launch an agent in
+a new worktree for issue N" → start-work-on-issue), the two rename regressions
+`cancel-one-named-watcher-is-foundation` and `injection-in-tool-output` (their TODO entry is
+closed), `tx-move-running-agent-to-new-worktree-agent-query` and
+`tx-fact-contest-peer-vote-user-words`.
+
+## A docs label this round broke, and fixed
+
+The first install failed `bench local` on the docs floor (4/26 missed lookups, ceiling 3). The
+cause was in this round's own data: one generator brief asked for "questions about the
+Daintree PRODUCT itself" as nothing-applies contrasts, and 17 such rows ("What's the keyboard
+shortcut in Daintree to split a pane?") landed as `is_docs: false` — the exact contradiction
+recorded on 2026-08-20. Search never reads the docs head, but the label was wrong, so the rows
+were relabelled `docs: true` and stage 2 retrained (stage 1 never reads the flag). **A brief
+that asks for "not a runbook" must also say whether it is a documentation question.**
+
+## Corrections after the shipped weights were trained
+
+Review found four row-level defects after the shipped stage 2 had trained, fixed in the
+corpus rather than by another retrain: two rows near-duplicating evaluation cases were
+removed ("Launch an agent in a new worktree for issue 212 and have it implement the fix",
+0.867 against `host-issue-agent-worktree`; "which worktrees do i have rn", 0.824 against
+round 2's `hE-foundation-list-worktrees`), and two more tab-behaviour questions were set to
+`docs: true`. The shipped weights saw the corpus BEFORE these four changes (13,155 rows; the
+journals keep both removed rows), so `host-issue-agent-worktree` passing is partly a
+near-duplicate and should not be quoted as a generalisation win.
+
+Review also found that `--init-seed` re-seeded the MPS generator as well as the CPU one
+(`torch.manual_seed` seeds every device; `set_rng_state` restores only CPU). So in every
+`--init-seed` arm above, seeds 7 and 17 differed only in data order and CPU-side sampling,
+not device-side dropout. The shipped artifact is seed 41 with `--init-seed 41` and is
+unaffected; the trainer now seeds only the CPU generator for the head.
+
+## Still open
+
+- `vectors.npz` identity is (precision stamp, document digests), not the encoders that built
+  it: an artifact directory holding a table from a DIFFERENT checkpoint at the same precision
+  would be adopted. The exporter always rebuilds the table with the graphs, so this needs a
+  hand-assembled artifact to bite; an embedding-function fingerprint in the table would close
+  it.
+- `edit-not-explore` (dev) expects "Add a retry with backoff to the webhook sender" to load
+  `spawn-visible-agent`; round 4's writers and both annotators label plain code changes
+  `[]`, since the runbook claims requests that ask for a visible agent. The answer depends on
+  the caller — the sidebar assistant cannot edit, an agent pane can — and the query does not
+  say which. Left as written; the new data leans `[]`, and the shipped artifact now misses it (p=0.013).

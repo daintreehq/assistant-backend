@@ -59,6 +59,44 @@ positives:
   - the review agent survived the reload but its watcher is gone, reattach one
   - you keep saying terminal not found but i can literally see the tab sitting right there
   - the watcher woke you at 9 and then nothing for two hours, is that agent wedged or what
+  - query: agent.launch for the Codex refactor returned no terminal id; work out from the terminal list whether the agent actually started.
+    run: 2026-09-28-agent-queries
+  - query: The claude-2 agent in wt/api-cleanup has shown the same output for 40 minutes with no progress; determine whether it's hung or just slow.
+    run: 2026-09-28-agent-queries
+  - query: terminal id term-7f3a returns not found on getStatus — reconcile it against what Daintree lists and find the real agent.
+    run: 2026-09-28-agent-queries
+  - query: Adopt the Gemini agent left running from an earlier session that has no notice armed on it, without restarting it.
+    run: 2026-09-28-agent-queries
+  - query: spawn result ambiguous for the docs agent — confirm whether it exists before launching anything again
+    run: 2026-09-28-agent-queries
+  - query: Codex has been working on the schema migration for over an hour and stopped producing output; triage it without killing its progress.
+    run: 2026-09-28-agent-queries
+  - query: The launch of the test-writer agent appeared to fail but a new terminal showed up in the panel; figure out which terminal it is and re-arm observation.
+    run: 2026-09-28-agent-queries
+  - query: unresponsive claude agent in the parser worktree, ignores input, decide between interrupt and waiting
+    run: 2026-09-28-agent-queries
+  - query: The notice for the lint agent never arrived even though it should have finished; check whether it's still alive and rearm the watcher.
+    run: 2026-09-28-agent-queries
+  - query: 'Recover the agent working #618: its terminal id in the run notes seems to be a typo and nothing responds to it.'
+    run: 2026-09-28-agent-queries
+  - query: An agent from this morning is still running with no one supervising it; take it over and set up a notification for when it goes idle.
+    run: 2026-09-28-agent-queries
+  - query: Launch of Codex into wt/perf timed out; check whether a duplicate agent was created before retrying.
+    run: 2026-09-28-agent-queries
+  - query: busy status for 50 min on the gemini terminal, output frozen — hung or slow?
+    run: 2026-09-28-agent-queries
+  - query: did that codex agent even start? nothing happened when you launched it
+    run: 2026-09-28-agent-queries
+  - query: claude's just been sitting there for ages doing nothing
+    run: 2026-09-28-agent-queries
+  - query: that terminal id doesn't work
+    run: 2026-09-28-agent-queries
+  - query: theres an agent running from before lunch and nobody's watching it, can you pick it up
+    run: 2026-09-28-agent-queries
+  - query: the spawn failed i think? i see no new tab
+    run: 2026-09-28-agent-queries
+  - query: gemini froze mid task. can u rescue it without losing its work
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: this agent has been stuck for twenty minutes, can you unstick it
     confusable_with: [daintree.worktree.relocate-agents]
@@ -234,6 +272,54 @@ boundaries:
   - query: the codex tab has been frozen on the same line since lunch
     confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
+  - query: codex hasn't printed anything for 30 minutes and isn't asking anything, is it hung?
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: the terminal id you gave me for the waiting agent doesn't exist any more
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: the codex agent I asked about the retry logic has been silent for 20 minutes and never answered, is it hung?
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: The gemini agent launched ten minutes ago is frozen and its terminal id t-83 no longer resolves
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: agent.launch for the claude spawn returned no terminalId; did it even start
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: Launched Claude to implement the parser, but agent.launch came back without a terminal id; find out what happened.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: you spawned codex for the refactor but nothing appeared — did it start?
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: The agent I launched for the docs update has been frozen for half an hour; check if it's hung before starting anything new.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Spawn attempt for the Gemini fixer timed out; reconcile with the terminal list before relaunching so we don't get two.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: the new agent you launched isnt responding to anything
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: The launch result for the test agent was ambiguous — an error but a tab opened; sort out whether that agent is real.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: the agent we spawned earlier is still running but nobody is watching it now — pick it up rather than launching another
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Launch returned a terminal id that getStatus says doesn't exist; resolve which terminal the agent is really in.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: spawn failed for claude in wt/ui-fix, figure out why and get it going
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: The visible agent working on the migration went silent and its output hasn't moved; is it stuck or thinking?
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: the codex terminal has been frozen for 40 min and won't respond to anything, sort it out
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how long has it actually been like that?
     history:

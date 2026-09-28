@@ -457,6 +457,78 @@ positives:
   - One agent is updating the submodule pointer while another needs the old submodule checked out for debugging. Give those running sessions separate branch directories.
   - Our merge plan assumes five independent branches, but the five agents are still editing one checkout. Move the same sessions into separate worktrees before the plan becomes fiction.
   - The four live roles are implementation, tests, docs, and migration, but they are all writing here. Give each role its own branch folder and retain the sessions.
+  - query: Move the already-running Claude agent from the main worktree into a new worktree on branch fix/session-expiry and have it continue there.
+    run: 2026-09-28-agent-queries
+  - query: Three agents started on main are editing the same files; give each existing terminal its own worktree and branch without relaunching them.
+    run: 2026-09-28-agent-queries
+  - query: 'existing codex terminal, idle: relocate into new worktree refactor/logger, then task it with replacing console.log calls'
+    run: 2026-09-28-agent-queries
+  - query: Put the gemini agent that is mid-way through the schema change into the existing db-migrations worktree, preserving its uncommitted edits.
+    run: 2026-09-28-agent-queries
+  - query: Take claude-2, which I launched earlier in this session with no task, and move it into a new worktree named spike/wasm to try the wasm build.
+    run: 2026-09-28-agent-queries
+  - query: relocate running agents claude-1, claude-3 into separate worktrees off develop; keep their sessions alive
+    run: 2026-09-28-agent-queries
+  - query: The agent in pane 2 was started in the wrong worktree; move it to the feature/search worktree and tell it to keep going.
+    run: 2026-09-28-agent-queries
+  - query: Give each of the five open agent terminals a branch of its own so their changes stop colliding, carrying over what each has changed so far.
+    run: 2026-09-28-agent-queries
+  - query: Codex has uncommitted work on main for the pricing page; shift it into a new worktree pricing/redesign and have it resume there.
+    run: 2026-09-28-agent-queries
+  - query: move both existing claude sessions out of the shared checkout, one worktree each, branches named after their tasks
+    run: 2026-09-28-agent-queries
+  - query: Without spawning replacements, move the idle agent into a fresh worktree and hand it the flaky-upload fix there.
+    run: 2026-09-28-agent-queries
+  - query: Agent already working on the i18n extraction should continue in worktree chore/i18n instead of the main tree.
+    run: 2026-09-28-agent-queries
+  - query: move claude to a new worktree called fix-nav and have it sort out the mobile nav there
+    run: 2026-09-28-agent-queries
+  - query: the two agents i have open keep stepping on each other. can each get its own wt?
+    run: 2026-09-28-agent-queries
+  - query: put that codex into its own branch/worktree pls, it's still running
+    run: 2026-09-28-agent-queries
+  - query: ok so gemini is already going on main, shift it over to the refactor wt
+    run: 2026-09-28-agent-queries
+  - query: each of those terminals needs its own branch, don't kill them
+    run: 2026-09-28-agent-queries
+  - query: can you move the agent i just opened into a separate worktree before it starts editing
+    run: 2026-09-28-agent-queries
+  - query: move the running agent into a new worktree called fix-auth and have it fix the session expiry bug there
+    run: 2026-09-28-agent-queries-2
+  - query: Relocate the existing Claude agent to its own worktree on branch feat/search-v2 and tell it to implement fuzzy matching there
+    run: 2026-09-28-agent-queries-2
+  - query: the agent that's already going - put it in a separate wt and have it do the migration there instead
+    run: 2026-09-28-agent-queries-2
+  - query: Take the idle codex terminal, give it a fresh worktree off main, and instruct it to add the retry wrapper in that directory
+    run: 2026-09-28-agent-queries-2
+  - query: Move the existing agent over to the refactor-logging worktree and have it start replacing console.log calls there
+    run: 2026-09-28-agent-queries-2
+  - query: don't start a new one, just shift the current agent to a new branch worktree and get it to write the tests there
+    run: 2026-09-28-agent-queries-2
+  - query: Existing gemini session should continue in a new worktree named perf-cache; once moved, have it implement the LRU cache
+    run: 2026-09-28-agent-queries-2
+  - query: 'The agent already running in the main checkout needs its own worktree: create one, move it, and have it build the export endpoint there'
+    run: 2026-09-28-agent-queries-2
+  - query: move claude-2 to the other worktree (payments-hotfix) and have it patch the rounding bug
+    run: 2026-09-28-agent-queries-2
+  - query: can you move that agent sitting idle into a new worktree and give it the dark mode task
+    run: 2026-09-28-agent-queries-2
+  - query: 'Reuse the running agent rather than spawning: new worktree ''docs-overhaul'', relocate the terminal, tell it to rewrite the README there'
+    run: 2026-09-28-agent-queries-2
+  - query: the existing agent is working on main by mistake - move it into a worktree for chore/deps and have it finish the dependency bumps there
+    run: 2026-09-28-agent-queries-2
+  - query: Relocate the codex pane into the api-v3 worktree that already exists and give it the job of porting the handlers
+    run: 2026-09-28-agent-queries-2
+  - query: put the agent that's already going in its own worktree so it stops touching my files, and let it keep implementing the parser there
+    run: 2026-09-28-agent-queries-2
+  - query: Move the current agent terminal to a brand-new worktree and ask it to implement the webhook retry queue in that tree
+    run: 2026-09-28-agent-queries-2
+  - query: shift the running claude into a new wt called spike-graphql and have it prototype the schema
+    run: 2026-09-28-agent-queries-2
+  - query: Without launching another agent, create worktree feat/i18n, move the existing agent there, and have it extract the UI strings
+    run: 2026-09-28-agent-queries-2
+  - query: the agent from earlier that's still open, move it to the staging-fixes worktree and have it fix the flaky cron there
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: move the agents that are already running into separate checkouts
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -485,18 +557,117 @@ boundaries:
   - query: the three agents i started in main keep overwriting each other's files, theyre all mid-task
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-24-selector-hardening
-  - query: "the claude I started earlier is just sitting there. move it into a new worktree called fix-dates and have it fix the date bug"
+  - query: the claude I started earlier is just sitting there. move it into a new worktree called fix-dates and have it fix the date bug
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-26-competition-relocate
-  - query: "shift the codex in t3 over to its own worktree before it touches anything, then let it carry on"
+  - query: shift the codex in t3 over to its own worktree before it touches anything, then let it carry on
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-26-competition-relocate
-  - query: "put that idle agent on a fresh branch in its own worktree and tell it to add the missing tests there"
+  - query: put that idle agent on a fresh branch in its own worktree and tell it to add the missing tests there
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: transcript-2026-09-26-competition-relocate
-  - query: "gemini's already open, give it a new worktree and tell it to start on the lint cleanup there"
+  - query: gemini's already open, give it a new worktree and tell it to start on the lint cleanup there
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-26-competition-relocate
+  - query: Move the Claude agent that is already working on the search refactor into its own worktree so it stops touching main.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: The codex terminal I started earlier is idle; put it in a new worktree called fix/cache-ttl and have it fix the TTL bug there.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Existing agents claude-1 and claude-2 keep overwriting each other's edits; give each running agent a worktree of its own.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: re-home the gemini agent that's mid-task into the feature/billing worktree without restarting it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: don't launch anything new, just take the three agents already open and put each on its own branch
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Shift the running Claude session out of the main checkout into a new worktree and let it carry on the migration there.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: the codex i spawned a minute ago hasn't started yet, move it to its own wt called perf/query-cache and give it the n+1 fix
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Relocate the agent panel currently doing the docs rewrite into the existing docs-v2 worktree.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: claude is halfway through the api refactor on main, get it into a separate worktree so i can keep using main
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Isolate the four already-running agents from one another: create four worktrees and move one agent into each.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Move the two agents already running in the main checkout into their own worktrees so they stop clobbering each other.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: The four claude terminals already running keep colliding; move each into its own worktree
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: Create worktrees for the agents that are already running and move them in.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Create worktrees for the two agents already running and move each into one.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: The agents all share one checkout and edit the same files; move each running agent into its own worktree.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: claude and codex are both running on main and colliding, give them separate worktrees without restarting
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Separate the three existing agent terminals so each works on its own branch in its own worktree.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Two running agents keep overwriting each other's migrations files in the shared tree; isolate them into worktrees of their own.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: move the gemini agent that's already going into the db-per-branch worktree
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Give each existing agent its own isolated environment — a worktree and branch apiece — so their edits stop clashing.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: agents are fighting over the same working copy, create worktrees and put each already-open one in its own
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Relocate the idle Codex agent from the main checkout into the existing feature/db-split worktree and let it continue there.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: The agent working on the port config is in the wrong worktree; move it to the infra worktree.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: each of my running agents needs its own branch so they can work side by side. don't spawn new ones
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: move the claude agent i already have open into a new worktree called fix-dates and have it fix the tz bug there
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: my two agents keep overwriting each other's files in the same checkout, move them into separate worktrees
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: The running claude and codex are both in the main tree and stepping on each other; give each its own worktree
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: isolate these three agents so they stop colliding, one worktree each
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: agents share one directory and one broke the other's build; separate them onto their own branches
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: Give each of the running terminals its own worktree so their edits don't collide
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: both agents are running tests in the same checkout and fighting over files - split them into worktrees and have them carry on
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: The existing agents share a working copy; relocate each into a new worktree without restarting them
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
+  - query: 'stop the agents clobbering each other: move the one doing auth into its own wt'
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: did they all pick it up
     history:

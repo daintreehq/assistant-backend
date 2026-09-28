@@ -84,6 +84,42 @@ positives:
   - Tell me why automatic pause and resume cannot run unattended.
   - The resource action says the target is not configured even though I named another worktree.
   - Inspect the resource state without dumping credential-bearing metadata.
+  - query: Check the status of the cloud devbox configured for the feature/gpu-inference worktree and report its last error.
+    run: 2026-09-28-agent-queries
+  - query: Provision the remote resource for the staging-sync worktree using its configured commands.
+    run: 2026-09-28-agent-queries
+  - query: Pause the remote VM attached to worktree perf/load-test to stop it burning credits while idle.
+    run: 2026-09-28-agent-queries
+  - query: resume remote resource for worktree ml/training-v2, verify with a fresh status read
+    run: 2026-09-28-agent-queries
+  - query: Is the devbox behind the payments worktree running or paused right now?
+    run: 2026-09-28-agent-queries
+  - query: 'Save cost: pause every worktree''s remote environment I''m not actively using, after showing what each pause command does.'
+    run: 2026-09-28-agent-queries
+  - query: The worktree card says the remote resource commands haven't been approved; check what they are and get the devbox provisioned.
+    run: 2026-09-28-agent-queries
+  - query: Tear down the cloud environment attached to the old experiment worktree but keep the worktree itself.
+    run: 2026-09-28-agent-queries
+  - query: How do I connect to the remote box provisioned for the data-pipeline worktree?
+    run: 2026-09-28-agent-queries
+  - query: Pause the ec2 devbox for worktree api/refactor at 7pm tonight.
+    run: 2026-09-28-agent-queries
+  - query: remote resource status for all worktrees, flag any in error
+    run: 2026-09-28-agent-queries
+  - query: Resume the paused remote sandbox for the frontend worktree and confirm it reports healthy.
+    run: 2026-09-28-agent-queries
+  - query: pause my devbox pls, done for the day
+    run: 2026-09-28-agent-queries
+  - query: is the cloud box for the ml wt still up? it's costing a fortune
+    run: 2026-09-28-agent-queries
+  - query: spin the remote env for feature/gpu back up
+    run: 2026-09-28-agent-queries
+  - query: provision the devbox for this worktree
+    run: 2026-09-28-agent-queries
+  - query: what's my remote resource doing, last check said error
+    run: 2026-09-28-agent-queries
+  - query: can you ssh me into the worktree's remote machine
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: how's the cloud box for this checkout doing
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -139,6 +175,66 @@ boundaries:
   - query: provision the devbox for the new worktree
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-24-selector-hardening
+  - query: Tear down the cloud devbox attached to the feat/search worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: pause the remote env for the payments wt, it's costing money
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Shut down the remote resource for worktree api-v2 but keep the worktree itself
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: clean up the devbox spend overnight — can it pause at 7pm?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Is the remote resource behind the staging worktree still running or already destroyed?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Resume the paused cloud environment for the analytics worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: kill the devbox on this worktree, not the worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Provision the remote resource for the new ml-pipeline worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: how do i connect to the cloud box for the checkout worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Save cost by stopping the remote resources we're not using on the idle worktree
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Pause the worktree's cloud devbox overnight to save money.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: what's the status of the remote dev environment attached to the feature/ml worktree?
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Tear down the cloud devbox attached to the feature/search worktree.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: destroy the remote resource for the payments wt, we're finished with it
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: Get rid of the remote dev environment backing the staging-fix worktree but keep the worktree itself.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: Remove the provisioned cloud machine for the experiment worktree; the git checkout stays.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: Deprovision the remote sandbox tied to worktree ws-82, leaving its terminals and branch alone.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: the devbox for the old-ui worktree isn't used anymore, tear it down
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: Shut down the remote resource on the billing worktree permanently.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
+  - query: Decommission the configured remote environment for wt perf-tuning since nobody uses it now.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: pause it then
     history:

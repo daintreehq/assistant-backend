@@ -60,6 +60,42 @@ positives:
   - which worktree am i in? bundle the graphql resolvers out of it
   - bundle the config layer as ndjson, im going to script over it
   - make me a snapshot of the billing code i can attach to an email
+  - query: 'Build a CopyTree bundle of the checkout flow: controllers, services, types and their tests'
+    run: 2026-09-28-agent-queries
+  - query: Produce one reference file with everything relevant to the websocket reconnect bug, fixtures included
+    run: 2026-09-28-agent-queries
+  - query: Generate a context bundle for the auth subsystem and put it on my clipboard
+    run: 2026-09-28-agent-queries
+  - query: Curate the pdf export feature's files into a single copytree file a reviewer can read later
+    run: 2026-09-28-agent-queries
+  - query: Package the rate-limiter middleware, its config and tests into a bundle for handing off to a contractor
+    run: 2026-09-28-agent-queries
+  - query: Bounded code-context file covering src/billing plus the webhook handlers that live elsewhere
+    run: 2026-09-28-agent-queries
+  - query: clipboard-ready context of the search indexing pipeline, tests included
+    run: 2026-09-28-agent-queries
+  - query: Assemble a copytree snapshot of the migration scripts and ORM models in the feat/schema worktree
+    run: 2026-09-28-agent-queries
+  - query: Pick the files that matter for the i18n loader and generate one copytree reference file, no clipboard
+    run: 2026-09-28-agent-queries
+  - query: Bundle the orders GraphQL resolvers with their schema and tests so I can paste them into another chat
+    run: 2026-09-28-agent-queries
+  - query: Gather the terrain generation code and its docs into a CopyTree file under 50k tokens
+    run: 2026-09-28-agent-queries
+  - query: Make a context file of the flaky scheduler test and the code it exercises to attach to a bug report
+    run: 2026-09-28-agent-queries
+  - query: copytree the notifications stuff for me, tests too
+    run: 2026-09-28-agent-queries
+  - query: can u bundle up everything related to the cart so i can paste it somewhere
+    run: 2026-09-28-agent-queries
+  - query: need a context file of the onboarding module
+    run: 2026-09-28-agent-queries
+  - query: make me a reference file of the payments code for tomorrow
+    run: 2026-09-28-agent-queries
+  - query: grab all the files for the image upload feature into one bundle
+    run: 2026-09-28-agent-queries
+  - query: copy the relevant auth code to my clipboard as a copytree
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: bundle up all the files related to the worktree handling so i can paste them somewhere
     confusable_with: [daintree.worktree.relocate-agents]
@@ -102,6 +138,33 @@ boundaries:
   - query: '// src/sync/queue.ts import { backoff } from ''./backoff'' import { store } from ''../db/store'' import type { Job } from ''./types'' export async function drain(q: Job[]) { for (const j of q) await backoff(() => store.put(j)) } bundle this file plus everything it imports and its tests into a copytree reference and copy it to my clipboard'
     confusable_with: [daintree.explore.repository]
     run: 2026-09-24-selector-hardening
+  - query: no agent needed, just make a copytree file of the auth module for later
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: I'll hand this to an agent tomorrow; for now bundle the reporting code into a reference file
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Bundle every file relevant to the billing subsystem, tests included, into a CopyTree context file.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Find every file involved in the search feature and bundle them into a CopyTree file
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: work out which files make up the billing module and generate a context bundle of them
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-agent-queries
+  - query: Before we fan out the endpoint work later, make one copytree file of the shared utils
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: bundle the shared types the parallel tasks all use into one reference file, no agents yet
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: 'For issue #812 just produce a CopyTree bundle of the affected files; don''t start any work yet'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: bundle the code related to ticket 3021 into a reference file i can attach to the issue
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
 followups:
   - query: also throw in the middleware tests
     history:

@@ -61,6 +61,62 @@ positives:
   - when you get a sec — could you have a look at what's defined for this repo and tell me which one is closest to 'dev server + tests + an agent'? don't run anything yet, i just want to know what's there
   - load the perf one
   - i need four tabs going at once for this — isn't there a saved thing that does that already? use it
+  - query: List the workspace recipes saved for this project and show what terminals the 'fullstack' one starts.
+    run: 2026-09-28-agent-queries
+  - query: Run the 'review-station' recipe in the existing feature/billing worktree and report which terminals came up.
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree on new branch feature/notifications with the 'api+web' recipe as its startup recipe, then check the agent it starts is live.
+    run: 2026-09-28-agent-queries
+  - query: apply recipe frontend-dev to current worktree, confirm storybook + claude terminals started
+    run: 2026-09-28-agent-queries
+  - query: Load the saved 'bug-bash' recipe into the qa worktree; it launches two agents with stored prompts.
+    run: 2026-09-28-agent-queries
+  - query: 'Inspect the ''nightly-checks'' recipe: which agents it launches and what prompts they get.'
+    run: 2026-09-28-agent-queries
+  - query: new branch chore/ts-strict in a worktree started from the 'typescript' recipe
+    run: 2026-09-28-agent-queries
+  - query: Write me a new recipe that opens a shell, the dev server and a Codex agent.
+    run: 2026-09-28-agent-queries
+  - query: Edit the 'backend' recipe so it also starts a redis-cli terminal.
+    run: 2026-09-28-agent-queries
+  - query: recipe.list for the payments worktree, then run whichever one sets up the stripe CLI listener
+    run: 2026-09-28-agent-queries
+  - query: Kick off the team's standard onboarding recipe in the docs worktree and tell me if any terminal failed to start.
+    run: 2026-09-28-agent-queries
+  - query: Spin up a worktree off develop for hotfix/rates using the default startup recipe, and wait until setup completes.
+    run: 2026-09-28-agent-queries
+  - query: run the dev recipe in this wt
+    run: 2026-09-28-agent-queries
+  - query: can you make a new worktree with the fullstack recipe for the search feature
+    run: 2026-09-28-agent-queries
+  - query: fire up my 'morning' recipe pls
+    run: 2026-09-28-agent-queries
+  - query: is there a recipe that starts the docs preview? if so run it
+    run: 2026-09-28-agent-queries
+  - query: make a recipe for me that launches claude and a test watcher
+    run: 2026-09-28-agent-queries
+  - query: New worktree off main with the dev-stack recipe as its startup so the server and watcher come up
+    run: 2026-09-28-agent-queries-2
+  - query: make a wt for the spike branch and run our usual recipe in it
+    run: 2026-09-28-agent-queries-2
+  - query: Create worktree hotfix/login with the 'api + worker' startup recipe and confirm which terminals launched
+    run: 2026-09-28-agent-queries-2
+  - query: spin up a worktree the way the frontend recipe sets it up - vite, storybook, claude
+    run: 2026-09-28-agent-queries-2
+  - query: Add a worktree for branch release/2.4 and apply the 'qa' workspace recipe on creation
+    run: 2026-09-28-agent-queries-2
+  - query: new worktree with the recipe that starts postgres and the test watcher
+    run: 2026-09-28-agent-queries-2
+  - query: Create a worktree named exp-embeddings using the saved recipe 'ml-notebook'; report whether its agent terminal is live
+    run: 2026-09-28-agent-queries-2
+  - query: worktree for the docs branch, with the docs recipe please
+    run: 2026-09-28-agent-queries-2
+  - query: Set up a worktree for feat/onboarding with our default recipe so its terminals start automatically
+    run: 2026-09-28-agent-queries-2
+  - query: can you make a worktree from the 'review' recipe for branch pr-512
+    run: 2026-09-28-agent-queries-2
+  - query: Provide a new worktree on chore/lint that boots the 'backend' recipe's terminals
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: open a checkout with my usual terminal layout
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -191,6 +247,105 @@ boundaries:
   - query: boot the worktree's startup terminals, dev server and all
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-24-selector-hardening
+  - query: Create a worktree for feature/onboarding using the 'fullstack' recipe so the agent, dev server and test watcher all start.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: run our claude+preview recipe in the current worktree
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Start the saved 'triage' recipe, which launches the reviewer agent with its stored prompt, in the payments worktree.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: new worktree off main with the frontend-dev recipe as its startup layout
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Which workspace recipes does this project have, and could I use one to launch an agent plus the storybook terminal?
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Run the 'storybook' recipe in the ui worktree; no need to rename anything
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Apply the backend recipe to the new worktree — we renamed it from 'api' to 'backend' last week
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: load the recipe i renamed to dev-all and start it
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for branch rename-user-model with the default startup recipe
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: list the recipes, i think i renamed one to e2e and want to run it
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Run the recipe that brings up the rename-service dev stack
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: make a wt with the dev recipe for the rename-api-routes branch
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Can I make a new recipe called 'rename-bench' that opens two shells?
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for the dashboard branch using the 'full-stack' recipe
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree for feature/tags using the 'web-dev' recipe so the dev server and watcher come up.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: new worktree off develop with our standard startup recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Make a worktree for hotfix/csv-encoding and apply the 'backend' recipe as its startup layout.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: branch experiment/a in a new worktree, started from the claude-plus-tests recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Which recipe should a new worktree for chore/upgrade-node20 start with? List them, then create it with the Node one.
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: spin up a worktree for scratch/sept with the usual recipe that opens storybook and a shell
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries
+  - query: Start the dev-server recipe in the new worktree so the app and watcher come up.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-agent-queries
+  - query: Create a worktree with the 'web+worker' recipe for branch feat/jobs and let me know when its agents finish.
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: worktree for fix-tz with the usual startup recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: New branch refactor/router in a worktree, start it with the 'web' recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: Add a worktree for chore/bump-node that launches the recipe's terminals on creation
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: spike/wasm worktree using the rust-dev recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: Set up release/3.0 as a worktree with the qa recipe applied
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: create a wt for experiment/sqlite-backend with our recipe that brings up the db and a claude
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: Worktree for jordan/perf-tweaks, started from the benchmark recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: docs/api-reference worktree, docs recipe
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: Create worktree bugfix/null-avatar using the saved 'frontend' workspace recipe and tell me which terminals started
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: new wt on hotfix/2.1.1 with the startup recipe so the server runs
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
+  - query: 'worktree + recipe for feat/search: the one with vite and the api'
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: is it done yet?
     history:

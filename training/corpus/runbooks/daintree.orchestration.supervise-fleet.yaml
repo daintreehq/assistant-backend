@@ -58,6 +58,46 @@ positives:
   - 12 running. dont give me all of them, just the ones that actually need a decision from me
   - is everything thats running actually being watched? attach one to anything thats not
   - something just pinged. which one was it and how are the others doing
+  - query: Go through all seven agent terminals in the payments worktree, classify each as working, waiting, finished or failed, and flag anything that needs the user
+    run: 2026-09-28-agent-queries
+  - query: 'Sweep the agents currently running on issues #412-#418 and report which have handed back and which are still busy'
+    run: 2026-09-28-agent-queries
+  - query: 'triage of every live agent pane right now: stalled, blocked, done, exited — one line each with evidence'
+    run: 2026-09-28-agent-queries
+  - query: Check on the codex and claude-2 terminals launched an hour ago and tell the user which one is blocked on something
+    run: 2026-09-28-agent-queries
+  - query: Find out whether any of the running agents has exited with a nonzero code and summarise the rest of the cohort
+    run: 2026-09-28-agent-queries
+  - query: There is a gemini terminal running that no one armed a notice on; take it under supervision along with the others
+    run: 2026-09-28-agent-queries
+  - query: cohort health check across background agents, read-only, no answers sent
+    run: 2026-09-28-agent-queries
+  - query: Report which agent terminals are currently armed to receive the user's broadcast typing
+    run: 2026-09-28-agent-queries
+  - query: Bring the next agent that needs attention into view for the user, then list what the remaining ones are doing
+    run: 2026-09-28-agent-queries
+  - query: Read the tails of the four refactor agents and say which have a coherent final message and which look stalled
+    run: 2026-09-28-agent-queries
+  - query: Look over the running fleet from the fleet broadcast the user fired and report per-terminal outcome
+    run: 2026-09-28-agent-queries
+  - query: Survey the agents in the docs-rewrite worktree and tell the user which one is sitting at a waiting prompt, quoting it
+    run: 2026-09-28-agent-queries
+  - query: state sweep of all running coding agents before the user leaves the desk; say what still needs them
+    run: 2026-09-28-agent-queries
+  - query: yo, any of the agents need me rn?
+    run: 2026-09-28-agent-queries
+  - query: is anybody stuck? there's like 6 of them going
+    run: 2026-09-28-agent-queries
+  - query: quick roll call on the agents pls
+    run: 2026-09-28-agent-queries
+  - query: show me the next one that's waiting
+    run: 2026-09-28-agent-queries
+  - query: which terminals are armed for my typing right now
+    run: 2026-09-28-agent-queries
+  - query: check on all the claudes and tell me who's done
+    run: 2026-09-28-agent-queries
+  - query: Triage all running agents and take me to the next one that needs my input.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: what are all these agents actually doing right now
     confusable_with: [daintree.worktree.relocate-agents]
@@ -255,6 +295,132 @@ boundaries:
   - query: what's each of the claude tabs actually working on
     confusable_with: [daintree.terminals.rename]
     run: 2026-09-24-selector-hardening
+  - query: 'sweep every running agent: answer whatever''s pending, close the finished ones, and tell me who still needs me'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Sweep the running agents: anyone rate-limited, stuck or waiting on me? Handle what you can and tell me the rest.'
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: how's everyone doing? go through every running agent and sort out whatever needs sorting, usage aside
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: Triage all open agent terminals — finished, working, waiting, failed — and act on each class.
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: anything need me across the agents? not asking about quota, just what state they're in
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: Check in on the fleet of six agents working the issue batch and report which ones still need the user.
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: is anyone stuck? check all the agents
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: Catch me up on the agents running right now and deal with the ones that are done.
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: There's a Codex agent running from earlier that nobody is supervising along with the others; sweep the fleet and adopt it.
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: status across all running agents, then show me the next one that needs my input
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: Which terminals are currently armed for my typed input, and which agents have finished? Act on the finished ones.
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: Go through all five running agents and tell me who's done, who's working and who needs me; nothing seems broken.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-agent-queries
+  - query: Sweep the running agents from the migration and report which need the user
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: The six agents launched this session are all running; sweep them now and say which need the user
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: whos stuck right now out of the running ones
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Read every live agent terminal this minute, classify it, and report finished versus waiting
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Take over supervision of the orphaned codex agent running in the search worktree along with the current fleet
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: any agent need me at the moment?
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Show the user the next running agent that's waiting and give a one-line status for the others
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: 'Quick triage of the fleet I just launched: done, working, failed'
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: 'Current state of the running agents on issues #40-#45, which have handed back'
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: how are all the agents doing right now
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Which of the currently running terminals will receive the user's broadcast keystrokes
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Sweep all the running agents — who's finished, who's waiting, who's stuck — and act on each.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Right now, look at every agent that is running and say which ones need the user
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: have a look at all of them now — who's stuck, who's done, anyone waiting on me?
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Before arranging anything for later, sweep the five running agents and report state per terminal
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: There's an agent from earlier in this workspace nobody is supervising; adopt it along with the rest of the running cohort
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: anything finished yet? check all the agents now
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Classify each live agent pane as working, waiting, exited or done and flag stalls
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: which of my running agents are armed for broadcast input
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Jump the view to the next agent that is sitting on a prompt and summarise the others
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: Status of the running refactor fleet this minute, with the outcome of any that handed back
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: how are the agents getting on? just a quick pass over the lot
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: what's still running from the batch, anything need me?
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: Tell me what each of the Claude terminals is doing right now and whether any of them need me
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: go through the named tabs and report which agents are done
+    confusable_with: [daintree.terminals.rename]
+    run: 2026-09-28-agent-queries
+  - query: Don't bother arranging alerts — look at every running agent right now and tell me who needs me.
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: rather than waiting for pings, check all the agents this minute and deal with whatever's up
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: No need for notifications; how's everyone doing at this moment?
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: Sweep the fleet now and flag which agents finished, which are working and which are waiting on me; no watch needed.
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
+  - query: Do an immediate pass over all agents in the batch and report any that failed or are waiting, instead of setting up a wake-up.
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: ok show me the failed one
     history:

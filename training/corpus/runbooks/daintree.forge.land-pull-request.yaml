@@ -82,6 +82,44 @@ positives:
   - Request changes publicly with the exact findings I supplied.
   - Sign off on this PR but do not merge it.
   - Use squash to land this exact PR and verify the merged state afterward.
+  - query: 'Merge PR #914 in acme/api with squash, guarding on the head commit that CI validated'
+    run: 2026-09-28-agent-queries
+  - query: Land the retry-backoff pull request now that the required checks are green and it is approved
+    run: 2026-09-28-agent-queries
+  - query: Mark draft PR 58 as ready for review so the reviewers get notified
+    run: 2026-09-28-agent-queries
+  - query: Add @priya and @ops-team as reviewers on pull request 2201 and confirm they stuck
+    run: 2026-09-28-agent-queries
+  - query: 'Submit a request-changes review on PR #77 with the three problems I found in the migration'
+    run: 2026-09-28-agent-queries
+  - query: Rebase-merge PR 1340 into release/3.1, not main
+    run: 2026-09-28-agent-queries
+  - query: 'Close pull request #506 unmerged; it was superseded by #512'
+    run: 2026-09-28-agent-queries
+  - query: Approve PR 88 on the user's behalf after the review we just did, then merge it
+    run: 2026-09-28-agent-queries
+  - query: 'Turn on auto-merge for PR #1402 so it squashes in once checks finish'
+    run: 2026-09-28-agent-queries
+  - query: 'Reopen the accidentally closed dependency bump PR, #731'
+    run: 2026-09-28-agent-queries
+  - query: Dismiss the outdated bot review blocking PR 245 and merge with a merge commit
+    run: 2026-09-28-agent-queries
+  - query: merge 914
+    run: 2026-09-28-agent-queries
+  - query: ok 58 looks good to me, approve and merge it
+    run: 2026-09-28-agent-queries
+  - query: can you squash the lockfile pr in once its green
+    run: 2026-09-28-agent-queries
+  - query: 'put #2201 back to draft, author isnt done'
+    run: 2026-09-28-agent-queries
+  - query: land it pls — the one you just opened for the cache fix
+    run: 2026-09-28-agent-queries
+  - query: 'Approve PR #12 and then squash-merge it.'
+    run: 2026-09-28-agent-queries-2
+  - query: 'enable auto merge on #55 so it lands when checks go green'
+    run: 2026-09-28-agent-queries-2
+  - query: Add @priya as a reviewer on PR 9 and mark it ready for review.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: merge 447 once the checks pass
     confusable_with: [daintree.worktree.relocate-agents]
@@ -132,6 +170,96 @@ boundaries:
   - query: rebase-merge the dependabot pr
     confusable_with: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
+  - query: 'Merge the offline mode PR, #2290'
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: 'PR #233 is approved and green, squash-merge it'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Close pull request 145 without merging, the approach was abandoned
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Check PR 57's required checks and review state, and if everything is good, merge it with a rebase
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Request review from @dana and the platform team on the pagination PR
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: land 441 once you've confirmed it's green
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Approve PR #660 — I reviewed it myself and it looks fine'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Reopen the pull request for issue 77, it was closed by mistake
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Dismiss the stale changes-requested review on PR 402 from the bot, then merge
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: convert the arm build pr back to draft, it's not ready
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Enable auto-merge on PR #1188 so it lands when checks pass'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: The PR for csv-export is approved; merge it
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Take draft PR 1177 out of draft so reviewers are pinged
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Request reviewers @li and @sam on the search-facets PR
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: approve the eslint-9 pr and squash it in
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Land the scheduler migration PR once required checks pass, guarding on the head SHA
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Close the stale draft PR for the old rate limiter approach
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: rebase-merge the websocket reconnect pr into develop
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: 'Leave a request-changes review on PR #640 listing the missing tests'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: merge my pr now that it's green
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: Reopen the merge request for feature/issue-77-cursor that I closed too early
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries
+  - query: merge PR 431 if it's green
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Squash-merge pull request #77 once required checks pass'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: approve 1204 and land it
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Mark PR #56 ready for review and request a review from @dana'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: close PR 1450 without merging, it's superseded by 1467
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'Rebase-merge the dependabot PR #3321 after confirming its checks'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'is #88 green? if so merge it'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: Dismiss the stale changes-requested review on PR 612 and merge it
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries-2
+  - query: 'PR #212 is approved and green - approve it from my side too and merge with rebase.'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: squash
     history:

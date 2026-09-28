@@ -43,9 +43,12 @@ conversation ─────────┤                                     
   positional` is the measured alternative, not the default.
 - The cardinality head makes "zero runbooks" a first-class prediction; there is no
   tuned threshold to go stale.
-- Served as ONNX **int8** for both encoders and fp32 for the head (~2.4M
-  parameters — 1% of the weights, so quantising it buys nothing). The export
-  gate fails any export whose int8 changes a *decision*, not just its logits.
+- Served as ONNX **int8** for the ranking encoder, **fp32** for the retriever
+  (quantising it never gained a case and cost up to 6; fp32 costs 67MB more) and fp32 for
+  the head (~2.4M parameters — 1% of the weights, so quantising it buys
+  nothing). The export gate compares fp32 and int8 *decisions* over the whole
+  benchmark, not logits: it fails when int8 changes the core decision on more than
+  10 cases or moves recall-pass by more than 3.
 
 ## Environment
 

@@ -6,8 +6,8 @@ are the artifact, and this is the only thing that produces them.
 
 Three graphs and a table come out of here:
 
-    retriever/model{,_int8}.onnx   stage 1 encoder, mean-pooled and L2-normalised
-    ranking/model{,_int8}.onnx     stage 2 encoder, mean-pooled
+    retriever/model.onnx           stage 1 encoder, mean-pooled and L2-normalised (served fp32)
+    ranking/model{,_int8}.onnx     stage 2 encoder, mean-pooled (served int8)
     head.onnx                      the set-wise head (fp32; ~2.4M params)
     vectors.npz                    both encoders' vectors for the build catalog
 
@@ -50,7 +50,12 @@ ARTIFACTS = (
 
 
 def _export_encoder(
-    graph: torch.nn.Module, tok, out: Path, *, max_length: int  # type: ignore[no-untyped-def]
+    graph: torch.nn.Module,
+    tok,  # type: ignore[no-untyped-def]
+    out: Path,
+    *,
+    max_length: int,
+    quantize: bool,
 ) -> None:
     out.mkdir(parents=True, exist_ok=True)
     sample = tok(
@@ -96,14 +101,18 @@ def _export_encoder(
     # returned NO runbooks for every request, while /health and /readyz stayed
     # green. The parity gate below compares int8 against fp32 on whichever
     # machine exports, so it is structurally blind to this. Keep the flag.
-    quantize_dynamic(
-        model_input=str(fp32),
-        model_output=str(out / "model_int8.onnx"),
-        weight_type=QuantType.QInt8,
-        per_channel=True,
-        reduce_range=True,
-        extra_options={"MatMulConstBOnly": True},
-    )
+    #
+    # Only the ranking encoder is quantised: serving runs the retriever in fp32
+    # (see SetwiseClassifier.__init__), so an int8 retriever would be dead weight.
+    if quantize:
+        quantize_dynamic(
+            model_input=str(fp32),
+            model_output=str(out / "model_int8.onnx"),
+            weight_type=QuantType.QInt8,
+            per_channel=True,
+            reduce_range=True,
+            extra_options={"MatMulConstBOnly": True},
+        )
     tok.save_pretrained(out)
 
     import onnxruntime as ort
@@ -127,7 +136,7 @@ def main() -> int:
     ap.add_argument("--out", default=str(ARTIFACTS / "selector"))
     args = ap.parse_args()
 
-    from transformers import AutoModel, AutoTokenizer
+    from transformers import AutoConfig, AutoModel, AutoTokenizer
 
     src = Path(args.setwise)
     meta = json.loads((src / "meta.json").read_text())
@@ -160,10 +169,16 @@ def main() -> int:
         r_tok,
         out / "retriever",
         max_length=r_meta["max_length"],
+        quantize=False,
     )
 
     state = torch.load(src / "model.pt", map_location="cpu")
-    backbone = AutoModel.from_pretrained(meta["base_model"])
+    # ModernBERT-family backbones must be traced with eager attention: their
+    # default path dispatches on runtime kernels the legacy exporter cannot
+    # capture. BERT keeps its default so the shipped graph does not change.
+    kind = AutoConfig.from_pretrained(meta["base_model"]).model_type
+    attn = {} if kind == "bert" else {"attn_implementation": "eager"}
+    backbone = AutoModel.from_pretrained(meta["base_model"], **attn)
     backbone.load_state_dict(state["backbone"])
     tok = AutoTokenizer.from_pretrained(src)
     _export_encoder(
@@ -171,6 +186,7 @@ def main() -> int:
         tok,
         out / "ranking",
         max_length=meta["max_length"],
+        quantize=True,
     )
 
     head = SetwiseHead(

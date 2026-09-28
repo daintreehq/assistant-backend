@@ -225,13 +225,17 @@ class SetwiseClassifier:
     """Two-stage runbook selection: cosine shortlist, then one set-wise judgement."""
 
     def __init__(self, directory: Path, *, quantized: bool = True) -> None:
-        """int8 encoders, fp32 head.
+        """int8 ranking encoder, fp32 retriever and head.
 
-        The encoders carry ~99% of the parameters and all of the memory
-        pressure, and quantising them is gated on decision parity in
-        ``training/export_two_stage.py``. The head is ~2.4M parameters — under
-        10MB in fp32 — so quantising it would trade measurable numerical slack
-        for memory nobody is short of.
+        The ranking encoder carries ~80% of the parameters and the memory
+        pressure, and quantising it is gated on decision parity in
+        ``training/export_two_stage.py``. The retriever is 22.7M parameters
+        (+67MB in fp32) and is the shortlist nothing downstream can repair:
+        quantising it as well never gained a case on eight artifacts and cost
+        one to six on five of them (training/EXPERIMENTS.md, 2026-09-28). The head
+        is ~2.4M parameters — under 10MB in fp32 — so quantising it would trade
+        measurable numerical slack for memory nobody is short of.
+        ``quantized=False`` runs every stage in fp32.
         """
         meta = json.loads((directory / "meta.json").read_text())
         self._meta = meta
@@ -248,10 +252,14 @@ class SetwiseClassifier:
         #: for real — an int8-built ``vectors.npz`` reused by an fp32 session
         #: moved the benchmark by two cases between two otherwise identical
         #: exports, which read as run-to-run noise and was not.
-        self._precision = "int8" if quantized else "fp32"
-        graph = "model_int8.onnx" if quantized else "model.onnx"
-        self._retriever = _session(directory / "retriever" / graph)
-        self._ranker = _session(directory / "ranking" / graph)
+        #: The stamp names the ranker's precision alone because the retriever is
+        #: fp32 in both modes. It is not plain "int8": a table stamped that was
+        #: built with an int8 retriever, and must re-embed rather than be reused.
+        self._precision = "int8-ranker" if quantized else "fp32"
+        self._retriever = _session(directory / "retriever" / "model.onnx")
+        self._ranker = _session(
+            directory / "ranking" / ("model_int8.onnx" if quantized else "model.onnx")
+        )
         self._head = _session(directory / "head.onnx")
 
         self._retriever_tok = _tokenizer(directory / "retriever", self._query_max)

@@ -62,6 +62,42 @@ positives:
   - set up a panel on the indexing question but i want a single recommendation out of it, not a discussion
   - claude wrote the migration plan. get another model to poke holes in it and keep passing it back until neither of them has objections left
   - they keep talking past each other. relay properly and get me one answer
+  - query: Have Claude and Codex jointly diagnose the intermittent 502s from the gateway, relaying each one's findings to the other until they agree on a root cause and fix plan
+    run: 2026-09-28-agent-queries
+  - query: Use the open agents claude-1 and codex-2 to cross-check each other's threat model for the upload endpoint and produce one merged document
+    run: 2026-09-28-agent-queries
+  - query: Three agents collaborate on a single migration plan for splitting the users table, iterating until they converge
+    run: 2026-09-28-agent-queries
+  - query: gemini and claude argue whether to adopt event sourcing until they converge; synthesize their final shared position
+    run: 2026-09-28-agent-queries
+  - query: 'multi-agent iteration on one API design for webhooks v2: relay critiques between agents, one final spec'
+    run: 2026-09-28-agent-queries
+  - query: Get codex to draft the incident postmortem, have claude critique it, pass the critique back, and repeat until both sign off on one version
+    run: 2026-09-28-agent-queries
+  - query: Relay proposals between the two running agents so they land on one agreed approach to the search ranking bug
+    run: 2026-09-28-agent-queries
+  - query: Coordinate three agents on why p99 latency doubled, sharing each round's evidence, and converge on one explanation
+    run: 2026-09-28-agent-queries
+  - query: codex + claude review loop producing one consolidated recommendation on the state-management rewrite
+    run: 2026-09-28-agent-queries
+  - query: Agents cross-examine each other's estimates for the payments migration effort and settle on a single number with reasoning
+    run: 2026-09-28-agent-queries
+  - query: Have two agents work the same architecture question together and hand me one synthesized answer, not two
+    run: 2026-09-28-agent-queries
+  - query: orchestrate claude, codex and gemini toward one agreed naming scheme for feature flags, relaying drafts between them
+    run: 2026-09-28-agent-queries
+  - query: get claude and codex to work together on the memory leak and give me one answer
+    run: 2026-09-28-agent-queries
+  - query: have them debate the db choice until they agree
+    run: 2026-09-28-agent-queries
+  - query: can you get the 3 agents to collaborate on the caching design, one final plan pls
+    run: 2026-09-28-agent-queries
+  - query: make codex and gemini cross-check each other on the auth bug till they converge
+    run: 2026-09-28-agent-queries
+  - query: i want claude and codex to iterate on this api design together and land on something they both like
+    run: 2026-09-28-agent-queries
+  - query: use the two open agents to thrash out one plan for the monorepo split
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: have three agents debate the caching approach and relay between them
     confusable_with: [daintree.worktree.relocate-agents]
@@ -193,9 +229,138 @@ boundaries:
   - query: have claude and gemini work the caching question together, swapping notes, and hand me one agreed answer
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: 2026-09-26-same-question-named-agents
-  - query: "have claude and codex work together on one version of the retry helper and hand me the merged result"
+  - query: have claude and codex work together on one version of the retry helper and hand me the merged result
     confusable_with: [daintree.orchestration.competition]
     run: transcript-2026-09-26-competition-relocate
+  - query: Have Claude and Codex work the flaky websocket reconnect question together, passing each one's findings to the other until they agree on one root cause
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: get codex's take on the retry logic, give it to claude to critique, and keep relaying until they settle on one recommendation
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: two agents argue the Redis vs Postgres queue question until they converge, then give me the merged conclusion
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Launch three agents that cross-check each other's analysis of the session refresh bug and synthesize a single explanation
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask claude and gemini to jointly figure out why the bundle grew, relaying between them, with one combined answer at the end
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: collaborative investigation by codex and claude into the worker memory leak, iterating until they agree
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: Use the two open agents codex-1 and claude-2 to converge on one migration plan for the billing tables
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask codex a question, forward its answer to claude for rebuttal, and continue until both endorse the same config file format
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: agents cross-examine each other's risk assessments for dropping node 18 and produce one consolidated risk list
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: get three agents iterating on one merged answer about the right caching strategy for product listings
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-09-28-agent-queries
+  - query: ask claude, codex and gemini about tRPC, then share each answer with the others and iterate until they agree on one recommendation
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: have the pinned agents discuss the cache invalidation options and converge on a single merged plan
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: get three agents' opinions on nx vs turborepo, then have them critique each other's and synthesize one answer
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Codex and Claude cross-check each other's verdicts on the error boundary placement until they agree, then report the joint conclusion
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: rather than a one-shot vote, have the agents collaborate on the API date format and give me one answer they all endorse
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Ask the fleet which billing file is riskiest, then feed each answer to the others for rebuttal until they converge
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: get all my agents working together on one recommendation for the logging library
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: three agents collaboratively design the retry policy, relaying drafts between them until there is one agreed spec
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: have codex and gemini iterate on one shared answer about why the lambda cold start is slow
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: 'multi-round: agents refine their bun vs node opinions after seeing each other''s, and land on one'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: claude and codex should work together on the cache invalidation design and converge on one plan
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: get claude and codex talking about event sourcing until they converge on one recommendation I can act on
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: roundtable of three agents on the plugin API, but it has to end with one merged proposal they all agree to
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: back-and-forth between gemini and claude on the test strategy, then synthesize the approach they agree on
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: let the agents discuss the monorepo split and relay until they reach a single consolidated plan
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: moderate a discussion among the agents about state management that must finish with one answer
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: have codex and claude talk through the latency regression and converge on the root cause
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: group chat between agents on naming conventions that produces one agreed naming scheme
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: facilitate a dialogue between the agents about the 502s until they agree on a fix plan
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: keep claude-1 and codex-2 conversing about the migration until they settle on one plan
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: let them discuss TDD, but I need a single synthesized position at the end
+    confusable_with: [daintree.orchestration.conversation]
+    run: 2026-09-28-agent-queries
+  - query: Have Claude and Codex debate the API versioning scheme until they converge on one recommendation I can adopt.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: get three agents to work the flaky scheduler together and converge on one fix
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-agent-queries
+  - query: have claude question codex and gemini about the search reindex, then combine their best ideas into one plan
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: one agent quizzes the others about the caching layer, then they all converge on one design, no winner needed
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: codex asks the other agents follow-ups on the auth architecture until the group agrees on a single approach
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: have the agents question each other's migration plans and iterate to one merged plan
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: use an interviewer agent to draw out each agent's view on test strategy, then synthesize one strategy from all of them
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: grill each agent on the CI pipeline design, then relay the answers between them until they converge
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: gemini asks probing questions of claude and codex about observability and they refine one joint answer
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: agents cross-examine each other's profiling findings until they agree on one bottleneck
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: have codex challenge claude and gemini on the data model until a single consolidated schema emerges
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
+  - query: question the three agents about the payments refactor and assemble one answer from them rather than picking one
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

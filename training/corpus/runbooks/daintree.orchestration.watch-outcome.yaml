@@ -78,6 +78,76 @@ positives:
   - in an hour, push the release branch and tell me how it went
   - queue up 'npm run lint' on the api terminal for half an hour from now
   - remind me about the release checklist at 4
+  - query: Arrange a wake-up in this pane when the codex agent refactoring the billing module stops its turn
+    run: 2026-09-28-agent-queries
+  - query: The e2e suite is running in the claude terminal; get notified once it goes quiet so the result can be read
+    run: 2026-09-28-agent-queries
+  - query: 'After PR #1204 merges, let the user know — explain honestly what mechanism can actually watch for that'
+    run: 2026-09-28-agent-queries
+  - query: Launch the benchmark agent with a stop notice so this session resumes when it finishes
+    run: 2026-09-28-agent-queries
+  - query: at 2am run the nightly data export check in a fresh terminal
+    run: 2026-09-28-agent-queries
+  - query: Delay spawning a claude agent on the changelog by fifteen minutes; do not start it now
+    run: 2026-09-28-agent-queries
+  - query: Retract the idle notice armed earlier on the gemini docs terminal; nothing else should change
+    run: 2026-09-28-agent-queries
+  - query: Remind the user in an hour to review the flaky-test report
+    run: 2026-09-28-agent-queries
+  - query: Send the migration command to the db terminal once the current seed job has stopped, and report the outcome
+    run: 2026-09-28-agent-queries
+  - query: wake-on-completion for the long-running type-check agent, with a note saying what to do next
+    run: 2026-09-28-agent-queries
+  - query: Keep watch over the deploy-check agent while the user steps away and resume here when it stops
+    run: 2026-09-28-agent-queries
+  - query: Once CI on branch fix/oauth-timeout goes green, tell the user; use a command that blocks until the checks settle
+    run: 2026-09-28-agent-queries
+  - query: Stop listening for the notice on the lint terminal; the user already saw the result
+    run: 2026-09-28-agent-queries
+  - query: ping me when codex finishes
+    run: 2026-09-28-agent-queries
+  - query: let it run overnight and wake me when it's done
+    run: 2026-09-28-agent-queries
+  - query: in 30 min kick off npm test in the build terminal
+    run: 2026-09-28-agent-queries
+  - query: lmk when the pr merges thx
+    run: 2026-09-28-agent-queries
+  - query: forget the notify on claude-2, don't need it anymore
+    run: 2026-09-28-agent-queries
+  - query: can you remind me at 5 to push the branch
+    run: 2026-09-28-agent-queries
+  - query: keep an eye on the migration agent while i grab coffee
+    run: 2026-09-28-agent-queries
+  - query: Stop watching all of them — I'll check on the agents myself.
+    run: 2026-09-28-agent-queries-2
+  - query: cancel every wake-up you scheduled
+    run: 2026-09-28-agent-queries-2
+  - query: Drop the pending notice on the codex terminal; there's no need to report when it finishes.
+    run: 2026-09-28-agent-queries-2
+  - query: Stand down the stop-notifications armed on the three test runners and leave the terminals running.
+    run: 2026-09-28-agent-queries-2
+  - query: nvm dont ping me when the build's done
+    run: 2026-09-28-agent-queries-2
+  - query: Forget the heads-up about the migration agent — I'm back at my desk now.
+    run: 2026-09-28-agent-queries-2
+  - query: No longer need to hear when the PR agent stops; abandon that wait without touching it.
+    run: 2026-09-28-agent-queries-2
+  - query: Retract the watches on the benchmark runs; they can finish on their own and I'll read results tomorrow.
+    run: 2026-09-28-agent-queries-2
+  - query: quit waiting on gemini's notice, not needed anymore
+    run: 2026-09-28-agent-queries-2
+  - query: Call off the supervision you set up on the overnight refactor agents; leave their terminals exactly as they are.
+    run: 2026-09-28-agent-queries-2
+  - query: i changed my mind about being woken when the e2e suite finishes, drop it
+    run: 2026-09-28-agent-queries-2
+  - query: Stop tracking when the lint agent completes; its finish no longer matters.
+    run: 2026-09-28-agent-queries-2
+  - query: Remove the finish alert on terminal t-77 without interrupting the agent.
+    run: 2026-09-28-agent-queries-2
+  - query: Don't report back on the three reviewers when they go idle — cancel those pending notices only.
+    run: 2026-09-28-agent-queries-2
+  - query: Unsubscribe from completion notices for every agent in the payments worktree, keeping them all running.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: keep checking that one agent every ten minutes and tell me the moment it's done — nothing else to start after it
     confusable_with: [daintree.orchestration.fan-out-work]
@@ -353,6 +423,87 @@ boundaries:
   - query: run the full bench overnight and wake me when it's done
     confusable_with: [daintree.orchestration.execute-durable-workflow]
     run: 2026-09-24-selector-hardening
+  - query: in 20 minutes spawn claude and have it run the lint fixes
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Wake me when PR #1402 actually merges'
+    confusable_with: [daintree.forge.land-pull-request]
+    run: 2026-09-28-agent-queries
+  - query: Remind me tomorrow morning to file the flaky upload bug
+    confusable_with: [daintree.forge.manage-issue]
+    run: 2026-09-28-agent-queries
+  - query: Tell the user when the schema-backfill agent finishes
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: Resume this pane when the migration agent finishes its current turn
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: pick this back up once the build is done, ping me
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Tomorrow morning, continue the rollout from where it is now
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Remove the pending wake on the refactor agent; the user will resume manually
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: let me know when the claude agent is done so we can carry on
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Arrange for this session to pick up again when the codex benchmark stops
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: unwatch the export terminal, i dont need the notice
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: After the user's meeting in an hour, remind them to resume the release checklist
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Watch the running test agent and resume here with its result
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Wake this pane when the PR for branch feat/csv-export gets merged
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-agent-queries
+  - query: Let the user know when the codex terminal running the lint fix stops, without reading the rest of the fleet
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: keep an eye on the build agent while i'm in a meeting and ping me when it's done
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Arm a notice on the claude-3 terminal so this pane wakes when its current turn ends
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Stop waiting on the notice armed for the gemini agent; the user no longer cares about its result
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: drop the watch you set on the test runner, i'll check it myself
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: In twenty minutes, check whether the agents are finished and report back
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Wake me when the release agent finishes tonight even if I'm away from the desk
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: tell me when the one agent doing the schema migration goes idle
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Cancel the pending wake-up on the docs agent and don't touch the terminal itself
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Notify this pane when the benchmark agent stops so its numbers can be read then
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Codex is still working on the migration; let me know when it's done.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-agent-queries
+  - query: Stop waiting on the notice for the docs agent; leave its terminal open
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-agent-queries
+  - query: 'Let me know when PR #233 finally merges, I''m heading out'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-agent-queries
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:

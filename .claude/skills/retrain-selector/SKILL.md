@@ -115,6 +115,22 @@ two-runbook turns, topic shifts that share the loaded runbook's vocabulary, no-t
 turns while something is loaded, fences in both directions, pasted output before
 the ask — was the only change that moved routing (+8 cases on a sealed suite).
 
+**Write most rows the way production asks.** `search_runbooks` queries are written by
+the CALLING agent — short, imperative task descriptions ("Move a running agent to a new
+worktree and have it implement a code change") — and in 2026-09 only 3% of the corpus
+looked like that. Briefing generators for ~65% agent-written rows (Claude- and
+Codex-style) and ~35% users' own words was worth +15-20 cases and took the
+production-shaped holdout (round 4) from 93.5% to 99.3% (`training/EXPERIMENTS.md`,
+2026-09-28). Keep that mix. And **any brief asking for "no runbook applies" rows must
+say whether each is a Daintree documentation question** — product questions are
+`docs: true`; a brief that forgot it relabelled 17 of them not-docs and failed the
+docs floor.
+
+`--init-seed` gives every seed the same head initialisation, so the seeds of one recipe
+can be averaged into one model (`python -m training.soup_setwise <dirs> --out <dir>`).
+Measured: a soup scores at the seed mean — it removes the lottery at 3x training cost,
+it does not beat it.
+
 ### 2. Ingest into the curated corpus, then compile
 
 The corpus is **three planes** — raw journals, curated YAML, compiled artifact —
@@ -191,14 +207,18 @@ and is the ablation showing the head does not depend on stage 1's scores.
 $PY -m training.export_two_stage
 ```
 
-Exports both encoders (fp32 + int8) and the head, rebuilds `vectors.npz` through
-the **shipped** `sync()` path, and gates on decision parity across the whole
-benchmark.
+Exports both encoders (the retriever fp32 only, the ranking encoder fp32 + int8)
+and the head, rebuilds `vectors.npz` through the **shipped** `sync()` path, and
+gates on decision parity across the whole benchmark. Serving runs the retriever
+in fp32 and the ranking encoder in int8 (measured 2026-09-28: an int8 retriever
+never gained a case and cost 1-6 on five of eight artifacts, for 67MB saved).
 
-**int8 is a lottery**: `quantize_dynamic` is nondeterministic, so each export
-draws a slightly different int8 graph (measured spread ~2 recall-pass cases).
-The gate scores every draw; if step 5 lands below its floor, export again — and
-never re-export an already-measured artifact without re-measuring.
+**int8 is a property of the weights, not a draw**: re-exporting the same
+checkpoint reproduces the same int8 decisions (checked 2026-09-28), so a gate
+failure is not fixed by exporting again. What varies is each RETRAIN's weights —
+one seed's int8 lost 5 dev cases against its fp32, another's gained 1. If the
+gate fails, the staged artifact is left in `<out>.staging`; score it, and judge
+the recipe over seeds rather than chasing one checkpoint's quantisation.
 
 ### 5. Score the SHIPPED artifact
 

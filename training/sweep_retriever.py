@@ -16,9 +16,10 @@ So the rule this sweep applies: ``r@32`` must be 1.000 (a shortlist that drops
 the answer caps the whole selector below where it already is), and among the
 backbones that clear it, pick on ``r@8``/``r@3`` and cost.
 
-Latency is measured through the SHIPPED path — exported to ONNX int8, single
-intra-op thread, matching the 1-vCPU container — not as torch on MPS, which
-would flatter every candidate equally and rank them wrongly.
+Latency is measured through the SHIPPED path — exported to ONNX fp32 (the
+retriever is served unquantised since 2026-09-28), single intra-op thread,
+matching the 1-vCPU container — not as torch on MPS, which would flatter every
+candidate equally and rank them wrongly.
 """
 
 from __future__ import annotations
@@ -51,11 +52,10 @@ CANDIDATES = [
 
 
 def measure(model_dir: Path, base: str) -> dict[str, float]:
-    """Export to ONNX int8 and time it the way production runs it."""
+    """Export to ONNX fp32 and time it the way production runs it."""
     import numpy as np
     import onnxruntime as ort
     import torch
-    from onnxruntime.quantization import QuantType, quantize_dynamic
     from transformers import AutoModel, AutoTokenizer
 
     from training.setwise_model import RetrieverGraph
@@ -84,17 +84,10 @@ def measure(model_dir: Path, base: str) -> dict[str, float]:
         do_constant_folding=True,
         dynamo=False,
     )
-    int8 = tmp / "model_int8.onnx"
-    quantize_dynamic(
-        model_input=str(fp32),
-        model_output=str(int8),
-        weight_type=QuantType.QInt8,
-        extra_options={"MatMulConstBOnly": True},
-    )
     opts = ort.SessionOptions()
     opts.intra_op_num_threads = 1
     opts.inter_op_num_threads = 1
-    sess = ort.InferenceSession(str(int8), opts, providers=["CPUExecutionProvider"])
+    sess = ort.InferenceSession(str(fp32), opts, providers=["CPUExecutionProvider"])
     # A realistic conversation query, not a three-word one: cost is linear-ish in
     # sequence length and a short probe would rank the deep models too kindly.
     probe = tok(
@@ -117,11 +110,11 @@ def measure(model_dir: Path, base: str) -> dict[str, float]:
         sess.run(None, feed)
         times.append((time.perf_counter() - started) * 1000)
     times.sort()
-    size_mb = int8.stat().st_size / 1e6
+    size_mb = fp32.stat().st_size / 1e6
     shutil.rmtree(tmp)
     return {
         "params_m": round(params / 1e6, 1),
-        "int8_mb": round(size_mb, 1),
+        "fp32_mb": round(size_mb, 1),
         "p50_ms": round(times[len(times) // 2], 2),
         "mean_ms": round(statistics.mean(times), 2),
         "tokens": int(probe["input_ids"].shape[1]),
@@ -169,11 +162,11 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(rows, indent=2))
 
-    print(f"\n{'backbone':46} {'params':>7} {'int8':>7} {'p50':>7} "
+    print(f"\n{'backbone':46} {'params':>7} {'fp32':>7} {'p50':>7} "
           f"{'r@3':>6} {'r@8':>6} {'r@16':>6} {'r@32':>6}")
     for row in rows:
         print(
-            f"{row['base_model']:46} {row['params_m']:>6.1f}M {row['int8_mb']:>6.1f}M "
+            f"{row['base_model']:46} {row['params_m']:>6.1f}M {row['fp32_mb']:>6.1f}M "
             f"{row['p50_ms']:>6.2f}ms {row.get('r@3', 0):>6.3f} {row.get('r@8', 0):>6.3f} "
             f"{row.get('r@16', 0):>6.3f} {row.get('r@32', 0):>6.3f}"
         )

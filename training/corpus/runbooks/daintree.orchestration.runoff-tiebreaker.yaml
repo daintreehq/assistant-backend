@@ -59,6 +59,46 @@ positives:
   - three of them are on 3 points each. new entries from all three and everyone votes
   - yep, runoff between those two then
   - hang on, that wasn't a win, they were joint first. run the extra round
+  - query: The peer vote in the README-intro contest finished 2-2 between Claude and Gemini; ask both for a revised entry and have the same four agents vote again.
+    run: 2026-09-28-agent-queries
+  - query: Tiebreak the fleet poll on the queue library — BullMQ and Bee-Queue each got two votes — using the same agents as voters.
+    run: 2026-09-28-agent-queries
+  - query: 'runoff: tied entrants codex + claude-2 resubmit, original cohort revotes, accurate tally'
+    run: 2026-09-28-agent-queries
+  - query: Resolve the deadlocked vote from the logo-pitch competition by running a second round restricted to the two tied entries, with no new agents.
+    run: 2026-09-28-agent-queries
+  - query: The competition over the retry wrapper ended in a three-way tie; collect fresh submissions from the three and poll the original electorate.
+    run: 2026-09-28-agent-queries
+  - query: Break the tie in yesterday's agent vote on the dashboard layout with the same cohort, and make sure no agent votes for its own entry.
+    run: 2026-09-28-agent-queries
+  - query: tied peer vote on the CSV export implementations, hold a runoff between the finalists
+    run: 2026-09-28-agent-queries
+  - query: Our pinned-agent poll between option A and option B for the auth flow came back even; run a tiebreaking round with those same agents.
+    run: 2026-09-28-agent-queries
+  - query: Second-round vote between the two top-scoring fun facts since they tied on points; keep the voters identical to round one.
+    run: 2026-09-28-agent-queries
+  - query: 'Deadlock in the bake-off: Gemini''s and Codex''s rate limiter versions tied. Get improved versions from just those two and re-poll everyone.'
+    run: 2026-09-28-agent-queries
+  - query: runoff after tie in naming contest, same electorate, report final tally and winner
+    run: 2026-09-28-agent-queries
+  - query: The tagline competition ended even; ask the tied agents for one more entry each and have the other agents pick between them.
+    run: 2026-09-28-agent-queries
+  - query: Tied blind vote on the caching proposals — settle it with a runoff among the current terminals rather than launching new agents.
+    run: 2026-09-28-agent-queries
+  - query: its a tie!! do a tiebreaker with the same agents
+    run: 2026-09-28-agent-queries
+  - query: claude and codex tied 2-2, run it off
+    run: 2026-09-28-agent-queries
+  - query: the vote was split evenly between the two schema designs. can you get the agents to vote again on just those two
+    run: 2026-09-28-agent-queries
+  - query: tiebreak round pls — same voters, the two tied ones submit again
+    run: 2026-09-28-agent-queries
+  - query: we got a draw in the refactor comp between gemini and claude-2. settle it
+    run: 2026-09-28-agent-queries
+  - query: hmm tied again on the logo thing. another runoff with the same 4 agents
+    run: 2026-09-28-agent-queries
+  - query: 3 votes each, no winner. need a runoff between the finalists
+    run: 2026-09-28-agent-queries
 boundaries:
   - query: the poll came out 2-2, run a tie-break round with the same agents
     confusable_with: [daintree.agents.poll-pinned-agents]
@@ -127,6 +167,72 @@ boundaries:
   - query: tied between codex and grok on the elimination vote, do a runoff between them
     confusable_with: [daintree.orchestration.debate-elimination]
     run: 2026-09-24-selector-hardening
+  - query: the pinned agents' vote on the accent colour tied 2-2, run another round between the tied options
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: The tagline contest ended 2-2 between Claude's and Codex's entries; run a tiebreak round with the same voters.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: tie between gemini and claude-2 in the refactor comp, get fresh submissions from just those two and have everyone vote again
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Break the deadlock from the last peer vote: the two tied entrants resubmit and the original cohort re-votes.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: the naming competition tied, do a runoff
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Our bake-off tally came out even between the two rate limiter versions; hold a second round among the same agents to settle it.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Runoff between the finalists of the fun-fact contest, same electorate, no new agents.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: two entries tied on 3 votes each — ask codex and claude for a new entry apiece and have all four agents vote once more
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: The blind peer vote on the caching proposals is a dead heat; settle it with a tie-breaking round using the existing agents.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: it's a draw between claude and gemini. tiebreaker please, same judges
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: 'Finish off the logo pitch competition: it tied three ways, so run a runoff among those three with the original voters.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: The elimination vote after the ORM debate tied between Codex's and Gemini's positions; run a tiebreak with the same agents.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: vote-off came out 1-1-1, need a runoff between those tied with the same voters
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: The debate's elimination round is deadlocked two votes each; ask the tied agents for a fresh statement and have the original cohort vote again.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: tie in the vote-off after the redis debate. tiebreaker round please, don't add new agents
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Settle the tied peer vote from the monolith-vs-microservices debate with a runoff among the same participants.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Two positions tied for weakest after the debate; hold a second vote between just those two using the existing electorate.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: the agents voted but its a draw between claude and codex — run it off
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: Debate vote ended even; break the tie with new submissions from the tied agents and a recount from everyone who voted before.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: runoff for the tied elimination vote, same cohort, report the new tally
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: The agents couldn't agree who to vote off — it's tied. Do a tiebreaker round with the original three.
+    confusable_with: [daintree.orchestration.debate-elimination]
+    run: 2026-09-28-agent-queries
+  - query: the interview vote between claude and codex came out tied; run a runoff with the same agents
+    confusable_with: [daintree.orchestration.interview]
+    run: 2026-09-28-agent-queries
 followups:
   - query: how's it going?
     history:

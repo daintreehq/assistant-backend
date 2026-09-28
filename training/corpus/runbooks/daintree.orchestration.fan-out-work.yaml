@@ -64,6 +64,48 @@ positives:
   - rolling batch please. 30 total, never more than 6 live, keep going till the list is empty
   - queue these up and drip-feed them to agents, at most three running at any moment
   - as each agent finishes, launch the next ticket from the list. cap it at four
+  - query: 'Put an agent on each of issues #812, #815, #820 and #833, each in a fresh worktree, and run /implement then /review then /pr per terminal'
+    run: 2026-09-28-agent-queries
+  - query: Split the dark-mode work into non-overlapping file-scoped tasks — header, sidebar, settings page — and give each its own claude in its own worktree
+    run: 2026-09-28-agent-queries
+  - query: Launch codex in every existing issue worktree that has no agent yet and send it the issue brief
+    run: 2026-09-28-agent-queries
+  - query: parallel agents for the 9 open 'good first issue' tickets, one per worktree, a failed one only stops its own chain
+    run: 2026-09-28-agent-queries
+  - query: Drain the backlog of 40 typo fixes with at most 6 agents at a time, starting the next whenever one completes
+    run: 2026-09-28-agent-queries
+  - query: Assign the three independent API endpoint stubs to separate agents concurrently, each committing on its own branch
+    run: 2026-09-28-agent-queries
+  - query: Fan the Sentry error fixes out across worktrees, checking none of them share the lockfile or migrations
+    run: 2026-09-28-agent-queries
+  - query: 'Run the project''s /fix-issue skill in a separate claude terminal for each of #140-#146'
+    run: 2026-09-28-agent-queries
+  - query: 'cap 4 concurrent: queue of dependency-upgrade tasks, refill as slots free, delete each worktree once its branch is pushed'
+    run: 2026-09-28-agent-queries
+  - query: Give gemini, codex and claude one disjoint module each to add unit tests to, in isolated worktrees
+    run: 2026-09-28-agent-queries
+  - query: Kick off a batch of unrelated refactors — one agent per package — and report per-unit status
+    run: 2026-09-28-agent-queries
+  - query: Launch agents on every issue labelled ready-for-dev in parallel, skipping ones that already have a worktree
+    run: 2026-09-28-agent-queries
+  - query: one worktree and agent per translation file for the six new locales, all at once
+    run: 2026-09-28-agent-queries
+  - query: 'start agents on #41 #42 #43 and #47, one wt each'
+    run: 2026-09-28-agent-queries
+  - query: do all the open bugs in parallel, max 3 at a time
+    run: 2026-09-28-agent-queries
+  - query: spin up a claude per issue in the milestone and let them run
+    run: 2026-09-28-agent-queries
+  - query: keep going til all 25 are done, no more than 5 running
+    run: 2026-09-28-agent-queries
+  - query: each of these 4 tickets gets its own codex pls
+    run: 2026-09-28-agent-queries
+  - query: open an agent in every issue worktree i've got
+    run: 2026-09-28-agent-queries
+  - query: parallelize the test coverage work across the packages, separate worktrees
+    run: 2026-09-28-agent-queries
+  - query: put an agent on each of these 8 issues, max 3 at once, and each one runs /implement then /review then /open-pr in order
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: take these six issues and put an agent on each one
     confusable_with: [daintree.worktree.relocate-agents]
@@ -386,12 +428,108 @@ boundaries:
   - query: morning! got issues 301 302 305 and 311, all independent — one codex each in its own worktree please
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-24-selector-hardening
-  - query: "give claude the parser cleanup and codex the export fix, each in its own worktree"
+  - query: give claude the parser cleanup and codex the export fix, each in its own worktree
     confusable_with: [daintree.orchestration.competition]
     run: transcript-2026-09-26-competition-relocate
-  - query: "launch three new agents, one per worktree, one issue each: 41, 42 and 43"
+  - query: 'launch three new agents, one per worktree, one issue each: 41, 42 and 43'
     confusable_with: [daintree.worktree.relocate-agents]
     run: transcript-2026-09-26-competition-relocate
+  - query: 'Launch Codex and Claude in parallel, one per issue for #41 and #42, each in its own worktree.'
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-09-28-agent-queries
+  - query: 'give each of three agents its own issue from the backlog, #101, #102 and #103, in separate worktrees'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-09-28-agent-queries
+  - query: Inject the shared API client context into each of the five agents working the endpoint issues
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: 'one agent per issue for #201-#205, each primed with the SDK context'
+    confusable_with: [daintree.context.curate-copytree-bundle]
+    run: 2026-09-28-agent-queries
+  - query: 'Launch one agent per issue for #88, #91 and #94, each in its own worktree.'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: 'Give each of four agents a different issue — #301, #302, #305, #309 — in its own worktree and have them work in parallel.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-agent-queries
+  - query: Plan and run the eight independent lint-rule fixes, one agent per worktree, all at once
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: split the icon migration into disjoint per-package tasks and launch them in parallel
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: 'Run issues #301, #305 and #311 through implement, review and PR, each in its own worktree and chain'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: Work through 30 small bug tickets with no more than 5 agents running, refilling as each finishes
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: track these 12 unrelated doc fixes, one codex each in separate worktrees
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: Open a claude terminal in each existing issue worktree and send its /implement command
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: Parallel units across worktrees for the accessibility audit findings, none of them touch the same files
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: keep a queue of the flaky test fixes going, 3 at a time till all are done
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: Hand each of the four microservices' dependency bumps to its own agent concurrently
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: batch the good-first-issue tickets out to agents, one worktree each, and advance each independently
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-agent-queries
+  - query: 'split the refactor: one agent takes api/, another takes web/, each in its own worktree'
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-09-28-agent-queries
+  - query: Work through these 24 issues with at most 4 agents at a time, starting the next whenever one finishes
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-09-28-agent-queries
+  - query: 'Run our /implement custom command in a Codex agent for each of issues #60, #61 and #62.'
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-09-28-agent-queries
+  - query: Pick the five smallest open bugs and launch an agent on each in its own worktree
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: 2026-09-28-agent-queries
+  - query: start issues 101, 102, 105 and 110, one agent and worktree each
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Start work on issues #812, #815 and #820, each with its own agent and worktree'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'pick up #31 and #32 at the same time, separate wts'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Begin every issue in the v2.4 milestone, one claude per ticket
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Set up worktrees and agents for the five bugs triaged this morning, all in parallel
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: start work on all the issues labelled quick-win
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Put codex on #90 and claude on #91 simultaneously, each on its own branch'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: kick off the 3 tickets we picked, an agent each
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Use startWorkOnIssue for each of #700 to #706 concurrently and track them'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: start these 10 issues from my list, 2 at a time
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: Pick up the two related-but-independent tickets on logging and metrics in parallel worktrees
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-09-28-agent-queries
+  - query: 'Start an agent for each of issues #201-#205 in its own worktree.'
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-agent-queries
 followups:
   - query: yeah all of them except the docs one
     history:

@@ -36,6 +36,48 @@ positives:
   - how much codex have i got left before it cuts me off
   - hows my quota, i want to know which agent to use for the next big job
   - can you check whether i have enough claude left to run a long refactor
+  - query: Find out how much of Claude Code's five-hour and weekly allowance is left and when each window resets, read from its own usage screen.
+    run: 2026-09-28-agent-queries
+  - query: Before launching a six-agent batch, read the remaining Codex quota and reset times without giving Codex any task.
+    run: 2026-09-28-agent-queries
+  - query: remaining premium requests for copilot this month, read-only
+    run: 2026-09-28-agent-queries
+  - query: Report how close the Gemini CLI is to its daily request cap, using the command inside the CLI that only displays usage.
+    run: 2026-09-28-agent-queries
+  - query: Check the remaining credits on the Kimi agent and where that figure came from.
+    run: 2026-09-28-agent-queries
+  - query: Read the usage/limits view for both Claude and Codex and report what's left on each plus reset times, side by side.
+    run: 2026-09-28-agent-queries
+  - query: The user wants to know how to check usage in the Grok CLI and what it currently shows.
+    run: 2026-09-28-agent-queries
+  - query: codex weekly limit remaining + reset time, don't send it a prompt
+    run: 2026-09-28-agent-queries
+  - query: 'Follow-up to the Claude usage read: now do the same for Antigravity.'
+    run: 2026-09-28-agent-queries
+  - query: Open a Claude Code session only to run its usage command and report the session and weekly percentages consumed.
+    run: 2026-09-28-agent-queries
+  - query: How much allowance does each configured agent CLI have left today? Read each one's own status screen rather than asking the agent.
+    run: 2026-09-28-agent-queries
+  - query: Determine whether Codex has enough quota left this week for a long overnight refactor, based on its usage display.
+    run: 2026-09-28-agent-queries
+  - query: rate limit headroom for gemini and claude-2, figures from their own usage output
+    run: 2026-09-28-agent-queries
+  - query: how much claude usage do i have left
+    run: 2026-09-28-agent-queries
+  - query: am i close to my codex weekly cap?
+    run: 2026-09-28-agent-queries
+  - query: when does my claude 5 hour limit reset
+    run: 2026-09-28-agent-queries
+  - query: whats left on copilot premium requests
+    run: 2026-09-28-agent-queries
+  - query: check my usage on gemini pls, and codex too
+    run: 2026-09-28-agent-queries
+  - query: how do i see how much quota grok has left? just check it for me
+    run: 2026-09-28-agent-queries
+  - query: same thing for kimi — how much is left
+    run: 2026-09-28-agent-queries
+  - query: Check Claude Code and Codex remaining allowance and when each resets.
+    run: 2026-09-28-agent-queries-2
 boundaries:
   - query: check my claude usage before you start anything
     confusable_with: [daintree.agents.ask-and-relay]
@@ -111,6 +153,45 @@ boundaries:
   - query: • Edited src/search/index.ts (+120 -34) • Ran npm test (212 passed) • Edited src/search/rank.ts (+48 -9) • Ran npm run lint • Thinking about next step... codex has been churning like that all morning. how much of its quota do i have left before it cuts me off
     confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
+  - query: How much of Codex's weekly allowance is left and when does it reset
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: is claude close to its 5 hour cap?
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-agent-queries
+  - query: Before I start more agents, how much of the weekly allowance is left on Codex and Claude?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: check on the agents — specifically how much five-hour quota each CLI has left
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Across all the configured agents, report remaining credits and reset times from each CLI's own usage screen.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: how are we doing on limits? claude, codex, gemini — whats left on each
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: 'Fleet-wide quota check: premium requests left on Copilot and weekly usage on Codex, read-only.'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: skip the fleet sweep — i only want to know if codex is near its weekly cap
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Sweep each agent CLI's usage view and tell me which ones are close to their five-hour limit.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: when does each of the agents' rate limit reset? i want to plan tonight's batch
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: 'Status of the Claude plan: session usage and weekly usage percentages, read from its own screen.'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: how much budget do the agents have left before they get throttled
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-agent-queries
+  - query: Open a fresh Codex pane and read its /status screen so I know how much of the weekly limit is left.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries-2
 followups:
   - query: now do grok
     history:

@@ -53,9 +53,10 @@ where = ["src"]
 [tool.setuptools.package-data]
 daintree_assistant_server = [
     "runbooks/files/*.md",
-    # The local two-stage runbook selector — the SHIPPED selector. Both encoders
-    # ship int8 only: fp32 is gitignored and exists locally so the export can
-    # measure what quantisation costs. The head is fp32 (~10MB) because it is
+    # The local two-stage runbook selector — the SHIPPED selector. The ranking
+    # encoder ships int8 only (its fp32 graph is gitignored and exists locally so
+    # the export can measure what quantisation costs); the retriever ships fp32,
+    # which is what serving loads. The head is fp32 (~10MB) because it is
     # 1% of the parameters and quantising it would trade numerical slack for
     # memory nobody is short of. vectors.npz is a build-time CACHE of the
     # catalog's embeddings — serving re-derives it from the live catalog, so a
@@ -64,7 +65,7 @@ daintree_assistant_server = [
     "runbooks/local/artifacts/selector/labels.json",
     "runbooks/local/artifacts/selector/head.onnx",
     "runbooks/local/artifacts/selector/vectors.npz",
-    "runbooks/local/artifacts/selector/retriever/model_int8.onnx",
+    "runbooks/local/artifacts/selector/retriever/model.onnx",
     "runbooks/local/artifacts/selector/retriever/tokenizer*.json",
     "runbooks/local/artifacts/selector/ranking/model_int8.onnx",
     "runbooks/local/artifacts/selector/ranking/tokenizer*.json",

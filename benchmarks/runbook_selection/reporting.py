@@ -13,7 +13,13 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 def save_doc(doc: dict[str, Any], out: Path | None = None) -> Path:
     if out is None:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        out = RESULTS_DIR / f"{stamp}-{doc['meta']['variant']}.json"
+        meta = doc["meta"]
+        # Only the retired live bench names a variant. `bench local` is told apart
+        # by its precision; `bench scale` has neither, so it falls back to its suite.
+        label = meta.get("variant") or (
+            f"local-{meta['precision']}" if "precision" in meta else str(doc.get("suite", "run"))
+        )
+        out = RESULTS_DIR / f"{stamp}-{label}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     return out
