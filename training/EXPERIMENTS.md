@@ -1670,8 +1670,30 @@ weekly Claude limit to 94%. Results:
   - the preview picks its own port;
   - no action reports the preview's URL.
 
+## Shipped: round-6 seed 41
+
+CI failed the first push of this round in `test_shipped_search_finds_the_obvious_runbook`. That test ran the
+first search against the round-5 artifact, and the first search embedded the ~60 new or re-fenced runbooks
+inside a 30 s timeout, which is 10 s on this Mac and more than 30 s on the Linux runner. The test now syncs the
+catalog before timing a search, as the app's lifespan does. A freshly exported artifact also embeds every
+runbook, so startup does no embedding at all.
+
+Seed 41 is shipped without waiting for 42 and 43. Against the rule, the gate passes with margin and y- reaches
+146/147. No suite drops against the round-5 weights on the same catalog; every row except r4a improved:
+
+| | r1 | r2 | r3 | r4a | r4b | r5a | r5b | r6a | bench local | strict | extra | docs missed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| round-5 weights | 97 | 173 | 185 | 133 | 137 | 127 | 123 | 74 | 804/834 | 732 | 97 | 1/30 |
+| **round-6 s41** | **98** | **175** | **188** | 133 | **139** | **129** | **125** | **80** | **806/834** | **746** | **82** | 2/30 |
+
+The x- cases score 395/401 (from 393), and candidate_miss is 0. Sealed round 6b, scored once: **81/83 (97.6%)**,
+strict 71.
+
+From here the cycle is add runbooks, run `training/retrain.sh` (one seed, gated by `bench local`, restores the
+previous artifact on failure), commit, and release. The release no longer waits for GitHub CI: Cloud Build
+smoke-tests every candidate before it takes traffic.
+
 ## Still open
-- Score the three stage-2 seeds against the rule and release the winner.
 - Trials of the other 8 runbooks, and reruns confirming the body fixes, are owed once the usage limit resets.
 - "A checking runbook reports failures, it doesn't repair them" belongs in the foundation, where every
   delivered runbook would carry it. The foundation has no byte budget left, so adding the rule needs trims

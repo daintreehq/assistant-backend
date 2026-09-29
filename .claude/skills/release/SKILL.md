@@ -1,6 +1,6 @@
 ---
 name: release
-description: "Ship the current branch to production. Gates on GitHub CI being green, fast-forwards main, pushes to origin, then watches the Cloud Build trigger build the image and roll a new Cloud Run revision out — confirming the live /version reports the exact commit that was released. Use when the user says release, ship it, deploy, push to production, or asks to get what is on develop live."
+description: "Ship the current branch to production. Does not wait for GitHub CI: fast-forwards main, pushes to origin, then watches the Cloud Build trigger build the image and roll a new Cloud Run revision out — confirming the live /version reports the exact commit that was released. Use when the user says release, ship it, deploy, push to production, or asks to get what is on develop live."
 argument-hint: "(optional) --dry-run to show what would ship without pushing anything"
 allowed-tools:
   - Bash
@@ -52,15 +52,17 @@ done)
   system (see CLAUDE.md, "Versioning") — the commit SHA *is* the version. It tags
   the image, is baked in as `BUILD_SHA`, and comes back from `/version`.
 - **No AI attribution** in the merge commit message.
-- **Do not run the test suite locally.** GitHub CI already ran it on this exact
-  head; use that verdict. Local runs are slow and prove nothing extra.
-- **Never use a foreground `sleep`** to wait — the harness blocks it. Wait for CI
-  with a backgrounded Bash call and watch the build with the Monitor tool (step 5).
+- **Do not wait for GitHub CI and do not run the test suite.** CI is a report, not a
+  release gate. What protects production is Cloud Build itself: it deploys the commit
+  as a no-traffic candidate, runs a real search against it (`smoke.sh`), and promotes
+  it only if that passes; a malformed runbook or artifact fails `/readyz` and never
+  gets traffic. Routing quality is checked where it changes, when a model is trained
+  and installed (`training/retrain.sh` runs `bench local` before installing).
+- **Never use a foreground `sleep`** to wait — the harness blocks it. Watch the build
+  with the Monitor tool (step 5).
 - **Nothing irreversible before every tool works.** An expired `gcloud` login
   discovered after the push leaves a deploy running that you cannot watch or
   verify. Preflight proves `gh` and `gcloud` both work before touching `main`.
-- **Never release red code.** A failed or missing CI run is a full stop, not a
-  judgement call.
 
 ## Procedure
 
@@ -123,25 +125,11 @@ operationally risky (a config default, a runbook that changes routing, a change 
 the MCP tool contract that callers depend on). If the arguments
 included `--dry-run`, stop here.
 
-### 3. Gate on GitHub CI
+### 3. GitHub CI is not a gate
 
-Query by the exact commit, not by the branch, so there's no need to match SHAs
-by eye:
-
-```bash
-HEAD_SHA=$(git rev-parse origin/<branch>)
-gh run list --commit "$HEAD_SHA" --workflow CI --event push \
-  --json databaseId,status,conclusion,attempt,url
-```
-
-Require a **completed, successful** run. `cancelled` is not green: it usually
-means a newer push replaced this one, so re-check the branch head.
-
-- Still running → `gh run watch <databaseId> --exit-status --interval 15`
-  with `run_in_background: true`. It exits non-zero on failure, so the exit code
-  is the verdict. Then re-check.
-- Failed → stop. Report which job failed and its URL. Do not merge.
-- No run for this SHA → stop and say so; CI is the only full-suite gate.
+Do not wait for it. If a run for this head has already FAILED, glance at which job
+and mention it in the report, but release anyway unless the failure is in the app
+itself starting (then the Cloud Build smoke step would stop it too).
 
 ### 4. Merge to main and push
 

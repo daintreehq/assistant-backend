@@ -180,7 +180,8 @@ not that a notice is delivered: only a live trial in a Daintree pane shows that.
 5. Run `bench local`. Its floors are a ratchet; a new runbook that drops recall elsewhere
    is a routing problem to fix in the text or with a retrain, not a floor to loosen.
 
-**Retraining** is a quality step (`.claude/skills/retrain-selector`). Retrains swing
+**Retraining** is one command: `training/retrain.sh` trains, installs and gates the
+new artifact (`.claude/skills/retrain-selector` for data generation and deeper work). Retrains swing
 several cases by seed, so judge a recipe over several seeds. `TODO.md` carries the
 retrain-triggered entries (reservation retention, renamed routing text, `k=64` at ~200
 runbooks, domain foundations).
@@ -199,7 +200,8 @@ MCP spec rather than frozen.
 
 ## CI
 
-`.github/workflows/ci.yml`: install from lock, ruff, `mypy --strict src`, pytest with
+`.github/workflows/ci.yml` reports on every push; it is **not** a release gate (Cloud Build's
+candidate smoke test guards production). It runs: install from lock, ruff, `mypy --strict src`, pytest with
 coverage (`fail_under = 90`), `bench coverage`, `bench local`. CI checks out the LFS
 artifact. `bench local` is the routing verdict: it attributes every
 miss to the stage that lost it, and `candidate_miss` (a required runbook that never

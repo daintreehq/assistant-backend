@@ -14,6 +14,17 @@ allowed-tools:
 
 # Retrain the local runbook selector
 
+## The normal cycle: add runbooks → retrain → release
+
+1. Add or edit runbooks, cases and training rows (step 1-2 below for generating rows).
+2. `training/retrain.sh` — compiles the corpus, trains both stages (one seed), exports,
+   installs the artifact and runs `bench local`; on a failed gate it puts the previous
+   artifact back and exits non-zero. About an hour on Apple silicon.
+3. Commit (the artifact is Git LFS) and `/release`. The release does not wait for CI.
+
+Everything below — seed sweeps, holdout rounds, decision rules — is for investigating a
+routing problem, not a requirement of every retrain.
+
 ## Read this first: a retrain is a QUALITY step, not an unblocking step
 
 The selector is **two stages** (`runbooks/local/setwise.py`):

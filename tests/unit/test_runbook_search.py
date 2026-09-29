@@ -122,6 +122,9 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
 
     catalog = load_catalog(default_runbooks_dir())
     clf = SetwiseClassifier(_ARTIFACT)
+    # Embedding runbooks the artifact has not seen is a one-time startup cost (the app's
+    # lifespan syncs before serving), not part of a search: keep it outside the timed call.
+    clf.sync(catalog)
 
     async def go() -> Any:
         pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=30.0)
