@@ -62,6 +62,15 @@ boundaries:
   - query: Launch a new agent in the existing release/3.1 worktree to backport the security patch.
     confusable_with: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
     run: 2026-09-28-agent-queries
+  - query: Take the fix claude committed on hotfix/null-cart and apply it to release/3.1 as well.
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Take the fix from the hotfix worktree and put it onto feature/cart.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: backport the checkout fix onto release/2.4
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
 followups:
   - query: ok and now do the same for release/2.2
     history:
@@ -137,3 +146,9 @@ topic_shifts:
       - 'assistant: Verified: export.spec fails on a1b2c3d and passes on its parent 5f6e7d8.'
     active: [daintree.git.bisect-regression]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: nice. now put my own fix c0ffee1 onto release/3.2 as well
+    history:
+      - 'user: undo codex''s changes on develop but keep my fix'
+      - 'assistant: Done: codex-2''s three commits reverted by claude-8; your commit c0ffee1 (the null check in sessions.ts) is untouched and the suite passes.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful

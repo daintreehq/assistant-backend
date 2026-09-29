@@ -70,6 +70,12 @@ boundaries:
     run: 2026-09-22-provision-boundary-fix
   - query: can you run tests
     run: pre-split
+  - query: run npm run build and the test suite in the release worktree and tell me what's red
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: does the project still build and typecheck on main?
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
 followups:
   - query: and the unit tests?
     history:

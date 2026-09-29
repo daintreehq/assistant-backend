@@ -94,6 +94,15 @@ boundaries:
   - query: Before we break down the offline mode, have agents prototype CRDT merging versus last-write-wins on our notes model and recommend one.
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-late
+  - query: Spike Drizzle, Prisma and Kysely against our orders schema in separate worktrees and recommend one.
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: prototype two approaches to the undo stack and compare them for me, nothing merged
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: mock up three versions of the pricing page so I can pick one
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
 followups:
   - query: add Kysely as a third option too, same scenario
     history:

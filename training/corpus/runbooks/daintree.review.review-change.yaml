@@ -487,6 +487,24 @@ boundaries:
   - query: review the winning entry's diff for bugs and give me findings
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Review the finished integration branch for bugs before I open the PR.
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: Review the spike/edge-cache branch and list its hacks and risks with file refs; don't build anything.
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: is the prototype on proto/queue any good? code review it, findings only
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: review the feat/exports branch, is it any good?
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: 'Review PR #733 for security problems before we merge it.'
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: code review claude-2's feat/oauth-refresh branch, especially how it stores refresh tokens
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
 followups:
   - query: how's it going?
     history:
@@ -860,6 +878,18 @@ topic_shifts:
       - 'assistant: claude-3 is done on chore/upgrade-pydantic-2; bump, codemods and fixes are separate commits and my re-run of the tests passes.'
     active: [daintree.deps.upgrade-dependency]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: get an independent code review of claude-2's limiter diff, look for security problems
+    history:
+      - 'user: claude-2 and codex-1 are duplicating the limiter, fix it'
+      - 'assistant: claude-2 now owns the limiter; codex-1 was stopped with its work kept. claude-2 confirmed and continued.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: have an agent review the integrator's change on its merits and give me findings before I open anything
+    history:
+      - 'user: retries and the rate limiter clash when combined, sort it'
+      - 'assistant: claude-6 implemented backoff respecting Retry-After on integrate/limits; the pinning test and full suite pass, and one existing test''s assertion changed as the decision required.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[terminal.awaitAll returned: t_2201 finished, t_2202 finished]'
     history:

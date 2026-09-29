@@ -81,6 +81,12 @@ boundaries:
   - query: triage the open issues and close the duplicates
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Re-rank the open bug reports by priority and label the P0s in the tracker.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: go through the open bugs in the tracker and tell me which are already fixed, then label them
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
 followups:
   - query: also check last month's closed issues when you look for duplicates
     history:

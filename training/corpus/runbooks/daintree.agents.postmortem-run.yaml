@@ -79,6 +79,21 @@ boundaries:
     confusable_with: [daintree.orchestration.verify-agent-work]
   - query: 'Investigate the finished run where claude said ''all tests pass'' but never ran them: first divergence, cause, prevention text.'
     confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Why did codex rewrite the whole auth module when it was only asked to fix token expiry? Find where the run went off course.
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: post-mortem last night's claude run on the billing branch, don't change anything, i just want to know what happened
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Why did two agents end up implementing the same thing in last night's finished run? Find where the briefs went wrong.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: The refactor attempt failed; before anything else, work out what went wrong and which parts might be worth keeping - don't build anything.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: why did codex's importer attempt blow up? i want the cause, not a fix
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
 followups:
   - query: it's the codex one from last night, the panel is closed now
     history:
@@ -142,3 +157,15 @@ topic_shifts:
       - 'assistant: Three done and verified. codex-5 on #422 ended its turn with a branch that fails to build and a deleted config file.'
     active: [daintree.orchestration.fan-out-work]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: and work out why codex went off the rails in the first place so it doesn't happen again
+    history:
+      - 'user: undo what codex-1 did to the payments config, keep my changes'
+      - 'assistant: Done and verified: claude-5 reverted codex-1''s commits 1f2e3d4 and 5c6b7a8; your staged payments.yml edits are intact and the checks pass.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: before we go any further — why did that refactor fail in the first place?
+    history:
+      - 'user: rescue the good parts of claude-4''s refactor'
+      - 'assistant: Surveyor''s list: keep the new config loader and its tests; drop the plugin registry rewrite (it breaks 17 tests). Confirm and I''ll create the salvage worktree.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful

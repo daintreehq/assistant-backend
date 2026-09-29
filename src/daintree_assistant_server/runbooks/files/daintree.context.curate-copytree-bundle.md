@@ -14,7 +14,8 @@ whenToUse: >-
   (daintree.workflow.start-work-on-issue for one issue,
   daintree.edits.spawn-visible-agent for one new agent,
   daintree.context.feed-running-agent for an agent that is already open, or
-  daintree.orchestration.fan-out-work for injecting context across parallel agents).
+  daintree.orchestration.fan-out-work for injecting context across parallel agents). Nor when a
+  bundle has already carried a key or token out (use daintree.security.respond-to-secret-exposure).
 risk: system
 requiredTools:
   - worktree.list

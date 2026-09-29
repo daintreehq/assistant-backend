@@ -1,0 +1,286 @@
+# Round 6, batch B: recovering without destroying work.
+#
+# Four runbooks: undo one agent's changes in place (git.undo-agent-changes), carry the
+# useful subset of a failed attempt into a fresh branch (orchestration.salvage-failed-attempt),
+# get back work that was lost (git.recover-lost-work), and settle two finished branches
+# whose combined behaviour clashes (git.resolve-semantic-conflict). Each has an agent-phrased
+# and a user-phrased case, and one routing trap per declared neighbour where the neighbour
+# is right, phrased close to the new runbook's territory.
+
+cases:
+  # --- daintree.git.undo-agent-changes -------------------------------------------------
+  - id: y-undo-agent-changes-agent
+    category: single-runbook
+    note: Agent-phrased outcome — reverse one agent's commits and edits, user's work intact.
+    messages:
+      - role: user
+        content: >-
+          Reverse exactly the changes the codex agent made in the payments worktree — its two
+          commits and its uncommitted edits — while keeping the user's own staged changes and
+          everything else intact, and prove it with a before/after diff.
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.foundation]
+
+  - id: y-undo-agent-changes-user
+    category: single-runbook
+    note: Casual user phrasing — undo what the agent did, keep mine.
+    messages:
+      - role: user
+        content: undo what that agent just did but keep my changes
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.foundation]
+
+  - id: y-undo-trap-postmortem
+    category: routing-trap
+    note: Why a run went wrong, nothing reverted — postmortem-run, not undo.
+    messages:
+      - role: user
+        content: codex trashed the config files last night — before we touch anything, work out why it went off the rails
+    expect:
+      required: [daintree.agents.postmortem-run]
+      optional: [daintree.foundation]
+
+  - id: y-undo-trap-steer
+    category: routing-trap
+    note: A running agent told to stop editing a file; nothing is undone — steer-running-agent.
+    messages:
+      - role: user
+        content: claude keeps editing the migrations — stop it touching them and have it carry on with the rest of its task
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: y-undo-trap-cherry-pick
+    category: routing-trap
+    note: Commits applied onto another branch, not reversed — cherry-pick-changes.
+    messages:
+      - role: user
+        content: take the two commits the agent made on the hotfix worktree and apply them onto release/2.4 as well
+    expect:
+      required: [daintree.git.cherry-pick-changes]
+      optional: [daintree.foundation]
+
+  - id: y-undo-trap-workspace-cleanup
+    category: routing-trap
+    note: The whole worktree deleted, not the agent's changes reversed — workspace-cleanup.
+    messages:
+      - role: user
+        content: the agent's experiment worktree is useless, close its terminal and delete the whole worktree
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: y-undo-trap-rollback-deployment
+    category: routing-trap
+    note: A deployed service put back on its previous release — rollback-deployment, not a source revert.
+    messages:
+      - role: user
+        content: the deploy the agent pushed out broke checkout in production, put the previous release back on prod
+    expect:
+      required: [daintree.release.rollback-deployment]
+      optional: [daintree.foundation]
+
+  # --- daintree.orchestration.salvage-failed-attempt -----------------------------------
+  - id: y-salvage-failed-attempt-agent
+    category: single-runbook
+    note: Agent-phrased outcome — the useful subset of a failed attempt into a new branch.
+    messages:
+      - role: user
+        content: >-
+          The refactor attempt in the parser-rewrite worktree failed overall. Extract its useful,
+          self-contained parts — the tokenizer and its tests — into a new branch off current main,
+          make them pass on their own, and leave the failed worktree untouched for reference.
+    expect:
+      required: [daintree.orchestration.salvage-failed-attempt]
+      optional: [daintree.foundation]
+
+  - id: y-salvage-failed-attempt-user
+    category: single-runbook
+    note: Casual user phrasing — rescue the good parts.
+    messages:
+      - role: user
+        content: codex's approach didn't work out but some of it is good, rescue the good bits into a fresh branch
+    expect:
+      required: [daintree.orchestration.salvage-failed-attempt]
+      optional: [daintree.foundation]
+
+  - id: y-salvage-trap-hand-off
+    category: routing-trap
+    note: The SAME task finished by another agent in the same checkout — hand-off-task.
+    messages:
+      - role: user
+        content: claude got stuck halfway through the refactor, have codex pick it up in the same worktree and finish it
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: y-salvage-trap-competition
+    category: routing-trap
+    note: Rival versions judged and a winner picked — competition, not salvage.
+    messages:
+      - role: user
+        content: have claude and codex each write their own version of the retry refactor, then tell me which one is better
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: y-salvage-trap-productionize
+    category: routing-trap
+    note: A prototype that WORKED taken to production quality — productionize-prototype.
+    messages:
+      - role: user
+        content: the drizzle spike worked and we picked it, now take that prototype and build it properly for production
+    expect:
+      required: [daintree.orchestration.productionize-prototype]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.recover-lost-work --------------------------------------------------
+  - id: y-recover-lost-work-agent
+    category: single-runbook
+    note: Agent-phrased outcome — commits lost to a hard reset brought back with provenance.
+    messages:
+      - role: user
+        content: >-
+          The user hard-reset the feature/search branch and lost three commits plus a stash.
+          Recover whatever still exists into a recovery branch in a new worktree, with the source
+          of each item, and say what cannot be recovered.
+    expect:
+      required: [daintree.git.recover-lost-work]
+      optional: [daintree.foundation]
+
+  - id: y-recover-lost-work-user
+    category: single-runbook
+    note: Casual user phrasing — an agent deleted the branch before it was pushed.
+    messages:
+      - role: user
+        content: the agent deleted my feature branch before I pushed it, can I get it back?
+    expect:
+      required: [daintree.git.recover-lost-work]
+      optional: [daintree.foundation]
+
+  - id: y-recover-lost-work-worktree-user
+    category: single-runbook
+    note: A removed worktree that held uncommitted work.
+    messages:
+      - role: user
+        content: I removed the billing worktree and it still had uncommitted work in it, is any of that recoverable?
+    expect:
+      required: [daintree.git.recover-lost-work]
+      optional: [daintree.foundation]
+
+  - id: y-recover-trap-status-and-resume
+    category: routing-trap
+    note: Where things were and reopening a closed session; nothing is lost — status-and-resume.
+    messages:
+      - role: user
+        content: I closed the claude session in the search worktree yesterday by mistake, reopen that session so it can carry on
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: y-recover-trap-prune-branches
+    category: routing-trap
+    note: Deleting branches, not getting one back — prune-stale-branches.
+    messages:
+      - role: user
+        content: which of my local branches are already merged into main? delete those ones
+    expect:
+      required: [daintree.git.prune-stale-branches]
+      optional: [daintree.foundation]
+
+  - id: y-recover-trap-audit-worktrees
+    category: routing-trap
+    note: Checking what is at risk BEFORE anything is lost — audit-worktrees.
+    messages:
+      - role: user
+        content: before I remove any worktrees, check which ones still have uncommitted or unpushed work I'd lose
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+      optional: [daintree.foundation]
+
+  # --- daintree.git.resolve-semantic-conflict ------------------------------------------
+  - id: y-semantic-conflict-agent
+    category: single-runbook
+    note: Agent-phrased outcome — two branches pass alone, clash together; settle and pin.
+    messages:
+      - role: user
+        content: >-
+          The auth and session branches each pass their own tests, but merged together they
+          implement incompatible token lifetimes. Get each author's intent, have the user decide
+          the combined behaviour, and have an integrator implement it on the integration branch
+          with a test that pins it.
+    expect:
+      required: [daintree.git.resolve-semantic-conflict]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-conflict-user
+    category: single-runbook
+    note: Casual user phrasing — clean merge, broken combined behaviour.
+    messages:
+      - role: user
+        content: both branches pass on their own but together the checkout totals come out wrong, sort it out
+    expect:
+      required: [daintree.git.resolve-semantic-conflict]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-trap-integrate
+    category: routing-trap
+    note: Combining several finished branches is merge mechanics — integrate-agent-branches.
+    messages:
+      - role: user
+        content: merge the auth, session and billing agents' branches together into one integration branch and check it still builds
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-trap-sync-with-base
+    category: routing-trap
+    note: Textual conflicts with the base — sync-with-base.
+    messages:
+      - role: user
+        content: the session branch has merge conflicts with main now, rebase it and sort the conflicts out
+    expect:
+      required: [daintree.git.sync-with-base]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-trap-compare-worktrees
+    category: routing-trap
+    note: Forecasting whether branches will clash, nothing merged — compare-worktrees.
+    messages:
+      - role: user
+        content: will the auth and session worktrees conflict when I merge them? don't change anything, just predict
+    expect:
+      required: [daintree.worktree.compare-worktrees]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-trap-task-collisions
+    category: routing-trap
+    note: Two agents still WORKING on the same thing — resolve-task-collisions.
+    messages:
+      - role: user
+        content: claude-2 and codex-1 are both implementing the rate limiter right now with different designs, sort out who owns it
+    expect:
+      required: [daintree.orchestration.resolve-task-collisions]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-trap-review-change
+    category: routing-trap
+    note: One change judged on its merits — review-change.
+    messages:
+      - role: user
+        content: review the token lifetime change on the auth branch and tell me if it's any good
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: y-semantic-trap-diagnose-and-fix
+    category: routing-trap
+    note: A failing check with one intended behaviour — diagnose-and-fix.
+    messages:
+      - role: user
+        content: the checkout totals test is failing on the integration branch after the rounding fix, get it green
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]

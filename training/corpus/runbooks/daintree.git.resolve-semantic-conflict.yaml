@@ -1,0 +1,129 @@
+# Training examples whose answer is `daintree.git.resolve-semantic-conflict` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.resolve-semantic-conflict
+run: 2026-09-28-round6
+positives:
+  - feature/discounts and feature/tax-rounding each pass alone, but merged together the cart total is a cent off on discounted items. Settle the intended behaviour with me, then have an integrator implement it.
+  - 'Merging codex''s and claude-2''s branches was textually clean, but the combined session timeout is wrong: the auth branch expires tokens at 15 minutes while the session branch refreshes every 30. Resolve the clash.'
+  - both branches pass on their own but together the retry logic fires twice. sort it out
+  - The merge of feat/soft-delete and feat/audit-log was clean, yet soft-deleted rows now vanish from the audit export. Find out what each author meant and get my decision before anyone changes code.
+  - pagination branch uses 0-based pages, the api-client branch assumes 1-based. each suite green, combined the first page gets skipped. resolve
+  - 'Behaviour clash on integrate/sprint-14: the i18n agent and the formatting agent changed date output incompatibly. Pin it with a failing test, gather both intents, present options.'
+  - after merging gemini's caching branch with codex's invalidation branch, stale prices show up even though each passes its own tests; need the combined behaviour decided and implemented
+  - Codex-1 made webhook handlers idempotent by event id; claude-3 made them retry with fresh ids. Combined, duplicates get processed. Settle what we want and pin it with a test on the integration branch.
+  - 'two agents'' branches clash in behaviour, not text: one throws on missing config, the other silently defaults. both fine separately. decide and fix on the integration branch, don''t touch their branches'
+  - 'The integration run held back feat/rate-limit and feat/burst-quota: both change the limiter and together requests over quota get through. Take that clash from here.'
+  - merged clean, CI green on both, but together the feature flag evaluates backwards for beta users. figure out intent + fix
+  - 'Get each author''s intent for the currency rounding changes in PRs #612 and #618, have me choose which rule applies, then have an integrator implement it with a test.'
+  - Branch A switched user ids to UUIDs, branch B added an endpoint that parses them as ints; both are merged into integrate/q3 and profile lookup now 404s. Settle the combined behaviour.
+  - no merge conflicts, but search-v2 plus the filters branch makes empty queries return everything instead of nothing. which one's right? ask me, then fix it with a test
+  - 'Resolve the behaviour clash between the dark-mode branch and the theming branch on integrate/ui: each overrides the palette its own way and combined the contrast is broken.'
+  - 'PRs #340 and #344 each pass CI, but together they disagree on whether archived projects count toward the plan limit. Settle the combined rule with me before either lands.'
+  - combined tree fails the checkout e2e though feat/shipping and feat/promos are green alone. not flaky, they changed the same pricing function in different directions
+  - codex and claude both finished their branches; together logout clears only one of the two token stores. Freeze both heads, reproduce it on a merged tree, bring me the options.
+  - 'Integration flagged a behaviour conflict between the parser branch and the validator branch and stopped. Handle that conflict: intents, my decision, integrator, pinning test.'
+  - the notification branch sends on create, the digest branch batches every send; merged, users get both. I'll pick the combined behaviour, then pin it
+  - Tests pass on feat/tz-storage and on feat/tz-display separately; merged, times display shifted twice. Pull each side's intent from its PR description and resolve on the integration branch.
+  - don't just pick a side. the two branches disagree about null handling in the importer and the merged build drops rows. lay out the options for me
+  - Rebase of feat/cart-limits onto develop had zero conflicts, yet develop's new stock reservation and the branch's cart caps together let carts exceed stock; each passed alone. Resolve the behaviour clash.
+  - compare said wt-auth and wt-sessions wouldn't conflict, i merged them, and now tokens expire mid-request. both pass alone. fix the combined behaviour properly
+  - Resolve incompatible behaviour between claude-2's cache TTL change and codex's prefetch branch on integrate/perf; a test must pin whatever I decide and both branches' tests must still pass.
+  - The conflict forecast said the two branches only overlap in one file and would merge clean, and they did, but together the export writes the CSV header twice.
+boundaries:
+  - query: CI on integrate/r12 is red on the pricing test while feat/discounts and feat/tax are each green; they changed rounding in opposite directions. Fix the combination properly.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: the combined build fails the auth e2e but neither branch fails it alone. don't just delete one side's tests
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: Integration branch test for session expiry fails; the auth branch and the session branch each pass it alone because they assume different token lifetimes. Resolve which lifetime we want and fix it there.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: The integration branch merged all three agents' work cleanly, but checkout totals are wrong only when promos and tax are both in; each branch was green alone. Settle that.
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: Integration stopped on a behaviour clash between feat/quota and feat/burst. Handle the clash; the other merges are fine.
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: after merging codex's and claude's branches into integrate/v2, logout does something neither of them intended. decide the right behaviour with me
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: Rebasing feat/limits onto main was clean and both passed alone, but main's new reservation rule and my caps together oversell stock. Resolve that clash.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: merged develop into the search wt, zero conflicts, but develop's ranking change and the branch's boost logic together bury exact matches. both were green before. work out the intended behaviour
+    confusable_with: [daintree.git.sync-with-base]
+  - query: Catch-up merge of main into feat/refunds went through without conflicts, but main's partial-capture change and the branch's refund rule now let refunds exceed captures; both suites passed before. Get the combined rule decided and pinned.
+    confusable_with: [daintree.git.sync-with-base]
+  - query: The auth and session branches both pass on their own, but after merging the token lifetimes are incompatible. Settle the combined behaviour.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+  - query: The comparison said wt-a and wt-b wouldn't conflict; they merged fine but together the export duplicates headers. Resolve the behaviour.
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: no overlap predicted, but combined the two branches break token refresh though each passes on its own. get it settled with a test that pins it
+    confusable_with: [daintree.worktree.compare-worktrees]
+  - query: we already merged wt-billing and wt-plans after the forecast came back clean. separately green, together annual plans get charged monthly. resolve what it should do
+    confusable_with: [daintree.worktree.compare-worktrees]
+followups:
+  - query: go with the session branch's 24h lifetime, but keep the auth branch's rotation on refresh
+    history:
+      - 'user: the auth branch and the session branch implement incompatible token lifetimes, sort it out'
+      - 'assistant: Repro committed on integrate/auth-session: a token issued by feat/auth expires at 15 min while feat/session expects 24h, so sessions drop. Intents: codex-2 (auth) wanted short-lived tokens with rotation; claude-3 (session) relied on long sessions for the mobile app.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
+  - query: try it through the refresh flow — the clash only shows when a refresh token is reused
+    history:
+      - 'user: the merge was clean but the combined login behaviour is broken'
+      - 'assistant: The integrator claude-6 merged feat/auth and feat/session into integrate/login but couldn''t reproduce a failure with a plain login test. It changed no behaviour.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
+  - query: no, don't delete it — change only the assertion the decision actually changes
+    history:
+      - 'user: both sides pass alone but together the retry logic hammers the rate limiter'
+      - 'assistant: You decided: retries back off and respect the limiter''s Retry-After. The integrator reports test_retry_immediate contradicts that and proposes deleting it.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
+  - query: use yesterday's integration worktree instead, both branches are already merged there
+    history:
+      - 'user: pricing and promo each pass alone but together promo codes double-discount'
+      - 'assistant: Froze feat/pricing at 4c3b2a1 and feat/promo at 8d7e6f5. About to create integrate/pricing-promo off main and launch an integrator to reproduce the double discount.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
+  - query: I don't want to pick yet. commit the repro and write the options up, I'll come back to it
+    history:
+      - 'user: integration held back a clash where both branches changed the refund logic'
+      - 'assistant: Reproduced on integrate/refunds: a partial refund is issued twice. feat/refund-async (claude-1) queues refunds; feat/ledger (codex-4) posts them synchronously. Options: async wins, sync wins, or async with a ledger idempotency key.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: sort out that token lifetime clash — I'll decide which lifetime wins
+    history:
+      - 'user: merge all four agents'' work together'
+      - 'assistant: Merged feat/auth and feat/session cleanly, but the suite fails after session: auth issues 15-minute tokens while session expects 24h. I''ve held that back as a behaviour clash, not a merge problem; feat/search and feat/export merged fine.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-round6-stateful
+  - query: we merged them anyway and there were no conflicts, but promo codes now double-discount. find out what each branch meant and let me pick the combined behaviour
+    history:
+      - 'user: will the pricing and promo branches conflict?'
+      - 'assistant: Trial merge of feat/pricing into feat/promo is clean — no overlapping hunks. Suggested order: pricing, then promo.'
+    active: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-round6-stateful
+  - query: 'separately: feat/rate-limit and feat/retry each pass on their own, but together the retries storm the limiter. settle the combined behaviour'
+    history:
+      - 'user: review feat/rate-limit'
+      - 'assistant: Findings: one medium (limit counter isn''t reset on config reload), two low (naming, a missing doc comment).'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-round6-stateful
+  - query: so it's not a plain bug — get each side's intent and give me options for how totals should work
+    history:
+      - 'user: CI is red on develop, fix it'
+      - 'assistant: The failure is test_totals. It passes on feat/tax and on feat/discounts separately and only fails since both merged: the two branches'' tests encode opposite orders of tax and discount.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-round6-stateful
+  - query: they're merged now, and codex-1's cache invalidation breaks claude-2's limiter even though both pass alone. resolve that
+    history:
+      - 'user: claude-2 and codex-1 are both implementing the rate limiter'
+      - 'assistant: Kept claude-2 on the limiter and moved codex-1 to cache invalidation. Both have since finished on their own branches.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: both sides are right on their own — find out what each intended and let me decide how refunds should behave
+    history:
+      - 'user: merge latest main into the payments worktree'
+      - 'assistant: Merged cleanly, but test_refund now fails: main made refunds async, while the payments branch assumes they complete synchronously.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-round6-stateful

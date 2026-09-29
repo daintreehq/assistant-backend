@@ -328,6 +328,9 @@ boundaries:
   - query: Show me Daintree's recent error log, the plugin panel keeps flashing an error.
     confusable_with: [daintree.skills.use-plugin-skill]
     run: 2026-09-28-catalog-expansion
+  - query: Daintree itself is using 4 GB and the UI lags when switching panels.
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
 followups:
   - query: and the key thing too?
     history:
@@ -583,6 +586,12 @@ topic_shifts:
       - 'assistant: errors.recent shows MCP disconnects at the time of the launch.'
     active: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: wait, the heaviest thing is Daintree itself at 250% CPU — why is Daintree doing that?
+    history:
+      - 'user: fans are screaming, find what''s eating CPU'
+      - 'assistant: Reading 1 (10:05): the top process is the Daintree app at 250% CPU, then two agent test runs at about 90% each.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[watcher fired: MCP link back up]'
     history:

@@ -453,6 +453,18 @@ boundaries:
   - query: where were we yesterday?
     confusable_with: [daintree.orchestration.park-work]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Reopen the Claude session I closed yesterday in the auth worktree and let it carry on.
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: where were we on the billing migration? i lost track over the weekend
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: where were we with the migration run yesterday? catch me up and pick it back up
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Resume the release run from its checkpoint in this new session and reconcile what finished overnight.
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
 followups:
   - query: close the stale ones
     history:
@@ -745,6 +757,18 @@ topic_shifts:
       - 'assistant: From the ledger: #502 PR open waiting review, the csv-export fan-out had 2 of 4 merged, and a codex run on fix/memory-leak was left unsupervised in t8.'
     active: [daintree.orchestration.status-and-resume]
     run: 2026-09-24-selector-hardening
+  - query: 'different thing: pick up the search-index run I left last Friday from its checkpoint'
+    history:
+      - 'user: hand the payments orchestration to a fresh claude'
+      - 'assistant: Successor claude-12 is running from /tmp/handoff-payments.md and reconciled cleanly; I am arming no further work.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+  - query: and reopen claude-3's session from before the worktree was removed so it can pick up where it was
+    history:
+      - 'user: get back the work I lost when I deleted the search-v2 worktree'
+      - 'assistant: Recovered into recover/search-v2 from two blobs and claude-3''s transcript; all items verified, pins at refs/recovery/search-v2/.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[async wait returned: resume digest ready]'
     history:

@@ -360,6 +360,15 @@ boundaries:
   - query: 'merge PR #77 now that the checks pass'
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'squash-merge #512 once it''s approved'
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: 'merge the release PR #88 that bumps the version to 3.0.0'
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: Squash-merge the changeset PR once its required checks are green so the release can go out.
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
 followups:
   - query: squash
     history:
@@ -742,6 +751,30 @@ topic_shifts:
       - 'assistant: Both attackers done: no confirmed breaks, 3 rejected claims (reasons below).'
     active: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: 'claude-7''s fix PR #919 is green and approved — merge it'
+    history:
+      - 'user: the login bug is urgent, reshuffle the agents'
+      - 'assistant: Paused codex-2 with a resume note, launched claude-7 on the login bug in fix/login-loop. claude-7 opened PR #919 and I verified the fix.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: 'merge #901 then'
+    history:
+      - 'user: is the release candidate good to go? it''s origin/release/4.0'
+      - 'assistant: Candidate = origin/release/4.0 at e19b7d2. Verdict: no-go. PR #901 (fix session expiry) is open with the release-blocker label, approved and green; required check e2e-linux failed on e19b7d2; CHANGELOG has no 4.0 section. Checkers were claude-2, claude-3, codex-2; nothing merged, tagged or deployed.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: 'and merge the version-bump PR #231 once its checks pass'
+    history:
+      - 'user: release acme-client 3.2.0 to PyPI'
+      - 'assistant: Published: 3.2.0 on PyPI, digests.sha256 matches the wheel, fresh venv installs and imports it. The bump commit is on release/3.2.0 and the PR is open as #231.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: 'demo went well. merge PR #88 for it'
+    history:
+      - 'user: show me what the agents built for search'
+      - 'assistant: Demo running from search-rework at 44ab1e0 (PR #88), walkthrough and works/missing list handed over.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[forge activity: pull request changed]'
     active: [daintree.forge.land-pull-request]

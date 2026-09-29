@@ -27,6 +27,8 @@ removed from round 3.
 | 4b | 139 | the same population, split at random | was **sealed** until the 2026-09-28 decision; scored once. Treat as development from here |
 | 5a | 133 | the 47 runbooks added 2026-09-28 (catalog 40 → 87): each one's own requests, traps toward every neighbour, plain code work under the orchestration principle | **development** |
 | 5b | 133 | the same population, split at random | was **sealed** until the catalog-expansion decision (2026-09-28); scored once: 126/133. Treat as development from here |
+| 6a | 82 | the 18 runbooks added in round 6 (catalog 87 → 105) plus the restore operation of `migrate-worktree-database`: own requests, traps toward every neighbour, plain code work, pairs | **development** |
+| 6b | 83 | the same population, split at random | **sealed** until the round-6 retrain decision |
 
 Round 4 (2026-09-28) was written by four agents on the same read-only rule, and each case
 labelled blind by gpt-6-sol and gpt-6-astra: 319 of 320 were unanimous with the writer. Cases
@@ -36,6 +38,13 @@ random into 4a and 4b.
 Round 5 (2026-09-28) was written the same way against the grown catalog, by four writers
 covering 11-12 new runbooks each; gpt-6-sol and gpt-6-astra agreed with the writer on all
 270, four near-duplicates of training rows were removed, and the rest split at random.
+
+Round 6 (2026-09-28) was written the same way by four writers against the 105-runbook catalog;
+gpt-6-sol and gpt-6-astra agreed with the writer on 169 of 170, five near-duplicates of training
+rows (queries and history lines) were removed, and the rest split at random. A blind audit of
+every existing case and corpus row that the new runbooks could plausibly own (1,050 candidates:
+the shipped selector ranking a new runbook top-3, or its vocabulary) changed no case and moved 9
+corpus rows, each where sol and astra agreed on a new runbook.
 
 The same day, every single-message case in rounds 1-4b (and in `../cases/`) was re-labelled
 blind against the grown catalog: gpt-6-sol first, gpt-6-astra on every disagreement, and a

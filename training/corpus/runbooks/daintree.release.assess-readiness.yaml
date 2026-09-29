@@ -1,0 +1,143 @@
+# Training examples whose answer is `daintree.release.assess-readiness` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.release.assess-readiness
+run: 2026-09-28-round6
+positives:
+  - 'Give a go/no-go verdict for release candidate tag v3.2.0-rc.1: CI on the tagged commit, migrations, config changes and open blockers. Read-only, tag and deploy nothing.'
+  - 'Assess whether origin/release/2.8 at its current tip is shippable: milestone items merged, required checks green on that exact commit, a rollback path.'
+  - are we good to ship 4.0 on friday?
+  - what's still blocking the 1.12 release
+  - 'Readiness verdict for the v5.1 candidate before the team cuts it: scope against milestone ''v5.1'', migration reversibility, new env vars, CHANGELOG coverage.'
+  - Decide if commit 9f3c2ab is fit to go out as 2.3.0; report each area as pass, fail, risk or unknown.
+  - sanity check rc2 before we tag the final pls
+  - Release go/no-go for the mobile-api 7.4 candidate. Do not tag, merge or deploy anything.
+  - 'Evaluate ship-readiness of billing-v19: any irreversible schema changes, and can the previous release still run on the new schema?'
+  - hey quick one - can we release 0.9 or not? need a yes/no with reasons
+  - 'Ship/no-ship call on the 12.0 RC; the must-haves are issues #901, #915 and #930.'
+  - 'Release readiness: v2.0.0-rc.4 of the gateway. Scope, CI on the tag SHA, open release-blocker issues, config and flags. Verdict only.'
+  - is the RC good to go or are there open blockers? milestone is 'Spring release'
+  - Establish whether the candidate at 5c8e7d1 can ship as 1.6.0, with evidence per area and unknowns called out as unknown.
+  - 'Pre-release gate for tag desktop-v0.14.0-rc.2: are all planned PRs in, is every required check green on it, and do the notes cover the range?'
+  - can we cut 3.3 today or is something gonna bite us
+  - Check that the v2.6 candidate is releasable, including whether rolling back to v2.5 would still work if it goes wrong.
+  - 'The tests pass locally on release/3.0; now I need an actual go/no-go on shipping 3.0: CI on the release commit, blockers, migrations, docs.'
+  - 'Before anyone writes the 2.5 notes, find out whether 2.5 is ready at all: anything in the milestone still unmerged, any blocker issues open?'
+  - 'Release PR #1204 merged into main. Is main at that merge commit ready to go out as v6.0? Verdict only, no deploy.'
+  - 'Not just whether the release PR is green: I want the whole readiness picture for v2.9, required checks on the candidate commit, open issues labelled release-blocker, rollback plan.'
+  - release/4.2 is cut and its PR is already open. Judge whether the 4.2 candidate is fit to ship.
+  - Before anyone deploys 3.4 to production, establish whether the 3.4 candidate is a go; nothing gets deployed in this step.
+  - Are all the must-have issues of the Q3 milestone merged in the v8.0 RC, and is that RC otherwise safe to release?
+  - codex says the migrations for 7.0 are fine. give me the full go/no-go on the 7.0 rc anyway, not just its word
+  - 'Readiness review of tag v1.18.0-rc.1: does the new FEATURE_LEDGER flag default safely, is the new STRIPE_WEBHOOK_SECRET documented, and are required checks green?'
+boundaries:
+  - query: 'Don''t just run the tests: give me a go/no-go on shipping rc3, with CI on its commit and open release blockers.'
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: tests are green on release/5.0, is the release itself ready to go?
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: Go through every readiness area for v2.0-rc.4 (scope, CI on the tag, migrations, config) and give a verdict.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: The 6.1 changelog draft is done. What I need now is whether the 6.1 candidate is a go.
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: Compare what's in the v3.3 RC against its milestone and tell me whether we can release it.
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: notes for 1.9 are written, are we actually ready to ship 1.9 or not?
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: 'Before I merge the 3.1 release PR, is the 3.1 candidate actually shippable: blockers, migrations, CI on its head commit? Verdict only.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: The release PR merged; is the resulting main commit ready to tag as v4.0? Don't tag it.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: should we ship 2.5 to prod? just a verdict, don't deploy anything
+    confusable_with: [daintree.release.deploy-and-verify]
+  - query: 'Give me a go/no-go on SDK tag v2.0.0-rc2 before anyone publishes it: CI on that SHA, blockers, migration notes.'
+    confusable_with: [daintree.release.publish-package]
+  - query: what's blocking the 2.5 release? not one PR, the whole release
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: Are all issues in the v4.4 milestone closed, and is the candidate safe to ship?
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: Is CI green on the exact commit tagged v3.0.0-rc.3, and are there open release-blocker issues? I need a release verdict.
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: 'release/2.7''s PR is open and reviewed. Now: is the 2.7 release as a whole ready to ship?'
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: Don't open any PR. I want a ship/no-ship verdict on tag v1.8.0-rc.2.
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: the branch is prepped and merged, is v1.8 good to release?
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+followups:
+  - query: 'the milestone is ''v2.5'' — and count the two SSO issues (#788, #790) as must-haves'
+    history:
+      - 'user: are we ready to ship 2.5? the RC is tag v2.5.0-rc.2'
+      - 'assistant: Pinned v2.5.0-rc.2 at 8c1e4f0 (previous release v2.4.3 at 71d09aa). Launched Readiness: scope (claude-3), Readiness: migrations (claude-4) and Readiness: config & docs (codex-1). CI on 8c1e4f0: 14 of 15 required checks green, e2e-linux still pending.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: the migrations checker says 0057 drops the legacy_token column — does that make it a no-go?
+    history:
+      - 'user: are we ready to ship 2.5? the RC is tag v2.5.0-rc.2'
+      - 'assistant: Pinned v2.5.0-rc.2 at 8c1e4f0 (previous release v2.4.3 at 71d09aa). Launched Readiness: scope (claude-3), Readiness: migrations (claude-4) and Readiness: config & docs (codex-1). CI on 8c1e4f0: 14 of 15 required checks green, e2e-linux still pending.'
+      - 'user: what have the checkers come back with so far?'
+      - 'assistant: claude-4 (migrations) finished: 0057_drop_legacy_token drops a column and has no down path; claude-3 and codex-1 still running.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: rc.3 just got tagged with the hotfix — redo the whole thing against that one instead
+    history:
+      - 'user: are we ready to ship 2.5? the RC is tag v2.5.0-rc.2'
+      - 'assistant: Pinned v2.5.0-rc.2 at 8c1e4f0 (previous release v2.4.3 at 71d09aa). Launched Readiness: scope (claude-3), Readiness: migrations (claude-4) and Readiness: config & docs (codex-1). CI on 8c1e4f0: 14 of 15 required checks green, e2e-linux still pending.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: 'don''t go by PR #812''s checks, I mean did CI actually pass on that exact sha?'
+    history:
+      - 'user: are we ready to ship 2.5? the RC is tag v2.5.0-rc.2'
+      - 'assistant: Pinned v2.5.0-rc.2 at 8c1e4f0 (previous release v2.4.3 at 71d09aa). Launched Readiness: scope (claude-3), Readiness: migrations (claude-4) and Readiness: config & docs (codex-1). CI on 8c1e4f0: 14 of 15 required checks green, e2e-linux still pending.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: our blocker label is 'release-blocker' not 'blocker', so recheck the open issues and PRs with that
+    history:
+      - 'user: are we ready to ship 2.5? the RC is tag v2.5.0-rc.2'
+      - 'assistant: Pinned v2.5.0-rc.2 at 8c1e4f0 (previous release v2.4.3 at 71d09aa). Launched Readiness: scope (claude-3), Readiness: migrations (claude-4) and Readiness: config & docs (codex-1). CI on 8c1e4f0: 14 of 15 required checks green, e2e-linux still pending.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: I can't wait for the config checker — give me a provisional verdict now and say what's missing
+    history:
+      - 'user: are we ready to ship 2.5? the RC is tag v2.5.0-rc.2'
+      - 'assistant: Pinned v2.5.0-rc.2 at 8c1e4f0 (previous release v2.4.3 at 71d09aa). Launched Readiness: scope (claude-3), Readiness: migrations (claude-4) and Readiness: config & docs (codex-1). CI on 8c1e4f0: 14 of 15 required checks green, e2e-linux still pending.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: good. now is 2.5 actually ready to ship? go/no-go on v2.5.0-rc.1
+    history:
+      - 'user: write the release notes for 2.5 into CHANGELOG.md'
+      - 'assistant: codex-1 wrote the 2.5 section from v2.4.3..v2.5.0-rc.1: 23 PRs, 2 breaking changes first. I checked every line traces to a merged PR; 3 chore PRs left out.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6-stateful
+  - query: that was the last one on the milestone — is the RC at the tip of release/3.1 good to go? migrations, CI, blockers, the lot
+    history:
+      - 'user: merge #812 once it''s ready'
+      - 'assistant: Merged PR #812 (squash) into release/3.1 as 4be0a17 after all required checks passed; the forge shows it merged.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-round6-stateful
+  - query: the tests passing isn't enough — I need an actual shipping verdict for v3.1.0-rc1
+    history:
+      - 'user: run the tests and lint in the main worktree'
+      - 'assistant: In main at a4f2c19: `npm test` passed (412 tests), `npm run lint` passed, `npm run typecheck` passed.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-round6-stateful
+  - query: ok, now what's blocking the 4.0 release? give me a go/no-go on the rc tag
+    history:
+      - 'user: triage the backlog, label anything that looks like a bug'
+      - 'assistant: Triaged 41 open issues: 12 labelled bug, 6 needs-info, 3 duplicates closed with links. Two of the bugs are also labelled release-blocker.'
+    active: [daintree.forge.triage-issue-backlog]
+    run: 2026-09-28-round6-stateful
+  - query: 'before prod: readiness verdict on that exact sha please — scope, migrations, config, open blockers'
+    history:
+      - 'user: put v2.5.0-rc.2 on staging and check it''s up'
+      - 'assistant: api-staging-00091 serves 8c1e4f0 at 100% traffic, /version reports 8c1e4f0, smoke check passed. Rollback point api-staging-00090.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: separate thing — sanity-check v1.8.0 before we cut it
+    history:
+      - 'user: which worktrees are stale?'
+      - 'assistant: 4 worktrees: feature/export (merged, clean), fix/login (2 unpushed commits), spike/cache (no commits in 3 weeks), main.'
+    active: [daintree.worktree.audit-worktrees]
+    run: 2026-09-28-round6-stateful

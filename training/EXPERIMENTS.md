@@ -1594,3 +1594,85 @@ notes) were NOT run: they need a real GitHub repository.
   multi-agent prompts — a host behaviour, not routing.
 - `fan-out-work` (510/512 tokens) and `competition` (505/512) have no room left in their
   routing text: the next fence there needs a trim or domain foundations (TODO).
+
+# Round 6: catalog 87 → 105 (2026-09-28)
+
+An outside review proposed 28 runbooks. 18 survived triage on one test: a distinct deliverable, a distinct failure to
+guard against, distinct acceptance evidence, and a real Daintree orchestration role. The survivors are:
+- **Coordinating the workload:** reprioritize-work, resolve-task-collisions, hand-off-orchestration,
+  relieve-resource-contention.
+- **Recovery:** undo-agent-changes, salvage-failed-attempt, recover-lost-work, resolve-semantic-conflict.
+- **Review, security, prototype, docs:** respond-to-secret-exposure, audit-spec-coverage, productionize-prototype,
+  sync-project-docs.
+- **Release:** assess-readiness, deploy-and-verify, rollback-deployment, publish-package, test-distributable,
+  prepare-feature-demo.
+
+`migrate-worktree-database` gained restore-from-backup rather than a runbook of its own. The other proposals were
+cut for these reasons:
+- **Already covered:** a budget policy (`check-usage-limits` plus a fan-out cap), roster benchmarking
+  (`competition`/`interview`), unwind-a-workflow, an environment matrix, and migration rehearsal.
+- **No mechanism in Daintree:** cross-repository work (a connection is bound to one project), feature-flag
+  rollout (no flag service or observation), and design verification (no screenshot action).
+- **Not for Daintree users:** a maintainer tool for validating runbooks.
+
+Process: the same as the 40 → 87 round.
+- Five authors wrote the runbooks. Codex reviewed each batch (astra max on recovery, security and release; sol
+  high on the rest) and fix agents applied the findings.
+- Reverse fences went into 44 established runbooks. `fan-out-work`, `watch-outcome` and `review-change` now sit
+  at 505-510 of their 512 routing tokens. Nearly every new body is within ~10 B of the 10240 B bundle ceiling,
+  so the foundation cannot grow without trims.
+- Found by reading the app source: Daintree refuses to hand a terminal over while the pane that launched it is
+  still running, so a coordinator hand-off must exit the old coordinator before the user hands its children on.
+
+Data:
+- **Round-6 rows:** 1,046 single-turn rows were generated, and 1,041 of them agreed with a blind gpt-6-sol
+  label. 11 of those were dropped as near-duplicates of a case, leaving 1,030.
+- **Round-6 stateful rows:** 288 follow-ups and topic shifts were generated. 285 agreed with the blind label and
+  29 near-duplicates were dropped, leaving 256. Screening now covers history lines against every case suite.
+- **Relabel audit:** 1,050 existing cases and rows were candidates, flagged by the shipped selector ranking a new
+  runbook top-3 or by vocabulary. Sol and astra agreed on 10 relabels. 9 corpus rows moved and no case changed.
+  `tx-drive-release-checklist-in-browser-yourself` stays `[]`, as decided in the last round.
+- **Corpus total:** 17,987 rows.
+- **Holdout round 6:** 170 cases, 169 of them unanimous across writer, sol and astra. 5 near-duplicates were
+  dropped, leaving 6a with 82 cases (dev) and 6b with 83 (sealed).
+
+Routing before any retrain. The shipped refine-s42 weights with the 105-runbook catalog pass `bench local`:
+- **Overall:** 804/834 recall-pass, strict 732.
+- **Docs:** 29/30, with 1 missed lookup, well under the ceiling.
+- **Candidate misses:** 0.
+- **Holdouts (int8):** r1 97, r2 173, r3 185, r4a 133, r4b 137, r5a 127, r5b 123.
+- **New runbooks:** the authors' y- cases rank their runbook first almost everywhere zero-shot. The exceptions are
+  the casual phrasings of `prepare-feature-demo` and `respond-to-secret-exposure`.
+
+The retrain has two stages. Stage 1 (the retriever) is trained: r@32 0.998, r@1 0.850 at 105 runbooks. Stage-2
+seeds 41-43 were running at commit time, and the decision rule was written before any of them (margin on docs,
+y- ≥ 90%, no holdout drop > 3, 6b scored once).
+
+## Live trials (isolated Daintree, Haiku orchestrating)
+
+The trials were stopped after 10 of the 18 runbooks: the runners and ~40 authoring agents had taken the user's
+weekly Claude limit to 94%. Results:
+- **Passed:** `resolve-task-collisions`, a live collision settled end to end. `deploy-and-verify` served the right
+  revision and verified `/version`, the release symlink and a smoke test.
+- **Partial:**
+  - `assess-readiness` reported unknown areas as absent; the report now names every area.
+  - `rollback-deployment` read git history as the serving release and could skip the authorization gate; both are
+    fixed in the text. It stopped and asked, and production was untouched.
+  - `respond-to-secret-exposure` kept every safety property, but child inventories printed the value once and
+    called an unfinished search clean.
+  - `salvage-failed-attempt` got the right outcome but skipped a user confirmation.
+  - `prepare-feature-demo` had no preview started, or a hidden server reported as the demo.
+- **Fail:** `test-distributable`. The orchestrator fixed the packaging bug it found and committed to main in all
+  three runs, even after two body edits.
+- **Not reached:** `reprioritize-work` routing. Haiku's query described the urgent fix, not the reallocation.
+- **App, found by the demo runner:**
+  - a dev-preview in a worktree that is not the active one does not start until it is shown (`worktree.setActive`);
+  - the preview picks its own port;
+  - no action reports the preview's URL.
+
+## Still open
+- Score the three stage-2 seeds against the rule and release the winner.
+- Trials of the other 8 runbooks, and reruns confirming the body fixes, are owed once the usage limit resets.
+- "A checking runbook reports failures, it doesn't repair them" belongs in the foundation, where every
+  delivered runbook would carry it. The foundation has no byte budget left, so adding the rule needs trims
+  elsewhere first.

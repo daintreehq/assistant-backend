@@ -414,6 +414,15 @@ boundaries:
   - query: Claude and Gemini both implement the debounce hook their own way; judge the two entries and name a winner
     confusable_with: [daintree.orchestration.spike-options]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Have claude and codex each build the rate limiter in their own worktree, then tell me which version is better.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Have gemini and claude each write their own version of the pricing page, then peer-vote the winner.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: claude and codex each wrote their own version of the parser, judge which is better and go with the winner
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
 followups:
   - query: how's it going?
     history:
@@ -653,6 +662,12 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
+  - query: actually let both finish their own version, then have them blind-judge which one is better
+    history:
+      - 'user: claude-2 and codex-1 are both building the export feature, sort it out'
+      - 'assistant: Held both. claude-2 has CSV export done with tests; codex-1 has CSV plus XLSX, fewer tests. The evidence doesn''t clearly separate them.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[terminal.awaitAll returned: 4 submissions in]'
     history:

@@ -1,0 +1,238 @@
+# Release: a go/no-go on an exact candidate, deploying a pinned revision and proving
+# it serves, and rolling an environment back to a known-good release. Each runbook has
+# an agent-phrased and a user-phrased case, and a routing trap per declared neighbour
+# where the neighbour is right.
+
+cases:
+  # --- daintree.release.assess-readiness ---
+  - id: y-release-ready-agent
+    category: single-runbook
+    note: Agent phrasing of a readiness verdict for a pinned candidate with evidence per area.
+    messages:
+      - role: user
+        content: Give a go/no-go verdict for release candidate v2.5.0-rc.2 - check CI on the tagged commit, open release blockers, migrations and the rollback path, config changes and release notes - and report the evidence per area without tagging or deploying anything
+    expect:
+      required: [daintree.release.assess-readiness]
+      optional: [daintree.foundation]
+
+  - id: y-release-ready-user
+    category: single-runbook
+    note: Casual user phrasing of "are we ready to ship" with a blocker question.
+    messages:
+      - role: user
+        content: are we actually ready to ship 2.5? what's still blocking it
+    expect:
+      required: [daintree.release.assess-readiness]
+      optional: [daintree.foundation]
+
+  - id: y-release-ready-trap-prep-branch
+    category: routing-trap
+    note: One feature branch readied and its PR opened is branch prep, not a release verdict.
+    messages:
+      - role: user
+        content: is my feature branch ready to push? if it is, commit it and open the PR
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
+  - id: y-release-ready-trap-land
+    category: routing-trap
+    note: Merging the release PR is landing a PR, not assessing the release.
+    messages:
+      - role: user
+        content: the release PR is green and approved now, go ahead and merge it
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: y-release-ready-trap-notes
+    category: routing-trap
+    note: Writing the notes for a version is draft-release-notes, even though readiness checks the notes exist.
+    messages:
+      - role: user
+        content: write the release notes for 2.5 from everything merged since the 2.4 tag
+    expect:
+      required: [daintree.forge.draft-release-notes]
+      optional: [daintree.foundation]
+
+  - id: y-release-ready-trap-checks
+    category: routing-trap
+    note: Running the suite and reporting failures on the release branch is a check run with no shipping verdict.
+    messages:
+      - role: user
+        content: run the full test suite and lint on the release branch and tell me what fails
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  - id: y-release-ready-trap-deploy
+    category: routing-trap
+    note: Shipping the tag and confirming it is live is a deploy, not a go/no-go.
+    messages:
+      - role: user
+        content: ship the 2.5.0 tag to production and confirm the new version is the one serving
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.foundation]
+
+  # --- daintree.release.deploy-and-verify ---
+  - id: y-deploy-verify-agent
+    category: single-runbook
+    note: Agent phrasing - the project's own deploy for a pinned SHA, then proof of what serves.
+    messages:
+      - role: user
+        content: Deploy commit 3fa9c21 of the api to the staging environment with the project's own deploy script in a visible pane, then verify that exact SHA is serving through the version endpoint and the platform's revision listing, and run the smoke test
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-user
+    category: single-runbook
+    note: Casual user phrasing of deploy-and-check.
+    messages:
+      - role: user
+        content: push main out to staging and make sure the new build is actually what's running
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-readiness
+    category: routing-trap
+    note: Asking whether it is safe to ship before deploying is a readiness verdict.
+    messages:
+      - role: user
+        content: before we deploy 3.1, tell me whether it's safe to ship - CI on the tag, migrations, open blockers
+    expect:
+      required: [daintree.release.assess-readiness]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-rollback
+    category: routing-trap
+    note: Putting the previous release back after a bad deploy is a rollback, not a forward deploy.
+    messages:
+      - role: user
+        content: the deploy an hour ago broke logins, put the previous release back on prod
+    expect:
+      required: [daintree.release.rollback-deployment]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-outage
+    category: routing-trap
+    note: A live incident after a deploy, with agents investigating, is investigate-outage.
+    messages:
+      - role: user
+        content: we deployed to prod and now half the requests are 500ing, get some agents digging into what changed
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-visible-command
+    category: routing-trap
+    note: A plain build command in a watchable terminal is run-visible-command.
+    messages:
+      - role: user
+        content: open a terminal in the api worktree and run the docker build so I can watch it
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-watch
+    category: routing-trap
+    note: Being told when someone else's deploy pipeline finishes is a watch.
+    messages:
+      - role: user
+        content: Sam already kicked off the production deploy pipeline, just let me know when it finishes
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-land
+    category: routing-trap
+    note: Merging a PR into a branch that auto-deploys is still landing the PR.
+    messages:
+      - role: user
+        content: merge PR 214 into main once its required checks pass
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: y-deploy-verify-trap-publish
+    category: routing-trap
+    note: Publishing a package version to a registry is publish-package, not a service deploy.
+    messages:
+      - role: user
+        content: publish version 1.4.0 of the SDK to npm under the latest tag
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.foundation]
+
+  # --- daintree.release.rollback-deployment ---
+  - id: y-rollback-deploy-agent
+    category: single-runbook
+    note: Agent phrasing - identify the known-good revision, check compatibility, shift back, verify.
+    messages:
+      - role: user
+        content: Roll the production api back to the last known-good revision before today's deploy - identify the exact revision and SHA, check migrations and config changed since then for compatibility, restore it with the project's rollback mechanism, and verify which revision serves and whether the checkout errors stopped
+    expect:
+      required: [daintree.release.rollback-deployment]
+      optional: [daintree.foundation]
+
+  - id: y-rollback-deploy-user
+    category: single-runbook
+    note: Casual user phrasing of a production rollback.
+    messages:
+      - role: user
+        content: the deploy broke checkout, put yesterday's version back on prod
+    expect:
+      required: [daintree.release.rollback-deployment]
+      optional: [daintree.foundation]
+
+  - id: y-rollback-deploy-trap-outage
+    category: routing-trap
+    note: Finding the cause and listing options, with no rollback asked for, is investigate-outage.
+    messages:
+      - role: user
+        content: prod started throwing errors right after the last deploy - figure out which change did it and what our options are
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  - id: y-rollback-deploy-trap-deploy
+    category: routing-trap
+    note: The fix shipped forward to production is a deploy, not a rollback.
+    messages:
+      - role: user
+        content: the fix is merged now, deploy the new main to production and check it's live
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.foundation]
+
+  - id: y-rollback-deploy-trap-revert-source
+    category: routing-trap
+    note: Reverting the offending commit in the code is a code change for an agent, not an environment rollback.
+    messages:
+      - role: user
+        content: get an agent to revert the commit that broke the discount calculation in the code, on a new branch
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: y-rollback-deploy-trap-undo-agent
+    category: routing-trap
+    note: Reversing an agent's edits while keeping the user's is undo-agent-changes.
+    messages:
+      - role: user
+        content: undo what the codex agent just changed in the config files but keep my own edits
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.foundation]
+
+  - id: y-rollback-deploy-trap-local-db
+    category: routing-trap
+    note: Rolling back a migration on a worktree's local database is migrate-worktree-database.
+    messages:
+      - role: user
+        content: roll back the last migration on my feature worktree's database
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]

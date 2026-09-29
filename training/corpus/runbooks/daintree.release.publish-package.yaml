@@ -1,0 +1,136 @@
+# Training examples whose answer is `daintree.release.publish-package` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.release.publish-package
+run: 2026-09-28-round6
+positives:
+  - Publish @acme/sdk 1.4.0 to npm from the tip of main under the latest tag, then confirm a fresh project can install and import it.
+  - Release the python client in packages/client-py to PyPI as 0.9.2; the user will type the 2FA code themselves.
+  - cut a crates.io release of the tokenizer crate, 0.3.1
+  - push 2.0.0-beta.3 of the cli to npm under the next dist-tag, latest must stay on 1.9.4
+  - Build and push version 5.2.0 of the billing gem to RubyGems, then check `gem install` of that exact version works in an empty directory.
+  - hey can u publish the new version of our client lib? patch bump per the changelog
+  - ship 1.12.0 of the react component library to npm and make sure no .env or .pem files end up in the tarball
+  - npm publish @org/parser 2.3.0, dist-tag latest, verify from a clean consumer afterwards
+  - Release pydantic-extras 1.1.0 to PyPI; build wheel and sdist from a clean checkout, run twine check, and have me type the token prompt in a visible terminal.
+  - packages/schema in the monorepo needs a new minor on npm; pick the version from our conventional-commit history and publish it exactly once.
+  - publish the sdk. 2fa is on my phone, I'll type the otp when it asks
+  - Push the v4.2.0 tag so our publish workflow uploads the package to npm, then confirm the registry holds 4.2.0 with the hash of the file CI built.
+  - The changelog entry for 0.8.0 is already merged; now get 0.8.0 of the crate onto crates.io and prove `cargo add` of that version builds.
+  - 'I merged the version-bump PR #231 myself an hour ago. Publish what''s on main as 3.4.0 to npm.'
+  - Our design-system package needs 7.1.0 on the private Verdaccio registry so the storefront repo can pick it up; release it from this repo.
+  - 'ship the new client library version: it''s an npm package, not the web service. 2.6.0 under latest'
+  - pack the wheel, make sure twine check passes and nothing from tests/fixtures is inside, then upload 1.0.0 to PyPI
+  - Release the JS SDK 5.0.0-rc.1 on the rc channel of npm; a scratch project must be able to import it afterwards.
+  - 'Only the registry part is left: build and publish vendor-sync 0.4.0 to PyPI. Notes and PR are done.'
+  - The publish of @acme/ui 1.9.0 got cut off at the OTP prompt. Find out whether it reached npm and finish the release without publishing twice.
+  - Publish the protobuf bindings package 0.12.0 to our internal Artifactory npm registry from commit a1b9e4f on main.
+  - Publish the Android SDK 3.1.0 to Maven Central using the project's gradle publish task, then check a clean gradle project resolves it.
+  - bump and publish a patch for the eslint config pkg pls
+  - Put 1.0.0 of the parser on PyPI as our first stable release and confirm `pip install parser==1.0.0` in a new venv imports it.
+  - Publish the next canary of the CLI to npm under the canary tag, leaving latest pointing at 3.8.2.
+boundaries:
+  - query: We own the logger package. Release 2.0.0 of it to npm so the other teams can upgrade to it.
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: publish a new version of our shared eslint-config to the registry, 9.1.0
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: Other repos are waiting on the new major of our http client; get 4.0.0 onto PyPI from this repo.
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: Release notes for 2.3.0 are already in CHANGELOG.md; now cut the actual 2.3.0 release of the package to npm.
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: notes are drafted on the github release. what's left is uploading 0.8.1 to pypi
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: Skip the changelog, it's done. Publish the logging crate 1.2.0 to crates.io and check it resolves from a new cargo project.
+    confusable_with: [daintree.forge.draft-release-notes]
+  - query: The release PR is merged. Publish 3.1.0 to npm from that merge commit.
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: don't merge anything, just publish the version already on main to the registry, 0.5.0
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'PR #77 bumped the version and landed; push the matching tag so the workflow publishes to PyPI, and confirm the upload.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Publish 2.5.0 of the Python SDK to PyPI and check it installs.
+    confusable_with: [daintree.release.assess-readiness]
+  - query: The tarball is packed and checked; publish it to npm as 2.4.0.
+    confusable_with: [daintree.release.test-distributable]
+followups:
+  - query: ok, looks clean. publish it
+    history:
+      - 'user: publish @acme/sdk 1.4.0 to npm as latest'
+      - 'assistant: Created worktree release/1.4.0 at a3f91c2 and launched claude-3 to bump, build and pack. It reports acme-sdk-1.4.0.tgz, 212 KB, sha256 7be0…, nothing flagged; 1.4.0 is free on npm. I re-listed the tarball myself. Command: npm publish ./acme-sdk-1.4.0.tgz --tag latest. Publish?'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: actually make it 2.0.0-beta.1 and put it on the next tag, not latest
+    history:
+      - 'user: get the sdk release ready for npm, don''t publish yet'
+      - 'assistant: Pinned main at 4c1d0e7. No version given, so the release agent will propose one from the changelog; I''ll show you the packed tarball before anything is uploaded.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: I typed the OTP, it says + @acme/sdk@1.4.0. are we done?
+    history:
+      - 'user: go ahead and publish'
+      - 'assistant: Opened terminal ''publish'' in the release/1.4.0 worktree and sent npm publish ./acme-sdk-1.4.0.tgz --tag latest. npm is asking for a one-time password — type it there yourself.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: the tarball has a .env.example and the fixtures folder in it — drop those and repack before we upload anything
+    history:
+      - 'user: cut a PyPI and npm release of the parser, 0.9.0'
+      - 'assistant: claude-2 finished in release/0.9.0: HEAD 9e2a1f0 plus one bump commit. Listing of parser-0.9.0.tgz shows dist/, README, package.json, .env.example and test/fixtures/ (3.1 MB).'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: same thing for the PyPI side — wheel and sdist, twine upload once you've checked them
+    history:
+      - 'user: release acme-client 3.2.0 to npm and PyPI'
+      - 'assistant: npm side is live: 3.2.0 under latest, dist.shasum matches the tarball, and a fresh temp project installed it and imported it cleanly. The Python package in packages/py-client hasn''t been built yet.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: the npm install in the temp dir says no matching version — should I just run publish again?
+    history:
+      - 'user: publish 1.4.1 to npm'
+      - 'assistant: Publish terminal ended with rc=0. Now checking npm view @acme/sdk dist-tags and installing 1.4.1 from a clean mktemp dir to prove it.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: and publish the client SDK 2.5.0 to npm
+    history:
+      - 'user: ship v2.5.0 to production — yes, prod'
+      - 'assistant: Deployed v2.5.0 (8c1e4f0) to production with `./infra/deploy.sh prod` in claude-6, operation d-4412. Serving: api-00114 at 100% traffic, /version reports 8c1e4f0, smoke check passed. Rollback point: api-00113 at 71d09aa.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: great. now publish 2.5.0 of the sdk to npm
+    history:
+      - 'user: write the release notes for sdk 2.5'
+      - 'assistant: Drafted the 2.5.0 section in CHANGELOG.md covering v2.4.0..main: 14 PRs, one breaking change first. Nothing tagged.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6-stateful
+  - query: good enough, go with it — push 3.1.0 of the client library to PyPI
+    history:
+      - 'user: is the python client ready to release as 3.1.0?'
+      - 'assistant: Verdict for 6b2e1d4: go. CI green on that SHA, planned scope merged, no migrations.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: looks fine, publish that exact version to npm under the next dist-tag
+    history:
+      - 'user: does the packed tarball of the cli actually work when installed?'
+      - 'assistant: Built acme-cli-0.8.0-rc.1.tgz from 1f4c7aa. Installed in a clean temp project: --help, init and build pass. I re-ran the install myself.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+  - query: all green? then release @acme/ui 1.2.0 to npm
+    history:
+      - 'user: run the tests and build in the ui package worktree'
+      - 'assistant: packages/ui at 8a1b3c4: test pass (212), lint pass, build pass.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-round6-stateful
+  - query: while that runs, can you get our own validator package published to PyPI as 0.3.0?
+    history:
+      - 'user: bump zod to v4 and fix whatever breaks'
+      - 'assistant: Launched claude-2 in the upgrade/zod-4 worktree to run baseline checks and apply the migration guide. I''ll verify when it reports.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-round6-stateful
+  - query: great, that's the one — publish that tarball to npm as latest
+    history:
+      - 'user: does the packed npm tarball actually work when installed?'
+      - 'assistant: acme-cli-0.7.0.tgz (sha256 9a1f…) from 6e2b0c4 installed in a clean temp project; --help, init and build pass, and I re-ran the install myself.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful

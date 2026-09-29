@@ -261,6 +261,12 @@ boundaries:
   - query: the dev preview for the checkout page shows a blank white screen, fix it
     confusable_with: [daintree.orchestration.spike-options]
     run: 2026-09-28-catalog-expansion-late
+  - query: the onboarding preview is blank and the console shows a hydration error, get it fixed
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: Open a Dev Preview panel for the web worktree so I can look at the settings page.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: and the second one?
     history:
@@ -588,6 +594,12 @@ topic_shifts:
       - 'assistant: Started the dev server in terminal "dev: checkout-v2" on port 4312 and confirmed /version reports that worktree''s SHA 5ab21e0. Suite finished: 46 passed, 2 failed (cart.spec: ''applies coupon'', address.spec: ''saves default'').'
     active: [daintree.ci.run-e2e-suite]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: the preview page is blank and the console has a TypeError — fix it
+    history:
+      - 'user: get the onboarding flow running so I can click through it'
+      - 'assistant: Launched a dev-preview panel in the onboarding worktree at 3e7b90a.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[agent completed: frontend fix]'
     active: [daintree.runtime.debug-web-app]

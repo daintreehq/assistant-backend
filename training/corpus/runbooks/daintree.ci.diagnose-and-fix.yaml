@@ -475,6 +475,21 @@ boundaries:
   - query: the tests on the coupon-codes branch are failing, get them green
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'Main''s CI went red right after PR #501 merged: the date parser test fails. Fix it.'
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: the checkout tests on develop started failing this morning, get them green
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: CI on main went red after the last merge; get an agent to fix the failing test.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: the docker build step fails in CI, get it green
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: CI is red because STRIPE_SECRET_KEY isn't set in the Actions env for the integration tests; get it passing.
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
 followups:
   - query: how's it going?
     history:
@@ -874,6 +889,18 @@ topic_shifts:
       - 'assistant: codex-2''s baseline on main was already red: lint fails in src/legacy/format.ts before any bump.'
     active: [daintree.deps.upgrade-dependency]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: get that e2e-linux failure fixed
+    history:
+      - 'user: is the release candidate good to go? it''s origin/release/4.0'
+      - 'assistant: Candidate = origin/release/4.0 at e19b7d2. Verdict: no-go. PR #901 (fix session expiry) is open with the release-blocker label, approved and green; required check e2e-linux failed on e19b7d2; CHANGELOG has no 4.0 section. Checkers were claude-2, claude-3, codex-2; nothing merged, tagged or deployed.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: forget the release for now — the typecheck is failing on the release branch, get it fixed
+    history:
+      - 'user: cut the 0.9.0 crates.io release of the parser'
+      - 'assistant: claude-2 stopped: `cargo package` refused because the build fails typechecking in src/lexer.rs:88. Nothing published.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[watcher w_88 fired: rerun complete, 0 failures]'
     history:

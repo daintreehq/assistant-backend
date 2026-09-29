@@ -70,6 +70,9 @@ boundaries:
     run: pre-split
   - query: give me the project pulse for this checkout
     run: pre-split
+  - query: write up what the agents shipped this week for my standup, with PR links
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: can you regroup it by person instead of by theme?
     history:
@@ -145,3 +148,9 @@ topic_shifts:
       - 'assistant: Range v3.1.4..main; claude-2 wrote 11 lines, 5 internal items excluded. Nothing tagged.'
     active: [daintree.forge.draft-release-notes]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: perfect. now write my standup covering what the agents shipped today
+    history:
+      - 'user: prepare a demo of the invoices feature for the standup'
+      - 'assistant: Demo is up in dev-preview panel ''Demo: invoices'', walkthrough of 5 steps, works/stubbed list attached.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful

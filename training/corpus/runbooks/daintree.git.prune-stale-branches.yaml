@@ -51,6 +51,12 @@ boundaries:
     confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: delete my merged local and remote branches
     confusable_with: [daintree.worktree.audit-worktrees]
+  - query: Delete all my local branches that have already been merged into main.
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: which remote branches are abandoned and safe to delete? list them with evidence first
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
 followups:
   - query: delete the merged ones, keep the abandoned for now
     history:

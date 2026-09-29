@@ -1,0 +1,111 @@
+# Training examples whose answer is `daintree.orchestration.hand-off-orchestration` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.hand-off-orchestration
+run: 2026-09-28-round6
+positives:
+  - Coordinator context is at 92%; write a handoff for the six running migration agents and launch a fresh Claude session to take over coordination.
+  - Hand coordination of the in-flight auth refactor run (codex-1, claude-2, gemini-3 across three worktrees) to a successor Codex coordinator without relaunching any workers.
+  - Write a coordinator handover covering every child terminal, the dependencies between them, pending questions and a never-replay list, then start a new orchestrator session from it.
+  - Replace this orchestrator session with Codex as coordinator of the running dependency-upgrade fan-out; the successor must reconcile against live Daintree state before acting.
+  - ok your context is getting huge. pass the whole orchestration to a fresh claude so it can keep driving the 5 agents
+  - switching coordinators — i want codex running the show from here. give it everything it needs about the agents in flight
+  - Transfer the bug-bash coordination (8 agent panes) to a successor coordinator and tell the user which panes to hand over and in what order.
+  - 'Successor coordinator needed for the monorepo migration run: capture each child by terminal id, worktree and branch, plus approved decisions and next actions.'
+  - can you write up the handover so another session can take over supervising this release run? i'm closing this pane after
+  - 'Coordinator handoff: snapshot the live multi-agent run, write handoff-<run-id>.md outside the repo, launch the successor and wait for its reconciled picture.'
+  - This coordinating session is being retired mid-run; brief a new coordinator on the three dependent phases still pending and stop arming new work.
+  - new orchestrator please. this chat is too long and it's starting to forget which agent is on which branch. keep the agents running
+  - Freeze new launches and hand orchestration of the frontend/backend contract split to a fresh Claude coordinator.
+  - I already opened a new claude pane on the right — make it the coordinator for everything you've got running
+  - Not one task — the coordination of all four agents moves to a new session; Codex takes over the orchestrator role and the workers keep their worktrees.
+  - The coordinating Claude hit its usage limit mid-run; have Codex take over as orchestrator of all seven worker agents.
+  - Launch a successor coordinator for the in-flight schema migration run and pass it the run checkpoint path; it becomes the only writer.
+  - i don't want to resume this myself later — set up a new coordinator right now that carries the run on while the agents keep going
+  - Don't pause the agents, they keep working; only the coordinator changes. Hand orchestration of the live run to a new Codex session.
+  - i'm logging off soon but the agents should keep going under a fresh coordinator. write the handover and spin it up
+  - The durable workflow for the payments migration is mid-flight; hand its coordination and checkpoint ownership to a successor session.
+  - Give the running phased migration a new coordinator that reads the handoff, reconciles it with terminal.list, and continues from the next actions.
+  - 'Hand off the orchestrator role, not the workers'' tasks: children stay put in their worktrees, the successor coordinator gets the handoff document.'
+  - Successor orchestrator must not relaunch finished children or replay merged PRs; write the never-replay list and launch it for the release-train run.
+  - 'coordinator succession: 6 children, 2 pending questions, handoff doc + successor launch'
+  - 'pls hand the conductor role to gemini, the agents on #812 #815 #820 stay where they are'
+boundaries:
+  - query: Claude's context is used up, but it's the one coordinating the other five agents; give its coordinator role to a fresh session.
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: have codex take over from this session — not a single task, the orchestration of every agent you launched
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: 'Take over from the coordinating agent: hand its whole multi-agent run, with dependencies and pending questions, to a new Claude.'
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: The workflow graph is still advancing; pass its coordination and checkpoint to a successor Claude session and stop acting.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: 'Track this plan from a new coordinator: hand over the running durable migration with its dependencies and next actions.'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: The phased migration's orchestrator needs replacing mid-flight; the successor must reconcile with live state before launching anything.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: i'm stepping away but the agents keep running — before i go, hand the coordination to a fresh codex pane
+    confusable_with: [daintree.orchestration.park-work]
+  - query: Don't stop anyone; the only thing that changes is who coordinates. Write the handoff and bring up the successor coordinator.
+    confusable_with: [daintree.orchestration.park-work]
+  - query: Save everything you know about the run into a handover so a new orchestrator session can drive it tonight while the agents work.
+    confusable_with: [daintree.orchestration.park-work]
+  - query: My context is nearly full; hand coordination of the five running agents over to a fresh Codex session.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+  - query: 'Leave this run so a new coordinator session can carry on right now: record where each child stands and launch the successor.'
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: resuming later isn't what i want — set up a replacement coordinator now and hand it the live run
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: The next session should take over the run checkpoint as its only writer; write the coordinator handover and start that session now.
+    confusable_with: [daintree.orchestration.status-and-resume]
+followups:
+  - query: use codex as the successor, not claude
+    history:
+      - 'user: your context is nearly full, hand the coordination of these six agents to a fresh session'
+      - 'assistant: Froze new launches. Wrote the handoff to /tmp/handoff-billing-migration.md: six children with terminal ids, worktrees, branches and HEADs, the dependency from claude-2''s schema change to codex-4''s backfill, one pending question from codex-3, and the never-replay list. Next: launch a fresh Claude as successor.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+  - query: so which panes do I hand over, and in what order?
+    history:
+      - 'user: hand the orchestration to a new claude, your context is almost gone'
+      - 'assistant: Successor claude-10 reconciled the handoff with live state: all seven children match, one difference (codex-2 finished since the snapshot). It is waiting for your go.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+  - query: claude-3 just finished while you were writing that — does the successor need to know?
+    history:
+      - 'user: pass the coordination of the api rewrite to a fresh codex session'
+      - 'assistant: Handoff written to /tmp/handoff-api-rewrite.md and codex-11 launched as successor; it is reading the handoff and reconciling now. I''m arming no new work.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+  - query: 'Add codex-2''s pending question about the index name to the handover verbatim, and list the PR #455 merge under never replay.'
+    history:
+      - 'user: prepare a successor coordinator for this monorepo split, I''m moving to a new session'
+      - 'assistant: Draft handoff at /tmp/handoff-monorepo-split.md: eight children, dependencies, approved decisions and next actions. Pending questions and the never-replay list are still thin.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: I'm switching to codex as the coordinator for the rest of this sweep, give it everything it needs
+    history:
+      - 'user: migrate every test file from enzyme to testing-library'
+      - 'assistant: Pilot passed; batches 1 and 2 of 4 are running with claude-2, codex-3 and claude-4, each in its own worktree.'
+    active: [daintree.orchestration.migration-sweep]
+    run: 2026-09-28-round6-stateful
+  - query: write the handover so a new session can take over this whole run tonight
+    history:
+      - 'user: track the three-phase schema rollout and keep it going'
+      - 'assistant: Phase 1 is verified; phase 2 (backfill) is running with codex-2, and phase 3 waits on it. The plan and evidence are in the run checkpoint.'
+    active: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-09-28-round6-stateful
+  - query: you're at 90% context — pass the queue's coordination to a new coordinator before you run out
+    history:
+      - 'user: work through these 30 issues, no more than 6 agents at a time'
+      - 'assistant: 14 of 30 done and verified, 6 agents working, 10 queued; the next launches when one finishes.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6-stateful
+  - query: My context budget is nearly exhausted while coordinating eight workers on the monorepo split; prepare a successor coordinator with the children, dependencies, pending questions and a never-replay list.
+    history:
+      - 'user: codex-2 is asking whether to keep the legacy alias, tell it yes'
+      - 'assistant: Sent codex-2 "yes, keep the legacy alias"; it acknowledged and continued.'
+    active: [daintree.agents.answer-waiting-agent]
+    run: 2026-09-28-round6-stateful

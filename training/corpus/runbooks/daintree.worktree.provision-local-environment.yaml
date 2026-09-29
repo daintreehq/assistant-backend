@@ -250,6 +250,12 @@ boundaries:
   - query: After creating a worktree I always have to copy .env and run yarn; automate that for every new one.
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-late
+  - query: Every new worktree should load the anonymised seed dump into its own fresh database automatically when it's created.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6
+  - query: wt-a and wt-b keep overwriting the same dev database, restoring it every time is a pain, fix that
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:

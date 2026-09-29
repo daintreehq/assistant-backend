@@ -52,6 +52,9 @@ boundaries:
   - query: Launch an agent immediately to run the integration suite
     confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
+  - query: Run the Cypress suite headless against the feature/checkout worktree's own server.
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
 followups:
   - query: rerun just those two with tracing on
     history:

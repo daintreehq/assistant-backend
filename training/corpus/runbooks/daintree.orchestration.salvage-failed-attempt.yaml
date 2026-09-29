@@ -1,0 +1,140 @@
+# Training examples whose answer is `daintree.orchestration.salvage-failed-attempt` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.salvage-failed-attempt
+run: 2026-09-28-round6
+positives:
+  - The agent's GraphQL migration on feat/gql failed, but the schema types and their tests look sound - put only those on a fresh branch off main and get them passing.
+  - codex's lexer rewrite is a bust but the tokenizer tests it wrote are great, save them onto a new branch
+  - 'Salvage from worktree refactor-orm: the connection-pool module and its fixtures; everything else in that attempt is broken. New branch off develop, failed worktree untouched.'
+  - rescue what's good from claude-3's attempt at offline sync, the rest can stay broken in its wt
+  - Start the i18n work over from main, but carry across the translation-key extractor and snapshot tests from gemini's failed attempt.
+  - The Rust port on port/rust-core doesn't compile; identify which pieces stand alone and move them to a clean branch where they build and test on their own.
+  - Codex's attempt to replace the job queue failed in integration. Keep its retry-backoff util and the Redis test harness in a new worktree; leave feat/queue-v2 as it is for reference.
+  - 'Failed attempt at #812 (branch agent/812-webhooks): extract the signature-verification hunks in src/webhooks/verify.ts plus tests into salvage/812 off origin/main.'
+  - ok the big refactor didn't work. can we keep the new error types it added and their tests, fresh branch pls
+  - From the abandoned dark-mode attempt, bring only the design-token file and its unit tests onto a new branch; the broken component rewrites must not come along.
+  - The agent's pagination rewrite fails e2e, but its cursor-encoding helper is sound. Make a clean branch from develop with just that helper, adapted and independently tested.
+  - salvage the migration + fixtures from the failed postgres upgrade attempt into a new branch, dont touch the old worktree
+  - The post-mortem on codex's failed run already listed the config loader and env-var validation as salvageable; build those into a fresh branch now.
+  - No need to explain why the payments attempt failed; just get its currency-rounding module into a clean branch off main that passes on its own.
+  - Of the eleven commits on the failed agent/refactor-auth branch, work out which are sound on their own and bring just those onto a new branch from main.
+  - the codex branch is broken overall but commits 3 and 5 look fine to me. get them onto a fresh branch off main and make sure they pass without the rest
+  - Don't revert anything in the failed worktree - copy the useful bits (the CSV parser and its tests) into a new branch off the base instead.
+  - rather than rolling back claude's attempt, leave it as-is for reference and pull the good parts into a new wt
+  - Codex hit a wall on the search indexer and its approach is wrong. Don't have another agent continue it; start clean off develop with only its tokenizer and those tests.
+  - Claude's attempt at the plugin loader is abandoned. Give a builder a new worktree to carry over just the manifest-validation code and make it pass there.
+  - The sync-engine attempt did not work - it deadlocks - but its conflict-resolution module is solid; move that alone onto a fresh branch with tests.
+  - Nothing is lost, the failed worktree is still there - I just want its good parts, the S3 upload helper and tests, on a new branch from main.
+  - Extract the salvageable subset of claude-2's failed Kotlin migration (data classes and serializers) into a new worktree off main; its checks must pass without the broken ViewModels.
+  - gemini's attempt at the chart lib swap flopped. the axis formatting code it wrote was nice tho, keep that in a fresh branch
+  - Keep the useful half of the failed monorepo-split attempt - the shared tsconfig and the build script - on a new branch off main; the failed worktree stays untouched.
+  - 'Salvage the rate limiter and its load tests from the broken agent/api-gateway attempt: new branch, provenance recorded, no push.'
+  - The 20-minute timeboxed attempt ended with a broken build; keep just its validation-schema changes on a fresh branch off develop.
+boundaries:
+  - query: Codex gave up on the websocket rewrite. Don't hand it to another agent to continue - start fresh off main keeping only its message-framing module and tests.
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: claude's attempt is dead. new branch, fresh start, but bring over its seed data and fixtures
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: Instead of passing the failed migration task to Gemini to carry on, extract the reusable schema helpers from it into a clean branch.
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: The attempt failed; rather than a post-mortem, lift its working CSV exporter and tests onto a clean branch from main.
+    confusable_with: [daintree.agents.postmortem-run]
+  - query: codex's run on the importer blew up but its fixtures are solid - start a new branch off develop with just those fixtures and their tests
+    confusable_with: [daintree.agents.postmortem-run]
+  - query: Skip analysing the failed run; extract its parser module into a fresh worktree and make it pass on its own.
+    confusable_with: [daintree.agents.postmortem-run]
+  - query: From the abandoned feat/graph-v2 attempt that never worked, pick out the sound query-builder commits and put them on a fresh branch off main with passing tests.
+    confusable_with: [daintree.git.cherry-pick-changes]
+  - query: The refactor attempt failed overall; carry its two sound commits (e4f1, 77ac) into a new salvage branch from develop and make them pass there without the rest.
+    confusable_with: [daintree.git.cherry-pick-changes]
+  - query: Codex's attempt at the CSV importer is broken, but its tokenizer and tests are worth keeping; move those onto a fresh branch off main.
+    confusable_with: [daintree.git.recover-lost-work]
+  - query: Codex's attempt at the new router failed but its route-matching tests are good; get those onto a fresh branch off main.
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: Both contest entries for the importer failed their tests; carry codex's CSV-dialect detection, which did work, into a fresh branch off main.
+    confusable_with: [daintree.orchestration.competition]
+  - query: The losing competition entry crashed, but its retry helper is solid - move just that into a new branch off develop and test it there.
+    confusable_with: [daintree.orchestration.competition]
+  - query: 'No winner to pick: every rival version of the upload flow broke. Salvage claude''s chunking logic into a clean branch with its tests.'
+    confusable_with: [daintree.orchestration.competition]
+  - query: The GraphQL prototype never worked; pull its schema file and resolver tests into a fresh branch off main and leave the rest behind.
+    confusable_with: [daintree.orchestration.productionize-prototype]
+  - query: codex's importer attempt failed overall but keep the parser and its fixtures in a new branch
+    confusable_with: [daintree.orchestration.productionize-prototype]
+followups:
+  - query: keep 1 and 2, and adapt those two parser tests so they don't need the new evaluator
+    history:
+      - 'user: codex''s refactor is broken but the parser and its tests are useful, keep those'
+      - 'assistant: The surveyor proposes: (1) src/parser/* with tests — standalone; (2) the new Token type the parser uses. Broken: the evaluator rewrite. Two parser tests call evaluator.run(), so they only pass alongside the broken code.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: drop the config schema change as well, just the LRU module and its tests
+    history:
+      - 'user: rescue the good parts of claude-4''s attempt at the caching layer'
+      - 'assistant: Proposed keep: the LRU module + tests, and the cache config schema change. Drop: the middleware wiring (it''s what breaks the request tests). The failed worktree cache-v1 stays untouched. Confirm the set?'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: base it on develop, not main — feature branches come off develop here
+    history:
+      - 'user: pull the bits worth keeping out of the broken importer refactor into a fresh branch'
+      - 'assistant: You confirmed the CSV reader and the fixtures. Next I''ll create salvage/importer off origin/main (last fetched 3 days ago) and launch a builder there.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: bring the UserRepo helpers along too then, but nothing else from the dropped list
+    history:
+      - 'user: start over on the accounts work but keep its migration and fixtures'
+      - 'assistant: Builder claude-7 in salvage/accounts stopped and reported: the migration you kept imports helpers from UserRepo, which was on the dropped list. It won''t bring them without your say.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: yes, include the uncommitted fixtures — those are the good ones
+    history:
+      - 'user: the sync engine attempt failed, salvage the conflict resolver out of it'
+      - 'assistant: Froze the failed worktree sync-v2 at F=5a4b3c2. It also has uncommitted changes under fixtures/ that aren''t in any commit — they count as part of the attempt. Do you want those carried over with the resolver?'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: for the CSV reader just take commit 71e2d0a whole, it's self-contained
+    history:
+      - 'user: rescue the useful parts of codex-3''s attempt at the export feature'
+      - 'assistant: Keep list: the CSV reader (commit 71e2d0a plus a hunk in src/export/index.ts) and the date formatter tests. Drop: the streaming writer. The builder will bring only these into salvage/export off the current base.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: actually don't undo it in place — the tokenizer and its tests are good. pull those into a fresh branch off main and leave its worktree alone
+    history:
+      - 'user: undo what claude-2 did in the parser worktree'
+      - 'assistant: Attributed four commits to claude-2 since 1a2b3c4 (its launch HEAD). They add a new tokenizer with tests and rewrite the evaluator, which is what broke the build.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: ok, take the conflict resolver and its tests into a fresh branch off main and get them passing on their own
+    history:
+      - 'user: post-mortem last night''s codex run on the sync engine'
+      - 'assistant: Cause: environment — the queue rewrite assumed an in-memory store and everything above it followed. Salvageable: the conflict resolver module and its 14 tests. The queue rewrite is unsound.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-round6-stateful
+  - query: abandon that approach, but keep the generated schema and the scalar types — put just those on a clean branch
+    history:
+      - 'user: give codex 20 minutes on the GraphQL migration'
+      - 'assistant: Deadline hit; stopped codex-3. It generated the schema and custom scalars, but the resolvers are half-done and the build fails with 31 errors.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: claude-2's is the winner, fine. but codex-1's entry failed — pull its retry helper out into its own branch off main, tested on its own
+    history:
+      - 'user: compare claude-2''s and codex-1''s versions of the webhook sender and pick a winner'
+      - 'assistant: Winner: claude-2 (all tests pass, simpler). codex-1''s version fails 9 tests, though its retry helper with jitter is well tested.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-28-round6-stateful
+  - query: then scrap the rewrite, but get the lexer and its tests out of it onto a clean branch
+    history:
+      - 'user: claude hit its limit on the parser rewrite, have codex finish it'
+      - 'assistant: codex-2 took over in parser-rewrite. After an hour it reports the approach can''t handle nested templates and the rewrite is a dead end; the lexer it inherited still passes its tests.'
+    active: [daintree.agents.hand-off-task]
+    run: 2026-09-28-round6-stateful
+  - query: forget fixing it. keep the webhook signature verification it wrote and put only that on a fresh branch
+    history:
+      - 'user: fix the failing build in the payments worktree'
+      - 'assistant: claude-5 tried twice. The Stripe v12 migration it made is fundamentally broken — 23 failures across the charge flow — but its webhook signature check passes its own tests.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-round6-stateful

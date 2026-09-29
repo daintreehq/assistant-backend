@@ -1,0 +1,189 @@
+# Training examples whose answer is `daintree.orchestration.reprioritize-work` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.reprioritize-work
+run: pre-split
+positives:
+  - query: Pause the two docs agents at a safe point and move that capacity onto the checkout 500 hotfix in a new worktree; keep the auth refactor agent running.
+    run: 2026-09-28-round6
+  - query: 'Urgent: the payment webhook is double-charging customers. Re-plan the running agents: pause lower-priority work with resume notes and launch two agents on the webhook fix.'
+    run: 2026-09-28-round6
+  - query: 'Release blocker #884 just came in. Decide for each of the five running agents whether it keeps going, pauses, or moves onto #884.'
+    run: 2026-09-28-round6
+  - query: Freeze claude-3 and gemini-1 mid-task with resume notes so their capacity goes to the login regression; codex-2 keeps working on the migration.
+    run: 2026-09-28-round6
+  - query: 'Investor demo in 90 minutes and the onboarding flow must work. Reshuffle the agents: anything off the demo path waits, the rest goes on onboarding.'
+    run: 2026-09-28-round6
+  - query: 'Priority change across running agents: stop the lint-cleanup agents at a clean point and start the urgent lodash CVE patch in its own worktree.'
+    run: 2026-09-28-round6
+  - query: reallocate running agents to urgent hotfix; pause non-critical ones with resume notes; no commits
+    run: 2026-09-28-round6
+  - query: 'urgent SSO login fix outranks in-flight feature work: pause 2 of the 4 agents, launch fix agents, do not close any panels'
+    run: 2026-09-28-round6
+  - query: Interrupt the agents working on the dark-mode theme now, record where each one stopped, and put them on the broken production build.
+    run: 2026-09-28-round6
+  - query: 'Swap priorities: the i18n agents wait, the corrupted-export bug #1203 gets two agents immediately. Nothing already done may be lost.'
+    run: 2026-09-28-round6
+  - query: Take claude-1 off its test-coverage task (pause it and note where it stopped) and give its slot to the urgent rate-limit bug alongside a fresh codex agent.
+    run: 2026-09-28-round6
+  - query: 'Customer escalation on the CSV importer: rebalance the busy agents so at least two are on it and the others carry on.'
+    run: 2026-09-28-round6
+  - query: Hold the refactor agents at a clean stopping point, no checkpoint commits, and spin up the fix for the session cookie missing its Secure flag on a new branch.
+    run: 2026-09-28-round6
+  - query: 'Before the 3pm cut, redistribute the agents: the Android crash-on-launch is top priority now; lower-priority tasks pause with notes on how to resume.'
+    run: 2026-09-28-round6
+  - query: Stop feature work in the feat/search, feat/tags and feat/export worktrees and point those agents at the P0 data-loss bug instead.
+    run: 2026-09-28-round6
+  - query: 'Mid-sprint escalation: go agent by agent (keep, pause or redirect) and staff the billing proration fix with two agents.'
+    run: 2026-09-28-round6
+  - query: 'Hotfix v3.2.1 needs capacity now: pause whichever running agents matter least and report each one''s resume point.'
+    run: 2026-09-28-round6
+  - query: ugh, prod checkout is broken. drop whatever the agents are doing and get two of them on it
+    run: 2026-09-28-round6
+  - query: ok new plan. the migration stuff can wait, get everyone except codex onto the login bug
+    run: 2026-09-28-round6
+  - query: 'boss just escalated #512, pause the docs agents and throw them at it'
+    run: 2026-09-28-round6
+  - query: stop the low priority stuff, the release blocker comes first. keep the api agent going tho
+    run: 2026-09-28-round6
+  - query: 'hey sorry, change of plans: safari users can''t log in, move some agents onto that and hold the rest where they are'
+    run: 2026-09-28-round6
+  - query: 'reprioritize: payments bug > everything else. dont lose anyone''s work'
+    run: 2026-09-28-round6
+  - query: demo's at 4 and the wizard crashes, reshuffle the agents
+    run: 2026-09-28-round6
+  - query: put the refactor on hold, need all hands on the memory leak in the worker. note where each one stopped
+    run: 2026-09-28-round6
+  - query: can you pull claude-2 and gemini off the tests for now and get them on the broken signup flow asap
+    run: 2026-09-28-round6
+boundaries:
+  - query: drop that - prod is on fire, errors spiked right after the 15:00 deploy. get some agents on it
+    history:
+      - 'user: the unit tests are failing on develop'
+      - 'assistant: codex-1 is fixing the failing date test in the develop worktree.'
+    active: [daintree.ci.diagnose-and-fix]
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-catalog-expansion-stateful
+  - query: Shelve the dashboard task on claude-3 with a resume note and put claude-3 on the urgent login failure instead.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-round6
+  - query: the chart agents can pick their tasks up later, get them on the security fix first
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-round6
+  - query: Stop claude-1 and codex-2 from what they are doing and point both at the urgent memory leak; gemini keeps its task.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: redirect the refactor agents to the release blocker, their current work can wait
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: CI on the release branch is red and blocks the ship; pause the two feature agents and put them on the failing tests.
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-round6
+  - query: the build broke on main, stop the docs agents and have them fix it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-round6
+  - query: 'prod is down: halt the non-critical agents at a safe point and send two of them to investigate'
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-round6
+  - query: Errors spiked after the deploy; pull the agents off the theming work, note where they stopped, and put them on the incident.
+    confusable_with: [daintree.debug.investigate-outage]
+    run: 2026-09-28-round6
+  - query: Launch two agents on the urgent billing bug, pausing lower-priority agents first to stay within the cap of four.
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6
+  - query: start agents on the urgent hotfix but pause the refactor agents first so we don't go over six
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6
+  - query: Get agents onto the regression now; the feature agents can pause where they are and resume later.
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6
+  - query: Pause the three lint agents at a clean stop and note where each is; their slots go to the broken OAuth callback.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-round6
+  - query: get the agents to a stopping point except the api one, and start a fix for the crashing uploader
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-round6
+  - query: Bring the docs and test agents to a safe stop with resume notes so two fresh agents can take the P0 cache-poisoning bug.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-round6
+  - query: 'Go through all the running agents and decide which can pause so the hotfix for #990 gets two agents.'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-round6
+  - query: check on everyone and move whoever's least important onto the broken password reset
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-round6
+  - query: 'Review the fleet against the new priority: the GDPR export bug is due today and needs agents on it.'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-round6
+followups:
+  - query: actually leave codex-2 alone, the settings refactor is nearly done — pause claude-1 instead
+    history:
+      - 'user: prod checkout is 500ing, drop what the agents are doing and get two of them on it'
+      - 'assistant: Sent pause requests to claude-3 (docs rewrite) and codex-2 (settings refactor) asking each for a resume note; launched claude-5 and codex-6 in a new worktree on hotfix/checkout-500. claude-1 (billing migration) and codex-4 (lint sweep) keep going.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: nudge claude-4 once more about the pause — I need it freed up for the blocker
+    history:
+      - 'user: the release blocker #812 is urgent now, stop the docs agents and move them onto it'
+      - 'assistant: Paused claude-2 and claude-4 (docs). claude-2 confirmed: stopped with docs/api.md half-written, next step is the auth section. claude-4 has not replied yet and is still working. Launched codex-7 on #812 in worktree fix/812-release-blocker.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: the checkout fix is merged — put the paused agents back on what they were doing
+    history:
+      - 'user: drop the low-priority stuff, the checkout bug is urgent'
+      - 'assistant: Paused claude-3 and codex-2 with resume notes (claude-3: docs/guide.md, next step the migration section; codex-2: settings form, 2 uncommitted files). codex-6 is on the checkout bug in hotfix/checkout-null-cart.'
+      - 'user: ok'
+      - 'assistant: codex-6 finished; I verified the fix and you merged PR #931.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: yes but make it three on onboarding, not two
+    history:
+      - 'user: the demo is in an hour, reshuffle the agents so the onboarding flow gets finished'
+      - 'assistant: Proposal: keep claude-1 on the onboarding UI; pause codex-3 (lint cleanup) and claude-4 (test refactor) at a clean point; launch one fresh agent on the onboarding API in worktree demo/onboarding-api. Leaving codex-5 (search indexing) running. OK to go?'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: fine, let them make wip checkpoint commits before they stop — I don't want anything lost
+    history:
+      - 'user: security fix for the token leak is top priority, pause the refactor agents and get two agents on it'
+      - 'assistant: About to pause claude-2 (router refactor, 6 uncommitted files) and codex-3 (store refactor, 3 uncommitted files) and launch two agents in worktree fix/token-leak. Should the paused ones commit a wip checkpoint or just leave their edits uncommitted?'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: The user now wants codex-2 redirected onto the token-leak fix as well, since it wrote the session code; keep the other paused agents where they are.
+    history:
+      - 'user: the auth-token leak is the only priority now, rearrange the agents around it'
+      - 'assistant: Paused claude-3 and codex-2 at clean points with resume notes, kept claude-1 on the payments migration, and launched claude-8 in worktree fix/token-leak on the leak.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: '#930 just came in as a sev1 — pause the two lowest-priority agents and put them on it, keep the rest going'
+    history:
+      - 'user: start agents on issues 201 through 205, one worktree each'
+      - 'assistant: Launched claude-1..claude-3 and codex-4, codex-5 on #201-#205, each in its own worktree with notify on. All five are working.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6-stateful
+  - query: 'new plan: the release is blocked on the migration bug. pause claude-2 and codex-1 at a safe point and get two agents on the migration'
+    history:
+      - 'user: tell claude-2 to use the existing date helper instead of writing a new one'
+      - 'assistant: Sent the correction to claude-2; it replied that it switched to utils/date.ts and is continuing the report export.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6-stateful
+  - query: stop — the demo moved up to 3pm. reshuffle the agents so the onboarding flow is done first and park whatever doesn't help
+    history:
+      - 'user: check that claude-4 actually finished the settings page'
+      - 'assistant: Verified claude-4''s settings page: diff matches the brief and the settings tests pass when I run them.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-round6-stateful
+  - query: pull the docs agents off and put two of them on the webhook dropping events, everyone else keeps going
+    history:
+      - 'user: draft release notes for v2.4 from what''s merged since v2.3'
+      - 'assistant: Launched claude-6 in the release worktree to draft the v2.4 notes from the 23 merged PRs; it is working.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6-stateful
+  - query: 'The user says the CVE fix now outranks everything in flight: decide which of the four running agents pause at a clean point with resume notes and put the freed capacity on the CVE.'
+    history:
+      - 'user: where were we with the agents?'
+      - 'assistant: Four agents are in flight: claude-1 (payments migration), codex-2 (search tuning), claude-3 (docs), codex-4 (flaky test hunt). The CVE-2026-4411 issue was filed an hour ago.'
+    active: [daintree.orchestration.status-and-resume]
+    run: 2026-09-28-round6-stateful

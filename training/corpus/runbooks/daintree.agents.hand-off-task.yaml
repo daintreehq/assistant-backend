@@ -77,6 +77,24 @@ boundaries:
   - query: codex hit its usage limit, have claude finish the task in the same worktree
     confusable_with: [daintree.agents.run-agent-command]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'claude-2 ran out of context halfway through #512; have a fresh Claude session finish that task in the same worktree'
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Codex is going in circles on the parser fix; give that task to Claude and keep going
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Hand gemini-1's unfinished migration task to codex in feat/db-split from a handoff brief checked against git.
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Claude hit its usage limit halfway through the export refactor; have Codex finish it in the same worktree.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: Codex is going in circles on the rate limiter; give the task to Claude to finish in the same worktree.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Claude ran out of usage halfway through the search indexer; have Codex pick up where it left off in the same worktree.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
 followups:
   - query: use codex rather than gemini for the successor, and make sure the brief says the pdfkit approach already failed
     history:
@@ -181,3 +199,9 @@ topic_shifts:
       - 'assistant: claude-2 stopped clean; claude-4 in feat/billing is still working and hasn''t read the parking message yet.'
     active: [daintree.orchestration.park-work]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: before you go — codex-4 hit its usage limit mid-task, have claude finish its retry-logic task in the same worktree
+    history:
+      - 'user: hand coordination of this run to a fresh session'
+      - 'assistant: Froze new launches and am gathering live state for the handoff: seven children, two finished.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful

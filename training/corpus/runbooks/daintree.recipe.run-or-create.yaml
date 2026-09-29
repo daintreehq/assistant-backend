@@ -407,6 +407,9 @@ boundaries:
   - query: create a worktree with the Work recipe
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-refine
+  - query: run the 'Full stack' recipe on the payments worktree
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: is it done yet?
     history:

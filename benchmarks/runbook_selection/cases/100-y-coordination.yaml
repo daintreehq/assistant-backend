@@ -1,0 +1,384 @@
+# Round 6, batch A: coordinating the whole workload. Four runbooks:
+#   reprioritize-work           — urgent work arrives; running agents kept, paused or redirected
+#   resolve-task-collisions     — agents already duplicating or contradicting each other
+#   hand-off-orchestration      — the COORDINATOR is replaced, not a worker
+#   relieve-resource-contention — the machine is bogged down by the agents' load
+#
+# Each gets an agent-phrased and a user-phrased case requiring it, one routing trap
+# that requires it against its closest neighbour, and one trap per declared
+# neighbour where the neighbour is right.
+
+cases:
+  # ---------------------------------------------------------------- reprioritize-work
+  - id: y-reprioritize-agent-phrased
+    category: single-runbook
+    note: Agent-phrased reallocation — pause lower-priority running agents with resume notes, put capacity on an urgent bug.
+    messages:
+      - role: user
+        content: A checkout bug just became urgent. Several agents are mid-task on lower-priority work; pause the less important ones at a clean point with resume notes and put two agents on the urgent bug in its own worktree.
+    expect:
+      required: [daintree.orchestration.reprioritize-work]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-user-casual
+    category: single-runbook
+    note: Casual user phrasing of the same reallocation.
+    messages:
+      - role: user
+        content: drop what the agents are doing, prod checkout is broken, get two of them on it
+    expect:
+      required: [daintree.orchestration.reprioritize-work]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-not-park
+    category: routing-trap
+    note: Stopping the docs agents is not parking — the freed agents go onto new urgent work.
+    messages:
+      - role: user
+        content: stop the docs agents and move them onto the release blocker instead
+    expect:
+      required: [daintree.orchestration.reprioritize-work]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-park-work
+    category: routing-trap
+    note: Everyone stops and nothing new starts — park-work, not a reallocation.
+    messages:
+      - role: user
+        content: pause all the agents at a good stopping point, I'm done for today and I'll pick it up tomorrow
+    expect:
+      required: [daintree.orchestration.park-work]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-steer
+    category: routing-trap
+    note: One agent corrected on its own task — steer-running-agent, nothing reallocated.
+    messages:
+      - role: user
+        content: interrupt the billing agent and tell it to stop touching the migrations, it should only change the API layer
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-supervise
+    category: routing-trap
+    note: A sweep of who needs attention, with no priorities changed.
+    messages:
+      - role: user
+        content: check on all the running agents and tell me which ones need me
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-fan-out
+    category: routing-trap
+    note: A new batch of work with nothing paused is fan-out.
+    messages:
+      - role: user
+        content: start agents on issues 210, 211 and 214, each in its own worktree, three at a time
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-hand-off-task
+    category: routing-trap
+    note: One task moved to a different agent — hand-off-task, not a reshuffle.
+    messages:
+      - role: user
+        content: claude ran out of usage halfway through the webhook task, have codex finish it
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-triage-backlog
+    category: routing-trap
+    note: Reprioritising the issue tracker, not the running agents.
+    messages:
+      - role: user
+        content: go through the open issues and reprioritise the backlog, label the urgent ones
+    expect:
+      required: [daintree.forge.triage-issue-backlog]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-diagnose-and-fix
+    category: routing-trap
+    note: An urgent red check with nothing running to pause — the fix itself.
+    messages:
+      - role: user
+        content: CI on main is red and it's urgent, get it green again
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: y-reprioritize-trap-investigate-outage
+    category: routing-trap
+    note: A live incident with no reallocation asked for — investigate-outage.
+    messages:
+      - role: user
+        content: prod is throwing 500s since the last deploy, get some agents investigating the logs and the diff
+    expect:
+      required: [daintree.debug.investigate-outage]
+      optional: [daintree.foundation]
+
+  # ---------------------------------------------------------- resolve-task-collisions
+  - id: y-collision-agent-phrased
+    category: single-runbook
+    note: Agent-phrased duplicate work — establish one owner on evidence, stop or redirect the other, keep the losing work.
+    messages:
+      - role: user
+        content: Two running agents, claude-2 and codex-1, are both implementing the rate limiter in different worktrees. Work out whose version to keep from their diffs and tests, make one the owner, redirect or stop the other, and do not delete the other's work.
+    expect:
+      required: [daintree.orchestration.resolve-task-collisions]
+      optional: [daintree.foundation]
+
+  - id: y-collision-user-casual
+    category: single-runbook
+    note: Casual user phrasing — two agents overwriting each other.
+    messages:
+      - role: user
+        content: ugh, those two agents keep overwriting each other's edits, sort it out
+    expect:
+      required: [daintree.orchestration.resolve-task-collisions]
+      optional: [daintree.foundation]
+
+  - id: y-collision-not-compare
+    category: routing-trap
+    note: Contradictory briefs to live agents need an owner decision, not a read-only overlap forecast.
+    messages:
+      - role: user
+        content: I gave two agents contradictory briefs about the API shape and both are building it, decide who carries on
+    expect:
+      required: [daintree.orchestration.resolve-task-collisions]
+      optional: [daintree.foundation]
+
+  - id: y-collision-trap-compare-worktrees
+    category: routing-trap
+    note: Predicting overlap between branches, nothing to decide about live ownership.
+    messages:
+      - role: user
+        content: will the auth and billing worktrees conflict when I merge them? just tell me, change nothing
+    expect:
+      required: [daintree.worktree.compare-worktrees]
+      optional: [daintree.foundation]
+
+  - id: y-collision-trap-relocate
+    category: routing-trap
+    note: Agents sharing a checkout on different tasks only need separating.
+    messages:
+      - role: user
+        content: both agents are in the main checkout on different tasks, move each into its own worktree
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]
+
+  - id: y-collision-trap-integrate
+    category: routing-trap
+    note: Finished branches combined — integrate-agent-branches.
+    messages:
+      - role: user
+        content: the four agents are done, merge all their branches together and check it still builds
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: y-collision-trap-competition
+    category: routing-trap
+    note: Deliberate rival versions with a winner picked — a competition.
+    messages:
+      - role: user
+        content: have claude and codex each write their own version of the rate limiter and then tell me which is better
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: y-collision-trap-steer
+    category: routing-trap
+    note: One agent's course corrected; no second agent involved.
+    messages:
+      - role: user
+        content: tell the codex agent it's going the wrong way, it should reuse the existing retry helper
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: y-collision-trap-semantic-conflict
+    category: routing-trap
+    note: Two FINISHED branches whose combined behaviour clashes — a semantic conflict, not live duplication.
+    messages:
+      - role: user
+        content: the auth branch and the session branch both pass on their own, but merged together the token lifetimes are incompatible
+    expect:
+      required: [daintree.git.resolve-semantic-conflict]
+      optional: [daintree.foundation]
+
+  # --------------------------------------------------------- hand-off-orchestration
+  - id: y-handoff-orch-agent-phrased
+    category: single-runbook
+    note: Agent-phrased coordinator replacement — handoff document, successor launched and reconciling, pane hand-over.
+    messages:
+      - role: user
+        content: My context is nearly full. Hand coordination of the six running agents to a fresh coordinator session, with a handoff covering each child, pending questions, decisions and next actions, so it continues without relaunching anything.
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation]
+
+  - id: y-handoff-orch-user-casual
+    category: single-runbook
+    note: Casual user phrasing — switching the coordinator to another agent.
+    messages:
+      - role: user
+        content: I'm switching to codex as the coordinator, give it everything it needs to take over
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation]
+
+  - id: y-handoff-orch-not-task
+    category: routing-trap
+    note: The whole migration run changes coordinator, not one worker's task.
+    messages:
+      - role: user
+        content: write the handover so another session can take over running this migration and its agents
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation]
+
+  - id: y-handoff-orch-trap-hand-off-task
+    category: routing-trap
+    note: One worker's unfinished task goes to a different agent.
+    messages:
+      - role: user
+        content: the refactor agent's context is full, start a fresh session that carries on its task
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: y-handoff-orch-trap-status-resume
+    category: routing-trap
+    note: Picking a run back up in a new session from what was left — status-and-resume.
+    messages:
+      - role: user
+        content: new session — where were we with the migration agents yesterday? pick it back up
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: y-handoff-orch-trap-park
+    category: routing-trap
+    note: Stopping everything for later, no successor.
+    messages:
+      - role: user
+        content: get everyone to a stopping point and leave notes, I'm shutting my laptop
+    expect:
+      required: [daintree.orchestration.park-work]
+      optional: [daintree.foundation]
+
+  - id: y-handoff-orch-trap-durable
+    category: routing-trap
+    note: Planning and tracking dependent phases — durable workflow.
+    messages:
+      - role: user
+        content: track this four-phase database migration as a dependency plan I can resume across sessions
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  # ---------------------------------------------------- relieve-resource-contention
+  - id: y-contention-agent-phrased
+    category: single-runbook
+    note: Agent-phrased load relief — attribute CPU and memory to terminals and worktrees, throttle, re-measure.
+    messages:
+      - role: user
+        content: The machine is nearly unusable while the agents run their test suites. Find which processes are using the CPU and memory, map them to Daintree terminals and worktrees, reduce or serialize the load, and show a before and after reading.
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
+      optional: [daintree.foundation]
+
+  - id: y-contention-user-casual
+    category: single-runbook
+    note: Casual user phrasing — fans and CPU.
+    messages:
+      - role: user
+        content: fans are screaming since the agents started, what's eating the cpu?
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
+      optional: [daintree.foundation]
+
+  - id: y-contention-disk-not-cleanup
+    category: routing-trap
+    note: A full disk from agents' builds is pressure to attribute, not a teardown request.
+    messages:
+      - role: user
+        content: my disk has been full ever since the agents started building everything, what's taking the space?
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-free-port
+    category: routing-trap
+    note: One port clash — free-busy-port.
+    messages:
+      - role: user
+        content: port 5173 is already in use and my dev server won't start, find what's holding it
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-recover-agent
+    category: routing-trap
+    note: One hung agent — recover-agent.
+    messages:
+      - role: user
+        content: the codex agent has been sitting there for ages with no output, is it hung?
+    expect:
+      required: [daintree.agents.recover-agent]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-supervise
+    category: routing-trap
+    note: A status sweep of the agents with no load question.
+    messages:
+      - role: user
+        content: how's everyone doing? anyone stuck?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-park
+    category: routing-trap
+    note: Stopping for the day is parking, not relieving load.
+    messages:
+      - role: user
+        content: wrap up all the agents for the day and save where each one got to
+    expect:
+      required: [daintree.orchestration.park-work]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-cleanup
+    category: routing-trap
+    note: An explicit teardown of terminals and worktrees.
+    messages:
+      - role: user
+        content: close all the finished agents and delete their worktrees
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-measure
+    category: routing-trap
+    note: The project's code benchmarked across revisions, not the machine's load.
+    messages:
+      - role: user
+        content: is my branch actually faster than main? benchmark the startup time
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation]
+
+  - id: y-contention-trap-diagnostics
+    category: routing-trap
+    note: Daintree itself misbehaving, not the agents' workload.
+    messages:
+      - role: user
+        content: the daintree app itself is frozen and nothing I click responds
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]

@@ -69,6 +69,15 @@ boundaries:
   - query: security audit the payments module as it stands today
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Accessibility audit of the checkout screens, ranked findings.
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: 'Security audit of the auth module: session fixation, token storage, password hashing. Ranked findings only.'
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: Scan the payments service for injection bugs and weak crypto, have two agents audit it and verify the findings.
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
 followups:
   - query: add a performance lens on the same paths too
     history:
@@ -137,3 +146,19 @@ topic_shifts:
       - 'assistant: codex-1 fixed the stale fixture in tests/cart.spec.ts; the suite passes on 2b3c4d5.'
     active: [daintree.ci.diagnose-and-fix]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: good. now do a proper security audit of the auth and config modules — injection, authz, insecure defaults
+    history:
+      - 'user: claude-3 just committed .env with our STRIPE_SECRET_KEY on feat/checkout, I think it pushed'
+      - 'assistant: Inventory back: commit a1b2c3d on feat/checkout is on origin/feat/checkout, PR #231 body has no match, one CopyTree bundle in $TMPDIR/daintree-context matches. Rotation still pending.'
+      - 'user: rotation''s done'
+      - 'assistant: Rotation confirmed; cleanup verified on feat/checkout and the bundle deleted.'
+    active: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6-stateful
+  - query: while we're at it, run a security audit of the billing module
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+      - 'assistant: codex-1 is back: R1-R6 implemented, R7 partial, R8 missing, R9 unverified. Still waiting on claude-2.'
+      - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful

@@ -591,6 +591,9 @@ boundaries:
   - query: 'start agents on issues #41, #42 and #43 in parallel'
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'Launch agents on issues #301 through #304, one worktree each, no more than three at a time.'
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
 followups:
   - query: yeah all of them except the docs one
     history:

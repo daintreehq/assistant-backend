@@ -458,5 +458,119 @@ examples:
     confusable_with: [daintree.orchestration.park-work]
     run: 2026-09-28-catalog-expansion-refine
   - query: what's the difference between a spike and a proof of concept?
-    confusable_with: [daintree.orchestration.spike-options]
+    confusable_with: [daintree.orchestration.productionize-prototype, daintree.orchestration.spike-options]
     run: 2026-09-28-catalog-expansion-refine
+  - query: what makes a good README in general?
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: mkdocs or docusaurus for an open source docs site, generally?
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: thanks, the new setup guide reads way better
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: what does git reflog actually record and how long are entries kept?
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: is running git gc manually ever dangerous in general?
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: thanks, got all of it back, appreciate it
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: what's the difference between a textual and a semantic merge conflict?
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: in general should teams integrate feature branches daily to avoid clashes like that?
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: what's the difference between git revert and git reset --hard?
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: lol that agent really went wild on the css. anyway thanks, that's all for today
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: what should a good on-call handover document contain, generally?
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: generally speaking, should you rewrite a prototype from scratch or harden it?
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: nice, the prototype demo went really well today, thanks
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: How do engineering teams usually decide what to deprioritize when an urgent bug comes in?
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: thanks, the reshuffle looks good
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: what's the usual way to stop two developers picking up the same ticket?
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: any general tips on salvaging a failed refactor?
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: what does git apply --3way actually do?
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: what does go/no-go actually mean in release management?
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: in general, what's the difference between a release candidate and a beta?
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: thanks, that readiness report was exactly what I needed
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: what's the difference between blue-green and canary deploys?
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: cool, the deploy looked fine, thanks
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: what's the difference between npm dist-tags latest and next, generally?
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: is adding an optional parameter a minor or a patch bump under semver?
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: thanks, the publish went fine and the install works
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: is rolling back or rolling forward generally the better call after a bad deploy?
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: explain what a canary rollback is
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: what's the difference between a .dmg and a .pkg installer?
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: nice, the dmg works now, thanks
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: how do teams usually write good acceptance criteria?
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: why does node use so much memory in general, is V8 just greedy?
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: what does the load average number actually mean on macOS?
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: what's the difference between revoking and rotating an API key?
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: how does git filter-repo compare to BFG in general?
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: why do people say never to keep secrets in git, generally speaking?
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: any tips for giving a good product demo to non-technical people?
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: thanks, the demo went great, everyone loved it
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6

@@ -343,6 +343,9 @@ boundaries:
   - query: claude is stuck and hasn't printed anything in 20 min
     confusable_with: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-refine
+  - query: codex-2 has shown the same spinner for 40 minutes with no output; is it hung?
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
 followups:
   - query: how long has it actually been like that?
     history:

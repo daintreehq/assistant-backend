@@ -54,6 +54,12 @@ boundaries:
     confusable_with: [daintree.orchestration.verify-agent-work]
   - query: Is my branch faster than main on the import benchmark?
     confusable_with: [daintree.review.audit-codebase]
+  - query: Is feat/lazy-load's bundle smaller than main's? Measure both builds.
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: Check the agent's claimed 30% memory reduction in the parser against main.
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
 topic_shifts:
   - query: is migrate/date-fns faster than main? the bundle feels bigger — measure it
     history:
@@ -91,3 +97,17 @@ topic_shifts:
       - 'assistant: You merged 5 PRs (#401, #403, #410, #411, #415) and have feat/lazy-images in progress with 2 unpushed commits.'
     active: [daintree.git.summarize-activity]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: 'separate question: is codex-1''s branch actually faster to build than main? benchmark it'
+    history:
+      - 'user: my machine is crawling, sort it out'
+      - 'assistant: Reading 2 (13:30): load down from 26 to 5 after serializing the builds; codex-1 is next in line to run its build.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: measure whether the new query layer is slower than the old one on the orders endpoints
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+      - 'assistant: Created feat/drizzle off spike/drizzle in a new worktree; builder claude-5 launched with S1-S11 as acceptance criteria. Waiting on its notice.'
+      - 'assistant: Done: S1-S8 and S10-S11 verified by me, S9 deferred; checks pass on feat/drizzle; the spike is untouched.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful

@@ -208,3 +208,11 @@ topic_shifts:
       - 'assistant: Against auth''s own server on port 4410: 57 passed, 1 failed (login.spec ''remembers session''); it passed on the one retry.'
     active: [daintree.ci.run-e2e-suite]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: the test behind R4 is flaky — failed once and passed twice when you ran it. track that down
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+      - 'assistant: codex-1 is back: R1-R6 implemented, R7 partial, R8 missing, R9 unverified. Still waiting on claude-2.'
+      - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful

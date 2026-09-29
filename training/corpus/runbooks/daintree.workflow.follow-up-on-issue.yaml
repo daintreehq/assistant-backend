@@ -483,6 +483,12 @@ boundaries:
   - query: What did the reviewer say on PR 318, and is CI passing on it?
     confusable_with: [daintree.git.summarize-activity]
     run: 2026-09-28-catalog-expansion
+  - query: 'is release PR #902 green yet?'
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: 'is the PR for #412 green and what did the reviewer say?'
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
 followups:
   - query: and the review?
     history:

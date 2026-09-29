@@ -1,0 +1,161 @@
+# Training examples whose answer is `daintree.orchestration.resolve-task-collisions` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.resolve-task-collisions
+run: pre-split
+positives:
+  - query: claude-2 and codex-1 are both implementing the Redis rate limiter in separate worktrees; pick one owner on evidence and redirect the other without deleting its branch.
+    run: 2026-09-28-round6
+  - query: 'Two agents were briefed on issue #742 by mistake. Compare their diffs and test results, keep the stronger one as owner, stop the other and preserve its work.'
+    run: 2026-09-28-round6
+  - query: The agents on feat/api-v2 and feat/list-endpoints got contradictory briefs about pagination (cursor vs offset) and are both coding it. Settle one owner and one shape.
+    run: 2026-09-28-round6
+  - query: 'Duplicate work: gemini-1 and claude-4 are both migrating the logger to pino. Establish a single owner and reassign the other.'
+    run: 2026-09-28-round6
+  - query: Two running agents keep overwriting each other's edits to src/router.ts for the same change; decide who owns it and stop the other.
+    run: 2026-09-28-round6
+  - query: codex and claude both picked up the date-parsing bug; figure out whose fix is closer to done and have the other stand down.
+    run: 2026-09-28-round6
+  - query: 'dedupe concurrent agents on #318 dark-mode toggle; choose owner by diff + tests; keep loser branch'
+    run: 2026-09-28-round6
+  - query: The backend agent is adding a status enum while the frontend agent assumes a boolean active flag for the same feature. Decide which brief is authoritative and redirect the other agent.
+    run: 2026-09-28-round6
+  - query: Two in-progress implementations of the CSV export exist in worktrees export-a and export-b. Decide whether to keep one or combine them, name one agent as owner, and leave both branches intact.
+    run: 2026-09-28-round6
+  - query: Both agents are writing the same retry wrapper for the HTTP client. Read their output and diffs, assign ownership, stop the duplicate.
+    run: 2026-09-28-round6
+  - query: claude-3 and codex-2 are both editing the same migration for the same task in one worktree; settle ownership and give the other agent its own checkout.
+    run: 2026-09-28-round6
+  - query: 'End the collision between the two agents refactoring AuthService: whichever has passing tests keeps it, the other moves to the session-expiry task.'
+    run: 2026-09-28-round6
+  - query: 'Two agents are simultaneously applying opposite fixes for #1011 (one removes the cache, one extends the TTL). Pick an owner with evidence and pause the other.'
+    run: 2026-09-28-round6
+  - query: 'The same brief was launched twice by accident: two agents on the onboarding email template. Keep one, redirect the other to #455.'
+    run: 2026-09-28-round6
+  - query: Three agents are all modifying the billing webhook handler for the same bug. Give it one owner and stand the others down.
+    run: 2026-09-28-round6
+  - query: Agents api-claude and sdk-codex are both writing input validation, each believing its layer owns it. Decide ownership and stop the loser.
+    run: 2026-09-28-round6
+  - query: two agents opened branches for the same feature flag service; decide which continues, which stops, keep both branches
+    run: 2026-09-28-round6
+  - query: wait, claude-2 and codex are both doing the rate limiter?? sort it out
+    run: 2026-09-28-round6
+  - query: 'oops i gave #231 to two agents. pick one and keep the other''s stuff around'
+    run: 2026-09-28-round6
+  - query: these two keep clobbering each other in the parser, make it stop
+    run: 2026-09-28-round6
+  - query: the ui agent and the api agent have different ideas about the response shape and they're both coding it, figure out who's right
+    run: 2026-09-28-round6
+  - query: looks like gemini and claude are duplicating the search work, just one of them pls
+    run: 2026-09-28-round6
+  - query: two agents on the same bug, one thinks it's the cache and one the index, both editing. choose
+    run: 2026-09-28-round6
+  - query: fyi both codex windows are implementing oauth refresh. don't delete anything, just decide who keeps it
+    run: 2026-09-28-round6
+  - query: hm the two workers are doing the same migration. which one's further along? keep that one going and stop the other
+    run: 2026-09-28-round6
+  - query: stop the double work on the settings page, the other agent should do something else
+    run: 2026-09-28-round6
+boundaries:
+  - query: these two need splitting up, they're both hammering the same files
+    confusable_with: [daintree.worktree.relocate-agents]
+  - query: Hmm, codex and claude were both given the export task; let one of them keep it and move the other elsewhere.
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-09-28-round6
+  - query: Tell whichever of the two agents duplicating the webhook fix is behind to stop, and let the other own it.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: claude-2 and codex-1 are both on the same bug, stop one and keep the other
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: Both agents are still coding the same notifications feature on separate branches; don't merge anything, decide which one carries on.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-round6
+  - query: codex-1 and claude-2 are mid-task on the same payments refactor in different branches. Choose one owner now instead of merging later.
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-round6
+  - query: two agents are still building overlapping versions of the search index, keep the one that fits the brief and keep the other's branch
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-round6
+  - query: claude-2 and codex-1 are both still implementing the rate limiter right now and contradicting each other; sort out who owns it.
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: I didn't mean for claude and codex to both build the export; it was accidental. Keep the stronger one and redirect the other.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-round6
+  - query: turns out two agents are racing on the same issue by mistake. no contest wanted, just one owner
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-round6
+  - query: Two agents duplicated the upload work by accident; judge the two diffs and tests and give the task to one of them.
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-09-28-round6
+  - query: Compare the diffs of the two worktrees where claude and codex are both building the importer, and decide which agent keeps it.
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-round6
+  - query: diff wt rate-limit-a vs rate-limit-b, both agents are doing the same ticket, keep the better one going
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-round6
+  - query: 'Check whether gemini''s and claude-3''s branches overlap; they were both assigned #88 and are still coding. Settle who owns it.'
+    confusable_with: [daintree.worktree.compare-worktrees]
+    run: 2026-09-28-round6
+  - query: Two agents in the same checkout are both implementing the same caching layer; pick one owner and stop the other.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-round6
+  - query: these two are colliding on the same feature, one should own it and the other should drop it
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-round6
+  - query: claude-2 and codex-1 share a worktree and are both writing the same config loader; give the loader one owner and put the other agent on something else.
+    confusable_with: [daintree.worktree.relocate-agents]
+    run: 2026-09-28-round6
+followups:
+  - query: go with claude-2, but have it take codex-1's redis adapter too
+    history:
+      - 'user: claude-2 and codex-1 are both implementing the rate limiter, sort it out'
+      - 'assistant: Held both; both replied. claude-2 (feature/rate-limit): token bucket in src/limit/, per-key limits, 5 tests. codex-1 (feature/ratelimit-mw): sliding window in middleware/ratelimit.ts plus a redis adapter, 3 tests, no per-key limits. Your brief asked for per-key limits, so claude-2 fits it better.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: and don't delete codex-1's branch, I might want to look at it later
+    history:
+      - 'user: I accidentally gave issue #418 to two agents, sort out who keeps it'
+      - 'assistant: Compared both worktrees: codex-1''s diff covers the parser and has passing tests I ran myself; claude-4 had only started. Proposing codex-1 owns #418 and claude-4 stops, its work kept in fix/418-b.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: run the tests in both worktrees yourself before you pick — I don't trust their claims
+    history:
+      - 'user: these two are fighting over the same files, figure out which one should own the export feature'
+      - 'assistant: Sent a hold to claude-3 and codex-5. Both say their export implementation is done and all tests pass: claude-3 on feature/export-csv, codex-5 on feature/export.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: cursor-based holds — make claude-1 the owner of pagination and stop codex-4 on it
+    history:
+      - 'user: two agents got contradictory briefs about the API shape, sort it out'
+      - 'assistant: The briefs conflict: claude-1 was told "cursor pagination on /orders", codex-4 was told "offset and limit on /orders". Both are halfway in. Which one holds?'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: codex-1 just touched limiter.ts again after you told it to stop
+    history:
+      - 'user: claude-2 and codex-1 are both doing the limiter, pick one'
+      - 'assistant: Decided on evidence: claude-2 owns the limiter; codex-1 was told to stop work on it and keep its edits for reference. claude-2 confirmed it owns the limiter and is continuing.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: ok, codex-3 keeps the websocket handler; claude-6 hands it over and changes nothing more in there
+    history:
+      - 'user: they keep overwriting each other''s edits in the api worktree'
+      - 'assistant: Interrupted codex-3 and claude-6 in the api worktree and confirmed both stopped. Both were rewriting src/ws/handler.ts; codex-3''s version passes the reconnect test, claude-6''s does not compile yet. Who should own the handler?'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: 'wait, #312 and #313 are the same bug — claude-2 and codex-3 are both fixing the null session thing. sort it out'
+    history:
+      - 'user: fan out issues #310 to #314, one agent each'
+      - 'assistant: Launched five agents, one per issue, each in its own worktree; all are working.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6-stateful
+  - query: it's because claude-5 is also writing that same migration in the main checkout — they keep overwriting each other. decide who keeps it
+    history:
+      - 'user: tell codex-1 to stop touching the migrations'
+      - 'assistant: Sent codex-1 the correction; its reply says it will leave db/migrations alone, but its screen shows it re-editing 0042_add_index.sql.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6-stateful

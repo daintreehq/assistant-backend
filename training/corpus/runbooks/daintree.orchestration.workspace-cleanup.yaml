@@ -433,6 +433,15 @@ boundaries:
   - query: delete the losing entries' worktrees and close their terminals
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Delete the recover/csv-import worktree now, its commits are merged.
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: the codex experiment worktree is junk, delete the whole thing and close its terminal
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Delete the four finished worktrees from yesterday's competition and close their terminals.
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
 followups:
   - query: actually delete the last one, i don't need that task
     history:
@@ -965,6 +974,40 @@ topic_shifts:
       - 'assistant: Parked: claude-2 and codex-1 stopped clean, nothing committed, all panels left open.'
     active: [daintree.orchestration.park-work]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: we don't need codex-1's attempt anymore — close its terminal and delete its worktree
+    history:
+      - 'user: two agents are on the same issue, pick one'
+      - 'assistant: claude-2 owns #418; codex-1 stopped and its work is kept in feature/418-codex.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: close the three finished children's terminals and delete their worktrees
+    history:
+      - 'user: write the handover for the next coordinator'
+      - 'assistant: Handoff draft lists nine children; three are finished and verified (claude-1, codex-2, claude-6), six still working.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+  - query: the salvage branch is merged, so delete the old failed worktree cache-v1 now
+    history:
+      - 'user: salvage the parser from codex''s failed attempt'
+      - 'assistant: Done: salvage/parser holds the parser and its tests, checks green; codex''s worktree cache-v1 left intact for reference.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: that's contained. close the inventory and cleanup agents and delete the scratch worktree
+    history:
+      - 'user: claude-3 just committed .env with our STRIPE_SECRET_KEY on feat/checkout, I think it pushed'
+      - 'assistant: Rotate that key first — treat it as compromised. I told claude-3 and codex-1 not to copy, commit or push it (both acknowledged) and launched a read-only inventory agent (claude-6) in the main checkout; it searches by pattern, never the value.'
+      - 'assistant: Inventory back: commit a1b2c3d on feat/checkout is on origin/feat/checkout, PR #231 body has no match, one CopyTree bundle in $TMPDIR/daintree-context matches. Rotation still pending.'
+      - 'assistant: Cleanup verified: remote tips match the rewritten history, listings clean.'
+    active: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6-stateful
+  - query: now delete the spike worktree and the spike/drizzle branch
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+      - 'assistant: Created feat/drizzle off spike/drizzle in a new worktree; builder claude-5 launched with S1-S11 as acceptance criteria. Waiting on its notice.'
+      - 'assistant: Done: S1-S8 and S10-S11 verified by me, S9 deferred; checks pass on feat/drizzle; the spike is untouched.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[wake: both worktree deletes completed]'
     history:

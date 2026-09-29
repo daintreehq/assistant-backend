@@ -1,0 +1,131 @@
+# Training examples whose answer is `daintree.git.recover-lost-work` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.recover-lost-work
+run: 2026-09-28-round6
+positives:
+  - Recover the commits on feature/invoice-export that disappeared after codex ran git reset --hard origin/main in its worktree; restore them on a new recovery branch and leave the original alone.
+  - The agent deleted branch fix/1423-null-avatar before it was ever pushed. Get that branch's commits back.
+  - worktree for payments-retry was removed with uncommitted changes in it; recover whatever of those edits still exists
+  - ugh i did git reset --hard HEAD~3 on my branch by mistake, can u get my commits back
+  - Restore work lost when claude-2's worktree was deleted during teardown; it held two commits that were never pushed to origin.
+  - my commits vanished after the rebase onto develop, the branch only has develop's history now. get them back pls
+  - 'Get back the stash claude dropped in the api worktree: it ran git stash drop instead of pop and those changes are gone.'
+  - Lost branch spike/graphql-gateway (deleted locally with -D). Restore it as recover/graphql-gateway from the reflog; no push.
+  - Codex amended over my last commit on refactor/auth-middleware and my version of session.ts is gone. Find the pre-amend commit and bring it back on a recovery branch.
+  - someone force-pushed over feat/search-filters and my local got reset to match. i need my 5 commits back
+  - Find and restore the staged-but-uncommitted migration files from the removed worktree db-indexes before git prunes the objects.
+  - the gemini agent ran git checkout -- . in the dashboard wt and wiped an afternoon of edits. anything recoverable?
+  - Reconstruct the uncommitted edits Claude made under src/billing/ from its session transcript; the worktree they were in no longer exists.
+  - 'Branch release-prep was deleted by the stale-branch prune before I pushed, but it is still the head of PR #88 on GitHub. Restore it locally.'
+  - Pin and restore the dangling commits left by the reset on hotfix/2.3.1 into a fresh worktree before anything runs gc.
+  - An agent ran git clean -fdx and a hard reset in wt-onboarding and my work is gone. Pause the other agents in the repo and recover what can be recovered.
+  - lost my branch. feat/csv-import, an agent deleted it during cleanup yesterday. bring it back
+  - Recover the three commits claude-3 dropped while resolving conflicts in its rebase of mobile/offline-sync onto main.
+  - The audit marked wt-docs-api as safe to remove, so I removed it, but it had unpushed commits on docs/api-v2. Get those commits back.
+  - What can still be recovered from the deleted branch experiment/wasm-parser? Rebuild it on a recovery branch and tell me plainly what is gone for good.
+  - hey thanks for earlier. so i reset my local main to origin and lost 2 commits i hadn't pushed, can you recover them
+  - Local branch feature/tenant-switcher was deleted; origin/feature/tenant-switcher may still hold it. Recover it into a recovery worktree and diff it against what I remember.
+  - workspace cleanup nuked the wt i was using for the pdf export and it had uncommitted stuff. recover it
+  - Codex had been editing in ~/wt/search-ranking before that worktree was removed; work out which session it was and pull its edits back into a recovery branch.
+  - I closed the agent and removed its worktree thinking its PR was merged. It wasn't. Get the branch's commits back.
+  - the branch cleanup deleted wip/perf-cache and it had my unpushed work on it, restore it
+boundaries:
+  - query: I pruned branches yesterday and feat/legacy-export went with them. It was never merged. Restore it.
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: the branch cleanup deleted too much, bring back hotfix/cve-2291
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: Restore wip/charts at the SHA it had before the prune deleted it by mistake.
+    confusable_with: [daintree.git.prune-stale-branches]
+  - query: the agent ran git reset --hard and my uncommitted changes to checkout.tsx are gone, get them back
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: codex's worktree got removed and its uncommitted parser went with it, get it back
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+  - query: I was on the invoice fix last week and now its worktree and branch are both gone; get the work back.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: My commits on feat/sso were there Friday and now the branch points at main. Get them back.
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: the session that was working in wt-reports is closed and the worktree was removed with its changes; recover those edits from the transcript
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: I deleted the spike branch by accident, get it back
+    confusable_with: [daintree.release.rollback-deployment]
+  - query: I did git reset --hard on feat/seeders and lost two commits, restore them
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: Cleanup deleted the reporting worktree while it had uncommitted migration files in it; get them back.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: The audit said wt-graphs was merged so I removed it, but its last two commits weren't on main. Recover them.
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: a worktree with uncommitted work already got removed. recover what was in it
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: I removed three worktrees from the at-risk list by mistake; get back their unpushed commits.
+    confusable_with: [daintree.worktree.audit-worktrees]
+followups:
+  - query: yes that's them, restore all three
+    history:
+      - 'user: I accidentally reset feat/cart, get my changes back'
+      - 'assistant: claude-2 and codex-1 replied ''held'', so nothing is writing to the repo. The reflog shows feat/cart@{1} = 7c1d9e2 before the reset --hard at 14:02: three commits of yours (cart totals, coupon field, tests) are recoverable.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+  - query: include that stash too, it's my uncommitted work from before
+    history:
+      - 'user: the agent deleted my feature branch feat/export'
+      - 'assistant: codex-2''s output shows ''Deleted branch feat/export (was 3f9a0bc)''; origin has no copy. git fsck also turned up an unreachable stash ''WIP on feat/export'' from yesterday evening.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+  - query: replay what you can from the transcript and mark anything you're unsure of as partial
+    history:
+      - 'user: I removed the search-v2 worktree and it had uncommitted work in it'
+      - 'assistant: Its staged files survive as unnamed blobs — 6 match paths under src/search. The unstaged edits never reached git, but claude-3''s session transcript (from agentSessionHistory, cwd search-v2) has the Edit calls that made them.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+  - query: call the branch feat/cart again instead of recover/cart, that name is free now
+    history:
+      - 'user: cleanup deleted feat/cart before I pushed it'
+      - 'assistant: Found it: ''Deleted branch feat/cart (was 9e0d1c2)'' in the cleanup output. I''ll create a recovery worktree on recover/cart pinned at 9e0d1c2 and verify it — only a commit was lost, so no agent needed.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+  - query: codex-1 never replied 'held' — interrupt it, it's the one that ran gc last time
+    history:
+      - 'user: my commits disappeared after the rebase on feat/ui, get them back'
+      - 'assistant: Freezing first: I sent every agent I own in this repo ''Pause: run no git write until I say.'' claude-4 replied ''held''; codex-1 hasn''t answered and is still working in the api worktree.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+  - query: config.local.json was never added, fine — I'll pull it from Time Machine myself. carry on with the rest
+    history:
+      - 'user: I removed the payments worktree by mistake, it had uncommitted work'
+      - 'assistant: Recoverable: two staged files as blobs and a dropped stash. Not recoverable from git: config.local.json was untracked and never staged, so it was never in git''s objects.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: hold on, forget the undo — feat/cart lost three of my commits when that agent reset it, I need those back
+    history:
+      - 'user: roll back the last agent''s commits on feat/cart'
+      - 'assistant: Looking at feat/cart: HEAD is at 2b3c4d5, and the reflog shows codex-3 ran git reset --hard origin/feat/cart at 11:40 before committing.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: my two commits for the modal disappeared after that rebase, recover them
+    history:
+      - 'user: rebase feat/ui on main'
+      - 'assistant: claude-4 rebased feat/ui; two conflicts resolved, checks pass, new HEAD 1b2c3d4. Not pushed.'
+    active: [daintree.git.sync-with-base]
+    run: 2026-09-28-round6-stateful
+  - query: it stashed and then dropped the stash — my uncommitted edits in api/ are gone. get them back
+    history:
+      - 'user: undo what codex did to the API, keep my changes'
+      - 'assistant: claude-5 finished the revert, but its report says it ran git stash before reverting and git stash drop afterwards.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: wait, where did feat/offline go? it's gone from the branch list and I never pushed it — find it and restore it
+    history:
+      - 'user: what happened in the repo this week?'
+      - 'assistant: Shipped: 4 PRs (#301-#304). In review: #307. In progress: feat/offline and feat/sync on local branches.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-round6-stateful
+  - query: that wiped my local commits on main — get them back
+    history:
+      - 'user: have claude fix the typo in the README'
+      - 'assistant: claude-8 fixed it, but its output shows it also ran git reset --hard origin/main ''to start clean'' before committing.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6-stateful

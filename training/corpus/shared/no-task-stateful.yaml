@@ -2138,11 +2138,6 @@ examples:
       - 'user: separate the four agents into worktrees'
       - 'assistant: Four worktrees created off develop; every terminal filed and instructed.'
     active: [daintree.worktree.relocate-agents]
-  - query: man this machine's fans are going nuts today
-    history:
-      - 'user: give the running agents their own worktrees'
-      - 'assistant: Five created and every agent redirected.'
-    active: [daintree.worktree.relocate-agents]
   - query: out of curiosity, how many worktrees can git handle before it gets slow
     history:
       - 'user: split the agents into their own worktrees'

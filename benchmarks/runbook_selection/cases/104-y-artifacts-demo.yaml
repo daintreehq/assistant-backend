@@ -1,0 +1,314 @@
+# Round 6, batch E: packages, artifacts, demos, and restoring a worktree database.
+#
+# publish-package ships a version to a registry; test-distributable tries the built
+# artifact without publishing; prepare-feature-demo makes finished work inspectable.
+# migrate-worktree-database gained RESTORE FROM A BACKUP as a fifth operation.
+
+cases:
+  # --- daintree.release.publish-package ---------------------------------------
+  - id: y-publish-agent-npm
+    category: single-runbook
+    note: Agent phrasing of the whole deliverable - clean build, inspected, published, installed from the registry.
+    messages:
+      - role: user
+        content: Publish version 1.4.0 of the client SDK to npm under the latest dist-tag from a clean tree, inspect the packed contents first, and confirm a fresh project can install and import it.
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.foundation]
+
+  - id: y-publish-user-crates
+    category: single-runbook
+    note: Casual registry release for a Rust crate.
+    messages:
+      - role: user
+        content: cut a crates.io release of the parser, it's ready to go
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.foundation]
+
+  - id: y-publish-user-pypi-beta
+    category: single-runbook
+    note: A prerelease on a non-default channel; the dist-tag/channel trap lives here.
+    messages:
+      - role: user
+        content: push a beta of the python sdk to pypi so people can try it
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.foundation]
+
+  - id: y-publish-trap-release-notes
+    category: routing-trap
+    note: The changelog for a package release is writing notes, not publishing.
+    messages:
+      - role: user
+        content: write the changelog entry for the 1.4.0 npm release of the sdk
+    expect:
+      required: [daintree.forge.draft-release-notes]
+      optional: [daintree.foundation]
+
+  - id: y-publish-trap-deploy
+    category: routing-trap
+    note: Shipping a service to an environment is a deploy, not a registry publish.
+    messages:
+      - role: user
+        content: ship the new version of the api service to staging and check the new build is the one serving
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.foundation]
+
+  - id: y-publish-trap-upgrade
+    category: routing-trap
+    note: Consuming someone else's newly published version is a dependency upgrade.
+    messages:
+      - role: user
+        content: zod just published a new major version, move us onto it and fix what breaks
+    expect:
+      required: [daintree.deps.upgrade-dependency]
+      optional: [daintree.foundation]
+
+  - id: y-publish-trap-land-pr
+    category: routing-trap
+    note: Merging the release PR is landing, even when a release follows.
+    messages:
+      - role: user
+        content: merge the release PR for sdk 1.4.0 once its checks are green
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: y-publish-trap-after-dist-test
+    category: routing-trap
+    note: >-
+      The tarball was already tested; now it goes to the registry. Publishing, not
+      test-distributable.
+    messages:
+      - role: user
+        content: the packed tarball checked out fine in a scratch project, now publish 2.1.0 of it to npm
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.foundation]
+
+  # --- daintree.release.test-distributable ------------------------------------
+  - id: y-dist-agent-dmg
+    category: single-runbook
+    note: Agent phrasing - build the installer at a tag, install it on a clean profile, check startup and assets.
+    messages:
+      - role: user
+        content: Build the macOS .dmg from tag v2.3.0, install it with an empty user-data directory, and report whether the app starts, its bundled assets load and first-run defaults are sane.
+    expect:
+      required: [daintree.release.test-distributable]
+      optional: [daintree.foundation]
+
+  - id: y-dist-user-docker
+    category: single-runbook
+    note: Casual - the shipped container image, not the dev server.
+    messages:
+      - role: user
+        content: it works from source but does the docker image we'd actually ship work? run the real image, not the dev server
+    expect:
+      required: [daintree.release.test-distributable]
+      optional: [daintree.foundation]
+
+  - id: y-dist-trap-publish
+    category: routing-trap
+    note: Test the packed tarball without publishing - the reverse of publish-package.
+    messages:
+      - role: user
+        content: pack the npm tarball and install it into a scratch project to see if it works, don't publish anything
+    expect:
+      required: [daintree.release.test-distributable]
+      optional: [daintree.foundation]
+
+  - id: y-dist-trap-local-checks
+    category: routing-trap
+    note: Tests and build from source in the release worktree are local checks.
+    messages:
+      - role: user
+        content: run the unit tests and the build in the release worktree and tell me if they pass
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+
+  - id: y-dist-trap-e2e
+    category: routing-trap
+    note: An e2e suite against a worktree's dev server is not testing the distributable.
+    messages:
+      - role: user
+        content: run the playwright suite against the release branch's dev server
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: y-dist-trap-pr-locally
+    category: routing-trap
+    note: Trying a PR's head from source.
+    messages:
+      - role: user
+        content: pull down PR 412 and run its tests to see if it actually works
+    expect:
+      required: [daintree.git.test-pull-request-locally]
+      optional: [daintree.foundation]
+
+  - id: y-dist-trap-bug-bash
+    category: routing-trap
+    note: Several agents exploring the product for bugs before a ship.
+    messages:
+      - role: user
+        content: have three agents poke at the app before we ship, one on signup, one on billing, one on weird inputs
+    expect:
+      required: [daintree.orchestration.bug-bash]
+      optional: [daintree.foundation]
+
+  # --- daintree.workflow.prepare-feature-demo ---------------------------------
+  - id: y-demo-agent-onboarding
+    category: single-runbook
+    note: Agent phrasing of the whole deliverable - running, seeded, walkthrough, honest list.
+    messages:
+      - role: user
+        content: Get the onboarding flow the agents built running in a preview with safe sample data, and give me a short walkthrough plus what works, what is stubbed and what is missing.
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+
+  - id: y-demo-user-click-through
+    category: single-runbook
+    note: Casual - see what the agents made.
+    messages:
+      - role: user
+        content: show me what the agents built, I want to click through it
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+
+  - id: y-demo-user-standup
+    category: single-runbook
+    note: A demo prepared for other people.
+    messages:
+      - role: user
+        content: prepare a demo of the new billing page for the standup
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-pr-locally
+    category: routing-trap
+    note: Clicking around a pull request's head is trying the PR.
+    messages:
+      - role: user
+        content: spin up PR 88 so I can click around it
+    expect:
+      required: [daintree.git.test-pull-request-locally]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-debug-preview
+    category: routing-trap
+    note: A broken preview is debugging, not demo prep.
+    messages:
+      - role: user
+        content: the onboarding preview is a blank page with errors in the console, fix it
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-visible-command
+    category: routing-trap
+    note: Only starting the server, nothing else.
+    messages:
+      - role: user
+        content: start the dev server for the onboarding worktree in a terminal
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-verify
+    category: routing-trap
+    note: Checking one agent's done claim.
+    messages:
+      - role: user
+        content: the agent says the onboarding flow is finished, check it actually did it
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-summarize
+    category: routing-trap
+    note: A written report of the work, not a running demo.
+    messages:
+      - role: user
+        content: write up what the agents built today for my team update
+    expect:
+      required: [daintree.git.summarize-activity]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-seed-db
+    category: routing-trap
+    note: Seeding a worktree's database is the whole ask.
+    messages:
+      - role: user
+        content: seed the database in the onboarding worktree with the dev fixtures
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-recipe
+    category: routing-trap
+    note: Running a saved recipe.
+    messages:
+      - role: user
+        content: run the dev recipe in the onboarding worktree
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: y-demo-trap-not-just-server
+    category: routing-trap
+    note: >-
+      Starting the app is part of it, but fake data and showing it to people make it a
+      demo, not run-visible-command or migrate-worktree-database.
+    messages:
+      - role: user
+        content: get the new checkout flow up with some fake orders in it so I can show the team this afternoon
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+
+  # --- daintree.runtime.migrate-worktree-database: restore --------------------
+  - id: y-db-restore-agent
+    category: single-runbook
+    note: Agent phrasing of the new restore operation, with a named backup file.
+    messages:
+      - role: user
+        content: Restore the feat-orders worktree's local Postgres database from the dump at /tmp/feat-orders-2026-09-27.dump and report the schema version afterwards.
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]
+
+  - id: y-db-restore-user
+    category: single-runbook
+    note: Casual restore of the backup taken before a reset.
+    messages:
+      - role: user
+        content: that reset wiped my test data, load the backup you took before it back into this branch's db
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]
+
+  - id: y-db-restore-trap-rollback-deploy
+    category: routing-trap
+    note: Putting a previous release back in production is a deployment rollback, not a local restore.
+    messages:
+      - role: user
+        content: the new release broke checkout in production, put yesterday's release back
+    expect:
+      required: [daintree.release.rollback-deployment]
+      optional: [daintree.foundation]
+
+  - id: y-db-restore-trap-recover-work
+    category: routing-trap
+    note: Getting back lost git work is recovery, not a database restore.
+    messages:
+      - role: user
+        content: I removed the worktree and it had uncommitted changes, get my work back
+    expect:
+      required: [daintree.git.recover-lost-work]
+      optional: [daintree.foundation]

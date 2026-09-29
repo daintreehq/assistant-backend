@@ -102,6 +102,24 @@ boundaries:
   - query: wrap up for the day but keep everything open
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'wrap up for the day: get all five agents to a stopping point and leave resume notes'
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Pause every agent and save their work before I shut the laptop; keep all panels open.
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: wrapping up for tonight, get all the agents to a stopping point and leave resume notes, keep the panels open
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: 'Family emergency, I''m leaving now: pause every agent safely and record where each one is. Nothing new needs to start.'
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: Everyone stop for today, get to a clean point, I'll pick it all up tomorrow.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: wrap up for the day, get all the agents to a clean stop, i'm shutting the laptop
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
 followups:
   - query: remind claude-4 again, it's still going
     history:
@@ -176,3 +194,21 @@ topic_shifts:
       - 'assistant: codex-3 and claude-4 are building both revisions in their own worktrees; the interleaved runs start after warmup.'
     active: [daintree.runtime.measure-performance]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: actually I'm done for the day — get everyone, hotfix agents included, to a clean stop and leave notes
+    history:
+      - 'user: prod checkout is broken, pause the docs agents and get two on it'
+      - 'assistant: Paused claude-3 and claude-4 with resume notes; codex-6 and claude-7 are on the checkout fix in hotfix/checkout.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful
+  - query: never mind the successor — just bring everyone to a clean stop with resume notes, I'll pick it up myself tomorrow
+    history:
+      - 'user: your context is full, pass the coordination to a new codex'
+      - 'assistant: Froze new work and wrote the handoff to /tmp/handoff-api-run.md; about to launch the codex successor.'
+    active: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6-stateful
+  - query: forget throttling, I'm heading out — get all the agents to a clean stop with resume notes
+    history:
+      - 'user: everything crawls when the test workers start'
+      - 'assistant: Proposal: cap claude-1 and codex-3 at 2 workers and serialize their full runs; codex-3''s run is the heaviest at 540% CPU.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful

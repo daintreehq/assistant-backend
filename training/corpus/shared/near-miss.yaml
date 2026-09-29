@@ -82,3 +82,23 @@ examples:
     run: 2026-09-28-catalog-expansion-late
   - query: cool, spike worked out great, cheers
     run: 2026-09-28-catalog-expansion-late
+  - query: lol my laptop fans sound like a jet engine today
+    run: 2026-09-28-round6
+  - query: what's the difference between RSS and virtual memory?
+    run: 2026-09-28-round6
+  - query: is it better to have one coordinator or many in a multi-agent system, in theory?
+    run: 2026-09-28-round6
+  - query: cheers, the handover worked
+    run: 2026-09-28-round6
+  - query: why are npm versions immutable once published?
+    run: 2026-09-28-round6
+  - query: what does a wheel contain compared to an sdist?
+    run: 2026-09-28-round6
+  - query: is it better to ship a cli as a single binary or as an npm package, in general?
+    run: 2026-09-28-round6
+  - query: is a proof of concept supposed to have tests, in general?
+    run: 2026-09-28-round6
+  - query: what does "production ready" usually mean for a web service?
+    run: 2026-09-28-round6
+  - query: how long should a README be, as a rule of thumb?
+    run: 2026-09-28-round6

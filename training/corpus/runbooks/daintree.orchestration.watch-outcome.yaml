@@ -534,6 +534,12 @@ boundaries:
   - query: 'ping me when #611 and #612 have merged'
     confusable_with: [daintree.forge.land-pull-request]
     run: 2026-09-28-catalog-expansion-late
+  - query: ping me when the deploy Priya started finishes
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: at 6pm kick off the staging deploy
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:

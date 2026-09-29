@@ -349,6 +349,15 @@ boundaries:
   - query: codex says it fixed the bug and the tests pass, verify that before I merge
     confusable_with: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'claude-2 says it''s done with #412 — did it actually do what I asked?'
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: codex reports the export task is finished and tests pass; confirm that before I merge
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: claude-2 says the invite flow is done and the tests pass; confirm that before I merge it.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: how's that going?
     history:

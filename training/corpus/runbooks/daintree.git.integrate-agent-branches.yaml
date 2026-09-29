@@ -68,6 +68,18 @@ boundaries:
   - query: Combine the best parts of Claude's and Codex's entries into one branch and check it builds.
     confusable_with: [daintree.orchestration.competition]
     run: 2026-09-28-catalog-expansion-late
+  - query: Merge the four agents' finished branches into one integration branch, running the checks after each merge.
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: combine wt-frontend and wt-backend into one branch and see if it still builds
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: All four agents finished; merge their branches into one integration branch and run the tests after each merge.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Merge the three agents' onboarding branches into one integration branch and check it still builds after each merge.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: ok, the codex one is committed now, add feat/search-index as the last merge
     history:
@@ -142,3 +154,15 @@ topic_shifts:
       - 'assistant: Suggested order from pairwise trials: feat/schema, feat/api, feat/jobs, feat/ui, feat/docs. Nothing merged.'
     active: [daintree.worktree.compare-worktrees]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: both pieces are finished now — merge claude-2's limiter branch and codex-1's config-flag branch into one integration branch
+    history:
+      - 'user: claude-2 and codex-1 are both doing the rate limiter, sort it out'
+      - 'assistant: Split it: claude-2 owns the limiter, codex-1 was redirected to the config flag. Both have since finished and I verified each diff.'
+    active: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6-stateful
+  - query: now merge the other two agent branches, feat/search and feat/export, into that integration branch as well
+    history:
+      - 'user: checkout totals are wrong once tax and discounts are combined'
+      - 'assistant: Done: integrate/checkout applies discount then tax per your decision, pinned by test_totals_order; both branches'' tests and the full suite pass.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful

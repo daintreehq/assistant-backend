@@ -69,6 +69,15 @@ boundaries:
   - query: pull down PR 77 and spin it up so i can click around
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'pull down #512 and see if it fixes the crash for me'
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: 'check out #340 and run its test suite, want to know if the fix actually works on my machine'
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: 'Pull down contributor PR #77 into its own worktree, screen its install scripts, and see whether the reported crash still reproduces at its head.'
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: yeah that's the sharp prebuilt, it's fine — go ahead
     history:

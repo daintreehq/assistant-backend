@@ -1,0 +1,141 @@
+# Training examples whose answer is `daintree.orchestration.productionize-prototype` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.productionize-prototype
+run: 2026-09-28-round6
+positives:
+  - 'The team picked the Kysely spike (spike/kysely @ 4f2a1c9). Turn it into production code: inventory its shortcuts, agree rebuild vs harden, then have an agent build it on a real branch.'
+  - 'Harden the websocket presence proof of concept in the poc-presence worktree so it can ship: real persistence, auth checks, tests, no mocked Redis.'
+  - prototype for the csv importer works great, now make it prod ready pls
+  - 'Productionize spike/edge-cache: it still has hardcoded TTLs, a fake KV client and zero tests. Plan first, I approve, then build it on its own branch.'
+  - codex's search-autocomplete POC got the thumbs up in the demo. get it to shipping quality, don't build inside the spike worktree
+  - Of the three spikes from yesterday we're going with the valibot one. Now do it for real across the forms package, with proper error messages and tests.
+  - 'Prototype to production: stripe webhook handler on proto/stripe-hooks. List every mock, TODO and missing retry, then a builder agent fixes them on feat/stripe-webhooks.'
+  - the offline sync hack claude-2 wrote actually works. rewrite it properly off main, it's too tangled to keep
+  - Turn the proof-of-concept PDF export (branch poc/pdf-export) into a production feature; it currently writes to /tmp and swallows every failure.
+  - 'Make the approved GraphQL gateway prototype production quality: replace the stub resolvers, add auth, add tests, and confirm afterwards that each shortcut is really gone.'
+  - we demoed the rate-limiter spike to the team and they want it. harden it in place on a new branch, keep the behaviour
+  - Before building the chosen image-resize spike properly, have a reviewer list its shortcuts and propose harden-in-place vs rebuild, then implement whichever plan I approve.
+  - prototype works, need a ship-quality version by friday. it's on spike/notifications in the notif-spike wt
+  - 'Chosen prototype: gemini''s dashboard-v2 variant from the design spike. Build it out to production standards: real API data instead of fixtures, loading and error states, tests.'
+  - 'Take the hackathon feature-flag service into production shape: env-driven config, a migration for the flags table, auth on the admin routes.'
+  - poc for the audit log is good enough to keep but it's full of TODOs and hardcoded tenant ids. get it production grade
+  - 'Promote the spike/ai-summaries prototype to a real feature: audit what it faked, then have an agent rebuild it cleanly from develop.'
+  - The multi-region upload proof of concept passed its scenario. Decide rebuild or harden with me, then get it built on feat/multi-region and re-check every shortcut.
+  - ok the sqlite-wasm spike won. now make it real — persistence, migrations, error handling, docs
+  - List the shortcuts in the OAuth prototype we chose, then get every one of them fixed on a proper branch and re-audit each item after the build.
+  - Convert the throwaway search-index spike into production code in its own worktree; leave the spike's worktree untouched as reference.
+  - the prototype codex built for bulk invites works end to end. can we get it hardened + tested and on a real branch?
+  - 'Production-harden the working queue-consumer prototype on proto/queue: drop the in-memory store, add retries and dead-lettering, cover it with tests.'
+  - 'Spike outcome: we go with the server-sent-events approach. Bring the SSE prototype up to production quality rather than merging the spike as-is.'
+  - Not the failed parser rewrite — the tokenizer prototype that WORKED. Take that one to production quality on a clean branch off main.
+  - the settings-sync prototype on proto/settings does what we want, i want it for real now. same behaviour, no fake data, proper tests
+boundaries:
+  - query: have an agent build the export feature properly — the spike on spike/export already proved it works
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Launch an agent to make the working geofence prototype production ready on its own branch.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Plan how to turn the working rate-limit prototype into production code, show me the plan, then build it.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: I want a plan I sign off before anyone touches the email-digest POC, then build it production ready.
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: spec out productionizing proto/webhooks, get my approval, then implement it
+    confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: We picked the Drizzle prototype and it works; now build it out properly for production.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+  - query: The Prisma vs Drizzle spike finished and I picked Drizzle; now get the Drizzle version built properly for production.
+    confusable_with: [daintree.orchestration.spike-options]
+  - query: spikes done, going with option B (the worker-thread one). make it production quality, not the throwaway version
+    confusable_with: [daintree.orchestration.spike-options]
+  - query: From the three UI directions we spiked, build the dense layout for real — live data, tests, accessibility — on a proper branch.
+    confusable_with: [daintree.orchestration.spike-options]
+  - query: Take the winning cache spike and turn it into shippable code; ignore the other two spike worktrees.
+    confusable_with: [daintree.orchestration.spike-options]
+  - query: Review the chosen prototype on spike/uploads for shortcuts, then have an agent fix every one on a new branch and re-review.
+    confusable_with: [daintree.review.review-change]
+  - query: look over the POC codex built for invoices, list what's hacky, then make it production quality
+    confusable_with: [daintree.review.review-change]
+  - query: Audit the approved search spike's mocks and TODOs and get them all replaced with real implementations on a proper branch.
+    confusable_with: [daintree.review.review-change]
+followups:
+  - query: go, but defer S9 — the admin docs can wait
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+  - query: actually rebuild it clean off main instead, the spike's base is three weeks stale
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+  - query: claude-5 is asking whether the in-memory fallback stays. that's S4 — no, it goes, use the real pool like the plan says
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+      - 'user: go'
+      - 'assistant: Created feat/drizzle off spike/drizzle in a new worktree; builder claude-5 launched with S1-S11 as acceptance criteria. Waiting on its notice.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+  - query: claude-5 says every S-item is done. don't take its word for it
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+      - 'user: go'
+      - 'assistant: Created feat/drizzle off spike/drizzle in a new worktree; builder claude-5 launched with S1-S11 as acceptance criteria. Waiting on its notice.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+  - query: the reviewer marked S6 NOT FIXED — send it back to the builder with the evidence
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+      - 'user: go'
+      - 'assistant: Created feat/drizzle off spike/drizzle in a new worktree; builder claude-5 launched with S1-S11 as acceptance criteria. Waiting on its notice.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+  - query: Reviewer returned FIXED for S1-S8 on feat/cache-layer; open the cited tests, re-run the TODO grep and the project checks, then report per item.
+    history:
+      - 'user: the cache prototype on spike/cache worked, make it production ready'
+      - 'assistant: Plan approved: rebuild clean off main. feat/cache-layer created, builder codex-2 finished; fresh reviewer claude-8 is re-auditing S1-S8.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: agreed, Drizzle. now make that spike production grade — real migrations, error handling, tests
+    history:
+      - 'user: spike Drizzle, Prisma and Kysely on our orders queries'
+      - 'assistant: All three spikes built the same scenario; Drizzle was fastest and smallest. Recommendation: Drizzle (spike/drizzle).'
+    active: [daintree.orchestration.spike-options]
+    run: 2026-09-28-round6-stateful
+  - query: codex's version wins. harden it for production — it's full of hardcoded limits and has no tests
+    history:
+      - 'user: run a competition for the rate limiter'
+      - 'assistant: Judges scored codex-2''s entry (comp/ratelimit-codex) highest, 3 votes to 1.'
+    active: [daintree.orchestration.competition]
+    run: 2026-09-28-round6-stateful
+  - query: the approach is right. take the POC to production quality on a proper branch
+    history:
+      - 'user: review the webhooks POC on spike/webhooks'
+      - 'assistant: Reviewer found the design sound; flagged a hardcoded signing secret and no retry handling.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-round6-stateful
+  - query: it works! now do it properly — rebuild it from main with persistence and tests
+    history:
+      - 'user: give claude-1 45 minutes to prototype offline sync'
+      - 'assistant: Time''s up. claude-1''s report: offline sync works end to end on spike/offline with an in-memory queue, no tests.'
+    active: [daintree.orchestration.timebox-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: the demo went well and they chose it. make the prototype production-ready before we ship
+    history:
+      - 'user: prepare a demo of the new onboarding prototype'
+      - 'assistant: Demo ready: dev preview on spike/onboarding with seeded data and a click-through script.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: separately — the proof of concept on spike/pdf-export worked, harden it into something shippable
+    history:
+      - 'user: run the checks on main'
+      - 'assistant: All green on main: tests, lint and typecheck pass.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-round6-stateful

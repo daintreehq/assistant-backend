@@ -60,6 +60,12 @@ boundaries:
   - query: get three agents to bug bash the whole app before release, one on onboarding, one on billing, one on weird inputs
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Get three agents hammering on the release build to find bugs, one on onboarding, one on billing, one on odd inputs.
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: Have three agents poke at the new onboarding flow and try to break it before we ship; report reproduced bugs by severity.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: 'add a fourth charter: keyboard only, whole app'
     history:
@@ -128,3 +134,9 @@ topic_shifts:
       - 'assistant: Reproduced on release/2.6 at 8f3a1d0: tests/repro/702.spec.ts fails with the reported TypeError.'
     active: [daintree.debug.reproduce-bug]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: now have three agents bug bash the installed build — one on import, one on sync, one on weird inputs
+    history:
+      - 'user: test the release binary on a clean setup'
+      - 'assistant: cli 1.8.0 built from 5d2a7b1; clean-dir run: startup, init and sync pass.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful

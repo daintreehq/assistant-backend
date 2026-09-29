@@ -1,0 +1,341 @@
+# Round 6, batch C: review, security, prototype, docs.
+#
+#   daintree.security.respond-to-secret-exposure
+#   daintree.review.audit-spec-coverage
+#   daintree.orchestration.productionize-prototype
+#   daintree.edits.sync-project-docs
+#
+# Each new runbook has an agent-phrased and a user-phrased recall case, one
+# routing-trap of its own (phrased beside a neighbour's territory), and one
+# routing trap per declared neighbour where the neighbour is right.
+#
+# sync-project-docs is about the PROJECT's own README/docs files. Its cases carry
+# `docs: false`: none of them is a question about how Daintree works, and the
+# documentation-lookup head must not fire on "update the docs".
+
+cases:
+  # ---- daintree.security.respond-to-secret-exposure ----
+  - id: y-secret-exposure-agent
+    category: single-runbook
+    note: Agent phrasing of the containment deliverable - inventory without echoing, stop spread, rotation, authorized cleanup.
+    messages:
+      - role: user
+        content: An agent committed a .env file with a live API key in the feature worktree and it may have been pushed. Find every place the key reached (branches, remotes, PRs, CopyTree bundles, agent transcripts) without printing it, stop the running agents from copying it further, and get it rotated and cleaned up.
+    expect:
+      required: [daintree.security.respond-to-secret-exposure]
+      optional: [daintree.foundation]
+
+  - id: y-secret-exposure-user
+    category: single-runbook
+    note: Casual panic after pasting a key into a prompt; the leak itself is the task.
+    messages:
+      - role: user
+        content: oh no, i just pasted our stripe live key into the prompt for claude. what do we do now?
+    expect:
+      required: [daintree.security.respond-to-secret-exposure]
+      optional: [daintree.foundation]
+
+  - id: y-secret-exposure-not-audit
+    category: routing-trap
+    note: >-
+      Credentials in a config file sound like an audit finding, but this is a leak that
+      already happened and was pushed: containment, not an audit of the code.
+    messages:
+      - role: user
+        content: codex pushed our AWS access keys inside config/prod.yml to the shared branch an hour ago. contain it
+    expect:
+      required: [daintree.security.respond-to-secret-exposure]
+      optional: [daintree.foundation]
+
+  - id: y-secret-trap-audit-codebase
+    category: routing-trap
+    note: Hardcoded secrets as one lens of a security audit of existing code is audit-codebase, not an exposure response.
+    messages:
+      - role: user
+        content: do a security audit of the payments service - injection, missing auth checks, and any hardcoded secrets in the code
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: y-secret-trap-review-change
+    category: routing-trap
+    note: A security review of a pending PR returns findings; nothing has leaked.
+    messages:
+      - role: user
+        content: review this PR for security problems before I merge it - auth checks, input validation, anything that logs sensitive data
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: y-secret-trap-memory
+    category: routing-trap
+    note: A durable rule about where credentials live is project memory, not an incident.
+    messages:
+      - role: user
+        content: remember from now on that we never commit .env files and that our API keys live in 1Password
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: y-secret-trap-copytree
+    category: routing-trap
+    note: Keeping credentials OUT of a bundle while curating it is curate-copytree-bundle; nothing leaked.
+    messages:
+      - role: user
+        content: make a CopyTree bundle of the auth module and its tests for later, and keep the .env and credential files out of it
+    expect:
+      required: [daintree.context.curate-copytree-bundle]
+      optional: [daintree.foundation]
+
+  # ---- daintree.review.audit-spec-coverage ----
+  - id: y-spec-coverage-agent
+    category: single-runbook
+    note: Agent phrasing - requirement by requirement, four statuses, file and test evidence.
+    messages:
+      - role: user
+        content: Go through docs/specs/billing.md requirement by requirement and report which ones are implemented, partially implemented, missing or unverified on the current branch, with file and test evidence for each.
+    expect:
+      required: [daintree.review.audit-spec-coverage]
+      optional: [daintree.foundation]
+
+  - id: y-spec-coverage-user
+    category: single-runbook
+    note: Casual "how much of the PRD exists" question.
+    messages:
+      - role: user
+        content: how much of the onboarding PRD have we actually built so far?
+    expect:
+      required: [daintree.review.audit-spec-coverage]
+      optional: [daintree.foundation]
+
+  - id: y-spec-coverage-not-follow-up
+    category: routing-trap
+    note: >-
+      Names an issue number, like follow-up-on-issue and verify-agent-work requests,
+      but asks which acceptance criteria exist in the code, not the forge state or one agent's claim.
+    messages:
+      - role: user
+        content: "which of the acceptance criteria in issue #412 are actually done in the code right now, and which are still missing?"
+    expect:
+      required: [daintree.review.audit-spec-coverage]
+      optional: [daintree.foundation]
+
+  - id: y-spec-trap-verify-agent-work
+    category: routing-trap
+    note: One agent's done claim on one issue is verify-agent-work.
+    messages:
+      - role: user
+        content: "the agent says it finished issue #412 and all the tests pass - check it actually did it before I merge"
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: y-spec-trap-audit-codebase
+    category: routing-trap
+    note: A lens audit (performance, dead code) of existing code has no spec to measure against.
+    messages:
+      - role: user
+        content: audit the billing module for performance problems and dead code
+    expect:
+      required: [daintree.review.audit-codebase]
+      optional: [daintree.foundation]
+
+  - id: y-spec-trap-decompose-work
+    category: routing-trap
+    note: Same spec file, but it is to be broken into units BEFORE building.
+    messages:
+      - role: user
+        content: break the billing spec in docs/specs/billing.md into tasks that four agents can build in parallel
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]
+
+  - id: y-spec-trap-review-change
+    category: routing-trap
+    note: Judging a branch's diff is review-change, not coverage of a spec.
+    messages:
+      - role: user
+        content: review the billing branch's diff for correctness and edge cases
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  - id: y-spec-trap-explore
+    category: routing-trap
+    note: Explaining how existing code works is explore.repository.
+    messages:
+      - role: user
+        content: how does our billing module calculate proration? walk me through the code
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  - id: y-spec-trap-follow-up
+    category: routing-trap
+    note: An issue's PR state and review decision is follow-up-on-issue.
+    messages:
+      - role: user
+        content: "is the PR for issue #412 green yet, and did the reviewer approve it?"
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  # ---- daintree.orchestration.productionize-prototype ----
+  - id: y-productionize-agent
+    category: single-runbook
+    note: Agent phrasing - shortcut inventory, approved plan, proper branch, re-audit.
+    messages:
+      - role: user
+        content: The Drizzle spike on branch spike/drizzle was chosen. List its shortcuts (mocks, hardcoded config, missing error handling and tests), get the plan approved, then have an agent build it to production quality on a proper branch and verify each shortcut was fixed.
+    expect:
+      required: [daintree.orchestration.productionize-prototype]
+      optional: [daintree.foundation]
+
+  - id: y-productionize-user
+    category: single-runbook
+    note: The canonical follow-on to a spike - "now build it properly".
+    messages:
+      - role: user
+        content: ok we're going with the drizzle spike. now build it properly
+    expect:
+      required: [daintree.orchestration.productionize-prototype]
+      optional: [daintree.foundation]
+
+  - id: y-productionize-not-spike
+    category: routing-trap
+    note: >-
+      Mentions a comparison and a prototype, like spike-options, but the choice is
+      made; the ask is hardening the winner.
+    messages:
+      - role: user
+        content: the kysely prototype won the comparison. harden it so it's ready to ship - no hardcoded connection strings, no mocked repositories, real tests
+    expect:
+      required: [daintree.orchestration.productionize-prototype]
+      optional: [daintree.foundation]
+
+  - id: y-proto-trap-spike-options
+    category: routing-trap
+    note: Trying several options before choosing is spike-options.
+    messages:
+      - role: user
+        content: spike drizzle, prisma and kysely against our orders schema and tell me which one we should use
+    expect:
+      required: [daintree.orchestration.spike-options]
+      optional: [daintree.foundation]
+
+  - id: y-proto-trap-plan-then-implement
+    category: routing-trap
+    note: A plan gate then build, with no prototype behind it.
+    messages:
+      - role: user
+        content: have codex write a plan for the caching layer, I'll approve it, then claude builds it
+    expect:
+      required: [daintree.orchestration.plan-then-implement]
+      optional: [daintree.foundation]
+
+  - id: y-proto-trap-salvage
+    category: routing-trap
+    note: A FAILED attempt with useful parts is salvage-failed-attempt, not a prototype that worked.
+    messages:
+      - role: user
+        content: the agent's cache refactor failed, but its LRU class and tests are good. pull those into a fresh branch
+    expect:
+      required: [daintree.orchestration.salvage-failed-attempt]
+      optional: [daintree.foundation]
+
+  - id: y-proto-trap-spawn
+    category: routing-trap
+    note: An ordinary single change with no prototype.
+    messages:
+      - role: user
+        content: add input validation and proper error responses to the signup endpoint
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: y-proto-trap-review-change
+    category: routing-trap
+    note: Findings on a prototype's diff with nothing built is review-change.
+    messages:
+      - role: user
+        content: review the diff on spike/cache for bugs and give me the findings, nothing else
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  # ---- daintree.edits.sync-project-docs ----
+  - id: y-sync-docs-agent
+    category: single-runbook
+    note: Agent phrasing - writer from the implementation, then a separate reader runs the examples.
+    messages:
+      - role: user
+        content: The README setup steps and the configuration reference in this repo are out of date after the config refactor. Rewrite them from what the code actually does, then have a second agent follow the README from a clean checkout and run every example.
+    expect:
+      required: [daintree.edits.sync-project-docs]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: y-sync-docs-user
+    category: single-runbook
+    note: Casual "our install steps don't work" about the project's own README.
+    messages:
+      - role: user
+        content: the install steps in our readme don't work anymore, can you get them fixed
+    expect:
+      required: [daintree.edits.sync-project-docs]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: y-sync-docs-not-spawn
+    category: routing-trap
+    note: >-
+      A docs edit that could look like a plain single-agent change, but the flags must be
+      documented from the code and the examples run.
+    messages:
+      - role: user
+        content: update docs/cli.md in our repo so it matches what the CLI actually does now - the new --dry-run and --since flags are missing and two of the examples fail
+    expect:
+      required: [daintree.edits.sync-project-docs]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: y-docs-trap-release-notes
+    category: routing-trap
+    note: A CHANGELOG section for a version is draft-release-notes.
+    messages:
+      - role: user
+        content: update CHANGELOG.md with what's new since v2.4 for the 2.5 release
+    expect:
+      required: [daintree.forge.draft-release-notes]
+      optional: [daintree.foundation]
+
+  - id: y-docs-trap-memory
+    category: routing-trap
+    note: Standing agent instructions in CLAUDE.md are project memory, not project docs.
+    messages:
+      - role: user
+        content: our CLAUDE.md still tells agents to use npm - change it to pnpm so every agent picks that up
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: y-docs-trap-spawn
+    category: routing-trap
+    note: A one-word typo in the README has nothing to verify against the code.
+    messages:
+      - role: user
+        content: fix the typo "recieve" in the README
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: y-docs-trap-explore
+    category: routing-trap
+    note: Explaining the project's code is explore.repository; nothing is written.
+    messages:
+      - role: user
+        content: explain how our config loader resolves the environment overrides
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+      docs: false

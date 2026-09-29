@@ -239,6 +239,21 @@ boundaries:
   - query: 'add a rule to AGENTS.md: never edit tests to make them pass'
     confusable_with: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-refine
+  - query: add a rule to AGENTS.md so agents stop editing the generated docs
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: CLAUDE.md still tells agents we use yarn; correct it to pnpm so they stop getting it wrong
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: Make CLAUDE.md and AGENTS.md agree on the test command.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: remember from now on that agents must never commit .env files
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: 'Add a rule to AGENTS.md: agents must never paste API keys into prompts or logs.'
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
 followups:
   - query: also the node version, 22
     history:
@@ -653,6 +668,22 @@ topic_shifts:
       - 'assistant: Cause: agent ignored the explicit migrations rule. Proposed prevention: add a memory entry and a brief line.'
     active: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: add a standing rule to CLAUDE.md so agents never commit .env files again
+    history:
+      - 'user: claude-3 just committed .env with our STRIPE_SECRET_KEY on feat/checkout, I think it pushed'
+      - 'assistant: Rotate that key first — treat it as compromised. I told claude-3 and codex-1 not to copy, commit or push it (both acknowledged) and launched a read-only inventory agent (claude-6) in the main checkout; it searches by pattern, never the value.'
+      - 'user: ok go'
+      - 'assistant: Inventory back: commit a1b2c3d on feat/checkout is on origin/feat/checkout, PR #231 body has no match, one CopyTree bundle in $TMPDIR/daintree-context matches. Rotation still pending.'
+    active: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6-stateful
+  - query: and add a note to AGENTS.md telling agents to update the README whenever they change a flag
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+      - 'assistant: Done: README fixed on docs/readme-setup, reader re-ran the failed steps and they now pass; --port ignored flagged as a code bug.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[async wait returned: memory search complete, 1 near-duplicate found]'
     history:

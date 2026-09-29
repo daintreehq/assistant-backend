@@ -1,0 +1,151 @@
+# Training examples whose answer is `daintree.release.deploy-and-verify` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.release.deploy-and-verify
+run: 2026-09-28-round6
+positives:
+  - Deploy origin/main at its current SHA to staging with the repo's own deploy script, then confirm staging's /version reports that SHA.
+  - ship v2.5 to production
+  - put this build on staging and check it's up
+  - Roll out tag api-v3.1.0 to the prod Cloud Run service through the project's Cloud Build pipeline and verify the new revision takes 100% of traffic. User explicitly authorized production.
+  - Redeploy the worker from the release/1.8 tip to the qa environment; verify the served build sha and run the smoke script.
+  - deploy develop to the dev env pls, and make sure the new version is actually live not just 'deploy succeeded'
+  - Trigger the deploy-staging workflow for commit 4e1a9d0 and prove that commit is what staging serves.
+  - push the marketing site to prod (yes prod, go ahead) and check the homepage renders
+  - fly deploy of the ingest service to staging at a pinned SHA; confirm via fly releases and the health endpoint
+  - Get 2.5.1 out to production, which I'm authorizing, and confirm the version endpoint reports it.
+  - staging is still on last week's build, get main onto it and verify
+  - Deploy hotfix tag v4.0.3 to production (explicitly approved) and run the smoke checks afterwards.
+  - Deploy the api from tag v2.2.0 to the eu-west staging cluster using the Makefile target and check the rollout finished with the new image.
+  - Put feature branch preview-auth at its current head onto the preview environment and confirm the build sha it serves.
+  - redeploy the admin app from the release tag to prod, i've signed off. check /health and the version
+  - One deploy of commit 81fe0c2 to the sandbox environment via scripts/deploy.sh, then verify the service reports 81fe0c2 and passes its smoke test.
+  - ok ship it to staging and tell me when the right version is actually serving
+  - 'PR #733 merged a few minutes ago and started the auto-deploy to staging; confirm the merge commit is what staging now serves and the smoke check passes.'
+  - Run the project's staging deploy in a pane I can watch, then prove the new build is what's serving.
+  - 'Staging is on the reverted build. Roll forward: deploy the fixed commit b72e10c to staging and verify it serves.'
+  - The 3.4 go/no-go came back as a go; now deploy the 3.4 tag to production as agreed and confirm it's live.
+  - The fix for the checkout 500s is merged. Ship main to prod (approved) and check checkout returns 200 on the new build.
+  - 'Not the npm package: deploy the docs website built from v1.4.0 to production and confirm it serves 1.4.0.'
+  - Deploy the container image built from tag v9.2 to the staging k8s namespace and check the rollout finished on that image.
+  - checks are green on release/2.2, deploy it to preprod and verify the served sha matches
+  - Deploy main to staging now, don't wait for tonight's scheduled run, and prove the new revision carries the traffic.
+boundaries:
+  - query: The incident is understood and the fix is merged. Ship the fix to prod now (authorized) and verify the errors stop.
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: 'Release PR #88 is merged. Confirm the production deploy it auto-triggered is serving the merge commit and passes smoke.'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: 'merged #540 which auto-deploys to staging; is the new version actually live there?'
+    confusable_with: [daintree.forge.land-pull-request]
+  - query: Keep an eye on the staging deploy you start for release/2.3 and confirm it's serving the right SHA once it lands.
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: 'The auto-deploy from merging #611 is in flight. Verify its commit ends up serving on staging and the smoke check passes.'
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: Deploy the 2.5 RC tag to staging and confirm staging is serving it.
+    confusable_with: [daintree.release.assess-readiness]
+  - query: Deploy the api service at tag v2.5.0 to staging and confirm /version reports that build.
+    confusable_with: [daintree.release.publish-package]
+  - query: ship the marketing site to production and check the new build is the one serving
+    confusable_with: [daintree.release.publish-package]
+  - query: deploy the fixed build from main to staging and verify it's serving
+    confusable_with: [daintree.release.rollback-deployment]
+  - query: Deploy the container image from tag v3.2.0 to staging and verify it's the revision serving.
+    confusable_with: [daintree.release.test-distributable]
+  - query: run the staging deploy where I can watch it and confirm the new sha is live afterwards
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Open a terminal and run `make deploy ENV=staging` for v1.3, then prove v1.3 is what staging serves.
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: kick off the fly deploy of the api to staging in a panel and check the new release is serving and healthy
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Deploy the onboarding branch's current SHA to the demo staging environment and confirm it's what's serving.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+followups:
+  - query: how's it going — is 3fa9c21 actually the thing serving yet?
+    history:
+      - 'user: deploy main to staging and check it''s up'
+      - 'assistant: Mechanism is `make deploy ENV=staging` (Makefile:41, Cloud Run service api-staging, us-central1). Pinned origin/main at 3fa9c21, created worktree deploy/3fa9c21 (ready). Serving now: api-staging-00087 at 5b7e2d1. Launched Deploy: staging 3fa9c21 in claude-5.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: for the smoke check also assert /api/health comes back with db:ok, not just a 200
+    history:
+      - 'user: deploy main to staging and check it''s up'
+      - 'assistant: Mechanism is `make deploy ENV=staging` (Makefile:41, Cloud Run service api-staging, us-central1). Pinned origin/main at 3fa9c21, created worktree deploy/3fa9c21 (ready). Serving now: api-staging-00087 at 5b7e2d1. Launched Deploy: staging 3fa9c21 in claude-5.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: staging looks good. now the same sha to production — yes, deploy to prod
+    history:
+      - 'user: deploy main to staging and check it''s up'
+      - 'assistant: Mechanism is `make deploy ENV=staging` (Makefile:41, Cloud Run service api-staging, us-central1). Pinned origin/main at 3fa9c21, created worktree deploy/3fa9c21 (ready). Serving now: api-staging-00087 at 5b7e2d1. Launched Deploy: staging 3fa9c21 in claude-5.'
+      - 'user: well?'
+      - 'assistant: api-staging-00088 takes 100% traffic, its image is built from 3fa9c21, /version reports 3fa9c21 and the smoke check passed.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: the agent says it finished but the new revision shows 0% traffic — did it deploy or not?
+    history:
+      - 'user: deploy main to staging and check it''s up'
+      - 'assistant: Mechanism is `make deploy ENV=staging` (Makefile:41, Cloud Run service api-staging, us-central1). Pinned origin/main at 3fa9c21, created worktree deploy/3fa9c21 (ready). Serving now: api-staging-00087 at 5b7e2d1. Launched Deploy: staging 3fa9c21 in claude-5.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: wait, before you launch it — ship the v2.5.0 tag, not main
+    history:
+      - 'user: put the release on staging and make sure the new version is serving'
+      - 'assistant: Mechanism: the deploy.yml workflow_dispatch (input `sha`). Pinned origin/main at 3fa9c21. Serving now: 5b7e2d1. Checking for in-progress runs before dispatching.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: /version still shows the old build sha, probably the CDN — look again
+    history:
+      - 'user: deploy main to staging and check it''s up'
+      - 'assistant: Mechanism is `make deploy ENV=staging` (Makefile:41, Cloud Run service api-staging, us-central1). Pinned origin/main at 3fa9c21, created worktree deploy/3fa9c21 (ready). Serving now: api-staging-00087 at 5b7e2d1. Launched Deploy: staging 3fa9c21 in claude-5.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: great, deploy it to staging and check it's up
+    history:
+      - 'user: give me a go/no-go on v3.1.0-rc1'
+      - 'assistant: Verdict for v3.1.0-rc1 (a4f2c19): go with risks. Scope: all 9 milestone items merged. CI: all required checks green on the SHA. Migrations: 0042 adds a nullable column, reversible. Config: new PAYMENTS_TIMEOUT_MS with a default. Risk: CHANGELOG does not cover PR #871. Nothing was merged, tagged or deployed.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: ship it to production — yes, prod
+    history:
+      - 'user: give me a go/no-go on v3.1.0-rc1'
+      - 'assistant: Verdict for v3.1.0-rc1 (a4f2c19): go. Every area has evidence: scope complete, CI green on the SHA, no migrations, no config changes, no open blockers. Nothing merged, tagged or deployed.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: merging that auto-deploys to staging — prove the new sha is what's serving there
+    history:
+      - 'user: land #640'
+      - 'assistant: Merged PR #640 into main as c77a0e3; required checks were green. The deploy-staging workflow started on push.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-round6-stateful
+  - query: 'the fix is merged as #905. deploy main to prod again and verify it — yes, production'
+    history:
+      - 'user: roll prod back to v2.4.1'
+      - 'assistant: api-00110 (v2.4.1, 3c2a9e7) holds 100% traffic, /version reports 3c2a9e7 and the read-only checkout smoke passed: symptom cleared. The bad code is still on main.'
+    active: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6-stateful
+  - query: build's fine. now put this build on staging and check it's actually serving
+    history:
+      - 'user: run the build in a terminal so I can see it'
+      - 'assistant: Ran `npm run build` in a visible terminal (terminal-4) in main: exit 0, dist/ written in 38s.'
+    active: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-round6-stateful
+  - query: 'unrelated: redeploy the api service to staging from the v3.0.2 tag and confirm it''s serving'
+    history:
+      - 'user: open an issue for the flaky upload test'
+      - 'assistant: Created issue #933 ''Upload test intermittently times out'' with the failing run links.'
+    active: [daintree.forge.manage-issue]
+    run: 2026-09-28-round6-stateful
+  - query: main's green now, deploy it to staging
+    history:
+      - 'user: CI is red on main, fix it'
+      - 'assistant: claude-3 fixed the broken import in src/api/router.ts (commit 2e91f4a); I re-ran the checks: all green on main, and GitHub CI passed on 2e91f4a.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-round6-stateful
+  - query: ok now deploy the docs site that uses it to staging and make sure it's serving
+    history:
+      - 'user: publish the ui kit 2.0.0 to npm'
+      - 'assistant: 2.0.0 is under latest with the right hash; clean consumer install works.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful

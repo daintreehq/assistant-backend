@@ -1,0 +1,141 @@
+# Training examples whose answer is `daintree.workflow.prepare-feature-demo` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.workflow.prepare-feature-demo
+run: 2026-09-28-round6
+positives:
+  - 'Prepare a demo of the new onboarding flow from the feat/onboarding-v2 worktree for tomorrow''s standup: running preview, fake users seeded, a short click-through script.'
+  - Get the saved-searches feature the agents built into a state the product manager can click through, with an honest list of what's still stubbed.
+  - show me what the agents built today for the invoice export, running, not a writeup
+  - 'Stage the bulk-tagging feature in worktree tags-ui for a stakeholder demo: install, seed sample projects in its own local DB, start the preview, write five walkthrough steps.'
+  - can u get the new dark mode thing running so i can show the team at 3
+  - 'Demo prep for the Stripe billing portal work on branch feat/billing-portal: invented customers and invoices only, never the shared staging DB, plus what works vs what''s missing.'
+  - claude-2 says the team invite flow is finished. Get it running with made-up invites so I can click through it myself and see what's real and what's hardcoded.
+  - 'Set up the CLI''s new `export --format parquet` command for a demo: a sample dataset in its worktree, a terminal ready in that checkout, and a walkthrough of what each command prints.'
+  - The frontend and backend agents' onboarding work is already merged in the integration worktree; get that running with seeded accounts so I can walk the investors through it.
+  - spin up the notifications worktree w/ some fake notifs and give me the steps to show it off at sprint review
+  - 'Put the checkout redesign from PR #512 in front of the design team: sample cart data, preview running, a walkthrough, and a list of what isn''t wired up yet.'
+  - open a preview of the new pricing page for my demo w sarah, seed some fake plans + subscribers in that worktree, and tell me which parts are mocked
+  - Rather than a written weekly update, get the analytics dashboard the agents shipped this week running with fake events so it can be demoed Friday.
+  - demo the 2fa enrollment on wt auth-2fa for the qa lead, need a walkthrough + whats stubbed
+  - 'Make the agents'' GraphQL subscriptions work inspectable for the backend guild: API running in a visible terminal, sample data seeded locally, a curl walkthrough, works/doesn''t-work list.'
+  - Reproducible demo of the drag-and-drop kanban from codex's worktree, pinned at its current commit, with safe sample boards and the click steps.
+  - i want to see the recommendations widget actually running before the call, with fake products. what's real and what's faked?
+  - 'Ready the mobile-web checkout flow for a customer-facing demo: test data only, no real card numbers, and flag anything still hardcoded.'
+  - Seed demo tenants in the multi-tenant worktree's own database and get the admin console up so it can be presented to the team, with a step-by-step script.
+  - fire up the fuzzy search thing gemini did so i can poke around it and show dave later
+  - 'Prepare the webhook retry dashboard for Monday''s all-hands demo: find which worktree has the finished version, get it running, seed some failing webhooks, write the walkthrough.'
+  - Everything the three agents did on the reporting epic is integrated on branch integ/reporting; stage it as a demo with generated data and a plain works/stubbed/missing list.
+  - 'Before the client review, make the file-sharing feature showable: preview up, dummy files and users, and exercise each walkthrough step you can yourself.'
+  - hey nice work on the calendar sync. can we get it demo-ready? fake calendars only pls
+  - 'Get the new onboarding emails viewable for a demo: the mail preview route running in the feat/welcome-emails worktree, fake signups seeded, and steps to see each email.'
+  - 'Demo setup without touching staging: run the audit-log feature from feat/audit-log locally with generated events and hand over a walkthrough for the compliance team.'
+boundaries:
+  - query: Instead of a written weekly update, show the team what the agents built this week running live with sample data.
+    confusable_with: [daintree.git.summarize-activity]
+  - query: for today's standup i want to show the new filters working, not list commits. get it running
+    confusable_with: [daintree.git.summarize-activity]
+  - query: what did the agents build this week? i'd rather see it running than read about it, set up a demo
+    confusable_with: [daintree.git.summarize-activity]
+  - query: 'PR #618 is the new onboarding wizard; set it up with fake accounts and a click-through script so the PM can see it before approving.'
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: spin up the agents' feature branch for the sales team with sample data and a list of what to click
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: The bulk-export PR is green. Get it running with seeded data and a walkthrough so it can be presented in the review meeting.
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: Get the onboarding prototype the agents built running with sample data so the PM can click through it tomorrow.
+    confusable_with: [daintree.orchestration.productionize-prototype]
+  - query: codex says the bulk editor is done. Rather than a verification report, get it running so I can click through it myself with fake records.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: dont need you to audit it, just get the export feature claude finished running with sample data so i can see it
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: The agent reports the onboarding checklist is complete; make it demoable for the 2pm call and say what's stubbed.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Put the settings redesign in a dev preview with dummy users and give me the steps to walk the designer through it.
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: open the preview for the team-invites worktree for a demo, seed sample invites and list what's still stubbed
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: i need the new map view up in a preview panel for tomorrow's demo, fake locations, and a list of what actually works
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Start the dev server in the reports worktree, load some fake data, and write out what to click for the stakeholder demo.
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: run the app from the notifications branch so I can show it to the team, with a list of what doesn't work yet
+    confusable_with: [daintree.terminals.run-visible-command]
+  - query: Bring up the API from the agents' graphql branch in a terminal with sample data seeded and a curl walkthrough for the demo.
+    confusable_with: [daintree.terminals.run-visible-command]
+followups:
+  - query: use fake customers only — nothing from the staging dump
+    history:
+      - 'user: set up a demo of the new onboarding flow'
+      - 'assistant: onboarding-v2 worktree at 3e7b90a, no agent working there. I''ll launch a prep agent to install, seed sample data in that worktree''s own database and draft a walkthrough.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: ok start it up
+    history:
+      - 'user: get the billing feature running so I can click through it'
+      - 'assistant: Prep agent claude-3 finished: setup ran clean, seeded 12 invented accounts into the worktree''s own Postgres (proved separate), walkthrough has 5 steps. HEAD is still 91f0c2d and nothing changed beyond setup.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: step 4 — did you actually see the invoice PDF render or is that the agent's word?
+    history:
+      - 'user: prepare a demo for the standup of what the agents built'
+      - 'assistant: Demo is up in dev-preview panel ''Demo: invoices'' at http://localhost:5174, serving the integration worktree. Walkthrough: 1 log in as demo@example.test, 2 open Invoices, 3 create one, 4 download the PDF, 5 mark paid.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: wait for claude-2 to finish then, I want its last commit in the demo
+    history:
+      - 'user: show me what the agents built for search'
+      - 'assistant: search-rework worktree: claude-2 is still working there, so the code would change under the demo. I can wait for it to go idle or demo the current commit 44ab1e0.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: just show each branch alone, don't bother integrating
+    history:
+      - 'user: get it in a state I can show the team — the frontend and api agents both built pieces of it'
+      - 'assistant: Two worktrees: feat/export-ui (claude-1) and feat/export-api (codex-1), no integration branch yet. Integrate first, or demo each alone?'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: add what's stubbed to the list — I don't want to promise the email step
+    history:
+      - 'user: prepare a demo of the referral feature for tomorrow'
+      - 'assistant: Running at http://localhost:3000 from the referrals worktree. I exercised steps 1-3 via curl and the console is clean. Works list: signup with code, reward credited. Known bug: dashboard count lags a refresh.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: nice. now get the integrated branch running so I can click through the export flow, with some fake data
+    history:
+      - 'user: merge the export-ui and export-api agents'' branches together'
+      - 'assistant: integration/export at f2c8a10: merged export-api then export-ui, checks green after each and on the final tree.'
+    active: [daintree.git.integrate-agent-branches]
+    run: 2026-09-28-round6-stateful
+  - query: good, it's real. set it up as a demo for tomorrow's standup — running, sample data, a walkthrough
+    history:
+      - 'user: claude-3 says the onboarding wizard is done, check it'
+      - 'assistant: Verified: diff matches the brief, I re-ran the tests (all pass) at 5a9c7e2 in the onboarding worktree.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-round6-stateful
+  - query: rather than a written report, get what the agents built running so I can show the team and tell me what's stubbed
+    history:
+      - 'user: what did the agents land today?'
+      - 'assistant: I can write that as a summary for today, Europe/London, split into shipped, in review and in progress. Starting from git and the forge now.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-round6-stateful
+  - query: show me what it built — get it running with some fake data and give me a walkthrough
+    history:
+      - 'user: have an agent build the team invites page'
+      - 'assistant: claude-2 finished in the invites worktree: invites page, API route and tests at 77e0d13, and handed back.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6-stateful
+  - query: 'thanks. now make the whole billing feature demo-ready: preview up, a walkthrough, and what works vs what''s stubbed'
+    history:
+      - 'user: seed the db for the billing worktree'
+      - 'assistant: Proved billing''s DATABASE_URL points at its own local Postgres; ran the seeder: 20 invented accounts, schema at 2026_09_20_1200.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6-stateful
+  - query: all green, so prep a demo of the new dashboard for the stakeholders call
+    history:
+      - 'user: run the checks in the dashboard worktree'
+      - 'assistant: dashboard worktree at 3c0e5d8: test pass, lint pass, typecheck pass, build pass.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-round6-stateful

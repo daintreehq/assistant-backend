@@ -50,6 +50,24 @@ boundaries:
     confusable_with: [daintree.workflow.find-issue-work]
   - query: Find all merged PRs since the last tag and turn them into the changelog for 2.1.
     confusable_with: [daintree.workflow.find-issue-work]
+  - query: write the CHANGELOG entry for 4.1.0 covering the new CLI flags
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: Draft the GitHub release notes for v3.2 from the PRs merged since v3.1.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: what's new in 2.8? write it up for the announcement post
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: Write the release notes for 2.5 from the PRs merged since v2.4, into CHANGELOG.md
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: Write the CHANGELOG section for sdk 1.4.0 from the PRs merged since v1.3.0.
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: draft the github release notes for v2.0 of the npm package, breaking changes first
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
 followups:
   - query: actually put them in CHANGELOG.md under a 2.5.0 heading instead of the reply
     history:
@@ -136,3 +154,29 @@ topic_shifts:
       - 'assistant: Provisional: #954 is the top suspect; you reverted it and error rates are back to baseline.'
     active: [daintree.debug.investigate-outage]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: get an agent to write the 4.0 release notes into CHANGELOG.md
+    history:
+      - 'user: is the release candidate good to go? it''s origin/release/4.0'
+      - 'assistant: Candidate = origin/release/4.0 at e19b7d2. Verdict: no-go. PR #901 (fix session expiry) is open with the release-blocker label, approved and green; required check e2e-linux failed on e19b7d2; CHANGELOG has no 4.0 section. Checkers were claude-2, claude-3, codex-2; nothing merged, tagged or deployed.'
+    active: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6-stateful
+  - query: now draft the GitHub release for v2.5.0
+    history:
+      - 'user: ship v2.5.0 to production — yes, prod'
+      - 'assistant: Deployed v2.5.0 (8c1e4f0) to production with `./infra/deploy.sh prod` in claude-6, operation d-4412. Serving: api-00114 at 100% traffic, /version reports 8c1e4f0, smoke check passed. Rollback point: api-00113 at 71d09aa.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: now write the changelog entry for 1.4.0
+    history:
+      - 'user: publish @acme/sdk 1.4.0 to npm'
+      - 'assistant: 1.4.0 is live under latest; dist.shasum matches the tarball and a clean temp project installed and imported it.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: write the changelog entry for this release too
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+      - 'assistant: Done: README fixed on docs/readme-setup, reader re-ran the failed steps and they now pass; --port ignored flagged as a code bug.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful

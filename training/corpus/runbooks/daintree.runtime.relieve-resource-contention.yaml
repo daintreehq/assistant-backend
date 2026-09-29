@@ -1,0 +1,194 @@
+# Training examples whose answer is `daintree.runtime.relieve-resource-contention` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.runtime.relieve-resource-contention
+run: pre-split
+positives:
+  - query: the agents have made my laptop basically unusable, can you figure out what's eating it
+    run: 2026-09-28-round6
+  - query: Load average is 38 with four agents running jest; attribute the CPU to worktrees and cap each agent's test workers.
+    run: 2026-09-28-round6
+  - query: Disk dropped to 4 GB free since the agents started building; find which worktrees' build and cache directories are responsible.
+    run: 2026-09-28-round6
+  - query: fans screaming again. what is eating cpu
+    run: 2026-09-28-round6
+  - query: Swap is at 12 GB and memory_pressure reports critical; map the top RSS processes to Daintree terminals and reduce what this session owns.
+    run: 2026-09-28-round6
+  - query: Serialize the full test runs across claude-1, claude-2 and codex-1 so only one suite runs at a time — the machine can't take three at once.
+    run: 2026-09-28-round6
+  - query: everything crawls the moment the pytest-xdist workers kick in across the worktrees
+    run: 2026-09-28-round6
+  - query: Tell the owned agents to run vitest with --maxWorkers=2 and stop their watch processes; take a load reading before and after.
+    run: 2026-09-28-round6
+  - query: Find which agent's cargo build is pinning all 10 cores and throttle it to -j 2.
+    run: 2026-09-28-round6
+  - query: Process count is over 3,000, mostly node children from agent worktrees; attribute them and propose what to stop.
+    run: 2026-09-28-round6
+  - query: too much running, it's swapping hard. calm it down but don't touch my own dev server
+    run: 2026-09-28-round6
+  - query: Relieve CPU pressure from the gemini agents' parallel webpack builds without losing their work; show readings before and after.
+    run: 2026-09-28-round6
+  - query: Take a load reading, pin the memory hog to a terminal and worktree, and interrupt the owned agent's test run if the user agrees.
+    run: 2026-09-28-round6
+  - query: mac is beachballing since you launched the 6 agents. sort it out
+    run: 2026-09-28-round6
+  - query: 'Out of disk: rank node_modules, .next and target directories by size per worktree, mark what''s regenerable, and ask before removing any.'
+    run: 2026-09-28-round6
+  - query: One of the agents brought up a docker compose stack that's using 9 GB of RAM; attribute it and tell the user how to stop it.
+    run: 2026-09-28-round6
+  - query: RAM is exhausted — leftover vite servers from panels that closed plus the agents' test runners; rank what's using memory and relieve it.
+    run: 2026-09-28-round6
+  - query: The agents aren't hung, they're slow because the machine is pegged at 100% CPU; find what's hogging it and throttle it.
+    run: 2026-09-28-round6
+  - query: all the agents are sluggish together because the machine is overloaded — ease the load, don't restart any of them
+    run: 2026-09-28-round6
+  - query: Which of the seven running agents are burning CPU and memory? Slow the heavy ones down and show the load afterwards.
+    run: 2026-09-28-round6
+  - query: Don't park anyone for the day, just stop them running their full suites simultaneously so the machine stays responsive.
+    run: 2026-09-28-round6
+  - query: disk is full. don't delete worktrees, just tell me which build caches the agents generated and how big they are
+    run: 2026-09-28-round6
+  - query: Test timings doubled only because concurrent agent runs are overloading the machine, not a code regression; reduce the contention.
+    run: 2026-09-28-round6
+  - query: It's not Daintree that's slow — the agents' test runners are saturating the CPU; attribute and throttle them.
+    run: 2026-09-28-round6
+  - query: Concurrent pnpm test runs from three agents are thrashing memory and the SSD; queue them so one suite runs at a time.
+    run: 2026-09-28-round6
+  - query: Ask claude-2 and codex-4 to drop to two test workers each — the laptop is overheating from their parallel runs.
+    run: 2026-09-28-round6
+boundaries:
+  - query: man this machine's fans are going nuts today
+    history:
+      - 'user: give the running agents their own worktrees'
+      - 'assistant: Five created and every agent redirected.'
+    active: [daintree.worktree.relocate-agents]
+  - query: all my agents are crawling at once, the cpu is pinned by their test runs
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-round6
+  - query: Nothing is hung — the laptop is drowning and every agent slowed down once the builds started; relieve it.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-round6
+  - query: Agents are crawling because load average is 30; don't restart them, throttle the worst offenders.
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-09-28-round6
+  - query: Daintree feels slow but I think it's the agents' test workers pegging the CPU; confirm and throttle them.
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-round6
+  - query: Everything on the machine lags since the agents started; attribute the load to terminals and ease it.
+    confusable_with: [daintree.diagnostics]
+    run: 2026-09-28-round6
+  - query: Don't stop them for the day; hold the lower-priority agents' next test runs so the machine recovers.
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-round6
+  - query: keep everyone working but make them take turns with the full build, my laptop can't cope
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-09-28-round6
+  - query: the agents are pegging the CPU and my laptop is unusable, throttle them
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: Sweep the running agents for who's hogging CPU and memory and cut their test parallelism.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-round6
+  - query: go through the agents and find which ones are thrashing the disk with builds, then limit them to one build at a time
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-round6
+  - query: Check which agents' test runs are overloading the machine and stagger them.
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: 2026-09-28-round6
+  - query: Disk filled up since the agents started; show which worktree caches are biggest, delete nothing yet.
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-round6
+  - query: free some disk — the agents' build outputs filled it. list regenerable dirs per worktree and remove only what i approve
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-round6
+  - query: It's not one port — the dozen dev servers the agents started are eating all my RAM; ease the load.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-round6
+  - query: Something from the agents' worktrees has spawned thousands of processes and the machine is swapping; map the heavy PIDs to terminals.
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-round6
+  - query: is one of the agents' servers what's using 6 gb? the whole mac is swapping
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-round6
+  - query: Suite timings tripled since the agents started running tests in parallel — it's machine contention, not the code; reduce it.
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-round6
+  - query: the build takes forever because three agents compile at the same time, stagger them
+    confusable_with: [daintree.runtime.measure-performance]
+    run: 2026-09-28-round6
+followups:
+  - query: do it, cap them all at 2 workers
+    history:
+      - 'user: the agents have made my machine unusable'
+      - 'assistant: Reading 1 (14:02): load 38, CPU pegged. Top offenders: three jest runs with 16 workers each, from claude-1 (feature/auth), codex-2 (feature/billing) and claude-5 (fix/cart), all owned by this session; a vite server in the docs worktree that is yours, not mine. Proposal: cap each agent''s test runs at 2 workers and serialize full runs.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: also interrupt codex-2's run now, it's the worst one
+    history:
+      - 'user: fans are screaming, what''s eating the CPU'
+      - 'assistant: Reading 1 (09:40): codex-2''s jest run in feature/billing is at 610% CPU, claude-1''s tsc --watch at 140%. I sent both a throttle: at most 2 workers, stop watch processes, ask before the next full run. It limits their next run, not the one running now.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: what's the node process at 180% cpu in the billing worktree? is that one of the agents?
+    history:
+      - 'user: everything crawls when the test workers start, find what''s loading it'
+      - 'assistant: Reading 1 (16:15): load 24 on 10 cores, 3.1 GB swap in use. Mapped the top PIDs to worktrees: two pytest-xdist runs in feature/search (claude-2) and fix/indexer (codex-4).'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: and close the storybook server you started earlier, it's holding 3GB
+    history:
+      - 'user: my laptop is swapping hard since the agents started, sort it out'
+      - 'assistant: Reading 1 (11:20): memory pressure critical, 6.4 GB swap. Largest: storybook in terminal ''Storybook (ui)'' that this session launched, 3.0 GB RSS; two cargo builds from codex-1 and claude-3. Throttled both agents to one build at a time.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: take the second reading now — is it any better?
+    history:
+      - 'user: the agents have bogged the machine down, calm it down'
+      - 'assistant: Sent throttles to claude-1, codex-2 and claude-5 (max 2 workers, ask before each full run). All three confirmed in one line, and the process list shows --maxWorkers=2 on the new runs.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: clear the target dir in rust-core and the .next caches, but leave node_modules alone
+    history:
+      - 'user: disk is full since the agents started building'
+      - 'assistant: df shows 4 GB free. By worktree: rust-core target/ 31 GB (regenerable), four .next caches at 2-3 GB each (regenerable), node_modules 1.8 GB per worktree. Nothing deleted yet; which paths should go?'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: everything crawls now that the test workers started and the fans are screaming — what's eating the CPU?
+    history:
+      - 'user: one agent per issue for #501-#506'
+      - 'assistant: Launched six agents in six worktrees; all are working and running their test suites.'
+    active: [daintree.orchestration.fan-out-work]
+    run: 2026-09-28-round6-stateful
+  - query: my laptop is swapping like crazy since the agents started, find out what's hogging memory and calm it down
+    history:
+      - 'user: run the checks in the auth and billing worktrees'
+      - 'assistant: Started lint, typecheck and tests in both worktrees in visible terminals; auth is green, billing still running.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-round6-stateful
+  - query: that helped, but the whole machine is still crawling — there are like 400 node processes
+    history:
+      - 'user: port 3000 is already in use'
+      - 'assistant: A vite server this session started in the old preview terminal held 3000; I stopped it and the port is free.'
+    active: [daintree.runtime.free-busy-port]
+    run: 2026-09-28-round6-stateful
+  - query: then it's the machine. figure out what's loading it and throttle the agents
+    history:
+      - 'user: claude-3 has been sitting there for ages, is it stuck?'
+      - 'assistant: claude-3 is not hung: its jest run is still progressing, just slowly. Load average is 42 on 10 cores.'
+    active: [daintree.agents.recover-agent]
+    run: 2026-09-28-round6-stateful
+  - query: The user reports the machine is unusable while four agents run builds in parallel; attribute CPU and memory to terminals and worktrees and serialize the builds.
+    history:
+      - 'user: spawn codex to add the export button'
+      - 'assistant: Launched codex-5 in feature/export-button; it is working.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6-stateful
+  - query: with the two extra urgent agents running their suites the machine is crawling — what's eating the CPU?
+    history:
+      - 'user: drop the refactor work, the release blocker comes first'
+      - 'assistant: Paused claude-1 and codex-2 at clean points; launched claude-5 and codex-6 on the blocker in fix/release-blocker. claude-4 and codex-3 kept going.'
+    active: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6-stateful

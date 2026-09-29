@@ -55,6 +55,12 @@ boundaries:
   - query: Port 3000 is held by a zombie node process; free it.
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-catalog-expansion-late
+  - query: EADDRINUSE on 5173 when starting the web app — who holds the port?
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: which worktree's server is sitting on 8080? free it if it's ours
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
 followups:
   - query: it's mine actually, I forgot about it — go ahead and kill it
     history:
@@ -123,3 +129,23 @@ topic_shifts:
       - 'assistant: Launched claude-4 ''Upgrade: vite 6'' in chore/upgrade-vite-6 with the baseline-first brief; ending my turn.'
     active: [daintree.deps.upgrade-dependency]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: load's fine now, but claude-2's dev server won't start — EADDRINUSE on 5173
+    history:
+      - 'user: the agents have made my machine unusable'
+      - 'assistant: Reading 2 (15:10): load down from 38 to 7 after capping the three jest runs at 2 workers. Throttles still stand on claude-1, codex-2 and claude-5.'
+    active: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6-stateful
+  - query: port 3000 is already in use — what's holding it?
+    history:
+      - 'user: set up a demo of the referral feature'
+      - 'assistant: Prep done. Starting the dev server in a terminal in the referrals worktree: it exited with EADDRINUSE :3000.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful
+  - query: port 3000 is still held by the reader's dev server — free it
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+      - 'assistant: Done: README fixed on docs/readme-setup, reader re-ran the failed steps and they now pass; --port ignored flagged as a code bug.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful

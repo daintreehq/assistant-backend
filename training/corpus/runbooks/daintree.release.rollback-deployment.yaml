@@ -1,0 +1,99 @@
+# Training examples whose answer is `daintree.release.rollback-deployment` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.release.rollback-deployment
+run: 2026-09-28-round6
+positives:
+  - roll back prod to yesterday's release
+  - Shift production traffic back to the last good Cloud Run revision, api-00412-xoq, and confirm checkout works again.
+  - revert staging to v2.4.1 - the deployed service, not the code
+  - undo the deploy on staging, it's throwing 502s
+  - Restore the payments service in prod to the release that ran before this morning's deploy; check the migrations since then first.
+  - Can we roll prod back to 3.7.2 safely? 3.8 may have dropped a column. Check before doing anything.
+  - Roll the web deployment in the prod k8s namespace back to its previous revision (user approved) and verify the pods run the old image.
+  - Put the ingest app on staging back to fly release v58 and check whether the timeout errors are gone.
+  - 'Redeploy v5.0.9 to production as a rollback: 5.1 broke SSO logins. Verify login works afterwards.'
+  - prod's on 2.9 and search is broken, go back to 2.8
+  - 'Bring the qa environment back to the build from before PR #611 deployed; verify which revision is serving.'
+  - go back to the last good release on prod NOW, the signup form 500s
+  - Roll back the prod api to image digest sha256:4be1... that was serving on Monday, using infra/rollback.sh, then confirm the version endpoint.
+  - Revert the preprod deployment to tag v11.3.0 and check whether the report exports work again.
+  - what would it take to roll prod back to 6.1? show me the plan and compatibility risks, don't execute yet
+  - restore the previous revision's 100% traffic split on the prod service and verify nothing else is serving
+  - 'We already know the cause: last night''s deploy broke image uploads. Don''t investigate, just roll production back to the prior release and confirm uploads work.'
+  - The incident agents recommended rolling back; go ahead and roll prod back to v7.3.0 and verify the 500s stopped.
+  - Redeploy last week's tag v2.2.0 to production because 2.3 is broken. It's a rollback, so check schema compatibility first.
+  - 'Not the local code: roll the deployed staging environment back to what was serving before the agents'' branch got deployed.'
+  - Roll production back to v4.1, but first check whether the migrations applied since 4.1 leave the old code incompatible with the prod schema.
+  - Leave the bad commit in the repo for now; just get prod back onto the previous revision.
+  - Undo today's staging deploy by sending traffic back to the revision it replaced.
+  - rollback prod to 1.9.4, we flipped the new_pricing flag on for 2.0, check the old build copes with that
+  - Roll the checkout service on prod back one release and tell me whether the failing /cart request passes afterwards.
+boundaries:
+  - query: 'prod broke after the 14:00 deploy and we''ve decided: roll it back to the 13:00 revision'
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: errors spiked after the deploy; put the previous version back immediately and tell me if the errors drop
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: 'Outage triage is done and the suspect is PR #455. Restore production to the release before it.'
+    confusable_with: [daintree.debug.investigate-outage]
+  - query: The deploy an hour ago broke login; put production back on the previous revision.
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: Roll back the api deployment on prod to the last revision. Not the branch, the live service.
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: undo what went out in today's staging deploy, shift traffic back to the old revision
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: Back out the deploy codex triggered to staging and restore the release that was serving before it.
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: roll staging back to the previous revision, the new one is erroring
+    confusable_with: [daintree.release.deploy-and-verify]
+  - query: Roll staging back to v3.0; first check whether the migrations applied since then leave staging's schema incompatible with it.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: rollback the prod deploy to 2.1, careful, 2.2 ran a migration
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: Before shifting prod traffic back to last week's revision, check whether the dropped legacy_status column breaks that old code.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: Shift prod traffic back to the previous Cloud Run revision; the 4.2 deploy broke login.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: roll staging back to v2.4.1, the new release broke checkout
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+topic_shifts:
+  - query: checkout is broken on staging after that — roll staging back to the previous revision
+    history:
+      - 'user: deploy main to staging and check it''s up'
+      - 'assistant: Mechanism is `make deploy ENV=staging` (Makefile:41, Cloud Run service api-staging, us-central1). Pinned origin/main at 3fa9c21, created worktree deploy/3fa9c21 (ready). Serving now: api-staging-00087 at 5b7e2d1. Launched Deploy: staging 3fa9c21 in claude-5.'
+      - 'user: well?'
+      - 'assistant: api-staging-00088 serves 3fa9c21 at 100% traffic, /version reports 3fa9c21, but the smoke check failed: POST /api/checkout/quote returns 500. Rollback point api-staging-00087 at 5b7e2d1.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: checkout is failing for customers since that went out — roll prod back to v2.4.3 now
+    history:
+      - 'user: ship v2.5.0 to production — yes, prod'
+      - 'assistant: Deployed v2.5.0 (8c1e4f0) to production with `./infra/deploy.sh prod` in claude-6, operation d-4412. Serving: api-00114 at 100% traffic, /version reports 8c1e4f0, smoke check passed. Rollback point: api-00113 at 71d09aa.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: that deploy broke staging login — put staging back on the previous revision
+    history:
+      - 'user: land #455'
+      - 'assistant: Merged PR #455 into main as 0bd3e18; the push deployed it to staging as api-staging-00092.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-round6-stateful
+  - query: 'different thing: shift prod traffic back to the last good revision, the 14:10 deploy is bad'
+    history:
+      - 'user: run the migrations in the feature/export worktree'
+      - 'assistant: feature/export''s .env points at its own local Postgres (export_dev); applied 0059 and 0060, schema version now 60.'
+    active: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6-stateful
+  - query: urgent — undo the deploy on staging, put v3.0.1 back
+    history:
+      - 'user: rename claude-2 to ''auth refactor'''
+      - 'assistant: Renamed claude-2 to ''auth refactor''.'
+    active: [daintree.terminals.rename]
+    run: 2026-09-28-round6-stateful
+  - query: leave that. the api deploy an hour ago broke prod — shift traffic back to yesterday's revision
+    history:
+      - 'user: tell claude-3 to stop touching the tests and focus on the parser'
+      - 'assistant: Sent the redirect to claude-3; it acknowledged and is now working in src/parser/.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6-stateful

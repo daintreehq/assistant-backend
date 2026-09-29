@@ -67,6 +67,12 @@ boundaries:
   - query: have codex plan the notifications feature and claude build it after I approve the plan
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Have codex write a plan for the new audit-log feature, I approve it, then claude builds it production-grade. Nothing exists yet.
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: plan first for the billing export, no code until i sign off on the plan, then build it
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
 followups:
   - query: ok, approved — answer to Q1 is keep the per-tenant limit in Redis, Q2 no admin override. go ahead and build it
     history:

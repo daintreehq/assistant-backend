@@ -1,0 +1,141 @@
+# Training examples whose answer is `daintree.release.test-distributable` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.release.test-distributable
+run: 2026-09-28-round6
+positives:
+  - Build the macOS .dmg from tag v0.9.0 and install it on a clean user profile; check first launch and opening a project.
+  - npm pack the CLI at the head of main and install the tarball in a temp dir outside the repo, then run `acme --help` and `acme init`.
+  - run the docker image we'd actually ship, not the compose dev setup. fresh container, only the documented env vars, hit /health
+  - does the wheel work? build it, pip install into a brand new venv, import the package and run the cli entry point
+  - 'Smoke-test the linux release binary from commit 4f2a9c1 in a scratch dir: --version, first-run defaults, the sync command.'
+  - Package the Electron app with electron-builder from release/2.3 and start it with an empty userData dir; confirm migrations run and the welcome screen appears.
+  - test the built pkg installer, not the checkout
+  - 'dist smoke: build tarball @ v1.4.0, clean npm project, install, import + run bin, result per check'
+  - Before we tag 3.0, make sure the packed sdist installs with no repo around; we've been bitten by missing package data before.
+  - Tests and lint are green from source. I want the actual built docker image run cold with no bind mounts to see if it even starts.
+  - 'Not the Playwright run against the dev server: start the production container image built from main and check the login and upload flows against it.'
+  - 'Build the installer from 9c1e0d2 (what #612 merged as) and try it on a clean profile.'
+  - 'One agent is enough: install the release build of the CLI in a clean temp dir and run the three core commands, pass or fail for each.'
+  - npm pack and install the tarball in a fresh project to confirm it works. We are NOT publishing yet.
+  - Check the wheel we'd upload to PyPI actually installs and imports in a clean venv, without uploading it.
+  - make dist, then try the resulting binary with a fresh HOME. unit tests aren't the question here
+  - does the built binary of our cli run on a setup without the dev toolchain installed?
+  - Run the AppImage built from v2.1.0-rc1 with a fresh config dir and check it opens a file and saves it.
+  - Build the container from the Dockerfile at abc1234, run it without the repo .env, and confirm migrations and static assets are inside the image and the service answers on 8080.
+  - does the packaged .vsix of our extension install and activate in a clean VS Code profile?
+  - pls test the prod build of the desktop app on a clean profile, I'll click through the GUI bits
+  - Verify the pyinstaller standalone binary at tag v0.7.2 runs from a clean directory without the venv.
+  - 'Don''t deploy anything: run the image we would deploy in a clean local container and check it serves /version.'
+  - 'The integration tests only ever hit the localhost dev server. Exercise the shipped image instead: health, login, one report export.'
+  - Install the built .tgz of @acme/ui into a fresh vite app and check the components render with the bundled css.
+  - Run the installer we built last night from 7d3e21a on a fresh profile and check bundled fonts and default settings load.
+boundaries:
+  - query: Playwright passes against the dev server; now run the production image with only documented env vars and check sign-in works.
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: forget the integration suite, install the built wheel in a new venv and run the import and the cli smoke
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: Run the shipped container, not the worktree's dev server, and exercise the health and checkout endpoints against it.
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: The unit tests pass; now check the packed npm tarball actually works once installed outside the repo.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: lint and build are green from source, but run the docker image we'd ship in a clean container and check it starts
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: Instead of the test suite, build the release binary and run it from a temp dir with no config to see the defaults.
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: '#340 works from source; build the installer from its head commit and try it on a clean profile.'
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: take the release PR's head, build the npm tarball from it and install that in a fresh project outside the repo
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: 'Rather than running #455 from the checkout, package it into the docker image we''d ship and start that cold.'
+    confusable_with: [daintree.git.test-pull-request-locally]
+  - query: Before the release, install the built binary in a fresh dir and smoke-test the three main commands.
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: no bug bash needed, just have one agent install the release dmg on a clean profile and check it launches
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: Check the built app bundle ships its assets and starts with an empty user-data dir.
+    confusable_with: [daintree.orchestration.bug-bash]
+  - query: run the Docker image we'd ship in a clean container and check it starts with the bundled assets
+    confusable_with: [daintree.release.deploy-and-verify]
+  - query: npm pack the cli and install the tarball in a temp dir to see if it runs. do NOT publish
+    confusable_with: [daintree.release.publish-package]
+  - query: Build the wheel from the release branch and try it in a fresh venv before we decide whether to release.
+    confusable_with: [daintree.release.publish-package]
+  - query: Install the built .dmg on a clean user profile and check the onboarding flow works from the artifact, not the source checkout.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+followups:
+  - query: use a fresh user-data dir too, not my normal profile
+    history:
+      - 'user: test the built .dmg we''d ship, not the dev build'
+      - 'assistant: Pinned v2.3.0-rc.1 = 81bd4c0. Plan: a dist-test/81bd4c0 worktree, one tester agent builds the dmg with the project''s packager and installs it to a temp location. Flows: first launch, open a project, create a worktree. Launching now unless you want changes.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+  - query: and the arm64 binary as well, same flows
+    history:
+      - 'user: smoke-test the release binary on a clean setup'
+      - 'assistant: claude-4 built dist/cli-linux-x64 (sha256 0c9e…) from 5d2a7b1 and ran it from a temp dir with HOME pointed at a fresh dir: --version reports 1.8.0, init and sync pass, no missing templates.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+  - query: it says it passed but did you run anything yourself?
+    history:
+      - 'user: does the packed npm tarball actually work when installed?'
+      - 'assistant: The tester agent (claude-2) reports: acme-cli-0.7.0.tgz installed into a fresh temp project, `acme --help` and `acme build` passed.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+  - query: so the migrations folder is missing from the image? ok, which other flows did it get to before that
+    history:
+      - 'user: run the Docker image we''d ship, not the dev server'
+      - 'assistant: claude-5 built image sha256:4f1e… from 2c9d031 with docker build --iidfile and ran it with no bind mount. Startup fails: ''ENOENT: migrations/0001_init.sql''.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+  - query: don't bother with the docker variant, just the wheel in a clean venv
+    history:
+      - 'user: it works from source but I want to know the shipped package works'
+      - 'assistant: Revision 7a0c3e9 on main. The project ships both a wheel and a container image; which should the tester agent build and test from a clean setting?'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+  - query: fine — re-check that the config defaults kick in when there's no ~/.acme at all
+    history:
+      - 'user: test the installer build on a fresh machine setup'
+      - 'assistant: Re-ran the install from a clean temp dir myself: `acme --version` prints 2.1.0 and first start works. The agent flagged one gap: it only tested with an existing config file.'
+    active: [daintree.release.test-distributable]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: that's from source though. does the installed wheel actually work? build it and try it in a clean venv
+    history:
+      - 'user: run the tests in the cli worktree'
+      - 'assistant: cli worktree at 2d8f0e1: pytest 341 passed, ruff clean, mypy clean.'
+    active: [daintree.ci.run-local-checks]
+    run: 2026-09-28-round6-stateful
+  - query: hold off on publishing entirely. I just want the packed tarball installed in a clean temp project and the init and build commands tried
+    history:
+      - 'user: get the sdk release ready for npm'
+      - 'assistant: Pinned main at 4c1d0e7 and created release/1.5.0. About to launch the release agent to bump and pack.'
+    active: [daintree.release.publish-package]
+    run: 2026-09-28-round6-stateful
+  - query: before any deploy, run the image we'd actually ship locally — no bind mount, no .env — and check it starts and serves /health
+    history:
+      - 'user: deploy the api to staging'
+      - 'assistant: Staging deploy uses `make deploy ENV=staging` from the release tag. Which revision — v4.2.0 or main''s tip?'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful
+  - query: the preview works from source. now build the .dmg and check it on a clean profile
+    history:
+      - 'user: the settings page crashes in the dev preview'
+      - 'assistant: codex-1 fixed the undefined theme access; after a reload the console shows no new errors and Settings renders.'
+    active: [daintree.runtime.debug-web-app]
+    run: 2026-09-28-round6-stateful
+  - query: ok CI's green again. but does the release binary actually run on a fresh setup? build it from that commit and smoke it
+    history:
+      - 'user: the build job is red on main, fix it'
+      - 'assistant: claude-1 fixed the missing asset path; I re-ran the build and it passes at e91a2b0. CI is green on the pushed commit.'
+    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-09-28-round6-stateful
+  - query: skip the demo. I care whether the installer we'd ship works — build it and test it outside the repo
+    history:
+      - 'user: set up a demo of the new sync feature'
+      - 'assistant: sync-v2 worktree at 0b3d9e1. Launching a prep agent to install, seed sample data and draft a walkthrough.'
+    active: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6-stateful

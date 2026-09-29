@@ -61,6 +61,21 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: Will the auth and billing worktrees conflict if I merge both into main?
     confusable_with: [daintree.worktree.audit-worktrees]
+  - query: Will the payments and refunds branches conflict if I merge them? Don't change anything.
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: which files do codex's and claude's worktrees both touch
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: Will the auth and billing worktrees conflict when merged? Suggest a merge order; change nothing.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Are any of my five agents' branches touching the same files? Just report the overlap.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Forecast whether the parser and lexer branches will conflict before I merge them.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
 followups:
   - query: ok and now do the same for the api worktree against billing
     history:

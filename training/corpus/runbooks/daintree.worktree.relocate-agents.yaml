@@ -211,7 +211,6 @@ positives:
   - should've done worktrees. can we retrofit that on the running ones
   - yeah do the thing where each agent gets its own tree, move the current ones
   - put them all in different folders and tell them to keep going from there
-  - these two need splitting up, they're both hammering the same files
   - just get them into separate trees please, i don't care about the branch names
   - name the branches whatever, just one tree per agent and move them
   - each agent gets a tree, you pick the names, move them over
@@ -685,6 +684,15 @@ boundaries:
   - query: move the running claude into a new worktree called api-fix
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-refine
+  - query: claude-1 and codex-1 share the main checkout but are on different tasks; give each its own worktree.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: move each of the three running agents into its own branch, they're on separate issues
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: isolate these four agents into their own worktrees, each has its own issue
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
 followups:
   - query: did they all pick it up
     history:

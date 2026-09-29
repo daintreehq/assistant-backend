@@ -1,0 +1,191 @@
+# Training examples whose answer is `daintree.edits.sync-project-docs` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.edits.sync-project-docs
+run: pre-split
+positives:
+  - query: README quickstart still says `npm run start:dev`, which went away in the vite migration. Rewrite the setup section from what package.json and the scripts actually do, then have a second agent follow it from a fresh clone.
+    run: 2026-09-28-round6
+  - query: docs/api.md is stale after the v2 route rewrite; redo the endpoint reference from src/routes and confirm the curl examples actually work.
+    run: 2026-09-28-round6
+  - query: our install guide is broken on a clean machine, get it fixed
+    run: 2026-09-28-round6
+  - query: Update docs/configuration.md so every config key, default and env var matches src/config/schema.ts. Docs only, no code changes.
+    run: 2026-09-28-round6
+  - query: the cli --help and the README usage section disagree now, make the README match the binary
+    run: 2026-09-28-round6
+  - query: 'Sync the project docs with the refactor merged in #642: the config reference still lists `cache.dir`, which became `storage.cacheDir`.'
+    run: 2026-09-28-round6
+  - query: CONTRIBUTING setup steps, the docker-compose instructions and the .env.example walkthrough have all drifted since March. rewrite them and have someone actually run them
+    run: 2026-09-28-round6
+  - query: Make sure the SDK usage examples in docs/sdk/*.md run against the current client; fix the docs wherever they don't.
+    run: 2026-09-28-round6
+  - query: readme says python 3.10 and `pip install -r requirements.txt`, we moved to uv + 3.12. fix the docs and have someone actually try them
+    run: 2026-09-28-round6
+  - query: Rewrite the self-hosting guide in docs/self-hosting.md to reflect the new env vars; leave the code alone even where the old docs describe nicer behaviour.
+    run: 2026-09-28-round6
+  - query: api docs don't mention the export command's new --format / --since options, get them documented properly
+    run: 2026-09-28-round6
+  - query: The Getting Started page references a `make bootstrap` target that no longer exists. Fix the page from the Makefile and have a fresh-eyes agent execute it.
+    run: 2026-09-28-round6
+  - query: can u get the readme setup working again, new hires keep getting stuck on step 4
+    run: 2026-09-28-round6
+  - query: Bring the plugin authoring guide in docs/plugins.md in line with the hook API as it exists in src/plugins/registry.ts.
+    run: 2026-09-28-round6
+  - query: Nobody trusts docs/config.md because it's wrong. Rewrite it from what the loader in src/config actually does — I want the file fixed, not an explanation.
+    run: 2026-09-28-round6
+  - query: Read the auth middleware and correct docs/auth.md to describe how token refresh really works now; the page still documents the old flow.
+    run: 2026-09-28-round6
+  - query: 'Not a changelog: the README''s feature list and usage examples still describe 2.x behaviour. Update them to match what the code does today.'
+    run: 2026-09-28-round6
+  - query: The CLI flags changed since the v3 tag. Update docs/cli-reference.md itself (the reference page, not release notes) to match.
+    run: 2026-09-28-round6
+  - query: The README's dev setup section is wrong — the human-facing doc, not AGENTS.md. Fix it to match the current scripts and test it from a clean checkout.
+    run: 2026-09-28-round6
+  - query: CLAUDE.md is fine; it's docs/getting-started.md that's out of date. Make it match the actual bootstrap script and run the steps.
+    run: 2026-09-28-round6
+  - query: Fix the README examples — several import paths and function names changed in the refactor, and each example should be run to confirm it works.
+    run: 2026-09-28-round6
+  - query: have one agent update docs/webhooks.md for the new payload shape and a second agent check the examples against a running dev server
+    run: 2026-09-28-round6
+  - query: the openapi-based API reference in docs/reference is wrong for 6 endpoints since the pagination change. correct the docs to match the handlers
+    run: 2026-09-28-round6
+  - query: Config reference out of date since the settings refactor (a91c3e0..HEAD). A writer agent updates it from the schema; a reader agent verifies it from a clean worktree.
+    run: 2026-09-28-round6
+  - query: the docs get several defaults wrong (verbose, retries, timeout). the code is right, fix the docs to match it
+    run: 2026-09-28-round6
+  - query: 'Refresh the Docker quickstart in README.md: the image name, ports and volume paths all changed with the compose rewrite.'
+    run: 2026-09-28-round6
+boundaries:
+  - query: install steps in the README are wrong since we moved to uv. someone needs to fix that, put an agent on it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Put a gemini agent on updating the README install section for the new pnpm workspace layout; I want to watch it work.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: The earlier agent's launch worked fine and it's done — now start another agent to write docs for the new flags.
+    confusable_with: [daintree.agents.recover-agent, daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-agent-queries
+  - query: Have an agent rewrite the README's install section for pnpm and Node 22.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.memory.manage-project-memory]
+    run: 2026-09-28-catalog-expansion-late
+  - query: have an agent fix the README setup section, half the commands in it fail now
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6
+  - query: Update the docs for the new export flags and make sure every example in them runs.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6
+  - query: Get a visible agent to rewrite docs/api.md to match the current endpoints, then have another agent test it.
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6
+  - query: figure out what the export command's flags really do and rewrite docs/cli.md to match
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-round6
+  - query: Read the config loader and fix the configuration reference wherever it's wrong.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-round6
+  - query: The auth flow changed; update docs/auth.md so it describes the current code, and verify its examples.
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-round6
+  - query: work out which env vars the server really reads and correct the table in the README
+    confusable_with: [daintree.explore.repository]
+    run: 2026-09-28-round6
+  - query: The release is out but docs/upgrade-guide.md still describes the old config format. Fix the guide to match the code.
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6
+  - query: after the 3.0 release the README usage section is wrong; update it (the release notes are already done)
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6
+  - query: Since the last tag the API reference drifted; bring docs/api to match the handlers and run its examples.
+    confusable_with: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6
+  - query: update the README so the setup instructions match what our bootstrap script actually does
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-round6
+  - query: The contributor guide's dev setup is wrong in several places since we moved to just; rewrite it and try the steps from a clean clone.
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-round6
+  - query: the project documentation (not the agent instructions) is out of date about env vars, fix docs/env.md from the code
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-round6
+  - query: The API docs say /v2/export supports filters but the code doesn't; update the docs to match what it really does.
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+followups:
+  - query: add docs/config.md to it too, the env var table is wrong as well
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
+  - query: the writer's done — did it touch anything besides the README?
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
+  - query: codex-4 says step 4, make seed, fails. is that the doc or the code?
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
+  - query: actually put the edits straight in my own checkout, no branch
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
+  - query: the writer flagged --dry-run as a code bug; it's meant to be ignored in CI mode, so document it that way
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
+  - query: Reader codex-4 finished following docs/INSTALL.md; send the three failed steps back to the writer and have the reader re-run them after the fix.
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: docs/cli.md still documents the --watch flag we removed this release — get the docs matching the code
+    history:
+      - 'user: draft release notes for v2.3'
+      - 'assistant: Draft written from the 41 merged PRs since v2.2, grouped by feature and breaking changes.'
+    active: [daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6-stateful
+  - query: different thing — the install section of our README doesn't work any more, fix it against what the code does
+    history:
+      - 'user: remember that agents should run pnpm, not npm'
+      - 'assistant: Added that rule to AGENTS.md.'
+    active: [daintree.memory.manage-project-memory]
+    run: 2026-09-28-round6-stateful
+  - query: right, so docs/configuration.md is wrong on half those keys. rewrite it from the code and have someone test it
+    history:
+      - 'user: how does the config loader work?'
+      - 'assistant: Explorer traced src/config/load.ts: env vars override config.toml, which overrides defaults in schema.ts.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-round6-stateful
+  - query: the setup guide still says node 18 and npm run dev:legacy — bring the docs up to date with the code
+    history:
+      - 'user: upgrade us to Vite 6'
+      - 'assistant: codex-1 finished on chore/vite6; I ran build and tests myself, both pass.'
+    active: [daintree.deps.upgrade-dependency]
+    run: 2026-09-28-round6-stateful
+  - query: lots of API changes there — update docs/api.md for the new endpoints and flags
+    history:
+      - 'user: summarize what landed this week'
+      - 'assistant: 3 new endpoints (/v2/exports, /v2/exports/:id, /v2/webhooks) and a --since flag on the CLI landed on main.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-round6-stateful
+  - query: now make sure our docs match what the CLI actually does, and have someone run the examples
+    history:
+      - 'user: add a --json flag to the CLI'
+      - 'assistant: claude-1 added --json to list and show on feat/cli-json; tests pass.'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6-stateful

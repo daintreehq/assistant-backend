@@ -1,0 +1,203 @@
+# Training examples whose answer is `daintree.git.undo-agent-changes` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.git.undo-agent-changes
+run: pre-split
+positives:
+  - query: Revert the three commits codex-1 made on feat/billing-export since it was launched at 14:10, keeping the user's uncommitted edits in src/invoice.ts untouched.
+    run: 2026-09-28-round6
+  - query: Back out claude-2's uncommitted changes to config/webpack.prod.js in the web-ui worktree; the user's staged changes in that worktree must survive.
+    run: 2026-09-28-round6
+  - query: undo what codex just did in the api wt but keep my changes
+    run: 2026-09-28-round6
+  - query: Roll back the last agent's two commits on fix/login-redirect with git revert, no push.
+    run: 2026-09-28-round6
+  - query: gemini rewrote half the i18n files when i only asked for one string. take its edits back out, leave my stuff alone
+    run: 2026-09-28-round6
+  - query: Reverse exactly the edits the claude agent made under packages/auth after 10:32 this morning; the commits other agents made on that branch stay.
+    run: 2026-09-28-round6
+  - query: 'Undo agent changes: worktree payments-v2, agent codex, commits after a1b2c3d, preserve unrelated working-tree edits.'
+    run: 2026-09-28-round6
+  - query: Take back whatever claude touched in the GraphQL resolvers during its last session, leaving the user's hand edits to schema.graphql in place.
+    run: 2026-09-28-round6
+  - query: Codex bumped every dependency in package.json and the lockfile without being asked; revert just its commit and keep claude-3's later commit on top intact.
+    run: 2026-09-28-round6
+  - query: The agent in the docs worktree has already finished, but its edits to CHANGELOG.md and README.md are unwanted; reverse them while the user's own README tweak stays.
+    run: 2026-09-28-round6
+  - query: Stop codex-2, it is still editing the Terraform files, then reverse everything it changed there since launch so those files match what the user had before.
+    run: 2026-09-28-round6
+  - query: Everything claude-1 committed to feat/search today has to be reverted; the user's commits from before its launch stay as they are.
+    run: 2026-09-28-round6
+  - query: No need to analyse why the Codex run went wrong - just reverse the commits it made on refactor/router and leave everything else alone.
+    run: 2026-09-28-round6
+  - query: last night's overnight agent run trashed the test fixtures. i dont care why, just revert its commits on nightly-cleanup
+    run: 2026-09-28-round6
+  - query: Codex's commit 9f3e2a1 in the develop worktree broke the date parsing; revert that commit of its in place and keep the user's pending edits.
+    run: 2026-09-28-round6
+  - query: The hotfix agent's commits went onto release/2.4 by mistake - back them out of release/2.4 without disturbing the user's own commits there.
+    run: 2026-09-28-round6
+  - query: Don't delete the ui-refresh worktree - just remove the changes the gemini agent made there, the user has two days of their own work in it.
+    run: 2026-09-28-round6
+  - query: keep the wt, only unwind what claude-4 did to the css
+    run: 2026-09-28-round6
+  - query: Roll back codex's local commits to config/rate_limits.yaml in the main-dev worktree; nothing has been deployed, the user just wants its change gone and their staged edits kept.
+    run: 2026-09-28-round6
+  - query: 'Codex''s attempt on the caching layer has nothing worth keeping: revert its commits on feat/cache in place and keep the user''s earlier commits.'
+    run: 2026-09-28-round6
+  - query: Reverse the rename refactor codex applied across src/models (still uncommitted), but only its hunks - the user also hand-edited two of those files.
+    run: 2026-09-28-round6
+  - query: Revert only the hunks claude-2 wrote in lib/pricing.py and flag any hunk where it's unclear whether the user or the agent wrote it.
+    run: 2026-09-28-round6
+  - query: hey thanks for earlier. codex messed with my eslint config without asking - undo that part of its work please, the rest of its changes can stay
+    run: 2026-09-28-round6
+  - query: Undo the merge of feat/flags that claude made into the integration branch an hour ago; later commits the user made on top must stay.
+    run: 2026-09-28-round6
+  - query: 'Revert the agent''s changes: branch chore/deps-bump, the codex session launched at 09:05, plus its working-tree edits to pnpm-lock.yaml; no push, no reset.'
+    run: 2026-09-28-round6
+  - query: Drop the two commits the agent added to the user's unpushed feature branch from history instead of reverting them; the user's own commits stay.
+    run: 2026-09-28-round6
+boundaries:
+  - query: Revert the bad changes the last agent made to src/config/loader.ts and restore the original behaviour.
+    confusable_with: [daintree.agents.postmortem-run, daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-catalog-expansion
+  - query: The overnight run went wrong; skip the analysis and revert the commits it made on feat/ingest, keeping the user's commits.
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-round6
+  - query: That failed codex run left uncommitted junk across lib/; undo only its edits, the user had WIP in lib/util.ts too.
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-round6
+  - query: I've learned enough about why that agent failed - now back out what it changed on the branch.
+    confusable_with: [daintree.agents.postmortem-run]
+    run: 2026-09-28-round6
+  - query: Codex has already stopped, but the changes it made to the Dockerfile shouldn't be there; take them back out, the user's own edits stay.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: Interrupting claude isn't enough - the eight files it already edited under src/api need those edits reversed, keeping the user's edits.
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: the agent went the wrong way for 20 min and committed twice. revert those two commits, it can stay stopped
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6
+  - query: Revert the commit codex cherry-picked onto release/2.4 by mistake, keeping the user's own backport commits there.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-round6
+  - query: Codex's commit abc123 on my feature branch shouldn't be there - undo it right there, don't copy it anywhere.
+    confusable_with: [daintree.git.cherry-pick-changes]
+    run: 2026-09-28-round6
+  - query: Revert what codex did to the webpack config in the frontend worktree but keep my own edits there.
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: roll back the last two commits claude made on feat/queue, i don't want them
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: The failed attempt's commits on feat/cache need reversing in place on that same branch; the user's commits stay.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: 'Clean up after gemini in the landing-page worktree: revert the edits it made but keep the worktree and the user''s changes.'
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-round6
+  - query: tidy up the mess claude left in src/ - its edits only, don't delete the wt
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-round6
+  - query: 'No teardown: just reverse the last agent''s commits on feat/theme; the worktree and panels stay open.'
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: 2026-09-28-round6
+  - query: roll back codex's last three commits on feat/cart but keep my own edits
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: revert what codex changed in database/migrations but keep my own edits
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6
+  - query: undo the last commit codex made on feat/mailer but keep my own changes
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+followups:
+  - query: the pricing.ts hunk is mine, leave it alone. reverse the rest
+    history:
+      - 'user: undo what codex-1 just did in the billing worktree but keep my changes to invoice.ts'
+      - 'assistant: codex-1 started at a1b2c3d and made two commits (e4f5a6b, 9c8d7e1) plus uncommitted hunks in config/billing.yml. Your staged invoice.ts edits stay. One hunk in src/pricing.ts is mixed — I can''t tell who wrote it, so it''s listed for you to decide.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: drop them from history instead of reverting — it's my branch and nothing's pushed yet
+    history:
+      - 'user: roll back the last agent''s commits on feat/search'
+      - 'assistant: claude-3 made three commits since 4d2e9f0 (its launch HEAD from the brief). By default I''ll have them reverted newest first, which adds three revert commits. Or do you want them dropped from history?'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: stop it first, then carry on with the undo
+    history:
+      - 'user: back out whatever claude-2 touched in the API layer, keep everything else'
+      - 'assistant: claude-2 is still working in the api-refactor worktree (terminal.getStatus says working). If I undo now it may re-apply its edits.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: also undo the change it made to .env.example, I forgot that one
+    history:
+      - 'user: revert codex''s edits to the webpack config, leave the rest'
+      - 'assistant: Undo set for codex-2: commit 7f3a21c and two uncommitted hunks in webpack.config.js. Your tsconfig.json edits are not in it.'
+      - 'user: ok go'
+      - 'assistant: Launched ''Undo: codex-2 changes'' (claude-5) in the build worktree with that undo set, notify on. I''ll verify the before/after diff when it reports.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: keep my seed commit, just reverse the migration part of 3b9e0a2
+    history:
+      - 'user: undo what gemini-1 did to the migrations, keep my seed data changes'
+      - 'assistant: gemini-1''s commit 3b9e0a2 touched db/migrations/0042_users.sql and seeds/users.sql, and your later commit 88f1c4d builds on that seeds change. A full revert would conflict with your work there.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+  - query: reverts are fine, no force push. and back out its changes under docs/ too
+    history:
+      - 'user: roll back what the codex agent did to auth on feat/auth, keep my changes'
+      - 'assistant: feat/auth is already on origin and codex-1''s two commits (b71c0de, 2f8e4a9) were pushed. Reverting adds two revert commits locally; dropping them would need a force-push, which I won''t do without your word.'
+    active: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: ok, now undo what it did to the router but keep my changes in middleware/
+    history:
+      - 'user: why did claude-2 rewrite half the router when I asked for one fix?'
+      - 'assistant: Divergence at its 4th turn: the brief said ''clean up routing while you''re there'' and it took that as licence to restructure src/router. Cause: the brief. I''ve proposed prevention text for future briefs.'
+    active: [daintree.agents.postmortem-run]
+    run: 2026-09-28-round6-stateful
+  - query: then revert its changes — all of them — but my uncommitted edits in format.test.ts stay
+    history:
+      - 'user: check codex-1 actually fixed the date parsing'
+      - 'assistant: It didn''t: the tests it says pass are marked skip, and it also changed lib/format.ts, which you didn''t ask for. Its two commits are c4d5e6f and 0a9b8c7 on fix/dates.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-round6-stateful
+  - query: good. now reverse the migration edits it already made, leave everything else it did
+    history:
+      - 'user: tell claude-3 to stop touching the migrations'
+      - 'assistant: Interrupted claude-3 and sent the correction; its reply confirms it''s back on the API handlers only and won''t edit db/migrations again.'
+    active: [daintree.agents.steer-running-agent]
+    run: 2026-09-28-round6-stateful
+  - query: I hate it. roll back claude-6's commits on that branch but keep the icon tweak I made by hand
+    history:
+      - 'user: have claude add dark mode to the settings page'
+      - 'assistant: Launched claude-6 in the ui worktree. It''s finished: three commits on feat/dark-mode (theme tokens, settings toggle, snapshot updates).'
+    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-09-28-round6-stateful
+  - query: separately — codex-2 committed junk to my local feat/export branch this morning, back out just its two commits there
+    history:
+      - 'user: merge PR #214 once CI is green'
+      - 'assistant: CI went green and #214 is squash-merged into main as 5e6f7a8.'
+    active: [daintree.forge.land-pull-request]
+    run: 2026-09-28-round6-stateful
+  - query: good. now undo the agent's local edits in the hotfix worktree that caused it, but keep my debug logging
+    history:
+      - 'user: roll prod back to yesterday''s release, checkout is broken'
+      - 'assistant: Traffic shifted to revision api-00042 (yesterday''s v3.8.1); the checkout smoke request passes again.'
+    active: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6-stateful
+  - query: actually, no salvage — just revert claude-4's commits in its own worktree and keep my edits there
+    history:
+      - 'user: pull the useful bits out of claude-4''s broken caching attempt'
+      - 'assistant: Froze cache-v1 at F=9f8e7d6. Its diff vs main: the LRU module, the middleware wiring and your two manual edits to cache.ts.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: one of those recovered commits (d4e5f6a) was codex's, not mine — revert just that one on the recovery branch and keep mine
+    history:
+      - 'user: cleanup deleted my branch feat/export, get it back'
+      - 'assistant: Restored feat/export''s four commits onto recover/export from ''was 3f9a0bc''; verified and pinned.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful

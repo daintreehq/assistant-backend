@@ -89,6 +89,15 @@ boundaries:
   - query: run pnpm install in a terminal in the auth worktree so I can watch it
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-catalog-expansion-late
+  - query: tail the staging server logs in a panel so I can watch them
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: tail the postgres log in a panel next to the api worktree
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6
+  - query: start npm run dev in the api worktree in a terminal I can watch
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: what did it exit with?
     history:

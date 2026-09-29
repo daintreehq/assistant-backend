@@ -75,6 +75,12 @@ boundaries:
     confusable_with: [daintree.orchestration.plan-then-implement]
   - query: Plan the work breakdown for API v3 — pieces, dependencies, acceptance per piece — then file them as issues.
     confusable_with: [daintree.orchestration.plan-then-implement]
+  - query: break the billing PRD into issues four agents can each take
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: Split docs/search-v3.md into buildable units with owned files and dependencies, then file them.
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
 followups:
   - query: merge 2 and 5 like you suggested and drop the analytics unit, then show me the waves again
     history:

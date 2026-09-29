@@ -372,6 +372,9 @@ boundaries:
   - query: ready the auth branch and open a PR
     confusable_with: [daintree.orchestration.park-work]
     run: 2026-09-28-catalog-expansion-refine
+  - query: commit what's on release/2.7, push it and open the PR for review
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
 followups:
   - query: yeah go ahead
     history:
@@ -807,6 +810,40 @@ topic_shifts:
       - 'assistant: acme.deploy-board is active, exercised from its panel, and dist/ is committed with the source on feat/deploy-board.'
     active: [daintree.plugins.develop-project-plugin]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: great, push salvage/lru and open a PR for it
+    history:
+      - 'user: rescue the LRU from the failed caching attempt'
+      - 'assistant: Verified salvage/lru: every hunk is the LRU module or its tests, checks pass, cache-v1 is still at F with its status unchanged. Not pushed.'
+    active: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6-stateful
+  - query: push recover/cart and open a PR for it
+    history:
+      - 'user: I accidentally reset feat/cart, get my changes back'
+      - 'assistant: Recovered: recover/cart at 7c1d9e2 holds your three commits, verified as ancestors, checks pass, nothing pushed. Agents released from the hold.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful
+  - query: push integrate/auth-session and open one PR for it
+    history:
+      - 'user: the auth and session branches implement incompatible token lifetimes'
+      - 'assistant: Verified: the integrator implemented your 24h-with-rotation decision, test_token_lifetime pins it, both sides'' tests and the suite pass. Nothing pushed.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful
+  - query: great, open a PR for feat/drizzle
+    history:
+      - 'user: we picked the Drizzle spike on spike/drizzle, now build it properly'
+      - 'assistant: Pinned spike/drizzle@9c1a7e2, base main@55de10a. Reviewer codex-3 listed S1-S11 (hardcoded DATABASE_URL, no migrations, mocked repo layer in src/db, no error handling on writes, 4 TODOs...) and recommends hardening in place on a new branch. Approve the plan?'
+      - 'assistant: Created feat/drizzle off spike/drizzle in a new worktree; builder claude-5 launched with S1-S11 as acceptance criteria. Waiting on its notice.'
+      - 'assistant: Done: S1-S8 and S10-S11 verified by me, S9 deferred; checks pass on feat/drizzle; the spike is untouched.'
+    active: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6-stateful
+  - query: open a PR for docs/readme-setup
+    history:
+      - 'user: the README setup steps are out of date, fix them'
+      - 'assistant: Created docs/readme-setup off main in a new worktree; writer claude-2 launched from start SHA 3e91a04, working from the implementation (argument parser, config schema), docs files only.'
+      - 'assistant: Writer done: README.md only, 14 claims changed with file:line sources. Reader codex-4 launched in docs/readme-setup-read, following the README literally from a fresh clone.'
+      - 'assistant: Done: README fixed on docs/readme-setup, reader re-ran the failed steps and they now pass; --port ignored flagged as a code bug.'
+    active: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[agent a_3390 completed: readiness verdict ready]'
     history:

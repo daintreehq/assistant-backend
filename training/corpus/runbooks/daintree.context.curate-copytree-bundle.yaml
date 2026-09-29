@@ -181,6 +181,12 @@ boundaries:
   - query: bundle the cart and pricing files into a copytree reference file
     confusable_with: [daintree.explore.repository]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Bundle the billing module and its tests into a CopyTree reference file for later, leaving the .env files out.
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: make a copytree file of src/auth for the review, skip the secrets/ folder
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
 followups:
   - query: also throw in the middleware tests
     history:

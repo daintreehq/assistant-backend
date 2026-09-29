@@ -212,6 +212,9 @@ boundaries:
   - query: Execute the phased tenant-sharding plan in docs/sharding-plan.md, tracking each phase's dependencies and resuming across sessions until cutover.
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-late
+  - query: Plan the three-phase Postgres migration as a dependency graph with checkpoints so it survives restarts.
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
 followups:
   - query: run the next one
     history:

@@ -435,6 +435,18 @@ boundaries:
   - query: how are the agents doing? anyone stuck?
     confusable_with: [daintree.worktree.audit-worktrees]
     run: 2026-09-28-catalog-expansion
+  - query: how are the six migration agents doing? anything need me?
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Sweep the running agents and tell me which are done, stuck, or waiting on me.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: anything need me? quick status on all six agents
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: How's the fleet doing? Anything stuck?
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
 followups:
   - query: ok show me the failed one
     history:

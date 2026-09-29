@@ -86,6 +86,12 @@ boundaries:
     run: 2026-09-28-agent-queries-2
   - query: Upgrade the project from Python 3.11 to 3.12 and fix deprecation warnings.
     run: 2026-09-28-agent-queries-2
+  - query: lodash-es 5.0 just landed on npm; move the web app onto it and fix whatever breaks.
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: Bump our dependency on @acme/sdk to the 1.4.0 we published last week and make sure the app still works.
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
 followups:
   - query: bring react-dom and @types/react along with it, obviously
     history:

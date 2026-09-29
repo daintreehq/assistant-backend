@@ -392,6 +392,27 @@ boundaries:
   - query: how does the auth flow work end to end?
     confusable_with: [daintree.review.audit-codebase]
     run: 2026-09-28-catalog-expansion
+  - query: Explain what each setting in config/default.yaml controls. Read-only, I just want to understand it; no files changed.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: how does the export CLI decide between csv and json output? just explain with file refs
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: Where are the /v2/orders routes defined and what params do they take? Don't change anything.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: The README glosses over how the plugin loader works; walk me through the actual code path, no edits needed.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: what env vars does the server read at startup? list them with where they're read, don't write any docs
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: is the README even right about how the app boots? explain the real startup sequence to me, don't change anything
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: how does the rate limiter actually work in our code? explain the flow
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
 followups:
   - query: hows it going?
     history:

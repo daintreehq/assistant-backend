@@ -77,6 +77,18 @@ boundaries:
   - query: prod checkout is throwing 500s since this morning's deploy
     confusable_with: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-refine
+  - query: prod api is returning 502s since the 2pm deploy, get agents on the logs and the deploy diff
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: prod is down and nobody knows why, get agents on the logs and the deploy diff
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: which deploy broke search on prod? give me suspects and options, don't touch anything
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: prod is returning 500s since someone rotated the database password this morning — get agents on the logs
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
 followups:
   - query: the payments service is throwing timeouts too - add that to the logs lens
     history:
@@ -115,12 +127,6 @@ topic_shifts:
       - 'assistant: Two probes running: claude-2 on re-render storm, codex-3 on CSS transitions.'
     active: [daintree.orchestration.hypothesis-split]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: drop that - prod is on fire, errors spiked right after the 15:00 deploy. get some agents on it
-    history:
-      - 'user: the unit tests are failing on develop'
-      - 'assistant: codex-1 is fixing the failing date test in the develop worktree.'
-    active: [daintree.ci.diagnose-and-fix]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: never mind the preview - production checkout is returning 500s since this morning's deploy
     history:
       - 'user: the dev preview shows a blank page'
@@ -145,3 +151,9 @@ topic_shifts:
       - 'assistant: claude-1 is writing a reproduction for #412 in a scratch worktree off main.'
     active: [daintree.debug.reproduce-bug]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: errors are spiking in prod since the deploy — get agents on the logs, the recent deploys and the diff
+    history:
+      - 'user: ship v2.5.0 to production — yes, prod'
+      - 'assistant: Deployed v2.5.0 (8c1e4f0) to production with `./infra/deploy.sh prod` in claude-6, operation d-4412. Serving: api-00114 at 100% traffic, /version reports 8c1e4f0, smoke check passed. Rollback point: api-00113 at 71d09aa.'
+    active: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6-stateful

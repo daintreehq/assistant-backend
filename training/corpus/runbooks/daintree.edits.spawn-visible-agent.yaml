@@ -37,7 +37,6 @@ positives:
   - in wt-2, have codex add table tests for the date parser, the DST edge cases mainly
   - start an agent on the migration script
   - use claude-cod, or whatever the anthropic one is actually called - have it rewrite the csv importer to stream instead of loading the whole file
-  - install steps in the README are wrong since we moved to uv. someone needs to fix that, put an agent on it
   - open a terminal with an agent digging through the events pipeline, i want to watch what it turns up and redirect it if it goes down a rabbit hole
   - kick off an agent to convert the remaining class components to hooks, im going to lunch, dont make me sit here watching it
   - so the config loader reads the env twice and im fairly sure thats why staging picks up the wrong bucket. i dont want to touch it myself today. can you get something onto it
@@ -63,8 +62,6 @@ positives:
   - query: visible agent to migrate the Express routes in server/api from callbacks to async/await, new branch refactor/async-routes
     run: 2026-09-28-agent-queries
   - query: Spin up claude in a new worktree to rename the UserProfile component to AccountProfile everywhere and fix the imports.
-    run: 2026-09-28-agent-queries
-  - query: Put a gemini agent on updating the README install section for the new pnpm workspace layout; I want to watch it work.
     run: 2026-09-28-agent-queries
   - query: single agent, own worktree, implement dark-mode toggle in the settings page using the existing theme context
     run: 2026-09-28-agent-queries
@@ -365,9 +362,6 @@ boundaries:
   - query: Start an agent in a terminal to refactor the logger module; nothing is running yet.
     confusable_with: [daintree.agents.recover-agent]
     run: 2026-09-28-agent-queries
-  - query: The earlier agent's launch worked fine and it's done — now start another agent to write docs for the new flags.
-    confusable_with: [daintree.agents.recover-agent]
-    run: 2026-09-28-agent-queries
   - query: spin up a gemini agent to investigate why the bundle grew, read-only, and let me steer it
     confusable_with: [daintree.agents.recover-agent]
     run: 2026-09-28-agent-queries
@@ -580,9 +574,6 @@ boundaries:
     run: 2026-09-28-catalog-expansion
   - query: Add logic to our job queue that reassigns unfinished jobs from a dead worker to a healthy one.
     confusable_with: [daintree.agents.hand-off-task]
-    run: 2026-09-28-catalog-expansion
-  - query: Revert the bad changes the last agent made to src/config/loader.ts and restore the original behaviour.
-    confusable_with: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion
   - query: Add a test that fails if the parser accepts an empty header; the last run broke that.
     confusable_with: [daintree.agents.postmortem-run]
@@ -1046,9 +1037,6 @@ boundaries:
   - query: Add a README section documenting the environment variables the server reads.
     run: 2026-09-28-agent-queries-2
   - fix it
-  - query: Have an agent rewrite the README's install section for pnpm and Node 22.
-    confusable_with: [daintree.memory.manage-project-memory]
-    run: 2026-09-28-catalog-expansion-late
   - query: Have an agent add streaming support to the CSV exporter we merged last week.
     confusable_with: [daintree.orchestration.competition]
     run: 2026-09-28-catalog-expansion-late
@@ -1079,6 +1067,120 @@ boundaries:
   - query: implement formatMoney with Intl.NumberFormat in src/utils/money.ts
     confusable_with: [daintree.orchestration.spike-options]
     run: 2026-09-28-catalog-expansion-refine
+  - query: docs/setup.md has 'teh' in the first paragraph, correct it
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: The README heading says 'Instalation'; fix the spelling.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: capitalise GitHub consistently in CONTRIBUTING.md, it says Github in two places
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: Add a help string for the new --since flag in cli/args.py.
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: make the CLI print which config file it loaded at startup
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-09-28-round6
+  - query: Add a pre-commit hook script to the repo that refuses git reset --hard while there are uncommitted changes.
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: write a script in tools/ that stashes uncommitted changes before our nightly cleanup job deletes worktrees
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: Change cart total rounding to banker's rounding in src/pricing/round.ts.
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: refactor the session and auth modules to read one shared TOKEN_TTL constant
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: 'Undo the dark-mode feature flag we added last sprint: remove the flag and make dark mode always on.'
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Add a HandoffSummary panel to the dashboard that shows each worker's state from the coordinator API.
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Refactor src/orchestrator/handoff.ts so the coordinator serializes child state to JSON instead of YAML.
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Remove the hardcoded API base URL in web/src/config.ts and read it from VITE_API_URL instead.
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: add error handling to fetchInvoices so a 500 doesn't blank the invoices page
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-09-28-round6
+  - query: Add a priority field to the Task model and sort the job queue by it in src/queue.ts.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: Implement preemption in the job scheduler so urgent jobs pause low-priority ones and resume them later.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: Add a mutex around the shared cache writes in cache.go so concurrent workers stop colliding.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Fix the bug where two worker processes pick up the same queue item and process it twice.
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Extract the date-parsing code in utils.ts into its own module and add tests for it.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: Pull the good bits of the old v1 exporter into the new exporter module and delete v1.
+    confusable_with: [daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: Add a /readyz endpoint to the api that returns 503 until the cache has warmed.
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: Add a CI job that fails the release workflow when a migration has no down step.
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: Add a /version endpoint that returns the git SHA baked in at build time.
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: Write a GitHub Actions workflow that deploys to staging on every push to main.
+    confusable_with: [daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: Add a files field to package.json so the tests folder stops getting shipped in the package.
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: Write a GitHub Actions workflow that publishes the package to npm whenever a v* tag is pushed.
+    confusable_with: [daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: Write an infra/rollback.sh script that shifts Cloud Run traffic to a named revision.
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: Add a HEALTHCHECK instruction to the Dockerfile.
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: Make the CLI binary print its version and commit when run with --version.
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: Implement requirement 4 from the billing spec — proration on plan downgrade — in the billing worktree.
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: add tests for the retry behaviours described in docs/webhooks.md
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: Write a make target that restores a dev database from the latest dump in the S3 bucket.
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-09-28-round6
+  - query: Reduce memory usage in src/importer/stream.ts — it loads the whole CSV into RAM before parsing.
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: Change jest.config.js so the project's default maxWorkers is 50% instead of all cores.
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: Add a gitleaks pre-commit hook to the repo so secrets get caught before commit.
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: change the mailer to read SENDGRID_API_KEY from the environment instead of config.json
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: Add a 'demo mode' banner to the app header that shows when DEMO=true.
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: write a seeder that generates fake demo customers with realistic names, in the api worktree
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
 followups:
   - query: how's it going?
     history:
@@ -1413,6 +1515,14 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
+  - query: ok, have an agent implement R14 — the proration rule — in the billing worktree
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+      - 'assistant: codex-1 is back: R1-R6 implemented, R7 partial, R8 missing, R9 unverified. Still waiting on claude-2.'
+      - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[watcher fired: t_1414 idle, agent reports the refactor is complete]'
     history:

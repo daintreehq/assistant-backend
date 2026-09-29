@@ -33,6 +33,30 @@ positives:
   - 'Just this one step, now: run the backfill migration in the users-split worktree''s local database.'
   - run `rails db:migrate` in the admin worktree
   - Run migrate-mongo up for the analytics worktree's local database and report status afterwards.
+  - query: Restore the feat/invoices worktree's Postgres database from /tmp/db-backups/invoices-2026-09-27T1830.dump, backing up the current state first.
+    run: 2026-09-28-round6
+  - query: Load the pg_dump the migration agent took before the reset back into the payments-refactor worktree's local database and confirm the schema version afterwards.
+    run: 2026-09-28-round6
+  - query: Restore the SQLite database in wt-search from the .backup copy made at 14:02 today; the seeded fixtures got wiped.
+    run: 2026-09-28-round6
+  - query: put yesterday's dump back into my branch db, ~/dumps/app_dev_0927.sql, the seeder trashed it
+    run: 2026-09-28-round6
+  - query: Bring the local MySQL for worktree api-v2 back to backups/api-v2-pre-migration.sql.gz and read the migration version back afterwards.
+    run: 2026-09-28-round6
+  - query: restore the db backup you made before the rollback, the one from 11:40
+    run: 2026-09-28-round6
+  - query: Undo the damage the truncating seeder did to the ledger worktree's database by restoring ../ledger-db-backup-1712.sqlite into it.
+    run: 2026-09-28-round6
+  - query: Restore the onboarding-v3 checkout's database from the dump file the user named; the pre-restore backup is waived.
+    run: 2026-09-28-round6
+  - query: Recover the orders data in the feat/refunds worktree's local DB by restoring last night's pg_dump at ~/backups/refunds-0927.pgdump.
+    run: 2026-09-28-round6
+  - query: 'Roll the local dev database in the checkout for #812 back to the pre-migration dump taken at 09:15 (the worktree DB, not anything deployed).'
+    run: 2026-09-28-round6
+  - query: can you restore the worktree's database from backups/dev-2026-09-26.sql and tell me the schema version after
+    run: 2026-09-28-round6
+  - query: pg_restore /Users/sam/db/feature-flags.dump into the feature-flags worktree's own database; prove the target is local before writing anything.
+    run: 2026-09-28-round6
 boundaries:
   - query: The migration is fine in CI; just apply it to my local db in the reports worktree.
     confusable_with: [daintree.ci.diagnose-and-fix]
@@ -58,6 +82,27 @@ boundaries:
   - query: seed the database in the search worktree
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-catalog-expansion-late
+  - query: restore my worktree's database from the dump you took this morning
+    confusable_with: [daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: run pg_restore for the api worktree's db using ~/backups/api-0926.dump
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-round6
+  - query: Open a terminal in wt billing and load dev_snapshot.sql back into that worktree's database.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-round6
+  - query: restore the feature worktree's sqlite db from the .bak file taken this morning, in a terminal
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-09-28-round6
+  - query: The feature worktree already has its own Postgres database; restore it from last night's dump.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-round6
+  - query: each worktree has its own db now. the one for wt search got wiped by a bad seed, restore it from backups/search-0927.dump
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-round6
+  - query: The per-worktree MySQL for checkout-v2 needs the snapshot from before the migration put back.
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-09-28-round6
 followups:
   - query: did it prove the database isn't the same one main uses?
     history:

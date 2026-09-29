@@ -71,6 +71,12 @@ boundaries:
   - query: rebase the fix/login-redirect branch onto main
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-refine
+  - query: feature/ledger has merge conflicts with main; resolve them and rerun the tests.
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: rebase the auth branch on latest develop pls
+    confusable_with: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
 followups:
   - query: ok push it — with the lease like you said
     history:

@@ -602,6 +602,14 @@ topic_shifts:
       - 'assistant: Filed #501-#506 in dependency order, each read back with its ''Depends on'' line and the epic link.'
     active: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-late-stateful
+  - query: file each of the missing requirements as an issue
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+      - 'assistant: codex-1 is back: R1-R6 implemented, R7 partial, R8 missing, R9 unverified. Still waiting on claude-2.'
+      - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
 wakes:
   - query: '[user returned after confirmation interruption]'
     active: [daintree.forge.manage-issue]

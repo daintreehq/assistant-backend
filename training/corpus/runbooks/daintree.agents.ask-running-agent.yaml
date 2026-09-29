@@ -177,3 +177,9 @@ topic_shifts:
       - 'assistant: Opened #512 ''Flaky login e2e on CI'' with the failing run linked.'
     active: [daintree.forge.manage-issue]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: unrelated — ask claude-9 what it decided about the log format
+    history:
+      - 'user: both branches pass alone but together the refund is issued twice'
+      - 'assistant: Reproduced on integrate/refunds and waiting on your decision: async wins, sync wins, or async with an idempotency key.'
+    active: [daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6-stateful

@@ -1,0 +1,1060 @@
+cases:
+- id: r6-W1-001
+  category: single-runbook
+  note: urgent bug arrives while three agents are busy; pause low-priority, start urgent in own worktree
+  active: []
+  messages:
+  - role: user
+    content: 'Three agents are mid-task on the settings redesign, the docs refresh and a lint cleanup. The payment
+      webhook bug is now P0: pause the two least important at a clean point and put that capacity on the webhook
+      fix in a new worktree.'
+  expect:
+    required:
+    - daintree.orchestration.reprioritize-work
+    optional:
+    - daintree.foundation
+- id: r6-W1-002
+  category: single-runbook
+  note: 'user wording: demo moved up, reshuffle running agents'
+  active: []
+  messages:
+  - role: user
+    content: ugh the customer demo got moved to 3pm today. can u shuffle the agents so the onboarding polish gets
+      done first, the refactor stuff can wait
+  expect:
+    required:
+    - daintree.orchestration.reprioritize-work
+    optional:
+    - daintree.foundation
+- id: r6-W1-003
+  category: single-runbook
+  note: 'near park-work: pausing some agents but new urgent work starts'
+  active: []
+  messages:
+  - role: user
+    content: Pause the two refactor agents where they are and record where each stopped, keep the test-coverage
+      agent running, and start an agent on the login regression that just became top priority.
+  expect:
+    required:
+    - daintree.orchestration.reprioritize-work
+    optional:
+    - daintree.foundation
+- id: r6-W1-007
+  category: routing-trap
+  note: 'trap: urgent correction to one agent''s own task -> steer-running-agent'
+  active: []
+  messages:
+  - role: user
+    content: urgent - tell the claude in the api worktree to stop touching the migrations and use the existing db
+      helper instead
+  expect:
+    required:
+    - daintree.agents.steer-running-agent
+    optional:
+    - daintree.foundation
+- id: r6-W1-008
+  category: single-runbook
+  note: 'user wording: same issue given to two agents by accident'
+  active: []
+  messages:
+  - role: user
+    content: 'wait, i gave issue #214 to both claude and codex by accident and theyre both halfway through it. sort
+      it out'
+  expect:
+    required:
+    - daintree.orchestration.resolve-task-collisions
+    optional:
+    - daintree.foundation
+- id: r6-W1-009
+  category: single-runbook
+  note: two agents overwriting each other on the same fix; choose owner on evidence, keep loser's work
+  active: []
+  messages:
+  - role: user
+    content: claude-2 and codex-1 are both editing src/billing/invoice.ts for the same rounding fix and clobbering
+      each other. Pick one owner from their diffs and test results, stop the other, and keep its work on a branch.
+  expect:
+    required:
+    - daintree.orchestration.resolve-task-collisions
+    optional:
+    - daintree.foundation
+- id: r6-W1-012
+  category: routing-trap
+  note: 'trap: forecast overlap with nothing duplicated -> compare-worktrees'
+  active: []
+  messages:
+  - role: user
+    content: Are any of my agents' worktrees touching the same files? Forecast conflicts and suggest a merge order,
+      don't change anything.
+  expect:
+    required:
+    - daintree.worktree.compare-worktrees
+    optional:
+    - daintree.foundation
+- id: r6-W1-015
+  category: single-runbook
+  note: 'user wording: coordinator context nearly full, pass the run to a fresh session'
+  active: []
+  messages:
+  - role: user
+    content: my context is almost gone. hand coordination of the 5 migration agents to a fresh claude session so
+      it can keep running things
+  expect:
+    required:
+    - daintree.orchestration.hand-off-orchestration
+    optional:
+    - daintree.foundation
+- id: r6-W1-017
+  category: single-runbook
+  note: 'near hand-off-task: coordinator replaced, not a worker'
+  active: []
+  messages:
+  - role: user
+    content: Codex is taking over as orchestrator of the four-agent refactor. Stop arming new work here, write the
+      handoff including what must never be re-run, and start it.
+  expect:
+    required:
+    - daintree.orchestration.hand-off-orchestration
+    optional:
+    - daintree.foundation
+- id: r6-W1-022
+  category: single-runbook
+  note: 'user wording: machine frozen under agents'' test runs'
+  active: []
+  messages:
+  - role: user
+    content: my laptop is basically frozen since the 6 agents started running tests, fans going crazy. fix it
+  expect:
+    required:
+    - daintree.runtime.relieve-resource-contention
+    optional:
+    - daintree.foundation
+- id: r6-W1-025
+  category: single-runbook
+  note: 'near measure-performance: CPU load from agents'' jest runs and dev servers'
+  active: []
+  messages:
+  - role: user
+    content: Load average is 40 with three jest runs and two dev servers from the agents. Throttle the test workers
+      to one at a time and report CPU before and after.
+  expect:
+    required:
+    - daintree.runtime.relieve-resource-contention
+    optional:
+    - daintree.foundation
+- id: r6-W1-026
+  category: routing-trap
+  note: 'trap: one port clash -> free-busy-port'
+  active: []
+  messages:
+  - role: user
+    content: EADDRINUSE on 3000 when the api agent starts its dev server. What's holding the port?
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    optional:
+    - daintree.foundation
+- id: r6-W1-030
+  category: single-runbook
+  note: chosen POC hardened; rebuild-vs-harden decision
+  active: []
+  messages:
+  - role: user
+    content: The webhooks proof of concept on spike/webhooks works and we've chosen it. Inventory its hacks (hardcoded
+      secrets, no retries, no tests), agree with me on rebuild from main vs harden in place, then have an agent
+      build it properly.
+  expect:
+    required:
+    - daintree.orchestration.productionize-prototype
+    optional:
+    - daintree.foundation
+- id: r6-W1-032
+  category: single-runbook
+  note: 'near plan-then-implement: prototype behind the plan'
+  active: []
+  messages:
+  - role: user
+    content: the drag and drop POC in the kanban worktree works but its full of TODOs and mocked data. figure out
+      if we rebuild it clean off develop or harden it there, check with me, then get it built for real
+  expect:
+    required:
+    - daintree.orchestration.productionize-prototype
+    optional:
+    - daintree.foundation
+- id: r6-W1-043
+  category: multi-runbook
+  note: machine load plus a separate port clash
+  active: []
+  messages:
+  - role: user
+    content: the machine is crawling under the agents' builds, get that load down. also something is squatting on
+      port 5173, find out what it is
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    - daintree.runtime.relieve-resource-contention
+    optional:
+    - daintree.foundation
+- id: r6-W1-044
+  category: multi-runbook
+  note: settle duplicated work then integrate other finished branches
+  active: []
+  messages:
+  - role: user
+    content: Claude and Codex are both implementing the rate limiter; settle who owns it. Then merge the other three
+      agents' finished branches into one integration branch and check it builds.
+  expect:
+    required:
+    - daintree.git.integrate-agent-branches
+    - daintree.orchestration.resolve-task-collisions
+    optional:
+    - daintree.foundation
+- id: r6-W2-001
+  category: single-runbook
+  note: 'agent-written: reverse one agent''s commits and edits, keep user staged work'
+  active: []
+  messages:
+  - role: user
+    content: Reverse the three commits codex-2 made on feature/billing plus its uncommitted edits to config/rates.yaml.
+      My own staged changes in that worktree must survive untouched.
+  expect:
+    required:
+    - daintree.git.undo-agent-changes
+    optional:
+    - daintree.foundation
+- id: r6-W2-002
+  category: single-runbook
+  note: 'user words: take back what claude touched, keep own edits'
+  active: []
+  messages:
+  - role: user
+    content: ugh claude just rewrote half of utils/date.ts. undo whatever it did but dont lose my edits from this
+      morning
+  expect:
+    required:
+    - daintree.git.undo-agent-changes
+    optional:
+    - daintree.foundation
+- id: r6-W2-003
+  category: single-runbook
+  note: 'near salvage: nothing worth keeping, reverse in place'
+  active: []
+  messages:
+  - role: user
+    content: The agent's rewrite of the payment client is wrong and none of it is worth keeping. Take its changes
+      back out of this branch in place; leave my earlier commits alone.
+  expect:
+    required:
+    - daintree.git.undo-agent-changes
+    optional:
+    - daintree.foundation
+- id: r6-W2-005
+  category: routing-trap
+  note: agent reset lost commits -> recover, not undo
+  active: []
+  messages:
+  - role: user
+    content: The agent ran git reset --hard on feat/search and my last two commits are gone. Get them back.
+  expect:
+    required:
+    - daintree.git.recover-lost-work
+    optional:
+    - daintree.foundation
+- id: r6-W2-007
+  category: routing-trap
+  note: undo a deploy -> rollback-deployment
+  active: []
+  messages:
+  - role: user
+    content: The release an agent deployed to staging an hour ago broke login. Shift staging back to the previous
+      revision.
+  expect:
+    required:
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation
+- id: r6-W2-010
+  category: single-runbook
+  note: 'near cherry-pick: two commits from a failed attempt rebuilt onto new branch'
+  active: []
+  messages:
+  - role: user
+    content: Approach on attempt/search-v2 failed. Only commits a3f9c1 (tokenizer) and 77be20 (its fixtures) are
+      worth keeping — rebuild them on a new branch from current main, passing without the rest.
+  expect:
+    required:
+    - daintree.orchestration.salvage-failed-attempt
+    optional:
+    - daintree.foundation
+- id: r6-W2-011
+  category: single-runbook
+  note: 'near hand-off/postmortem: agent gave up; rescue a module, not continue'
+  active: []
+  messages:
+  - role: user
+    content: claude gave up on offline sync after 3 hours. most of it is junk but the conflict-resolution module
+      + its tests are worth saving, get those onto a new branch
+  expect:
+    required:
+    - daintree.orchestration.salvage-failed-attempt
+    optional:
+    - daintree.foundation
+- id: r6-W2-013
+  category: routing-trap
+  note: prototype that worked -> productionize
+  active: []
+  messages:
+  - role: user
+    content: The spike on spike/edge-cache worked and we're going with it. Get an agent to build it properly for
+      production.
+  expect:
+    required:
+    - daintree.orchestration.productionize-prototype
+    optional:
+    - daintree.foundation
+- id: r6-W2-017
+  category: single-runbook
+  note: 'near prune: pruning deleted an unmerged branch'
+  active: []
+  messages:
+  - role: user
+    content: Branch pruning earlier deleted fix/tz-offset, which was never merged or pushed. Bring its commits back.
+  expect:
+    required:
+    - daintree.git.recover-lost-work
+    optional:
+    - daintree.foundation
+- id: r6-W2-018
+  category: single-runbook
+  note: 'near workspace-cleanup/audit: cleanup removed worktree with unpushed commits'
+  active: []
+  messages:
+  - role: user
+    content: Workspace cleanup removed codex-3's worktree while feat/rate-limit still had unpushed commits. Restore
+      that work and list anything that can't come back.
+  expect:
+    required:
+    - daintree.git.recover-lost-work
+    optional:
+    - daintree.foundation
+- id: r6-W2-021
+  category: routing-trap
+  note: orphaned branches after removed worktrees, which to delete -> prune
+  active: []
+  messages:
+  - role: user
+    content: The branch list is full of abandoned agent branches left behind when their worktrees were removed.
+      Which of them can I delete?
+  expect:
+    required:
+    - daintree.git.prune-stale-branches
+    optional:
+    - daintree.foundation
+- id: r6-W2-022
+  category: single-runbook
+  note: 'agent-written: two branches pass alone, totals wrong together'
+  active: []
+  messages:
+  - role: user
+    content: feat/currency and feat/discounts each pass alone, but merged together checkout totals get rounded twice.
+      Pin that as a failing test and get the intended combined behaviour implemented.
+  expect:
+    required:
+    - daintree.git.resolve-semantic-conflict
+    optional:
+    - daintree.foundation
+- id: r6-W2-023
+  category: single-runbook
+  note: 'user words: clean merge, incompatible timeout assumptions'
+  active: []
+  messages:
+  - role: user
+    content: merge went through clean but now sessions expire wrong — one branch sets 15 min tokens, the other assumed
+      24h. figure out which behavior we want and fix it
+  expect:
+    required:
+    - daintree.git.resolve-semantic-conflict
+    optional:
+    - daintree.foundation
+- id: r6-W2-026
+  category: routing-trap
+  note: textual conflicts with base -> sync-with-base
+  active: []
+  messages:
+  - role: user
+    content: my PR has merge conflicts in pricing.ts with main, sort them out
+  expect:
+    required:
+    - daintree.git.sync-with-base
+    optional:
+    - daintree.foundation
+- id: r6-W2-028
+  category: routing-trap
+  note: two agents still working on same thing -> resolve-task-collisions
+  active: []
+  messages:
+  - role: user
+    content: claude-2 and codex-1 are both implementing token refresh right now with different lifetimes. Sort out
+      which one owns it.
+  expect:
+    required:
+    - daintree.orchestration.resolve-task-collisions
+    optional:
+    - daintree.foundation
+- id: r6-W2-030
+  category: no-task
+  note: general git knowledge using recovery vocabulary
+  active: []
+  messages:
+  - role: user
+    content: how long does git keep unreachable commits around before gc prunes them?
+  expect:
+    required: []
+    optional: []
+- id: r6-W2-031
+  category: no-task
+  note: chatter after a recovery
+  active: []
+  messages:
+  - role: user
+    content: thanks, getting that branch back saved my week
+  expect:
+    required: []
+    optional: []
+- id: r6-W2-033
+  category: single-runbook
+  note: plain code work in user words
+  active: []
+  messages:
+  - role: user
+    content: the env var in docker-compose.yml is misspelled DATABSE_URL, fix it
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: r6-W2-035
+  category: multi-runbook
+  note: undo then postmortem
+  active: []
+  messages:
+  - role: user
+    content: Undo what codex-1 did to the routing layer, keeping my edits, and separately work out why it went so
+      far off its brief.
+  expect:
+    required:
+    - daintree.agents.postmortem-run
+    - daintree.git.undo-agent-changes
+    optional:
+    - daintree.foundation
+- id: r6-W2-037
+  category: multi-runbook
+  note: integrate branches plus resolve known behaviour clash
+  active: []
+  messages:
+  - role: user
+    content: Combine the four agents' branches into one integration branch, and settle the known token-lifetime
+      clash between auth and session — each passes alone but they break together.
+  expect:
+    required:
+    - daintree.git.integrate-agent-branches
+    - daintree.git.resolve-semantic-conflict
+    optional:
+    - daintree.foundation
+- id: r6-W3-001
+  category: single-runbook
+  note: agent-written; pushed .env
+  active: []
+  messages:
+  - role: user
+    content: The implementer agent on feature/billing committed .env.local with the live Postgres password and pushed
+      the branch to origin. Find everywhere it reached and contain it.
+  expect:
+    required:
+    - daintree.security.respond-to-secret-exposure
+    optional:
+    - daintree.foundation
+- id: r6-W3-003
+  category: single-runbook
+  note: near curate-copytree-bundle; a bundle already carried the key out
+  active: []
+  messages:
+  - role: user
+    content: The CopyTree bundle I generated for the payments area this morning included config/secrets.yml with
+      the Braintree private key, and I already sent it to a contractor. Deal with it.
+  expect:
+    required:
+    - daintree.security.respond-to-secret-exposure
+    optional:
+    - daintree.foundation
+- id: r6-W3-004
+  category: single-runbook
+  note: near review/audit; a found token that is already public
+  active: []
+  messages:
+  - role: user
+    content: Codex spotted a hardcoded GitHub PAT in scripts/deploy.sh on main while reading the repo; main has
+      been public for a week. Handle the exposure.
+  expect:
+    required:
+    - daintree.security.respond-to-secret-exposure
+    optional:
+    - daintree.foundation
+- id: r6-W3-005
+  category: routing-trap
+  note: secret vocabulary but nothing leaked; security audit of existing code
+  active: []
+  messages:
+  - role: user
+    content: Audit services/ for hardcoded credentials, weak crypto and injection risks and give me ranked findings
+      with file:line evidence.
+  expect:
+    required:
+    - daintree.review.audit-codebase
+    optional:
+    - daintree.foundation
+- id: r6-W3-006
+  category: routing-trap
+  note: secret vocabulary but it is a standing rule for agents
+  active: []
+  messages:
+  - role: user
+    content: Add a rule to AGENTS.md telling every agent never to commit .env files or echo API keys in their output.
+  expect:
+    required:
+    - daintree.memory.manage-project-memory
+    optional:
+    - daintree.foundation
+- id: r6-W3-010
+  category: single-runbook
+  note: near verify-agent-work; issue acceptance criteria graded after several agents
+  active: []
+  messages:
+  - role: user
+    content: 'Three agents built the export feature from issue #530 over the week. Before I close the epic, grade
+      each of its 11 acceptance criteria against develop and name the test covering each.'
+  expect:
+    required:
+    - daintree.review.audit-spec-coverage
+    optional:
+    - daintree.foundation
+- id: r6-W3-011
+  category: single-runbook
+  note: near decompose-work; coverage measured before planning
+  active: []
+  messages:
+  - role: user
+    content: Before anyone plans more work on the search RFC, find out which of its requirements already exist in
+      the codebase and which are still missing.
+  expect:
+    required:
+    - daintree.review.audit-spec-coverage
+    optional:
+    - daintree.foundation
+- id: r6-W3-012
+  category: routing-trap
+  note: spec vocabulary but the ask is a breakdown into units
+  active: []
+  messages:
+  - role: user
+    content: Break docs/specs/notifications-v2.md into independently buildable units with owned files and dependencies
+      so four agents can each take one. I want to approve the split first.
+  expect:
+    required:
+    - daintree.orchestration.decompose-work
+    optional:
+    - daintree.foundation
+- id: r6-W3-013
+  category: routing-trap
+  note: one agent's done claim, not a spec
+  active: []
+  messages:
+  - role: user
+    content: 'The codex agent says it finished #288 and all tests pass. Confirm that before I merge.'
+  expect:
+    required:
+    - daintree.orchestration.verify-agent-work
+    optional:
+    - daintree.foundation
+- id: r6-W3-017
+  category: single-runbook
+  note: near release notes; new flags missing from CLI docs
+  active: []
+  messages:
+  - role: user
+    content: The CLI gained --dry-run and --since in the last two releases, but docs/cli.md never mentions them
+      and several of its examples now fail. Bring the CLI docs in line with the code.
+  expect:
+    required:
+    - daintree.edits.sync-project-docs
+    optional:
+    - daintree.foundation
+- id: r6-W3-018
+  category: single-runbook
+  note: near explore/spawn; API reference vs handlers
+  active: []
+  messages:
+  - role: user
+    content: docs/api/ still documents offset/limit pagination while the handlers take a cursor now. Have the API
+      reference rewritten from the handlers and every curl example run.
+  expect:
+    required:
+    - daintree.edits.sync-project-docs
+    optional:
+    - daintree.foundation
+- id: r6-W3-019
+  category: routing-trap
+  note: docs vocabulary but it is a changelog for a version
+  active: []
+  messages:
+  - role: user
+    content: Update CHANGELOG.md with a 3.2.0 section covering everything merged since v3.1.0.
+  expect:
+    required:
+    - daintree.forge.draft-release-notes
+    optional:
+    - daintree.foundation
+- id: r6-W3-020
+  category: routing-trap
+  note: out-of-date doc but it is agent instructions in CLAUDE.md
+  active: []
+  messages:
+  - role: user
+    content: CLAUDE.md still tells agents to use yarn and we switched to pnpm months ago. update it so they stop
+      running yarn
+  expect:
+    required:
+    - daintree.memory.manage-project-memory
+    optional:
+    - daintree.foundation
+- id: r6-W3-022
+  category: single-runbook
+  note: agent-written; integrated multi-agent feature
+  active: []
+  messages:
+  - role: user
+    content: Get the team-invites flow the three agents built running from the integration worktree with seeded
+      sample teams, so the user can click through it, and write a short walkthrough.
+  expect:
+    required:
+    - daintree.workflow.prepare-feature-demo
+    optional:
+    - daintree.foundation
+- id: r6-W3-023
+  category: single-runbook
+  note: user words; show the team tomorrow
+  active: []
+  messages:
+  - role: user
+    content: want to show the team the new onboarding thing tomorrow. can you get it set up so i can just click
+      thru it
+  expect:
+    required:
+    - daintree.workflow.prepare-feature-demo
+    optional:
+    - daintree.foundation
+- id: r6-W3-024
+  category: single-runbook
+  note: near debug-web-app; preview is the vehicle, demo is the goal
+  active: []
+  messages:
+  - role: user
+    content: Open the billing-redesign worktree's app in a Dev Preview with some fake invoices loaded and give me
+      the steps to show the new invoice screen to the PM.
+  expect:
+    required:
+    - daintree.workflow.prepare-feature-demo
+    optional:
+    - daintree.foundation
+- id: r6-W3-025
+  category: single-runbook
+  note: near summarize-activity; live demo instead of written update
+  active: []
+  messages:
+  - role: user
+    content: Standup is in 30 minutes. Instead of a written update I want the search filters Claude built on feature/search-filters
+      running with demo data so I can show them live.
+  expect:
+    required:
+    - daintree.workflow.prepare-feature-demo
+    optional:
+    - daintree.foundation
+- id: r6-W3-028
+  category: routing-trap
+  note: demo meeting but a written report of work
+  active: []
+  messages:
+  - role: user
+    content: Write up what the agents shipped this week for Friday's demo meeting, one line per merged PR with links.
+  expect:
+    required:
+    - daintree.git.summarize-activity
+    optional:
+    - daintree.foundation
+- id: r6-W3-029
+  category: single-runbook
+  note: restore worktree db from a backup taken before reset
+  active: []
+  messages:
+  - role: user
+    content: The reset in the feature/ledger worktree wiped the dev data I needed. Restore that worktree's Postgres
+      from the dump taken before the reset and read back the schema version.
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: r6-W3-032
+  category: routing-trap
+  note: restore vocabulary but lost uncommitted files
+  active: []
+  messages:
+  - role: user
+    content: I removed the ledger worktree and it had uncommitted migration files in it. Restore them.
+  expect:
+    required:
+    - daintree.git.recover-lost-work
+    optional:
+    - daintree.foundation
+- id: r6-W3-033
+  category: no-task
+  note: general knowledge using secret vocabulary
+  active: []
+  messages:
+  - role: user
+    content: In general, what's the difference between rotating an API key and revoking it?
+  expect:
+    required: []
+    optional: []
+- id: r6-W3-039
+  category: multi-runbook
+  note: contain a leak and add a standing rule
+  active: []
+  messages:
+  - role: user
+    content: Codex pushed .env with the Twilio auth token to origin on feature/sms. Contain that, and add a rule
+      to AGENTS.md so no agent commits .env files again.
+  expect:
+    required:
+    - daintree.memory.manage-project-memory
+    - daintree.security.respond-to-secret-exposure
+    optional:
+    - daintree.foundation
+- id: r6-W4-001
+  category: single-runbook
+  note: 'AR: agent-written go/no-go on pinned RC'
+  active: []
+  messages:
+  - role: user
+    content: 'Give a go/no-go for release candidate v3.2.0-rc.2 (tag at 8f1c2ab): CI on that SHA, pending migrations,
+      open release-blocker issues, and whether we have a rollback path.'
+  expect:
+    required:
+    - daintree.release.assess-readiness
+    optional:
+    - daintree.foundation
+- id: r6-W4-002
+  category: single-runbook
+  note: 'AR: casual user asking if the release can ship'
+  active: []
+  messages:
+  - role: user
+    content: r we actually good to ship 4.0 on friday? whats still in the way
+  expect:
+    required:
+    - daintree.release.assess-readiness
+    optional:
+    - daintree.foundation
+- id: r6-W4-005
+  category: routing-trap
+  note: 'trap AR -> run-local-checks: tests only, no shipping verdict'
+  active: []
+  messages:
+  - role: user
+    content: run the full test suite and lint in the release/2.6 worktree and tell me what's red, no need to decide
+      anything about shipping
+  expect:
+    required:
+    - daintree.ci.run-local-checks
+    optional:
+    - daintree.foundation
+- id: r6-W4-007
+  category: routing-trap
+  note: 'trap AR -> deploy-and-verify: already signed off, ship it now'
+  active: []
+  messages:
+  - role: user
+    content: The RC is signed off. Deploy v3.2.0 to production now and confirm the new version is the one serving
+      traffic.
+  expect:
+    required:
+    - daintree.release.deploy-and-verify
+    optional:
+    - daintree.foundation
+- id: r6-W4-008
+  category: single-runbook
+  note: 'DV: agent-written deploy pinned SHA and prove it serves'
+  active: []
+  messages:
+  - role: user
+    content: Deploy commit 4be91d0 of the api service to staging with the repo's make deploy target, then confirm
+      /version reports that SHA and the health check passes.
+  expect:
+    required:
+    - daintree.release.deploy-and-verify
+    optional:
+    - daintree.foundation
+- id: r6-W4-009
+  category: single-runbook
+  note: 'DV: user wants release tag on prod and proof it is new build'
+  active: []
+  messages:
+  - role: user
+    content: push the release tag out to prod pls and make sure its really serving the new build not the old one
+  expect:
+    required:
+    - daintree.release.deploy-and-verify
+    optional:
+    - daintree.foundation
+- id: r6-W4-010
+  category: single-runbook
+  note: 'DV: near run-visible-command, deploy script in a watched pane'
+  active: []
+  messages:
+  - role: user
+    content: Run our deploy script for the web app against staging in a pane I can watch, then prove Cloud Run is
+      actually routing traffic to the new revision.
+  expect:
+    required:
+    - daintree.release.deploy-and-verify
+    optional:
+    - daintree.foundation
+- id: r6-W4-012
+  category: routing-trap
+  note: 'trap DV -> rollback-deployment: go back to previous revision'
+  active: []
+  messages:
+  - role: user
+    content: The 14:00 deploy broke login on prod. Shift traffic back to the previous revision rev-0042 and check
+      whether logins work again.
+  expect:
+    required:
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation
+- id: r6-W4-015
+  category: single-runbook
+  note: 'RB: agent-written rollback with compatibility check'
+  active: []
+  messages:
+  - role: user
+    content: Roll production back to v2.4.1. Check first whether migrations applied since then or config and flag
+      changes would break the old code, restore it via the platform, and verify /pay errors drop.
+  expect:
+    required:
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation
+- id: r6-W4-017
+  category: single-runbook
+  note: 'RB: near investigate-outage, cause known, just restore'
+  active: []
+  messages:
+  - role: user
+    content: We already know the 3pm release caused the checkout errors. Don't investigate further, just put prod
+      back on the last good image and tell me if checkout recovers.
+  expect:
+    required:
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation
+- id: r6-W4-018
+  category: single-runbook
+  note: 'RB: near undo-agent-changes, agent''s change deployed'
+  active: []
+  messages:
+  - role: user
+    content: The agent's change went out in this morning's deploy and search is broken in prod. Put the deployed
+      service back on the revision before it; the code fix can wait.
+  expect:
+    required:
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation
+- id: r6-W4-020
+  category: routing-trap
+  note: 'trap RB -> migrate-worktree-database: local migration rollback'
+  active: []
+  messages:
+  - role: user
+    content: Roll back the last migration on the payments worktree's local database and show me the schema version
+      after.
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: r6-W4-021
+  category: routing-trap
+  note: 'trap RB -> spawn-visible-agent: revert bad commit in source via PR'
+  active: []
+  messages:
+  - role: user
+    content: Revert the bad commit a1b2c3d in source and open a PR so main is clean again. Leave the running deployment
+      alone.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: r6-W4-022
+  category: single-runbook
+  note: 'PP: agent-written npm publish with tarball inspection'
+  active: []
+  messages:
+  - role: user
+    content: Publish @acme/sdk 1.4.0 to npm under latest from a clean checkout of tag v1.4.0, inspect the packed
+      contents first, then confirm a fresh project installs and imports it.
+  expect:
+    required:
+    - daintree.release.publish-package
+    optional:
+    - daintree.foundation
+- id: r6-W4-028
+  category: routing-trap
+  note: 'trap PP -> draft-release-notes: changelog only, CI publishes'
+  active: []
+  messages:
+  - role: user
+    content: Write the CHANGELOG entry for sdk 1.4.0 covering everything merged since 1.3.2. CI handles the npm
+      publish later.
+  expect:
+    required:
+    - daintree.forge.draft-release-notes
+    optional:
+    - daintree.foundation
+- id: r6-W4-029
+  category: single-runbook
+  note: 'TD: agent-written dmg on clean profile'
+  active: []
+  messages:
+  - role: user
+    content: Build the macOS .dmg from commit 7d3e9f0, install it with an empty user-data dir, and check it launches,
+      loads its bundled fonts and gets through onboarding.
+  expect:
+    required:
+    - daintree.release.test-distributable
+    optional:
+    - daintree.foundation
+- id: r6-W4-030
+  category: single-runbook
+  note: 'TD: user wants release binary tried with nothing installed'
+  active: []
+  messages:
+  - role: user
+    content: source build is fine but i want to know the actual release binary works on a setup with nothing installed.
+      try it
+  expect:
+    required:
+    - daintree.release.test-distributable
+    optional:
+    - daintree.foundation
+- id: r6-W4-031
+  category: single-runbook
+  note: 'TD: near run-e2e-suite, production image not dev server'
+  active: []
+  messages:
+  - role: user
+    content: Run the production container image built from release/3.0 with no repo .env mounted and walk the signup
+      and export flows against it.
+  expect:
+    required:
+    - daintree.release.test-distributable
+    optional:
+    - daintree.foundation
+- id: r6-W4-034
+  category: routing-trap
+  note: 'trap TD -> bug-bash: several agents exploring release'
+  active: []
+  messages:
+  - role: user
+    content: 'Get three agents to poke at the release build and try to break it: one on onboarding, one on billing,
+      one throwing weird inputs at it.'
+  expect:
+    required:
+    - daintree.orchestration.bug-bash
+    optional:
+    - daintree.foundation
+- id: r6-W4-035
+  category: routing-trap
+  note: 'trap TD -> test-pull-request-locally: try a PR head'
+  active: []
+  messages:
+  - role: user
+    content: 'check out PR #221 and get it running so I can click around before we merge'
+  expect:
+    required:
+    - daintree.git.test-pull-request-locally
+    optional:
+    - daintree.foundation
+- id: r6-W4-037
+  category: no-task
+  note: 'general knowledge: semver precedence'
+  active: []
+  messages:
+  - role: user
+    content: Is 1.0.0-rc.1 lower precedence than 1.0.0 under semver?
+  expect:
+    required: []
+    optional: []
+- id: r6-W4-039
+  category: single-runbook
+  note: 'code work: add dry-run flag to release script'
+  active: []
+  messages:
+  - role: user
+    content: Add a --dry-run flag to scripts/release.sh that prints what it would upload without uploading anything.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+- id: r6-W4-042
+  category: multi-runbook
+  note: notes then publish
+  active: []
+  messages:
+  - role: user
+    content: Write the release notes for 2.6 into CHANGELOG.md, then publish 2.6.0 of the package to npm.
+  expect:
+    required:
+    - daintree.forge.draft-release-notes
+    - daintree.release.publish-package
+    optional:
+    - daintree.foundation
+- id: r6-W4-043
+  category: multi-runbook
+  note: merge PR then deploy
+  active: []
+  messages:
+  - role: user
+    content: 'merge #488 and then deploy main to staging and make sure its serving'
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    - daintree.release.deploy-and-verify
+    optional:
+    - daintree.foundation
+- id: r6-W4-044
+  category: multi-runbook
+  note: rollback then file issue
+  active: []
+  messages:
+  - role: user
+    content: Roll prod back to v2.3.0 now, and file an issue to track the broken payment retry that caused it.
+  expect:
+    required:
+    - daintree.forge.manage-issue
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation

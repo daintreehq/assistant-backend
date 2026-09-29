@@ -99,6 +99,24 @@ boundaries:
   - query: tell the running claude to stop editing migrations and use the existing helper
     confusable_with: [daintree.agents.run-agent-command]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Claude is refactoring the payment service and has started touching the migrations - tell it to leave migrations alone and carry on with the rest.
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: stop codex's current turn, it's heading the wrong way, but don't undo anything it has done
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Tell claude-2 to stop editing the migrations and use the existing seed helper instead.
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: 'Interrupt codex in the search worktree: it is using npm but the repo uses pnpm. Then let it continue its own task.'
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: 'Correct codex on the tags task: it should keep the old API working while it refactors.'
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: tell codex-1 it should use the existing token bucket helper, not write a new one
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
 followups:
   - query: also tell it to keep the old /v1/users response shape working
     history:

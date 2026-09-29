@@ -80,6 +80,9 @@ boundaries:
     run: pre-split
   - query: sort my open worktrees into ones i still care about and ones i've abandoned
     run: pre-split
+  - query: check whether any of my 12 worktrees would lose work if i removed them, change nothing
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
 followups:
   - query: what exactly would I lose from feat/search-v2 if I removed it?
     history:
@@ -160,3 +163,9 @@ topic_shifts:
       - 'assistant: Open from earlier sessions: feat/search-v2, fix/login, exp/cache, chore/deps worktrees; one workflow still marked active.'
     active: [daintree.orchestration.status-and-resume]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: now check which of my other worktrees have unpushed or uncommitted work so this doesn't happen again
+    history:
+      - 'user: I removed the search worktree and it had uncommitted work'
+      - 'assistant: Restored into recover/search: 5 files from blobs, 2 partial from the transcript, config.local.json not recoverable. Checks pass.'
+    active: [daintree.git.recover-lost-work]
+    run: 2026-09-28-round6-stateful

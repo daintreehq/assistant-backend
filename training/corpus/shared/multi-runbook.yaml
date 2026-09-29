@@ -994,9 +994,6 @@ examples:
   - query: Have agents test the three theories for the leak, then put an agent on fixing whichever one is confirmed.
     expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.hypothesis-split]
     run: 2026-09-28-catalog-expansion
-  - query: Spike recharts, visx and echarts on the revenue chart, then build the winner into the real page.
-    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.spike-options]
-    run: 2026-09-28-catalog-expansion
   - query: Spike zod vs valibot on the forms and, once you've reported, delete all the spike worktrees.
     expect: [daintree.orchestration.spike-options, daintree.orchestration.workspace-cleanup]
     run: 2026-09-28-catalog-expansion
@@ -1247,3 +1244,158 @@ examples:
   - query: switch the codex pane to sonnet, then tell it to stop touching the migrations
     expect: [daintree.agents.run-agent-command, daintree.agents.steer-running-agent]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Spike recharts, visx and echarts on the revenue chart, then build the winner into the real page.
+    expect: [daintree.orchestration.productionize-prototype, daintree.orchestration.spike-options]
+    run: 2026-09-28-catalog-expansion
+  - query: Pause the lint agents and put them on the checkout crash, and file a GitHub issue for the crash so it's tracked.
+    expect: [daintree.forge.manage-issue, daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: 'Re-plan the running agents so two are on #77 right now, then triage the rest of the needs-triage issues and propose labels.'
+    expect: [daintree.forge.triage-issue-backlog, daintree.orchestration.reprioritize-work]
+    run: 2026-09-28-round6
+  - query: 'claude-2 and codex-1 are both building the importer: settle one owner. Separately, move the unrelated docs agent that shares their checkout into its own worktree.'
+    expect: [daintree.orchestration.resolve-task-collisions, daintree.worktree.relocate-agents]
+    run: 2026-09-28-round6
+  - query: 'Two agents are both on #231; decide who owns it and assign the GitHub issue to that account.'
+    expect: [daintree.forge.manage-issue, daintree.orchestration.resolve-task-collisions]
+    run: 2026-09-28-round6
+  - query: Hand coordination of the migration run to a fresh Codex session, and separately have claude-3's stalled parser task finished by Gemini in its worktree.
+    expect: [daintree.agents.hand-off-task, daintree.orchestration.hand-off-orchestration]
+    run: 2026-09-28-round6
+  - query: Tear down the three finished competition worktrees, then hand the orchestrator role for the rest of the run to a new Claude session.
+    expect:
+      - daintree.orchestration.hand-off-orchestration
+      - daintree.orchestration.workspace-cleanup
+    run: 2026-09-28-round6
+  - query: The machine is swapping with all eight agents building — throttle them, then hand coordination to a new session because my context is nearly full.
+    expect:
+      - daintree.orchestration.hand-off-orchestration
+      - daintree.runtime.relieve-resource-contention
+    run: 2026-09-28-round6
+  - query: port 3000 is taken so my server won't start, and separately the agents' test runs are making the whole machine unusable — deal with both
+    expect: [daintree.runtime.free-busy-port, daintree.runtime.relieve-resource-contention]
+    run: 2026-09-28-round6
+  - query: Throttle the agents overloading the CPU, then delete the worktrees whose PRs already merged and close their terminals.
+    expect:
+      - daintree.orchestration.workspace-cleanup
+      - daintree.runtime.relieve-resource-contention
+    run: 2026-09-28-round6
+  - query: Figure out why codex's overnight refactor failed, and separately pull its working date utilities into a fresh branch off main.
+    expect: [daintree.agents.postmortem-run, daintree.orchestration.salvage-failed-attempt]
+    run: 2026-09-28-round6
+  - query: Revert claude's commits on feat/menu, then add a rule to CLAUDE.md so agents never edit the generated menu files again.
+    expect: [daintree.git.undo-agent-changes, daintree.memory.manage-project-memory]
+    run: 2026-09-28-round6
+  - query: Pull the good parts of the failed import attempt into a new branch, and once that's verified delete the failed worktree.
+    expect:
+      - daintree.orchestration.salvage-failed-attempt
+      - daintree.orchestration.workspace-cleanup
+    run: 2026-09-28-round6
+  - query: Revert codex's changes to the session middleware and tell me why it went off and changed them in the first place.
+    expect: [daintree.agents.postmortem-run, daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Get back the commits the reset wiped on feat/billing, and delete my other branches that are already merged into main.
+    expect: [daintree.git.prune-stale-branches, daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: Recover the branch the agent deleted, and separately undo the config edits that same agent made in the api worktree that I don't want.
+    expect: [daintree.git.recover-lost-work, daintree.git.undo-agent-changes]
+    run: 2026-09-28-round6
+  - query: Work out why codex ran reset --hard and wiped my branch so it doesn't happen again, and get the commits back.
+    expect: [daintree.agents.postmortem-run, daintree.git.recover-lost-work]
+    run: 2026-09-28-round6
+  - query: Merge the three agents' branches into one integration branch, then settle the known behaviour clash between the cache and invalidation branches once both are in.
+    expect: [daintree.git.integrate-agent-branches, daintree.git.resolve-semantic-conflict]
+    run: 2026-09-28-round6
+  - query: Resolve the token-lifetime clash between the auth and session branches, then have the resulting integration branch reviewed for bugs.
+    expect: [daintree.git.resolve-semantic-conflict, daintree.review.review-change]
+    run: 2026-09-28-round6
+  - query: rebase feat/pricing on main first, then sort out the behaviour clash it has with feat/promos when combined
+    expect: [daintree.git.resolve-semantic-conflict, daintree.git.sync-with-base]
+    run: 2026-09-28-round6
+  - query: Give me a go/no-go on v2.5 and also draft its release notes into CHANGELOG.md.
+    expect: [daintree.forge.draft-release-notes, daintree.release.assess-readiness]
+    run: 2026-09-28-round6
+  - query: Check whether the 3.4 RC is ready to ship, and if it's a go, deploy it to staging and verify it's serving.
+    expect: [daintree.release.assess-readiness, daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: 'merge #1402, then deploy the merge commit to staging and prove it''s serving'
+    expect: [daintree.forge.land-pull-request, daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: Ship v2.5 to production (approved) and write the GitHub release notes for it.
+    expect: [daintree.forge.draft-release-notes, daintree.release.deploy-and-verify]
+    run: 2026-09-28-round6
+  - query: Roll prod back to v7.3.0 right now, and separately get read-only agents investigating what in 7.4 broke checkout.
+    expect: [daintree.debug.investigate-outage, daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: put the previous release back on prod, and have an agent open a PR reverting commit a41c9e2
+    expect: [daintree.edits.spawn-visible-agent, daintree.release.rollback-deployment]
+    run: 2026-09-28-round6
+  - query: Publish sdk 2.0.0 to npm and deploy the api 2.0.0 to production (authorized); verify both.
+    expect: [daintree.release.deploy-and-verify, daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: Test the packed tarball in a clean project first, and if it passes, publish 1.4.0 to npm.
+    expect: [daintree.release.publish-package, daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: write the release notes for 2.3.0 and then publish 2.3.0 to pypi
+    expect: [daintree.forge.draft-release-notes, daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: 'Merge the version-bump PR #140, then publish 0.6.0 to crates.io.'
+    expect: [daintree.forge.land-pull-request, daintree.release.publish-package]
+    run: 2026-09-28-round6
+  - query: Run the unit tests in the release worktree, and separately smoke-test the built docker image in a clean container.
+    expect: [daintree.ci.run-local-checks, daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: Build the production image and test it cold, then deploy that same image to staging and verify it's serving.
+    expect: [daintree.release.deploy-and-verify, daintree.release.test-distributable]
+    run: 2026-09-28-round6
+  - query: Merge the three agents' onboarding branches into one integration branch, then set up a demo of the combined flow with fake users and a walkthrough.
+    expect: [daintree.git.integrate-agent-branches, daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: demo the invoice feature for the team with sample data, and also write my standup of what shipped this week
+    expect: [daintree.git.summarize-activity, daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: Get the pricing page demo running with fake plans, and separately fix the hydration error already showing in the open preview's console.
+    expect: [daintree.runtime.debug-web-app, daintree.workflow.prepare-feature-demo]
+    run: 2026-09-28-round6
+  - query: Contain the Stripe key codex committed on feat/checkout, and separately have agents run a full security audit of the payments module afterwards.
+    expect: [daintree.review.audit-codebase, daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: The .env got committed on feat/mailer — handle the exposure, and also add a rule to AGENTS.md so agents never commit .env files again.
+    expect: [daintree.memory.manage-project-memory, daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: 'PR #733 has a live token pasted in its description; deal with that leak, and also give me a proper code review of the PR''s changes.'
+    expect: [daintree.review.review-change, daintree.security.respond-to-secret-exposure]
+    run: 2026-09-28-round6
+  - query: Audit how much of the billing PRD exists, then break whatever is missing into work units for agents.
+    expect: [daintree.orchestration.decompose-work, daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: 'grade #412''s acceptance criteria against main, and separately check codex''s claim that it finished #413'
+    expect: [daintree.orchestration.verify-agent-work, daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: Check docs/webhooks.md requirement by requirement against the code, and also rewrite the README setup section, which is out of date.
+    expect: [daintree.edits.sync-project-docs, daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6
+  - query: Take the chosen caching spike to production quality, then open a PR for the finished branch.
+    expect:
+      - daintree.orchestration.productionize-prototype
+      - daintree.workflow.prep-branch-for-review
+    run: 2026-09-28-round6
+  - query: productionize the onboarding prototype, and once that's done set up a demo of it for thursday's standup
+    expect:
+      - daintree.orchestration.productionize-prototype
+      - daintree.workflow.prepare-feature-demo
+    run: 2026-09-28-round6
+  - query: Harden the chosen notifications POC on a proper branch; after it's verified, close the old spike panels and remove the spike worktrees.
+    expect:
+      - daintree.orchestration.productionize-prototype
+      - daintree.orchestration.workspace-cleanup
+    run: 2026-09-28-round6
+  - query: Update the README install section and docs/cli.md to match the new CLI, and also write the release notes for 3.0.
+    expect: [daintree.edits.sync-project-docs, daintree.forge.draft-release-notes]
+    run: 2026-09-28-round6
+  - query: bring docs/api.md in line with the current routes, then open a PR with the docs changes
+    expect: [daintree.edits.sync-project-docs, daintree.workflow.prep-branch-for-review]
+    run: 2026-09-28-round6
+  - query: Fix the out-of-date setup guide, and add a rule to AGENTS.md that agents must update docs/config.md whenever they add a config key.
+    expect: [daintree.edits.sync-project-docs, daintree.memory.manage-project-memory]
+    run: 2026-09-28-round6

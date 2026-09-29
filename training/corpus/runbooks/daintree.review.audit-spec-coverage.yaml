@@ -1,0 +1,151 @@
+# Training examples whose answer is `daintree.review.audit-spec-coverage` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.review.audit-spec-coverage
+run: 2026-09-28-round6
+positives:
+  - 'Audit docs/specs/billing-v2.md against main requirement by requirement: implemented, partial, missing or unverified, with file:line and test evidence.'
+  - 'which acceptance criteria on #412 are actually done in the code right now?'
+  - how much of the onboarding PRD is really built? be honest, i think a lot is stubbed
+  - 'Grade RFC-0007 (streaming exports) coverage on feat/exports: status per requirement, citing tests that assert each.'
+  - What's left of the search-v3 spec to implement? Read-only, change nothing.
+  - Is every requirement in docs/rfc/rate-limits.md covered by a test that actually asserts it?
+  - The PM says the notifications PRD is 90% shipped. Check that number requirement by requirement against the code.
+  - spec coverage audit, SPEC.md sections 4-7, worktree api-main, read-only auditors, evidence per item
+  - Before we set scope for 3.1, map which parts of the offline-sync design doc exist in the mobile app and which don't.
+  - 'Compare issue #1187''s acceptance checklist with the current code on develop — which boxes are genuinely satisfied?'
+  - Not one agent's work — several people built pieces of the auth PRD over a month. Which of its requirements are implemented and tested?
+  - Map each requirement in docs/api-contract.md to its handler and test; flag the ones missing or only partly there.
+  - 'gap analysis for the audit-log feature spec (docs/audit-log-spec.md): per requirement, does the code do it, with proof'
+  - Don't break anything down yet — just tell me which of the 30 requirements in checkout-prd.md the code already meets.
+  - 'coverage check of the i18n spec vs the web app: implemented/partial/missing, and what was searched for the missing ones'
+  - Walk the plugin-loader design doc and report per requirement whether the code delivers it. No fixes.
+  - Use read-only auditor agents to check sections 2 and 3 of the payments spec against the code, one auditor per section.
+  - 'Epic #900''s child issues are all closed. Are its acceptance criteria actually met on main, or were the issues just closed?'
+  - is the webhook retry spec actually implemented? docs/webhooks.md lists 9 behaviours, i want each one checked
+  - Determine the implementation status of every MUST in spec/protocol.md within the proto-impl worktree; cite code and asserting tests.
+  - How far along is the CSV import feature against its PRD? Numbered list with status and evidence for each.
+  - Which of the accessibility requirements listed in the redesign spec's section 5 does the new UI actually satisfy?
+  - 'Trace every requirement in the body of issue #512 (billing portal) to code and tests in the billing worktree.'
+  - the client SOW lists 14 features in docs/sow-features.md — tell me which are really in the product and which are half done
+  - Check the multi-tenant spec against the code instead of explaining how tenancy works — I need a status per requirement.
+  - 'PR #640 said ''implements #640 spec'' and merged, but I doubt every criterion in the spec is covered. Grade the criteria against main.'
+boundaries:
+  - query: Check docs/billing-spec.md against the code requirement by requirement and say what's implemented and what's missing; change nothing.
+    confusable_with: [daintree.edits.sync-project-docs]
+  - query: don't explain the auth flow — tell me which of the auth spec's requirements the code actually satisfies
+    confusable_with: [daintree.explore.repository]
+  - query: Where is each requirement from docs/sso.md implemented, and which ones aren't there at all?
+    confusable_with: [daintree.explore.repository]
+  - query: find the code for every numbered requirement in the export RFC and say which have asserting tests
+    confusable_with: [daintree.explore.repository]
+  - query: 'Before any planning: how much of the payments PRD is already built?'
+    confusable_with: [daintree.orchestration.decompose-work]
+  - query: which pieces of the epic's spec are missing from the code today? just the status, no breakdown, no tickets
+    confusable_with: [daintree.orchestration.decompose-work]
+  - query: Tell me what of the migration design doc already exists, requirement by requirement.
+    confusable_with: [daintree.orchestration.decompose-work]
+  - query: No single agent to check here — grade the whole onboarding PRD against develop requirement by requirement.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: Did we build everything in docs/billing.md? Status per requirement with code and test evidence.
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: forget checking any agent's report; across the entire spec, what's implemented, partial or missing?
+    confusable_with: [daintree.orchestration.verify-agent-work]
+  - query: How much of the payments RFC in docs/payments.md is actually built, requirement by requirement?
+    confusable_with: [daintree.release.assess-readiness]
+  - query: Audit the code against the requirements in docs/compliance-export.md — status per requirement, not a security review.
+    confusable_with: [daintree.review.audit-codebase]
+  - query: which requirements in the performance section of our spec does the code meet? per requirement with evidence
+    confusable_with: [daintree.review.audit-codebase]
+  - query: Grade how much of the SSO PRD is implemented rather than hunting for bugs in it.
+    confusable_with: [daintree.review.audit-codebase]
+  - query: rather than reviewing a diff, check the feature on main against every requirement in the PRD
+    confusable_with: [daintree.review.review-change]
+  - query: is everything in the RFC implemented and covered by tests? not a code review, a requirement-by-requirement status
+    confusable_with: [daintree.review.review-change]
+  - query: 'Don''t judge PR #640''s code quality; tell me which acceptance criteria of #640 exist in the code at all.'
+    confusable_with: [daintree.review.review-change]
+  - query: 'not the PR status — which of #412''s acceptance criteria does the code satisfy?'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: 'Issue #733 lists six acceptance criteria; which does main actually meet?'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: '#1022 got closed but were its acceptance criteria really delivered? check the code, not the thread'
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+followups:
+  - query: R7 isn't a requirement, it's just background — drop it and carry on
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
+  - query: codex-1 says R3 is implemented. did you actually run the test it cited or just take its word?
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+      - 'assistant: codex-1 is back: R1-R6 implemented, R7 partial, R8 missing, R9 unverified. Still waiting on claude-2.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
+  - query: 'also fold in the acceptance criteria on issue #412, they''re part of the same spec'
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
+  - query: count my uncommitted webhook handler too, I haven't committed it yet
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
+  - query: 'on R12: ''refund'' in the spec means partial refunds as well, not just full ones'
+    history:
+      - 'user: how much of docs/billing.md is actually built?'
+      - 'assistant: Snapshot main@4f2c1e9, spec hash 7d01ac2. The extractor numbered R1-R18 (listed above). Auditors launched: codex-1 has R1-R9, claude-2 has R10-R18; I''ll check their evidence when they report.'
+      - 'assistant: codex-1 is back: R1-R6 implemented, R7 partial, R8 missing, R9 unverified. Still waiting on claude-2.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
+  - query: Both auditors have replied on the RFC-0042 coverage audit; downgrade anything whose test does not assert the requirement and give the per-status counts.
+    history:
+      - 'user: check RFC-0042 against the code requirement by requirement'
+      - 'assistant: Numbered R1-R22 from docs/rfc/0042-sync.md at main@b81e0f3. Auditors claude-4 (R1-R11) and codex-5 (R12-R22) launched read-only.'
+    active: [daintree.review.audit-spec-coverage]
+    run: 2026-09-28-round6-stateful
+topic_shifts:
+  - query: wait, before we build anything — half of this might already exist. check it requirement by requirement against the code
+    history:
+      - 'user: split docs/search-v2.md into parallel work units'
+      - 'assistant: Proposed 5 units (index schema, query parser, ranking, API, UI) with file ownership; waiting for your go before launching.'
+    active: [daintree.orchestration.decompose-work]
+    run: 2026-09-28-round6-stateful
+  - query: 'forget CI — which of #412''s acceptance criteria are actually done in the code?'
+    history:
+      - 'user: what''s happening with #412?'
+      - 'assistant: PR #430 links #412; CI is red on the lint job, one review requesting changes.'
+    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-09-28-round6-stateful
+  - query: ok, and how much of docs/prd/notifications.md is actually built?
+    history:
+      - 'user: how does the notifications module work?'
+      - 'assistant: Explorer claude-3 traced it: events go through src/notify/dispatcher.ts to email and push adapters; digests run from a cron job.'
+    active: [daintree.explore.repository]
+    run: 2026-09-28-round6-stateful
+  - query: 'fine, that task checks out. bigger question: of the whole export RFC, what''s implemented and what''s still missing, with test evidence?'
+    history:
+      - 'user: claude-4 says it finished the CSV export task, check it'
+      - 'assistant: Verified: the diff matches the task, the 3 new tests pass when I run them.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-09-28-round6-stateful
+  - query: 'separate thing: audit docs/api-v3.md against main, requirement by requirement'
+    history:
+      - 'user: review PR #501'
+      - 'assistant: Reviewer codex-1 returned 3 findings on PR #501; two confirmed, one was a false positive.'
+    active: [daintree.review.review-change]
+    run: 2026-09-28-round6-stateful
+  - query: for the update I also need how much of the onboarding spec is covered — each requirement, implemented or not
+    history:
+      - 'user: summarize this week''s activity for standup'
+      - 'assistant: 23 commits across 4 branches; onboarding flow landed on main, billing work still on feat/billing.'
+    active: [daintree.git.summarize-activity]
+    run: 2026-09-28-round6-stateful
