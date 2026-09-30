@@ -208,6 +208,12 @@ boundaries:
   - query: run /usage in claude and tell me how close I am to the cap
     confusable_with: [daintree.agents.run-agent-command]
     run: 2026-09-28-catalog-expansion
+  - query: "how much codex allowance do I have left before I launch anything else?"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "check claude's weekly limit, I want to know whether I can afford another big run"
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
 followups:
   - query: now do grok
     history:

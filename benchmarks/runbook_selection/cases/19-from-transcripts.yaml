@@ -355,3 +355,41 @@ cases:
     expect:
       required: [daintree.orchestration.workspace-cleanup]
       optional: [daintree.foundation]
+
+  - id: tx-per-launch-model-and-effort
+    category: routing-trap
+    note: >-
+      Help-assistant session 566371c8, 2026-09-29: asked to spend Codex in proportion
+      to the stakes, the assistant read the empty preset lists and told the user no
+      model or effort could be set per launch; agent.launch takes both. Unsearched;
+      before the fix check-usage-limits led this phrasing (0.82) and spike-options a
+      paraphrase of the user's words (0.84). Decided by spawn-visible-agent's "ONE
+      visible agent in the right worktree, on any model or effort named" and
+      check-usage-limits' fence "to choose which model or reasoning effort an agent
+      launches with, even to save budget (daintree.edits.spawn-visible-agent)".
+    messages:
+      - role: user
+        content: Launch Codex with a specific model and reasoning effort for each task
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: tx-continue-agents-cut-off-by-sleep
+    category: routing-trap
+    note: >-
+      Same session: three coders' turns ended in "went to sleep mid-response". The
+      assistant sent two of them a continue message, holding back the third because
+      it shared a checkout, and the resumed coder's commits landed; this phrasing
+      selected park-work at 0.99. Decided by recover-agent's "a turn cut off
+      by an error (the machine slept, the network dropped) that must be told to
+      continue" and park-work's fence "to get agents whose turn was cut off by sleep
+      or an error going again (use daintree.agents.recover-agent)".
+    messages:
+      - role: user
+        content: >-
+          Tell the agents that were cut off when the machine went to sleep to continue
+          where they stopped
+    expect:
+      required: [daintree.agents.recover-agent]
+      optional: [daintree.foundation]
+

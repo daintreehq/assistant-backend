@@ -120,6 +120,12 @@ boundaries:
   - query: wrap up for the day, get all the agents to a clean stop, i'm shutting the laptop
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
+  - query: "I'm shutting the laptop now, get the agents to a stopping point so nothing is lost while it sleeps"
+    confusable_with: [daintree.agents.recover-agent]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "before my machine sleeps tonight have every agent note where it is and stop starting new things"
+    confusable_with: [daintree.agents.recover-agent]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
 followups:
   - query: remind claude-4 again, it's still going
     history:

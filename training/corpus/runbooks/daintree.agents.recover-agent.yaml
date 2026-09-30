@@ -346,6 +346,21 @@ boundaries:
   - query: codex-2 has shown the same spinner for 40 minutes with no output; is it hung?
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
+  - query: "my laptop went to sleep and both claudes died mid-reply with an API error, nudge them to pick up where they left off"
+    confusable_with: [daintree.orchestration.park-work]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "the codex pane says the connection dropped halfway through its turn, just tell it to carry on"
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "wifi cut out and the reviewer's turn ended on a network error, get it going again from where it was"
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "the lid closed overnight and the coders stopped mid-step with their prompts back, tell them to continue"
+    confusable_with: [daintree.orchestration.park-work]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "both agents show 'your computer went to sleep mid-response', resume them"
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
 followups:
   - query: how long has it actually been like that?
     history:

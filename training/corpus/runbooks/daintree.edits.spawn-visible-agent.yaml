@@ -1181,6 +1181,21 @@ boundaries:
   - query: write a seeder that generates fake demo customers with realistic names, in the api worktree
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: "start codex on the csv export fix but at low reasoning effort, it's a small change"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "have claude do the logging cleanup on the cheaper model, we're burning through the budget"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "launch codex at high effort to fix the migration ordering bug, it touches stored data"
+    confusable_with: [daintree.orchestration.spike-options]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "use a smaller model for the agent renaming the test helpers, no need for the big one"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "we're short on codex quota, put one agent on the retry fix at medium effort"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-09-29-launch-effort-cut-off-turns
 followups:
   - query: how's it going?
     history:
