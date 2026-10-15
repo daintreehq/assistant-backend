@@ -11,7 +11,7 @@ cases:
   - id: reassign-host-work-issue-machine-dropped
     category: single-runbook
     note: >-
-      The issue's first request. Decided by "work this Shell already handed to one
+      The issue's first request. Decided by "a piece of work ALREADY SENT to one
       Remote Host has to MOVE TO A DIFFERENT MACHINE because the first cannot finish
       it: that machine went offline or silent mid-task".
     messages:
@@ -235,8 +235,8 @@ cases:
     note: >-
       The lane's side: steer-for-hub's "Use on a Remote Host's lane to STOP, PAUSE or
       CHANGE the work of the AGENTS it launched for one of the hub's runs". This
-      runbook is the Shell's side: "work this Shell already handed to one Remote
-      Host".
+      runbook is the sender's side: "a piece of work ALREADY SENT to one Remote Host
+      has to MOVE TO A DIFFERENT MACHINE".
     messages:
       - role: user
         content: I'm the assistant on this host; the hub says it is moving its unit elsewhere, so stop the agent I launched for it and keep its changes
