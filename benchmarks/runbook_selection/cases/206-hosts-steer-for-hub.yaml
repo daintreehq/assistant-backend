@@ -18,9 +18,10 @@ cases:
   - id: steer-for-hub-issue-stop-and-report
     category: single-runbook
     note: >-
-      The issue's first request. Decided by "when the hub asks it to STOP, PAUSE or CHANGE
-      work it delegated here" and "the hub told each agent's actual state". At base it
-      selected daintree.hosts.recover-and-clean-up (hub side) with the envelope.
+      The issue's first request. Decided by "to STOP, PAUSE or CHANGE the work of the AGENTS
+      it launched for one of the hub's runs" and "answer the hub with each agent's actual
+      state rather than the exchange's". At base it selected
+      daintree.hosts.recover-and-clean-up (hub side) with the envelope.
     messages:
       - role: user
         content: The hub asked me to stop the delegated agents and report their saved work.
@@ -31,9 +32,10 @@ cases:
   - id: steer-for-hub-issue-acceptance-change
     category: single-runbook
     note: >-
-      The issue's second request, a correction that keeps the rest of the brief: "hub update:
-      new acceptance criteria for the run, every other constraint stands". At base it went to
-      daintree.memory.manage-project-memory, execute-durable-workflow and spawn-visible-agent.
+      The issue's second request, a correction that keeps the rest of the brief: "hub
+      update: new acceptance criteria for the run, every other constraint stands". At base
+      it went to daintree.memory.manage-project-memory, execute-durable-workflow and
+      spawn-visible-agent.
     messages:
       - role: user
         content: "Hub update: change the acceptance criteria for this run; keep all other constraints."
@@ -44,9 +46,9 @@ cases:
   - id: steer-for-hub-issue-pause-checkpoint
     category: single-runbook
     note: >-
-      The issue's third request, after the lane has read the hub's message naming the
-      panes: "pause the hub's child panes and send back a checkpoint". The bare string
-      selected daintree.orchestration.park-work at base.
+      The issue's third request, after the lane has read the hub's message naming the panes:
+      "pause the hub's child panes here". The bare string selected
+      daintree.orchestration.park-work at base.
     messages:
       - role: user
         content: Anything new from the hub since the last run started?
@@ -61,9 +63,9 @@ cases:
   - id: steer-for-hub-agent-phrased
     category: single-runbook
     note: >-
-      How a lane describes the task to search_runbooks: "each of that run's agents
-      interrupted, redirected or found already done, confirmed from its own screen with
-      nothing it made thrown away".
+      How a lane describes the task to search_runbooks: "each of those agents stopped,
+      redirected or found already done, confirmed from its own screen, with nothing it made
+      thrown away".
     messages:
       - role: user
         content: Hub follow-up for a delegated unit, interrupt the agent this lane launched for it, keep its uncommitted work, and reply with the agent's verified state.
@@ -74,8 +76,8 @@ cases:
   - id: steer-for-hub-user-cancelled-still-going
     category: single-runbook
     note: >-
-      Casual: the hub cancelled, the child is still working. "or the hub cancelling an
-      exchange whose agent is still working" decides it; at base a similar line went to
+      Casual: the hub cancelled, the child is still working. "an agent still working after
+      the hub cancelled its exchange" decides it; at base a similar line went to
       daintree.agents.recover-agent.
     messages:
       - role: user
@@ -87,8 +89,8 @@ cases:
   - id: steer-for-hub-mid-turn-stop
     category: single-runbook
     note: >-
-      The live scenario of a stop mid-turn with the work kept: "each of that run's agents
-      interrupted" and "confirmed from its own screen with nothing it made thrown away".
+      The live scenario of a stop mid-turn with the work kept: "each of those agents
+      stopped" and "confirmed from its own screen, with nothing it made thrown away".
     messages:
       - role: user
         content: The hub wants the Claude agent on its search unit stopped mid-turn; leave its changes in the worktree and tell the hub where it got to.
@@ -99,8 +101,8 @@ cases:
   - id: steer-for-hub-idle-child-correction
     category: single-runbook
     note: >-
-      The live scenario of a correction to a child idle after its turn: "CHANGE work it
-      delegated here that an agent launched by this lane is running or ran".
+      The live scenario of a correction to a child idle after its turn: "to STOP, PAUSE or
+      CHANGE the work of the AGENTS it launched for one of the hub's runs".
     messages:
       - role: user
         content: "The hub's new requirement is for the agent that already finished its turn on the export unit: keep the header row. Pass it on."
@@ -123,8 +125,8 @@ cases:
   - id: steer-for-hub-unrelated-pane
     category: single-runbook
     note: >-
-      The live scenario with an unrelated pane that must stay untouched: "that run's agents"
-      and nothing else.
+      The live scenario with an unrelated pane that must stay untouched: "the AGENTS it
+      launched for one of the hub's runs" and nothing else.
     messages:
       - role: user
         content: Stop just the hub's agent on the docs unit and leave the other panes in this project alone.
@@ -137,9 +139,10 @@ cases:
     category: routing-trap
     note: >-
       The agent is one this lane launched for the hub's unit and the answer goes to the hub,
-      so the lane's runbook owns it: "when the hub asks it to STOP, PAUSE or CHANGE work it
-      delegated here". Fence: "the person at this machine changing an agent's course
-      (daintree.agents.steer-running-agent)", which took this string at base (0.999).
+      so the lane's runbook owns it: "to STOP, PAUSE or CHANGE the work of the AGENTS it
+      launched for one of the hub's runs". Fence: "the person at this machine changing an
+      agent's course (daintree.agents.steer-running-agent)", which took this string at base
+      (0.999).
     messages:
       - role: user
         content: Stop the agent I launched for the hub's migration unit mid-turn, keep its uncommitted changes, and reply to the hub with where it stopped.
@@ -151,8 +154,9 @@ cases:
     category: routing-trap
     note: >-
       A stop of one hub unit with the other panes left alone is not wrapping up for the day:
-      "STOP, PAUSE or CHANGE work it delegated here". Fence: "wrapping up their agents for
-      the day (daintree.orchestration.park-work)", which took this string at base (0.99).
+      "to STOP, PAUSE or CHANGE the work of the AGENTS it launched for one of the hub's
+      runs". Fence: "wrapping up their agents for the day
+      (daintree.orchestration.park-work)", which took this string at base (0.99).
     messages:
       - role: user
         content: hub says stop work on unit-3 but leave the other panes alone
@@ -179,8 +183,8 @@ cases:
     category: routing-trap
     note: >-
       A change to a unit whose agent is already working is a steer, not starting the unit:
-      "CHANGE work it delegated here that an agent launched by this lane is running or ran".
-      Fence: "starting the hub's unit of work (daintree.hosts.do-delegated-work)".
+      "to STOP, PAUSE or CHANGE the work of the AGENTS it launched for one of the hub's
+      runs". Fence: "starting the hub's unit of work (daintree.hosts.do-delegated-work)".
     messages:
       - role: user
         content: The hub now wants the unit it delegated here to keep the old config format too; the agent on it is partway through.
@@ -192,8 +196,8 @@ cases:
     category: routing-trap
     note: >-
       A change to a unit the hub already delegated here, received by this lane for the agent
-      it launched: "when the hub asks it to STOP, PAUSE or CHANGE work it delegated here".
-      Sending new or reworked work from the hub is "the hub's own side
+      it launched: "to STOP, PAUSE or CHANGE the work of the AGENTS it launched for one of
+      the hub's runs". Sending new or reworked work from the hub is "the hub's own side
       (daintree.hosts.delegate-to-host)", which must not be picked.
     messages:
       - role: user
@@ -205,10 +209,10 @@ cases:
   - id: steer-for-hub-not-clean-up
     category: routing-trap
     note: >-
-      A stop with nothing removed is not the run's cleanup: "when the hub asks it to STOP,
-      PAUSE or CHANGE work it delegated here". daintree.hosts.clean-up-for-hub fences it:
-      "for stopping, pausing or correcting an agent of that run that is still at work
-      (daintree.hosts.steer-for-hub)".
+      A stop with nothing removed is not the run's cleanup: "to STOP, PAUSE or CHANGE the
+      work of the AGENTS it launched for one of the hub's runs".
+      daintree.hosts.clean-up-for-hub fences it: "for stopping, pausing or correcting an
+      agent of that run that is still at work (daintree.hosts.steer-for-hub)".
     messages:
       - role: user
         content: The hub cancelled the run; stop its agents but don't delete anything yet.
@@ -219,9 +223,9 @@ cases:
   - id: steer-for-hub-not-hung-agent
     category: routing-trap
     note: >-
-      A healthy agent still working on a job the hub dropped is a stop, not a recovery:
-      "or the hub cancelling an exchange whose agent is still working". recover-agent owns
-      "a hung or unresponsive agent", which this one is not.
+      A healthy agent still working on a job the hub dropped is a stop, not a recovery: "an
+      agent still working after the hub cancelled its exchange". recover-agent owns "a hung
+      or unresponsive agent", which this one is not.
     messages:
       - role: user
         content: hub dropped the job it gave me; the codex pane for it is fine, just still working, halt it
@@ -247,8 +251,8 @@ cases:
   - id: steer-for-hub-trap-park-own-agents
     category: routing-trap
     note: >-
-      Reverse: the person parking their own agents for the day, the hub only mentioned to say
-      its runs are done. park-work owns "Use when the user is walking away and wants
+      Reverse: the person parking their own agents for the day, the hub only mentioned to
+      say its runs are done. park-work owns "Use when the user is walking away and wants
       in-flight work paused and made safe, not torn down".
     messages:
       - role: user
@@ -261,8 +265,8 @@ cases:
     category: routing-trap
     note: >-
       Reverse: the hub's message is a question about this lane's agents, not a request to
-      change them. The envelope owns it: "The deliverable is the exchange handled: read
-      once with assistant.getInbox".
+      change them. The envelope owns it: "The deliverable is the exchange handled: read once
+      with assistant.getInbox".
     messages:
       - role: user
         content: The hub's message only asks which agents this lane has running; read it and reply.
@@ -288,8 +292,8 @@ cases:
     note: >-
       Reverse: a new unit from the hub with nothing started yet. do-delegated-work owns
       "when the hub asks THIS machine to implement, fix or build something as one unit of
-      work"; this runbook's "starting the hub's unit of work (daintree.hosts.do-delegated-work)"
-      keeps it out.
+      work"; this runbook's "starting the hub's unit of work
+      (daintree.hosts.do-delegated-work)" keeps it out.
     messages:
       - role: user
         content: The hub's message asks this machine to build the CSV export as one unit in a new worktree with Claude; nothing has started yet.
@@ -300,9 +304,9 @@ cases:
   - id: steer-for-hub-trap-hub-side-redo
     category: routing-trap
     note: >-
-      Reverse: the hub's own side, sending reworked acceptance to a Remote Host. delegate-to-host
-      owns "ONE piece of WORK done by the Daintree assistant on another machine"; this
-      runbook fences "the hub's own side (daintree.hosts.delegate-to-host)".
+      Reverse: the hub's own side, sending reworked acceptance to a Remote Host.
+      delegate-to-host owns "ONE piece of WORK done by the Daintree assistant on another
+      machine"; this runbook fences "the hub's own side (daintree.hosts.delegate-to-host)".
     messages:
       - role: user
         content: Get the assistant on my other Mac to rework the export feature with the new acceptance criteria and open a PR.

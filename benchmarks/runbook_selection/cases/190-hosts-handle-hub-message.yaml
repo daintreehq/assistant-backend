@@ -399,10 +399,10 @@ cases:
     category: routing-trap
     note: >-
       Redirecting an agent on the hub's word goes to its host-side receiver,
-      daintree.hosts.steer-for-hub ("when the hub asks it to STOP, PAUSE or CHANGE work it
-      delegated here"), not to daintree.agents.steer-running-agent ("the person at this
-      machine changing an agent's course"), which this case pinned before that receiver
-      landed.
+      daintree.hosts.steer-for-hub ("to STOP, PAUSE or CHANGE the work of the AGENTS it
+      launched for one of the hub's runs"), not to daintree.agents.steer-running-agent ("the
+      person at this machine changing an agent's course"), which this case pinned before
+      that receiver landed.
     messages:
       - role: user
         content: The hub says to stop the agent that's refactoring the billing module and switch it to the logging cleanup instead.
