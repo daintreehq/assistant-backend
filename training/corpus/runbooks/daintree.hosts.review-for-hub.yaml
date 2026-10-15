@@ -28,7 +28,7 @@ positives:
   - A hub review request came in while the person here is away, for the export branch at 2d9f7a3, judged on error handling only
   - Independent review for the hub of the scheduler branch built on another machine, at commit 5d7e21b0, findings only
   - Review the other host's pushed branch at the commit the hub quoted, keeping the reviewer read-only, and report back to the hub
-  - Get a reviewer here that did not write the code to go over the hub's branch at 0c4f8e13 and list its findings
+  - 'The hub asked this lane for a review by an agent that did not write the code: the branch at 0c4f8e13, findings back to the hub'
   - 'Hub review request: the token refresh change at 7e19a4d2, criteria are security and error paths, no commits'
   - Review for the hub the migration branch at a fixed commit and say which findings block a merge
   - Hub wants findings on the rate limiter rewrite at 3b8c0d55 from a Codex reviewer on this host, nothing changed
@@ -71,7 +71,7 @@ positives:
   - hub wants this host to review someone else's PR at its head sha and tell it what's wrong
   - the hub sent over a review job for the auth branch, findings only
   - review that commit for the hub, nothing else
-  - codex here should look over the hub's branch at 2c7e9d1 and list issues
+  - the hub wants codex here to look over the branch at 2c7e9d1 and send it the issues
   - the other mac built it, we review it, the hub wants findings
   - 'hub: review race/sorting/b at a91f3c2 for correctness and edge cases, no edits'
   - hub wants our review of the webhook retries change, pinned commit, report problems only
@@ -97,13 +97,13 @@ positives:
   # explanation questions
   - query: Explain why a review for the hub is done in a fresh worktree at the pinned commit rather than in this machine's main checkout
     docs: true
-  - query: Why shouldn't the reviewer on this host just review whatever the branch tip is when the hub's SHA has moved on?
+  - query: Why shouldn't the reviewer on this host just review the latest commit when the branch tip has moved past the hub's SHA?
     docs: true
 
 followups:
   - query: now send the hub what the reviewer found
     history:
-      - "user: review the hub's branch at 9f1e2d3"
+      - "user: the hub wants its branch reviewed here at 9f1e2d3"
       - "assistant: The Codex reviewer is running in a worktree pinned to 9f1e2d3; I'll pick it up on its notice."
   - query: the reviewer is done, make sure it didn't change anything, then answer the hub
     history:
@@ -162,3 +162,7 @@ boundaries:
     confusable_with: [daintree.orchestration.verify-agent-work]
   - query: pass judgment on the branch the hub sent over at 7c2d9e1, comments only, and send the verdict back
     confusable_with: [daintree.review.review-change]
+  - query: the hub has its own test results and wants this machine's read of the scheduler change at 4f2b8d0 for logic errors
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: 'hub review job on the parser rewrite at e17c3a5: findings on design and correctness, the suite already passed on another host'
+    confusable_with: [daintree.hosts.verify-for-hub]

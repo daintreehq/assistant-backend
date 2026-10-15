@@ -130,3 +130,12 @@ boundaries:
   - query: 'the hub wants its release branch run through the integration tests here again, in a fresh worktree since the old one was cleaned up'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: 'the hub wants commit 7d1e9a0 put through the e2e suite on this machine and to hear what failed, not comments on the code'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'the hub sent a commit it already had reviewed and now only wants lint and the unit tests run on it here, counts back'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'hub message: check that the branch at 6c0e2d9 builds and its tests pass on this machine; a reviewer is already on it'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
