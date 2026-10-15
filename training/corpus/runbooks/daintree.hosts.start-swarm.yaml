@@ -112,6 +112,12 @@ boundaries:
   - query: check which of my remote machines have an assistant that could take a task, without sending anything yet
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: "every host is added already, get an assistant enrolled on each one for the api repo"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: "the machines show connected under hosts; ready a codex lane on each before I split the work"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
 
 followups:
   - query: 'now get them ready'

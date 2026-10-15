@@ -172,3 +172,9 @@ boundaries:
     confusable_with: [daintree.ci.diagnose-and-fix, daintree.diagnostics]
   - query: get the new linux box connected to daintree first, then I'll give its assistant work
     confusable_with: [daintree.hosts.delegate-to-host]
+  - query: "two of the machines I want in the swarm aren't in daintree yet, add them as hosts first"
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: "before the swarm, the spare linux box still needs adding as a remote host"
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: "Add the newly bought Mac mini to Daintree as a Remote Host so a later swarm can include it; nothing should start on it yet"
+    confusable_with: [daintree.hosts.start-swarm]
