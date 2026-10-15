@@ -16,7 +16,7 @@ run: runbook-2026-10-issue-115
 
 positives:
   - >-
-    Execute a five-unit dependency graph across three Remote Hosts: the shared protobuf
+    Execute a four-unit dependency graph across three Remote Hosts: the shared protobuf
     definitions first, then the Go service and the TypeScript client against that commit, then the
     integration tests once both are verified
   - Coordinate a cross-repository plan on the remote machines where the billing service change must be verified on the shared remote before the storefront and the admin panel start building on it
@@ -160,7 +160,7 @@ topic_shifts:
   - query: forget the copies, chain it instead, the first host builds the core and the others build on its commit
     history:
       - "user: have every host try the parser rewrite"
-      - "assistant: Sent to four hosts on their own branches; replies pending."
+      - "assistant: I can send it to four hosts on their own branches; nothing has gone out yet."
   - query: rather than placing them independently, run them in order since the ui tickets need the api ticket
     history:
       - "user: place these four issues on the hosts"

@@ -25,13 +25,14 @@ cases:
   - id: execute-distributed-workflow-issue-api-before-client
     category: single-runbook
     note: >-
-      The issue's second request: it asks for "the whole cross-host plan", not a lone
-      hand-over. Decided by "a multi-stage PLAN across their Remote Hosts" and "The deliverable
-      is the whole graph carried through stage by stage"; delegate-to-host keeps "for that
-      single dependency a deliberate relay" when one hand-over is the whole request.
+      The issue's second request, with the third dependent unit made explicit so it is a
+      plan and not one hand-over. Decided by "a multi-stage PLAN across their Remote Hosts"
+      and "The deliverable is the whole graph carried through stage by stage";
+      delegate-to-host keeps "for that single dependency a deliberate relay" when one
+      hand-over is the whole request.
     messages:
       - role: user
-        content: The API must land before the client starts; coordinate the whole cross-host plan.
+        content: The API must land before the client starts, then a third host runs the end-to-end tests on both; coordinate the whole cross-host plan.
     expect:
       required: [daintree.hosts.execute-distributed-workflow]
       optional: [daintree.hosts.foundation]

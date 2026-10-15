@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 20062,
-  "compiled_sha256": "ab58f2e2315f78ba16bf81cc0526d75ae652ad941edf56e0796e07167c10124f",
+  "compiled_sha256": "0be8db7ea45bd863aaf9c6fd041a49a612462eb0e23339cebe1c2701a2b477a4",
   "label_space_sha256": "744e55b2953d8097702eef58d3b614b577f6dedcb9af2814d756a5becaa793cd",
   "label_space_size": 129,
   "by_source": {
@@ -380,7 +380,7 @@
       "examples": 66,
       "rows": 66,
       "runbook": "daintree.hosts.execute-distributed-workflow",
-      "sha256": "bf73877fdaaab6b3ed4b4828a5363ccf90fe66d715278afa7044ae76725994c9"
+      "sha256": "33aa637544027015ef8473d1726f9ded2229462200bd20ebd746f8d51a1947d4"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
       "examples": 75,
