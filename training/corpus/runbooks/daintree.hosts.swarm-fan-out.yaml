@@ -156,6 +156,15 @@ boundaries:
   - query: 'have all my machines try the caching idea, each on its own branch, and show me what each got'
     confusable_with: [daintree.hosts.steer-swarm]
     run: runbook-2026-10-issue-110
+  - query: have each of my machines build the same prototype on its own branch
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: run this experiment on every host at once and compare what they get
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: same fix on all four machines, one branch each, no ordering between them
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

@@ -218,6 +218,18 @@ boundaries:
   - query: "Ask the build box to take another pass at the login page it finished yesterday, this time with the new copy, and report the PR."
     confusable_with: [daintree.hosts.reassign-host-work]
     run: runbook-2026-10-issue-113
+  - query: when the linux host has pushed the parser fix, have the mini build the cli change on that exact commit
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: single handoff, the build box finishes the endpoint and then the laptop does the client against it
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: the cache layer on the mini depends on one thing only, the config change the linux host is pushing; start it once that commit is in
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: after the backend machine's commit is verified, pass it to the frontend machine for the ui change, that is the only dependency
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

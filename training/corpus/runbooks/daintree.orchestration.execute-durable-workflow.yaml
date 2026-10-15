@@ -224,6 +224,18 @@ boundaries:
   - query: "the API change must land before the client work starts; run it as a tracked plan here"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: keep a plan I can come back to for the agents here, parser rewrite then call sites then removing the old code, nothing starting before the previous step passes
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: dependent phases on this machine only, schema then backfill then cleanup, with a plan I can resume tomorrow
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: make a durable plan for the local agents with dependencies between the steps
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
+  - query: phased upgrade here in this checkout, step two only after step one passes, and keep a checkpoint
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: runbook-2026-10-issue-115
 followups:
   - query: run the next one
     history:

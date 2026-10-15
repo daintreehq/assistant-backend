@@ -1,0 +1,163 @@
+# daintree.hosts.execute-distributed-workflow: the hub carries a PLAN of dependent units across
+# Remote Hosts and their repositories to the end, releasing a unit only when the commits it depends
+# on are verified on the shared remote, keeping failed and blocked units visible, and picking the
+# plan up again after a hub restart.
+#
+# Positives are invented situations in agent and user words, short and long, some with a social
+# lead-in, a constraint or an earlier turn; two how-to questions carry docs. Boundaries are
+# requests this runbook wins against a neighbour whose vocabulary they share: a chain or fan-in
+# that is more than one relay (delegate-to-host), a list whose pieces depend on each other
+# (place-work), different stages per host rather than one brief copied (swarm-fan-out), a
+# dependent plan whose units sit on other machines (execute-durable-workflow), and a restart where
+# the plan is to continue rather than be accounted for (recover-and-clean-up). Followups and topic
+# shifts are the plan as a second turn. Machine names are generic.
+runbook: daintree.hosts.execute-distributed-workflow
+run: runbook-2026-10-issue-115
+
+positives:
+  - >-
+    Execute a five-unit dependency graph across three Remote Hosts: the shared protobuf
+    definitions first, then the Go service and the TypeScript client against that commit, then the
+    integration tests once both are verified
+  - Coordinate a cross-repository plan on the remote machines where the billing service change must be verified on the shared remote before the storefront and the admin panel start building on it
+  - >-
+    Run a staged plan across hosts: stage one updates the OpenAPI spec in the api repository,
+    stage two regenerates the SDK in the sdk repository on another machine, stage three bumps the
+    SDK in the web app on a third
+  - Drive a multi-host workflow with dependencies, schema migration on the linux host, then the ORM models on the mac mini, then the reporting dashboard, each unit released only after its predecessor's commit is checked
+  - Carry a dependency plan across remote machines to completion and keep a table of each unit's host, state and verified SHA
+  - Plan and run units on several hosts in dependency order where two repositories share an interface definition pinned at a version
+  - The shared contract unit on the build host was rejected; mark its dependents blocked and continue the units that do not depend on it
+  - the backend api has to go in first on the linux box, then the ios app and the android app on the two macs can build against it
+  - do the auth library on the mini, then once that's pushed get the other two machines to update the services that use it, then the docs
+  - 'chain this across my machines: migration, then api, then frontend. each one waits for the one before to actually land'
+  - three repos, three hosts, one order. proto first, then server, then client. go
+  - can you run the release prep across the machines? changelog after the version bump, and the tag only after both build boxes finish
+  - ok so the schema has to be merged before the two consumers touch it, and the e2e tests wait on both consumers. spread that over my hosts
+  - kick off the dependent stuff across the remote machines and keep going until everything's in
+  - 'the plan we agreed: types package on the workstation first, then web and mobile on the macs, then the docs site. run it'
+  - morning! busy one today. the payments contract goes first on the build server, then checkout and invoicing on the other two machines against it
+  - hey, before I head out, keep the cross-machine plan moving while I'm away, nothing starts until what it needs has landed
+  - thanks for getting the hosts ready. now the real work, four steps across them, each waiting on the previous one's commit
+  - >-
+    I want to split this feature across my machines but there's an order to it. The event schema
+    lives in its own repository and has to be agreed and pushed first; the producer service on the
+    linux box and the consumer on the mac mini both build against that exact commit, and only when
+    both are verified should the third machine run the end-to-end suite. Keep me posted on what's
+    blocked.
+  - >-
+    We have one repository for the backend and a separate one for the dashboard. The backend needs
+    a new endpoint, the dashboard needs to call it, and the docs need updating after both, and each
+    of those lives on a different host. Run it in that order, check each commit on the remote
+    before moving on, and tell me if anything fails.
+  - >-
+    Orchestrate dependent units across Remote Hosts. Units: A the contract (api-spec repository,
+    build host); B the server (api repository, linux host, after A); C the client (web repository,
+    mac host, after A); D release notes (docs repository, after B and C). Give each dependent its
+    predecessors' verified branch and SHA and report a table at the end.
+  - >-
+    The ui kit change on the mac mini failed its tests, so the two apps that depend on it are
+    stuck. The rest of the plan, the analytics service and its dashboard, doesn't need the ui kit.
+    Keep those going and leave the blocked ones visible so I can decide.
+  - execute the graph across hosts, units with depends-on edges, each run once its inputs are verified
+  - sequence the work across my machines so nothing builds on an unpushed commit
+  - keep track of which host is doing which step of the plan and only start a step once the steps it needs are verified
+  - run the migration plan across the two repos on separate hosts, backend first then frontend then smoke tests
+  - I need the sdk regenerated on one machine after the api spec lands on another, and then the sample apps updated on a third
+  - the server step on the linux host came back completed; check its commit and if it's good, release the client and docs steps
+  - one step of the plan failed on the second mac, block what depends on it and keep the others going
+  - run my four-stage plan over the hosts, a lint config change, then the two packages using it, then a release candidate build
+  - cross-machine plan with a shared contract at v2, the producer and the consumer each build against v2 in their own repositories
+  - have each host do its part in order and verify each part before the next one starts
+  - query: now run the whole thing across my machines in that order
+    history:
+      - "user: here's the plan: shared types, then api and web, then docs"
+      - "assistant: Four units; three of them depend on the types package. Which hosts should take them?"
+  - query: go ahead, send whatever is ready
+    history:
+      - "user: lay out the cross-host plan for the export feature"
+      - "assistant: Plan table: contract on the build host, server and client after it, docs last. Nothing sent yet."
+  - query: how do I run a plan across several machines where one step depends on another? then set one up for the export feature
+    docs: true
+  - query: explain how you make sure the client machine only starts after the api commit is verified, and then do it for these three steps
+    docs: true
+
+boundaries:
+  - query: 'this is not one handoff, it is a chain: the build box does the parser, then the mini does the cli on it, then the laptop does the docs'
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the api change feeds both the web client and the mobile client on two different machines, and the release notes wait on both
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: have the linux host do the schema, then two other hosts each build a service on it, and a fourth host integrate both
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: three dependent pieces of work on three of my remote machines, each starting only when the previous one's commit is verified
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: send the contract work to the build box, then the follow-on work to the two other machines once it lands, and then the docs
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: here are five tickets for the hosts, but tickets two and three can't start until ticket one is merged
+    confusable_with: [daintree.hosts.place-work]
+  - query: spread this backlog over my machines, though the frontend tickets depend on the api ticket landing first
+    confusable_with: [daintree.hosts.place-work]
+  - query: assign these issues to the remote machines in an order that respects which ones depend on which
+    confusable_with: [daintree.hosts.place-work]
+  - query: put this work on the hosts, keeping in mind both clients need the server work finished and verified, and the docs wait on both clients
+    confusable_with: [daintree.hosts.place-work]
+  - query: 'not the same task everywhere: each machine does a different stage, and the stages depend on each other'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: every host gets its own part of the feature, in order, schema then server then ui
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: use all my machines for this feature but in sequence, each one building on the last one's commit
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: track a dependency plan across my remote hosts and resume it after interruptions
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: phased migration with dependent steps, but the steps run on my other machines rather than here
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: durable multi-step plan across the remote macs, with each step's commit verified before the next
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: workflow graph where the nodes are units on different hosts and repositories
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: Daintree restarted, so reconcile the cross-host plan and dispatch the units whose dependencies are now verified
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: after the hub restart, find out which plan units were already sent and carry on with the rest
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the hub crashed halfway through the staged plan across machines; work out where it stands and keep it going
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+
+followups:
+  - query: yes, run it
+    history:
+      - "user: plan the cross-host api and client work with the docs last"
+      - "assistant: Plan: api on the linux host; client and docs after it on the two macs. Send the api unit now?"
+  - query: its commit checks out? then start the next ones
+    history:
+      - "user: run the schema, service and dashboard plan across the hosts"
+      - "assistant: The schema unit on the build host replied completed with a SHA; the service and dashboard units wait on it."
+  - query: add a fourth step, the changelog after the docs, and carry on
+    history:
+      - "user: run the contract, server and docs plan over my machines"
+      - "assistant: Contract verified; server running on the linux host; docs waits on it."
+  - query: drop the mobile unit from the plan and continue with the rest
+    history:
+      - "user: run the four-unit plan across the hosts"
+      - "assistant: The mobile unit is blocked: its host has no enrolled assistant. Web and docs are waiting on the api."
+  - query: ok the contract is fixed and pushed now, send what was blocked on it
+    history:
+      - "user: keep the cross-machine plan going"
+      - "assistant: The contract unit failed its checks; server and client are blocked on it, docs is unaffected and done."
+
+topic_shifts:
+  - query: 'now run the dependent plan across them: shared lib first, then the two apps on top of it'
+    history:
+      - "user: are the hosts ready to take work?"
+      - "assistant: Three hosts have an assistant ready, with their generations."
+  - query: good, now the real plan, api on the linux box first, then the web client on the mac once that's verified, then docs
+    history:
+      - "user: how much usage do my hosts have left"
+      - "assistant: The linux box has 60% of its Codex week left; the mac has 85% of Claude."
+  - query: forget the copies, chain it instead, the first host builds the core and the others build on its commit
+    history:
+      - "user: have every host try the parser rewrite"
+      - "assistant: Sent to four hosts on their own branches; replies pending."
+  - query: rather than placing them independently, run them in order since the ui tickets need the api ticket
+    history:
+      - "user: place these four issues on the hosts"
+      - "assistant: Proposed placement: api ticket on the linux host, three ui tickets across the macs."
