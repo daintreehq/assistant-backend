@@ -148,6 +148,9 @@ boundaries:
   - query: before the cross-platform test run, make sure every host has an enrolled assistant in this project and show me the ready table
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: "get an assistant ready in this repo on every remote host before I hand anything out"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 
 followups:
   - query: 'now get them ready'

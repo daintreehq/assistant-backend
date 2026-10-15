@@ -202,3 +202,9 @@ boundaries:
   - query: 'we''re abandoning the parked remote run; have each host remove what it made for it'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
+  - query: "I've been out all afternoon, what became of the jobs I handed my other machines this morning?"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
+  - query: "the task I gave the linux server's assistant yesterday never came back, find out what happened to it"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109

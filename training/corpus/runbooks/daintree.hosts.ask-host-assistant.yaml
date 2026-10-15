@@ -163,3 +163,6 @@ boundaries:
   - query: 'have the linux box''s assistant tell me why its deploy script failed'
     confusable_with: [daintree.hosts.diagnose-messaging]
     run: runbook-2026-10-issue-103
+  - query: "ask the build host's assistant whether last night's soak test passed and bring me its answer"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109

@@ -126,6 +126,12 @@ boundaries:
     confusable_with: [daintree.agents.steer-running-agent]
   - query: the host I sent the parser unit to says its claude code isn't signed in there; move the unit to a host that has it
     confusable_with: [daintree.hosts.handle-hub-message]
+  - query: "the server's assistant stopped answering halfway through the export job and the run can't wait; give that unit to one of the macs from where it left off"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
+  - query: "the laptop host lost its sign-in mid-unit and nobody's there to fix it; let a different host pick up that unit without redoing what was pushed"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 
 followups:
   - query: fine, move that one to the tower then

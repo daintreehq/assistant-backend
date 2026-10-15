@@ -128,6 +128,12 @@ boundaries:
   - query: 'the hub came back after the update: continue the three-stage plan across my hosts from the task records, docs last as before'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
+  - query: "the client units on the minis can't start until the server's API unit is verified; run the whole chain across the hosts"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
+  - query: "docs wait on both apps and both apps wait on the schema; drive that plan across my machines to the end"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 
 followups:
   - query: yes, run it

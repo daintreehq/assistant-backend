@@ -549,6 +549,12 @@ boundaries:
   - query: "after the deploy check passes tonight, kick off the cleanup agent in this worktree"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: "let me know when the build in the second terminal here finishes"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
+  - query: "ping me when the PR I just opened gets merged"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:
