@@ -636,6 +636,12 @@ boundaries:
   - query: 'I''ve got a list of eight cleanup tasks for this repo, run them in parallel here, max three agents'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: 'the test suite has six failing modules, put one local agent on each module in its own worktree'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'divide the test-writing for the new API between three agents on this machine'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
 followups:
   - query: yeah all of them except the docs one
     history:

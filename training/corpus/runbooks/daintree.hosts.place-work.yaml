@@ -147,6 +147,15 @@ boundaries:
   - query: "split these five unrelated tickets across whichever hosts have room, then see each one through"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: 'here are four failing test files with different causes, put each on whichever host has room to fix it'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'assign these test-tooling tickets to whichever machines are least loaded'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'three separate bugs in the test helpers, one per host, choose the hosts by how busy they are'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
 
 followups:
   - query: yes, go ahead with that split

@@ -101,6 +101,15 @@ boundaries:
   - query: check whether this branch builds on both node versions I have installed locally, no remote hosts
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: 'use pytest -n auto here and tell me which tests fail'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'run all the tests on this machine in a few parallel processes so it''s quicker, nothing remote'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'run the jest suite locally with --shard 1/2 and then 2/2 and tell me if both halves pass'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
 followups:
   - query: and the unit tests?
     history:

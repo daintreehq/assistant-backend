@@ -150,3 +150,9 @@ boundaries:
   - query: 'three machines each finished one module of the importer; pick one of them to combine the three branches and run the tests on the result'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
+  - query: 'the hosts each pushed their part of the test fixes; have the build machine merge those branches in order and run the suite'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'two machines finished their halves of the migration; get one host to combine both branches and tell me if the tests pass'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118

@@ -186,6 +186,15 @@ boundaries:
   - query: "have both hosts apply the same timezone fix to the date tests and run the suite"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: 'give all my machines the same job: each adds snapshot tests for the invoice renderer on a branch of its own, and I will compare them'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'each of my machines should try speeding up the slow test suite its own way on a separate branch'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'same job for all the hosts, each writes integration tests for the export endpoint on its own branch and reports its SHA'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

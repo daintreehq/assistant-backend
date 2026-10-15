@@ -169,3 +169,12 @@ boundaries:
   - query: "the hub wants this host's results for its sha so it can compare them with another machine; run the tests here and reply"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: 'only the tests under the api folder are this host''s share of the hub''s split; run them at the hub''s commit without touching anything'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'hub message with a list of test ids for this host at commit 7f3a; run exactly those and send back what ran'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'this lane got one slice of the hub''s split test run, run it here unchanged and report'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
