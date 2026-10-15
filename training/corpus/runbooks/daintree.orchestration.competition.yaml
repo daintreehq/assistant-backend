@@ -426,6 +426,12 @@ boundaries:
   - query: 'have three agents on this machine race on the same bug and pick the best fix'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'get two agents to each write their own take on the slug helper and judge which is cleaner'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'three agents compete on the caching change here and I''ll be the judge'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
 followups:
   - query: how's it going?
     history:

@@ -145,3 +145,9 @@ boundaries:
   - query: 'the hub''s merged release commit needs the test suite run on this box, nothing combined here'
     confusable_with: [daintree.hosts.integrate-for-hub]
     run: runbook-2026-10-issue-107
+  - query: 'the hub wants the commit it built elsewhere put through lint and the unit tests here, nothing changed, counts back'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'before the hub merges, it asked this machine to rerun the integration suite on its branch head and report what passed, no fixes'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105

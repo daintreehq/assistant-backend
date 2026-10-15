@@ -142,3 +142,18 @@ boundaries:
   - query: "The hub's unit brief just arrived and nothing has been started for it yet; set up its worktree and get Codex going on it."
     confusable_with: [daintree.hosts.steer-for-hub]
     run: runbook-2026-10-issue-106
+  - query: 'the hub wants one fix here, the broken pagination, in a new worktree with codex'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'hub message asks this host for a single feature, the export button, so no extra attempts'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'only the null check in the importer came from the hub this time, a worktree and claude for it'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'the hub asked for the login fix on this machine, just the one agent on it'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'one ticket from the hub for this host, the search debounce, codex in a fresh worktree'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105

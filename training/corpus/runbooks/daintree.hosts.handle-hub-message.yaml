@@ -214,3 +214,12 @@ boundaries:
   - query: "the delegated job is done and i've verified it, let the main machine's assistant know"
     confusable_with: [daintree.hosts.steer-for-hub]
     run: runbook-2026-10-issue-106
+  - query: 'there''s a new message from the hub in the inbox, read it and tell me what it''s asking this machine for'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'the hub''s message lists several tasks but doesn''t say which project, ask it back'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'tell the hub this machine can''t take its batch because codex isn''t signed in here'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105

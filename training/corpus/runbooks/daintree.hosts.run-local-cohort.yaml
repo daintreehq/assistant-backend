@@ -1,0 +1,198 @@
+# daintree.hosts.run-local-cohort: a Remote Host's lane given SEVERAL pieces by the hub at once,
+# a batch of independent units for this project or rival attempts the hub asked for, splits them
+# across its own worktrees and visible agents within the hub's cap and this project's running
+# agents, verifies each piece here, and answers the hub once with a row per piece.
+#
+# Rows: hub batches and hub-requested attempts in lane-written task descriptions and people's own
+# words, short and long, some with a social lead-in or earlier turns; the situations inside a
+# batch (a cap, agents already running, one CLI signed in, two units sharing a file, a queue);
+# followups mid-batch; boundaries against one unit (daintree.hosts.do-delegated-work), the
+# envelope (daintree.hosts.handle-hub-message), the person's own split
+# (daintree.orchestration.fan-out-work, daintree.orchestration.competition,
+# daintree.orchestration.spike-options, daintree.orchestration.decompose-work), the hub side
+# (daintree.hosts.swarm-fan-out) and checks of a commit (daintree.hosts.verify-for-hub).
+# Reverse rows sit in those neighbours' files. Blind labels agreed on every row.
+runbook: daintree.hosts.run-local-cohort
+run: runbook-2026-10-issue-105
+positives:
+- Hub delegated four separate bug fixes to this host; set up a worktree and agent for each, then reply
+  with one combined result
+- split the hub's three tasks for this project across parallel local agents, each on its own branch from
+  the base commit, and report back once
+- run several hub-assigned units concurrently on this machine with a cap of two and send one rolled-up
+  reply
+- hub asked for competing implementations of the rate limiter here; run each attempt in its own worktree
+  and report the strongest
+- orchestrate the hub's batch of independent tickets locally, verify each agent's commit, reply with a
+  per-ticket table
+- lane has a list of five refactors from the hub; launch one agent per refactor in separate worktrees
+  and roll up the outcomes
+- the hub wants two rival approaches to the search indexing fix built on this host and the better one
+  named
+- work through the hub's queue of six small fixes here, two agents at a time, then one reply with branch
+  and SHA per fix
+- carry out this machine's portion of the hub run, several units in local worktrees, one verified summary
+  back
+- parallelise the hub's units across claude agents on this host without exceeding its concurrency limit
+- hub dropped three tickets on this mac, get them all going
+- the main machine sent over a bunch of little fixes for this repo, spread them over a few agents and
+  tell it how each went
+- hub wants this tried a couple of different ways here, pick the winner and tell it
+- ok so the hub gave us four things to build, do them in parallel but don't melt the laptop
+- the hub says try both a regex and a parser-based approach to the date bug on this box, then report which
+  holds up
+- five items from the hub for this project, codex only, max two running
+- do the hub's batch here, each in its own worktree, and only reply when everything's checked
+- hub wants three different takes on the onboarding copy component here
+- the other machine split its work and gave this one the backend pieces, three of them
+- run the hub's units here but this box is already running a couple of agents so go easy
+- hub requested parallel work on four modules of this repo, they don't overlap, start them
+- 'Lane: the hub wants the retry logic, the metrics hook and the docs fix done here at once'
+- the hub sent a couple of independent chores for this project, use codex for both, separate worktrees
+- make this machine work the hub's three bugs side by side
+- the hub wants this machine to race two fixes for the memory leak and keep the one that passes
+- four units from the hub, but this mac only has claude signed in, run them all with claude
+- the hub said up to four agents at once on this host for its seven tasks
+- the hub's request is a set of small refactors across separate packages; split them over agents here
+- best-of-three attempt at the flaky upload test, requested by the hub for this machine
+- as the hub's submanager here, spread its tickets over local agents and report one summary
+- The hub just sent this machine its slice of tonight's run, the CSV export bug, the pagination off-by-one
+  and the stale cache header, all in this repo. Each should get its own branch from the commit it gave,
+  Claude doing the work, and I want a single answer back to the hub listing what passed and what didn't.
+- Message from the hub wants the image resize worker rewritten three ways on this host, one with sharp,
+  one with libvips bindings, one pure wasm, each on its own branch from the base SHA. The benchmarks in
+  the repo decide the winner. Reply with all three results and which one won.
+- We're the lane for the api project. The hub's request lists four migrations to write, but two of them
+  touch the same users table schema file. Run the ones that can go in parallel, sort out the overlap,
+  and get one reply back with everything.
+- This host got six units from the hub with a limit of three at once. Two agents from yesterday are still
+  working here. Start what fits, queue the rest, and don't send the hub anything until every unit is either
+  verified or stuck.
+- Hub exchange asks this host to implement three independent units in the payments service from base 2b8e4f0,
+  idempotency keys, a webhook retry and a refund status field. Run each with Codex on its own branch,
+  rerun the unit tests per branch, and answer the hub once with a row per unit.
+- morning! the hub left a batch of four fixes for this machine overnight, can you get agents on them
+- hey, quick one, the hub wants a few parallel attempts at the login timeout thing here and the best one
+  sent back
+- query: split them up across agents then
+  history:
+  - 'user: check the inbox'
+  - 'assistant: The hub''s message asks this host for three changes in this project: retry backoff, a
+    health endpoint and log redaction, base commit 7f2e1aa.'
+- query: go, one worktree each and claude on all of them
+  history:
+  - 'user: what did the hub want'
+  - 'assistant: Four independent fixes for this repository from base c41d9e0, Claude Code, run the unit
+    tests on each, reply with branch and SHA per fix.'
+- query: do that and report to the hub
+  history:
+  - 'user: the hub wants competing versions of the debounce hook'
+  - 'assistant: It asks for three attempts at the debounce hook on this host, judged by the hook''s test
+    suite, best one reported.'
+- this mac got the hub's four lint and typing fixes; only claude is signed in here, so run them all with
+  it and reply when they're verified
+- two of the hub's units collide on the same migration file, so run the rest here and ask the hub about
+  those two
+- the hub says up to three at a time and this project already has two agents working, so pace its units
+  accordingly
+- query: explain how this machine runs the hub's several units at once, then start them
+  docs: true
+- query: what happens when the hub sends this host more units than it allows at once? queue the extras
+    here
+  docs: true
+followups:
+- query: fine, run all of them here, two at a time
+  history:
+  - 'user: open the hub''s latest message'
+  - 'assistant: The hub asks this machine for five independent fixes in this project, at most two at once,
+    with Codex.'
+- query: start them
+  history:
+  - 'user: read what the hub sent'
+  - 'assistant: It sent three units for this project, each with its own branch name, base SHA 91c0d2b,
+    Claude Code, checks npm test.'
+- query: the second attempt finished too, so which one goes back to the hub?
+  history:
+  - 'user: the hub wants three attempts at the slug fix here'
+  - 'assistant: Three attempts are running in their own worktrees; the first one has committed.'
+- query: ok the last unit is done, check them all and answer the hub
+  history:
+  - 'user: work the hub''s four tickets here'
+  - 'assistant: Four agents launched in their own worktrees; three have committed so far.'
+boundaries:
+- query: the hub sent this host two unrelated fixes, each needs its own worktree and agent
+  confusable_with:
+  - daintree.hosts.do-delegated-work
+- query: 'hub task list for this machine: add the export endpoint, fix the timezone bug, bump the logging
+    level, separate branches'
+  confusable_with:
+  - daintree.hosts.do-delegated-work
+- query: the hub explicitly asked for three independent attempts at the parser bug on this machine
+  confusable_with:
+  - daintree.hosts.do-delegated-work
+- query: not one unit this time, the hub's message has a batch of four for this project
+  confusable_with:
+  - daintree.hosts.do-delegated-work
+- query: the hub's message I just read wants four tickets done here in parallel, set that up
+  confusable_with:
+  - daintree.hosts.handle-hub-message
+- query: reply to the hub once all three of its units are built and checked here
+  confusable_with:
+  - daintree.hosts.handle-hub-message
+- query: hub message asks this lane for two competing versions of the cache layer and the better one,
+    get going
+  confusable_with:
+  - daintree.hosts.handle-hub-message
+- query: the hub's list of independent tasks for this machine, one agent and worktree per task, and answer
+    the hub once
+  confusable_with:
+  - daintree.orchestration.fan-out-work
+- query: run the hub's units in parallel here capped at three, then send it a table
+  confusable_with:
+  - daintree.orchestration.fan-out-work
+- query: 'it''s the hub asking, not me: several separate issues on this host, an agent each'
+  confusable_with:
+  - daintree.orchestration.fan-out-work
+- query: rolling queue of the hub's eight small units on this box, two at a time, one reply at the end
+  confusable_with:
+  - daintree.orchestration.fan-out-work
+- query: the hub asked this host for rival attempts at the search ranking change, each committed on its
+    own branch, best reported back
+  confusable_with:
+  - daintree.orchestration.competition
+- query: claude and codex should each try the hub's flaky test fix here, and the hub hears which worked
+  confusable_with:
+  - daintree.orchestration.competition
+- query: hub wants several approaches tried on this machine and only the strongest reported, the tests
+    decide
+  confusable_with:
+  - daintree.orchestration.competition
+- query: the hub already split the work into units for this host, just run them in separate worktrees
+    and report
+  confusable_with:
+  - daintree.orchestration.decompose-work
+- query: these four pieces from the hub are already scoped with acceptance criteria, start agents on them
+    here
+  confusable_with:
+  - daintree.orchestration.decompose-work
+- query: of the hub's swarm this host got three units, handle them locally with an agent each
+  confusable_with:
+  - daintree.hosts.swarm-fan-out
+- query: 'I''m the host, not the hub: the run gave me several pieces, work them here'
+  confusable_with:
+  - daintree.hosts.swarm-fan-out
+- query: the hub fanned out to all hosts and this machine's part is four tasks, get them done here
+  confusable_with:
+  - daintree.hosts.swarm-fan-out
+- query: the hub sent three fixes to build here, and each agent's commit must pass the tests before the
+    hub hears back
+  confusable_with:
+  - daintree.hosts.verify-for-hub
+- query: the hub assigned this host three caching approaches to try, each on its own branch, and wants
+    the best one back
+  confusable_with:
+  - daintree.orchestration.spike-options
+- query: hub wants a redis version and an in-memory version of the session store built here, then the
+    better one reported
+  confusable_with:
+  - daintree.orchestration.spike-options

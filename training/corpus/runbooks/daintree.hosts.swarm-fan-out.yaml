@@ -135,6 +135,15 @@ boundaries:
   - query: "every host should take this one bug, not whichever is least loaded, I want all of them on it"
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
+  - query: 'have my other computers each implement the same pagination tweak separately and tell me how each did'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'have all my machines each build the parser on their own branch'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'from the Shell, every host should try the caching change and report its SHA'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

@@ -103,6 +103,12 @@ boundaries:
   - query: mock up three versions of the pricing page so I can pick one
     confusable_with: [daintree.orchestration.productionize-prototype]
     run: 2026-09-28-round6
+  - query: 'try a redis and an in-memory session store hands-on and tell me which to keep'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'spike two ORMs on this repo before we pick one'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
 followups:
   - query: add Kysely as a third option too, same scenario
     history:
