@@ -59,9 +59,9 @@ cases:
   - id: park-swarm-agent-phrased
     category: single-runbook
     note: >-
-      How a hub agent describes the task to search. Decided by "a resume record ... (per host:
-      project, slot, branch, SHA, pushed or not, uncommitted files, panes, open questions, what
-      must not be redone, and which hosts never acknowledged)".
+      How a hub agent describes the task to search. Decided by "a resume record kept where the
+      person chooses (per host: project, slot, branch, SHA, pushed or not, uncommitted files,
+      panes, open questions, what must not be redone, and which hosts never acknowledged)".
     messages:
       - role: user
         content: >-
@@ -184,8 +184,9 @@ cases:
     category: routing-trap
     note: >-
       Reverse: a catch-up after a restart with nothing parked. daintree.hosts.recover-and-clean-up
-      owns "rebuild where every exchange with the Remote Hosts stands after a restart ... from
-      each host's task records"; this runbook fences "an account of what happened while away".
+      owns "rebuild where every exchange with the Remote Hosts stands after a restart, a new hub
+      or a dropped link, from each host's task records"; this runbook fences "an account of what
+      happened while away".
     messages:
       - role: user
         content: Daintree restarted on this Mac. Rebuild where every delegated exchange with the remote hosts stands from their task records.
