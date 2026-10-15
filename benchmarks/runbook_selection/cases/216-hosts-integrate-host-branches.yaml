@@ -1,0 +1,223 @@
+# daintree.hosts.integrate-host-branches: the hub's side of combining what several Remote Hosts
+# built. From the person's Shell, the hub checks each host's result on the shared remote, chooses
+# one host's assistant to merge them, briefs it with the inputs in order and what each must still
+# satisfy, and verifies that the branch it reports holds exactly those inputs.
+#
+# Recall: the issue's three requests, an agent-phrased and a user-phrased outcome, a source that
+# moved after the job went out, the integrator's result checked, and a host's question answered
+# in a second turn. Traps where this runbook wins over each declared neighbour: one unit on one
+# host (daintree.hosts.delegate-to-host), the same work on every host
+# (daintree.hosts.swarm-fan-out), merging on this machine (daintree.git.integrate-agent-branches)
+# and the lane doing the merge (daintree.hosts.integrate-for-hub). Reverse traps where that
+# neighbour wins and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: integrate-host-branches-issue-pushed
+    category: single-runbook
+    note: >-
+      The issue's first request, quoted in the positive clause ("integrate the branches the remote
+      hosts pushed into one verified branch"). Before this runbook it selected
+      daintree.hosts.integrate-for-hub alone, and the untrained runbook still loses it to that
+      trained receiver (two text revisions measured; retrain owed).
+    messages:
+      - role: user
+        content: Integrate the branches the remote hosts pushed into one verified branch.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-issue-designated
+    category: single-runbook
+    note: >-
+      The issue's second request, quoted in the positive clause ("the hosts finished their units;
+      combine them on the designated integration machine"). Before this runbook it selected
+      daintree.hosts.integrate-for-hub with daintree.hosts.run-local-cohort and
+      daintree.hosts.swarm-fan-out.
+    messages:
+      - role: user
+        content: The hosts finished their units; combine them on the designated integration machine.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-issue-coordinate
+    category: single-runbook
+    note: >-
+      The issue's third request, hub shorthand, quoted in the positive clause ("coordinate one host
+      integrating pinned artifacts from the other lanes"). Before this runbook it selected
+      daintree.hosts.integrate-for-hub.
+    messages:
+      - role: user
+        content: Coordinate one host integrating pinned artifacts from the other lanes.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-agent-phrased
+    category: single-runbook
+    note: >-
+      How the hub describes the task to search: "one machine chosen and briefed with the inputs in
+      order and what each must still satisfy, and the combined branch it reports verified to
+      contain exactly those inputs".
+    messages:
+      - role: user
+        content: Hand the merge of the hosts' finished branches to one machine's assistant and check the combined commit contains only those inputs
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-user-moves-later
+    category: single-runbook
+    note: >-
+      A person's own words, with the moved-source rule: "a source that moved on or a clash brought
+      back to the person to decide". The receiver may ride along on the shipped selector.
+    messages:
+      - role: user
+        content: have the linux box integrate what the laptop and the mini pushed, and if either branch moves after that, leave the new commits out
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-moved-after-dispatch
+    category: single-runbook
+    note: >-
+      A source branch moved after the job went out: "a source that moved on ... brought back to
+      the person to decide", and "the combined branch it reports verified to contain exactly those
+      inputs".
+    messages:
+      - role: user
+        content: After the integration job went out, the mini pushed more commits to its branch; check that the combined branch on the remote still only has the commit we pinned.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-verify-result
+    category: single-runbook
+    note: >-
+      The integrator's reply checked by the hub: "the combined branch it reports verified to
+      contain exactly those inputs".
+    messages:
+      - role: user
+        content: The tower's merge of the two hosts' branches came back; confirm on the remote it holds exactly the inputs we sent, and flag any source that moved since.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-answer-clash
+    category: continuation
+    note: >-
+      The integrating host asked about a clash between two inputs, and the person decides: "a
+      source that moved on or a clash brought back to the person to decide".
+    messages:
+      - role: user
+        content: get the tower to merge the api host's branch and the web host's branch into one
+      - role: assistant
+        content: The tower stopped at the second merge. Both inputs change the session timeout, and it is asking which value to keep.
+      - role: user
+        content: keep the api host's value and have it finish
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps: this runbook wins
+  - id: integrate-host-branches-not-one-unit
+    category: routing-trap
+    note: >-
+      Nothing new to build: two pushed results combined, not "one unit of work on one host
+      (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: the api host and the web host both pushed; have the build box combine them and verify nothing else got in
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-not-fan-out
+    category: routing-trap
+    note: >-
+      The hosts' copies are already pushed and one machine merges them: not "the same work sent to
+      every host (daintree.hosts.swarm-fan-out)".
+    messages:
+      - role: user
+        content: Once every host's copy is pushed, have the build box merge them together in the order I gave and check it
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-not-local
+    category: routing-trap
+    note: >-
+      The sources are on remote machines and a remote host merges them: not "combining branches or
+      worktrees on this machine (daintree.git.integrate-agent-branches)".
+    messages:
+      - role: user
+        content: These branches came from my remote machines, not worktrees here; have the build host put them together on one branch.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-not-lane
+    category: routing-trap
+    note: >-
+      The hub chooses and briefs the integrator: "Use on the hub, the person's own Shell", not "on
+      the host chosen to do the merging (daintree.hosts.integrate-for-hub)".
+    messages:
+      - role: user
+        content: From the hub, choose which remote host integrates the two finished units and send it the pinned commits.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps: the neighbour wins
+  - id: integrate-host-branches-trap-one-unit
+    category: routing-trap
+    note: >-
+      One new piece of work for one host, nothing to combine: daintree.hosts.delegate-to-host ("the
+      person wants ONE piece of WORK done by the Daintree assistant on another machine"), which
+      fences "several hosts' finished work combined into one branch
+      (daintree.hosts.integrate-host-branches)".
+    messages:
+      - role: user
+        content: get the assistant on the tower to write the CSV export endpoint on a new branch and tell me the commit
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-trap-fan-out
+    category: routing-trap
+    note: >-
+      The same work on every host, each result kept apart: daintree.hosts.swarm-fan-out ("the SAME
+      WORK done on EVERY Remote Host"), which fences "the hosts' finished branches combined into one
+      (daintree.hosts.integrate-host-branches)".
+    messages:
+      - role: user
+        content: run the same lint cleanup on all my hosts, one branch each, and show me what each got
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-host-branches-trap-local
+    category: routing-trap
+    note: >-
+      Local agents' branches merged here: daintree.git.integrate-agent-branches ("the work of
+      SEVERAL agents, branches or worktrees must be combined into one branch").
+    messages:
+      - role: user
+        content: merge the branches my three local agents produced into one integration worktree here
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+
+  - id: integrate-host-branches-trap-lane
+    category: routing-trap
+    note: >-
+      This machine is the lane doing the merge: daintree.hosts.integrate-for-hub ("Use when the hub
+      has chosen this lane as its integrator"), which fences "the hub's side
+      (daintree.hosts.integrate-host-branches)".
+    messages:
+      - role: user
+        content: The hub made this lane its integrator for the export run; merge the pinned commits here in its order
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
