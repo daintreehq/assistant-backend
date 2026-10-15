@@ -382,10 +382,11 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: commit what's left, push the branch and open the PR
+  - query: 'tell the reviewers it''s ready: push what''s committed and put up the pull request'
     confusable_with:
     - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
-  - query: tidy the commits on this branch, push it and open a pull request
+  - query: tell the team the change is done by pushing the branch and opening a pull request
     confusable_with:
     - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90

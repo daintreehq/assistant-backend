@@ -199,6 +199,7 @@ boundaries:
   - query: can the laptop's assistant receive work from my hub, or does something need switching on first
     confusable_with:
     - daintree.hosts.handle-hub-message
+    docs: true
     run: runbook-2026-10-issue-90
   - query: set things up so the assistant on the second machine accepts messages from this one
     confusable_with:

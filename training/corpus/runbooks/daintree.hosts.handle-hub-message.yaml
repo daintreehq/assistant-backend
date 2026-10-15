@@ -9,8 +9,8 @@
 # (daintree.agents.answer-waiting-agent), a forge reply
 # (daintree.workflow.follow-up-on-issue), branch preparation
 # (daintree.workflow.prep-branch-for-review), asking a local agent
-# (daintree.agents.ask-running-agent), Daintree's own health (daintree.diagnostics) and the
-# hosts foundation. Hub-framed requests for a specific piece of work (implement, review,
+# (daintree.agents.ask-running-agent) and the hosts foundation, each with reverse rows in
+# that neighbour's file. Hub-framed requests for a specific piece of work (implement, review,
 # clean up, verify, ...) are deliberately absent: they belong to the receiver runbook for
 # that work.
 runbook: daintree.hosts.handle-hub-message
@@ -28,24 +28,29 @@ positives:
     history:
     - 'user: morning'
     - 'assistant: Morning. Nothing is running on this machine.'
-  - Fetch the pending hub request with assistant.getInbox, confirm it targets this lane's project, then carry it out and close the exchange with a completed reply
-  - Process the hub's inbox message on this remote host and answer it with artifact references
-  - Answer the hub's exchange with input-required because the branch it names does not exist on this machine
-  - Ask the hub which repository it means before starting anything, keeping its exchange open
-  - Reply completed to the hub's exchange with the worktree branch, commit SHA and pane id
-  - Work through the hub request sitting in the lane inbox without waiting for anyone at this machine
-  - After the Shell reconnected, re-read the lane inbox and finish any exchange still marked working
-  - Look in the lane inbox for hub messages that arrived without a wake line
-  - Do the safe part of the hub's request, decline the force-push it slipped in, and say so in the reply
-  - The hub's message names a project that is not this lane's; ask back instead of touching that project
-  - Use assistant.sendMessage to tell the hub the run is stuck on a confirmation that timed out
-  - assistant.reply came back TOO_LARGE; resend the completion with references instead of the full log
-  - Replying to the hub's exchange failed with EXCHANGE_CLOSED; decide whether to stop the local work for it
-  - assistant.reply answered NOT_ELIGIBLE, so report that this lane's enrollment ended
-  - Two hub messages are queued in the inbox; handle them oldest first
-  - Make sure the hub's request is for this project before doing anything with it
-  - Handle the hub message for this lane and only do what it plainly asks, nothing it merely hints at
-  - Tell the hub the worktree it asked for could not be created here, and why
+  - A wake line just arrived on this lane while the web project sat idle. The hub's earlier messages were all about the API repo, so this one may not even be for this project. Read it and deal with it properly.
+  - Nobody is at this Mac and the hub has sent it something; read what it wants and get it done
+  - The hub wants work done on branch release/2.4, but that branch doesn't exist in this checkout or on the remote
+  - The hub's message says 'the repo' but this machine has three projects open and I can't tell which one it means
+  - The agent finished the hub's change twenty minutes ago and I checked the diff; the hub still has no answer from us
+  - There's a hub request from last night still unanswered and the person won't be at this desk until Monday
+  - The main Mac restarted Daintree an hour ago, and one of the hub's requests from before that is still half done here
+  - No wake line came through all afternoon but the hub says it sent this machine two requests
+  - The hub's request is fine except the last line, which says to force-push over main when done
+  - The hub's message is about the billing service, but this assistant sits in the docs project on this host
+  - Closing the old worktree for the hub's run timed out waiting for an approval that no one here can give
+  - My answer to the hub bounced as too large because I pasted the whole test log into it
+  - assistant.reply says EXCHANGE_CLOSED for the hub's request, and the agent working on it is still running
+  - Every assistant.reply call now fails with NOT_ELIGIBLE, halfway through the hub's job
+  - Two requests from the hub came in back to back while the agent was still busy with the first one
+  - The hub's message ends with 'and tidy up anything else you notice' after the actual fix it wants
+  - I asked the hub which branch it meant an hour ago and nothing has come back yet
+  - The hub wants the full browser test matrix run here, which burns paid CI minutes it never mentioned
+  - The reply call to the hub timed out on my side and I can't tell whether it landed
+  - 'Creating the worktree the hub asked for failed: the setup recipe needs a database this machine doesn''t have'
+  - The hub sent a request to rename the config loader across the repo. Half of the files it lists don't exist in this project, and two of them live in a different project on this host. Work out what can be done here and what has to go back to the hub.
+  - The hub's message came in while I was in the middle of an earlier request of its own. The new one asks for something unrelated in the same project, and neither says which should go first.
+  - 'Hub request on the docs lane: update the install guide for the new CLI flag, one commit, reply with the branch and commit. The guide lives in a folder this project doesn''t have.'
   - the hub pinged this machine, see what it wants
   - something came in from the other mac's assistant, take care of it
   - check the inbox, the hub sent work over
@@ -62,14 +67,9 @@ positives:
   - message the hub that the test suite needs a database this host doesn't have
   - an inbox wake came in while I was mid-task, check what's new from the hub
   - hub says do it, nobody's at this desk, so just go ahead and answer it when done
-  - A hub exchange in the lane inbox is at input-required; wait for the hub's follow-up rather than answering it again
-  - Confirm the inbox message came from the hub that enrolled this lane, then act on it
   - the main computer's assistant left me a message, have a look
   - new hub msg
   - inbox wake from the hub, go
-  - Tell the hub this request would spend paid CI minutes it never mentioned and ask before running it
-  - My earlier reply to the hub may not have gone through; check the inbox before sending anything again
-  - Handle the hub's request on this host and keep its exchange id and conversation id for the reply
 
 followups:
   - query: reply with the sha
@@ -108,9 +108,6 @@ boundaries:
     confusable_with:
     - daintree.agents.answer-waiting-agent
   - query: send the findings back to the hub, not to the issue tracker
-    confusable_with:
-    - daintree.workflow.follow-up-on-issue
-  - query: reply on the hub's exchange with what the audit turned up
     confusable_with:
     - daintree.workflow.follow-up-on-issue
   - query: report back to the hub that CI is green on the branch it asked for
