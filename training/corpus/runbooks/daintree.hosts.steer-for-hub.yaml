@@ -147,3 +147,12 @@ boundaries:
     confusable_with: [daintree.hosts.clean-up-for-hub]
   - query: hub says pause the race agents here, it may want them back later, so nothing gets closed
     confusable_with: [daintree.hosts.clean-up-for-hub]
+  - query: 'the hub wants the lint unit''s agent here to drop what it''s doing and switch to the new acceptance it sent'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'stop the two codex agents I launched for the hub''s batch, the hub called the run off, keep whatever they changed'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105
+  - query: 'hub update says the attempts running on this machine should all use the new API version from now on'
+    confusable_with: [daintree.hosts.run-local-cohort]
+    run: runbook-2026-10-issue-105

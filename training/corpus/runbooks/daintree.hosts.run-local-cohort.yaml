@@ -10,7 +10,8 @@
 # envelope (daintree.hosts.handle-hub-message), the person's own split
 # (daintree.orchestration.fan-out-work, daintree.orchestration.competition,
 # daintree.orchestration.spike-options, daintree.orchestration.decompose-work), the hub side
-# (daintree.hosts.swarm-fan-out) and checks of a commit (daintree.hosts.verify-for-hub).
+# (daintree.hosts.swarm-fan-out), checks of a commit (daintree.hosts.verify-for-hub) and agents
+# already running for the hub (daintree.hosts.steer-for-hub).
 # Reverse rows sit in those neighbours' files. Blind labels agreed on every row.
 runbook: daintree.hosts.run-local-cohort
 run: runbook-2026-10-issue-105
@@ -204,3 +205,12 @@ boundaries:
   confusable_with:
   - daintree.orchestration.fan-out-work
   - daintree.hosts.do-delegated-work
+- query: 'the hub queued two more refactors for this machine while its first agents are still busy; get the new ones going too'
+  confusable_with:
+  - daintree.hosts.steer-for-hub
+- query: 'another batch from the hub landed for this host and three of the earlier agents are still at it, so add the new pieces within the cap'
+  confusable_with:
+  - daintree.hosts.steer-for-hub
+- query: 'hub sent this machine a second round of units to run; the first round''s agents haven''t finished'
+  confusable_with:
+  - daintree.hosts.steer-for-hub
