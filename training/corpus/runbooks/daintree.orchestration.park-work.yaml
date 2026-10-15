@@ -138,7 +138,7 @@ boundaries:
   - query: 'park the agents in my local panes for the night with resume notes'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
-  - query: 'wrap up the agents on this laptop and leave the worktrees, back tomorrow'
+  - query: 'freeze the claude and codex panes on this mac until monday and save a resume note for each'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
 followups:

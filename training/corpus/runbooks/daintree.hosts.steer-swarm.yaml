@@ -150,6 +150,6 @@ boundaries:
   - query: 'call off the swarm and confirm which hosts stopped; I don''t need notes to resume it'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
-  - query: 'the run on my other machines is pointless now, kill it everywhere but keep what they wrote'
+  - query: 'stop the swarm on every host and keep their worktrees as they are, no resume record needed, we''re done with it'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
