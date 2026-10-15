@@ -1,0 +1,195 @@
+# daintree.hosts.delegate-to-host: the hub hands one unit of work to the enrolled assistant on
+# one Remote Host, verifies the branch, SHA or PR it reports, and relays a verified result to
+# a second host when the next piece depends on it. Recall cases in agent and user words (the
+# issue's three requests, scrubbed), a routing trap per declared neighbour where this runbook
+# wins, and a reverse trap per neighbour where the local runbook wins and this one must not
+# ride along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: delegate-to-host-agent-phrased
+    category: single-runbook
+    note: >-
+      The issue's agent-phrased request. Decided by "WORK done by the Daintree assistant on
+      another machine, a Remote Host this Shell reaches" and "The deliverable is that host's
+      commit, branch or PR, verified by reference".
+    messages:
+      - role: user
+        content: Delegate a coding task to the assistant on a remote host and verify the branch it pushes
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-user-casual
+    category: single-runbook
+    note: >-
+      Casual user words naming another machine and asking for the SHA back: "WORK done by
+      the Daintree assistant on another machine" with "that host's commit" as the deliverable.
+    messages:
+      - role: user
+        content: have the assistant on the linux box implement the pagination fix and tell me the sha
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-relay-user
+    category: single-runbook
+    note: >-
+      The issue's relay request with the machine names scrubbed: "one host starting once
+      another host's change lands" and "a deliberate relay of the verified result to the
+      next host".
+    messages:
+      - role: user
+        content: once the server box has pushed the API change, have the laptop host build the client against that commit
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-flaky-test-on-other-mac
+    category: single-runbook
+    note: >-
+      The issue's second request, scrubbed. The work's content (a flaky test) is
+      daintree.ci.hunt-flaky-test's vocabulary; the clause "whatever the work is (a bug, a
+      flaky or failing test, a feature, docs)" keeps this runbook selected beside it. The
+      flaky-test owner riding along is an extra, so this passes recall, not strict, until a
+      retrain separates them.
+    messages:
+      - role: user
+        content: get my other mac to fix the flaky login test and open a pr
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  # -------------------------------------------- traps: this runbook wins
+  - id: delegate-to-host-not-durable-workflow
+    category: routing-trap
+    note: >-
+      A two-step dependency across machines is a relay ("one host starting once another
+      host's change lands"), not a dependent plan on this machine
+      (daintree.orchestration.execute-durable-workflow).
+    messages:
+      - role: user
+        content: Delegate implementing the export endpoint to the remote host's assistant, then have a second host write the client once the first host's commit is verified
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-not-spawn-here
+    category: routing-trap
+    note: >-
+      A code change, but for another machine's assistant: "Do not use for work by an agent
+      on THIS machine (daintree.edits.spawn-visible-agent ...)" keeps spawn-visible-agent out.
+    messages:
+      - role: user
+        content: get the build machine's assistant to add retries to the webhook sender and push a branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-not-hand-off
+    category: routing-trap
+    note: >-
+      Passing a half-done task to another machine's assistant is delegation; moving a
+      started task to another LOCAL agent in the same checkout is
+      daintree.agents.hand-off-task ("a started task moved to another local agent").
+    messages:
+      - role: user
+        content: pass the half-done auth refactor to the assistant on my other mac to finish on its own branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-not-watch-outcome
+    category: routing-trap
+    note: >-
+      A start that waits on another host's pushed fix is a relay to the next host, not a
+      later start on this machine (daintree.orchestration.watch-outcome).
+    messages:
+      - role: user
+        content: after the remote host pushes its fix, get the second host to write the tests against that commit
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: delegate-to-host-not-fan-out
+    category: routing-trap
+    note: >-
+      One issue to one remote assistant, not a batch of agents here
+      (daintree.orchestration.fan-out-work, "several units here").
+    messages:
+      - role: user
+        content: give just this one issue to the assistant on the remote host and have it open a PR
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  # ---------------------------------- reverse traps: the local runbook wins
+  - id: delegate-to-host-trap-spawn-here
+    category: routing-trap
+    note: >-
+      A code change by an agent in a worktree on this machine: spawn-visible-agent, and the
+      remote-delegation runbook must not ride along.
+    messages:
+      - role: user
+        content: spin up claude in a new worktree to add rate limiting to the upload endpoint
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: delegate-to-host-trap-hand-off
+    category: routing-trap
+    note: >-
+      A started task moved to another agent in the same worktree on this machine:
+      hand-off-task, not delegation to another machine.
+    messages:
+      - role: user
+        content: codex hit its usage limit halfway through the parser rewrite, have claude finish it in the same worktree
+    expect:
+      required: [daintree.agents.hand-off-task]
+      optional: [daintree.foundation]
+
+  - id: delegate-to-host-trap-watch-outcome
+    category: routing-trap
+    note: >-
+      A delayed start on this machine with no other host involved: watch-outcome.
+    messages:
+      - role: user
+        content: in an hour start an agent on the flaky export test
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: delegate-to-host-trap-fan-out
+    category: routing-trap
+    note: >-
+      One agent per issue in its own worktree here: fan-out-work, not delegation.
+    messages:
+      - role: user
+        content: open an agent per issue for these four bugs, each in its own worktree
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: delegate-to-host-trap-durable-workflow
+    category: routing-trap
+    note: >-
+      Dependent phases tracked across sessions on this machine: execute-durable-workflow.
+    messages:
+      - role: user
+        content: run the payments migration as dependent phases and track the plan across sessions
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: delegate-to-host-trap-local-flaky-test
+    category: routing-trap
+    note: >-
+      The issue's flaky-test request with no other machine named: hunt-flaky-test. Guards the
+      "whatever the work is (a bug, a flaky or failing test ...)" clause from pulling local
+      flaky-test work to this runbook.
+    messages:
+      - role: user
+        content: Get an agent to fix the flaky login test and open a PR.
+    expect:
+      required: [daintree.ci.hunt-flaky-test]
+      optional: [daintree.workflow.prep-branch-for-review, daintree.foundation]
