@@ -89,6 +89,12 @@ boundaries:
   - query: 'combine what the two codex agents did at their current commits into one branch, I''m asking, nobody else'
     confusable_with: [daintree.hosts.integrate-for-hub]
     run: runbook-2026-10-issue-107
+  - query: 'merge the three worktrees my agents finished on this machine into one branch before I push anything'
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-116
+  - query: 'my local agents each made a branch here; combine them in order and run the tests after each merge'
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-116
 followups:
   - query: ok, the codex one is committed now, add feat/search-index as the last merge
     history:

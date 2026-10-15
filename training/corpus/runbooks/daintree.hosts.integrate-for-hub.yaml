@@ -125,3 +125,9 @@ boundaries:
     confusable_with: [daintree.git.cherry-pick-changes]
   - query: I'm the lane here, not the hub; it sent me pinned commits from two hosts to merge into one branch
     confusable_with: [daintree.hosts.delegate-to-host]
+  - query: 'the hub chose this host to do the merging; combine the two units at the commits it listed'
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-116
+  - query: 'as the hub''s integrator, merge the pinned commits from the other hosts into the branch it named here'
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-116

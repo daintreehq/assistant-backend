@@ -144,6 +144,12 @@ boundaries:
   - query: 'from the Shell, every host should try the caching change and report its SHA'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: 'have every machine build the parser on its own branch; I''ll decide later which one to merge'
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-116
+  - query: 'send the same migration to all my hosts, each on its own branch, and give me a table of what each pushed'
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-116
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch
