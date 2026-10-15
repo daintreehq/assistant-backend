@@ -126,3 +126,9 @@ boundaries:
     confusable_with: [daintree.hosts.foundation]
   - query: get a reply from the Daintree assistant on the linux host about whether the cache was cleared
     confusable_with: [daintree.hosts.foundation]
+  - query: ask the build box's assistant whether it has finished the client changes it was given
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: ask the other mac's assistant how long the auth refactor will take it
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: ask the linux host's assistant which commit its fix for the upload bug went into
+    confusable_with: [daintree.hosts.delegate-to-host]

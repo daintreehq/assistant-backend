@@ -119,6 +119,15 @@ boundaries:
   - query: 'the date parsing bug needs fixing; send it to the Linux box''s assistant and get a branch back'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: ask the build box to regenerate the API docs and push them
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: get my other mac's assistant to track down the memory leak and push a fix
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: could the linux host's assistant bump the dependencies and tell me the commit
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit
