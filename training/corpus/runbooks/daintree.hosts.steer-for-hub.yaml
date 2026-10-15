@@ -11,8 +11,9 @@
 # against the envelope (daintree.hosts.handle-hub-message), starting the unit
 # (daintree.hosts.do-delegated-work), the person's own steering
 # (daintree.agents.steer-running-agent), parking for the day (daintree.orchestration.park-work)
-# and a hung agent (daintree.agents.recover-agent), each with reverse rows in that neighbour's
-# file; the hub's own side (daintree.hosts.delegate-to-host) has reverse rows in its file.
+# a hung agent (daintree.agents.recover-agent), the run's cleanup (daintree.hosts.clean-up-for-hub)
+# and the hub's own side (daintree.hosts.delegate-to-host), each with reverse rows in that
+# neighbour's file.
 runbook: daintree.hosts.steer-for-hub
 run: runbook-2026-10-issue-106
 
@@ -132,3 +133,17 @@ boundaries:
     confusable_with: [daintree.hosts.do-delegated-work]
   - query: hub says the delegated build it sent me should now target arm64 too, the agent is halfway in
     confusable_with: [daintree.hosts.do-delegated-work]
+  - query: The other machine's assistant sent a revised brief for the unit already running here; get that agent onto it and report the commit later.
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: hub message, the unit it delegated here should also cover the mobile layout. the agent is mid-way, adjust it, don't start over
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: >-
+      The hub delegated the search unit to this host an hour ago and the Claude pane I started
+      is still at it. Now the hub says the index must stay backwards compatible. Change course
+      on the existing agent rather than treating this as a new job, and let the hub know where
+      it stands.
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: The hub wants the agents from its parser run stopped where they are; keep their panes and worktrees.
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+  - query: hub says pause the race agents here, it may want them back later, so nothing gets closed
+    confusable_with: [daintree.hosts.clean-up-for-hub]
