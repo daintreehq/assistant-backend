@@ -158,8 +158,9 @@ cases:
     category: routing-trap
     note: >-
       The machine is not a host yet, so adding it comes first: "ANOTHER MAC OR LINUX
-      MACHINE added to Daintree as a Remote Host". A swarm on hosts already added is fenced
-      off: "getting an assistant ready on hosts already added (daintree.hosts.start-swarm)".
+      MACHINE added to Daintree as a Remote Host". daintree.hosts.start-swarm readies
+      assistants on hosts this Shell already reaches ("Claude Code or Codex ready on every
+      Remote Host"), so it riding along is an extra.
     messages:
       - role: user
         content: bring the new build machine into daintree as a host so it can be part of the swarm
@@ -240,8 +241,9 @@ cases:
     note: >-
       Reverse trap. The hosts are already added; an assistant ready on each before work goes
       out is start-swarm's ("Claude Code or Codex ready on every Remote Host" and
-      "bootstrapping each host's assistant lane"), and this runbook fences it off as
-      "getting an assistant ready on hosts already added (daintree.hosts.start-swarm)".
+      "bootstrapping each host's assistant lane"). Nothing is added as a host, so this
+      runbook ("ANOTHER MAC OR LINUX MACHINE added to Daintree as a Remote Host") must not
+      ride along.
     messages:
       - role: user
         content: all three machines are already hosts here; line up one claude assistant on each for this repo, no work yet
