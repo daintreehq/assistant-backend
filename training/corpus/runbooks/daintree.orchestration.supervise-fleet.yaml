@@ -447,6 +447,15 @@ boundaries:
   - query: How's the fleet doing? Anything stuck?
     confusable_with: [daintree.orchestration.reprioritize-work]
     run: 2026-09-28-round6
+  - query: "I'm back, anything among the agents here need me?"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "after the network blip, how are the local agents doing?"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "sweep the agents running on this machine and sort out what you can"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
 followups:
   - query: ok show me the failed one
     history:

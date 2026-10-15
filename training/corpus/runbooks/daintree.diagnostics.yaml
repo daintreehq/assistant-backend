@@ -349,6 +349,15 @@ boundaries:
   - query: the remote hosts are fine, the problem is this mac, I type into its sidebar assistant and nothing happens
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-86
+  - query: "since the restart my sidebar assistant on this mac answers nothing"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "daintree here keeps saying the mcp is disconnected after the link dropped"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "no notifications from daintree on this machine since the update, what's broken"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
 followups:
   - query: and the key thing too?
     history:

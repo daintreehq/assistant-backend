@@ -1,0 +1,127 @@
+# daintree.hosts.recover-and-clean-up: the hub picking up after a Shell restart, a new
+# hub session or a dropped link from each Remote Host's task records, and cleaning up
+# after a named run through each host's own assistant.
+#
+# Boundaries are the same words about the work on OTHER machines that the local
+# runbooks (status-and-resume, workspace-cleanup, recover-agent, supervise-fleet,
+# diagnostics) own for this machine, and the hosts foundation owns for setup and
+# reachability. Reverse rows live in those runbooks' files.
+runbook: daintree.hosts.recover-and-clean-up
+run: runbook-2026-10-issue-95
+
+positives:
+  - Reconcile the delegated exchanges on each Remote Host after the Shell came back from a crash, using the task lists rather than waiting for update lines
+  - Rebuild the status of every task this hub sent to the other hosts before Daintree restarted and say which ones still have a live assistant behind them
+  - Page through host.listTasks for each host from the oldest record and summarise which exchanges completed while the Shell was offline
+  - Work out which open exchanges on the remote hosts lost their assistant when a host rebooted and report them as unanswerable
+  - Determine whether the migration task sent to the second host is still being worked on, given its assistant now lists with no generation
+  - After the network link to the hosts was down for a while, check each host's task records and report what moved during the outage
+  - This is a fresh hub session; recover what the previous hub delegated to the Remote Hosts and report each exchange's state and delivery times
+  - Report how long each still-open exchange on the remote machines has been waiting since it was accepted
+  - A host's assistant replied that its Daintree tools fail with SESSION_BINDING_GONE; work out what that means for its open task and what the person has to do
+  - Check whether the lint task delegated to the linux host is in progress or orphaned now that its assistant was restarted
+  - The person wants the lost docs task sent again; get it to an assistant on that host as a new message referencing the old exchange
+  - Look up the exchanges the remote hosts finished overnight and relay their replies with branch and commit
+  - morning, did the other macs finish the jobs I left them last night?
+  - daintree crashed on me, are the remote machines still doing what I asked?
+  - which of the hosts still owe me an answer?
+  - the mac mini went quiet after the wifi dropped, is the refactor I sent it still going?
+  - I restarted the whole app. find out what the other computers did with my tasks
+  - is the task on the second machine dead? its assistant looks like it got restarted
+  - the request I sent to the build box two hours ago hasn't come back, is it lost or just slow
+  - hey, quick one, anything from the remote hosts land while I was in the meeting?
+  - the host assistant got relaunched mid-job. send the job again to whatever assistant is there now
+  - did anything I farmed out to the other machines get stuck while the link was down
+  - new sidebar session, the old one had handed out work to my other machines, where is all that at
+  - every remote lane shows unavailable since I got back, what happened to the work I sent them
+  - Have each host's assistant close the agent panes and delete the clean worktrees it created for the pagination experiment, keeping anything unpushed for the user to decide
+  - Ask the remote assistants to list what they made for yesterday's benchmark run, close those panes, and report what they kept and why
+  - Brief every enrolled lane to tear down its leftovers from the parallel refactor run without forcing anything or deleting branches
+  - Clean up the remote worktrees from the cross-machine race except the winning branch
+  - Get the host assistants to close the usage-check terminals they opened earlier today
+  - Coordinate cleanup on all Remote Hosts after the test campaign, panes closed, clean worktrees removed, unpushed work reported back as a question
+  - tidy up what the swarm left on the other macs, but nothing that hasn't been pushed
+  - can you get the other machines to bin the panes they opened for the cache experiment
+  - eight panes and four worktrees are still hanging around across my hosts from the test runs, clean them up properly
+  - delete the worktrees the remote assistants made for the parser job, not the branches
+  - ok that cross-host run is done, have every machine clean up after itself
+  - the cleanup on one host timed out on a confirmation, can we try that one again while I watch its window
+  - just close the usage panes on the hosts, leave their worktrees alone
+  - remove the leftover agent panes from the fan-out on each remote host and tell me what's still there
+  - sorry to bug you again, but can you see whether the build host ever answered the question it asked before the app restarted
+  - query: Before I sign off, make sure nothing I sent to the other machines is silently stuck since this morning's restart
+  - query: The relaunched assistant on the second host never answered the old task, and I want it redone. Send it again there, pointing back at the original exchange, and tell me when it replies
+
+followups:
+  - query: ok all done, now clean up after it on every machine
+    history:
+      - "user: send the flaky-test fix to all four hosts"
+      - "assistant: Sent to the four hosts' assistants; I'll report as their update lines arrive."
+    active: [daintree.hosts.foundation]
+  - query: daintree restarted in between, where is that at now?
+    history:
+      - "user: hand the migration to the build machine's assistant"
+      - "assistant: Sent; the exchange is open on that host."
+    active: [daintree.hosts.foundation]
+  - query: that open one, is its assistant still there or do we need to send it again?
+    history:
+      - "user: what's happening across my hosts?"
+      - "assistant: Three hosts connected; one exchange to the second host has been open for three hours."
+    active: [daintree.hosts.foundation]
+  - query: great, now get rid of those panes on all of them
+    history:
+      - "user: check usage on each remote host"
+      - "assistant: Each host's assistant opened a usage pane: two have about half the week left, one resets tomorrow."
+    active: [daintree.agents.check-usage-limits]
+  - query: keep that one, remove the rest
+    history:
+      - "user: clean up after the race on the hosts"
+      - "assistant: Two hosts finished. The third asks whether to delete a worktree with two unpushed commits."
+    active: [daintree.hosts.recover-and-clean-up]
+  - query: send that one again then
+    history:
+      - "user: did the remote hosts get through their work while I was at lunch?"
+      - "assistant: Two exchanges completed; one will not be answered, because its assistant was relaunched."
+    active: [daintree.hosts.recover-and-clean-up]
+  - query: the app just restarted, don't wait for the notice, find out yourself
+    history:
+      - "user: start the API task on the linux host"
+      - "assistant: Sent; I'll pick it up on the update line."
+    active: [daintree.hosts.foundation]
+  - query: nice. clean up the panes they opened, keep the branches
+    history:
+      - "user: run the benchmark on every host"
+      - "assistant: All four hosts replied with results and branch names."
+    active: [daintree.hosts.foundation]
+
+boundaries:
+  - query: what happened with the jobs I gave the remote hosts while daintree was down
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: catch me up on the other machines, I've been out all afternoon
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: resume where the hub left off with the exchanges to the hosts after the crash
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: clean up the panes and worktrees on the remote macs from the experiment
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: shut it all down on the other hosts now that the run is finished
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: close the usage panes the hosts' assistants opened
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: the assistant on the second host got restarted and my task there is stuck
+    confusable_with: [daintree.agents.recover-agent]
+  - query: the task I delegated to the other mac never came back, is it hung?
+    confusable_with: [daintree.agents.recover-agent]
+  - query: did the job on the build host even start? it's been silent since the link dropped
+    confusable_with: [daintree.agents.recover-agent]
+  - query: anything on the remote hosts need me now that the link is back?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: how are the delegated tasks on the other machines doing now that I'm back
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: no update lines came in after the hub restarted for the tasks it sent to the hosts
+    confusable_with: [daintree.diagnostics]
+  - query: the remote host's task never came back after daintree restarted, is something broken
+    confusable_with: [daintree.diagnostics]
+  - query: the exchange to the host is still open after the restart, is its assistant gone?
+    confusable_with: [daintree.hosts.foundation]
+  - query: should I resend the message to the host assistant that got relaunched?
+    confusable_with: [daintree.hosts.foundation]

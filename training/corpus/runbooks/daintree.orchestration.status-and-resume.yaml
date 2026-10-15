@@ -465,6 +465,15 @@ boundaries:
   - query: Resume the release run from its checkpoint in this new session and reconcile what finished overnight.
     confusable_with: [daintree.orchestration.hand-off-orchestration]
     run: 2026-09-28-round6
+  - query: "daintree restarted, what were the agents in my worktrees doing before?"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "catch me up on this machine, I've been away since lunch"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "pick up the session I had going here before the app crashed"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
 followups:
   - query: close the stale ones
     history:

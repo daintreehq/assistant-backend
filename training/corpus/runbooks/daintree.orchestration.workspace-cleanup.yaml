@@ -442,6 +442,15 @@ boundaries:
   - query: Delete the four finished worktrees from yesterday's competition and close their terminals.
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
+  - query: "close the panes from the fan-out on this mac and remove their worktrees"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "clean up the usage panes I opened here"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "tear down the worktrees whose agents were pushing to the remote staging server"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
 followups:
   - query: actually delete the last one, i don't need that task
     history:

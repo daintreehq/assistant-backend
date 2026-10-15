@@ -181,6 +181,16 @@ boundaries:
     docs: true
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: "what has to be switched on before the hub can message a host's assistant again after it was relaunched"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "is assistant messaging with my other mac switched on at all?"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "how does a host's reply get back to the hub, in general?"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    docs: true
+    run: runbook-2026-10-issue-95
 
 followups:
   - query: where do I change that

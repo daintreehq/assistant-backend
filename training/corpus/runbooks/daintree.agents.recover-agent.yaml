@@ -361,6 +361,15 @@ boundaries:
   - query: "both agents show 'your computer went to sleep mid-response', resume them"
     confusable_with: [daintree.orchestration.status-and-resume]
     run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "my claude pane here never came back after the laptop slept"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "the agent I launched in this worktree is stuck, did it even start?"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
+  - query: "the gemini agent in pane two froze when the wifi went"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-95
 followups:
   - query: how long has it actually been like that?
     history:
