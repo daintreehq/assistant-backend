@@ -202,3 +202,15 @@ boundaries:
     confusable_with: [daintree.hosts.diagnose-messaging]
     docs: true
     run: runbook-2026-10-issue-103
+  - query: "The hub asks in its message whether the agent it delegated here is still alive; read it and answer from what you can see."
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
+  - query: "A message from the hub mentions the agent on unit 2 but I can't tell what it wants yet; read it properly and ask it back if needed."
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
+  - query: "Send the hub its result now that the agent's commit checks out; it asked for the SHA."
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
+  - query: "the delegated job is done and i've verified it, let the main machine's assistant know"
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106

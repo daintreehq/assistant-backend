@@ -139,3 +139,6 @@ boundaries:
   - query: 'the hub sent one unit for this machine, add pagination to the orders endpoint, nothing to merge'
     confusable_with: [daintree.hosts.integrate-for-hub]
     run: runbook-2026-10-issue-107
+  - query: "The hub's unit brief just arrived and nothing has been started for it yet; set up its worktree and get Codex going on it."
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106

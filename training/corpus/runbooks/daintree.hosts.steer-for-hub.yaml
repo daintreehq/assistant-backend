@@ -1,0 +1,134 @@
+# daintree.hosts.steer-for-hub: a lane steering the hub's work on this host. The Daintree
+# assistant on a Remote Host, enrolled for one Shell's hub, is asked to stop, pause or correct
+# work it delegated here and that an agent this lane launched is running or already finished,
+# and to tell the hub what each agent's actual state is.
+#
+# Rows: hub-framed stop, pause and correction requests written by a lane and in people's own
+# words, with the situations the procedure handles (an agent mid-turn, one idle at its prompt,
+# one that already finished, a cancelled exchange whose agent is still working, a similar name
+# from another run, a pane that is the person's own, an interrupt that did not take, dirty
+# work that must survive); followups after the hub's request has been read; and boundaries
+# against the envelope (daintree.hosts.handle-hub-message), starting the unit
+# (daintree.hosts.do-delegated-work), the person's own steering
+# (daintree.agents.steer-running-agent), parking for the day (daintree.orchestration.park-work)
+# and a hung agent (daintree.agents.recover-agent), each with reverse rows in that neighbour's
+# file; the hub's own side (daintree.hosts.delegate-to-host) has reverse rows in its file.
+runbook: daintree.hosts.steer-for-hub
+run: runbook-2026-10-issue-106
+
+positives:
+  - Right now, please. The hub needs the indexing agent halted before it finishes the rewrite, and whatever it changed has to survive.
+  - 'Lane task: the hub asked to halt the Codex pane on unit api-2 mid-turn, keep its dirty worktree as it is, and report HEAD and the changed files.'
+  - hub says the migration agent here should stop touching the schema files and only write the backfill script
+  - The hub changed its mind about the unit it gave me; it should target the v2 endpoint instead of v1, and the Claude pane I launched is halfway through.
+  - hub cancelled the exchange for the lint-fix unit but the agent here is still going, stop it
+  - The hub wants both agents I started for its run paused, with a note for each on what is left so it can pick them up tomorrow.
+  - 'Hub message: the run''s acceptance now requires the old CLI flags to keep working; pass that to the agent without starting it over.'
+  - hey, the main machine just told me to stop the refactor job here. make sure the agent actually stops and nothing gets thrown away
+  - The hub asked me to stop unit-4's agent, but it looks like it finished and committed ten minutes ago. Tell the hub that rather than poking it.
+  - Stop only the hub's pane for the docs unit; the person's own Claude pane in the same project must not be touched.
+  - 'Hub: the agent on unit cache-1 is going the wrong way, it should reuse the existing LRU class. Correct it and confirm it understood.'
+  - The hub wants the agent I launched for its flaky-test hunt to stop and say what it found so far; it is still running the suite.
+  - hub wants unit 3 stopped. there are two panes with unit 3 in the name and one of them is from an older run
+  - Pause the hub's delegated agents on this box and give it a checkpoint for each one, its branch, last commit, uncommitted files and what it was about to do.
+  - The hub says the order changed, the agent should write the tests first and then the fix. It is idle at its prompt after finishing its last turn.
+  - The hub canceled what it sent me an hour ago. The Codex agent working on it is still mid-run in its worktree.
+  - redirect the child agent on the hub's ticket to use pnpm instead of npm, everything else stays the same
+  - The hub asks whether its agent here really stopped; the exchange shows canceled but nobody has looked at the pane.
+  - >-
+    The hub sent a follow-up for the payments run: stop the agent on the refund unit because
+    another host already landed that change, keep its branch exactly as it is, and send back
+    the branch name, the last commit and any files it left modified. The other two units here
+    should keep going.
+  - >-
+    Hub follow-up on a delegated unit: the agent this lane launched is mid-turn editing the
+    parser and the hub now wants error recovery out of scope. Interrupt it, send one
+    correction that keeps the rest of its brief, confirm from its screen that it changed
+    course, and answer the hub with the agent's actual state.
+  - hub says hold off on the deploy-script unit until it says otherwise. stop the agent but leave everything where it is
+  - The interrupt I sent to the hub's agent does not seem to have taken; the hub still wants it stopped and a straight answer on whether it did.
+  - Tell the hub's coding agent here to stop pushing to the branch; its brief said no pushes and it looks about to do another.
+  - the other machine wants me to stop my codex job for it, i think it's already done though
+  - 'Hub update for the run: the time box is shorter now, the agent should wrap up the file it is on and stop there.'
+  - The hub wants the agent on its unit to switch from the hand-written REST client to the generated SDK. It has been working for twenty minutes.
+  - On the hub's word, stop the three agents I launched for its batch and only those; the dev server pane stays up.
+  - The hub asked me to pause its child agents while the person reviews the plan. They have to be resumable, so nothing committed or reverted.
+  - stop the hub's job on this machine, and don't let the agent tidy up by resetting anything
+  - The hub's latest message corrects the brief, the target branch is release/4.2 and not main. The agent has not committed yet.
+  - The hub wants its delegated work stopped here and asks what state the worktree was left in.
+  - 'Lane, hub follow-up: the agent on the hub''s indexing unit must stop before it starts the reindex job; its edits so far stay in the worktree.'
+  - The hub told me to narrow the agent's task from fixing every warning to fixing only the ones under src/net; it is sitting idle waiting for its next prompt.
+  - The hub asked me to stop the agent on its unit. I launched it earlier in this session and it is still going.
+  - good morning! the hub left a message overnight asking me to stop the agent on the search unit and say what it saved
+  - The hub wants me to let its agent finish the step it is on and then give it the new requirement, no interrupt.
+  - hub cancelled. agent still running. stop it and report back
+  - The hub wants a pause on its run here, agents stopped where they are, panes and worktrees left standing.
+  - The hub asked me to tell the Codex agent working on its unit that the API key variable has a new name, without stopping it.
+  - >-
+    Two of the hub's units are running here. The hub says the auth unit is now blocked on a
+    design decision, so that agent has to stop where it is without losing anything, while the
+    logging unit carries on. Tell the hub what the auth agent had done when it stopped.
+  - the hub wants the agent i launched for it to stop, it's halfway through rewriting a config file, don't let that file get lost
+  - Correct the agent working on the hub's export unit, the CSV should keep its header row, and tell the hub whether it acknowledged the change.
+  - The hub cancelled its request for the dependency bump; the agent here has two commits on the unit branch and is still running. Stop it and keep the commits.
+  - 'Hub request: freeze the work on unit ui-7. The agent is waiting on a permission prompt, so it may not even be running.'
+  - Stop the hub's agent for the cache unit. Do not close the pane or delete its worktree, the hub may want it to carry on later.
+  - thanks for handling that. the hub has another change for the same agent, it should log at debug level not info
+  - the hub's agent here is about to run the database migration and the hub says it must not, stop it before it does
+  - Hub says the units on this host are on hold until the API contract settles. Stop both agents where they are and send back what each had done.
+  - 'Lane query: per the hub''s follow-up, the delegated agent should write to packages/web instead of apps/web; the rest of its brief is unchanged.'
+  - Can you check whether the agent the hub wanted stopped actually stopped? I interrupted it but the screen still shows a spinner.
+  - The hub wants the Codex agent on its unit to stop installing new packages for the rest of the task; it is in the middle of an install right now.
+  - 'hub: please stop unit search-2 and unit search-3 but keep search-1 running'
+  - The hub's correction is for the agent sitting on a permission prompt; it should not run the deploy script at all.
+  - My hub wants the work it sent here frozen as it is so a person can look at it, nothing committed and nothing reverted.
+  - Hub says scrap the second half of the brief, the agent should finish the parser and skip the CLI changes.
+  - The hub sent the same stop request again; the agent stopped after the first one, so just confirm its state.
+  - query: the hub cancelled its exchange with me. does that stop the agent working on it here, and if not, stop it
+    docs: true
+  - query: how do I halt the agent I launched for the hub without losing what it changed? it's mid-task now
+    docs: true
+
+followups:
+  - query: go ahead
+    history:
+      - 'user: the hub sent another message'
+      - 'assistant: It asks to stop the agent on unit db-3 and report what it saved; that pane is still working.'
+  - query: yes, the one on the parser branch
+    history:
+      - 'user: hub wants its agent here stopped'
+      - 'assistant: Two panes match its run name, one on the parser branch and one on the lexer branch. Which one did the hub mean?'
+  - query: ok send it the correction then
+    history:
+      - 'user: did the hub''s new requirement reach the agent yet?'
+      - 'assistant: Not yet. The agent on the hub''s unit is still mid-turn; the hub said the change cannot wait.'
+  - query: ok, do that, but don't close anything
+    history:
+      - 'user: what did the hub want this time?'
+      - 'assistant: It wants the agent on unit ui-2 stopped and its state reported; the agent is mid-turn.'
+
+boundaries:
+  - query: The hub wants the agent I launched for it to stop editing the lockfile and leave dependency changes alone.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: interrupt the codex pane i started for the hub's unit, it's going the wrong way, and let the hub know
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: 'New hub message: correct the agent on unit 2, it should keep the public API unchanged. Deal with it.'
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: Pause the hub's agents on this machine and send it a resumable checkpoint for each one.
+    confusable_with: [daintree.orchestration.park-work]
+  - query: the hub wants its run here paused overnight, agents stopped at a clean point, nothing torn down
+    confusable_with: [daintree.orchestration.park-work]
+  - query: Hub's request for this machine, stop the agents it had me start and tell it which files each left changed.
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: The hub withdrew the request it sent this morning; the Claude agent for it keeps going and isn't stuck, just still busy. Stop it.
+    confusable_with: [daintree.agents.recover-agent]
+  - query: The hub changed the acceptance criteria for the work it delegated to me; get the agent here onto the new criteria.
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: Stop the agent working on the hub's unit, it is touching files outside its brief.
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: the hub is done for today and wants its agents on this machine parked with resume notes
+    confusable_with: [daintree.orchestration.park-work]
+  - query: The hub sent a new acceptance line for the unit whose agent is already working here.
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: hub says the delegated build it sent me should now target arm64 too, the agent is halfway in
+    confusable_with: [daintree.hosts.do-delegated-work]

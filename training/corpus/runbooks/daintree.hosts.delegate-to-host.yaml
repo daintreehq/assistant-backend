@@ -182,6 +182,12 @@ boundaries:
   - query: 'messaging with the build box is back on, so hand its assistant the lint fix now and get me the PR'
     confusable_with: [daintree.hosts.diagnose-messaging]
     run: runbook-2026-10-issue-103
+  - query: "Hand the other Mac a revised brief for the parser work with the new acceptance criteria and have it reply with the commit."
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
+  - query: "Send the second laptop a fresh brief for its unit with the corrected base commit and have its assistant report the PR."
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

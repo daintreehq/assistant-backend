@@ -126,6 +126,12 @@ boundaries:
   - query: "before my machine sleeps tonight have every agent note where it is and stop starting new things"
     confusable_with: [daintree.agents.recover-agent]
     run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "end of my day here, get my own Claude and Codex panes to a safe stop, keep their sessions, and write down what each was doing"
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
+  - query: "wrap up the agents i launched myself today and tell me where each one stopped, the hub's runs aren't on this box"
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-106
 followups:
   - query: remind claude-4 again, it's still going
     history:
