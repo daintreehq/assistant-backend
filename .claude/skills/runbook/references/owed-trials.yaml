@@ -1075,3 +1075,60 @@ trials:
       - "No verify task was sent for the unavailable row (Shell's record)."
     execution:
       - "The hub asked each lane what its machine offers before placing any row, since host.list carries no platform (hub transcript)."
+
+  - id: park-swarm
+    runbook: daintree.hosts.park-swarm
+    also: [daintree.hosts.steer-swarm, daintree.hosts.steer-for-hub]
+    issue: 111
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [shell-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; start consent off on both. Create /tmp/dsw-{run}/notes/ on the Shell, outside every repository. Nobody watches either host's windows."
+    steps:
+      - say: |-
+          Have {host_a} and {host_b} each add a CSV export to the tally library on its own branch under run/{run}, with an agent on model haiku; don't push anything.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "Once both lanes report their agents working, restart {host_b}'s assistant conversation (More actions, Restart conversation) and leave Accept messages from other machines off, so that lane cannot answer; its agent pane keeps running."
+      - say: |-
+          I'm done for today. Park the run/{run} work on both machines until tomorrow, keep everything as it is, and keep the resume record in /tmp/dsw-{run}/notes/park.md.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.park-swarm, daintree.hosts.steer-swarm]
+            calls: [host.list, host.listAssistants, host.listTasks, host.getTask, host.sendMessage]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [assistant.getInbox, terminal.getStatus, assistant.reply]
+            never: [terminal.close, worktree.delete]
+            notices: [lane-wake]
+      - person: "After the hub's reply, quit the Shell instance; start it again, open a fresh hub session and turn Accept messages from other machines on in it. On {host_b}, open the assistant again and turn Accept messages from other machines on."
+      - say: |-
+          Resume the parked run/{run} work from /tmp/dsw-{run}/notes/park.md.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.park-swarm]
+            calls: [host.listTasks, host.getTask, host.listAssistants, host.sendMessage]
+          lane:
+            calls: [assistant.getInbox, terminal.getStatus, assistant.reply]
+    checks:
+      - "After the park, /tmp/dsw-{run}/notes/park.md lists {host_a} parked with the branch, HEAD and uncommitted files that git status --short and git log -1 show in its run/{run} worktree, and {host_b} unacknowledged, never parked."
+      - "No commit, push, pane close or worktree removal on either host for the park: the bare remote's run/{run} refs and each worktree's status match their state before the park prompt."
+      - "{host_b}'s agent pane kept running through the park and after the resume each unit has exactly one agent pane on its host; no second agent on {host_a}'s parked unit."
+      - "{host_a}'s uncommitted files are still in the same worktree after the resume, and its agent continued there."
+      - "After the restart the Shell's record shows new resume exchanges, one per unit, and no resend of the original work messages."
+    execution:
+      - "Hub transcript at the park: the stop went out with the park wording ('Parking for later'), and the reply to the person named the record's place and gave a resume prompt."
+      - "Hub transcript after the restart: host.listTasks and host.getTask before any host.sendMessage; nothing waits for an update line from before the restart."
+      - "{host_b}'s lane, back after the resume message, checked its agent's state before acting and asked back or reported rather than launching another."
