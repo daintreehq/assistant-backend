@@ -1,0 +1,74 @@
+# Seeing a project plugin's panel: daintree.plugins.develop-project-plugin.
+#
+# A request to look at a plugin panel (its layout, what it shows now, whether it renders)
+# belongs to the plugin runbook, which sees it through the plugin's panel preview or asks
+# the user, never through a debug-port relaunch of Daintree. The first three cases are the
+# requests that should find it; the reverse trap keeps a question about the project's own
+# UI code with daintree.explore.repository.
+
+cases:
+  - id: develop-project-plugin-look-layout
+    category: single-runbook
+    note: >-
+      User-phrased look request. Decided by the positive clause "what does my plugin's
+      panel look like" and the deliverable "a panel seen through its preview where it has
+      one".
+    messages:
+      - role: user
+        content: Can you look at my plugin's panel and check the layout?
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-look-settings-panel
+    category: routing-trap
+    note: >-
+      "What does X look like" reads like a code question, and daintree.explore.repository
+      took it 0.99 to 0.23 before the plugin runbook's positive clause gained "what does my
+      plugin's panel look like". It now selects the plugin runbook; explore still rides
+      along until a retrain (boundary rows written), so this fails strict for now.
+    messages:
+      - role: user
+        content: What does the settings panel in my plugin look like now?
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-verify-panel-renders
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "Daintree PROJECT PLUGIN" and the deliverable "a
+      panel seen through its preview where it has one".
+    messages:
+      - role: user
+        content: Verify a Daintree project plugin's panel renders correctly
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-no-debug-attach
+    category: routing-trap
+    note: >-
+      The improvised route: driving the running app to see a panel. The plugin runbook owns
+      it (it says to use the preview or ask the user, never a debug port), not
+      daintree.diagnostics, which is for Daintree itself misbehaving with no plugin of the
+      user's involved.
+    messages:
+      - role: user
+        content: can you hook playwright up to my running daintree to look at the plugin panel
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-reverse-explore-ui-code
+    category: routing-trap
+    note: >-
+      Reverse trap: "look like" about the project's own UI code is an explanation from
+      the source, daintree.explore.repository ("the user wants to UNDERSTAND the project").
+      No plugin is involved, so the plugin runbook must not ride along.
+    messages:
+      - role: user
+        content: what does the settings screen in this codebase look like in code, which components make it up
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
