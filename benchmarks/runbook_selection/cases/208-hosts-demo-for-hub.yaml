@@ -99,9 +99,9 @@ cases:
   - id: demo-for-hub-trap-not-local-demo
     category: routing-trap
     note: >-
-      A demo for the hub, not for a person at this screen. Decided by this runbook's "Do not use
-      for ... a demo the person asks for at this machine (daintree.workflow.prepare-feature-demo)"
-      and that runbook's "or for a demo the hub asked this Remote Host's lane to prepare (use
+      A demo for the hub, not for a person at this screen. Decided by this runbook's fence "a demo
+      the person asks for at this machine (daintree.workflow.prepare-feature-demo)" and that
+      runbook's "or for a demo the hub asked this Remote Host's lane to prepare (use
       daintree.hosts.demo-for-hub)".
     messages:
       - role: user
