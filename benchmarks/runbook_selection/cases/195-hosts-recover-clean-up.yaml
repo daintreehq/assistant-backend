@@ -26,9 +26,9 @@ cases:
   - id: recover-and-clean-up-agent-cleanup
     category: single-runbook
     note: >-
-      Agent-phrased cleanup: "what a run left on the Remote Hosts, its panes, worktrees and
-      branches, cleaned up through each host's own assistant", with "what each host
-      removed and kept".
+      Agent-phrased cleanup: "what a run left on the Remote Hosts, its panes (usage-check
+      panes included), worktrees and branches, cleaned up through each host's own
+      assistant", with "what each host removed and kept".
     messages:
       - role: user
         content: >-
@@ -189,8 +189,8 @@ cases:
     category: routing-trap
     note: >-
       A restart with nothing sent to another machine is catching up on local work
-      (daintree.orchestration.status-and-resume, "what happened while I was away ... pick
-      up something from an earlier session"); this runbook's "other machines" clause does
+      (daintree.orchestration.status-and-resume, "what happened while I was away, or to pick
+      up / resume something from an earlier session"); this runbook's "other machines" clause does
       not apply.
     messages:
       - role: user
@@ -203,7 +203,7 @@ cases:
     category: routing-trap
     note: >-
       The bare request with no Remote Hosts in the conversation is this machine's
-      teardown (daintree.orchestration.workspace-cleanup, "close these, clean up").
+      teardown (daintree.orchestration.workspace-cleanup: "close these", "clean up").
     messages:
       - role: user
         content: Close all the usage panes.
