@@ -11,14 +11,15 @@ cases:
     category: foundation-only
     note: >-
       The issue's own example of a hosts request no specific runbook owns. The positive
-      clause claims it: "how the assistants on two machines message each other at all".
-      A bare how-to usually reads as a documentation question and selects nothing, so
-      this case is the one that tells whether the foundation is reached cold.
+      clause claims it: "wants to know how messaging between the assistants on two
+      machines works". It is also a documentation question, and a bare how-to usually
+      selects nothing, so this case tells whether the foundation is reached cold.
     messages:
       - role: user
         content: how do I talk to the assistant on my other Mac?
     expect:
       required: [daintree.hosts.foundation]
+      docs: true
 
   - id: hosts-foundation-switch-on-messaging
     category: foundation-only
@@ -36,9 +37,8 @@ cases:
     category: routing-trap
     note: >-
       Another machine's assistant that cannot be reached is a messaging question
-      ("why the assistant on another machine cannot be reached"), not Daintree
-      misbehaving on this machine, which the foundation fences off as
-      daintree.diagnostics. The answer is the enrollment and consent path, so
+      ("why one is not reachable"), not "Daintree itself misbehaving on this machine",
+      which the foundation fences off as daintree.diagnostics. The answer is the enrollment and consent path, so
       diagnostics riding along is an extra.
     messages:
       - role: user
@@ -59,15 +59,16 @@ cases:
       required: [daintree.diagnostics]
       optional: [daintree.foundation]
 
-  - id: hosts-foundation-devbox-is-manage-resource
+  - id: hosts-foundation-remote-workspace-is-manage-resource
     category: routing-trap
     note: >-
-      Reverse trap. A worktree's remote dev box is daintree.worktree.manage-resource
-      ("a worktree's cloud devbox or remote resource", fenced off in the foundation);
-      "remote" here is a resource, not another machine's assistant.
+      Reverse trap. A branch's provisioned remote workspace is
+      daintree.worktree.manage-resource ("a worktree's cloud devbox or remote resource",
+      fenced off in the foundation); "remote" here is a resource, not another machine's
+      assistant.
     messages:
       - role: user
-        content: is the remote dev box for this worktree still running?
+        content: my branch's provisioned remote workspace - still running or stopped?
     expect:
       required: [daintree.worktree.manage-resource]
       optional: [daintree.foundation]

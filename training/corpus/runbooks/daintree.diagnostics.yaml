@@ -346,7 +346,7 @@ boundaries:
   - query: show me daintree's recent errors on this machine, something is off with the assistant
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-86
-  - query: I type into the sidebar assistant and nothing happens
+  - query: the remote hosts are fine, the problem is this mac, I type into its sidebar assistant and nothing happens
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-86
 followups:

@@ -10,63 +10,148 @@ runbook: daintree.hosts.foundation
 run: runbook-2026-10-issue-86
 
 positives:
-  - Explain how the Shell's sidebar assistant reaches the assistant on a Remote Host and which settings have to be on first
+  - query: Explain how the Shell's sidebar assistant reaches the assistant on a Remote Host and which settings have to be on first
+    docs: true
   - Work out why host.sendMessage is not offered in this sidebar assistant session
   - Check whether the assistant in a remote host's project is enrolled for this Shell before messaging it
-  - Find out what the person must allow before the hub may start an assistant on a host
+  - query: Find out what the person must allow before the hub may start an assistant on a host
+    docs: true
   - Set up assistant messaging between this Shell and a remote host that was just added
-  - Explain why a host's assistant is listed with no generation and cannot be messaged
-  - Describe how a host assistant's reply comes back to the hub and how to read it
-  - Explain why an agent in a Daintree pane cannot use the host messaging tools
+  - query: Explain why a host's assistant is listed with no generation and cannot be messaged
+    docs: true
+  - query: Describe how a host assistant's reply comes back to the hub and how to read it
+    docs: true
+  - query: Explain why an agent in a Daintree pane cannot use the host messaging tools
+    docs: true
   - Resolve a NOT_ELIGIBLE refusal from the host messaging tools
-  - Clarify which cross-host messaging tools need the Full tool set and which work at Core
-  - Explain what pausing messages between machines stops and what keeps working
+  - query: Clarify which cross-host messaging tools need the Full tool set and which work at Core
+    docs: true
+  - query: Explain what pausing messages between machines stops and what keeps working
+    docs: true
   - Interpret an opted_out result from a send to a remote host and say how the person fixes it
-  - Confirm whether two remote hosts can message each other directly or only through the hub
-  - Explain what a "delegated exchange update" line typed into the hub means
-  - Tell the user what has to be true on both machines for their assistants to exchange messages
-  - Explain what completed means on a message the hub sent to another machine
+  - query: Confirm whether two remote hosts can message each other directly or only through the hub
+    docs: true
+  - query: "Explain what a \"delegated exchange update\" line typed into the hub means"
+    docs: true
+  - query: Tell the user what has to be true on both machines for their assistants to exchange messages
+    docs: true
+  - query: Explain what completed means on a message the hub sent to another machine
+    docs: true
 
+  - query: >-
+      The user's Shell lists a second Mac as a connected Remote Host, but host.listAssistants
+      shows its project with no assistant carrying a generation. Starting assistants there
+      is not allowed and the user does not want it allowed. Explain how they enroll the
+      assistant already running there for this Shell.
+    docs: true
+  - query: >-
+      Hub session at Tool set Full. A host.sendMessage to one remote host came back
+      opted_out with no taskId, and the user insists messaging with that host was on
+      yesterday. Work out which setting governs this and what the user should check,
+      without sending again.
+  - query: >-
+      The user asks whether the assistant on their Linux build host can message this
+      Shell's assistant first, unprompted, how such a message would show up here and how
+      it gets answered. No exchange is in flight.
+    docs: true
+  - query: >-
+      Before any work is handed to a remote machine, confirm this sidebar session can
+      message hosts at all: the host tools are offered, this session is the enrolled hub,
+      and the host in question has assistant messaging allowed. Report what is missing
+      and who has to change it.
+  - query: >-
+      A reply from the assistant on another machine says the fix is pushed and the tests
+      pass. The other machine's working tree cannot be seen from here. Explain what the hub
+      can check for itself before telling the user the work is done.
+    docs: true
 foundation:
-  - how does messaging between the assistants on my two macs work
-  - can the sidebar assistant here talk to the one on my mac mini
-  - what do I need to switch on so my main machine's assistant can message the one on the other machine
-  - I added the build box as a remote host, now how do I get its assistant talking to this one
-  - the hub says only the enrolled hub can reach other hosts, what does that mean
+  - query: how does messaging between the assistants on my two macs work
+    docs: true
+  - query: can the sidebar assistant here talk to the one on my mac mini
+    docs: true
+  - query: what do I need to switch on so my main machine's assistant can message the one on the other machine
+    docs: true
+  - query: I added the build box as a remote host, now how do I get its assistant talking to this one
+    docs: true
+  - query: the hub says only the enrolled hub can reach other hosts, what does that mean
+    docs: true
   - the assistant on my other machine isn't showing up as something I can message
-  - is it possible for daintree's assistant to hand things off to the assistant on another computer
-  - what does accept messages from other machines actually do
+  - query: is it possible for daintree's assistant to hand things off to the assistant on another computer
+    docs: true
+  - query: what does accept messages from other machines actually do
+    docs: true
   - my assistant can list the hosts but can't send them anything, what's missing
-  - do I need the full tool set to message assistants on other hosts
-  - can a claude agent in one of my panes message the assistant on another host
-  - explain hub and lane in the remote hosts messaging setup
-  - I paused messages between machines, does the work on the other mac stop too
-  - what setting lets my assistant start an assistant on the mac mini by itself
+  - query: do I need the full tool set to message assistants on other hosts
+    docs: true
+  - query: can a claude agent in one of my panes message the assistant on another host
+    docs: true
+  - query: explain hub and lane in the remote hosts messaging setup
+    docs: true
+  - query: I paused messages between machines, does the work on the other mac stop too
+    docs: true
+  - query: what setting lets my assistant start an assistant on the mac mini by itself
+    docs: true
   - why is every assistant on my remote host marked unavailable
   - hook up the assistant on my desktop to the one on my laptop
-  - does the assistant on the remote machine act on the hub's messages without asking me
+  - query: does the assistant on the remote machine act on the hub's messages without asking me
+    docs: true
   - turn on cross machine assistant messaging
-  - which settings decide whether this shell can message the assistants on its hosts
-  - can my two remote hosts talk to each other directly or does it all go through this machine
+  - query: which settings decide whether this shell can message the assistants on its hosts
+    docs: true
+  - query: can my two remote hosts talk to each other directly or does it all go through this machine
+    docs: true
   - the remote mac's assistant never gets my messages, where do I even start
   - is the other machine's assistant enrolled for this shell yet
-  - when I message the other machine's assistant how does its answer get back to me
-  - what happens if I message the other machine while it's offline
-  - how can I tell whether a message to the other mac actually arrived
-  - can the assistant on my other mac message me first
-  - what's the safe way to let my main mac's assistant direct the one on the build box
+  - query: when I message the other machine's assistant how does its answer get back to me
+    docs: true
+  - query: what happens if I message the other machine while it's offline
+    docs: true
+  - query: how can I tell whether a message to the other mac actually arrived
+    docs: true
+  - query: can the assistant on my other mac message me first
+    docs: true
+  - query: what's the safe way to let my main mac's assistant direct the one on the build box
+    docs: true
   - get my linux box's daintree assistant reachable from the assistant here
-  - what does it mean that the reply from the other machine is just a claim
+  - query: what does it mean that the reply from the other machine is just a claim
+    docs: true
   - i want the assistant here and the one on the second mac to work together, set that up
   - query: ok so how does my assistant talk to its assistant
+    docs: true
     history:
       - "user: I just added the mac mini under hosts"
       - "assistant: It's added and connected."
   - query: how do I stop my assistant from starting new assistants over there
+    docs: true
     history:
       - "user: what can the assistant here do on my other mac?"
       - "assistant: It can message the assistant enrolled there, and start one if you allow that for the host."
 
+  - query: >-
+      I've got the Mac mini added under Remote Hosts and it shows connected, but when I
+      ask the assistant here to message the one on the mini it says only the enrolled hub
+      can reach other hosts. I haven't changed any messaging settings yet. What do I turn
+      on, and on which machine?
+  - query: >-
+      My laptop's sidebar assistant runs on the Core tool set and I'd like to keep it that
+      way. I only want it to send the build machine an occasional question. Is Full
+      required for that, and is there anything it could do at Core instead?
+    docs: true
+  - query: >-
+      I paused messages between machines last night while I was away from the desk. The
+      laptop was in the middle of something for the assistant on my desktop. What did the
+      pause actually stop, and what did it leave running?
+    docs: true
+  - query: >-
+      I'd like the assistant on this Mac to be able to start an assistant on the render
+      machine by itself when nothing is running there, but only on that one host and never
+      on the others. Which setting is that and where does it live?
+    docs: true
+  - query: >-
+      We have three machines. The two remote ones will be working on the same branch, one
+      on an API change and one building against it. Can their assistants talk to each
+      other directly, or does every message go through the assistant on my main machine?
+    docs: true
 boundaries:
   - query: messaging tools are missing from my sidebar assistant even though I added a remote host
     confusable_with: [daintree.diagnostics]
@@ -91,18 +176,22 @@ boundaries:
 
 followups:
   - query: where do I change that
+    docs: true
     history:
       - "user: message the assistant on the build machine"
       - "assistant: Sending to another host needs the Full tool set, and this session is on Core."
   - query: which setting is that exactly
+    docs: true
     history:
       - "user: ask the laptop's assistant something for me"
       - "assistant: The send came back opted_out: assistant messaging is turned off for that host in this Shell's host settings."
   - query: how do I give it one
+    docs: true
     history:
       - "user: who can I message on the mac mini?"
       - "assistant: There's an assistant in that project, but none has a generation for this Shell yet."
   - query: can the panes do it instead
+    docs: true
     history:
       - "user: get the other machine's assistant to look at this"
       - "assistant: Only the sidebar assistant can message other machines."

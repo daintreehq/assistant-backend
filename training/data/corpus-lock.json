@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18128,
-  "compiled_sha256": "756150cd4ca1a9173123af12fd60ca9b1e8bc99fa216aa807f95b4d4f31d6cae",
+  "rows": 18138,
+  "compiled_sha256": "1ada17205cc5b6d5f6f2bd438f7bb7b05d29b7bd2b4973d30bb2ac53d77d2ae3",
   "label_space_sha256": "e728fc814c2034a453b6f42d833ea786031929acb42c45b362f306356d8022b5",
   "label_space_size": 107,
   "by_source": {
     "boundary": 5445,
     "docs": 841,
     "followup": 819,
-    "foundation": 441,
+    "foundation": 446,
     "foundation_boundary": 309,
     "multi_runbook": 488,
     "near_miss": 116,
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5601,
+    "positive": 5606,
     "topic_shift": 2998,
     "wake": 149
   },
@@ -39,7 +39,7 @@
     "2026-09-28-round6": 1029,
     "2026-09-28-round6-stateful": 256,
     "pre-split": 9808,
-    "runbook-2026-10-issue-86": 73,
+    "runbook-2026-10-issue-86": 83,
     "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
     "transcript-2026-09-26-fact-contest-named-agents": 7,
@@ -177,7 +177,7 @@
       "examples": 288,
       "rows": 288,
       "runbook": "daintree.diagnostics",
-      "sha256": "d55eef2b6b9a15c1b35423bd4de54268972a9a965e8b98303bd45feca81f5a21"
+      "sha256": "b92ddbf974e74f50b63cb68e28b29802e0920dd2a4ce2fc45336332b70bc7c15"
     },
     "runbooks/daintree.edits.spawn-visible-agent.yaml": {
       "examples": 584,
@@ -306,10 +306,10 @@
       "sha256": "c45a8b179c18b5a710469a1dc4782229b0c6275096a94c250af8dbd8f91ab5d1"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
-      "examples": 62,
-      "rows": 62,
+      "examples": 72,
+      "rows": 72,
       "runbook": "daintree.hosts.foundation",
-      "sha256": "5e063f9ba78f08fe4df83f9bfdec2cd15bcbacc30480a25c24e87d8858dd7e6c"
+      "sha256": "ab635906240e8c0a8678cc83af485ba001a903b2f6d26ab6424a5288e4028dc8"
     },
     "runbooks/daintree.memory.manage-project-memory.yaml": {
       "examples": 228,
