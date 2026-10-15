@@ -398,13 +398,16 @@ cases:
   - id: handle-hub-message-receiver-steer
     category: routing-trap
     note: >-
-      Redirecting a running local agent on the hub's word: today
-      daintree.agents.steer-running-agent (an agent that "must change course or stop").
+      Redirecting an agent on the hub's word goes to its host-side receiver,
+      daintree.hosts.steer-for-hub ("when the hub asks it to STOP, PAUSE or CHANGE work it
+      delegated here"), not to daintree.agents.steer-running-agent ("the person at this
+      machine changing an agent's course"), which this case pinned before that receiver
+      landed.
     messages:
       - role: user
         content: The hub says to stop the agent that's refactoring the billing module and switch it to the logging cleanup instead.
     expect:
-      required: [daintree.agents.steer-running-agent]
+      required: [daintree.hosts.steer-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-integrate
