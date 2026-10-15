@@ -1,0 +1,108 @@
+# daintree.hosts.do-delegated-work: a Remote Host's lane carrying out one unit of work the
+# hub delegated, on this machine: the unit's worktree from the pinned base commit, the CLI
+# the brief names launched there, its folder trust answered, the commit and the brief's
+# checks verified by the lane, and the result ready to go back by reference.
+#
+# Rows: hub-delegated changes in lane-written task descriptions and people's own words,
+# short and long; the situations inside a unit (a half-made worktree, an agent already on
+# it, a base commit not yet fetched, a named project command, the trust prompt, a check that
+# cannot run here); followups mid-unit; boundaries against reading and answering the
+# message (daintree.hosts.handle-hub-message), the hub sending work
+# (daintree.hosts.delegate-to-host), the same work from the person here
+# (daintree.edits.spawn-visible-agent, daintree.workflow.start-work-on-issue), several
+# units (daintree.orchestration.fan-out-work), a started task moved
+# (daintree.agents.hand-off-task) and a plain worktree
+# (daintree.worktree.create-plain-worktree). Reverse rows sit in those neighbours' files.
+# Checking a finished agent's claim on its own, answering its question and correcting it
+# stay with daintree.orchestration.verify-agent-work, daintree.agents.answer-waiting-agent
+# and daintree.agents.steer-running-agent (blind labels agreed), so they are absent.
+runbook: daintree.hosts.do-delegated-work
+run: runbook-2026-10-issue-98
+
+positives:
+  - The hub wants a verbose logging flag added to the export tool on this machine, on its own branch from the commit it gave, with Codex doing the change
+  - hub says build the settings page toggle here with claude, branch swarm-12/u4 off 3c9f0e1, run the frontend tests
+  - Lane task from the hub, make the retry count configurable in the queue worker on a new branch from the pinned base commit, and check it with the worker's unit tests before answering
+  - ok so the hub just handed me a bug, the CSV importer chokes on quoted newlines, and it wants the fix on a fresh branch here
+  - The hub's request is a migration adding an index on orders.created_at, done by Codex since that is what its brief names
+  - 'Implement the hub''s change on this host: rate-limit the login endpoint, branch run-21/unit-1 from main at 8d0c2ab, pytest must pass, no push'
+  - get an agent going on the hub's ticket about the broken dark mode colours, in its own worktree on this box
+  - the other mac's assistant wants this box to add a healthcheck endpoint in a new worktree, then hear back the commit
+  - Hub brief for this project says rename the config loader's env prefix and keep the old one as a fallback, one commit on the branch it names
+  - 'Work the hub sent over: add type hints to the billing module. Create the worktree from the base it pinned and put Claude on it.'
+  - Delegated from the hub, teach the date parser ISO week dates with a regression test, on branch run-5/unit-2
+  - hey, the hub needs the sitemap generator fixed on this machine and it says use codex
+  - hub job for this host is a dry-run flag on the deploy script, worktree off the base SHA it sent, checked with shellcheck
+  - The hub asked this lane for unit tests on the pricing calculator on a new branch; the repo's own test command is npm test
+  - 'On this host, carry out the hub''s unit: the scheduler drops events across midnight; branch run-9/unit-3 from 1f4e7b2, and I rerun the scheduler suite myself'
+  - The main machine's assistant asked for a small refactor here, splitting the giant utils file into three modules on a fresh branch, Claude Code to do it
+  - The hub's unit for us is the empty-state screen from the design notes, built in a new worktree on the branch it named
+  - Can you do the hub's change here? It's a --json output mode for the status command.
+  - hub asked for webhook signature checking on this box, with tests, on run-3/unit-1
+  - The hub gave this lane a configurable upload size limit to build. New branch from its base commit, one agent, and the tests verified here.
+  - the hub sent a coding task for this repo, set up the worktree and an agent for it
+  - 'hub task: port the date helpers to the new library with codex on its branch'
+  - hub wants the invoice numbering off-by-one fixed here, branch and base are in its brief
+  - Carry out the implementation the hub assigned this lane, from its worktree to a checked commit
+  - hub delegated a docs fix, correct the install steps in the README on its unit branch, codex
+  - The hub's assignment for this host is making the health endpoint report the build SHA, on a new branch from the base it pinned
+  - Do the hub's piece of the work here; the rate limiter needs a burst setting and the brief names the branch and the tests
+  - The hub's unit names Claude Code and a base commit; get it started on the null pointer crash in the image resizer
+  - the hub wants the http client's retry test made deterministic on this box, branch run-17/unit-3
+  - main mac asked this machine for a dark-mode toggle in the settings screen, codex, its own worktree
+  - hub message for this lane, make the password rules configurable in the auth service on its run branch with Codex, and I verify the commit after
+  - the main machine's assistant handed this host one change, a CSV header fix in the reports module; get it built in its own worktree
+  - 'Hub unit for this repo: move the feature flags into a config file, branch from the commit it pinned, run the repo''s lint and tests'
+  - Start the hub-assigned feature work in this repository, a new worktree off the pinned commit and the named agent briefed with its acceptance criteria
+  - query: The hub just delegated a change to this host. It wants the cache TTL read from the environment instead of being hard-coded, on branch run-14/unit-2 cut from main at a91c3d0, with the integration tests run and nothing pushed. Codex is signed in here. Set it up and get it done.
+  - query: Nobody's at this desk. The hub's message asks this machine to add pagination to the admin users list, using the repository's own lint and test commands, on a new branch from the commit it pinned. I want the agent in its own worktree and the result checked before anything goes back.
+  - query: 'Execute the hub-delegated implementation unit in this project: create the unit''s worktree from the pinned base SHA, start Claude Code there with the objective and acceptance criteria, get it past its folder trust prompt, then confirm the commit and rerun the named checks.'
+  - query: The hub's unit asks for a feature flag around the new checkout flow. The brief pins main at 6b2d8e4, names Claude Code, and says the PR is allowed once the e2e smoke test passes. Get the worktree and the agent going.
+  - query: morning! the hub dropped a job on this machine overnight, add an audit log entry whenever a role changes. branch run-2/unit-6, base in the brief. can you run with it
+    history:
+      - 'user: morning'
+      - 'assistant: Morning. No agents are running in this project.'
+  - query: thanks. now the hub's second piece, the signup form validation, same drill on its own branch
+    history:
+      - 'user: how did the first one go?'
+      - 'assistant: The hub''s first unit is committed as 2c7e91f on run-4/unit-1; I checked the tests myself and replied.'
+  - The worktree for the hub's unit branch is open here with Codex still working in it from the earlier wake; keep that going rather than starting over
+  - The base commit the hub pinned isn't in this clone yet; get it before the unit's worktree is cut from it
+  - The hub's brief names ./scripts/verify.sh as the check for its change, and the agent has to run exactly that, nothing else in its place
+  - The hub wants its /add-endpoint command used for the change; find out whether this project on this host really has that command before the agent starts
+  - Bring up Claude for the hub's change in the unit's fresh worktree; its folder trust question needs the trusting option picked, since Enter exits
+  - The hub's unit says to check with pytest, which isn't installed on this machine; brief the agent so it reports that rather than passing on unittest
+  - The hub's change is half done here, the worktree exists but the agent never launched because the earlier turn ended; carry on from there
+  - Creating the unit's worktree errored out but the branch seems to exist now; find out what's really there before anything is made again
+
+followups:
+  - query: now get claude started in it
+    history:
+      - 'user: hub message: add CSV export to the reports page, branch run-6/unit-1 from main at 0e4b9d2, claude code'
+      - 'assistant: The worktree for run-6/unit-1 is ready at that commit.'
+  - query: go on, launch it there and get it past the trust question
+    history:
+      - 'user: the hub wants the label colours fixed here, claude code, new worktree'
+      - 'assistant: The unit''s worktree is ready at the base commit.'
+
+boundaries:
+  - query: the hub's message wants a fix for the flaky cart total, so set up the worktree and the agent for it
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: hub request, implement the logout redirect here and reply with the commit once it's verified
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: add request validation to the signup form in a new worktree with codex, it's the hub's unit for this host
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: put an agent on the hub's bug here, its own branch from the given base
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: this machine is the one the hub sent the export fix to, so do it here
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: as the host lane, implement the change the hub sent and verify its branch
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: only one ticket came from the hub this time; wire up the password reset email in a worktree of its own
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: nothing exists yet for the hub's search filter unit; a new branch and an agent to write it
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: 'the hub''s unit is an open forge issue in this repo: a worktree on its run branch, Codex implements it, verified before the answer'
+    confusable_with: [daintree.workflow.start-work-on-issue]
+  - query: make the worktree the hub's unit needs from its pinned commit, then launch Claude in it
+    confusable_with: [daintree.worktree.create-plain-worktree]

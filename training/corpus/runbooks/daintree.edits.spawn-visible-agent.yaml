@@ -1211,6 +1211,12 @@ boundaries:
   - query: 'start a claude agent here to tidy up the logging module'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: 'launch codex in a new worktree to add the healthcheck endpoint'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
+  - query: 'put claude on the scheduler''s midnight bug, fresh branch from main'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
 followups:
   - query: how's it going?
     history:

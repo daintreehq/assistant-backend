@@ -501,6 +501,9 @@ boundaries:
   - query: "pick up the ticket about slow search results and set up a branch and an agent for it here"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: 'pick up the open login-page issue on this machine, its own worktree with claude on it'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
 followups:
   - query: how's it looking?
     history:

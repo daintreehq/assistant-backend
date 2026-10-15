@@ -132,3 +132,15 @@ boundaries:
   - query: "tell the hub its usage request is stuck: claude code here is sitting on a login prompt"
     confusable_with: [daintree.hosts.check-usage-limits]
     run: runbook-2026-10-issue-91
+  - query: 'a hub message came in that might be meant for the other repo open on this host; read it and say which'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
+  - query: 'the hub''s change is verified on its branch; send the completed answer with the SHA and the test results'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
+  - query: 'the brief needs Gemini, which isn''t installed here; put that back to the hub as a question'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
+  - query: 'the hub''s request is for a repository this lane doesn''t have open; send it back as a question'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98

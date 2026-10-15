@@ -104,6 +104,9 @@ boundaries:
   - query: "pass the unfinished migration from the gemini pane to claude, same checkout"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: 'the agent on the hub''s change ran out of context halfway; start a fresh session that picks up from its commits in that worktree'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
 followups:
   - query: use codex rather than gemini for the successor, and make sure the brief says the pdfkit approach already failed
     history:

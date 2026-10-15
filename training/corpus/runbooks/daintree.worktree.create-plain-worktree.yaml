@@ -389,6 +389,9 @@ boundaries:
   - query: create a worktree for the coupon-codes branch
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-refine
+  - query: 'just make a worktree for the branch run-3/unit-2, no agent in it yet'
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-98
 followups:
   - query: nice. do another one off origin/develop, call it spike/cache
     history:
