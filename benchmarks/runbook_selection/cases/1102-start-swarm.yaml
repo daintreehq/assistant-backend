@@ -37,10 +37,10 @@ cases:
   - id: start-swarm-bootstrap-generations
     category: single-runbook
     note: >-
-      The issue's lane-level phrasing; "Bootstrap" pulled it to daintree.deps.upgrade-
-      dependency before this runbook. Decided by "bootstrapping each host's assistant
-      lane" and "The deliverable is a ready table (host, project, slot, agent,
-      generation)".
+      The issue's lane-level phrasing; "Bootstrap" pulled it to
+      daintree.deps.upgrade-dependency before this runbook. Decided by "bootstrapping each
+      host's assistant lane" and "The deliverable is a ready table (host, project, slot,
+      agent, generation)".
     messages:
       - role: user
         content: Bootstrap host/project assistant lanes and return their current generations.
@@ -133,8 +133,8 @@ cases:
   - id: start-swarm-not-remote-resource
     category: routing-trap
     note: >-
-      The issue's baseline query, which selected daintree.worktree.manage-resource. start-
-      swarm says "Do not use for a worktree's cloud devbox or remote resource
+      The issue's baseline query, which selected daintree.worktree.manage-resource.
+      start-swarm says "Do not use for a worktree's cloud devbox or remote resource
       (daintree.worktree.manage-resource)", and manage-resource says "or readying an
       assistant in a project on each Remote Host (daintree.hosts.start-swarm)".
     messages:
@@ -147,8 +147,8 @@ cases:
   - id: start-swarm-not-worktree-environment
     category: routing-trap
     note: >-
-      An assistant per machine, not a resource per worktree: start-swarm fences "per-
-      worktree databases, ports or setup scripts on this machine
+      An assistant per machine, not a resource per worktree: start-swarm fences
+      "per-worktree databases, ports or setup scripts on this machine
       (daintree.worktree.provision-local-environment)".
     messages:
       - role: user
@@ -195,8 +195,9 @@ cases:
   - id: start-swarm-reverse-worktree-environment
     category: routing-trap
     note: >-
-      Per-worktree resources on this machine: daintree.worktree.provision-local-
-      environment's "each branch needs its own database". start-swarm must not ride along.
+      Per-worktree resources on this machine:
+      daintree.worktree.provision-local-environment's "each branch needs its own
+      database". start-swarm must not ride along.
     messages:
       - role: user
         content: each worktree needs its own database and port so the branches can run side by side
@@ -206,9 +207,9 @@ cases:
   - id: start-swarm-reverse-local-fan-out
     category: routing-trap
     note: >-
-      Unrelated bugs, one agent each, on this machine: daintree.orchestration.fan-out-
-      work's "Use for a BATCH of independent issues or tasks, one agent terminal per issue
-      or worktree". start-swarm must not ride along.
+      Unrelated bugs, one agent each, on this machine:
+      daintree.orchestration.fan-out-work's "Use for a BATCH of independent issues or
+      tasks, one agent terminal per issue or worktree". start-swarm must not ride along.
     messages:
       - role: user
         content: these four bugs are unrelated, put a separate agent on each and keep them out of each other's way
