@@ -500,6 +500,9 @@ boundaries:
   - query: is the PR the other machine opened for the login bug green yet
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: the laptop host opened a pull request yesterday, has its reviewer left any comments
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: and the review?
     history:

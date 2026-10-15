@@ -40,9 +40,15 @@ positives:
   - the mini's assistant has seen the new lint warnings, ask it which ones matter
   - ask the second machine's assistant whether its worktree has uncommitted changes
   - relay my question to the assistant on the build box, did the last deploy roll back
-  - ask atlas whether it's still busy with the schema migration
-  - ask sirius how the docs rewrite is coming along
-  - ask kestrel what it thinks went wrong with the release build
+  - query: ask atlas whether it's still busy with the schema migration
+    history:
+      - "user: is atlas connected? it's the linux box I added as a remote host"
+      - "assistant: Yes, atlas is connected and its assistant in the api project is enrolled for this Shell."
+  - query: ask sirius how the docs rewrite is coming along
+    history:
+      - "user: which of my machines can you reach from here?"
+      - "assistant: Two remote hosts: sirius, the office iMac, and kestrel, the linux server."
+  - query: kestrel is the linux server I added as a remote host; ask its assistant what it thinks went wrong with the release build
   - query: ask it whether the API tests pass there
     history:
       - "user: is the build box online?"
@@ -132,3 +138,16 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: ask the linux host's assistant which commit its fix for the upload bug went into
     confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the linux host has been rerunning the upload suite all day; ask its assistant whether the failures cluster around one test
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: before I read the queue change myself, ask the build box's assistant what it was unsure about when writing it
+    confusable_with: [daintree.review.review-change]
+  - query: ask it whether anything is blocking it now
+    history:
+      - "user: the other mac took the billing issue yesterday"
+      - "assistant: Its assistant replied that it had started on the billing issue."
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: the deploy smoke test is failing on the build box; ask its assistant what the error says, I'll decide on a fix myself
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: ask the mini's assistant whether it has room for one more job today
+    confusable_with: [daintree.hosts.start-swarm]

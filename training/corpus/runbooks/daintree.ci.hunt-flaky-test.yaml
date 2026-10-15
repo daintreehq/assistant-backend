@@ -135,6 +135,9 @@ boundaries:
   - query: the upload test fails one run in five on the build machine too, measure it here and find the trigger
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: the timeout test is intermittent on every machine including the build box, run it fifty times here and tell me the rate
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: have it try with random ordering as well, I bet something else is polluting it
     history:

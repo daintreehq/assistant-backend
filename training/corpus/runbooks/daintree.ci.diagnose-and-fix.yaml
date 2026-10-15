@@ -493,6 +493,9 @@ boundaries:
   - query: CI went red right after the build machine's branch merged, find out why and fix it
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: the deploy job has failed on main since the other machine's merge; fix it and show me a green run
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: how's it going?
     history:

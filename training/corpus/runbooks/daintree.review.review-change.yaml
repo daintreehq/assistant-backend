@@ -508,6 +508,9 @@ boundaries:
   - query: the other machine pushed a retry change, give it a proper code review with findings
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: look over the auth change the other mac's assistant wrote and tell me what's risky in it
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: how's it going?
     history:
