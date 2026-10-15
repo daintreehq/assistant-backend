@@ -116,6 +116,9 @@ boundaries:
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: get the second mac to sync the API docs with the code and push it
     confusable_with: [daintree.edits.sync-project-docs]
+  - query: 'the date parsing bug needs fixing; send it to the Linux box''s assistant and get a branch back'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

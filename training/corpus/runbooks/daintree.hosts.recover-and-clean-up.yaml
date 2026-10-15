@@ -130,3 +130,6 @@ boundaries:
     confusable_with: [daintree.hosts.foundation]
   - query: should I resend the message to the host assistant that got relaunched?
     confusable_with: [daintree.hosts.foundation]
+  - query: 'while I was out the Shell crashed; which of the jobs on my other machines actually came back'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18479,
-  "compiled_sha256": "a26c8d287b7ab69eaa557e80738eb2e7899065c03da4fbb0eb19b9aacf55c060",
+  "rows": 18483,
+  "compiled_sha256": "7c65ec876e41cff942ad77486190f2205a20741f5ba6af683be9004893c6b102",
   "label_space_sha256": "073ac10afbdbc7b696bad3a29882d4f8c16250fd236eaeed9af4ae12e36be8e3",
   "label_space_size": 111,
   "by_source": {
-    "boundary": 5585,
+    "boundary": 5589,
     "docs": 841,
     "followup": 843,
     "foundation": 446,
@@ -39,7 +39,7 @@
     "2026-09-28-round6": 1029,
     "2026-09-28-round6-stateful": 256,
     "pre-split": 9809,
-    "runbook-2026-10-issue-102": 82,
+    "runbook-2026-10-issue-102": 86,
     "runbook-2026-10-issue-86": 83,
     "runbook-2026-10-issue-89": 96,
     "runbook-2026-10-issue-90": 76,
@@ -310,10 +310,10 @@
       "sha256": "c45a8b179c18b5a710469a1dc4782229b0c6275096a94c250af8dbd8f91ab5d1"
     },
     "runbooks/daintree.hosts.delegate-to-host.yaml": {
-      "examples": 66,
-      "rows": 66,
+      "examples": 67,
+      "rows": 67,
       "runbook": "daintree.hosts.delegate-to-host",
-      "sha256": "aac731c2e37d5872f6460b87b88d1b49d9bdaad653775d46570748ec6d697424"
+      "sha256": "122202e6502809eca126f961a9ad216ed4fbff12f017b7c768f231dc307c8120"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
       "examples": 82,
@@ -328,16 +328,16 @@
       "sha256": "82a7cd78c3fa0f43cadcdb3fa205befb9817251b9dc4a9dd81aaf494502c3357"
     },
     "runbooks/daintree.hosts.recover-and-clean-up.yaml": {
-      "examples": 68,
-      "rows": 68,
+      "examples": 69,
+      "rows": 69,
       "runbook": "daintree.hosts.recover-and-clean-up",
-      "sha256": "3fa75d28b4237398cc5cd71fa6f1a4429b54321afe122e53610c5f52fbff0025"
+      "sha256": "04732849c69d748fe9ab1c5cf03babda915f1b91c0044ed9598787ecd78044df"
     },
     "runbooks/daintree.hosts.start-swarm.yaml": {
-      "examples": 65,
-      "rows": 65,
+      "examples": 67,
+      "rows": 67,
       "runbook": "daintree.hosts.start-swarm",
-      "sha256": "5b2eafedffeb610e83ace8d7d4a8dd39fcdc4d1d5617897c87d5ee2d0563a987"
+      "sha256": "e323863837a00b67e038138f167c9e44555c6c5511e54f54f17ce3e2044c07ae"
     },
     "runbooks/daintree.memory.manage-project-memory.yaml": {
       "examples": 228,

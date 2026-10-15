@@ -105,6 +105,10 @@ boundaries:
     confusable_with: [daintree.runtime.relieve-resource-contention]
   - query: 'bootstrap the assistant lanes on each host for this repo'
     confusable_with: [daintree.deps.upgrade-dependency]
+  - query: 'get an assistant ready on the build box for this repo, I''ll hand it the flaky test later'
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: 'after the restart, put the assistants back on my hosts in this project so they can take new work'
+    confusable_with: [daintree.hosts.recover-and-clean-up]
 
 followups:
   - query: 'now get them ready'
