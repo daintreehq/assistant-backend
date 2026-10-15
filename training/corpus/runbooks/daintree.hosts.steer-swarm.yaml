@@ -33,8 +33,8 @@ positives:
   - scrap the remote swarm, I gave it the wrong base branch
   - The run on the remote hosts is burning through usage. Stop it everywhere and tell me what each machine had done so far.
   - the lint cleanup on my other machines is editing test fixtures, get every host to leave those alone from here on
-  - Messages between machines are paused right now, but I want the run over there actually stopped. What has to happen?
-  - Only the build server should drop out of the run; let the other host carry on with it.
+  - I paused messages between machines earlier to halt the run, but the agents over there are still working on it. Stop them for real.
+  - Pull just the benchmarking unit out of the remote run. The other units on those hosts keep going as briefed.
   - the job I sent the linux server, if its agent is still at it, stop it and keep the branch
   - >-
     I sent the same refactor to four machines about an hour ago. Two of them are clearly going
@@ -121,7 +121,7 @@ boundaries:
     confusable_with: [daintree.agents.steer-running-agent]
   - query: stop the run on the remote hosts before I log off, it isn't coming back
     confusable_with: [daintree.orchestration.park-work]
-  - query: Heading home soon. The remote run must not keep going overnight; stop it on every host and keep what they made.
+  - query: Nobody will be watching the remote hosts this weekend, so the run there has to end now. Keep whatever they made.
     confusable_with: [daintree.orchestration.park-work]
   - query: The task the build box is working on should target the release branch instead. Change it in flight; this is not a new job.
     confusable_with: [daintree.hosts.delegate-to-host]

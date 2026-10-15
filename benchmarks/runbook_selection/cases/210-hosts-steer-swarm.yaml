@@ -19,7 +19,7 @@ cases:
     category: single-runbook
     note: >-
       The issue's first request. Decided by "wants work they ALREADY SENT to their other
-      machines ... STOPPED, CALLED OFF or CHANGED while it is under way" and "each worker's
+      machines", "STOPPED, CALLED OFF or CHANGED while it is under way" and "each worker's
       state as its answer gives it". At base it selected daintree.hosts.steer-for-hub, the
       receiving lane's runbook.
     messages:
@@ -60,7 +60,8 @@ cases:
     category: single-runbook
     note: >-
       How a hub agent describes the task to search_runbooks, with the run's state observed:
-      "one run on one or several Remote Hosts, STOPPED, CALLED OFF" and "per host ... each
+      "one run on one or several Remote Hosts, STOPPED, CALLED OFF" and "The deliverable is,
+      per host, the stop or correction delivered to that host's own assistant and each
       worker's state as its answer gives it".
     messages:
       - role: user
@@ -72,8 +73,8 @@ cases:
   - id: steer-swarm-user-abort
     category: single-runbook
     note: >-
-      Casual and short: "CALLED OFF ... while it is under way", every host. At base
-      daintree.hosts.start-swarm, daintree.hosts.steer-for-hub and
+      Casual and short: "STOPPED, CALLED OFF or CHANGED while it is under way", every host. At
+      base daintree.hosts.start-swarm, daintree.hosts.steer-for-hub and
       daintree.hosts.check-usage-limits were all selected.
     messages:
       - role: user
@@ -85,8 +86,8 @@ cases:
   - id: steer-swarm-host-offline
     category: single-runbook
     note: >-
-      One host disconnected while the rest are stopped: "per host ... (acknowledged, finished,
-      unresolved, disconnected)".
+      One host disconnected while the rest are stopped: "each worker's state as its answer
+      gives it (acknowledged, finished, unresolved, disconnected)".
     messages:
       - role: user
         content: Stop the export run on every host. The mini is offline right now, so tell me it's unresolved instead of guessing.
@@ -97,9 +98,9 @@ cases:
   - id: steer-swarm-cancel-is-not-a-stop
     category: single-runbook
     note: >-
-      A cancel already pressed is not evidence the workers stopped: "STOPPED ... while it is
-      under way" and "each worker's state as its answer gives it". At base a similar line went
-      to daintree.agents.recover-agent.
+      A cancel already pressed is not evidence the workers stopped: "STOPPED, CALLED OFF or
+      CHANGED while it is under way" and "each worker's state as its answer gives it". At base
+      a similar line went to daintree.agents.recover-agent.
     messages:
       - role: user
         content: I hit cancel on the remote exchanges an hour ago, did the agents on those machines actually stop? Find out and stop any that didn't.
@@ -138,7 +139,7 @@ cases:
     note: >-
       The agents to stop are on the other machines, not in this window: "work they ALREADY
       SENT to their other machines". Fence: "for agents on this machine
-      (daintree.agents.steer-running-agent ...)".
+      (daintree.agents.steer-running-agent; parking them, daintree.orchestration.park-work)".
     messages:
       - role: user
         content: "Not the agents in this window: the ones on my remote hosts working on the run I sent need to stop, and I want each host to confirm."
@@ -149,9 +150,9 @@ cases:
   - id: steer-swarm-not-park-work
     category: routing-trap
     note: >-
-      Leaving for the night, but the stop is of a run on other machines: "work they ALREADY SENT
-      to their other machines ... STOPPED, CALLED OFF" with "their work left in place". Fence:
-      "parking them, daintree.orchestration.park-work" is for agents on this machine.
+      Leaving for the night, but the stop is of a run on other machines: "work they ALREADY
+      SENT to their other machines" and "with their work left in place". Fence: "parking them,
+      daintree.orchestration.park-work" is for agents on this machine.
     messages:
       - role: user
         content: I'm stopping for the night; call off the run on the remote machines and keep their worktrees as they are
@@ -162,9 +163,9 @@ cases:
   - id: steer-swarm-not-new-delegation
     category: routing-trap
     note: >-
-      A correction to work one host is already doing, keeping what it has done: "CHANGED while
-      it is under way". Fence: "for sending new work or redoing
-      finished work (daintree.hosts.delegate-to-host ...)".
+      A correction to work one host is already doing, keeping what it has done: "STOPPED,
+      CALLED OFF or CHANGED while it is under way". Fence: "for sending new work or redoing
+      finished work (daintree.hosts.delegate-to-host, daintree.hosts.swarm-fan-out)".
     messages:
       - role: user
         content: "Redirect the remote host's agent: the task I sent it this morning must keep the v1 endpoints. Keep what it has done."
@@ -175,9 +176,10 @@ cases:
   - id: steer-swarm-not-swarm-fan-out
     category: routing-trap
     note: >-
-      A correction to a run already on every host, not sending it again: "CHANGED while it is
-      under way" and "the stop or correction delivered to that host's own assistant". Fence:
-      "for sending new work or redoing finished work (... daintree.hosts.swarm-fan-out)".
+      A correction to a run already on every host, not sending it again: "STOPPED, CALLED OFF
+      or CHANGED while it is under way" and "the stop or correction delivered to that host's
+      own assistant". Fence: "for sending new work or redoing finished work
+      (daintree.hosts.delegate-to-host, daintree.hosts.swarm-fan-out)".
     messages:
       - role: user
         content: The run I sent to every host should use the new tokenizer API from here on; tell each host's assistant and confirm who took it.
@@ -188,8 +190,9 @@ cases:
   - id: steer-swarm-not-clean-up
     category: routing-trap
     note: >-
-      A stop with nothing removed: "STOPPED ... with their work left in place". Fence: "for
-      catching up on or cleaning up after a run (daintree.hosts.recover-and-clean-up)".
+      A stop with nothing removed: "STOPPED, CALLED OFF or CHANGED while it is under way" and
+      "with their work left in place". Fence: "for catching up on or cleaning up after a run
+      (daintree.hosts.recover-and-clean-up)".
     messages:
       - role: user
         content: Stop the run on the remote hosts now; their worktrees and panes stay until I say otherwise.
@@ -229,7 +232,8 @@ cases:
     note: >-
       Reverse: the unit is finished, so the rework is new work to that host. delegate-to-host
       owns "ONE piece of WORK done by the Daintree assistant on another machine"; this runbook
-      fences "sending new work or redoing finished work (daintree.hosts.delegate-to-host ...)".
+      fences "for sending new work or redoing finished work (daintree.hosts.delegate-to-host,
+      daintree.hosts.swarm-fan-out)".
     messages:
       - role: user
         content: "Hand the other Mac a new task: rework the export it finished so it keeps the header row, and tell me the SHA."
@@ -253,8 +257,9 @@ cases:
     category: routing-trap
     note: >-
       Reverse: an agent on this machine. steer-running-agent owns "an agent that is ALREADY
-      WORKING on a task ... must change course or stop"; this runbook fences "for agents on
-      this machine (daintree.agents.steer-running-agent ...)".
+      WORKING on a task, or paused mid-task at its prompt, must change course or stop"; this
+      runbook fences "for agents on this machine (daintree.agents.steer-running-agent; parking
+      them, daintree.orchestration.park-work)".
     messages:
       - role: user
         content: The Claude pane next to this one is rewriting the auth tests; stop its turn and tell it to keep the old fixtures.

@@ -14,20 +14,20 @@ requiredTools:
 ---
 1. Resolve the run the person names: its tasks, `hostTaskId`s and lanes from what you kept, else `host.listTasks` per host (records hold no text: unsure which are this run's, ask). Only the hosts and units named. `host.getTask` each; `host.listAssistants` for lane addresses.
 2. One row per task:
-   - `completed`: finished, as its reply says.
+   - `completed`: finished if its reply says the work ended; else step 3.
    - `canceled`, `rejected`, or `failed` with no `inboxFetchedAt`: never read.
    - Host `disconnected`: nothing reaches it or queues; unresolved till it is back.
    - A stop, `submitted`: `host.cancelTask`. `state:"canceled"`: withdrawn. Only `cancelRequestedAt`: delivery may have begun; step 3.
    - Otherwise, or a change: step 3.
-3. One `host.sendMessage` per lane, up to 16 originals' `taskId`s in `referenceTaskIds`. Text: the run id; each original by `hostTaskId` with the units, agents and pane ids its replies named; "Follow daintree.hosts.steer-for-hub: <stop | the change; the rest of the brief stands>. An original not yet started: <never start it | start it changed>. Keep all work. Report any push, PR or other external step done or under way. Close each stopped original with a completed reply." End the turn.
+3. One `host.sendMessage` per lane, up to 16 originals' `taskId`s in `referenceTaskIds`. Text: the run id; each original by `hostTaskId` with the units, agents and pane ids its replies named; "Follow daintree.hosts.steer-for-hub: <stop | the change; the rest of the brief stands>. An original not yet started: <never start it | start it changed>. Keep all work. Report any push, PR or other external step done or under way. Close each stopped original still open with a completed reply." End the turn.
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","text":"<run id, originals, stop or change>","referenceTaskIds":["<taskId>"]}
 ```
 
-   `paused`: nothing went; the pause holds the stop, never the work: the person turns messaging back on, then send. `lane_unavailable`: list again once; still no generation: unresolved, the person stops it at that machine.
+   `paused`: nothing went; the pause holds the stop, never the work: the person turns messaging back on, then send. `lane_unavailable`: list again once; still unavailable: unresolved, the person stops it at that machine.
 
-On notice or resume: `host.getTask` the steer and original tasks the notice names, and read the reply per agent: stopped or on the new course, acknowledged; already done, finished; stop unconfirmed or no answer, unresolved. A change's result comes later, on its original or as a host message.
+On notice or resume: `host.getTask` the steer and original tasks the notice names, and read the reply per agent: stopped or on the new course, acknowledged; already done, or gone on a stop, finished; anything else, unresolved. A change's result comes later, on its original or as a host message.
 
 Stop and recovery: one stop or change per lane per request; a resend only on the person's word. Never clean up, force, revert, merge or reassign here; external steps already taken stand, reported. `cancelRequestedAt` proves nothing about a worker.
 
