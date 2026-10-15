@@ -35,15 +35,15 @@ positives:
   - all the other machines, write the base64 url helper with tests, commit, and send me back the sha
   - spin the same coding exercise out to the whole swarm and show me a row per machine
   - put the word-frequency kata on every host I've connected, each with whatever agent it has signed in
-  - Brief each connected Remote Host's assistant identically, with its own branch, and assemble the per-host branch, commit and test outcome once all replies are in
-  - Replicate one coding task across all Remote Hosts at once, end the turn, and verify each host's reported commit before reporting
-  - Give the assistants on three named remote hosts an identical objective with host-specific branch names, Claude Code on two and Codex on one, and report a row per host
-  - Dispatch the same experiment to every enrolled host lane in this project without waiting on each send, then gather each host's artifacts as replies arrive
-  - Have each Remote Host's assistant build the same prototype on its own run branch and check every reported SHA on the shared remote
-  - The user wants every remote machine to attempt the same refactor independently; brief all hosts at once and table the branches and checks each reports
-  - Broadcast one task to the assistants on all Remote Hosts with per-host branches and report which hosts answered, which are still open, and what each verified
-  - Fan the same feature out to every Remote Host this Shell reaches and bring back one table of host, agent CLI, branch, SHA and test result
-  - Ask every host assistant in the swarm to implement the same small module from the main commit, without pushing, and confirm each commit by a follow-up question
+  - Each connected Remote Host's assistant should take the same cursor-based listing change on its own branch; the user wants the per-host branch, commit and test outcome once all replies are in
+  - The user wants the null-check fix tried on all four Remote Hosts at once and every reported commit confirmed before anyone calls it done
+  - Three named remote hosts should each build the webhook retry change, Claude Code on two and Codex on the third, with a row per host at the end
+  - The person wants the same caching experiment run by the assistant on each enrolled host in this project, with each host's branch and results gathered as they come in
+  - Have each Remote Host's assistant build the same markdown preview prototype on its own branch and check every reported SHA on the shared remote
+  - The user wants every remote machine to attempt the same router refactor independently and see the branches and checks each one reports in a table
+  - Put the cron parser task on every Remote Host's assistant, a branch per host, and report which hosts answered, which are still open, and what each verified
+  - Fan the export-to-PDF feature out to every Remote Host this Shell reaches and bring back one table of host, agent CLI, branch, SHA and test result
+  - Every host assistant in the swarm should implement the same small date-range module from the main commit, nothing pushed, and the user wants each commit confirmed
   - query: >-
       The user has four Remote Hosts connected to this Shell and wants each of them to
       independently implement a small LRU cache module with unit tests, on a branch named for
@@ -72,6 +72,8 @@ positives:
       wants the same accessibility fix applied on each so they can look at the diffs later:
       every host gets its own branch from the current main commit, no pushing, and the report
       says which hosts finished, with commit and test output per host.
+  - I want the minis to all implement the feature flag, a branch apiece, commits back to me
+  - run the formatter fix on all my remote hosts and bring back each machine's commit
   - thanks for setting that up! now get every host to write the url shortener exercise on its own branch
   - 'nice, that worked. ok next: all the remote machines do the same port of the logger to structured json, and tell me each sha'
   - query: all four, claude on the first two and codex on the rest
@@ -120,10 +122,6 @@ boundaries:
     confusable_with: [daintree.hosts.handle-hub-message]
   - query: from the Shell I'm on, broadcast the dependency bump to every enrolled lane and list what each one committed
     confusable_with: [daintree.hosts.handle-hub-message]
-  - query: I want the minis to all implement the feature flag, a branch apiece, commits back to me
-    confusable_with: [daintree.worktree.provision-local-environment]
-  - query: run the formatter fix on all my remote hosts and bring back each machine's commit
-    confusable_with: [daintree.ci.run-local-checks]
   - query: swarm the remote hosts with this task, the same brief for each machine
     confusable_with: [daintree.orchestration.multi-agent]
   - query: I want the importer written on all of my remote boxes, each lane making its own worktree, and the commits listed for me
