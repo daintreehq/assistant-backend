@@ -109,6 +109,9 @@ followups:
       - "assistant: Two hosts are working on it. I can send each host's assistant a stop, or a correction that keeps the rest of the brief."
 
 boundaries:
+  - query: "Hand the other Mac a revised brief for the parser work it's already doing, with the new acceptance criteria, and have it reply with the commit."
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-110
   - query: From my main machine, the cache run has to stop on the hosts still working on it. Their own assistants should halt it and send back each agent's state.
     confusable_with: [daintree.hosts.steer-for-hub]
   - query: From the main machine, stop the agents the other hosts launched for my run and bring back their real state.

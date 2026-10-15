@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 19887,
-  "compiled_sha256": "c14cb6393b886b46a353009f6f6b005dfc7f0d1d9ea5080286019efc4628a226",
+  "compiled_sha256": "92dcac2d01ca2d311f4bb41bb1b5f84123cd6dc44c916ace16be376cb45c90de",
   "label_space_sha256": "2947935fdc1363063f47afd196f27a82c58983403b609bb9b7f6fabf29766287",
   "label_space_size": 127,
   "by_source": {
@@ -44,10 +44,10 @@
     "runbook-2026-10-issue-103": 100,
     "runbook-2026-10-issue-104": 83,
     "runbook-2026-10-issue-105": 103,
-    "runbook-2026-10-issue-106": 95,
+    "runbook-2026-10-issue-106": 94,
     "runbook-2026-10-issue-107": 74,
     "runbook-2026-10-issue-108": 82,
-    "runbook-2026-10-issue-110": 81,
+    "runbook-2026-10-issue-110": 82,
     "runbook-2026-10-issue-116": 82,
     "runbook-2026-10-issue-122": 89,
     "runbook-2026-10-issue-131": 46,
@@ -351,10 +351,10 @@
       "sha256": "ff57ea3d77397e5303574452875f85b39098a5c1728c8476542af4066359289d"
     },
     "runbooks/daintree.hosts.delegate-to-host.yaml": {
-      "examples": 96,
-      "rows": 96,
+      "examples": 95,
+      "rows": 95,
       "runbook": "daintree.hosts.delegate-to-host",
-      "sha256": "27c850cb94ba1aad657b524c7757cf1ebe708a218bda9e185ff1dea6d15ecc43"
+      "sha256": "2730554e666dcf6d74370f2451bf74ca711756565bb7553be9cc45363fe20163"
     },
     "runbooks/daintree.hosts.demo-for-hub.yaml": {
       "examples": 65,
@@ -435,10 +435,10 @@
       "sha256": "78f351cc447581255f04d82d165e776d3574c376055b8b385604aea6ab9fb73a"
     },
     "runbooks/daintree.hosts.steer-swarm.yaml": {
-      "examples": 68,
-      "rows": 68,
+      "examples": 69,
+      "rows": 69,
       "runbook": "daintree.hosts.steer-swarm",
-      "sha256": "7c07cb7d15223a74f10cb3dea362eef6251703d4405cbdb18b978ee88ad3c317"
+      "sha256": "73f6c929b2b2751beb64936d7e9c97788e2142dc4b11d8db946916b9ae6deb53"
     },
     "runbooks/daintree.hosts.swarm-fan-out.yaml": {
       "examples": 76,
