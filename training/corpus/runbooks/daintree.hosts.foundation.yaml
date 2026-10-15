@@ -173,6 +173,14 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
   - query: the remote host is up but its assistant won't accept anything from me
     confusable_with: [daintree.worktree.manage-resource, daintree.diagnostics]
+  - query: "before I hand work to my other mac's assistant, what has to be switched on for this shell to reach it"
+    docs: true
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "explain how a task I give the hub for another machine actually gets there and how I'd know it was done"
+    docs: true
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 
 followups:
   - query: where do I change that

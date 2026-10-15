@@ -1,0 +1,159 @@
+# daintree.hosts.delegate-to-host: the hub hands one unit of work to the assistant enrolled
+# on one Remote Host, ends its turn, verifies the branch, SHA or PR that host reports, and
+# relays a verified result to a second host when the next piece depends on it.
+#
+# Positives are invented situations in agent and user words. Boundaries are requests this
+# runbook wins against a local owner whose vocabulary they share (a code change, a flaky
+# test, a hand-over, a later start, an issue, a PR). Followups are the relay or the check as
+# a second turn after a unit was sent. Machine names are generic.
+runbook: daintree.hosts.delegate-to-host
+run: runbook-2026-10-issue-89
+
+positives:
+  - have the mini do the changelog cleanup and push it to a branch
+  - get the GPU box to retrain the tokenizer fixtures and tell me which commit it lands
+  - ask the assistant on my office iMac to bump the eslint config and open a draft PR
+  - make the Linux host do the dockerfile slimming, I want the SHA when it's done
+  - can the other machine take the search index refactor? branch and PR please
+  - put the assistant on the build server to work on the date parsing bug
+  - hey, can you hand the CSV export feature to the mac studio's assistant and check what it pushes
+  - morning! get my second mac to write the missing unit tests for the billing module
+  - send the remote host the job of upgrading the graphql codegen, and verify the commit before you tell me it's done
+  - the laptop host should implement the dark mode toggle, branch off main, no PR yet
+  - delegate the flaky websocket reconnect fix to the assistant on my linux box
+  - let the other mac handle the i18n string extraction and report back with the branch name
+  - Hand the README rewrite to the assistant on the remote host and verify the branch it pushes before reporting
+  - Send one implementation task to the enrolled assistant on a remote host with a brief that names the base commit, then verify the reported SHA on the shared remote
+  - Delegate the cache invalidation fix to another machine's Daintree assistant, end the turn, and on its reply confirm the pushed branch matches the commit it claims
+  - Ask the hub-enrolled assistant in the payments project on a remote host to implement the refund endpoint and open a pull request, then check the PR head
+  - Get a remote host's assistant to make the logging change on a fresh branch and report each test command with its result
+  - Brief the assistant on a Remote Host to add input validation to the signup form, scoped to that project, pushing only a branch
+  - Have the Daintree assistant on another Mac carry out a code change and return branch, commit SHA and pane id, then confirm the branch on the remote
+  - Delegate a docs update to the remote machine's assistant with acceptance criteria and verify what it pushed
+  - Route a bug fix to the assistant running in the matching project on a remote host and confirm the commit before telling the user
+  - Hand a single refactor to the assistant on a Remote Host, without waiting in the send, and resume when its exchange updates
+  - query: >-
+      The user wants the assistant on their Linux workstation to port the image resizing
+      helper to the new storage API, push a branch and open a draft pull request. The work
+      should be checked against the shared remote before anyone says it is done.
+  - query: >-
+      Hand the migration of the notifications table to the assistant on the remote build
+      host. It should branch from the current main commit, run the project's own migration
+      tests there, and report the commit SHA and test results; nothing should be merged.
+  - query: >-
+      The user is at the Shell and wants a second machine to take on a self-contained task:
+      add rate limiting to the public upload route in the API project, commit it on its own
+      branch, and send back the branch and SHA so the user can review it later.
+  - query: >-
+      The other Mac has the repository open with an assistant enrolled for this Shell. The
+      user wants it to fix the timezone bug in the scheduler and push a branch; confirm the
+      pushed commit before reporting back.
+  - query: >-
+      Get the GPU workstation to write the benchmark harness for the inference module,
+      because only that machine has the hardware for it, and verify the commit it pushes.
+  - query: >-
+      The user says their mini is idle and wants it to take the Python 3.12 compatibility
+      fixes in the CLI project, open a PR, and tell them when it is up.
+  # relay positives: one hop from a verified result on one host to work on another
+  - when the linux box has pushed the schema change, have the mac mini build the migration script on top of it
+  - once the GPU box lands the model export, get the laptop host to wire it into the app
+  - the server machine is doing the API, then the other mac should write the SDK against whatever it pushes
+  - first have the build host add the event types, and after that's verified, the mini writes the consumers
+  - Relay a verified commit from one remote host to another as the base for the next task, naming the predecessor exchange
+  - Have one host implement the protocol change, verify its pushed commit, then brief a second host to update the client on that commit
+  - Coordinate two remote assistants in sequence, the second starting from the first one's verified branch
+  - query: >-
+      The backend change has to exist before the frontend work can start. The user wants
+      the assistant on the Linux host to add the new endpoint and push it, and only then
+      the assistant on the iMac to build the settings page against that exact commit.
+  - query: >-
+      The user wants the build machine to regenerate the protobuf types and push them, and
+      once that branch is verified, the second Mac's assistant should update the mobile
+      client to the new types starting from that commit.
+  # social lead-ins
+  - sorry to bother you again, but could the other machine pick up the pagination bug? it has the repo already
+  - quick one before I head out, get the mini to fix the broken link checker and push a branch
+  - thanks for earlier. next, have the remote host add the health check endpoint and send me the commit
+  - ok cool. now get the linux box to do the same lint fixes on its checkout and push them
+  - I'm stepping away for an hour, have my second mac implement the export retry and open a PR, check it when it's back
+
+boundaries:
+  # a code change, but for another machine's assistant (not one agent here)
+  - query: have the assistant on the build box add the missing null check in the parser and push a branch
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: the mini should do the webhook retry change, not an agent on this machine
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: Delegate adding request logging to the assistant on a Remote Host instead of spawning a local agent
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  # several things here vs one unit on another machine
+  - query: give only the search bug to the remote host's assistant; the other issues stay here
+    confusable_with: [daintree.orchestration.fan-out-work]
+  # handing over a started task to another machine, not another local agent
+  - query: the auth refactor is half done here, hand it to the assistant on my other mac to finish on a branch there
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: pass the unfinished pagination work over to the linux box's assistant and have it complete it
+    confusable_with: [daintree.agents.hand-off-task]
+  # a start that waits on another host's work, not a timed start here
+  - query: after the GPU box pushes the weights loader, have the laptop host write its tests
+    confusable_with: [daintree.orchestration.watch-outcome]
+  - query: when the other machine has its fix on the remote, get the mini to rebase the docs branch onto it
+    confusable_with: [daintree.orchestration.watch-outcome]
+  # one dependency between two hosts, not a durable plan here
+  - query: Have one remote host build the parser and a second host write the CLI on its verified commit
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  # the work's content belongs to a local owner, but the machine is another one
+  - query: get my other mac to track down why the upload test is flaky and fix it on a branch
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: the linux host should chase the intermittent timeout in the integration suite and push a fix
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: have the build box upgrade react to the latest major and push a branch
+    confusable_with: [daintree.deps.upgrade-dependency]
+  - query: send issue 87's fix to the assistant on the remote host and check the PR it opens
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: have the mini get the feature branch ready for review and open the PR from there
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: pass the review findings to the assistant on the other machine and have it fix them on its branch
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: get the second mac to sync the API docs with the code and push it
+    confusable_with: [daintree.edits.sync-project-docs]
+
+followups:
+  - query: when it's pushed, have the mini start the client against that commit
+    history:
+      - "user: get the linux box to add the orders endpoint and push a branch"
+      - "assistant: Sent to the assistant on the Linux host (orders project, slot 0). I'll verify the branch on the remote when it replies."
+    active: [daintree.hosts.delegate-to-host]
+  - query: did it actually push what it says? check before you tell me
+    history:
+      - "user: have the other mac fix the date picker bug"
+      - "assistant: The other Mac's assistant replied completed: branch fix/date-picker at 3f2a9c1, tests passed."
+    active: [daintree.hosts.delegate-to-host]
+  - query: good, now hand the next part to the GPU box, starting from that commit
+    history:
+      - "user: get the mini to add the feature flags module"
+      - "assistant: Verified: feature-flags-module is on the remote at 9b41e07, matching the mini's report."
+    active: [daintree.hosts.delegate-to-host]
+  - query: it's asking which test command to use, tell it the unit suite only
+    history:
+      - "user: have the build box refactor the config loader and push it"
+      - "assistant: The build host's assistant asked a question: run the unit suite or the full integration suite?"
+    active: [daintree.hosts.delegate-to-host]
+  - query: let it open the PR too
+    history:
+      - "user: get my second mac to write the retry tests, branch only"
+      - "assistant: The second Mac's assistant asks whether it may push the branch and open a pull request; you said branch only."
+    active: [daintree.hosts.delegate-to-host]
+  - query: actually do that on the linux box instead of here
+    history:
+      - "user: fix the flaky export test"
+      - "assistant: I can launch an agent in this worktree to fix it."
+  - query: ok and the other host should do the frontend half once that's in
+    history:
+      - "user: have the iMac's assistant build the upload API"
+      - "assistant: Sent to the iMac's assistant; the exchange is working."
+    active: [daintree.hosts.delegate-to-host]
+  - query: no, don't use claude there, the mini only has codex signed in, brief it for codex
+    history:
+      - "user: get the mini to do the lint cleanup"
+      - "assistant: The mini's assistant replied input-required: Claude Code is not signed in on this machine."
+    active: [daintree.hosts.delegate-to-host]

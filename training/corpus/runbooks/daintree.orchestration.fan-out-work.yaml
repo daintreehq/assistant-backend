@@ -594,6 +594,15 @@ boundaries:
   - query: 'Launch agents on issues #301 through #304, one worktree each, no more than three at a time.'
     confusable_with: [daintree.orchestration.reprioritize-work]
     run: 2026-09-28-round6
+  - query: "put one agent on each of these five issues here, each in its own worktree, and open PRs"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "split the lint fixes across three local agents by package"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "run claude on issues 12, 14 and 19 in parallel worktrees on this machine"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: yeah all of them except the docs one
     history:

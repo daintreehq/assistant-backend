@@ -95,6 +95,15 @@ boundaries:
   - query: Claude ran out of usage halfway through the search indexer; have Codex pick up where it left off in the same worktree.
     confusable_with: [daintree.orchestration.salvage-failed-attempt]
     run: 2026-09-28-round6
+  - query: "claude is stuck on the half-done auth refactor, give it to codex to finish in the same worktree"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "the agent on the pagination work ran out of context, start a fresh session here that picks up where it stopped"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "pass the unfinished migration from the gemini pane to claude, same checkout"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: use codex rather than gemini for the successor, and make sure the brief says the pdfkit approach already failed
     history:

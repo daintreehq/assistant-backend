@@ -126,6 +126,12 @@ boundaries:
   - query: launch a fresh codex agent to fix the flaky date test, visible so i can watch
     confusable_with: [daintree.agents.recover-agent, daintree.edits.spawn-visible-agent]
     run: 2026-09-28-agent-queries
+  - query: "the upload test fails one run in ten, find out why and fix it"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "chase down the intermittent timeout in the integration suite and push a fix"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: have it try with random ordering as well, I bet something else is polluting it
     history:

@@ -540,6 +540,15 @@ boundaries:
   - query: at 6pm kick off the staging deploy
     confusable_with: [daintree.release.deploy-and-verify]
     run: 2026-09-28-round6
+  - query: "once the build in this terminal finishes, start an agent here to write the release notes"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "in thirty minutes spawn an agent to rerun the flaky suite"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "after the deploy check passes tonight, kick off the cleanup agent in this worktree"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:

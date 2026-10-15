@@ -1196,6 +1196,18 @@ boundaries:
   - query: "we're short on codex quota, put one agent on the retry fix at medium effort"
     confusable_with: [daintree.agents.check-usage-limits]
     run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: "have an agent here add the missing null check in the parser and push a branch"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "spin up codex in this checkout to fix the pagination bug and tell me the commit sha"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "fix the webhook retry on this machine with a visible agent, not on the remote host"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "launch claude in the api worktree to implement the refund endpoint and report the branch"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: how's it going?
     history:
