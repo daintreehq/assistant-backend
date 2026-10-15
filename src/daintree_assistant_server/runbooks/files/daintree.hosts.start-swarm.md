@@ -9,7 +9,7 @@ requiredTools:
   - host.listAssistants
   - host.startAssistant
 ---
-Readies one lane per host, then stops: no work is sent. Start only what the person asked to have ready; a "who can take work?" question gets the table and an offer.
+Readies one lane per host and sends no work. Start only what the person asked to have ready; a "who can take work?" question gets the table and an offer.
 
 1. `host.list`; keep the hosts the person named, else all. Not `connected`: report, start nothing.
 2. `host.listAssistants` for each, in one parallel round. Not `ok`, or no project names: unknown, not absent; start nothing there. Find the project in each host's own listing; another host's or this Shell's name, path or projectId proves nothing. A match the person named is usable; one found only from this project's name needs their yes before any start. None (see `projectsOmitted`) or several: ask.
@@ -25,8 +25,8 @@ Readies one lane per host, then stops: no work is sent. Start only what the pers
 4. `ok`: keep `slot`, `agentId`, `generation`, `started` (`available:false`: enrolled, not yet taking messages). Else quote `detail`; nothing more on that host unless:
    - `opted_out` "Starting assistants is turned off": the person turns on "Let the assistant start assistants on this host" (Settings, Hosts, that host).
    - "No window here shows this host": the person opens the host in a window here.
-   - "different agent CLI" with none asked: list again, retry once with theirs.
+   - "different agent CLI" with none asked: re-list, then step 3 with theirs.
    - "already runs 3 assistants": the limit; end or take none.
-   - "didn't reach its prompt", "while this ran", "couldn't be enrolled", no reply or a tool error: an uncertain start. Re-list: a new lane with a `generation` is yours; an assistant without one in a slot free before is this start's, unenrolled (maybe on a question in that host's window); nothing new may still be starting: list again in a minute. A repeat, `startNew` or not, opens another: only on the person's word.
+   - "didn't reach its prompt", "while this ran", "couldn't be enrolled", `disconnected`, `ambiguous`, no reply or a tool error: uncertain. Re-list (once reachable): a new lane with a `generation` is yours; an assistant without one in a slot free before is this start's, unenrolled (maybe on a question in its window); nothing new may still be starting: list again in a minute. A repeat can open another: only on the person's word.
 
 Report back, per host: project (its own name and path), slot, agent, generation, reused or started, ready or the blocker and the exact setting; omitted projects; unavailable or other assistants seen. Then stop; sending work is another runbook's.
