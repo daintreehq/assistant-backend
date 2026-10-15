@@ -146,3 +146,17 @@ cases:
     expect:
       required: [daintree.runtime.free-busy-port]
       optional: [daintree.foundation]
+
+  - id: fbp-hosts-hub-free-over-there-not-handoff
+    category: routing-trap
+    note: >-
+      The hub asking another machine's assistant to free a port: free-busy-port's "on this
+      machine or a Remote Host", not daintree.hosts.delegate-to-host, whose deliverable is "that
+      host's commit, branch or PR". Two text attempts (a fence in delegate-to-host, the hub's ask
+      in this text) left it a rank miss: owed to a retrain on the boundary rows in both files.
+    messages:
+      - role: user
+        content: get the other Mac's assistant to free the port its api worktree needs, only if it's ours
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation, daintree.hosts.foundation]
