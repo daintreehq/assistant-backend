@@ -172,6 +172,20 @@ cases:
       required: [daintree.git.integrate-agent-branches]
       optional: [daintree.foundation]
 
+  - id: integrate-for-hub-trap-hub-assigns-integration
+    category: routing-trap
+    note: >-
+      The person, on the hub, wants another machine to do the integration: that is the
+      hub's side, which this runbook fences off as "the hub's side
+      (daintree.hosts.delegate-to-host)"; delegate-to-host owns "ONE piece of WORK done by
+      the Daintree assistant on another machine".
+    messages:
+      - role: user
+        content: Get the assistant on my other Mac to merge the two hosts' branches into one integration branch on its machine and report the SHA
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
   - id: integrate-for-hub-trap-one-unit
     category: routing-trap
     note: >-
