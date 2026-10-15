@@ -188,4 +188,5 @@ boundaries:
     run: runbook-2026-10-issue-113
   - query: 'the host check for the build server says ssh would not connect; how do I get that machine connected again'
     confusable_with: [daintree.hosts.reassign-host-work]
+    docs: true
     run: runbook-2026-10-issue-113
