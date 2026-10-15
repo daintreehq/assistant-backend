@@ -410,15 +410,19 @@ cases:
   - id: handle-hub-message-receiver-integrate
     category: routing-trap
     note: >-
-      Combining local agents' branches for the hub: today
-      daintree.git.integrate-agent-branches ("The deliverable is an integration branch in
-      its own worktree"); conflict resolution may ride along.
+      Combining branches into one integration branch because the hub asked: the host-side
+      receiver daintree.hosts.integrate-for-hub ("Use when the hub has chosen this lane as its
+      integrator"). The local owner is fenced both ways: integrate-for-hub's "the person's own
+      local merge (daintree.git.integrate-agent-branches)" and integrate-agent-branches' "on a
+      host lane the hub chose as its integrator (use daintree.hosts.integrate-for-hub)".
+      Re-pointed from integrate-agent-branches when the receiver landed; the local owner still
+      rides along on "the branches my two agents produced" until the retrain.
     messages:
       - role: user
         content: The hub asked me to merge the branches my two agents produced into one integration branch and report conflicts.
     expect:
-      required: [daintree.git.integrate-agent-branches]
-      optional: [daintree.hosts.handle-hub-message, daintree.git.resolve-semantic-conflict, daintree.hosts.foundation, daintree.foundation]
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-demo
     category: routing-trap
