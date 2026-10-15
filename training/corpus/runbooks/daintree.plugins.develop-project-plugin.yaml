@@ -38,6 +38,30 @@ positives:
     run: 2026-09-28-catalog-expansion-refine
   - query: validate the release-board plugin's manifest
     run: 2026-09-28-catalog-expansion-refine
+  - query: "Have an agent render our project plugin's panel stories and tell me what the empty state looks like."
+    run: runbook-2026-10-issue-96
+  - query: "how's the deploy-board plugin panel looking after codex restyled it"
+    run: runbook-2026-10-issue-96
+  - query: "I want to see the incidents panel from our .daintree plugin before I commit it"
+    run: runbook-2026-10-issue-96
+  - query: "screenshot the panel our project plugin adds so I can check the spacing"
+    run: runbook-2026-10-issue-96
+  - query: "Look at the metrics plugin's panel in the light theme and tell me whether the table overflows."
+    run: runbook-2026-10-issue-96
+  - query: "the plugin panel looks cramped on my screen, can you take a look at it"
+    run: runbook-2026-10-issue-96
+  - query: "Confirm the acme.oncall plugin's panel still renders after the UI kit upgrade, with screenshots."
+    run: runbook-2026-10-issue-96
+  - query: "can you see my plugin's view? tell me what's on it"
+    run: runbook-2026-10-issue-96
+  - query: "Our project plugin has a test:preview script; run it and describe what each panel story shows."
+    run: runbook-2026-10-issue-96
+  - query: "Check the release-checklist plugin panel's layout without driving the Daintree window."
+    run: runbook-2026-10-issue-96
+  - query: "hey, quick one: can you show me what my plugin's sidebar panel looks like with the new colours?"
+    run: runbook-2026-10-issue-96
+  - query: "Inspect a Daintree project plugin's panel visually without attaching to the running app; report what each state looks like."
+    run: runbook-2026-10-issue-96
 boundaries:
   - query: Daintree's plugin manager shows our project's plugin with a red error; what's wrong with it?
     confusable_with: [daintree.diagnostics]
@@ -64,6 +88,30 @@ boundaries:
   - query: Build a Daintree project plugin that adds a panel showing our deploy queue.
     confusable_with: [daintree.memory.manage-project-memory]
     run: 2026-09-28-catalog-expansion-late
+  - query: "show me the queue panel from our daintree plugin as it is at the moment"
+    confusable_with: [daintree.explore.repository]
+    run: runbook-2026-10-issue-96
+  - query: "how does the plugin's hosts view look when nothing is configured yet"
+    confusable_with: [daintree.explore.repository]
+    run: runbook-2026-10-issue-96
+  - query: "run npm run test:preview in our .daintree plugin and read the screenshots"
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: runbook-2026-10-issue-96
+  - query: "Preview the project plugin's panel in Playwright and check that every story rendered."
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: runbook-2026-10-issue-96
+  - query: "should I relaunch daintree with a remote debugging port so you can see my plugin panel"
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: runbook-2026-10-issue-96
+  - query: "Attach a CDP client to the running Daintree so the agent can inspect our plugin's view."
+    confusable_with: [daintree.diagnostics]
+    run: runbook-2026-10-issue-96
+  - query: "describe how the incident board panel from our .daintree plugin looks today"
+    confusable_with: [daintree.explore.repository]
+    run: runbook-2026-10-issue-96
+  - query: "Find out what the metrics panel our project plugin contributes looks like after yesterday's commit."
+    confusable_with: [daintree.explore.repository]
+    run: runbook-2026-10-issue-96
 followups:
   - query: why is it staged, what do I have to do?
     history:
@@ -89,6 +137,18 @@ followups:
       - 'assistant: claude-8 wrote acme.metrics in ~/proj-metrics-plugin and built dist/; plugin.validate on that directory passes.'
     active: [daintree.plugins.develop-project-plugin]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "ok, what does the panel look like now?"
+    history:
+      - "user: fix the overflow in the acme.board plugin panel"
+      - "assistant: claude-4 rebuilt dist/; plugin.reloadProject shows acme.board active and plugin.reloadPanel scheduled a remount."
+    active: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
+  - query: "there's no preview script, so how do we check it?"
+    history:
+      - "user: look at my plugin's panel"
+      - "assistant: The plugin has no test:preview script; plugin.diagnostics shows acme.board active with no errors."
+    active: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
 topic_shifts:
   - query: ok so it's not Daintree — it's my plugin in .daintree/plugins/acme.board that won't load
     history:
@@ -120,3 +180,9 @@ topic_shifts:
       - 'assistant: Saved to project memory: ''Staging deploys run via deploy-bot; CI only builds.'''
     active: [daintree.memory.manage-project-memory]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "now show me how my plugin's panel looks"
+    history:
+      - "user: fix the console error in the preview"
+      - "assistant: claude-2 fixed the hydration mismatch; after a reload the new navigation logs nothing."
+    active: [daintree.runtime.debug-web-app]
+    run: runbook-2026-10-issue-96

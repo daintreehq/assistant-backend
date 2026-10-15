@@ -413,6 +413,18 @@ boundaries:
   - query: how does the rate limiter actually work in our code? explain the flow
     confusable_with: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6
+  - query: "which components make up the onboarding screen in this repo, and where do they live"
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
+  - query: "Walk me through how the billing page component in our app is put together."
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
+  - query: "what does the request handler for /settings look like now after the refactor? explain it"
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
+  - query: "Explain what the panel layout code under src/ui looks like and how the pieces fit together."
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
 followups:
   - query: hows it going?
     history:

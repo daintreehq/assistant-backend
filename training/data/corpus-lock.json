@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18021,
-  "compiled_sha256": "a3fcbdd116b52d6b7c96c76c50ea99c3681e7793e0c59a0952f93c472538c99d",
+  "rows": 18051,
+  "compiled_sha256": "f53a22909f5d0a68bce62239544f580cc9d1d94204cb5eaea3cdd1b6c7f87b54",
   "label_space_sha256": "a7f0d839690a9dec183ac1e1f01bfc9672ae1ebdd814cfecb5ab752a1b8b0990",
   "label_space_size": 106,
   "by_source": {
-    "boundary": 5405,
+    "boundary": 5420,
     "docs": 839,
-    "followup": 813,
+    "followup": 815,
     "foundation": 409,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -16,8 +16,8 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5573,
-    "topic_shift": 2999,
+    "positive": 5585,
+    "topic_shift": 3000,
     "wake": 149
   },
   "by_run": {
@@ -39,6 +39,7 @@
     "2026-09-28-round6": 1029,
     "2026-09-28-round6-stateful": 256,
     "pre-split": 9811,
+    "runbook-2026-10-issue-96": 30,
     "transcript-2026-09-26-competition-relocate": 12,
     "transcript-2026-09-26-fact-contest-named-agents": 7,
     "transcript-2026-09-26-reviewer-fixer-relay": 10,
@@ -190,10 +191,10 @@
       "sha256": "f5ca2b400c7cad89131521a125d6d807ca173623e3af79a556551eb15c82b527"
     },
     "runbooks/daintree.explore.repository.yaml": {
-      "examples": 353,
-      "rows": 353,
+      "examples": 357,
+      "rows": 357,
       "runbook": "daintree.explore.repository",
-      "sha256": "e9ad86ed9d32a57c28654dc7041cea277b3cf821418d3c3ad0e5fac9f605fa78"
+      "sha256": "9a5450c7f569fb8c27848652703b216b99188fe2f54635d8962e20a7f55917cb"
     },
     "runbooks/daintree.forge.address-pr-review.yaml": {
       "examples": 53,
@@ -490,10 +491,10 @@
       "sha256": "da02fe50d9e72f6b4dd8d8c43218a3cc7d5608883c7d85dcecd66369071b330d"
     },
     "runbooks/daintree.plugins.develop-project-plugin.yaml": {
-      "examples": 49,
-      "rows": 49,
+      "examples": 72,
+      "rows": 72,
       "runbook": "daintree.plugins.develop-project-plugin",
-      "sha256": "d7c5307c28ac3bbce7cd2d9a76fa87d0874e6e6bceaaf9d042211f9927e1b18a"
+      "sha256": "f68601b0d34ab2b7df94f8a0edbb9ae605976876caa5b9a3462c532a2657e9c5"
     },
     "runbooks/daintree.recipe.run-or-create.yaml": {
       "examples": 274,
@@ -568,10 +569,10 @@
       "sha256": "8630d0d737f06ae6878f50220f6701f8c1e8de162ccb4d25fc6b7dd6afe04b98"
     },
     "runbooks/daintree.runtime.debug-web-app.yaml": {
-      "examples": 228,
-      "rows": 228,
+      "examples": 231,
+      "rows": 231,
       "runbook": "daintree.runtime.debug-web-app",
-      "sha256": "f509ff2cb8df041571883a85bec050a5bfa5ec7954b972ee274743dab941fd8c"
+      "sha256": "b7af9f6323aa1711ebae5b9d7c502a5ed556dcb17b182688602321a574fa8d30"
     },
     "runbooks/daintree.runtime.free-busy-port.yaml": {
       "examples": 53,

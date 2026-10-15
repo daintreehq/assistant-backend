@@ -267,6 +267,15 @@ boundaries:
   - query: Open a Dev Preview panel for the web worktree so I can look at the settings page.
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: "my web app's profile page in the dev preview looks off, look at it and tell me what's wrong"
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
+  - query: "The dev preview of our storefront renders a blank page since the last change; inspect it."
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
+  - query: "the checkout page in my Dev Preview panel looks misaligned, take a look"
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
 followups:
   - query: and the second one?
     history:
