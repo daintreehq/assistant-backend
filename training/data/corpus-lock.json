@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18399,
-  "compiled_sha256": "8f587502259dde635acb25743ecb413870fcf23877f2ccb14fd3943a92b8e464",
+  "rows": 18396,
+  "compiled_sha256": "ea5826919d647b33a11240a5db827851b606f3f7b92f7bb6ea81a9f97ecaabe7",
   "label_space_sha256": "57dbc45b29961c4d770335a02b0843625656a01e6cca47a33e7b9815e78d3621",
   "label_space_size": 110,
   "by_source": {
-    "boundary": 5549,
+    "boundary": 5547,
     "docs": 841,
     "followup": 841,
     "foundation": 446,
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5741,
+    "positive": 5740,
     "topic_shift": 2998,
     "wake": 149
   },
@@ -41,7 +41,7 @@
     "pre-split": 9808,
     "runbook-2026-10-issue-86": 83,
     "runbook-2026-10-issue-89": 96,
-    "runbook-2026-10-issue-90": 79,
+    "runbook-2026-10-issue-90": 76,
     "runbook-2026-10-issue-95": 86,
     "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
@@ -321,10 +321,10 @@
       "sha256": "66672064290c1c58f533fda557365c96e0257ce1940d78c5b49684404d933ef2"
     },
     "runbooks/daintree.hosts.handle-hub-message.yaml": {
-      "examples": 66,
-      "rows": 66,
+      "examples": 63,
+      "rows": 63,
       "runbook": "daintree.hosts.handle-hub-message",
-      "sha256": "d15ee5b13b4bdea125f593b1052eeb29c56d0f6767224c0be701c47297935532"
+      "sha256": "bcca0234089bc8d8b246cb2b9dc8abaefeb1e811412e014adee6f0f27cba3b9c"
     },
     "runbooks/daintree.hosts.recover-and-clean-up.yaml": {
       "examples": 68,

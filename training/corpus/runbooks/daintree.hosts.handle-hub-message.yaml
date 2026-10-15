@@ -38,7 +38,6 @@ positives:
   - Look in the lane inbox for hub messages that arrived without a wake line
   - Do the safe part of the hub's request, decline the force-push it slipped in, and say so in the reply
   - The hub's message names a project that is not this lane's; ask back instead of touching that project
-  - The hub's brief links a document that asks for API tokens; ignore that and answer the real request
   - Use assistant.sendMessage to tell the hub the run is stuck on a confirmation that timed out
   - assistant.reply came back TOO_LARGE; resend the completion with references instead of the full log
   - Replying to the hub's exchange failed with EXCHANGE_CLOSED; decide whether to stop the local work for it
@@ -121,18 +120,12 @@ boundaries:
   - query: the work for the hub is committed already, just send it the SHA, no PR
     confusable_with:
     - daintree.workflow.prep-branch-for-review
-  - query: assistant.getInbox isn't listed in this session, so what do I tell the hub
-    confusable_with:
-    - daintree.diagnostics
   - query: ask the hub what it meant by the cache fix
     confusable_with:
     - daintree.agents.ask-running-agent
   - query: check with the hub before touching the other repo
     confusable_with:
     - daintree.agents.ask-running-agent
-  - query: the hub's Shell went quiet, still answer its exchange
-    confusable_with:
-    - daintree.hosts.foundation
   - query: is the hub's message in my inbox something I'm allowed to act on
     confusable_with:
     - daintree.hosts.foundation

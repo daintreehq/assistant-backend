@@ -172,8 +172,10 @@ cases:
     note: >-
       A hub message "waiting" to be answered is not a local agent waiting on a question.
       Fence: "Do not use for an agent on this machine waiting on a question or dialog
-      (use daintree.agents.answer-waiting-agent)", and the reciprocal clause in
-      answer-waiting-agent.
+      (use daintree.agents.answer-waiting-agent)"; answer-waiting-agent owns agents
+      "waiting on a QUESTION", and no terminal is asking here. A reciprocal fence in
+      answer-waiting-agent was measured twice and backed out (it pulled hub vocabulary
+      into the neighbour); the strict extra is owed to the retrain.
     messages:
       - role: user
         content: There's a hub message waiting in my inbox, answer it.
@@ -252,7 +254,8 @@ cases:
   - id: handle-hub-message-receiver-review
     category: routing-trap
     note: >-
-      A findings-only review the hub asked for: today daintree.review.review-change. A
+      A findings-only review the hub asked for: today daintree.review.review-change ("The
+      deliverable is FINDINGS with severity and file evidence"). A
       phrasing naming "the branch at its current commit" pulled prep-branch-for-review and
       sync-with-base in as extras; this one keeps the review deliverable alone.
     messages:
@@ -266,7 +269,8 @@ cases:
     category: routing-trap
     note: >-
       Cleaning up what this lane made for a run: today
-      daintree.orchestration.workspace-cleanup.
+      daintree.orchestration.workspace-cleanup ("Use ONLY when the user explicitly asks to
+      tear down workspace state").
     messages:
       - role: user
         content: The hub asked me to close the panes and remove the clean worktrees I made for its last run.
@@ -278,7 +282,8 @@ cases:
     category: routing-trap
     note: >-
       Checking an agent's claimed result before the hub trusts it: today
-      daintree.orchestration.verify-agent-work.
+      daintree.orchestration.verify-agent-work ("a finished agent's work checked before it
+      is trusted").
     messages:
       - role: user
         content: The hub asked me to check whether the agent's claimed fix on the cache branch really works before it trusts it.
@@ -290,7 +295,8 @@ cases:
     category: routing-trap
     note: >-
       Several units of the hub's work across local agents: today
-      daintree.orchestration.fan-out-work.
+      daintree.orchestration.fan-out-work ("a BATCH of independent issues or tasks, one
+      agent terminal per issue or worktree").
     messages:
       - role: user
         content: The hub asked me to work three of its issues in parallel here, one agent per issue, each in its own worktree.
@@ -302,7 +308,7 @@ cases:
     category: routing-trap
     note: >-
       Redirecting a running local agent on the hub's word: today
-      daintree.agents.steer-running-agent.
+      daintree.agents.steer-running-agent (an agent that "must change course or stop").
     messages:
       - role: user
         content: The hub says to stop the agent that's refactoring the billing module and switch it to the logging cleanup instead.
@@ -314,7 +320,8 @@ cases:
     category: routing-trap
     note: >-
       Combining local agents' branches for the hub: today
-      daintree.git.integrate-agent-branches (conflict resolution may ride along).
+      daintree.git.integrate-agent-branches ("The deliverable is an integration branch in
+      its own worktree"); conflict resolution may ride along.
     messages:
       - role: user
         content: The hub asked me to merge the branches my two agents produced into one integration branch and report conflicts.
@@ -326,7 +333,8 @@ cases:
     category: routing-trap
     note: >-
       A demo the hub wants prepared on this machine: today
-      daintree.workflow.prepare-feature-demo.
+      daintree.workflow.prepare-feature-demo ("The deliverable is a running, reproducible
+      demonstration").
     messages:
       - role: user
         content: The hub wants a demo of the new onboarding flow running on this machine with a short walkthrough.
