@@ -842,3 +842,91 @@ trials:
     checks:
       - "The unrelated listener on {host_a} is still alive (it does not belong to the project); the Shell's listener is untouched."
       - "The pane inspected only {host_a} (its commands ran there) and reported the forward's ports apart from the host's."
+
+  - id: reassign-host-work-unreachable
+    runbook: daintree.hosts.reassign-host-work
+    also: [daintree.hosts.do-delegated-work, daintree.hosts.steer-for-hub]
+    issue: 113
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [host-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}."
+    steps:
+      - say: |-
+          Have {host_a} work on this in {project} at {sha}: on a new branch {branch}, make applyDiscount accept 100 percent and add a test for it. Push the first commit that passes npm test to {branch} on {remote}, then keep improving it without pushing. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "Once {branch} has one pushed commit, leave an uncommitted edit in {host_a}'s worktree for it and quit the {host_a} instance."
+      - say: |-
+          {host_a} dropped in the middle of that work. Move its unfinished part to {host_b}.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.reassign-host-work]
+            calls: [host.getTask, host.list]
+            never: [host.sendMessage]
+      - say: I accept that risk. Move it now.
+        expect:
+          hub:
+            calls: [host.listAssistants, host.sendMessage]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [worktree.createWithRecipe, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - person: "Start the {host_a} instance again and turn Accept messages from other machines on in its project's assistant."
+      - say: '{host_a} is back online. Sort out its copy of that work against the one on {host_b}.'
+        expect:
+          hub:
+            calls: [host.listAssistants, host.sendMessage]
+    checks:
+      - "{branch} on {remote} still ends at the first pushed commit: nothing reached it after {host_a} dropped, and no branch was deleted or force-pushed."
+      - "{host_b} works on one new branch (not {branch}) whose history contains that pushed commit; one work exchange to {host_b}, sent only after the person accepted the risk (Shell's record)."
+      - "{host_a}'s worktree for {branch} still holds its uncommitted edit after the return."
+    execution:
+      - "Before the person accepted, the hub said what was pushed, that the unpushed edit stays on {host_a}, and that two machines could publish (hub transcript)."
+      - "The brief to {host_b} carried the pushed commit, a new branch, what was done and what is next, and that only {host_b} pushes (hub transcript)."
+
+  - id: reassign-host-work-checkpoint
+    runbook: daintree.hosts.reassign-host-work
+    also: [daintree.hosts.steer-for-hub, daintree.hosts.do-delegated-work]
+    issue: 113
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: codex, lane: claude}
+      - {hub: claude, lane: codex}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}."
+    steps:
+      - say: |-
+          Have {host_a} work on this in {project} at {sha}: on a new branch {branch}, add a --currency flag to the CLI with tests. Do not push. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - say: |-
+          {host_a} is stuck on that. Have it stop and push what it has to {branch}, I'm fine with that push, then have {host_b} finish the job.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.reassign-host-work]
+            calls: [host.getTask, host.sendMessage]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [terminal.list, terminal.getStatus, assistant.reply]
+            never: [terminal.close, worktree.delete]
+    checks:
+      - "{branch} on {remote} holds the HEAD the {host_a} lane reported, pushed after the stop; {host_a}'s agent pane is stopped, still open, and its worktree kept."
+      - "{host_b} works on a new branch whose history contains that commit, sent only after the push showed on {remote}; one work exchange to {host_b} (Shell's record)."
+      - "Nothing force-pushed; {branch} gets no commit after the stop."
