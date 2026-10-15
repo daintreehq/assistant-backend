@@ -278,6 +278,26 @@ boundaries:
   - query: The agent is asking whether it should read the whole src folder; tell it yes.
     confusable_with: [daintree.context.feed-running-agent]
     run: 2026-09-28-catalog-expansion
+  - query: terminal 6 wants to know whether to use pnpm or npm, tell it pnpm
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: the agent stopped to ask which branch to base on; say main
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: two panes are waiting on prompts right now, unblock both
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: the codex agent asks if it may run the migrations; tell it yes
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: an agent pane here is stuck on a question about the test runner, answer it with jest
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
 followups:
   - query: how's it going?
     history:

@@ -489,6 +489,18 @@ boundaries:
   - query: 'is the PR for #412 green and what did the reviewer say?'
     confusable_with: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6
+  - query: reply on the PR thread with what we found and close the issue
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: did anyone answer on that GitHub issue? reply to them
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: leave a comment on the bug report with the root cause
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
 followups:
   - query: and the review?
     history:

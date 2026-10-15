@@ -381,6 +381,14 @@ boundaries:
   - query: "tidy the commits on this branch, write the description and open a draft PR"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: commit what's left, push the branch and open the PR
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
+  - query: tidy the commits on this branch, push it and open a pull request
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-90
 followups:
   - query: yeah go ahead
     history:
