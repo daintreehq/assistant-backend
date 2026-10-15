@@ -4,9 +4,9 @@
 # units visible, and resuming the plan after a hub restart. Recall cases are the issue's three
 # requests plus agent- and user-phrased plans, a blocked predecessor and a restart mid-plan.
 # Routing traps: this runbook wins against each declared neighbour (one unit or one relay,
-# independent placement, the same work everywhere, a plan on this machine, an account after a
-# restart). Reverse traps: the neighbour wins and this runbook must not ride along. The hosts
-# foundation may ride along (optional).
+# independent placement, the same work everywhere, finished branches combined, a plan on this
+# machine, an account after a restart). Reverse traps: the neighbour wins and this runbook
+# must not ride along. The hosts foundation may ride along (optional).
 
 cases:
   # ------------------------------------------------------------------- recall
@@ -164,6 +164,21 @@ cases:
       required: [daintree.hosts.execute-distributed-workflow]
       optional: [daintree.hosts.foundation]
 
+  - id: execute-distributed-workflow-not-integrate-host-branches
+    category: routing-trap
+    note: >-
+      A finished predecessor whose dependents are now due, with nothing to combine. Decided by
+      "a stage released only once the commits it depends on are verified"; this runbook fences
+      "finished branches combined into one (daintree.hosts.integrate-host-branches)".
+    messages:
+      - role: user
+        content: >-
+          the schema host finished and pushed its branch; nothing needs combining, just start
+          the three units that were waiting on it on the other machines
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
   # ------------------------------------------------------------- reverse traps
   - id: execute-distributed-workflow-reverse-delegate-relay
     category: routing-trap
@@ -185,7 +200,7 @@ cases:
       pieces of work" and "put on whichever Remote Host this Shell reaches can best take it".
     messages:
       - role: user
-        content: Here are six unrelated bugs, spread them over whichever machines have room
+        content: None of these six bugs touch each other; whichever of my machines is idlest should take each one
     expect:
       required: [daintree.hosts.place-work]
       optional: [daintree.hosts.foundation]
@@ -226,4 +241,17 @@ cases:
         content: Have every host try the same parser fix on its own branch and show me what each got
     expect:
       required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-reverse-integrate-host-branches
+    category: routing-trap
+    note: >-
+      Several hosts' finished parts merged on one machine is integrate-host-branches': "work that
+      SEVERAL Remote Hosts finished has to end up on ONE branch and one machine is to do the
+      combining".
+    messages:
+      - role: user
+        content: the work is finished on every host now, so pick an integration machine among them to merge everyone's branch and report whether it builds
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
       optional: [daintree.hosts.foundation]
