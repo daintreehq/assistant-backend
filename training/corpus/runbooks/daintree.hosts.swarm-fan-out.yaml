@@ -42,7 +42,7 @@ positives:
   - Have each Remote Host's assistant build the same markdown preview prototype on its own branch and check every reported SHA on the shared remote
   - The user wants every remote machine to attempt the same router refactor independently and see the branches and checks each one reports in a table
   - Put the cron parser task on every Remote Host's assistant, a branch per host, and report which hosts answered, which are still open, and what each verified
-  - Fan the export-to-PDF feature out to every Remote Host this Shell reaches and bring back one table of host, agent CLI, branch, SHA and test result
+  - my four other machines are idle this afternoon, could each of them have a go at the PDF export so tomorrow I can look at four branches?
   - Every host assistant in the swarm should implement the same small date-range module from the main commit, nothing pushed, and the user wants each commit confirmed
   - query: >-
       The user has four Remote Hosts connected to this Shell and wants each of them to
@@ -94,7 +94,10 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: the assistants are ready on every host, now hand them all the same task, the webhook signature check
     confusable_with: [daintree.hosts.start-swarm]
-  - query: every machine already has claude enrolled, give each the same refactor and bring back their shas
+  - query: good, then the logging refactor goes to all three, separate branches
+    history:
+      - 'user: are the assistants up on the other boxes?'
+      - 'assistant: Yes, all three hosts have an assistant enrolled in this project.'
     confusable_with: [daintree.hosts.start-swarm]
   - query: have every host run the code generator and report back a table of the commits, one row per machine
     confusable_with: [daintree.hosts.check-usage-limits]
@@ -104,7 +107,7 @@ boundaries:
     confusable_with: [daintree.hosts.ask-host-assistant]
   - query: get the assistants on all my other machines to implement the fix rather than just tell me what they think
     confusable_with: [daintree.hosts.ask-host-assistant]
-  - query: 'start a fresh run: every host implements the throttle helper on a new branch'
+  - query: the hosts wrapped up last week's job, so here is a new one for all of them, write the throttle helper with one branch each
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: kick off a new swarm run on the remote hosts, same feature for each, and table what comes back
     confusable_with: [daintree.hosts.recover-and-clean-up]
@@ -118,7 +121,7 @@ boundaries:
     confusable_with: [daintree.orchestration.competition]
   - query: let every one of my other macs write its own version of the tokenizer and show me all of them
     confusable_with: [daintree.orchestration.competition]
-  - query: "I'm on the Shell: send the build task to every host's assistant and collect what each one replies"
+  - query: from my desk mac, get the remote boxes' assistants all building the docs site generator and let me know what each comes back with
     confusable_with: [daintree.hosts.handle-hub-message]
   - query: from the Shell I'm on, broadcast the dependency bump to every enrolled lane and list what each one committed
     confusable_with: [daintree.hosts.handle-hub-message]
