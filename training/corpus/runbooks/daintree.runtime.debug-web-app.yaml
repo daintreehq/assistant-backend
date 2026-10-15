@@ -276,6 +276,14 @@ boundaries:
   - query: "the checkout page in my Dev Preview panel looks misaligned, take a look"
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-96
+  - query: the dev preview of the host's worktree went blank after its server moved to another port; reload it and read the console
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
+  - query: my preview of the remote app logs a websocket error on port 24678 in the console since the last frontend change; get it fixed
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
 followups:
   - query: and the second one?
     history:

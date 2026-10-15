@@ -33,6 +33,55 @@ positives:
   - stop the server on port 3000 — I didn't start it and neither did you, as far as I know
   - Before touching anything, report which process and worktree hold port 5000 and whether it's an agent's server or the user's.
   - npm start dies with 'Something is already running on port 3000'. Find what it is.
+  - query: Worktree server on the remote machine exits with EADDRINUSE :::5000. Find the listener on that machine and match it to a terminal there before touching anything.
+    run: runbook-2026-10-issue-131
+  - query: Identify which process holds 8080 on the host where the feature worktree lives; the user wants it freed only if one of our terminals owns it.
+    run: runbook-2026-10-issue-131
+  - query: 'Port 4200 is taken on the workstation host that runs the angular worktree. Attribute the listener there: pid, cwd, terminal.'
+    run: runbook-2026-10-issue-131
+  - query: lsof on this Mac names ssh as the listener for 5173. Before anyone kills it, tell me whether that is a Daintree forward to a remote host.
+    run: runbook-2026-10-issue-131
+  - query: Daintree forwarded the host's 8000 to 8001 here. Confirm whether anything actually needs freeing and report both port numbers.
+    run: runbook-2026-10-issue-131
+  - query: 'I''m driving a remote workstation from my laptop. The worktree''s rails server on the workstation won''t boot: ''Address already in use - bind(2) for 0.0.0.0 port 3000''. My laptop also has something on 3000 but I think that''s unrelated. Work out which machine actually has the conflict and what''s holding it there, and don''t kill anything until I say.'
+    run: runbook-2026-10-issue-131
+  - query: The api worktree lives on a remote host and its server log there says port 9000 is busy. Find the process on that host holding 9000, its working directory and whether a Daintree terminal owns it; leave anything that isn't ours running and come back with the options.
+    run: runbook-2026-10-issue-131
+  - query: my workstation says 3000 is in use but the 3000 on my laptop is my own app, leave that alone and find what's on the workstation
+    run: runbook-2026-10-issue-131
+  - query: whats holding 5173 on the remote box, the vite server in that worktree cant start
+    run: runbook-2026-10-issue-131
+  - query: something on the build machine grabbed 4000 and the worktree's server there won't start. check over there, not here
+    run: runbook-2026-10-issue-131
+  - query: why does the Ports view map the host's 3000 to 3002 here, and what is sitting on 3000 and 3001 on my mac
+    run: runbook-2026-10-issue-131
+  - query: the host's admin page won't open in the browser panel because 5432 is taken here. what is holding 5432 on my laptop, and do I have to stop it?
+    run: runbook-2026-10-issue-131
+  - query: is that ssh listening on localhost 8080 one of daintree's forwards or something I left running?
+    run: runbook-2026-10-issue-131
+  - query: 'morning! quick one: the worktree on the remote host can''t get port 6006 for storybook. who''s got it on that machine?'
+    run: runbook-2026-10-issue-131
+  - query: hey, can you see what's on 8888 over on the other computer? jupyter won't start in that worktree
+    run: runbook-2026-10-issue-131
+  - query: 'Relayed from the Shell: before the staging worktree here restarts, check that nothing on this machine still listens on 8443, and say what does if something is.'
+    run: runbook-2026-10-issue-131
+  - query: I'm at my laptop. The test server for the checkout on the desktop machine dies with EADDRINUSE on 9100; get the answer from that machine, not from mine.
+    run: runbook-2026-10-issue-131
+  - query: 'two machines, same port: the host''s server wants 4000 and my laptop has its own 4000. check which one is actually blocked, and by what'
+    run: runbook-2026-10-issue-131
+  - query: The node server in the worktree on my Linux host fails to listen on 3030. Which process on the host has 3030, and is it from a Daintree terminal there?
+    run: runbook-2026-10-issue-131
+  - query: Before restarting the server on the remote host, check whether 8443 is actually free there or still held by the old process.
+    run: runbook-2026-10-issue-131
+  - query: and the one on the host itself?
+    history:
+    - 'user: port 3000 is taken, find what''s on it'
+    - 'assistant: On this machine 3000 is held by ssh, which is Daintree forwarding the workstation''s 3000.'
+    run: runbook-2026-10-issue-131
+  - query: 'Context: the user drives a Linux build host from a Mac. On the host, the worktree''s next.js server logs ''EADDRINUSE: address already in use :::3000'' and exits; on the Mac, 3000 is held by the user''s own unrelated app. Goal: attribute the host''s listener (pid, command, cwd, Daintree terminal) without touching the Mac''s process, and propose options without stopping anything we don''t own.'
+    run: runbook-2026-10-issue-131
+  - query: the remote worktree's server is up fine but my local app can't take 3000 because an ssh process holds it here
+    run: runbook-2026-10-issue-131
 boundaries:
   - query: EADDRINUSE on 3000 when the e2e server starts. What's holding it? free it
     confusable_with: [daintree.ci.run-e2e-suite]
@@ -61,6 +110,42 @@ boundaries:
   - query: which worktree's server is sitting on 8080? free it if it's ours
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
+  - query: the remote worktree's server can't bind 3000 on the host. find what process has that port over there
+    confusable_with:
+    - daintree.worktree.manage-resource
+    run: runbook-2026-10-issue-131
+  - query: 'remote box, 8080 already taken, nothing local involved: who holds it on that machine?'
+    confusable_with:
+    - daintree.worktree.manage-resource
+    run: runbook-2026-10-issue-131
+  - query: On the remote host the dev server for this worktree fails with address in use. Track down the process listening on that port.
+    confusable_with:
+    - daintree.worktree.manage-resource
+    run: runbook-2026-10-issue-131
+  - query: it's not the cloud resource, it's the ordinary server process on my remote machine that can't get its port. what's holding it?
+    confusable_with:
+    - daintree.worktree.manage-resource
+    run: runbook-2026-10-issue-131
+  - query: my remote server and my local app both default to 5000 and now the remote one won't start. which machine has the clash?
+    confusable_with:
+    - daintree.worktree.manage-resource
+    run: runbook-2026-10-issue-131
+  - query: the preview of the remote app loads, but now my own local server can't bind 5173. what took it?
+    confusable_with:
+    - daintree.runtime.debug-web-app
+    run: runbook-2026-10-issue-131
+  - query: 'on the host, not here: find what is bound to 7000 in that worktree; the server there reports the port in use'
+    confusable_with:
+    - daintree.hosts.foundation
+    run: runbook-2026-10-issue-131
+  - query: a link from the remote terminal opened on 3001 here instead of 3000. find what has 3000 on my machine and whether it is in the host's way
+    confusable_with:
+    - daintree.hosts.foundation
+    run: runbook-2026-10-issue-131
+  - query: anything bound to 8081 at the moment?
+    confusable_with:
+    - daintree.workflow.follow-up-on-issue
+    run: runbook-2026-10-issue-131
 followups:
   - query: it's mine actually, I forgot about it — go ahead and kill it
     history:
@@ -92,6 +177,16 @@ followups:
       - 'assistant: Re-read PID 7781 (same command, cwd and start time) and sent kill 7781; rechecking the listener in a few seconds.'
     active: [daintree.runtime.free-busy-port]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: no, the one on the workstation
+    history:
+    - 'user: the api can''t bind 4000, find what''s on it'
+    - 'assistant: On this laptop, 4000 is your local docker container.'
+    run: runbook-2026-10-issue-131
+  - query: ok, it's daintree's forward then. so what is holding the port on the host?
+    history:
+    - 'user: what''s ssh doing on 127.0.0.1:3000 here'
+    - 'assistant: That ssh is the connection to your remote host, and it carries a forward of the host''s 3000.'
+    run: runbook-2026-10-issue-131
 topic_shifts:
   - query: the server won't come up, it says port 4312 is already in use — find out what's holding it
     history:

@@ -233,6 +233,15 @@ boundaries:
   - query: is the second machine's assistant able to take questions from this shell yet
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: the workstation's assistant never answers when I message it from here, is a port or a setting blocking it?
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
+  - query: can my laptop's assistant ask the one on the workstation what's running there? how do I switch that on
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    docs: true
+    run: runbook-2026-10-issue-131
 
   - query: "the hub couldn't get usage from the build host because the send came back opted_out, how do I allow messaging with it"
     confusable_with: [daintree.hosts.check-usage-limits]

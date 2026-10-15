@@ -503,6 +503,10 @@ boundaries:
   - query: the laptop host opened a pull request yesterday, has its reviewer left any comments
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: where's 4127 at now, did CI pass on it?
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
 followups:
   - query: and the review?
     history:

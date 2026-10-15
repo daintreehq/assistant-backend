@@ -261,6 +261,22 @@ boundaries:
   - query: 'resume the remote box attached to the feature worktree so the agent can use it'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: the worktree's remote resource says its endpoint on 8443 is down; show me the resource status and what the status command printed
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
+  - query: resume the paused remote resource for the payments worktree so its server comes back
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
+  - query: what does the remote resource status say for this worktree, is the box even up?
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
+  - query: the worktree's devbox shows an error status, read what its status command reported
+    confusable_with:
+    - daintree.runtime.free-busy-port
+    run: runbook-2026-10-issue-131
 followups:
   - query: pause it then
     history:
