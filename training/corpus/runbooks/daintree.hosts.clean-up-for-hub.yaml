@@ -130,3 +130,7 @@ boundaries:
     confusable_with: [daintree.hosts.handle-hub-message]
   - query: inbox has the hub's cleanup for the export run, carry it out
     confusable_with: [daintree.hosts.handle-hub-message]
+  - query: 'the hub''s check of that SHA is done here; it now wants the test worktree and the verifier pane I opened for it removed'
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: 'the unit I built for the hub got merged, and its message now says to close that agent''s pane and drop the worktree'
+    confusable_with: [daintree.hosts.do-delegated-work]

@@ -127,3 +127,6 @@ boundaries:
   - query: "the hub asked this machine to implement the settings screen it described, starting from the branch it named, so the person can demo it later"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: 'the hub''s earlier unit was tidied away; now it wants the follow-up fix built in a new worktree on this host'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100

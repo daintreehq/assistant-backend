@@ -25,16 +25,19 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-issue-fizzbuzz-run
-    category: single-runbook
+    category: continuation
     note: >-
-      The issue's second selection case, verbatim: the hub's own words to this assistant,
-      as the lane passes them to search. Decided by the second-person request this runbook
-      quotes, "remove the worktrees you made for the parser job and tell the hub what you
-      kept", and its deliverable, "one reply to the hub: completed with each item removed or
-      kept and why". With no hub named it also reads as the person's own cleanup, so
-      daintree.orchestration.workspace-cleanup rides along until a retrain; the same text
-      read from the inbox is clean-up-for-hub-bare-message-read-from-inbox.
+      The issue's second selection case, verbatim, as the hub's message to this lane: the
+      history establishes that the request comes from the hub and is addressed to this
+      lane about its own run here. Decided by "when the hub, the assistant on the person's
+      main machine, asks it to remove what it made on this machine for one of the hub's
+      runs". daintree.orchestration.workspace-cleanup is "for the person tearing down panes
+      and worktrees on their own machine", which this is not.
     messages:
+      - role: user
+        content: Read the hub's latest message and tell me what it wants from this machine.
+      - role: assistant
+        content: "It's the hub asking this lane to clean up after its fizzbuzz run here. Its exact text:"
       - role: user
         content: clean up what you made for the fizzbuzz run and report back
     expect:
@@ -188,3 +191,18 @@ cases:
     expect:
       required: [daintree.worktree.audit-worktrees]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-reverse-wrong-project
+    category: routing-trap
+    note: >-
+      A cleanup the hub addressed to another project's lane is a fit question for the
+      envelope, daintree.hosts.handle-hub-message ("checked against this lane's project and
+      the CLIs signed in here", "ask the hub what it meant"); this runbook only removes
+      "what it made on this machine for one of the hub's runs", and there is nothing of this
+      lane's to remove.
+    messages:
+      - role: user
+        content: this lane belongs to the api project but the hub's request is about the frontend project's leftovers; send it back as a question
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]

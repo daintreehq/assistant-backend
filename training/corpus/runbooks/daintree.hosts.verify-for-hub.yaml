@@ -127,3 +127,6 @@ boundaries:
   - query: "Run the hub's smoke suite against its release candidate on this machine and send back pass and fail counts per check"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: 'the hub wants its release branch run through the integration tests here again, in a fresh worktree since the old one was cleaned up'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
