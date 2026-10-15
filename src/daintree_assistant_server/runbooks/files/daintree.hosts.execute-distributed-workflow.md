@@ -13,22 +13,22 @@ requiredTools:
 optionalTools:
   - host.cancelTask
 ---
-The plan lives in this conversation and wakes nobody; task records hold no text and expire after a day. Each unit is a daintree.hosts.delegate-to-host unit, its brief and checks (`get_runbook` if absent).
+The plan lives in this conversation and wakes nobody; task records hold no text and last a day. Each unit is a daintree.hosts.delegate-to-host unit, its brief and checks (`get_runbook` if absent).
 
-1. Plan, per unit: id; host, project and lane (`host.listAssistants`) holding its repository (the lane confirms `origin`); that repository's base branch at SHA; `dependsOn`; what it takes from each predecessor (repository, branch, SHA; a contract from another project also by path and version); acceptance; allowed writes; branch `<run>/<unit>`; `taskId` `<run>-<unit>`. Ids unique, dependencies known, no cycle; two predecessors in one repository need an integration unit (daintree.hosts.integrate-for-hub). Show the table before sending unless told to go.
-2. Ready: every predecessor done, its exact SHA on the remote the dependent's project fetches (`git ls-remote`, PR head); unpushed feeds no other host.
-3. Per ready unit: mark it `sending`, then `host.sendMessage` under its `taskId`, no `waitMs`. The brief adds: build on exactly these SHAs, never a newer tip or another repository's history; a missing pin or contract mismatch is `input-required`. `rate_limited`: send after `retryAfterMs`. End the turn.
+1. Plan, per unit: id; host, project and lane (`host.listAssistants`) holding its repository (the lane confirms `origin`); that repository's base branch at SHA; `dependsOn`; its inputs from each predecessor (repository, branch, SHA; another project's contract also by path and version); acceptance; allowed writes; branch `<run>/<unit>`; `taskId` `<run>-<unit>`. Ids unique, dependencies known, no cycle; two predecessors in one repository need an integration unit (daintree.hosts.integrate-for-hub). Show the table before sending unless told to go.
+2. Ready: every predecessor done, its exact SHA on the remote the dependent's project fetches (`git ls-remote`, PR head); unpushed feeds no host.
+3. Per ready unit: mark it `sending` with the time, then `host.sendMessage` under its `taskId`, no `waitMs`. The brief adds: build on exactly these SHAs, no newer tip, no other repository's history; a missing pin or contract mismatch is `input-required`. `rate_limited`: send after `retryAfterMs`. End the turn.
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","taskId":"<run>-<unit>","text":"<brief>"}
 ```
 
 On notice or resume, after the hosts foundation's reconcile:
-- `sending`, no result: `host.getTask` by its `taskId`. `not_found` on a connected host: resend under that `taskId`; a host holding it never delivers twice (`conflict`: held). `expired`: ask the person.
+- `sending`, no result: `host.getTask` by its `taskId`. `not_found`, host connected, within the hour: resend that id (never delivered twice; `conflict`: held; after a restart it wakes nobody); later or `expired`: ask the person.
 - `completed`, verified as delegate-to-host does: done, SHA and how noted. `failed`, `rejected` or a failed check: failed, dependents blocked and shown.
-- Then steps 2 and 3, input SHAs re-read.
+- Then steps 2-3, input SHAs re-read.
 Conversation lost: send nothing until the person restores the plan; then reconcile by `taskId` and `<run>/*` branches.
 
-Stop and recovery: one send per unit; rework is a new `taskId` referencing the failed one, on the person's go. Changing units or hosts is the person's call; the plan grants no push, merge or deploy. Cancel only on request (`host.cancelTask`): canceled stays canceled; a late completion releases nothing.
+Stop and recovery: one send per unit; rework: a new `taskId` referencing the failed one, on the person's go. Changing units or hosts is the person's call; the plan grants no push, merge, deploy. Cancel only on request (`host.cancelTask`): canceled stays canceled; a late completion releases nothing.
 
 Report back: the table (unit, host, dependencies, state, SHA claimed vs verified and how), blocked and canceled units, what wakes the next step.

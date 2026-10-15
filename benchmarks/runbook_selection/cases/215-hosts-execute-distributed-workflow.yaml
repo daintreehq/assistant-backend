@@ -25,8 +25,10 @@ cases:
   - id: execute-distributed-workflow-issue-api-before-client
     category: single-runbook
     note: >-
-      The issue's second request. Decided by "several wait on others" and "a stage released
-      only once the commits it depends on are verified".
+      The issue's second request: it asks for "the whole cross-host plan", not a lone
+      hand-over. Decided by "a multi-stage PLAN across their Remote Hosts" and "The deliverable
+      is the whole graph carried through stage by stage"; delegate-to-host keeps "for that
+      single dependency a deliberate relay" when one hand-over is the whole request.
     messages:
       - role: user
         content: The API must land before the client starts; coordinate the whole cross-host plan.
@@ -39,8 +41,8 @@ cases:
     note: >-
       The issue's third request, in agent words. Decided by "a dependency graph of three or more
       units" and "a stage released only once the commits it depends on are verified";
-      execute-durable-workflow now fences work on another machine, "several that depend on each
-      other: daintree.hosts.execute-distributed-workflow". Fails on the untrained head
+      execute-durable-workflow now fences work on another machine, "a plan of several dependent
+      units: daintree.hosts.execute-distributed-workflow". Fails on the untrained head
       (rank_miss behind execute-durable-workflow): retrain owed.
     messages:
       - role: user
@@ -180,7 +182,7 @@ cases:
     category: routing-trap
     note: >-
       Unrelated bugs with no order between them are place-work's: "DIFFERENT, independent
-      pieces of work ... put on whichever Remote Host this Shell reaches can best take it".
+      pieces of work" and "put on whichever Remote Host this Shell reaches can best take it".
     messages:
       - role: user
         content: Here are six unrelated bugs, spread them over whichever machines have room
@@ -217,8 +219,8 @@ cases:
   - id: execute-distributed-workflow-reverse-swarm
     category: routing-trap
     note: >-
-      The same fix on every host is swarm-fan-out's: "the SAME WORK done on EVERY Remote Host
-      ... one copy per machine".
+      The same fix on every host is swarm-fan-out's: "the SAME WORK done on EVERY Remote Host"
+      and "one copy per machine".
     messages:
       - role: user
         content: Have every host try the same parser fix on its own branch and show me what each got
