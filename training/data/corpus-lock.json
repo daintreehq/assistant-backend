@@ -2,16 +2,16 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 18711,
-  "compiled_sha256": "8c207a3c2de5930b51cac34b46e89ec3a403f9c4536689d6c6472070c3f8a9f3",
+  "compiled_sha256": "eeb7bd4437821d449c6bf752cefffcfed841b8845c4dcd49bbf7880130f81f9e",
   "label_space_sha256": "4e7562a406bf49ab1c5b15ecbc0d73309df11b891bdd9b8fe3d6b6b518c94086",
   "label_space_size": 113,
   "by_source": {
-    "boundary": 5698,
+    "boundary": 5700,
     "docs": 841,
     "followup": 855,
     "foundation": 446,
     "foundation_boundary": 309,
-    "multi_runbook": 490,
+    "multi_runbook": 488,
     "near_miss": 116,
     "no_task": 117,
     "no_task_stateful": 592,
@@ -625,10 +625,10 @@
       "sha256": "50bb3cdd0ddd4961132281868ac10ef1072bf7e9c69fb1f6efd7318e815c59a6"
     },
     "runbooks/daintree.runtime.free-busy-port.yaml": {
-      "examples": 87,
-      "rows": 87,
+      "examples": 89,
+      "rows": 89,
       "runbook": "daintree.runtime.free-busy-port",
-      "sha256": "1763a64a67bfb3066005abdfd018653434d01185e9b1a02a35e31d519d6fa9eb"
+      "sha256": "025f9089391722d8aa1e45aa84ece93b60159c7e1a12efac900e2f67d4d54f3f"
     },
     "runbooks/daintree.runtime.measure-performance.yaml": {
       "examples": 47,
@@ -757,10 +757,10 @@
       "sha256": "ae5da6466d72617433c7d2cc3a827bfd34450a6e7ba1c31ebc39bf0810667589"
     },
     "shared/multi-runbook.yaml": {
-      "examples": 490,
-      "rows": 490,
+      "examples": 488,
+      "rows": 488,
       "runbook": null,
-      "sha256": "09697e1193e556fcd84fbf9db527a999cde59b20c8bec6733eecb3071e37444b"
+      "sha256": "f45cecf28fed6426550790994d1581eae41d1fbe1b3e44e5d2dd2fc5439f3a4d"
     },
     "shared/near-miss.yaml": {
       "examples": 57,

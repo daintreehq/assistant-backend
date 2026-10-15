@@ -54,6 +54,7 @@ positives:
   - query: something on the build machine grabbed 4000 and the worktree's server there won't start. check over there, not here
     run: runbook-2026-10-issue-131
   - query: why does the Ports view map the host's 3000 to 3002 here, and what is sitting on 3000 and 3001 on my mac
+    docs: true
     run: runbook-2026-10-issue-131
   - query: the host's admin page won't open in the browser panel because 5432 is taken here. what is holding 5432 on my laptop, and do I have to stop it?
     run: runbook-2026-10-issue-131
@@ -118,7 +119,7 @@ boundaries:
     confusable_with:
     - daintree.worktree.manage-resource
     run: runbook-2026-10-issue-131
-  - query: On the remote host the dev server for this worktree fails with address in use. Track down the process listening on that port.
+  - query: On the remote host this worktree's integration tests can't start their fixture server, address in use on 7070. Track down whatever is listening there.
     confusable_with:
     - daintree.worktree.manage-resource
     run: runbook-2026-10-issue-131
@@ -145,6 +146,14 @@ boundaries:
   - query: anything bound to 8081 at the moment?
     confusable_with:
     - daintree.workflow.follow-up-on-issue
+    run: runbook-2026-10-issue-131
+  - query: "get the workstation's assistant to see what is bound to 6000 over there and stop it only if it's one of ours"
+    confusable_with:
+    - daintree.hosts.delegate-to-host
+    run: runbook-2026-10-issue-131
+  - query: "ask the build box's assistant which process has 8080 in its worktree. no code changes, I just want the answer"
+    confusable_with:
+    - daintree.hosts.delegate-to-host
     run: runbook-2026-10-issue-131
 followups:
   - query: it's mine actually, I forgot about it — go ahead and kill it
