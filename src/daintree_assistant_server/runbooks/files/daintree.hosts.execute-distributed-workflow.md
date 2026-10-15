@@ -24,7 +24,7 @@ The plan lives in this conversation and wakes nobody; task records hold no text 
 ```
 
 On notice or resume, after the hosts foundation's reconcile:
-- `sending`, no result: `host.getTask` by its `taskId`. `not_found`, host connected, within the hour: resend that id (never delivered twice; `conflict`: held; after a restart it wakes nobody); later or `expired`: ask the person.
+- `sending`, no result: `host.getTask` by its `taskId`. `not_found`, host connected, within the hour of sending: resend that id (never delivered twice; `conflict`: held); later or `expired`: ask the person.
 - `completed`, verified as delegate-to-host does: done, SHA and how noted. `failed`, `rejected` or a failed check: failed, dependents blocked and shown.
 - Then steps 2-3, input SHAs re-read.
 Conversation lost: send nothing until the person restores the plan; then reconcile by `taskId` and `<run>/*` branches.
