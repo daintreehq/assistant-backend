@@ -609,12 +609,6 @@ boundaries:
   - query: 'spread these tasks over parallel agents here, one per worktree'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
-  - query: 'the hub''s batch for this host is five separate lint fixes; give each its own agent and worktree'
-    confusable_with: [daintree.hosts.do-delegated-work]
-    run: runbook-2026-10-issue-98
-  - query: 'the hub handed this machine seven small UI tickets; work them two agents at a time, a worktree each'
-    confusable_with: [daintree.hosts.do-delegated-work]
-    run: runbook-2026-10-issue-98
   - query: 'five unrelated bugs, give each its own agent and worktree locally; the remote boxes stay out of it'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92

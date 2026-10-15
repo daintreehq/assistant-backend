@@ -21,20 +21,19 @@ optionalTools:
 ---
 After daintree.hosts.handle-hub-message fitted it; keep its `taskId`.
 
-1. Pieces: the hub's list, this project only. Attempts only if it asked for several, each with its assigned approach, if any. One fix is one unit (daintree.hosts.do-delegated-work). Units share no files (a lockfile counts), else ask back. `git -C <project path>` (`actions.getContext`): origin is the brief's remote; `cat-file -e <base SHA>`, else `fetch` once.
+1. Pieces: the hub's list, this project only. Attempts only if it asked for several (one fix: daintree.hosts.do-delegated-work), each with its assigned approach. Units share no files (lockfiles count), else ask back. `git -C <project path>` (`actions.getContext`): origin is the brief's remote; `cat-file -e <base SHA>`, else `fetch` once.
 2. Slots: the hub's cap at most, fewer while this project's agents work (`terminal.list`); no cap, about four; under 32 notices pending. Others queue.
-3. Record per piece (foundation, Long runs) its worktree id, phase and corrections.
-4. Per admitted piece: `worktree.createWithRecipe` (new branch `<run>/<piece>` from the base SHA, no `recipeId`, `collisionPolicy:"error"`), `worktree.waitUntilReady` to `ready` (`timedOut`: again, a few times; else failed), a named command or skill resolved for its CLI (`slashCommands.list`), then:
+3. Per admitted piece: `worktree.createWithRecipe` (new branch `<run>/<piece>` from the base SHA, no `recipeId`, `collisionPolicy:"error"`), `worktree.waitUntilReady` to `ready` (`timedOut`: again, a few times), a named command or skill resolved for its CLI (`slashCommands.list`), then:
 
 ```json tool=agent.launch surface=lane-full
 {"agentId":"<hub's CLI, else a ready one>","name":"<run> <piece>","requestedId":"<run>-<piece>","worktreeId":"<worktree id>","prompt":"<brief>","notify":true,"handback":true}
 ```
 
-   Brief: the hub's objective, acceptance and limits verbatim; commit here; its checks; report SHA, each check's exit.
-5. `terminal.getStatus` `includeOutput`: a trust prompt gets `terminal.sendKeys` `choose`, `notify:true`. End the turn.
+   Brief: the hub's objective, acceptance and limits verbatim; commit here; its checks; report SHA and exits.
+4. Paced `terminal.getStatus` `includeOutput` rounds until each works or shows a dialog: trust prompt: `terminal.sendKeys` `choose`, `notify:true`; still stuck, hold it. End the turn.
 
-On notice or resume: map the terminal to its piece; a question beyond the brief holds it. Done: in its worktree `git status --porcelain`, `git log -1 --stat`, `git merge-base --is-ancestor <base SHA> HEAD`, rerun checks; unmet: one correction (`terminal.sendCommand`, `notify`, `handback`). Verified, failed or held with its agent stopped frees a slot: launch the next. Attempts: name the best verified one on the hub's criterion, with evidence, or call them even.
+On notice or resume: map the terminal to its piece; a question beyond the brief holds it. Done: in its worktree `git status --porcelain`, `git log -1 --stat`, `git merge-base --is-ancestor <base SHA> HEAD`, rerun checks; unmet: one correction (`terminal.sendCommand`, `notify`, `handback`). Verified, failed or held with its agent stopped frees a slot: launch the next. Attempts: the best verified one on the hub's criterion, with evidence, or a tie.
 
-Stop and recovery: after a restart, rebuild from `worktree.list` and `terminal.getStatus` (`<run>-<piece>`): re-arm working agents (`terminal.notifyWhenIdle`); launch an unknown id only if its branch has no commit.
+Stop and recovery: before a create or launch, and after a restart, reconcile with `worktree.list` and `terminal.getStatus` (`<run>-<piece>`): reuse a made worktree; re-arm a working agent (`terminal.notifyWhenIdle`); launch a missing one only on a clean worktree at the base SHA, else hold it.
 
-Report back: once nothing runs or queues, one `assistant.reply`: `completed`, or `input-required` with the held questions; per piece branch, SHA claimed vs verified, checks, pane id; the best attempt, why. The hub's answer is a new exchange: resume held pieces in free slots; reply there with the whole table.
+Report back: once nothing runs or queues, one `assistant.reply`: `completed`, or `input-required` with the held questions; per piece worktree, branch, SHA claimed vs verified, checks, pane id; the best attempt. The hub's answer is a new exchange: resume held pieces in free slots; reply there with the whole table.

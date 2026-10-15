@@ -113,7 +113,7 @@ followups:
     Claude Code, checks npm test.'
 - query: the second attempt finished too, so which one goes back to the hub?
   history:
-  - 'user: the hub wants three attempts at the slug fix here'
+  - 'user: the hub asked this host for a few competing versions of the slug fix'
   - 'assistant: Three attempts are running in their own worktrees; the first one has committed.'
 - query: ok the last unit is done, check them all and answer the hub
   history:
@@ -196,3 +196,11 @@ boundaries:
     better one reported
   confusable_with:
   - daintree.orchestration.spike-options
+- query: the hub's batch for this host is five separate lint fixes; give each its own agent and worktree
+  confusable_with:
+  - daintree.orchestration.fan-out-work
+  - daintree.hosts.do-delegated-work
+- query: the hub handed this machine seven small UI tickets; work them two agents at a time, a worktree each
+  confusable_with:
+  - daintree.orchestration.fan-out-work
+  - daintree.hosts.do-delegated-work
