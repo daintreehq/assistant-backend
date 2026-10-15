@@ -5,7 +5,7 @@
 # must win against daintree.diagnostics (its one declared neighbour) and against
 # daintree.hosts.handle-hub-message, daintree.hosts.start-swarm and
 # daintree.hosts.recover-and-clean-up; reverse traps where each of those, or the hosts
-# foundation alone, wins and this runbook must not ride along. Two cases (marked) miss on
+# foundation alone, wins and this runbook must not ride along. Three cases (marked) miss on
 # the shipped selector: the runbook is untrained against established neighbours, and they
 # wait on the retrain.
 
@@ -14,7 +14,7 @@ cases:
     category: single-runbook
     note: >-
       The issue's agent-phrased request. Decided by "wants to know which gate is in the
-      way" and the deliverable "with nothing sent or resent".
+      way" and the deliverable ending "sending nothing".
     messages:
       - role: user
         content: Diagnose host assistant reachability without resending the task.
@@ -43,6 +43,7 @@ cases:
     note: >-
       A user naming the refusal: "a send or start that came back ... rate_limited". The
       foundation's one line on limits may ride along; the diagnosis is this runbook's.
+      RETRAIN OWED: the shipped selector picks the hosts foundation alone (rank_miss).
     messages:
       - role: user
         content: sends to the render machine come back rate_limited; why?
@@ -129,7 +130,7 @@ cases:
     note: >-
       One live exchange that reached the host but never its assistant, with nothing
       restarted: the person "cannot message or start the Daintree assistant on it" and the
-      answer is where delivery stopped, "with nothing sent or resent".
+      answer is where delivery stopped, "sending nothing".
       daintree.hosts.recover-and-clean-up is for the account of exchanges "usually after
       Daintree restarted, the hub was replaced or the link to a Remote Host dropped", so it
       is an extra here.
