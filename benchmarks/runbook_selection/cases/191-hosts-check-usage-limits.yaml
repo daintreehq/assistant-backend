@@ -176,3 +176,84 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.agents.check-usage-limits, daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-not-foundation-alone
+    category: single-runbook
+    note: >-
+      Messaging the assistant on each other machine is the hosts foundation's subject, but
+      it is the domain foundation, to "co-load it with whichever one fits, and load it
+      ALONE only when none does". Here one fits: the usage figures are "figures each host's
+      assistant read off that machine's own usage screen". The foundation alone would be
+      a miss; beside this runbook it may ride along.
+    messages:
+      - role: user
+        content: Get the Daintree assistant on each of my other machines to report its Codex usage back to me
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-foundation-usage-opted-out-not-check
+    category: routing-trap
+    note: >-
+      Reverse trap. The usage request is only the occasion; what is asked is the setting
+      that lets the hub message that machine, the foundation's "how to switch it on". No
+      usage is to be read, so daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: The usage request to my second Mac came back opted_out. What do I switch on so the hub can message it?
+    expect:
+      required: [daintree.hosts.foundation]
+
+  - id: measure-performance-memory-headroom-not-hosts-usage
+    category: routing-trap
+    note: >-
+      Reverse trap. The headroom here is memory between two revisions: "Use when the user
+      wants a SPEED, MEMORY, SIZE or THROUGHPUT difference measured between two
+      revisions". It is not agent allowance, so daintree.hosts.check-usage-limits is
+      excluded.
+    messages:
+      - role: user
+        content: Measure peak memory on this branch against main and tell me whether the headroom improved
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation]
+
+  - id: relieve-contention-no-headroom-not-hosts-usage
+    category: routing-trap
+    note: >-
+      Reverse trap. No headroom on this machine because of the agents' builds is "Use when
+      the MACHINE is struggling under the agents' load and the user wants it relieved",
+      not plan allowance on other machines; daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: Four agents are running builds and this Mac has no headroom left, it is swapping hard
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
+      optional: [daintree.foundation]
+
+  - id: hosts-check-usage-not-ask-host
+    category: routing-trap
+    note: >-
+      The bait is daintree.hosts.ask-host-assistant, "ONE QUESTION answered by the Daintree
+      assistant on ANOTHER MACHINE". But what comes back is not that assistant's answer:
+      it is "figures each host's assistant read off that machine's own usage screen".
+      ask-host-assistant is excluded.
+    messages:
+      - role: user
+        content: ask the assistant on my laptop host to read me its Claude Code usage
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: ask-host-rate-limits-not-hosts-usage
+    category: routing-trap
+    note: >-
+      Reverse trap. Whether the host ran into rate limits during a finished job is a
+      question about what happened there, and "The deliverable is that assistant's
+      ANSWER"; no usage screen is read, so daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: ask the laptop host's assistant whether it hit any rate limits while it was finishing the migration
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
