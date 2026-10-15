@@ -165,3 +165,9 @@ boundaries:
   - query: "Got the hub's wake again for the demo exchange I already answered; check the inbox and do nothing twice"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: 'the hub wants to know which panes I still have open from its run; it isn''t asking me to close any'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
+  - query: 'the hub''s cleanup message names a project that isn''t the one this lane is in'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100

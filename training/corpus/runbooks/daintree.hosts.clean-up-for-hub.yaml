@@ -1,0 +1,132 @@
+# daintree.hosts.clean-up-for-hub: the Remote Host's own assistant, enrolled as a lane,
+# removing what it made for a run the hub names, safely and with nobody at the machine.
+#
+# Boundaries are the same cleanup words on the hub (recover-and-clean-up), at the
+# person's own request on their machine (workspace-cleanup), a read-only verdict on
+# worktrees (audit-worktrees), and the hub-message envelope (handle-hub-message). Reverse
+# rows live in those runbooks' files.
+runbook: daintree.hosts.clean-up-for-hub
+run: runbook-2026-10-issue-100
+
+positives:
+  - The hub's latest message wants the three agent panes and the worktree I set up for the pagination experiment gone from this machine
+  - hub says the race is over, close my panes from it and get rid of my worktree
+  - the main machine's assistant asked me to tidy up after the search-index swarm on this host
+  - Close the two Codex panes this lane launched for the hub's flaky-test hunt and remove their worktree if nothing is unpushed
+  - the hub wants me to clear out what I opened here for the migration dry run
+  - Remove what this lane created for the cache benchmark run on the hub's request; one of the worktrees still has a modified config file
+  - hub asked for cleanup of the lint sweep. two panes, one worktree, all pushed
+  - "As this host's lane: the hub has asked for the panes and worktrees from yesterday's tokenizer run to be removed; my earlier replies named pane ids and a branch for each"
+  - the person's main mac sent word through the hub to close everything I spun up for the docs rewrite
+  - Hub request on this machine, shut the review panes I opened for the auth refactor and delete the review worktree, keep the branch
+  - got a cleanup ask from the hub for the onboarding run, but one of the worktrees has a commit that never got pushed
+  - the hub's message names the run "telemetry spike" and asks me to remove my leftovers from it
+  - The hub wants the usage-check pane I opened on this machine this morning closed, nothing else
+  - hub wants my worktrees from the cross-machine race deleted except the one whose branch won
+  - clean up my side of the hub's experiment, the branch is already on the remote
+  - "Hub says: close the panes you made for the CSV importer run and tell me what you kept"
+  - Remove the worktree this lane built for the hub's benchmark comparison; its pane is already closed
+  - the hub just asked me to drop everything I created for the retry-logic swarm and report back
+  - Cleanup request from the hub covering the four agent panes and two worktrees from the flaky-test race on this machine
+  - the hub told this host to close what it opened for the schema run but the worktree delete is sitting on a confirmation nobody is here to click
+  - the hub's cleanup wants my worktree gone, and its branch also lives on the shared remote; what goes back to the hub about that branch
+  - Tear down this host's part of the hub's dependency-upgrade run; one agent pane in it is still working
+  - the hub sent a cleanup for the "rate limiter" run, and there's another worktree here from a different run that looks just as stale
+  - I'm the assistant on the build host and the hub asked me to remove my panes and worktree from the test campaign
+  - Hub asks this lane to remove its two worktrees from the API split; one is clean and pushed, one has uncommitted files
+  - the hub wants the panes from the bisect run on this machine closed, and the worktree only if its branch is pushed
+  - close out what I made for the hub's localisation run, it's been merged
+  - The hub's cleanup lists three panes and a worktree from the thumbnail run; one of the panes is not in my terminal listing any more
+  - hub says abandon the caching run, close its panes and delete its worktree even though the branch never got pushed
+  - the hub asked me to clean up after its swarm; my session restarted since, so I can't tell which panes I opened from memory
+  - the hub asked this host to delete its run's worktree, but this project's teardown script also wipes a staging database on another server
+  - the hub's run left an agent here sitting on a question; the cleanup says close it
+  - my own panes from the hub's run closed fine but the run's worktree delete hung on a confirmation, and the hub is still waiting on my cleanup reply
+  - query: I'm the lane on the second Mac. The hub's message says the search swarm is finished and merged, and asks me to close the two Claude panes and remove the worktree I made for it, then tell it what I removed and what I kept. Nobody is at this machine.
+  - query: "Hub message for this host: the export run is done. Close what you opened for it. Observed: terminal.list shows three panes in the run's worktree, two of them mine and one the person opened yesterday; the worktree has one unpushed commit"
+  - query: The hub wants this machine cleaned up after last night's fan-out. I launched three agents and made two worktrees for it. One worktree is clean and pushed, the other has a test file nobody committed. Do the safe part and ask the hub about the rest in one go.
+  - query: Earlier the worktree delete for the hub's cleanup timed out waiting for a confirmation because no one was at this machine. The hub hasn't asked again. Work out what to tell it about that worktree.
+  - query: "Hub request on this lane: remove the panes and worktree for the pricing experiment and also delete the experiment branch on origin. Branches on the shared remote aren't mine to delete from here"
+  - query: The hub asked me to clean up after the docs swarm. Its message lists pane ids I reported yesterday, but the app restarted overnight and my earlier replies no longer show their text. Close what I can still match exactly and report the rest.
+
+followups:
+  - query: ok, do the cleanup it asked for
+    history:
+      - "user: the hub messaged us again, have a look"
+      - "assistant: It says the token-refresh run is finished and it wants this lane's panes and worktree from that run gone."
+    active: [daintree.hosts.handle-hub-message]
+  - query: the hub answered, go ahead and remove the one with unpushed commits too
+    history:
+      - "user: the hub wants this host cleaned up after the parser race"
+      - "assistant: Closed two panes and removed one worktree. Asked the hub about the second worktree, which has three unpushed commits."
+    active: [daintree.hosts.clean-up-for-hub]
+  - query: now close the panes from that run like the hub said
+    history:
+      - "user: read what the hub just sent"
+      - "assistant: The hub says the report run is finished and asks this lane to remove the panes it opened for it."
+    active: [daintree.hosts.handle-hub-message]
+  - query: the hub says keep that worktree, just close its panes
+    history:
+      - "user: hub asked for cleanup of the onboarding run"
+      - "assistant: One worktree has uncommitted files; I asked the hub whether to keep it."
+    active: [daintree.hosts.clean-up-for-hub]
+  - query: someone is at the window now, the hub wants that worktree delete tried once more
+    history:
+      - "user: clean up after the hub's import run"
+      - "assistant: Closed both panes; the worktree delete timed out waiting for a confirmation, so it is still there."
+    active: [daintree.hosts.clean-up-for-hub]
+  - query: great, the hub's other message is the cleanup for that run, handle it
+    history:
+      - "user: reply to the hub with the branch and commit for the export fix"
+      - "assistant: Replied completed with the branch, the commit and the pane id."
+    active: [daintree.hosts.handle-hub-message]
+  - query: fine, the hub says that agent can go too
+    history:
+      - "user: the hub wants my panes from the metrics run closed"
+      - "assistant: Closed two; the third agent is still working, so I asked the hub before closing it."
+    active: [daintree.hosts.clean-up-for-hub]
+  - query: it's done with them all now, clear my stuff from that run off this machine
+    history:
+      - "user: the hub needs the branch and commit from my CSV export work"
+      - "assistant: Replied to the hub with the branch, the commit and both pane ids."
+    active: [daintree.hosts.handle-hub-message]
+
+topic_shifts:
+  - query: separate thing, the hub also wants the panes and worktree from the logging run gone from here
+    history:
+      - "user: check whether the codex pane on the cache branch is still running"
+      - "assistant: It is idle; its last reply says the tests pass."
+    active: [daintree.foundation]
+  - query: never mind that, the hub sent a cleanup for its race, start on that
+    history:
+      - "user: how much disk are the worktrees on this machine using?"
+      - "assistant: About 14 GB across five worktrees."
+    active: [daintree.foundation]
+
+boundaries:
+  - query: the hub wants this machine's race panes closed and its race worktrees gone
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: as the lane here, tidy up what the hub's run left on this host
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: I'm the host-side assistant; the hub wants my swarm leftovers removed
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the hub's cleanup for its search run reached this host; what do I keep and what goes
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the hub sent a cleanup for its last run, shut my panes and drop whichever worktrees are clean
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: close the panes and worktrees this host made for the hub's experiment, nobody here to confirm anything
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: the hub asked this lane to shut down its agents from the race and delete their worktrees
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: hub wants the worktrees I made for its run deleted, but only the pushed ones
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: the hub asked me to remove whichever of my run's worktrees are safe to remove
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: per the hub, check which of my run's worktrees are clean and pushed and remove those
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: hub message says close the panes from the benchmark run
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: the hub's message is a cleanup request for the fuzzing run, what do I remove
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: inbox has the hub's cleanup for the export run, carry it out
+    confusable_with: [daintree.hosts.handle-hub-message]

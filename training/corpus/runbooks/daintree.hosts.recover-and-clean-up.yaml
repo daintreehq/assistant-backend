@@ -136,3 +136,15 @@ boundaries:
   - query: "close the usage panes the last check left open on the hosts"
     confusable_with: [daintree.hosts.check-usage-limits]
     run: runbook-2026-10-issue-91
+  - query: 'get each remote host''s assistant to remove the panes and worktrees it made for the parser race'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
+  - query: 'the cleanup I asked the build host to do came back with a list of unpushed worktrees, what now'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
+  - query: 'tell the other machines to tidy up after the swarm and bring me their removed and kept lists'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
+  - query: 'ask the linux host''s assistant to close only the panes it opened for the usage check, nothing else'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100

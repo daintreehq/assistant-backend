@@ -451,6 +451,15 @@ boundaries:
   - query: "tear down the worktrees whose agents were pushing to the remote staging server"
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
+  - query: 'my agents from the docs race are done; close their panes on this laptop and remove the clean worktrees'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
+  - query: 'shut down the agents from my swarm here and remove the clean worktrees'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
+  - query: 'clean up everything the race left on my laptop except the winner''s worktree'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
 followups:
   - query: actually delete the last one, i don't need that task
     history:
