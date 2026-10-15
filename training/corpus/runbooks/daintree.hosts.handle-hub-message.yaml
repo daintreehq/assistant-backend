@@ -156,3 +156,12 @@ boundaries:
     confusable_with:
     - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
+  - query: "The hub's message asks for a demo but names a project that isn't the one open here; ask it which one it means"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+  - query: "The hub wants a demo built by Claude Code and only Codex is signed in on this machine; ask back before doing anything"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+  - query: "Got the hub's wake again for the demo exchange I already answered; check the inbox and do nothing twice"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108

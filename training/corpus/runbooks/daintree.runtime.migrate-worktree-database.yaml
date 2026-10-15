@@ -103,6 +103,9 @@ boundaries:
   - query: The per-worktree MySQL for checkout-v2 needs the snapshot from before the migration put back.
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-round6
+  - query: "the hub only wants this worktree's database migrated and seeded with invented customers, no server and no demo"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
 followups:
   - query: did it prove the database isn't the same one main uses?
     history:

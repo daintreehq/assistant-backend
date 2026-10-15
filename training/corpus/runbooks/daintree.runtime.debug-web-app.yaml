@@ -284,6 +284,9 @@ boundaries:
     confusable_with:
     - daintree.runtime.free-busy-port
     run: runbook-2026-10-issue-131
+  - query: "The preview I started for the hub's demo shows a blank page and a console error; find out why it doesn't render"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
 followups:
   - query: and the second one?
     history:
