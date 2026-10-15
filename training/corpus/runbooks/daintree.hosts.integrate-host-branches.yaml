@@ -51,7 +51,7 @@ positives:
   - get the other machines' finished work merged into one branch on the build box, I'll review that branch myself
   - one of the hosts only gave me a short hash for its commit; get the full one before anyone merges it with the others
   - please have one of the remote hosts merge the three pushed branches in the order I said, and if a branch moves later, don't take the new commits
-  - 'Agent task: hand the integration of two remote hosts'' pushed units to a third host''s assistant with the base, the ordered commits, the checks and the target branch, then confirm the merged head on the shared remote.'
+  - 'Agent task: the reporting and export units came back from two hosts, both pushed. The person wants them on one branch built by the third host, which has the large fixtures, and the merged head confirmed on origin before they look.'
   - good evening! the localisation hosts finished; could the laptop combine their branches and tell me which strings conflict
   - The mini's branch for the search work still has uncommitted changes on that machine; merge only what is pushed from it and the tower, on the linux host.
   - >-
@@ -70,18 +70,18 @@ positives:
     the laptop's, with the unit tests after each. If the second merge breaks the config tests,
     I want to hear which input caused it, not have it patched over.
   - >-
-    Agent task: the person wants the three pushed unit branches from the remote hosts
-    combined on one host. Inputs are pinned at the SHAs the earlier replies reported and were
-    checked against origin. Choose the host with an available assistant in this repository,
-    send it the ordered inputs with acceptance and checks, and verify the integration branch's
-    head and merge parents once it reports.
+    Agent task: the person's notification service was split across three hosts last night.
+    The templates, the delivery worker and the settings page are each pushed on their own
+    branch. They want one branch with all three on the shared base, put together by the machine
+    that has the mail sandbox, and want to know whether anything clashes or the delivery tests
+    fail before they review it.
   - get the mini to merge the two hosts' branches and tell me if the merged branch passes its tests
   - the tower's merge of the hosts' branches reported done; verify on the remote that it holds only those inputs
   - 'Agent task: the person approved the commits two hosts reported for the importer and the exporter. Confirm both are on origin, have the third host merge importer then exporter onto the shared base with pytest after each, and report the merged SHA with its parents.'
   - so both laptops are done, right? cool, now one place for all of it please, on the tower
   - the linux box should merge the arm build fix from the mini and the x86 fix from the tower, run the build after each, and push the result to a new branch
   - three hosts pushed their pieces of the plugin; get them combined on the machine with Claude Code signed in and tell me the merged head
-  - 'Hub agent: integration step of the run. Inputs are the two unit branches the hosts reported, base is the run base; dispatch to the tower''s lane and verify by artifact when it answers.'
+  - 'Hub agent: the run''s two units are back and verified; the person said the tower should be the one to combine them, and nothing is pushed until they have seen the result.'
   - merge every host's branch from this run on the mini, but if the tower's branch has a new commit since I approved it, ask me first
   - the integrating host says one input's commit isn't on the remote; find out which host still has to push it
   - The tower finished merging but the e2e suite failed after the third input; tell me which input it was and keep what merged cleanly.

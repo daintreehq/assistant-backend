@@ -82,8 +82,8 @@ cases:
   - id: integrate-host-branches-moved-after-dispatch
     category: single-runbook
     note: >-
-      A source branch moved after the job went out: "a source that moved on ... brought back to
-      the person to decide", and "the combined branch it reports verified to contain exactly those
+      A source branch moved after the job went out: "a source that moved on or a clash brought
+      back to the person to decide", and "the combined branch it reports verified to contain exactly those
       inputs".
     messages:
       - role: user
