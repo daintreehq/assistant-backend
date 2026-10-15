@@ -38,6 +38,13 @@ scenarios:
     runbooks: [daintree.foundation]
     states: ["USER_REJECTED.{0,40}do not retry"]
 
+  - id: asking-for-a-daintree-restart
+    situation: The assistant is about to ask the user to quit, restart or relaunch Daintree.
+    must: Say first why it is needed and what it stops, every terminal and agent in every open project.
+    must_not: Ask for the restart with the reason or the cost only after the fact, or not at all.
+    runbooks: [daintree.foundation]
+    states: ["quit, restart or relaunch Daintree, say why", "stops every terminal and agent in every open project"]
+
   - id: initial-prompt-sent-twice
     situation: A child launched with a prompt looks idle right after launch.
     must: Treat the prompt as already submitted.
