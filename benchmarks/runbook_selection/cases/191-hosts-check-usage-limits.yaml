@@ -33,8 +33,8 @@ cases:
     category: single-runbook
     note: >-
       User-phrased: which remote machine has the most Codex left before its reset. The
-      whenToUse names "which machine has the most usage headroom left" on "OTHER
-      MACHINES", compared "host by host".
+      whenToUse names "which machine has the most usage headroom" on "OTHER MACHINES",
+      "reported host by host".
     messages:
       - role: user
         content: Which of the remote machines has the most Codex quota left before its weekly reset?
@@ -65,7 +65,7 @@ cases:
       The word headroom on a machine baited daintree.runtime.measure-performance and
       daintree.runtime.relieve-resource-contention (CPU and memory) before this runbook
       existed. Claude headroom is plan allowance: "which machine has the most usage
-      headroom left". Both runtime runbooks are excluded.
+      headroom". Both runtime runbooks are excluded.
     messages:
       - role: user
         content: Which machine has the most Claude headroom?
@@ -77,8 +77,8 @@ cases:
     category: single-runbook
     note: >-
       Two hosts by bare name, the commonest shape of the request: "how much Claude Code or
-      Codex allowance is left on OTHER MACHINES ... on one or several Remote Hosts this
-      Shell reaches". Nothing in the query itself says they are other machines, so the
+      Codex allowance each Remote Host this Shell reaches has left, on one host, several
+      or all of them". Nothing in the query itself says they are other machines, so the
       untrained selector gives it to the local runbook; owed to the retrain.
     messages:
       - role: user
@@ -90,7 +90,7 @@ cases:
   - id: hosts-check-usage-one-named-host-codex
     category: single-runbook
     note: >-
-      One host by bare name, Codex: "on one or several Remote Hosts this Shell reaches".
+      One host by bare name, Codex: "each Remote Host this Shell reaches".
       Same gap as the two-host case: owed to the retrain.
     messages:
       - role: user
@@ -103,8 +103,8 @@ cases:
     category: continuation
     note: >-
       After the table, asking which machine has the most headroom is a question about the
-      figures just gathered across hosts: "which machine has the most usage headroom
-      left", answered from the table, not a machine-load question.
+      figures just gathered across hosts: "which machine has the most usage headroom",
+      answered from the table, not a machine-load question.
     active: [daintree.hosts.check-usage-limits, daintree.hosts.foundation, daintree.foundation]
     messages:
       - role: user

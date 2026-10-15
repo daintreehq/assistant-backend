@@ -1,8 +1,8 @@
 ---
 id: daintree.hosts.check-usage-limits
 title: Check agent usage left on other machines
-summary: From this Shell's hub, have each Remote Host's assistant read its agent CLI's own usage screen, and bring back one table of every host's remaining allowance, windows and reset times as that host printed them, never added together.
-whenToUse: 'Use when the user wants to know how much Claude Code or Codex allowance is left on OTHER MACHINES — usage, weekly or five-hour limits, credits and reset times on one or several Remote Hosts this Shell reaches, or which machine has the most usage headroom left — compared host by host and account by account, never as one combined total. The deliverable is one table of figures each host''s assistant read off that machine''s own usage screen. Do not use for the usage of agents on this machine (daintree.agents.check-usage-limits).'
+summary: From this Shell's hub, have the assistant on each Remote Host read its own machine's agent usage screen, and bring back one table of what every host printed, host by host and never added together.
+whenToUse: 'Use when the user wants agent usage checked on OTHER MACHINES — how much Claude Code or Codex allowance each Remote Host this Shell reaches has left, on one host, several or all of them, or which machine has the most usage headroom — reported host by host and account by account, never as one combined total. The deliverable is one table of figures each host''s assistant read off that machine''s own usage screen. Do not use for the usage of agents on this machine (daintree.agents.check-usage-limits).'
 risk: external
 requiredTools:
   - host.list
