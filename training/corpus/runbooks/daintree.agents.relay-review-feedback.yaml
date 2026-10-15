@@ -303,6 +303,12 @@ boundaries:
   - query: send the confirmed breaks from codex's red-team terminal to claude to fix
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-refine
+  - query: "take what the reviewer agent wrote about the migration script and hand it to the agent that wrote the script to fix"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "the security reviewer flagged three problems in the auth module; get those to the claude pane working on it and have it address them"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:

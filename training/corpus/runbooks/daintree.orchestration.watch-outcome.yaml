@@ -543,7 +543,7 @@ boundaries:
   - query: "once the build in this terminal finishes, start an agent here to write the release notes"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
-  - query: "in thirty minutes spawn an agent to rerun the flaky suite"
+  - query: "at 5pm start an agent here to bisect the nightly slowdown"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: "after the deploy check passes tonight, kick off the cleanup agent in this worktree"

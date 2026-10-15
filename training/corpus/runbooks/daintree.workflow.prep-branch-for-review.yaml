@@ -375,6 +375,12 @@ boundaries:
   - query: commit what's on release/2.7, push it and open the PR for review
     confusable_with: [daintree.release.assess-readiness]
     run: 2026-09-28-round6
+  - query: "squash the fixup commits on the search branch, write a proper description and raise the pull request"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "tidy the commits on this branch, write the description and open a draft PR"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: yeah go ahead
     history:

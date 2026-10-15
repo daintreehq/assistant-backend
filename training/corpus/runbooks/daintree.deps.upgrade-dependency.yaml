@@ -92,6 +92,12 @@ boundaries:
   - query: Bump our dependency on @acme/sdk to the 1.4.0 we published last week and make sure the app still works.
     confusable_with: [daintree.release.publish-package]
     run: 2026-09-28-round6
+  - query: "upgrade react to the next major in this repo and get the build green again"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "bump the graphql codegen to its latest release here and fix whatever breaks"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: bring react-dom and @types/react along with it, obviously
     history:

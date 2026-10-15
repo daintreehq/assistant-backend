@@ -112,6 +112,12 @@ boundaries:
   - query: The API docs say /v2/export supports filters but the code doesn't; update the docs to match what it really does.
     confusable_with: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6
+  - query: "the docs are out of date with the new CLI flags, bring them in line with the code"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
+  - query: "update the API reference so it matches what the handlers actually accept"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-89
 followups:
   - query: add docs/config.md to it too, the env var table is wrong as well
     history:
