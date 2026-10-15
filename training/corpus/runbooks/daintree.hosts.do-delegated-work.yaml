@@ -118,3 +118,12 @@ boundaries:
   - query: make the hub's requested logging change here and double-check the resulting commit passes lint before the reply goes out
     confusable_with: [daintree.hosts.verify-for-hub]
     run: runbook-2026-10-issue-104
+  - query: "the hub wants Codex here to write the missing tests for the invoice exporter on its run branch, then reply with the commit"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+  - query: "Hub request: fix the broken date parsing in a new worktree from the base commit it gave and report the SHA once the agent commits"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+  - query: "the hub asked this machine to implement the settings screen it described, starting from the branch it named, so the person can demo it later"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108

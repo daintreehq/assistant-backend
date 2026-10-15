@@ -102,6 +102,15 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: As the lane on this host, prepare the demo of the subscription page the hub asked for
     confusable_with: [daintree.hosts.delegate-to-host]
+  # vs a delegated unit of code: the code exists; the hub wants it shown.
+  - query: The hub says the CSV export is finished on its branch and wants it running here so the person can try it, no code changes
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: hub wants the search filters the agents built last night up on this host as a demo, with the sha it serves
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: Rather than building anything, the hub asks for the merged billing page to be started on this machine with invented data and the host port reported
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: the hub wants the reports feature that landed on main stood up here to show off, with a short walkthrough
+    confusable_with: [daintree.hosts.do-delegated-work]
   # vs a broken or bare preview: the preview is a means to the demo.
   - query: Start a dev preview of the hub's branch here so it can be demoed, and report the port it picked
     confusable_with: [daintree.runtime.debug-web-app]
