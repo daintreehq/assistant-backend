@@ -49,10 +49,10 @@ cases:
   - id: develop-project-plugin-no-debug-attach
     category: routing-trap
     note: >-
-      The improvised route: driving the running app to see a panel. The plugin runbook owns
-      it (it says to use the preview or ask the user, never a debug port), not
-      daintree.diagnostics, which is for Daintree itself misbehaving with no plugin of the
-      user's involved.
+      The improvised route: driving the running app to see a plugin panel. Decided by
+      "Daintree PROJECT PLUGIN" and "what does my plugin's panel look like"; the fence to
+      daintree.diagnostics is "Daintree itself misbehaving with no plugin of the user's
+      involved".
     messages:
       - role: user
         content: can you hook playwright up to my running daintree to look at the plugin panel

@@ -49,9 +49,9 @@ On notice or resume (look only: relay the screenshots and stop, or the preview's
    - `blocked`: not running (project trust, or turned off); do not guess or call it staged: point the user to the plugin manager.
    Never click through for the user or copy the plugin to the user plugins directory to dodge the gate.
 4. An open panel after a view change: `plugin.reloadPanel` (`panelId` from `terminal.list`): `scheduled` is remounting, `not-mounted` no view was mounted; an unsaved-work refusal is not success.
-5. Exercise it: run the command, then `plugin.diagnostics` (host-logger lines, not view errors). A view: the preview screenshots (mock host: activation and live data need Daintree); none, ask the user to open the panel and say what they see (a crashed view's pane offers Copy diagnostics) and take their answer to 6. A reload that returned is not a plugin that works.
+5. Exercise it: run a changed command the request covers, then `plugin.diagnostics` (host-logger lines, not view errors). A view: the preview screenshots (mock host: activation and live data need Daintree); none, ask the user to open the panel and say what they see (a crashed view's pane offers Copy diagnostics) and take their answer to 6. A reload that returned is not a plugin that works.
 6. A fault: one corrective send with the validator errors or diagnostics, `notify:true, handback:true`; at most two rounds per fault, then report it.
 
-Agent tools: a CLI reads its MCP servers at launch, so agents started before the plugin loaded, got agent access or changed its tools need a relaunch; say so, never relaunch them yourself.
+Agent tools: agents started before the plugin loaded, got agent access or changed what it declares for agents need a relaunch; say so, never relaunch them yourself.
 
 Report back: plugin id, directory, checkout; validate verdict (origin, errors by path); referenced files built, tracked or ignored; state and error after reload; what was exercised and seen (preview or the user), new diagnostics, what is untested; what the user must still do (merge to the root, trust, Activate, relaunch agents, commit dist).
