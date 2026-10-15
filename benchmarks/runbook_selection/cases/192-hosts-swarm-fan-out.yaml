@@ -33,12 +33,16 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-swarm-it
-    category: single-runbook
+    category: continuation
     note: >-
-      The issue's bare request. Decided by "the SAME WORK done on EVERY Remote Host"; the word
-      alone carries no host, and trained local owners take it (spawn-visible-agent, multi-agent)
-      beside daintree.hosts.start-swarm. Retrain owed: the corpus rows teach it.
+      The issue's bare request as a second turn: the first turn names the Remote Hosts and the one
+      task each should do. Decided by "the SAME WORK done on EVERY Remote Host this Shell
+      reaches" and "one copy per machine".
     messages:
+      - role: user
+        content: I want the slug helper with a unit test written on every one of my other machines, the same task for each host, a branch apiece
+      - role: assistant
+        content: Every Remote Host has an enrolled assistant. Do you want me to send each host that same task now?
       - role: user
         content: Swarm it.
     expect:
@@ -58,11 +62,16 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-swarm-this-task
-    category: single-runbook
+    category: continuation
     note: >-
-      The issue's bare request. Decided by "the SAME WORK done on EVERY Remote Host"; trained
-      daintree.orchestration.fan-out-work takes the bare phrase. Retrain owed.
+      The issue's bare request after the task and the hosts are on the table and every host
+      getting the same brief is the option offered. Decided by "the SAME WORK done on EVERY
+      Remote Host this Shell reaches" and "one copy per machine".
     messages:
+      - role: user
+        content: 'here is the job: add a --dry-run flag to the deploy script, with a test that covers it'
+      - role: assistant
+        content: Your three Remote Hosts each have an assistant in this repository. Should one host take it, or should every host get the same brief?
       - role: user
         content: Swarm this task.
     expect:
@@ -193,6 +202,19 @@ cases:
       required: [daintree.hosts.swarm-fan-out]
       optional: [daintree.hosts.foundation]
 
+  - id: swarm-fan-out-not-competition
+    category: routing-trap
+    note: >-
+      Each host's own version, laid side by side with no winner. Decided by "have every host build
+      the parser on its own branch and show me what each got"; daintree.orchestration.competition
+      owns entries "compared and a winner picked".
+    messages:
+      - role: user
+        content: every remote host should write its own version of the rate limiter so I can look at all of them side by side, nobody needs to win
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
   # ------------------------------------------------------------ reverse traps
   - id: swarm-fan-out-reverse-delegate-to-host
     category: routing-trap
@@ -288,3 +310,29 @@ cases:
         content: 'on this mac, run a contest: two agents each build the tokenizer their own way, then judge which is better'
     expect:
       required: [daintree.orchestration.competition]
+
+  - id: swarm-fan-out-reverse-ask-host
+    category: routing-trap
+    note: >-
+      A question to one host's assistant, not work. daintree.hosts.ask-host-assistant owns "ONE
+      QUESTION answered by the Daintree assistant on ANOTHER MACHINE" where "The deliverable is
+      that assistant's ANSWER, relayed with attribution and its caveats; the question asks it to
+      change nothing".
+    messages:
+      - role: user
+        content: ask the linux workstation's assistant why its nightly build got slower this week; it should only look, not change anything
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: swarm-fan-out-reverse-multi-agent
+    category: routing-trap
+    note: >-
+      Agents here converging on one answer. daintree.orchestration.multi-agent owns "several
+      agents must work ONE problem together and you relay between them until they CONVERGE on a
+      single synthesized answer".
+    messages:
+      - role: user
+        content: two agents here should argue the caching bug out together until they agree on one fix
+    expect:
+      required: [daintree.orchestration.multi-agent]
