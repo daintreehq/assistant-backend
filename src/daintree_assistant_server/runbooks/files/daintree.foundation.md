@@ -27,7 +27,7 @@ A runbook grants nothing: the user's request sets the authority (`USER_REJECTED`
 
 Before asking the user to quit, restart or relaunch Daintree, say why and that it stops every terminal and agent in every open project.
 
-API-key client: no `notify`, `terminal.notifyWhenIdle` or batch tools. Omit `notify` entirely, never send `notify:false`; use `waitForReply`, or say the rest needs the user's continuation. Sidebar assistant: `terminal.sendCommand`, `sendKeys`, `close`, `inject` stand in for the `*Owned` tools, same rules.
+API-key client: no `notify`, `terminal.notifyWhenIdle` or `*Many`. Omit `notify` entirely, never send `notify:false`; use `waitForReply`, or say the rest needs the user's continuation. Sidebar assistant: `terminal.sendCommand`, `sendKeys`, `close`, `inject` stand in for the `*Owned` tools, same rules.
 
 ## Targets and ownership
 

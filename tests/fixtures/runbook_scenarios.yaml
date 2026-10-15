@@ -43,7 +43,7 @@ scenarios:
     must: Say first why it is needed and what it stops, every terminal and agent in every open project.
     must_not: Ask for the restart with the reason or the cost only after the fact, or not at all.
     runbooks: [daintree.foundation]
-    states: ["quit, restart or relaunch Daintree, say why", "stops every terminal and agent in every open project"]
+    states: ["Before asking the user to quit, restart or relaunch Daintree, say why", "stops every terminal and agent in every open project"]
 
   - id: initial-prompt-sent-twice
     situation: A child launched with a prompt looks idle right after launch.
