@@ -22,6 +22,6 @@ On notice or resume:
 - `input-required` is a decision: settle it within the person's request, else bring them the inputs and acceptance it touches, the lane's evidence and last good HEAD. Your answer's text names the integration branch.
 - `completed`, pushed: `origin/<branch>` is the reported HEAD; `git log --first-parent --reverse --format='%H %P' <base>..<HEAD>` shows only merges, one per input in order, second parent its pin (one already in: `git merge-base --is-ancestor <pin> <HEAD>`); each merge's tree equals `git merge-tree --write-tree <first parent> <pin>`, a settled conflict read with `git show --remerge-diff`. Not pushed: one narrow question naming branch and HEAD for that log. Checks: the forge's on that SHA (`gh`), else each check's exit code at that SHA from the lane; otherwise unverified. Then each source's tip again: changed or gone is a finding, never merged in.
 
-Stop and recovery: one integrator, one send. Never ask for a merge into a protected branch, a force push or a source deletion; a failed or partial integration stays as the lane left it (branch, worktree, SHAs).
+Stop and recovery: one integrator, one brief. Never ask for a merge into a protected branch, a force push or a source deletion; a failed or partial integration stays as the lane left it (branch, worktree, SHAs).
 
 Report back: integrator host, project, lane; branch, base and HEAD claimed vs verified (how); per input its pin and merge, or skipped or pending and why; checks and their evidence; moved sources; open decisions.
