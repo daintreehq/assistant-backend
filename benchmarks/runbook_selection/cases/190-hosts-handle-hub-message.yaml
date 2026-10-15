@@ -350,14 +350,15 @@ cases:
   - id: handle-hub-message-receiver-cleanup
     category: routing-trap
     note: >-
-      Cleaning up what this lane made for a run: today
-      daintree.orchestration.workspace-cleanup ("Use ONLY when the user explicitly asks to
-      tear down workspace state").
+      Cleaning up what this lane made for a run: the host-side receiver
+      daintree.hosts.clean-up-for-hub ("when the hub, the assistant on the person's main
+      machine, asks it to remove what it made on this machine for one of the hub's runs").
+      Before it, the hub's own daintree.hosts.recover-and-clean-up won this (rank_miss).
     messages:
       - role: user
         content: The hub asked me to close the panes and remove the clean worktrees I made for its last run.
     expect:
-      required: [daintree.orchestration.workspace-cleanup]
+      required: [daintree.hosts.clean-up-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-verify
