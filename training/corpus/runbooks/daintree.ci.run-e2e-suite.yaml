@@ -55,6 +55,9 @@ boundaries:
   - query: Run the Cypress suite headless against the feature/checkout worktree's own server.
     confusable_with: [daintree.release.test-distributable]
     run: 2026-09-28-round6
+  - query: end-to-end tests in the browser against this branch's running app on node 22, failures with their traces
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 followups:
   - query: rerun just those two with tracing on
     history:

@@ -92,6 +92,15 @@ boundaries:
     confusable_with:
     - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
+  - query: run the tests in this checkout with python 3.11 and then 3.12 through uv and give me a result for each
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: lint, typecheck and tests in this worktree at the current commit; leave the other machines out of it
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: check whether this branch builds on both node versions I have installed locally, no remote hosts
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 followups:
   - query: and the unit tests?
     history:

@@ -65,6 +65,12 @@ boundaries:
     confusable_with: [daintree.workflow.prep-branch-for-review]
   - query: the branch is prepped and merged, is v1.8 good to release?
     confusable_with: [daintree.workflow.prep-branch-for-review]
+  - query: the cross-platform runs came back mostly green; give me a go or no-go on 5.0 with the risks
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: taking the host matrix results into account, should we cut 1.8 today?
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 followups:
   - query: 'the milestone is ''v2.5'' — and count the two SSO issues (#788, #790) as must-haves'
     history:

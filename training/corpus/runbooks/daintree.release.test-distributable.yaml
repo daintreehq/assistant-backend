@@ -65,6 +65,9 @@ boundaries:
     confusable_with: [daintree.release.publish-package]
   - query: Install the built .dmg on a clean user profile and check the onboarding flow works from the artifact, not the source checkout.
     confusable_with: [daintree.workflow.prepare-feature-demo]
+  - query: test the built RC installer on a fresh macOS profile and in a clean linux container here, not from source
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 followups:
   - query: use a fresh user-data dir too, not my normal profile
     history:

@@ -1,0 +1,144 @@
+# daintree.hosts.run-validation-matrix: from this Shell's hub, one exact commit put through the
+# same checks under each environment the person asks for (OS, architecture, runtime versions) on
+# the Remote Hosts able to meet it, one matrix back with a row per environment: passed, failed,
+# incomplete or unavailable.
+#
+# Positives are invented situations in agent and user words, short and long, some with a social
+# lead-in or an earlier turn; explanation questions carry docs: true. Boundaries are requests this
+# runbook wins against a neighbour whose vocabulary they share: the same change built on every host
+# (swarm-fan-out), a lane testing its one row (verify-for-hub), checks on this machine
+# (run-local-checks), a ship verdict (assess-readiness), different pieces spread over hosts
+# (place-work), one host (delegate-to-host), and the local runbooks the starting sweep picked
+# (test-distributable, run-e2e-suite, provision-local-environment). Followups and topic shifts are
+# the matrix as a second turn. Machine names are generic.
+runbook: daintree.hosts.run-validation-matrix
+run: runbook-2026-10-issue-117
+
+positives:
+  - does 9c4d2e1 hold up under python 3.10 and 3.12 on the ubuntu server and the macbook host? give me each combination
+  - 'matrix please: node 18, 20 and 22 on whichever of my machines have them, same commit, tests only'
+  - I need to know if v2.8.0-rc1 holds up on arm64 and x86 linux; use the remote boxes and don't touch the code
+  - run go test ./... at the tagged commit on my linux server and the macbook host and give me a row for each
+  - does the 1.4 release candidate build and pass its tests on every OS my hosts cover? one line per environment
+  - 'same SHA, three environments: mac arm64 with ruby 3.3, linux x64 with ruby 3.2 and with 3.3. what passes where?'
+  - test the head of release/5.1, pinned to its current sha, on the linux and macos hosts and flag anything that couldn't run
+  - cross-check the parser commit on java 17 and java 21 using the remote machines, no fixes, just results
+  - if a host can't do node 22 just mark that row unavailable; run the commit on 18, 20 and 22 across the machines
+  - I want a compatibility grid for this tag, rust stable and beta on linux and mac, from the other machines
+  - validate 0b7d3f2 on the x64 linux box and the arm64 mac before I tag it, and tell me which environments failed
+  - does the cli still pass on python 3.9? have whichever host has 3.9 run it at this commit, with 3.12 as the control
+  - is the current main commit green on linux and mac with bun 1.1? use the other machines, not this one
+  - put the pinned commit through lint and unit tests under deno 1.46 and deno 2 on my hosts and show each result
+  - the integration tests at e81f0aa against postgres 15 and postgres 16, spread over the remote hosts, one result per database version
+  - run the windows, linux and mac rows of our test matrix at this sha on my machines, and say which ones never ran
+  - Run the repository's test suite at one pinned SHA under each environment the user listed (Linux x64, macOS arm64) on the Remote Hosts and return a per-environment table of passed, failed and could-not-run
+  - The user wants release candidate rc.4 checked under Node 20 and Node 22 on the hosts; put each environment on a host that has that runtime and report one row per environment
+  - Hub task, verify the tagged revision across macOS and Linux hosts with Python 3.11 and 3.12, no edits, every requested environment shown even when no host can run it
+  - Cross-host compatibility run for commit 4a0e9b2, the same lint and unit commands on every requested platform, each result bound to that SHA
+  - The user wants go test results at the pinned commit for Go 1.22 and Go 1.23 from whichever of their hosts have those toolchains, tabulated per environment
+  - User asked for a platform matrix of the build and tests at the release tag across their remote machines; a failure on one platform is that platform's finding, not a reason to fix anything
+  - The user's library claims support for Node 18 through 22 and they want proof at the release commit from the Linux and Mac hosts, a row per version and platform
+  - A contributor says the build breaks on arm64; the user wants the same commit tested on the arm64 Mac host and the x64 Linux host to compare, without anyone fixing it
+  - 'We''re about to cut 3.0 and I don''t want a ship decision from you, just facts: run the unit and integration tests at the RC commit on the linux workstation and on the mac mini, node 20 on both and node 22 where it''s installed. Anything that can''t run should say so, not show up as green.'
+  - 'The dependency bump landed as 6e2f1c9. Before I trust it I''d like the same checks on every platform my hosts cover, x64 and arm64. Nothing gets fixed or pushed; I just want one table of what passed, failed or couldn''t run.'
+  - 'Users report the install script breaking on older python. Can you have the hosts run the test suite at today''s release commit under 3.9, 3.10 and 3.12, one result per version per OS? If a version isn''t available somewhere, mark it rather than skipping the row.'
+  - 'thanks for the earlier help! one more thing: run commit d4c1b07''s tests on the linux and mac hosts with node 20 and show me both results'
+  - hi! could you see how that sha behaves under every runtime we claim to support, using my other computers?
+  - 'same tests, same commit, three boxes: the linux server, the arm mac and the intel mac. which ones go green?'
+  - can you ask the hosts to run pytest at 1f0c3d2 under 3.12 on linux and on macos? if one of them doesn't have 3.12 say so
+  - grab the release tag's sha and have every host platform run the build plus the unit tests, a row for each
+  - The user is preparing a point release and wants evidence that the lockfile change at c2e81a4 installs and tests cleanly on both Linux x64 and macOS arm64 hosts, with any missing toolchain reported rather than worked around
+  - 'yo, quick sanity check across the machines for this commit: node 20 on linux, node 22 on mac, tests only'
+  - Pin the release tag to its commit and get per-platform test results from the connected hosts; platforms no host offers still belong in the table as unavailable
+  - query: now run that exact commit on both hosts under node 20 and node 22
+    history:
+      - "user: what's the sha of the release branch head?"
+      - 'assistant: release/2.3 is at 5b8e1f0.'
+  - query: good, so put rc2 through the tests on both of them, one result per platform
+    history:
+      - 'user: which machines can I reach from here?'
+      - 'assistant: Two are connected, a Linux x64 server and a macOS arm64 laptop, each with an assistant in this project.'
+  - query: How does the hub get the same commit tested on my Linux and Mac hosts under different runtimes, and what do I get back?
+    docs: true
+  - query: When the hub has my hosts test one commit under several environments, what counts as incomplete rather than passed?
+    docs: true
+
+boundaries:
+  - query: every host should run the test suite at 7d03e1b under its own OS and report per environment, nobody changes code
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: get all my machines to test the same tag, each under its own runtime, and give me pass or fail per platform
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: 'same commit on every host, but this time it is only checks: linux and mac, node 20 and 22, one row per environment'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: Have each Remote Host run identical check commands against one release commit and return a per-platform matrix rather than building anything
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: send the linux host and the mac host the commit to verify, each under its own python, and collect a row per environment
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: From the hub, ask the host lanes to test this SHA under the listed runtimes and assemble their results into one matrix
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: i'm on the main machine, have the remote assistants each verify the RC in their own environment and give me the grid
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: run the tests for this commit on node 18 and 22, but on my remote hosts, not here
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: lint and unit tests at the RC sha on each of my other machines' platforms, one result per platform
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: check the build passes on linux and mac using the hosts; this laptop has only one runtime so don't run it here
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: Run the project's checks at one pinned commit under several runtime versions spread over the Remote Hosts and report each environment
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: before we decide whether 2.5 ships I just need the RC tested on every host platform; I'll make the call myself
+    confusable_with: [daintree.release.assess-readiness]
+  - query: I'm not asking whether we ship; I want the RC's test results from both the linux and macos machines, failures listed per platform
+    confusable_with: [daintree.release.assess-readiness]
+  - query: gather per-platform test results for the release tag from the remote machines; the ship decision comes later
+    confusable_with: [daintree.release.assess-readiness]
+  - query: decide which of my machines covers mac arm64 and which covers linux x64, then have both test commit 8d2a5c0 and report
+    confusable_with: [daintree.hosts.place-work]
+  - query: put the node 20 run on whichever host has node 20 and the node 22 run on whichever has 22, same commit for both
+    confusable_with: [daintree.hosts.place-work]
+  - query: the linux box already passed; add the mac host under its own python as a second row for the same commit
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: have the build server test 3c7a1e0 on node 20 and the mac host test it on node 22, then a table of both
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: 'source-tree tests only, not the packaged build: run them at the RC commit on the linux and mac hosts, one row per platform'
+    confusable_with: [daintree.release.test-distributable]
+  - query: the end-to-end and unit suites at the tagged commit on each host platform, results per environment, remote machines only
+    confusable_with: [daintree.ci.run-e2e-suite]
+  - query: run the same commit on each remote host under the runtimes I listed, without installing anything new over there
+    confusable_with: [daintree.worktree.provision-local-environment]
+
+followups:
+  - query: actually do it on the mac host too, and add node 22 on both, as one matrix
+    history:
+      - 'user: have the linux box test commit 2f1a9e4 on node 20'
+      - "assistant: Sent to the linux box's assistant; I'll report its counts when it replies."
+  - query: nice, now let's see that sha on the other machines too, linux and mac, one row each
+    history:
+      - 'user: run the checks here'
+      - 'assistant: All checks pass locally at 9ab31c2: lint, typecheck and 318 unit tests.'
+  - query: and what about arm64? add the mac host as another row, same sha
+    history:
+      - 'user: test 5d1e0a7 on the x64 linux host'
+      - 'assistant: Linux x64 passed at 5d1e0a7, 412 passed and 0 failed.'
+  - query: ok, and the python 3.13 row, which host can take that one?
+    history:
+      - 'user: run the tests at the tag on python 3.11 and 3.12 across my machines'
+      - 'assistant: Both rows passed: 3.11 on the Linux host, 3.12 on the Mac host, at the same SHA.'
+
+topic_shifts:
+  - query: then use them to test v1.9.0 on every OS and runtime they have
+    history:
+      - 'user: is every host enrolled in this repo?'
+      - 'assistant: The Linux server, the arm Mac and the Intel Mac each have an assistant in this repository.'
+  - query: good, now have them run the tests for this commit under python 3.11 and 3.12, a row per environment
+    history:
+      - 'user: how much allowance does each host have left?'
+      - 'assistant: Every host has well over half of its weekly allowance left.'
+  - query: before that goes out, have the hosts test the tagged commit under each OS they run and tabulate it
+    history:
+      - 'user: write up what changed since 2.3 for the changelog'
+      - 'assistant: The changelog entry is written from the merged PRs and open in the editor.'
+  - query: different thing now, test main's head on each platform the hosts cover, no code changes this time
+    history:
+      - 'user: have every host build the parser on its own branch'
+      - 'assistant: All three hosts replied with verified branches and SHAs.'

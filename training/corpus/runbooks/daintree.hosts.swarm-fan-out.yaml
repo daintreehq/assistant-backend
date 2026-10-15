@@ -165,6 +165,15 @@ boundaries:
   - query: same fix on all four machines, one branch each, no ordering between them
     confusable_with: [daintree.hosts.execute-distributed-workflow]
     run: runbook-2026-10-issue-115
+  - query: let the linux server and both macs each take a shot at the pagination helper with tests, then compare their branches
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: each machine should try speeding up the slow test suite on its own branch and tell me what it got
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: all three hosts build the cli flag parser and run its tests, then a table of branch, sha and test outcome per host
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

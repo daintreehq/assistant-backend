@@ -138,6 +138,12 @@ boundaries:
   - query: spread these five tickets over my machines; none of them depends on another, so the order doesn't matter
     confusable_with: [daintree.hosts.execute-distributed-workflow]
     run: runbook-2026-10-issue-115
+  - query: a feature, a docs fix and a flaky test to sort out; which of my machines should take each one?
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: split this sprint's backlog across the remote hosts by load and signed-in CLI
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 
 followups:
   - query: yes, go ahead with that split

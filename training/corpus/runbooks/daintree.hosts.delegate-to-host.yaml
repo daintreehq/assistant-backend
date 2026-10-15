@@ -230,6 +230,12 @@ boundaries:
   - query: after the backend machine's commit is verified, pass it to the frontend machine for the ui change, that is the only dependency
     confusable_with: [daintree.hosts.execute-distributed-workflow]
     run: runbook-2026-10-issue-115
+  - query: get the linux box to fix the date parsing test that only fails there and open a PR
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: have the mac host chase down the slow startup on its own and send me the branch with its fix
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

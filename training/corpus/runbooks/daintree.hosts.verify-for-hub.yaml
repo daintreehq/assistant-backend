@@ -151,3 +151,15 @@ boundaries:
   - query: 'before the hub merges, it asked this machine to rerun the integration suite on its branch head and report what passed, no fixes'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: my row from the hub is linux x64 with node 20; put its commit through the unit tests in an isolated checkout and reply
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: 'hub message: this host is the macOS arm64 row of its matrix, test 6f1e2d9 under python 3.12 here, no fixes'
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: the hub wants this machine's environment checked at its sha; run the unit tests here under the runtime it named and report what could not run
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: Lane task from the hub, one environment row of a cross-host matrix, verify the given full SHA with the listed commands on this machine and reply with counts
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
