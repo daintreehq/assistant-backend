@@ -29,6 +29,6 @@ Build the hub's demo by daintree.workflow.prepare-feature-demo with these change
 
 On notice or resume: the prep agent's notice continues the demo runbook, with step 4 before its exercising.
 
-Stop and recovery: one prep agent and one preview per exchange; before any launch, reconcile with `terminal.list` by name, or a preview by `worktreeId` and kind (also its trash and background). Lost prep state is a blocker, never a second seed.
+Stop and recovery: one prep agent and one preview per exchange; before any launch, `terminal.list` with `worktreeId` (also `location:"trash"` and `"background"`): the prep agent by `title`, a preview by `kind`. Lost prep state is a blocker, never a second seed.
 
 Report back: the reply as sent and its result.
