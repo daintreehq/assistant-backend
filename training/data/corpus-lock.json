@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18129,
-  "compiled_sha256": "3a5c4676772fd3e5428ea073da7a8b77060ed60a1b92dcd8303acbc17788184b",
+  "rows": 18128,
+  "compiled_sha256": "756150cd4ca1a9173123af12fd60ca9b1e8bc99fa216aa807f95b4d4f31d6cae",
   "label_space_sha256": "e728fc814c2034a453b6f42d833ea786031929acb42c45b362f306356d8022b5",
   "label_space_size": 107,
   "by_source": {
     "boundary": 5445,
     "docs": 841,
-    "followup": 820,
+    "followup": 819,
     "foundation": 441,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -39,7 +39,7 @@
     "2026-09-28-round6": 1029,
     "2026-09-28-round6-stateful": 256,
     "pre-split": 9808,
-    "runbook-2026-10-issue-86": 74,
+    "runbook-2026-10-issue-86": 73,
     "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
     "transcript-2026-09-26-fact-contest-named-agents": 7,
@@ -306,10 +306,10 @@
       "sha256": "c45a8b179c18b5a710469a1dc4782229b0c6275096a94c250af8dbd8f91ab5d1"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
-      "examples": 63,
-      "rows": 63,
+      "examples": 62,
+      "rows": 62,
       "runbook": "daintree.hosts.foundation",
-      "sha256": "40bb0e74991ce20e1cc06376181c08ad99c23e4fb0d631774bd57adaf1b9079b"
+      "sha256": "5e063f9ba78f08fe4df83f9bfdec2cd15bcbacc30480a25c24e87d8858dd7e6c"
     },
     "runbooks/daintree.memory.manage-project-memory.yaml": {
       "examples": 228,

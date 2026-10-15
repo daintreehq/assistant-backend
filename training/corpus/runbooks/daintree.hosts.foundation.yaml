@@ -102,10 +102,6 @@ followups:
     history:
       - "user: who can I message on the mac mini?"
       - "assistant: There's an assistant in that project, but none has a generation for this Shell yet."
-  - query: so did it get there or not
-    history:
-      - "user: send the other mac the branch name to check"
-      - "assistant: The send came back ambiguous."
   - query: can the panes do it instead
     history:
       - "user: get the other machine's assistant to look at this"

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 
+import pytest
 from daintree_mcp_surfaces import (
     CALLER_POLICY,
     HUB_TOOLS,
@@ -29,6 +30,7 @@ from daintree_mcp_surfaces import (
     baseline_violation,
     capture,
     known_action_ids,
+    rebuild_delta,
 )
 
 from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
@@ -209,6 +211,25 @@ def test_hub_and_lane_surfaces_are_the_sidebar_plus_messaging() -> None:
         assert len(capture(surface)["tools"]) == recorded["tool_count"], surface
         assert action_ids(base) <= action_ids(surface), surface
         assert action_ids(surface) - action_ids(base) <= MESSAGING_TOOLS | host_gated, surface
+
+
+def test_a_delta_that_does_not_apply_is_refused() -> None:
+    """The rebuild refuses any delta it cannot apply exactly, so a hand edit to a
+    delta file cannot drop or duplicate part of a surface unnoticed."""
+    base = [{"action_id": "a.one"}, {"action_id": "a.two"}]
+    ok = {"added": [{"action_id": "b.new"}], "changed": [{"action_id": "a.two", "x": 1}],
+          "removed": ["a.one"]}
+    assert [t["action_id"] for t in rebuild_delta(base, ok)] == ["a.two", "b.new"]
+    bad = [
+        {"added": [], "changed": [{"action_id": "z.gone"}], "removed": []},
+        {"added": [], "changed": [], "removed": ["z.gone"]},
+        {"added": [{"action_id": "a.one"}], "changed": [], "removed": []},
+        {"added": [], "changed": [{"action_id": "a.one"}], "removed": ["a.one"]},
+        {"added": [{"action_id": "b.new"}, {"action_id": "b.new"}], "changed": [], "removed": []},
+    ]
+    for delta in bad:
+        with pytest.raises(ValueError):
+            rebuild_delta(base, delta)
 
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,31 @@ SURFACES: tuple[str, ...] = (
 )
 
 
+def rebuild_delta(base_tools: list[dict[str, Any]], delta: dict[str, Any]) -> list[dict[str, Any]]:
+    """A delta surface's tools: the base's, minus ``removed``, with ``changed`` entries
+    replacing theirs, plus ``added``. Refuses a delta that does not apply cleanly (an id
+    removed or changed that the base lacks, one added that it has, an id named twice),
+    so a hand edit cannot quietly drop part of a surface."""
+    base_ids = [str(t["action_id"]) for t in base_tools]
+    removed = [str(i) for i in delta["removed"]]
+    changed = {str(t["action_id"]): t for t in delta["changed"]}
+    added = [str(t["action_id"]) for t in delta["added"]]
+    named = [*removed, *changed, *added]
+    problems = []
+    if len(set(named)) != len(named) or len(changed) != len(delta["changed"]):
+        problems.append("an id is named more than once")
+    if missing := sorted((set(removed) | set(changed)) - set(base_ids)):
+        problems.append(f"removed or changed ids the base lacks: {missing}")
+    if present := sorted(set(added) & set(base_ids)):
+        problems.append(f"added ids the base already has: {present}")
+    if problems:
+        raise ValueError("delta does not apply: " + "; ".join(problems))
+    kept = [
+        changed.get(str(t["action_id"]), t) for t in base_tools if t["action_id"] not in removed
+    ]
+    return sorted([*kept, *delta["added"]], key=lambda t: str(t["action_id"]))
+
+
 @cache
 def capture(surface: str) -> dict[str, Any]:
     """One surface's capture as ``{"capture": ..., "tools": [...]}``.
@@ -41,11 +66,7 @@ def capture(surface: str) -> dict[str, Any]:
         return data
     delta = json.loads((FIXTURES / f"{surface}.delta.json").read_text(encoding="utf-8"))
     base = capture(delta["capture"]["delta_of"])
-    removed = set(delta["removed"])
-    changed = {tool["action_id"]: tool for tool in delta["changed"]}
-    tools = [changed.get(t["action_id"], t) for t in base["tools"] if t["action_id"] not in removed]
-    tools = sorted([*tools, *delta["added"]], key=lambda t: str(t["action_id"]))
-    return {"capture": delta["capture"], "tools": tools}
+    return {"capture": delta["capture"], "tools": rebuild_delta(base["tools"], delta)}
 
 
 def input_schemas(surface: str) -> dict[str, Any]:
@@ -103,6 +124,8 @@ HUB_TOOLS = frozenset(
 )
 LANE_TOOLS = frozenset({"assistant.getInbox", "assistant.reply", "assistant.sendMessage"})
 MESSAGING_TOOLS = HUB_TOOLS | LANE_TOOLS
+#: The surfaces only the messaging callers are captured on.
+MESSAGING_SURFACES: tuple[str, ...] = ("hub-full", "lane-full")
 
 
 def baseline_callers(runbook_id: str) -> tuple[str, ...]:
@@ -128,3 +151,14 @@ def baseline_violation(runbook_id: str, required: tuple[str, ...] | list[str]) -
         return None
     missing = {caller: sorted(set(required) - action_ids(caller)) for caller in callers}
     return f"{runbook_id}: no single caller in {list(callers)} is offered all of it: {missing}"
+
+
+def untagged_example_surfaces(runbook_id: str) -> tuple[str, ...]:
+    """Where an untagged example in this runbook is validated: the first of these
+    offering the action. A hosts runbook's own callers only; for any other runbook
+    every surface but the messaging ones, pane first, so a pane runbook's hub-branch
+    example must name its surface (``surface=hub-full``) to validate at all."""
+    callers = baseline_callers(runbook_id)
+    if callers != PANE_CALLERS:
+        return callers
+    return tuple(surface for surface in SURFACES if surface not in MESSAGING_SURFACES)

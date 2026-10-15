@@ -6,9 +6,10 @@ annotation, never an MCP argument) says which caller the example is written for 
 any captured surface (``pane-core``, ``help-full``, ``hub-full``, ``lane-core``,
 ``external``, ...) — and it is validated against THAT caller's schema. Without one, the
 example is validated against the first surface offering the action among the runbook's
-own callers (``baseline_callers``): for most runbooks every surface, pane first, so the
-ordinary pane path is the default reading; for a ``daintree.hosts`` runbook only the hub
-and lane surfaces, because no other caller ever follows it.
+own callers (``untagged_example_surfaces``): for most runbooks every surface but the
+hub and lane ones, pane first, so the ordinary pane path is the default reading and a
+hub-branch example must say ``surface=hub-full``; for a ``daintree.hosts`` runbook only
+the hub and lane surfaces, because no other caller ever follows it.
 
 The surfaces differ at the property level, which is the point of validating per
 caller: an API-key ``external`` client is not offered ``notify`` at all, so an
@@ -23,7 +24,7 @@ import json
 import re
 
 import pytest
-from daintree_mcp_surfaces import PANE_CALLERS, SURFACES, baseline_callers, input_schemas
+from daintree_mcp_surfaces import SURFACES, input_schemas, untagged_example_surfaces
 from jsonschema import Draft202012Validator
 
 from daintree_assistant_server.runbooks.catalog import load_catalog
@@ -61,8 +62,7 @@ def test_example_matches_the_callers_captured_schema(
         schemas = input_schemas(surface)
         assert tool in schemas, f"{runbook_id}: {tool} is not offered to {surface}"
     else:
-        callers = baseline_callers(runbook_id)
-        order = SURFACES if callers == PANE_CALLERS else callers
+        order = untagged_example_surfaces(runbook_id)
         offering = [s for s in order if tool in input_schemas(s)]
         assert offering, f"{runbook_id}: {tool} is not offered to any of its callers {order}"
         surface = offering[0]
@@ -71,3 +71,18 @@ def test_example_matches_the_callers_captured_schema(
     assert isinstance(arguments, dict), f"{runbook_id}: tool arguments must be an object"
     errors = [e.message for e in Draft202012Validator(schemas[tool]).iter_errors(arguments)]
     assert not errors, f"{runbook_id}: invalid {tool} example for {surface}: {errors}"
+
+
+def test_untagged_examples_follow_the_caller_policy() -> None:
+    """Negative checks: a pane runbook's untagged hub or lane call resolves to no
+    surface, and a hosts runbook's untagged pane-only call resolves to none either."""
+
+    def resolves(runbook_id: str, tool: str) -> bool:
+        return any(tool in input_schemas(s) for s in untagged_example_surfaces(runbook_id))
+
+    for tool in ("host.sendMessage", "assistant.sendMessage", "assistant.getInbox"):
+        assert not resolves("daintree.release.example", tool), tool
+    assert resolves("daintree.release.example", "terminal.sendCommand")
+    assert not resolves("daintree.hosts.example", "terminal.sendCommandOwned")
+    assert resolves("daintree.hosts.example", "host.sendMessage")
+    assert resolves("daintree.hosts.example", "assistant.sendMessage")

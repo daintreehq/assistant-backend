@@ -58,7 +58,7 @@ Every runbook is followed from an agent pane, so its `requiredTools` must be on
 `pane-core`, except `daintree.hosts.*`: sidebar-only by design, its whole
 baseline must be on ONE of `hub-full` or `lane-full`. A pane runbook with a hub
 branch (asking the hosts too) lists the `host.*` tools in `optionalTools`, never
-`requiredTools`.
+`requiredTools`, and tags that branch's examples `surface=hub-full`.
 
 The capture proves what is listed, not what happens when an action is called. Notice
 delivery in particular is only proven by a live trial in a Daintree pane.

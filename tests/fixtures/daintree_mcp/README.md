@@ -74,8 +74,11 @@ capture run fails if the rebuild differs from what the session listed.
 checked against its caller's surface, decided by the id namespace alone
 (`CALLER_POLICY` in `tests/daintree_mcp_surfaces.py`): `pane-core` by default,
 and for `daintree.hosts.*` one of `hub-full` or `lane-full`, the whole
-baseline on one of them. Outside `daintree.hosts` a messaging tool can only be
-`optionalTools`, the sidebar hub variant of a pane runbook.
+baseline on one of them, and so must each runbook's bundle with its supporting
+runbooks. Outside `daintree.hosts` a messaging tool can only be `optionalTools`,
+the sidebar hub variant of a pane runbook, and its tagged example must say
+`surface=hub-full` (or `lane-full`): untagged examples resolve only on the
+runbook's own callers (`untagged_example_surfaces`).
 
 ## Shape
 
