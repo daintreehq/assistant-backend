@@ -336,15 +336,17 @@ cases:
   - id: handle-hub-message-receiver-review
     category: routing-trap
     note: >-
-      A findings-only review the hub asked for: today daintree.review.review-change ("The
-      deliverable is FINDINGS with severity and file evidence"). A phrasing naming a branch
-      at its current commit pulled prep-branch-for-review and sync-with-base in as extras;
-      this one keeps the review deliverable alone.
+      A findings-only review the hub asked for: its host-side receiver,
+      daintree.hosts.review-for-hub ("when the hub's message asks THIS machine to review
+      work it did not write, findings only"), no longer the local
+      daintree.review.review-change. A phrasing naming a branch at its current commit
+      pulled prep-branch-for-review and sync-with-base in as extras; this one keeps the
+      review deliverable alone.
     messages:
       - role: user
         content: The hub asked me for a findings-only code review of the auth refactor; no edits.
     expect:
-      required: [daintree.review.review-change]
+      required: [daintree.hosts.review-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-cleanup
