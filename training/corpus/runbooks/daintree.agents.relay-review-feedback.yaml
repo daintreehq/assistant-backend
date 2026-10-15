@@ -309,6 +309,12 @@ boundaries:
   - query: "the security reviewer flagged three problems in the auth module; get those to the claude pane working on it and have it address them"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: 'once the read-only codex pass over the importer branch is done, its findings go to the claude pane so it can fix them'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'the review the hub asked for is done here; pass those findings to the claude pane that wrote the branch so it fixes them'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:

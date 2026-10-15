@@ -171,3 +171,18 @@ boundaries:
   - query: 'the hub''s cleanup message names a project that isn''t the one this lane is in'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: 'the hub''s review request is for the billing service, but this lane sits in the docs project; tell it'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'the hub wants a Claude Code reviewer but only Codex is signed in on this machine; check with the hub before anything'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'two new hub messages came in and one of them is a review job; read both in order before starting anything'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'the fix is on the remote now and CI went green; that is the hub''s answer, send it'
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-99
+  - query: 'the hub''s job is finished here; give it the commit and the branch name as the answer'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99

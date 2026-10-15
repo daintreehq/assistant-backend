@@ -158,6 +158,15 @@ boundaries:
   - query: "get my other Mac to stand up the export feature with sample data and send me back its port"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: 'the codex box should go over what my laptop pushed to feature/ingest at 3e9c1a7 and send the problems back to me'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'have the other machine''s assistant do a findings-only review of the retry branch at its pinned commit'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
+  - query: 'have the build server look over the PR my desktop opened and report back what it finds'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

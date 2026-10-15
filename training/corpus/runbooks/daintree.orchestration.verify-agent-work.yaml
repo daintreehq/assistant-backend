@@ -366,6 +366,9 @@ boundaries:
     confusable_with:
     - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
+  - query: 'the reviewer agent here says the branch''s tests all pass at 2a7f9c4; confirm that claim yourself before the hub hears it'
+    confusable_with: [daintree.hosts.review-for-hub]
+    run: runbook-2026-10-issue-99
 followups:
   - query: how's that going?
     history:
