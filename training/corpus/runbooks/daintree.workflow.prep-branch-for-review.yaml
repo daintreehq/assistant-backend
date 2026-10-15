@@ -119,6 +119,8 @@ positives:
     run: 2026-09-28-catalog-expansion-refine
   - query: open a PR for the export worktree
     run: 2026-09-28-catalog-expansion-refine
+  - query: commit what's left, push the branch and open the PR
+    run: runbook-2026-10-issue-90
 boundaries:
   - query: get the branch ready for review and open the PR
     confusable_with: [daintree.worktree.relocate-agents]
@@ -381,7 +383,6 @@ boundaries:
   - query: "tidy the commits on this branch, write the description and open a draft PR"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
-  - query: commit what's left, push the branch and open the PR
   - query: 'tell the reviewers it''s ready: push what''s committed and put up the pull request'
     confusable_with:
     - daintree.hosts.handle-hub-message

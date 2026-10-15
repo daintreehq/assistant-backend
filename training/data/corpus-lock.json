@@ -2,11 +2,11 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 18483,
-  "compiled_sha256": "687e829501cc9d608d2453771dce59e83e59eef97d50c3b48e9176c142d49673",
+  "compiled_sha256": "f5db17a17f150df098d2785508b54579b55f707fe2099390dd1a51e19f425359",
   "label_space_sha256": "073ac10afbdbc7b696bad3a29882d4f8c16250fd236eaeed9af4ae12e36be8e3",
   "label_space_size": 111,
   "by_source": {
-    "boundary": 5589,
+    "boundary": 5588,
     "docs": 841,
     "followup": 843,
     "foundation": 446,
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5781,
+    "positive": 5782,
     "topic_shift": 3000,
     "wake": 149
   },
@@ -38,11 +38,11 @@
     "2026-09-28-catalog-expansion-stateful": 663,
     "2026-09-28-round6": 1029,
     "2026-09-28-round6-stateful": 256,
-    "pre-split": 9809,
+    "pre-split": 9808,
     "runbook-2026-10-issue-102": 86,
     "runbook-2026-10-issue-86": 83,
     "runbook-2026-10-issue-89": 96,
-    "runbook-2026-10-issue-90": 76,
+    "runbook-2026-10-issue-90": 77,
     "runbook-2026-10-issue-95": 86,
     "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
@@ -673,7 +673,7 @@
       "examples": 289,
       "rows": 289,
       "runbook": "daintree.workflow.prep-branch-for-review",
-      "sha256": "da2bab771ba43390a3cd546e519a9c852cc16f4e767d9a4bddafa9890ec3e504"
+      "sha256": "2f9dcf7c31f30e986ca169ad9d220cdb6f1308d6f1b71e0a4fb726852eeaca0a"
     },
     "runbooks/daintree.workflow.prepare-feature-demo.yaml": {
       "examples": 54,

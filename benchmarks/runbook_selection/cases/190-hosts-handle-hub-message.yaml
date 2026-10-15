@@ -241,6 +241,78 @@ cases:
       required: [daintree.workflow.follow-up-on-issue]
       optional: [daintree.foundation]
 
+  - id: handle-hub-message-act-on-it-not-setup
+    category: routing-trap
+    note: >-
+      Whether this lane may act on a message already in its inbox is this runbook's
+      judgment ("weighed under the person's own setup on this machine"), not the hosts
+      foundation's question of whether messaging is set up at all. Fence: "the person
+      asking on their own machine whether another machine's assistant is set up to
+      receive messages at all (daintree.hosts.foundation)". The foundation is left out of
+      optional on purpose: it must not ride along as the answer.
+    messages:
+      - role: user
+        content: The hub's message landed in my inbox and I'm not sure I'm allowed to act on it with nobody here; work it out and answer the hub.
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.foundation]
+
+  - id: handle-hub-message-trap-messaging-setup
+    category: routing-trap
+    note: >-
+      Reverse of the hosts foundation fence: the person on the Shell checking whether
+      another machine's assistant can be messaged at all, before anything is sent. The
+      foundation owns "how messaging between the assistants on two machines works,
+      whether it is set up, how to switch it on"; no message has arrived, so this
+      runbook must not ride along.
+    messages:
+      - role: user
+        content: Check from here whether the other Mac's assistant has messaging switched on for this Shell before I send it anything.
+    expect:
+      required: [daintree.hosts.foundation]
+
+  - id: handle-hub-message-ask-the-hub-not-an-agent
+    category: routing-trap
+    note: >-
+      A question back to the hub is "ask the hub what it meant" and "input-required for a
+      real question", not asking a local agent. daintree.agents.ask-running-agent ("Use
+      when the user wants an answer FROM an agent that already exists, because that agent
+      holds the context") is the neighbour that took such requests at base.
+    messages:
+      - role: user
+        content: Before starting, put a question to the hub about which environment its request means.
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: handle-hub-message-trap-ask-local-agent
+    category: routing-trap
+    note: >-
+      Reverse: the hub only in the background, the question is for an agent this lane
+      launched. ask-running-agent owns it: "Use when the user wants an answer FROM an
+      agent that already exists, because that agent holds the context"; "The deliverable
+      is that agent's own answer".
+    messages:
+      - role: user
+        content: While the hub waits, ask the agent I launched for its task why it skipped the integration tests.
+    expect:
+      required: [daintree.agents.ask-running-agent]
+      optional: [daintree.foundation]
+
+  - id: handle-hub-message-trap-branch-prep
+    category: routing-trap
+    note: >-
+      Reverse of the completion-report trap: committing, pushing and opening the PR is
+      the deliverable here, so prep-branch-for-review wins ("Use when the user asks to
+      prepare a branch for review, open or ready a PR"); "tell me when it's done" is not
+      a reply to the hub, and this runbook must not ride along.
+    messages:
+      - role: user
+        content: "Tell me when it's done: commit the remaining changes, push this branch and open the PR."
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
   # ------------------------------------------------------------------ receiver tasks
   # The hub framing kept; the work's own runbook must be found. This runbook is
   # optional (the lane holds it for the reply). Each one moves to its host-side
