@@ -1,0 +1,147 @@
+# daintree.hosts.check-usage-limits: the hub's side of a usage check across machines.
+# This Shell's hub asks each Remote Host's assistant to read its own agent CLI usage
+# screen and brings back one attributed table, never added together. The host side is
+# daintree.agents.check-usage-limits, which owns a usage check on THIS machine.
+#
+# Before the hosts runbook existed every one of these requests went to
+# daintree.agents.check-usage-limits at 1.00, which reads a screen here and has no way
+# to reach another machine. Cases pin recall (agent- and user-phrased), a trap each way
+# against the local runbook, a trap against the runtime runbooks that took "headroom",
+# and the follow-up turn after a table.
+#
+# The two named-host cases use invented host names: the selector has no way to know
+# a bare name is another machine until it is trained on rows that say so. They are
+# kept as honest measurement, owed to the next retrain.
+
+cases:
+  - id: hosts-check-usage-agent-phrased
+    category: host-query
+    note: >-
+      Agent-phrased, the way a hub describes the task to search_runbooks. The positive
+      clause claims it: "figures each host's assistant read off that machine's own usage
+      screen", as "one table".
+    messages:
+      - role: user
+        content: >-
+          Have the assistant on each Remote Host read its agent CLI's usage screen and
+          return allowance left and reset times as one table
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-codex-quota-remote-machines
+    category: single-runbook
+    note: >-
+      User-phrased: which remote machine has the most Codex left before its reset. The
+      whenToUse names "which machine has the most usage headroom left" on "OTHER
+      MACHINES", compared "host by host".
+    messages:
+      - role: user
+        content: Which of the remote machines has the most Codex quota left before its weekly reset?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-not-local-panel
+    category: routing-trap
+    note: >-
+      The bait is daintree.agents.check-usage-limits: a Codex usage panel read exactly as
+      printed is its whole procedure. But the panel is on every remote host and only that
+      host's assistant can read it: "figures each host's assistant read off that machine's
+      own usage screen", and its fence "Do not use for the usage of agents on this machine
+      (daintree.agents.check-usage-limits)". The local runbook is excluded.
+    messages:
+      - role: user
+        content: >-
+          Ask every remote host's Daintree assistant to check its Codex usage panel and
+          report the percentages exactly as printed
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-claude-headroom-not-runtime
+    category: routing-trap
+    note: >-
+      The word headroom on a machine baited daintree.runtime.measure-performance and
+      daintree.runtime.relieve-resource-contention (CPU and memory) before this runbook
+      existed. Claude headroom is plan allowance: "which machine has the most usage
+      headroom left". Both runtime runbooks are excluded.
+    messages:
+      - role: user
+        content: Which machine has the most Claude headroom?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-two-named-hosts
+    category: single-runbook
+    note: >-
+      Two hosts by bare name, the commonest shape of the request: "how much Claude Code or
+      Codex allowance is left on OTHER MACHINES ... on one or several Remote Hosts this
+      Shell reaches". Nothing in the query itself says they are other machines, so the
+      untrained selector gives it to the local runbook; owed to the retrain.
+    messages:
+      - role: user
+        content: Check the Claude Code usage available on build-1 and build-2.
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-one-named-host-codex
+    category: single-runbook
+    note: >-
+      One host by bare name, Codex: "on one or several Remote Hosts this Shell reaches".
+      Same gap as the two-host case: owed to the retrain.
+    messages:
+      - role: user
+        content: How much Codex is left on mini-3?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-followup-most-headroom
+    category: continuation
+    note: >-
+      After the table, asking which machine has the most headroom is a question about the
+      figures just gathered across hosts: "which machine has the most usage headroom
+      left", answered from the table, not a machine-load question.
+    active: [daintree.hosts.check-usage-limits, daintree.hosts.foundation, daintree.foundation]
+    messages:
+      - role: user
+        content: Check the Claude Code and Codex usage on my remote hosts.
+      - role: assistant
+        content: >-
+          Both hosts replied. The first shows Claude Code at 41% of the weekly limit used,
+          resetting Monday 09:00; the second has Codex at 63% of its weekly limit left,
+          resetting Thursday 14:00. They are separate accounts.
+      - role: user
+        content: Which machine has the most headroom?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: local-usage-weekly-limit-close-not-hosts
+    category: routing-trap
+    note: >-
+      Reverse trap. No other machine is mentioned, so it is the local runbook's "how much
+      of an AI agent CLI's plan allowance is LEFT", "how close they are to a weekly or
+      five-hour cap"; daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: is my claude weekly limit close to running out
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: local-usage-before-next-batch-not-hosts
+    category: routing-trap
+    note: >-
+      Reverse trap. A check before queueing more work, on the user's own Codex: the local
+      runbook's "remaining session, five-hour and weekly allowance" with no other machine
+      in sight; daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: Before I queue the next batch, how much of my Codex weekly limit is left?
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
