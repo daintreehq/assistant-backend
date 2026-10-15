@@ -410,6 +410,9 @@ boundaries:
   - query: run the 'Full stack' recipe on the payments worktree
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: "set up a recipe so every new worktree opens a server terminal and a claude pane"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
 followups:
   - query: is it done yet?
     history:

@@ -277,6 +277,12 @@ boundaries:
     confusable_with:
     - daintree.runtime.free-busy-port
     run: runbook-2026-10-issue-131
+  - query: "open an ssh session to the cloud resource behind my reporting worktree"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: "is the remote machine provisioned for the data-sync worktree up yet"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
 followups:
   - query: pause it then
     history:

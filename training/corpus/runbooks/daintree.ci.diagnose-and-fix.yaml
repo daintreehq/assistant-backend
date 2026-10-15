@@ -496,6 +496,9 @@ boundaries:
   - query: the deploy job has failed on main since the other machine's merge; fix it and show me a green run
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: "the deploy job in CI fails at the ssh step with host key verification failed"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
 followups:
   - query: how's it going?
     history:

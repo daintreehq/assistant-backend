@@ -242,6 +242,15 @@ boundaries:
     - daintree.runtime.free-busy-port
     docs: true
     run: runbook-2026-10-issue-131
+  - query: "the mac mini already shows connected under hosts; what has to be on for my assistant to message the one there"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: "my linux host is connected now, let the assistant here start an assistant on it when nobody is there"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: "both machines are already set up in daintree, why can't their assistants talk to each other"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
 
   - query: "the hub couldn't get usage from the build host because the send came back opted_out, how do I allow messaging with it"
     confusable_with: [daintree.hosts.check-usage-limits]

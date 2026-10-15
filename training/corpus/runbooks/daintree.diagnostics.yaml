@@ -361,6 +361,12 @@ boundaries:
   - query: 'Daintree on this machine says every agent fails to start, can you check what''s broken'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: "my agents in panes here can't connect to daintree's mcp anymore"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: "daintree keeps saying disconnected on this machine and nothing responds to the sidebar"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
 followups:
   - query: and the key thing too?
     history:

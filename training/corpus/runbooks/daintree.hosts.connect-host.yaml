@@ -1,0 +1,174 @@
+# daintree.hosts.connect-host: the person adds another Mac or Linux machine to Daintree as a
+# Remote Host through Settings → Hosts (the SSH check, an exact-build install or update, Host
+# mode and start at login), or gets an added host that will not connect working again, and
+# hears what is ready before any assistant messaging or assistant start is switched on.
+#
+# Boundaries are the words this shares with Daintree's own health on this machine
+# (diagnostics), a worktree's cloud devbox (manage-resource), messaging on a host that is
+# already added (the hosts foundation), work handed to a connected host (delegate-to-host),
+# and the "set up / onboarding" and "check failed" vocabulary that recipes and CI failures
+# use. Reverse rows live in those runbooks' files.
+runbook: daintree.hosts.connect-host
+run: runbook-2026-10-issue-122
+
+positives:
+  - Walk the person through adding their office iMac as a Daintree Remote Host and tell them which settings are still off afterwards
+  - Guide setup of a Linux workstation as a host for this Shell; Daintree has never been installed on it
+  - The person's new host fails the SSH row of the host check; explain what to fix outside Daintree without touching their ssh config
+  - Help the user bring a headless Ubuntu box into Daintree as a Remote Host and confirm its projects are listed on this Mac
+  - The user wants the build server added as a host but does not want Daintree starting at login there; guide the Host mode step to match
+  - A host saved yesterday reads "Daintree isn't running in Host mode there"; get it connecting again
+  - Find out why the Remote Host added this morning can't connect and needs a compatible build, and get the two machines onto the same Daintree
+  - The Linux host's install plan ends with a sudo command; tell the person exactly what they run on the host and what to press after
+  - Onboard the user's second Mac as a remote host; they use an SSH agent from their password manager and want nothing about their keys changed
+  - Confirm a just-added Remote Host is connected and that its project list is current, without enabling assistant messaging
+  - Add an arm64 Linux mini PC to Daintree as a host and check it is a platform Daintree ships for
+  - The person's host got a new hostname; change its SSH target in Daintree and tell them which permissions that resets
+  - A Mac that was added as a host went unreachable after its user logged out; work out what Host mode needs on that machine
+  - First time using Remote Hosts on this Shell; take the person from an empty Hosts page to a connected host
+  - The host check could not resolve the machine's name on the home network; guide the person to try its .local name
+  - Report what is ready on a newly connected host before the person decides whether to allow assistant messaging with it
+  - Help connect a cloud VM the user rents, reachable over their tailnet, to Daintree as a Remote Host
+  - Get the spare Mac in the studio running Daintree in Host mode so this laptop can open projects on it
+  - The person clicked Skip at the Enable step and now the host shows not connected; finish turning on Host mode there
+  - Update the Daintree build on an existing host that reads Different build, and warn the person what an update ends there
+  - add my linux desktop to daintree
+  - i want daintree to run my projects on the mac mini in the closet
+  - the host check says didn't connect for my ubuntu box
+  - set up my old macbook as a host
+  - daintree says my workstation runs a different build, what do i click
+  - my linux server keeps showing unreachable in the hosts list
+  - add the office imac as a host but don't turn on messaging or anything yet
+  - it says host mode is off on the mac mini
+  - daintree can't log in to my new host over ssh
+  - my server won't show up under other hosts in the project switcher
+  - connect my tailscale machine to daintree
+  - finish setting up the linux box I started adding yesterday
+  - add my mac studio as a host so I can open its repos from the laptop
+  - get the gaming pc running ubuntu into daintree as a host
+  - hey! quick one, I just got a beefy linux tower and want to drive it from daintree on my laptop, help me hook it up
+  - morning. could you help me get the mac studio set up as a remote host before standup
+  - thanks for the earlier help. next thing, I'd like my desktop added as a host in daintree
+  - query: what are the steps to make my second mac a remote host
+    docs: true
+  - query: my build machine runs linux; can it be a remote host, and if so walk me through adding it
+    docs: true
+  - query: can the server be a host without daintree launching at login there? if so set it up like that
+    docs: true
+  - query: explain host mode, then get it on for the machine I'm adding as a host
+    docs: true
+  - query: the add host dialog wants an ssh target, what do I put there
+    docs: true
+  - query: the machine I'm adding as a host has an older daintree; why must the builds match, and how do I fix it
+    docs: true
+  - query: the host install wants me to run a sudo command on the server, is that expected
+    docs: true
+  - query: add my desktop as a remote host, and tell me whether that switches on assistant messaging with it
+  - query: >-
+      I've got a Linux workstation under my desk that I want to use from my MacBook in
+      Daintree. I can ssh into it fine from a terminal. I'd like its projects to show up
+      here, but I don't want any assistant messaging or anything starting by itself yet.
+      Can you walk me through it?
+  - query: >-
+      The user added a host yesterday and today Settings shows it unreachable, with ssh
+      reporting a publickey permission denial. They rotated their SSH key last week. Help
+      them get it connecting again without editing their ssh config or copying keys around.
+  - query: >-
+      I added my Mac mini as a host and the check said Different build, it's on an older
+      Daintree. If I press update will it kill what's running there? Two agents are in the
+      middle of something on it.
+  - query: >-
+      Help the person onboard a second Linux server as a Remote Host. Their first host is
+      already connected and has messaging on; this one should stay without messaging until
+      they decide, and they want to see its projects listed here first.
+  - query: >-
+      Before I add my desktop as a remote host, what exactly will Daintree change on that
+      machine? I'm wary of things getting installed or set to start at login without me
+      knowing.
+    docs: true
+  - query: >-
+      The host check on my new server shows SSH works, Platform Linux arm64, Installed
+      nothing, and Host mode off. What do I do from here to get it connected, and will it
+      need me at that machine?
+
+followups:
+  - query: it says different build now
+    history:
+      - "user: add my ubuntu box as a host"
+      - "assistant: Open Settings → Hosts → Add host, enter its SSH target and press Check host, then read me each row."
+    active: [daintree.hosts.connect-host]
+  - query: the ssh row says didn't connect, permission denied
+    history:
+      - "user: help me add the linux tower as a host"
+      - "assistant: Enter the SSH target in Add host and press Check host; tell me what the SSH row says."
+    active: [daintree.hosts.connect-host]
+  - query: ok it shows connected. what's left to decide?
+    history:
+      - "user: set up the mac mini as a remote host"
+      - "assistant: Host mode is on there. Read me the Status row under Settings → Hosts → Details."
+    active: [daintree.hosts.connect-host]
+  - query: skip the start at login part, I only want it on while I'm working
+    history:
+      - "user: add my desktop to daintree as a host"
+      - "assistant: The check passed with the same build. The next step is Enable."
+    active: [daintree.hosts.connect-host]
+  - query: great, now the same for the second linux machine
+    history:
+      - "user: get the build server added as a host"
+      - "assistant: It's connected and its projects are listed under Other hosts; messaging is still off."
+    active: [daintree.hosts.connect-host]
+  - query: it's asking whether to update and end two terminals, should I?
+    history:
+      - "user: the host check says different build for the mac studio"
+      - "assistant: Plan update copies this machine's build there. Tell me what it shows."
+    active: [daintree.hosts.connect-host]
+  - query: how do I get it added then?
+    history:
+      - "user: can daintree run agents on my other mac?"
+      - "assistant: Yes, once that Mac is added as a Remote Host and runs Daintree in Host mode."
+  - query: ok, add it then
+    history:
+      - "user: is the linux box under my desk usable from daintree here?"
+      - "assistant: Not yet: it isn't in your hosts list, so it would need adding under Settings → Hosts first."
+
+topic_shifts:
+  - query: before that, I still need the second linux machine added as a host at all
+    history:
+      - "user: have the build host's assistant run the integration tests"
+      - "assistant: Sent to the assistant on the build host; I'll report when its update line arrives."
+    active: [daintree.hosts.delegate-to-host]
+  - query: forget the devbox, I actually want my own server added to daintree as a host
+    history:
+      - "user: is the cloud box for the payments worktree running?"
+      - "assistant: Its last status is stopped, checked two minutes ago."
+    active: [daintree.worktree.manage-resource]
+
+boundaries:
+  - query: daintree on this mac can't reach my newly added host, it just says unreachable
+    confusable_with: [daintree.diagnostics]
+  - query: is something broken? the host I added keeps flipping between connecting and not connected
+    confusable_with: [daintree.diagnostics]
+  - query: the hosts page says ssh couldn't log in to my server
+    confusable_with: [daintree.diagnostics]
+  - query: I'd rather run my projects on the desktop and drive them from the laptop through daintree, set that up
+    confusable_with: [daintree.diagnostics]
+  - query: the linux server in the rack should be usable from this laptop's daintree, checkouts and all
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: add the rented cloud machine as a remote host, it isn't tied to any worktree
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: my remote machine should show up in daintree, set up the connection
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: set up my second mac with daintree first, messaging can wait
+    confusable_with: [daintree.hosts.foundation]
+  - query: the other machine isn't a host yet; get it added so the assistants can talk later
+    confusable_with: [daintree.hosts.foundation]
+  - query: is my linux box ready to use from here? I haven't added it anywhere yet
+    confusable_with: [daintree.hosts.foundation]
+  - query: set up a new remote host for this shell
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: onboarding task, add the team's shared build machine to daintree as a host
+    confusable_with: [daintree.recipe.run-or-create]
+  - query: the host check failed with host key verification failed for the new machine
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.diagnostics]
+  - query: get the new linux box connected to daintree first, then I'll give its assistant work
+    confusable_with: [daintree.hosts.delegate-to-host]
