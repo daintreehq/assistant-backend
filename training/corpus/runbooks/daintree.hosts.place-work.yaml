@@ -148,12 +148,13 @@ boundaries:
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
   - query: 'here are four failing test files with different causes, put each on whichever host has room to fix it'
+  - query: 'one host should take the e2e flake and another the unit-test timeout bug; pick which by the agents each has signed in'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
-  - query: 'the flaky-test cleanup splits into a lint fix, a fixture rewrite and a CI cache change; put each on whichever of my machines has room'
+  - query: 'the coverage report and the test fixtures need separate fixes; which of my machines should do which?'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
-  - query: 'three separate bugs in the test helpers, one per host, choose the hosts by how busy they are'
+  - query: 'is the tower or the mini better placed to take the slow-test investigation, given what''s running on each?'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
 

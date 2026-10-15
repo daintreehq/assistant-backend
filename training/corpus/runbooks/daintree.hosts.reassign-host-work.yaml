@@ -135,7 +135,7 @@ boundaries:
   - query: 'the build box died while writing the new integration tests; move that work to the laptop host and keep what it pushed'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
-  - query: 'the tower ran out of usage halfway through adding test coverage for the importer; have another host finish it from its branch'
+  - query: 'the old mac mini''s disk filled up while it was adding contract tests; continue that piece on the linux host from the commits it already pushed'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
 
