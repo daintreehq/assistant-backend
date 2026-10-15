@@ -98,7 +98,11 @@ test("hold an isolated Daintree for runbook trials", async () => {
     }
   }
 
-  ctx = await launchApp({ userDataDir: path.join(RUN_DIR, "userdata") });
+  // isolateHome: false. The app's launch helper gives every launch a throwaway HOME
+  // (CLAUDE_CONFIG_DIR and CODEX_HOME inside it) unless told otherwise, which signs
+  // every agent CLI out; trials run on the user's own sign-ins, as the app's own
+  // assistant workflows do. A build whose helper predates the option ignores it.
+  ctx = await launchApp({ userDataDir: path.join(RUN_DIR, "userdata"), isolateHome: false });
   // Daintree's global "Skip permission prompts for agents" (adds each CLI's
   // dangerous args). Set BEFORE the project opens: the project's renderer caches
   // agent settings when it loads, and a launch reads that cache, so setting it

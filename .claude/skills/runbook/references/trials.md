@@ -14,11 +14,12 @@ worktree included):
 
 | file | what |
 |---|---|
-| `dtrb.sh` | the driver: build, runbooks, up, trial, wait, summary, send, adopt, hold, reset, mcp, status, down, purge |
+| `dtrb.sh` | the driver: build, runbooks, up, trial, wait, summary, send, adopt, hold, reset, mcp, status, down, purge, plan |
 | `harness/hold.spec.ts` | the Playwright "holder": launches and configures the isolated app, keeps it open, runs queued trials, records each one |
 | `harness/playwright.dtrb.config.ts` | its config (one worker, no retries) |
 | `summarise.py` | finds a trial's transcript(s) and prints what happened; also reads any Claude Code or Codex JSONL (`--transcript <file>`) |
 | `mcp_call.py` | calls the isolated app's MCP with its API key (the `external` surface), for inspection |
+| `trial_plan.py` | offline planning for hub and lane trials (`dtrb.sh plan`): checks the owed-trial register, prints runsheets and a staged run's layout; launches nothing |
 
 ```bash
 T="$ROOT/.claude/skills/runbook/scripts/trial"
@@ -51,7 +52,9 @@ T="$ROOT/.claude/skills/runbook/scripts/trial"
   To test that a runbook **stops** at a confirmation, set `DTRB_SKIP_CONFIRMATIONS=0`.
 - **Shared with the user, by necessity.** Agents use the user's own `~/.claude` and
   `~/.codex`: the same login and subscription, user-level instructions, hooks and
-  MCP servers. Transcripts land in `~/.claude/projects` and `~/.codex/sessions`.
+  MCP servers. Transcripts land in `~/.claude/projects` and `~/.codex/sessions`. The
+  holder launches with `isolateHome: false`: the app's launch helper otherwise gives
+  the instance a throwaway HOME, which signs every agent CLI out.
 
 ## Cost: the binding constraint
 
@@ -221,12 +224,15 @@ and stays inside the size budgets.
 
 ## Limits
 
-- **Agent-pane caller only.** The sidebar assistant (`help-*` surface) is exercised by
-  the app's own harness (`npm run test:e2e:assistant` in `$APP_REPO`, with
-  `DAINTREE_RUNBOOKS_MCP_URL` pointing at the runbook server). It builds into the
+- **Agent-pane caller only, here.** The sidebar assistant (`help-*` surface) is
+  exercised by the app's own harness (`npm run test:e2e:assistant` in `$APP_REPO`,
+  with `DAINTREE_RUNBOOKS_MCP_URL` pointing at the runbook server). It builds into the
   user's checkout, so run it only with the user's say-so.
-- **No other machines.** Remote Hosts, a second Mac and real accounts cannot be
-  staged here; such runs are recorded as owed (`references/proof.md`).
+- **Hubs and lanes** (the `hub-full` and `lane-full` callers, Remote Hosts, other
+  machines, real accounts) follow `references/hub-lane-trials.md`: a staged Shell and
+  host on one Mac, or person-assisted runs on the real fleet. A hosts runbook's run
+  that cannot happen yet is an entry in `references/owed-trials.yaml` (checked by
+  `dtrb.sh plan check`), as well as in `$W/trials/owed.md`.
 - **Headless runs are not trials.** `claude -p` or `codex exec` outside a pane cannot
   receive notices; use them only for routing questions, and `bench search` is better
   for those.

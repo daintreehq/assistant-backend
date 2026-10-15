@@ -20,6 +20,9 @@
 #   dtrb.sh project                print the running trial project's path
 #   dtrb.sh status | down          show state | close the app and stop the holder
 #   dtrb.sh purge [run-name]       delete stopped runs and their scratch projects
+#   dtrb.sh plan check|coverage|show ID|layout RUN|revision
+#                                  hub and lane trials, offline (trial_plan.py): the owed-trial
+#                                  register, a runsheet, a staged run's layout; launches nothing
 #
 # Parallel runners: set DTRB_RUNNER=<name> and DTRB_N=<1-9> on EVERY call. Each runner
 # gets its own run root, isolated-app MCP port (45700+N) and runbook server port (8620+N);
@@ -451,6 +454,11 @@ cmd_mcp() {
     "$run/mcp-api-key" "$@"
 }
 
+cmd_plan() {
+  resolve_backend_python
+  exec "$PY_BACKEND" "$HERE/trial_plan.py" "$@"
+}
+
 cmd_project() {
   local run; run="$(current_run)"
   cat "$run/project-path"
@@ -513,5 +521,6 @@ case "${1:-}" in
   status) shift; cmd_status ;;
   down) shift; cmd_down ;;
   purge) shift; cmd_purge "$@" ;;
-  *) sed -n '2,30p' "$0"; exit 2 ;;
+  plan) shift; cmd_plan "$@" ;;
+  *) sed -n '2,33p' "$0"; exit 2 ;;
 esac
