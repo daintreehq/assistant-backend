@@ -12,7 +12,7 @@ requiredTools:
 optionalTools:
   - host.listTasks
 ---
-Git: a scratch clone of the shared remote (`git clone --filter=blob:none --no-checkout <remote>`), `git fetch --prune` before each check.
+Git: a scratch clone of the remote (`git clone --filter=blob:none --no-checkout <remote>`), `git fetch --prune` before each check.
 
 1. Inputs: the remote URL and full base SHA the units used; each source's branch, full SHA and acceptance, from its verified reply (`host.getTask`) or the person; the order (the person's, else what others build on first). Base and each pin must be on the remote (`git branch -r --contains <SHA>`); unpushed or missing is no input yet. Keep each source's tip; past its pin, newer commits join only on the person's word.
 2. Integrator: the host and project the person named, else an `available` lane in a project named for the repository (`host.listAssistants`; the lane checks its remote); two fit: ask. Name a new integration branch.
@@ -20,8 +20,8 @@ Git: a scratch clone of the shared remote (`git clone --filter=blob:none --no-ch
 
 On notice or resume:
 - `input-required` is a decision: settle it within the person's request, else bring them the inputs and acceptance it touches, the lane's evidence and last good HEAD. Your answer's text names the integration branch.
-- `completed`, pushed: `origin/<branch>` is the reported HEAD; `git log --first-parent --reverse --format='%H %P' <base>..<HEAD>` shows only merges, the first on `<base>`, each on the last, second parents the pins in order (a pin already in: `git merge-base --is-ancestor <pin> <HEAD before it>`); a clean merge's tree equals `git merge-tree --write-tree <first parent> <pin>`, a settled conflict read with `git show --remerge-diff <merge>`. Not pushed: one narrow question naming branch and HEAD for that log. Checks: the forge's on that SHA (`gh`), else the lane's exit code for each at it; else unverified. Then each source's tip again: changed or gone is a finding.
+- `completed`, pushed: `origin/<branch>` is the reported HEAD; `git log --first-parent --reverse --format='%H %P' <base>..<HEAD>` shows only merges. Walk pins in order from `<cur>`=`<base>`: skip one `git merge-base --is-ancestor <pin> <cur>` passes; else the next merge's parents are `<cur> <pin>`, and it becomes `<cur>`; end at HEAD. A clean merge's tree equals `git merge-tree --write-tree <first parent> <pin>`, a settled conflict: `git show --remerge-diff <merge>`. Unpushed: ask for that log, naming branch and HEAD. Checks: the forge's on that SHA (`gh`), else the lane's exit code for each at it; else unverified. Then each source's tip again: changed or gone is a finding.
 
 Stop and recovery: one integrator, one brief. Never ask for a merge into a protected branch, a force push or a source deletion; a failed or partial integration stays as the lane left it (branch, worktree, SHAs).
 
-Report back: integrator (host, project, lane); branch, base, HEAD claimed vs verified and how; per input its pin and merge, skipped or pending and why; checks with evidence; moved sources; open decisions.
+Report back: integrator (host, project, lane); branch, base, HEAD claimed vs verified and how; per input its pin and merge, skipped or pending, why; checks with evidence; moved sources; open decisions.
