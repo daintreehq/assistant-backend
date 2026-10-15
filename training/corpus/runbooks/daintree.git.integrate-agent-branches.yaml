@@ -80,6 +80,15 @@ boundaries:
   - query: Merge the three agents' onboarding branches into one integration branch and check it still builds after each merge.
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: 'merge my three agents'' branches into one here before I open the PR, I''ll say the order'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
+  - query: 'the frontend and backend worktrees on this machine are finished; put them together on an integration branch and run the tests after each'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
+  - query: 'combine what the two codex agents did at their current commits into one branch, I''m asking, nobody else'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
 followups:
   - query: ok, the codex one is committed now, add feat/search-index as the last merge
     history:

@@ -133,3 +133,9 @@ boundaries:
   - query: 'the hub gave each host the same retry helper to build; make the worktree here, launch codex on it and send back the commit'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'the hub wants a new rate limiter written here on its unit branch from the base commit and the SHA back'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
+  - query: 'the hub sent one unit for this machine, add pagination to the orders endpoint, nothing to merge'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107

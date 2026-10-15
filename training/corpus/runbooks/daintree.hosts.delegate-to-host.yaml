@@ -176,6 +176,9 @@ boundaries:
   - query: 'the second machine should start on the importer only after the first one''s branch is pushed and checked'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'get the other mac to build the client on top of the API commit the first machine just pushed, then send me its SHA'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

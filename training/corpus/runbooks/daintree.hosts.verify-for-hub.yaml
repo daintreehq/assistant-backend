@@ -139,3 +139,9 @@ boundaries:
   - query: 'hub message: check that the branch at 6c0e2d9 builds and its tests pass on this machine; a reviewer is already on it'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
+  - query: 'the hub wants the integration branch another host built tested here at its SHA, no merging on this machine'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
+  - query: 'the hub''s merged release commit needs the test suite run on this box, nothing combined here'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107

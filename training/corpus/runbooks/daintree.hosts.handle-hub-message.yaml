@@ -189,3 +189,9 @@ boundaries:
   - query: 'an inbox wake just came in from the hub with the task the whole swarm got; go through it and answer'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'the hub asked whether this machine could act as its integrator; just answer it with which CLIs are signed in here'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
+  - query: 'read the hub''s newest message first, it may be about merging the units, and work out which project here it means'
+    confusable_with: [daintree.hosts.integrate-for-hub]
+    run: runbook-2026-10-issue-107
