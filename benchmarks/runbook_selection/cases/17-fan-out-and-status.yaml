@@ -276,3 +276,31 @@ cases:
     expect:
       required: [daintree.workflow.start-work-on-issue]
       optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
+
+  - id: approved-waves-run-not-decompose
+    category: routing-trap
+    note: >-
+      The plan is already approved; the ask is to run it wave by wave through the
+      merges. Decided by work-in-waves' "start the next wave" and its fence
+      "splitting a spec into waves for approval (daintree.orchestration.decompose-work)".
+    messages:
+      - role: user
+        content: >-
+          The split is approved. Run it wave by wave: start wave 1, and once its pull
+          requests are merged, branch wave 2 from the new develop and keep going
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: plan-waves-for-approval-not-run
+    category: routing-trap
+    note: >-
+      Ordering units into waves for the user to approve is decomposition, not running
+      them. Decided by work-in-waves' fence "splitting a spec into waves for approval
+      (daintree.orchestration.decompose-work)".
+    messages:
+      - role: user
+        content: Break this spec into issues and order them into waves for me to approve
+    expect:
+      required: [daintree.orchestration.decompose-work]
+      optional: [daintree.foundation]

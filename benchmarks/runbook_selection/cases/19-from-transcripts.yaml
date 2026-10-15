@@ -393,3 +393,89 @@ cases:
       required: [daintree.agents.recover-agent]
       optional: [daintree.foundation]
 
+
+  - id: tx-waves-agent-query
+    category: routing-trap
+    note: >-
+      Help-assistant session 7be17974, 2026-10-14: the agent's own query for a
+      four-wave issue plan. It got fan-out-work alone, which has no merge between
+      batches, and improvised the wave cycle across thirteen issues. Decided by
+      work-in-waves' "WAVES … where the next wave starts only once the previous
+      wave's pull requests are merged" and its fence "one batch, or a rolling queue
+      under a cap, with no merge between waves (daintree.orchestration.fan-out-work)".
+      fan-out-work still rides along (1.0000, waves 0.9971) until a retrain.
+    messages:
+      - role: user
+        content: >-
+          Work issues in waves: worktree per issue with recipe, merge PRs, delete
+          worktrees, repeat
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: tx-waves-user-words
+    category: routing-trap
+    note: >-
+      Same session, the user's words with the issue list removed. Workspace-cleanup
+      rides along on "delete those worktrees"; the teardown here is a step of the
+      wave cycle. Decided by work-in-waves' "once every PR in the wave passes CI, merge
+      them, delete the worktrees and start the next wave" and its fence "one batch …
+      with no merge between waves (daintree.orchestration.fan-out-work)".
+    messages:
+      - role: user
+        content: >-
+          Work through all of these issues. For each one create a new worktree, assign
+          the issue to me and start a Claude Code agent with /work on it; there's a
+          recipe for this. Once every pull request in a wave is finished and its CI
+          passes, delete those worktrees and run the merge command in a new Claude Code
+          terminal in the root worktree, close it once it's done, then start the next
+          wave the same way. Continue until all waves are done.
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: tx-waves-start-next-wave
+    category: single-runbook
+    note: >-
+      Same session: the user's go once a wave had merged. Without a waves runbook this
+      selected audit-worktrees at 0.99. Decided by work-in-waves' "start the next
+      wave".
+    messages:
+      - role: user
+        content: Everything has merged so you can start the next wave
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: tx-add-issues-to-waves-is-find-work
+    category: routing-trap
+    note: >-
+      Same session, mid-run: the user asked for more ready issues to add. The agent
+      screened unassigned, ready issues against the waves in flight and added two on
+      a yes. Decided by work-in-waves' fence "finding more issues to add
+      (daintree.workflow.find-issue-work)" and find-issue-work's "anything
+      unassigned".
+    messages:
+      - role: user
+        content: >-
+          Please check all open issues and see if there's anything else we could add to
+          the waves
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation, daintree.forge.triage-issue-backlog]
+
+  - id: tx-ten-minute-monitor-is-watch-outcome
+    category: single-runbook
+    note: >-
+      Same session: the user asked for a periodic check on the running agents. On
+      its own this is a deferred wake. Decided by watch-outcome's "keep an eye on it
+      while I'm out" and its step 3, "your host's scheduler, only once confirmed to
+      exist".
+    messages:
+      - role: user
+        content: >-
+          Set a timer for every 10 minutes or so just to monitor the terminals and
+          figure out what's going on
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation, daintree.orchestration.supervise-fleet]

@@ -1,0 +1,43 @@
+# Training examples whose answer is `daintree.orchestration.work-in-waves` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.orchestration.work-in-waves
+run: transcript-2026-10-15-work-in-waves
+positives:
+  - 'here''s the plan: round one is the three auth tickets, round two the two billing ones once round one has landed. new worktree and agent per ticket, and merge each round before the next'
+  - do these issues in batches of three — finish a batch, merge its PRs, clean up the worktrees, then branch the next batch off main
+  - 'phase 1: 210, 211. phase 2: 214, 215, 216. phase 3: 220. every issue gets the Work recipe, and my merge skill lands each phase before the next one starts'
+  - run the backlog in waves of four and don't start a wave until everything from the last one is merged into develop
+  - 'keep cycling: launch the wave, wait for green CI on all of its PRs, have an agent run the merge in the main checkout, delete the wave''s worktrees, next wave'
+  - 88 and 91 depend on 85, so they go in a second wave after 85 is merged; 85, 86 and 87 can go first. agent per issue, merge between waves
+  - I've ordered these 12 tickets into 4 waves. take them through one wave at a time and merge in between
+  - for each wave, use the Implement recipe on every issue, then when all of the wave's PRs pass, run /land-all in a fresh claude terminal at the repo root
+  - carry on with wave 3
+  - after every wave tear down its worktrees and branch the next wave from the freshly merged main
+  - 'waves: three issues, merge, three issues, merge, until the list is empty'
+  - sequence these in rounds so the later ones build on the merged earlier ones, one codex agent per issue
+  - the first wave's PRs are all merged, go ahead with the second
+boundaries:
+  - query: start wave 1 of the approved breakdown, and once it's merged go on to wave 2
+    confusable_with: [daintree.orchestration.decompose-work]
+  - query: work through these 9 issues three at a time, but merge each group of three before starting the next group
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: wave 2's PRs are all merged, so delete those worktrees and kick off wave 3
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: this wave's PRs are green, get an agent merging them and start the next wave once they're in
+    confusable_with: [daintree.git.integrate-agent-branches]
+  - query: run phase 2 only after every phase 1 PR has merged; they're all issues, one agent each
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+followups:
+  - query: yep retry those deletes and then kick off the merge
+    history:
+      - 'user: three waves of issues, worktree and agent each, merge every wave before the next'
+      - 'assistant: Wave 1''s three PRs are green and clean. Two worktree deletes timed out on Daintree''s confirmation and the third worktree is gone. Retry the two, then start the merge?'
+    active: [daintree.orchestration.work-in-waves]
+  - query: next wave please
+    history:
+      - 'user: take these four waves through to the end'
+      - 'assistant: Wave 3 is merged: all four PRs show MERGED and develop''s CI passed. Wave 4 has two issues and is ready to start.'
+    active: [daintree.orchestration.work-in-waves]

@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18001,
-  "compiled_sha256": "79be304099b7f57c697e42a24d13c3d3ba19fb6c1792c7ad0feba224ff56fc24",
-  "label_space_sha256": "d0c733d43e65e9e4d0f6d86903972bbe436b529f5f37e5bfe7d9ff9b0e07c144",
-  "label_space_size": 105,
+  "rows": 18021,
+  "compiled_sha256": "a3fcbdd116b52d6b7c96c76c50ea99c3681e7793e0c59a0952f93c472538c99d",
+  "label_space_sha256": "a7f0d839690a9dec183ac1e1f01bfc9672ae1ebdd814cfecb5ab752a1b8b0990",
+  "label_space_size": 106,
   "by_source": {
-    "boundary": 5400,
+    "boundary": 5405,
     "docs": 839,
-    "followup": 811,
+    "followup": 813,
     "foundation": 409,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5560,
+    "positive": 5573,
     "topic_shift": 2999,
     "wake": 149
   },
@@ -43,7 +43,8 @@
     "transcript-2026-09-26-fact-contest-named-agents": 7,
     "transcript-2026-09-26-reviewer-fixer-relay": 10,
     "transcript-2026-09-27-help-release": 15,
-    "transcript-2026-09-29-launch-effort-cut-off-turns": 14
+    "transcript-2026-09-29-launch-effort-cut-off-turns": 14,
+    "transcript-2026-10-15-work-in-waves": 20
   },
   "dropped": {},
   "adjusted": {
@@ -475,6 +476,12 @@
       "rows": 397,
       "runbook": "daintree.orchestration.watch-outcome",
       "sha256": "edbcc1b47a079233e2750737466be61854a8544029ff23fb4c8bf86173e50a6e"
+    },
+    "runbooks/daintree.orchestration.work-in-waves.yaml": {
+      "examples": 20,
+      "rows": 20,
+      "runbook": "daintree.orchestration.work-in-waves",
+      "sha256": "f50411eb3a01fc6ad84ec3ab3f5958ddf8aa72046e00360a09f148e5e1c11b95"
     },
     "runbooks/daintree.orchestration.workspace-cleanup.yaml": {
       "examples": 359,
