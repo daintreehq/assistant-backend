@@ -139,7 +139,8 @@ cases:
       Naming the reviewer CLI and a worktree drew daintree.agents.relay-review-feedback
       ("have Codex review this file without changing anything") and
       daintree.review.review-change before this runbook. Nobody fixes here: "the reviewer's
-      findings ... replied to the hub as unfixed claims".
+      findings (severity, file and line, what is wrong) replied to the hub as unfixed
+      claims".
     messages:
       - role: user
         content: have codex review the hub's branch at abc1234 in a worktree and reply with findings
@@ -151,10 +152,10 @@ cases:
   - id: review-for-hub-reverse-local-review
     category: routing-trap
     note: >-
-      A teammate's pushed branch reviewed for the person here, no hub: daintree.review.review-change
-      ("Use when the user wants a change JUDGED on its merits ... The deliverable is
-      FINDINGS with severity and file evidence"). This runbook must not ride along: it is
-      only "when the hub's message asks THIS machine".
+      A teammate's pushed branch reviewed for the person here, no hub:
+      daintree.review.review-change ("Use when the user wants a change JUDGED on its
+      merits"; "The deliverable is FINDINGS with severity and file evidence"). This runbook
+      must not ride along: it is only "when the hub's message asks THIS machine".
     messages:
       - role: user
         content: review the branch my teammate pushed at 3f9a2c1 and list problems by severity, no edits
@@ -166,8 +167,8 @@ cases:
     category: routing-trap
     note: >-
       The hub's own side: the person wants another machine to do the review, which is
-      daintree.hosts.delegate-to-host ("whatever the work is (... a review of a pushed
-      branch)"), and its fence "the review a lane carries out when the hub asks THIS
+      daintree.hosts.delegate-to-host ("a review of a pushed branch" among the work it
+      hands out), and its fence "the review a lane carries out when the hub asks THIS
       machine for one" keeps this runbook out. Contested at the shipped artifact (this
       runbook rides at about 0.98 after two text attempts): retrain owed.
     messages:

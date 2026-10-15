@@ -19,13 +19,13 @@ positives:
   # agent-written task descriptions
   - Hub asked this lane to review branch race/dedupe/b at 41c9e07a and return findings without touching the code
   - Review the commit the hub named on the importer branch with a reviewer agent here and send the hub the findings, no fixes
-  - Set up a review of the hub's branch at its pinned commit in a fresh worktree on this host and reply with severity-ranked findings
+  - The hub wants this machine's opinion on the session-timeout change at 6b1e0d4 before it merges anything; nobody here has seen that code
   - 'Lane task: second-opinion review of feature/webhooks at 0b7d3a91 using Codex, comments only, then answer the hub'
   - Run a findings-only review on this host of the branch another host built, pinned to the commit in the hub's message
   - Hub wants Claude Code on this machine to review the retry-policy branch at e2f4a610 for error handling and test gaps
   - Check the change at 9a1c3f5 against the acceptance criteria the hub sent and report problems with file and line, for the hub
   - Do the hub's code review of the logging refactor at the exact SHA it gave and report the findings without editing anything
-  - Pin a worktree to the commit the hub wants reviewed and have an independent agent read it, then reply with what it found
+  - A hub review request came in while the person here is away, for the export branch at 2d9f7a3, judged on error handling only
   - Independent review for the hub of the scheduler branch built on another machine, at commit 5d7e21b0, findings only
   - Review the other host's pushed branch at the commit the hub quoted, keeping the reviewer read-only, and report back to the hub
   - Get a reviewer here that did not write the code to go over the hub's branch at 0c4f8e13 and list its findings

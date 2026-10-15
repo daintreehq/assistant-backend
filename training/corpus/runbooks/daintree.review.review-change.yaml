@@ -525,7 +525,7 @@ boundaries:
   - query: 'second opinion on this commit before I merge it, just a list of problems, no edits'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
-  - query: 'have codex do a findings-only pass over the PR at its head sha here, in its own worktree'
+  - query: 'give the PR a findings-only pass at its head sha on this machine, in its own worktree, before I approve it'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
 followups:
