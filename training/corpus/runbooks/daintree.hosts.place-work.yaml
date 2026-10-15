@@ -150,7 +150,7 @@ boundaries:
   - query: 'here are four failing test files with different causes, put each on whichever host has room to fix it'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
-  - query: 'assign these test-tooling tickets to whichever machines are least loaded'
+  - query: 'the flaky-test cleanup splits into a lint fix, a fixture rewrite and a CI cache change; put each on whichever of my machines has room'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
   - query: 'three separate bugs in the test helpers, one per host, choose the hosts by how busy they are'
