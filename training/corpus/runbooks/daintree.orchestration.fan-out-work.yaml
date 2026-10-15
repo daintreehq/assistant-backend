@@ -603,6 +603,12 @@ boundaries:
   - query: "run claude on the three open accessibility bugs in parallel worktrees on this machine"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: 'start an agent on each of these six issues, one worktree each, and keep going until they''re done'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
+  - query: 'spread these tasks over parallel agents here, one per worktree'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: yeah all of them except the docs one
     history:

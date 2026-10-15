@@ -1,0 +1,126 @@
+# daintree.hosts.start-swarm: the hub readies one enrolled assistant per Remote Host in
+# the right project before any work goes out (reuse an enrolled lane, start one only where
+# the person allows it) and reports who is ready. Boundaries hold it against the runbooks
+# that took these requests before it existed; the work itself, a read-only fleet report and
+# messaging setup belong elsewhere.
+runbook: daintree.hosts.start-swarm
+run: runbook-2026-10-issue-102
+
+positives:
+  - 'Make sure each connected Remote Host has an enrolled Codex assistant in the user''s current repository, reusing lanes already enrolled for this Shell, and report the slot and generation of each'
+  - 'Reuse or start an assistant in the user''s project on the three connected hosts and return a readiness table plus anything the user must switch on'
+  - 'Check which remote hosts already have an assistant enrolled for this Shell in the project and start one on the hosts that have none'
+  - 'Ready an assistant lane on the Linux build server and the Mac mini for this repository without dispatching any tasks'
+  - 'Start assistants on the remote hosts that allow starting, and list the hosts where the user has to turn the start setting on'
+  - 'Bring up a Claude Code assistant in this project on every Remote Host this Shell can reach and record the generation each returns'
+  - 'Prepare the hub for a multi-machine run: per host, find the project in that host''s listing and get one enrolled assistant there, no work sent'
+  - 'Fill the gaps in the host lanes for this repository: keep every enrolled assistant, open one where a host has none, report what is left for the user'
+  - 'Get the remote hosts ready to receive work on the monorepo, one enrolled assistant each, and stop before sending anything'
+  - 'Establish one ready assistant per remote machine in the target project and report host, project path, slot, agent and generation'
+  - 'Retry the assistant start on the Linux host with the CLI that project''s assistants already use'
+  - 'get the other macs ready for this project'
+  - 'put an assistant on each of my remote machines'
+  - 'can you get my two other computers ready to help on this repo'
+  - 'i want codex on the linux box and claude on the mac mini, both in this project'
+  - 'spin up the swarm but no tasks yet'
+  - 'make sure every host has an assistant in this repo'
+  - 'which of my machines are ready for work'
+  - 'who''s ready to take a task on the other machines'
+  - 'get assistants ready on the hosts and reuse whatever''s there'
+  - 'line up an assistant on each server before I hand things out'
+  - 'start an assistant on the build server in this project'
+  - 'set up assistants on all three remote machines for this codebase'
+  - 'are the other hosts staffed for this project yet'
+  - 'get claude running on the mac mini for this repo so I can send it stuff later'
+  - 'prep the fleet, one assistant per box in this project'
+  - 'is anybody free on the hosts to take a job in this repo'
+  - 'fill the empty hosts with assistants for this project and leave the ones that already have one alone'
+  - 'morning! before I split up today''s tickets, can you make sure each of my remote hosts has an assistant in this project'
+  - 'ok so the mac studio and the linux tower are both connected now, get each of them an assistant in this repo and tell me if anything needs me'
+  - 'hey, quick one, I''d like an assistant ready on every machine I''ve connected for this project, but don''t give them anything to do yet'
+  - 'I''m about to run a big refactor across machines, first just get the assistants in place on each host and show me where they landed'
+  - 'thanks for that. next, can you set up assistants for this repo on the remote machines and let me know which ones you couldn''t'
+  - query: 'do it for all of them'
+    history:
+      - 'user: is there an assistant on the mac mini for this project?'
+      - 'assistant: No. The project is listed there, but no assistant is enrolled for this Shell.'
+  - query: 'ok get them ready'
+    history:
+      - 'user: which of my hosts have this repo?'
+      - 'assistant: The Mac mini and the Linux box both list it; neither has an assistant enrolled for you.'
+  - query: 'go ahead and start the missing ones'
+    history:
+      - 'user: get my hosts ready for this repo'
+      - 'assistant: Two hosts already have enrolled assistants. The Linux box has none yet and its start setting is on.'
+  - query: 'fine, use codex there then'
+    history:
+      - 'user: get an assistant on each host'
+      - 'assistant: The Linux box refused a Claude Code start: that project''s assistants run a different agent CLI.'
+  - query: 'I turned the start setting on for the tower, try it now'
+    history:
+      - 'user: get assistants on my other machines for this project'
+      - 'assistant: The tower answered opted_out: starting assistants is turned off for it in this Shell''s host settings.'
+
+boundaries:
+  - query: 'provision assistants on the remote hosts for this project'
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: 'get the remote machines ready for this repo'
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: 'connect an assistant on each remote host to this project'
+    confusable_with: [daintree.worktree.manage-resource]
+  - query: 'each machine should get its own assistant in this repository'
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: 'set up every remote host with an assistant for this codebase'
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: 'give every remote machine its own assistant on this project'
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: 'one assistant per machine for this repo, I''ll split the issues across them after'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'spread assistants across my hosts for this project but don''t hand out the issues yet'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'get a swarm of assistants going across my machines with no tasks yet'
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: 'which machines have an assistant that can take something new right now'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: 'anyone on the other hosts free for a new job in this repo?'
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: 'start a codex assistant on the linux host for this repo'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'spin up a claude on the mac mini in this project'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+  - query: 'get the assistant on my other mac ready in this project so I can message it later'
+    confusable_with: [daintree.hosts.foundation]
+  - query: 'enroll an assistant on each remote host for this project'
+    confusable_with: [daintree.hosts.foundation]
+  - query: 'my other two macs should each have claude running in this project'
+    confusable_with: [daintree.diagnostics]
+  - query: 'get codex going on every machine for this repo using whatever each one is signed into'
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: 'which hosts can I give work to in this project'
+    confusable_with: [daintree.workflow.find-issue-work]
+  - query: 'which remote machine has room for an assistant in this repo'
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: 'bootstrap the assistant lanes on each host for this repo'
+    confusable_with: [daintree.deps.upgrade-dependency]
+
+followups:
+  - query: 'now get them ready'
+    history:
+      - 'user: which of my hosts are connected?'
+      - 'assistant: The Mac mini and the Linux tower are connected; the laptop host is offline.'
+  - query: 'and start one on the tower too'
+    history:
+      - 'user: is the mac mini''s assistant enrolled for this project?'
+      - 'assistant: Yes: slot 0, Codex, with a current generation for this Shell.'
+
+topic_shifts:
+  - query: 'before that, put an assistant on each remote host in this repo'
+    history:
+      - 'user: rename these tabs by what each agent is doing'
+      - 'assistant: Retitled all four.'
+    active: [daintree.terminals.rename]
+  - query: 'different thing, are the hosts ready to take work on this project?'
+    history:
+      - 'user: how much codex usage do I have left'
+      - 'assistant: Codex shows 62% of the weekly limit left, resetting Monday.'
+    active: [daintree.agents.check-usage-limits]

@@ -252,6 +252,15 @@ boundaries:
   - query: provision the remote resource configured for this worktree
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-86
+  - query: 'provision the remote resource for this worktree and tell me when it''s up'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
+  - query: 'is the devbox for this worktree ready yet'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
+  - query: 'resume the remote box attached to the feature worktree so the agent can use it'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: pause it then
     history:

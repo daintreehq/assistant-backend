@@ -456,6 +456,12 @@ boundaries:
   - query: "sweep the agents running on this machine and sort out what you can"
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
+  - query: 'go through the agents running here and tell me which ones are free to take something new'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
+  - query: 'anything need me across the running agents?'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: ok show me the failed one
     history:

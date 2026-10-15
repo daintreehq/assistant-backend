@@ -256,6 +256,12 @@ boundaries:
   - query: wt-a and wt-b keep overwriting the same dev database, restoring it every time is a pain, fix that
     confusable_with: [daintree.runtime.migrate-worktree-database]
     run: 2026-09-28-round6
+  - query: 'every worktree needs its own local database before I split the work'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
+  - query: 'give each worktree its own dev server port so they can all run at once'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:

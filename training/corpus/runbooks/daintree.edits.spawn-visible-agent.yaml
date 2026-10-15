@@ -1208,6 +1208,9 @@ boundaries:
   - query: "launch claude in the api worktree to implement the refund endpoint and report the branch"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: 'start a claude agent here to tidy up the logging module'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: how's it going?
     history:

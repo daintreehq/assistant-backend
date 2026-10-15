@@ -118,6 +118,9 @@ boundaries:
   - query: the build takes forever because three agents compile at the same time, stagger them
     confusable_with: [daintree.runtime.measure-performance]
     run: 2026-09-28-round6
+  - query: 'is this machine too loaded to take on more agents right now'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: do it, cap them all at 2 workers
     history:
