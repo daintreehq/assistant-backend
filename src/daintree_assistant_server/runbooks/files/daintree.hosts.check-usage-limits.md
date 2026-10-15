@@ -15,7 +15,7 @@ optionalTools:
 ---
 1. Hosts: those the user named, else every host `host.list` gives. Per host, `host.listAssistants`: one `available` lane with a `generation` is enough. None: foundation step 2. This machine only when the user includes it: daintree.agents.check-usage-limits, here.
 2. CLI per host: the one the user named. Unnamed or unknown: every agent CLI signed in there; the hub cannot see which, so never guess.
-3. One `host.sendMessage` per host, in one round, no `waitMs`. Brief, adapted:
+3. One `host.sendMessage` per host, in one round, no `waitMs`, to the lane step 1 chose (its own `slot`). Brief, adapted:
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<host id>","projectId":"<project id>","slot":0,"generation":"<generation>","text":"Read Codex's usage on this machine with runbook daintree.agents.check-usage-limits, in a new pane. Codex not signed in here: say so and check nothing else. Reply with, exactly as printed: the command sent; plan or account; each window, per-model ones too, as % used or % left, saying which; resets with the timezone shown; credits; the pane id. Leave the pane open."}
