@@ -385,14 +385,14 @@ cases:
   - id: handle-hub-message-receiver-cohort
     category: routing-trap
     note: >-
-      Several units of the hub's work across local agents: today
-      daintree.orchestration.fan-out-work ("a BATCH of independent issues or tasks, one
-      agent terminal per issue or worktree").
+      Several units of the hub's work across local agents:
+      daintree.hosts.run-local-cohort ("the hub hands THIS machine SEVERAL pieces of work at
+      once").
     messages:
       - role: user
         content: The hub asked me to work three of its issues in parallel here, one agent per issue, each in its own worktree.
     expect:
-      required: [daintree.orchestration.fan-out-work]
+      required: [daintree.hosts.run-local-cohort]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-steer

@@ -1,0 +1,283 @@
+# daintree.hosts.run-local-cohort: a Remote Host's lane given SEVERAL pieces by the hub at
+# once (a batch of independent units for this project, or rival attempts the hub asked for)
+# splits them across its own worktrees and visible agents, within the hub's cap and this
+# machine's load, verifies each piece and answers the hub once with a row per piece.
+#
+# Recall: the two issues' own requests, an agent-phrased and a user-phrased request, and the
+# request as a second turn after the hub's message was read. Traps: this runbook wins against
+# each declared neighbour (one unit, the envelope, the same split asked by the person here,
+# rival entries, options to prototype, a spec to break down, the hub side). Reverse traps: the neighbour wins and
+# this runbook must not ride along; the one-fix trap pins the guard that a hub asking for one
+# fix has not asked for attempts. The envelope and the hosts foundation may ride along on a
+# hub-framed request (the lane holds the exchange for the reply).
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: run-local-cohort-four-issues-here
+    category: single-runbook
+    note: >-
+      The issue's first selection case. Decided by the positive clause's own example "the hub
+      sent these four issues to this machine".
+    messages:
+      - role: user
+        content: the hub sent these four issues to this machine
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-three-attempts-best
+    category: single-runbook
+    note: >-
+      The issue's second selection case: attempts the hub explicitly asked for. Decided by "the
+      hub wants three attempts at this here and the best one reported" and "rival attempts at
+      one task when the hub asked for more than one".
+    messages:
+      - role: user
+        content: the hub wants three attempts at this here and the best one reported
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-split-batch-local-agents
+    category: single-runbook
+    note: >-
+      The issue's request. Decided by "the hub hands THIS machine SEVERAL pieces of work at
+      once" and "a batch of independent units for this project".
+    messages:
+      - role: user
+        content: The hub asked me to split this batch across several local agents.
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-share-of-swarm
+    category: single-runbook
+    note: >-
+      The issue's request, quoted in the positive clause: "run my share of the swarm in separate
+      local worktrees and send the hub one result".
+    messages:
+      - role: user
+        content: Run my share of the swarm in separate local worktrees and send the hub one result.
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-agent-phrased
+    category: host-query
+    note: >-
+      The lane's own search query. Decided by "a batch of independent units for this project",
+      "every piece in its own worktree and branch from the base commit" and "ONE reply to the hub
+      with a row per piece".
+    messages:
+      - role: user
+        content: Carry out the hub's batch on this host, one worktree and agent per unit from its base commit, verify each commit, then one reply to the hub with a row per unit
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-user-phrased
+    category: single-runbook
+    note: >-
+      Casual, as typed by the person at the host. Decided by "the hub hands THIS machine SEVERAL
+      pieces of work at once" and "failures and open questions in the same reply".
+    messages:
+      - role: user
+        content: hub dumped a handful of separate fixes on this machine, get them going in parallel and tell it how each went
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-after-reading-message
+    category: continuation
+    note: >-
+      The batch as a second turn once the hub's message was read. Decided by "a batch of
+      independent units for this project" and "no more at once than the hub's cap and this
+      machine allow".
+    messages:
+      - role: user
+        content: did the hub send anything for this machine?
+      - role: assistant
+        content: Its message lists three independent changes for this repository, a retry backoff, a health check route and log redaction, each from the base commit it gave, with Codex and at most two at once.
+      - role: user
+        content: ok, go ahead with all three
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------- traps
+  - id: run-local-cohort-not-do-delegated-work
+    category: routing-trap
+    note: >-
+      Two pieces, not one. "SEVERAL pieces of work at once"; the fence sends "one unit of work"
+      to daintree.hosts.do-delegated-work.
+    messages:
+      - role: user
+        content: the hub sent two separate fixes for this repo, the date filter and the CSV header, each on its own branch
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-not-fan-out-work
+    category: routing-trap
+    note: >-
+      The hub's batch with its cap, not the person's own. "a batch of independent units for this
+      project" and "no more at once than the hub's cap"; the fence sends "the same split asked
+      for by the person at this machine" to daintree.orchestration.fan-out-work.
+    messages:
+      - role: user
+        content: 'hub''s request for this machine: five small tasks, at most two running at once, reply with each branch and SHA'
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-not-competition
+    category: routing-trap
+    note: >-
+      Attempts the hub asked for, judged here and reported. "rival attempts at one task when the
+      hub asked for more than one" and "for attempts the best one named with evidence"; the fence
+      sends rival entries asked by the person here to daintree.orchestration.competition.
+    messages:
+      - role: user
+        content: the hub wants claude and codex each to have a go at the flaky retry fix on this machine, each committed on its own branch, and the better one reported
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-not-decompose-work
+    category: routing-trap
+    note: >-
+      Units the hub already scoped, nothing to break down. "a batch of independent units for this
+      project"; the fence sends "a spec to break down first" to
+      daintree.orchestration.decompose-work.
+    messages:
+      - role: user
+        content: the hub's three units for this host each come with owned files and acceptance; build them here and reply once
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-not-spike-options
+    category: routing-trap
+    note: >-
+      Approaches the hub assigned, built here and the best reported. "rival attempts at one task
+      when the hub asked for more than one" and "for attempts the best one named with evidence";
+      the fence sends "options to prototype" asked by the person here to
+      daintree.orchestration.spike-options.
+    messages:
+      - role: user
+        content: the hub wants three different approaches to the cache invalidation tried here, each on its own branch, and the best one reported
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-not-swarm-fan-out
+    category: routing-trap
+    note: >-
+      This host's share, not the hub sending to every host. "the hub hands THIS machine SEVERAL
+      pieces"; the fence sends "the hub sending work to every host" to
+      daintree.hosts.swarm-fan-out.
+    messages:
+      - role: user
+        content: of the hub's run this machine got three units, work them here and send the hub one answer
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-not-handle-hub-message
+    category: routing-trap
+    note: >-
+      The message is already read; what is left is the batch. "a batch of independent units for
+      this project" and "ONE reply to the hub with a row per piece"; the fence sends "reading the
+      hub's message, or answering one that sends no work here" to
+      daintree.hosts.handle-hub-message.
+    messages:
+      - role: user
+        content: 'the hub''s message is read: three independent fixes for this repo from its base commit. Give each its own branch and agent here and answer once.'
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.foundation]
+
+  # ----------------------------------------------------------- reverse traps
+  - id: run-local-cohort-reverse-one-fix
+    category: routing-trap
+    note: >-
+      One fix from the hub authorises no parallel attempts. daintree.hosts.do-delegated-work
+      ("the hub asks THIS machine to implement, fix or build something as one unit of work");
+      this runbook fences "one unit of work".
+    messages:
+      - role: user
+        content: the hub wants the flaky upload test fixed here, just that one fix with claude
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: run-local-cohort-reverse-fan-out-here
+    category: routing-trap
+    note: >-
+      The person's own batch on this machine, no hub. daintree.orchestration.fan-out-work ("a
+      BATCH of independent issues or tasks, one agent terminal per issue or worktree"); this
+      runbook fences "the same split asked for by the person at this machine".
+    messages:
+      - role: user
+        content: spin up an agent for each of these tickets in parallel, separate worktrees please
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+
+  - id: run-local-cohort-reverse-competition-here
+    category: routing-trap
+    note: >-
+      The person's own contest. daintree.orchestration.competition ("and then wants the entries
+      compared and a winner picked"); this runbook fences "rival entries".
+    messages:
+      - role: user
+        content: I want claude, codex and gemini to each have a go at the rate limiter in separate worktrees, then you pick the winner
+    expect:
+      required: [daintree.orchestration.competition]
+
+  - id: run-local-cohort-reverse-spike-options-here
+    category: routing-trap
+    note: >-
+      The person's own options to try. daintree.orchestration.spike-options ("wants several
+      OPTIONS tried hands-on before deciding"); this runbook fences "options to prototype".
+    messages:
+      - role: user
+        content: Prototype three different caching approaches on this machine and recommend one
+    expect:
+      required: [daintree.orchestration.spike-options]
+
+  - id: run-local-cohort-reverse-decompose
+    category: routing-trap
+    note: >-
+      A spec to break down for approval. daintree.orchestration.decompose-work ("BROKEN DOWN into
+      separately buildable pieces before anyone writes code"); this runbook fences "a spec to
+      break down first".
+    messages:
+      - role: user
+        content: break the billing PRD into units with owned files for my approval before anyone starts
+    expect:
+      required: [daintree.orchestration.decompose-work]
+
+  - id: run-local-cohort-reverse-swarm-hub-side
+    category: routing-trap
+    note: >-
+      The hub side. daintree.hosts.swarm-fan-out ("the SAME WORK done on EVERY Remote Host");
+      this runbook fences "the hub sending work to every host".
+    messages:
+      - role: user
+        content: give every remote host the identical parser task and line their commits up in a table for me
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-local-cohort-reverse-read-message
+    category: routing-trap
+    note: >-
+      Reading the hub's message, no work yet. daintree.hosts.handle-hub-message ("the hub, the
+      assistant on the person's main machine, has messaged it"); this runbook fences "reading the
+      hub's message".
+    messages:
+      - role: user
+        content: a new message from the hub just arrived, read it and tell me what it wants
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation]
