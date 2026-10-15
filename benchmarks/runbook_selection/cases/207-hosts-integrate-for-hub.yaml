@@ -59,9 +59,8 @@ cases:
   - id: integrate-for-hub-agent-phrased
     category: single-runbook
     note: >-
-      How a lane describes the task to search. "The deliverable is that integration branch in
-      its own worktree: a visible integrator agent merges each pinned commit ... one at a time
-      with checks after each".
+      How a lane describes the task to search. "a visible integrator agent merges each pinned
+      commit (never a branch's newer tip) one at a time with checks after each".
     messages:
       - role: user
         content: Integrate the commits the hub pinned from three hosts' unit branches into a new integration branch on this lane, checking after each merge, and reply with the resulting SHA

@@ -416,7 +416,7 @@ cases:
       local merge (daintree.git.integrate-agent-branches)" and integrate-agent-branches' "on a
       host lane the hub chose as its integrator (use daintree.hosts.integrate-for-hub)".
       Re-pointed from integrate-agent-branches when the receiver landed; the local owner still
-      rides along on "the branches my two agents produced" until the retrain.
+      rides along on this request, whose branches came from local agents, until the retrain.
     messages:
       - role: user
         content: The hub asked me to merge the branches my two agents produced into one integration branch and report conflicts.

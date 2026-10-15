@@ -22,7 +22,7 @@ positives:
   - Merge the three source commits the hub pinned, ledger, payouts and the admin screens, onto its base in a fresh worktree here and send it the integration SHA.
   - 'Lane task: the hub chose this host to assemble run 9. Units 1 to 4 were pushed by other machines; merge each at the hash in the brief, in that order, with make test between merges.'
   - The hub wants this box to stitch the other machines' branches together on one branch and tell it if anything clashes.
-  - merge what the other hosts pushed, the hub gave the exact hashes
+  - two of the hub's inputs share history because unit b was cut from unit a's branch; merge them here in the order it gave
   - hub's asking this machine to be the integrator for the parser run, can you take it
   - the hub sent three commits to merge in order, schema first, then the api, then the web client
   - combine the hosts' commits on one branch for the hub but do not push anything
@@ -42,8 +42,8 @@ positives:
   - On the hub's behalf, fold the auth and billing units into one branch here and run the suite after each merge.
   - 'hub: integrate unit-a and unit-b at the shas in my message onto base 0c4e1d2, reply with the merged head'
   - the hub wants the gpu host's branch and the arm host's branch merged on this box, tests after each
-  - be the hub's integration machine for this one, merge its pinned commits and answer it
-  - can you merge the units the hub listed? it said which commit for each
+  - The docs host's branch was deleted on the remote after the hub approved its commit, and that commit is one of the inputs to combine here.
+  - the hub wants its units combined on this box with the e2e suite after each merge, but there's no browser installed here for it
   - The other hosts' units for the checkout redesign are done; the hub wants them combined at their pinned commits on a branch of their own here.
   - The hub's message gives a base commit and five source commits from four hosts, in order, and asks for one integration branch here with the test results after every merge.
   - Merging the second of the hub's inputs conflicted in the router config, and the hub's brief says nothing about how to resolve it.
