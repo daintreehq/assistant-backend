@@ -140,6 +140,18 @@ boundaries:
   - query: 'get the other computer''s assistant to take the webhook retry change, and check its branch when it reports'
     confusable_with: [daintree.hosts.do-delegated-work]
     run: runbook-2026-10-issue-98
+  - query: get the assistant on the build server to run the integration tests on the release candidate and tell me what broke
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: ask the assistant on my other mac to check whether this sha passes its unit tests
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: send the build host a request to verify the release commit and report back what failed
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

@@ -358,6 +358,14 @@ boundaries:
   - query: claude-2 says the invite flow is done and the tests pass; confirm that before I merge it.
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: my pane finished the retry logic and claims green tests; rerun them on its commit and look at the diff before I merge
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: the claude pane says the migration test passes now; double-check its commit before I tell anyone
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
 followups:
   - query: how's that going?
     history:

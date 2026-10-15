@@ -78,6 +78,10 @@ boundaries:
   - query: 'Pull down contributor PR #77 into its own worktree, screen its install scripts, and see whether the reported crash still reproduces at its head.'
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: pull down the contributor's pull request and run its tests here before I review it
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
 followups:
   - query: yeah that's the sharp prebuilt, it's fine — go ahead
     history:

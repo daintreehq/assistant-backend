@@ -76,6 +76,22 @@ boundaries:
   - query: does the project still build and typecheck on main?
     confusable_with: [daintree.release.test-distributable]
     run: 2026-09-28-round6
+  - query: I'm about to push the release branch, so give me a pass or fail per check from its worktree, lint first
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: before I hand this branch to the other machine, run the whole check suite here myself
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: which checks are red in the docs worktree right now? lint, types and unit tests, I want to push tonight
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: pytest isn't installed in this worktree; run what checks you can and tell me what couldn't run
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
 followups:
   - query: and the unit tests?
     history:

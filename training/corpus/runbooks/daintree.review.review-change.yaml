@@ -511,6 +511,14 @@ boundaries:
   - query: look over the auth change the other mac's assistant wrote and tell me what's risky in it
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: read through the commit the other machine pushed and tell me whether the approach is sound; nothing needs running
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: review the diff at that sha for bugs, I don't need the tests run
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
 followups:
   - query: how's it going?
     history:

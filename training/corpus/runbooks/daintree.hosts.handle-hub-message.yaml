@@ -144,3 +144,15 @@ boundaries:
   - query: 'the hub''s request is for a repository this lane doesn''t have open; send it back as a question'
     confusable_with: [daintree.hosts.do-delegated-work]
     run: runbook-2026-10-issue-98
+  - query: tell the hub its commit passed here; I already checked the counts against the logs
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: reply to the hub with the verification results we already have
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
+  - query: the hub's message is a test request for some commit, read it and work out what it wants
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-104
