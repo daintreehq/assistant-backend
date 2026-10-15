@@ -2,7 +2,7 @@
 id: daintree.hosts.execute-distributed-workflow
 title: Run a dependent plan across Remote Hosts
 summary: 'From this Shell''s hub, run a multi-stage plan of dependent units across Remote Hosts and repositories to the end: a dependency graph kept in the conversation, each stage released only when everything it depends on is verified, failed and blocked units kept visible, and the plan resumed from the hosts'' task records after a restart.'
-whenToUse: 'Use on the hub when the person has a multi-stage PLAN across their Remote Hosts: a dependency graph of three or more units in which several wait on others, often in different repositories: "contract first, then the server and the client against it, then the docs, each on the host that owns that project", "five units over three machines; both apps wait on the schema and the release notes wait on both apps", "run this dependency graph across my machines and keep going until it is done". The deliverable is the whole graph carried through stage by stage: every unit with its host, project and repository; a stage released only once the commits it depends on are verified; failed or blocked units kept visible; one table of every unit''s state and verified SHA. Do not use for one unit on one host, or a single relay where one host''s verified result starts one unit on a second host (daintree.hosts.delegate-to-host), independent pieces placed on whichever host can take them (daintree.hosts.place-work), the same work on every host (daintree.hosts.swarm-fan-out), finished branches combined into one (daintree.hosts.integrate-host-branches), a dependent plan for agents on this machine (daintree.orchestration.execute-durable-workflow), or only an account of where exchanges stand after a restart, or a cleanup (daintree.hosts.recover-and-clean-up).'
+whenToUse: 'Use on the hub when the person has a multi-stage PLAN across their Remote Hosts: a dependency graph of three or more units in which several wait on others, often in different repositories: "contract first, then the server and the client against it, then the docs, each on the host that owns that project", "five units over three machines; both apps wait on the schema and the release notes wait on both apps", "run this dependency graph across my machines and keep going until it is done". The deliverable is the whole graph carried through stage by stage: every unit with its host, project and repository; a stage released only once the commits it depends on are verified; failed or blocked units kept visible; one table of every unit''s state and verified SHA. Do not use for one unit, or one hand-over between two hosts (daintree.hosts.delegate-to-host), independent pieces placed on whichever host can take them (daintree.hosts.place-work), the same work on every host (daintree.hosts.swarm-fan-out), finished branches combined into one (daintree.hosts.integrate-host-branches), a dependent plan for agents on this machine (daintree.orchestration.execute-durable-workflow), or only an account of where exchanges stand after a restart, or a cleanup (daintree.hosts.recover-and-clean-up).'
 risk: external
 requiredTools:
   - host.list
@@ -10,8 +10,6 @@ requiredTools:
   - host.sendMessage
   - host.getTask
   - host.listTasks
-optionalTools:
-  - host.cancelTask
 ---
 The plan lives in this conversation and wakes nobody; task records hold no text and last a day. Each unit is a daintree.hosts.delegate-to-host unit, its brief and checks (`get_runbook` if absent).
 
@@ -29,6 +27,6 @@ On notice or resume, after the hosts foundation's reconcile:
 - Then steps 2-3, input SHAs re-read.
 Conversation lost: send nothing until the person restores the plan; then reconcile by `taskId` and `<run>/*` branches.
 
-Stop and recovery: one send per unit; rework: a new `taskId` referencing the failed one, on the person's go. Changing units or hosts is the person's call; the plan grants no push, merge, deploy. Cancel only on request (`host.cancelTask`): canceled stays canceled; a late completion releases nothing.
+Stop and recovery: one send per unit; rework: a new `taskId` referencing the failed one, on the person's go. Changing units or hosts is the person's call; the plan grants no push, merge, deploy. Stop only on request (daintree.hosts.steer-swarm): canceled stays canceled; a late completion releases nothing.
 
 Report back: the table (unit, host, dependencies, state, SHA claimed vs verified and how), blocked and canceled units, what wakes the next step.
