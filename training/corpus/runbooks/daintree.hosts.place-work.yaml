@@ -30,7 +30,7 @@ positives:
   - who should get the websocket reconnect bug, the mini or the workstation? whichever is less loaded
   - give the three docs tasks to the hosts with spare claude allowance and the two refactors to the codex machines
   - the hosts have different agents signed in, so match each of these issues to a machine that can actually run the right CLI
-  - Survey the Remote Hosts' load and agent usage, then propose which host takes each of these independent tasks before delegating
+  - 'User pasted five unrelated tasks (a flaky test, two UI bugs, a docs fix, a migration) and wants them run on their other machines; work out which host takes each and confirm with them before sending'
   - allocate these issues across the swarm by capacity, I'll approve the table before anything goes out
   - 'just do it, no need to check with me: spread these four bugs over the remote hosts by load'
   - which of my other macs should take the database migration ticket given how loaded they all are?
@@ -42,9 +42,9 @@ positives:
   - which remote machine is the best fit for the billing refactor right now?
   - hand out these unrelated chores to the hosts, one apiece if they can take it
   - I have five feature flags to remove and none depends on another, put them on my remote machines by how busy each is
-  - Allocate independent tasks to Remote Hosts from host load samples, enrolled assistants and signed-in CLIs, and propose a placement table
+  - User's laptop is busy, so the three backlog tickets should run on the remote Macs instead, Codex work only where Codex is signed in, with a table of where each landed
   - Pick the least-loaded Remote Host that has this repository and a Claude Code lane for one bug fix, then delegate it
-  - Distribute pending work items across connected remote machines based on available agent allowance and load
+  - Two remote hosts are connected and one is nearly out of Claude allowance for the week; spread the four pending bug fixes so neither runs dry
   - honestly no idea which host should do the cache invalidation fix, you pick and send it
   - put the remaining tickets on whatever hosts are free; the mini is out, it's running the nightly
   - one of my hosts has most of its codex week left and the others are low, so spread the four migration issues accordingly

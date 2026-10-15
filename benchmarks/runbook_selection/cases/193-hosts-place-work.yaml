@@ -37,7 +37,7 @@ cases:
     category: single-runbook
     note: >-
       The issue's request. Decided by "DIFFERENT, independent pieces of work (a list of
-      issues, bugs or tasks ...)" placed "on whichever Remote Host this Shell reaches can best
+      issues, bugs or tasks" placed "on whichever Remote Host this Shell reaches can best
       take it".
     messages:
       - role: user
@@ -162,8 +162,8 @@ cases:
     category: routing-trap
     note: >-
       The assistants are already up and the work is in hand: choosing a host per issue.
-      start-swarm's deliverable is "a ready table ... with no work sent"; place-work's is
-      "a placement table".
+      start-swarm's deliverable is "a ready table (host, project, slot, agent, generation)"
+      and "with no work sent"; place-work's is "a placement table".
     messages:
       - role: user
         content: the machines are ready; now decide which host gets each of these five issues
@@ -223,7 +223,7 @@ cases:
   - id: place-work-reverse-start-swarm
     category: routing-trap
     note: >-
-      Readying assistants with no work: start-swarm's "a ready table ... with no work sent".
+      Readying assistants with no work: start-swarm's "a ready table (host, project, slot, agent, generation)" and "with no work sent".
     messages:
       - role: user
         content: make sure every remote host has a codex lane enrolled in the api project before anything is assigned
