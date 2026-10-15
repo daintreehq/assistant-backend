@@ -159,11 +159,11 @@ cases:
   - id: shard-test-suite-reverse-swarm-tests
     category: routing-trap
     note: >-
-      The same task on every machine, each on its own branch: daintree.hosts.swarm-fan-out
+      The same task on every machine, results compared: daintree.hosts.swarm-fan-out
       ("the SAME WORK done on EVERY Remote Host"). Tests are the subject, but nothing is split.
     messages:
       - role: user
-        content: have each of my machines write the missing parser tests on its own branch and show me what each pushed
+        content: every remote machine should take a shot at adding property-based tests to the date utils, then I'll compare the results
     expect:
       required: [daintree.hosts.swarm-fan-out]
       optional: [daintree.hosts.foundation, daintree.foundation]
