@@ -1,0 +1,129 @@
+# daintree.hosts.check-usage-limits: the hub's side of a usage check on other machines.
+#
+# This Shell's hub asks each Remote Host's assistant to read its own agent CLI usage
+# screen and brings back one table, attributed per host and never added together.
+# A usage check on THIS machine is daintree.agents.check-usage-limits (reverse rows in
+# its file); "headroom" meaning CPU or memory is the runtime runbooks'; how messaging
+# itself works or why a host cannot be reached is daintree.hosts.foundation.
+runbook: daintree.hosts.check-usage-limits
+run: runbook-2026-10-issue-91
+
+positives:
+  - User is about to hand long tasks to the remote hosts and wants each host's remaining Claude Code allowance and reset time first
+  - User asked which of their three remote machines can still take a big Codex job this week; each host's remaining Codex limit is needed
+  - Codex sessions on two remote hosts stalled with rate-limit errors; find out how much of the five-hour and weekly limits each host has left and when they reset
+  - User wants to know which remote host has the most Codex weekly allowance left before choosing where to run the migration
+  - The person suspects the remote machines are on different Claude plans; show each host's plan, remaining windows, resets and credits side by side
+  - Both Claude Code and Codex are installed on the remote hosts; user wants the usage left for each CLI on each host
+  - Find out which agent CLIs are signed in on each remote host and what allowance each one has left
+  - User says the build host keeps hitting its Claude Code limit; check its weekly usage there and when it resets
+  - User does not want a summary, only the exact usage percentages the second machine's Codex shows
+  - Compare the Codex weekly limit across the remote hosts, noting each host's account and reset time
+  - how much claude is left on the other macs
+  - what's codex looking like on the remote boxes this week
+  - can you check the usage on both of my other machines
+  - are any of my remote hosts close to their claude limit
+  - which of the remote machines still has codex left today
+  - check the 5 hour limit on every host before I send them more work
+  - the mac mini in the office, how much claude code allowance does it have left
+  - do the remote hosts have enough codex left for an overnight run each
+  - get me a table of usage for all the hosts with plan and reset time
+  - how close is the other machine to its weekly cap on codex
+  - whats left on the claude account on the remote workstation and when does it reset
+  - I want to know how much allowance each host has before I split the work up
+  - find out if the linux box's codex quota has reset yet
+  - check agent usage everywhere except here
+  - whats the claude usage on my remote hosts right now
+  - morning! quick one before standup, can you see how much Codex is left on the remote machines?
+  - hey, thanks for earlier. could you check how much claude allowance my other two computers have left?
+  - sorry to bug you again, the hosts got hammered yesterday. how much usage does each have left now?
+  - >-
+    I've got three machines hooked up to this Shell and I'm about to give each one a long
+    task. Before I do, find out how much Claude Code usage each has left this week and when
+    it resets, and don't lump them together, they're on different plans.
+  - >-
+    Two of the remote hosts only have Codex logged in. Check which agent each host can run
+    and how much allowance is left on each, so I can decide what to send where.
+  - >-
+    The weekly limits on my remote machines reset at different times and I keep losing
+    track. Check each one and tell me what's left and when it resets, in that machine's
+    own timezone.
+  - is there codex allowance left on render-02 this week
+  - check claude code usage on nas-box and the dev mini
+  - what does the claude usage look like on atlas and hermes
+  - is there any claude left on the spare imac
+  - pull the credits balance and the weekly codex limit from every host's assistant
+  - >-
+    host.list shows three connected hosts, two with Codex lanes and one with a Claude Code
+    lane. The user plans to split a large refactor across them this week and wants each
+    host's remaining allowance and next reset first, per host, not combined.
+  - >-
+    A remote host's Claude Code sessions have been stopping mid-task since this morning and
+    the user thinks that machine is on the smaller plan. Find out what its usage screen says
+    is left and when it resets, and do the same for the other host for comparison.
+
+boundaries:
+  - query: check claude usage on every machine I have connected, not just this one
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: how much codex is left on the hosts, like you did for this mac earlier
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: read the codex status screen on each remote machine for me
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: usage limits on the remote hosts please
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: compare my claude weekly limit across the remote machines
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: what's the weekly allowance on the other computer
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: how much of the 5-hour window is left on each host
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: check the agent usage limits on the remote boxes, not here
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: which remote host has the most codex left
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: going into the weekly reset, how much claude headroom does each of my machines still have
+    confusable_with: [daintree.runtime.relieve-resource-contention, daintree.agents.check-usage-limits]
+  - query: is there more codex headroom on the remote mac or the linux box
+    confusable_with: [daintree.runtime.measure-performance]
+  - query: which host has the most plan headroom for another long agent run
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: ask the assistant on the other machine how much claude usage it has left
+    confusable_with: [daintree.hosts.foundation]
+  - query: get the remote host's assistant to report its codex limits back here
+    confusable_with: [daintree.hosts.foundation]
+  - query: message every host assistant for its usage numbers
+    confusable_with: [daintree.hosts.foundation]
+
+followups:
+  - query: and claude on those same machines?
+    history:
+      - "user: what's the codex situation on the hosts"
+      - "assistant: Both hosts replied. One has 72% of its Codex weekly limit left, resetting Friday 10:00; the other 18% left, resetting Tuesday 08:00."
+    active: [daintree.hosts.check-usage-limits]
+  - query: is that 41% used or left?
+    history:
+      - "user: how much claude allowance do the other machines have"
+      - "assistant: The office host's assistant reports Claude Code at 41% for the week, resetting Monday 09:00 its time."
+    active: [daintree.hosts.check-usage-limits]
+  - query: check them again, the first one should have reset by now
+    history:
+      - "user: usage on every host please"
+      - "assistant: Host one: Codex 5-hour window 96% used, resets 13:40. Host two: Claude weekly 22% used, resets Thursday."
+    active: [daintree.hosts.check-usage-limits]
+  - query: did it show opus separately or just one weekly number
+    history:
+      - "user: claude usage on the remote workstation?"
+      - "assistant: Its assistant read 30% of the weekly limit used, resetting Sunday 18:00."
+    active: [daintree.hosts.check-usage-limits]
+
+topic_shifts:
+  - query: now do the same on the remote machines
+    history:
+      - "user: check my codex limits on this mac before the batch"
+      - "assistant: Codex /status here: 40% of the weekly limit left, resetting Wednesday 07:15."
+    active: [daintree.agents.check-usage-limits]
+  - query: ok and how much claude allowance do the remote hosts have left
+    history:
+      - "user: status of the agents in this project?"
+      - "assistant: Three are working and one is waiting on a question in terminal 4."
+    active: [daintree.orchestration.supervise-fleet]

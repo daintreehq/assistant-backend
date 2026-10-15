@@ -121,6 +121,12 @@ boundaries:
   - query: 'is this machine too loaded to take on more agents right now'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: "this machine has no headroom left, the agents are eating all the memory"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "the mac is maxed out on cpu with four agents running, free up some headroom"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
 followups:
   - query: do it, cap them all at 2 workers
     history:

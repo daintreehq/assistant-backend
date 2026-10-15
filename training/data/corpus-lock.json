@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18583,
-  "compiled_sha256": "6c0f2f67bf8a8d48acdd5b69b63069a5eab8025eefaa0ca02363284a71cfeae3",
-  "label_space_sha256": "1ebead9093cc0288b7856b00f729e15224c09c77e13a28e60746e9c2871c92c5",
-  "label_space_size": 112,
+  "rows": 18657,
+  "compiled_sha256": "2e0e664d5c6d8e2bd8a45e634d265e8c0320c8fe31c508d8d9f0b980d5fc03b3",
+  "label_space_sha256": "4e7562a406bf49ab1c5b15ecbc0d73309df11b891bdd9b8fe3d6b6b518c94086",
+  "label_space_size": 113,
   "by_source": {
-    "boundary": 5641,
+    "boundary": 5671,
     "docs": 841,
-    "followup": 849,
+    "followup": 853,
     "foundation": 446,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -16,8 +16,8 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5820,
-    "topic_shift": 3003,
+    "positive": 5858,
+    "topic_shift": 3005,
     "wake": 149
   },
   "by_run": {
@@ -44,6 +44,7 @@
     "runbook-2026-10-issue-88": 100,
     "runbook-2026-10-issue-89": 96,
     "runbook-2026-10-issue-90": 77,
+    "runbook-2026-10-issue-91": 74,
     "runbook-2026-10-issue-95": 86,
     "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
@@ -77,10 +78,10 @@
       "sha256": "e7c99ddeab11ef16074c5725d97b8c0ab3b0597d3fef53451d9b0a95008adb62"
     },
     "runbooks/daintree.agents.check-usage-limits.yaml": {
-      "examples": 117,
-      "rows": 117,
+      "examples": 127,
+      "rows": 127,
       "runbook": "daintree.agents.check-usage-limits",
-      "sha256": "b40861a8008b3f732c3f1b3de50d2e4f47aac670a6f673a24ca607c40fa71478"
+      "sha256": "ebe28b42dfe54bc75793d0f6f4590241981d316e5f0e9026ba692a4beaa0dcfe"
     },
     "runbooks/daintree.agents.hand-off-task.yaml": {
       "examples": 74,
@@ -316,6 +317,12 @@
       "runbook": "daintree.hosts.ask-host-assistant",
       "sha256": "a1c6d749e418b6f9a61fab02a3d9f5f7acfe6c636fdfb2b2b217bbdefaaf1bd2"
     },
+    "runbooks/daintree.hosts.check-usage-limits.yaml": {
+      "examples": 59,
+      "rows": 59,
+      "runbook": "daintree.hosts.check-usage-limits",
+      "sha256": "78d520c8bd397b98f2e0d82f642c9630a42d534bc62cf240989f6beea0cfd0e0"
+    },
     "runbooks/daintree.hosts.delegate-to-host.yaml": {
       "examples": 70,
       "rows": 70,
@@ -323,10 +330,10 @@
       "sha256": "47880c9a1050e947c7fa733e039349a8bbfe6dd16ea82b6cb934284702ac0bb2"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
-      "examples": 88,
-      "rows": 88,
+      "examples": 90,
+      "rows": 90,
       "runbook": "daintree.hosts.foundation",
-      "sha256": "a595e697fd09667c08a1ac1affd34bfb850934692268db97c2a3644a42169e6b"
+      "sha256": "eac23065b6458a680dae53bed5dbd32a6ad3eaab477cb80a0ec300131c4b0300"
     },
     "runbooks/daintree.hosts.handle-hub-message.yaml": {
       "examples": 62,
@@ -623,10 +630,10 @@
       "sha256": "8728b2fded75a9180ec8e9d362ead6c06d4a30e6164ab2b8c1d16e751add1703"
     },
     "runbooks/daintree.runtime.measure-performance.yaml": {
-      "examples": 46,
-      "rows": 46,
+      "examples": 47,
+      "rows": 47,
       "runbook": "daintree.runtime.measure-performance",
-      "sha256": "6bce185e75a3460b7e5b5f9f8ea2bbb0334c6d839751984f3b4ba4270da86138"
+      "sha256": "6025752f89fd8d4a37bc9cc43bec229aba0e46f33e452448963da83c3f5e1a88"
     },
     "runbooks/daintree.runtime.migrate-worktree-database.yaml": {
       "examples": 69,
@@ -635,10 +642,10 @@
       "sha256": "c0beea24711953e1fc3052fa0b588328e5e8ee3ea18f3e18045f68c60076bed5"
     },
     "runbooks/daintree.runtime.relieve-resource-contention.yaml": {
-      "examples": 58,
-      "rows": 58,
+      "examples": 60,
+      "rows": 60,
       "runbook": "daintree.runtime.relieve-resource-contention",
-      "sha256": "02c3b57907de68a44af8663386b45fb56e129cae1bc3f5a2ae7e52f8fb861c5a"
+      "sha256": "056f54081581f7846690de71b3483cbc0c93d32c6bf011d22e4334673389a64b"
     },
     "runbooks/daintree.security.respond-to-secret-exposure.yaml": {
       "examples": 49,

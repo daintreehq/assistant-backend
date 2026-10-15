@@ -60,6 +60,9 @@ boundaries:
   - query: Check the agent's claimed 30% memory reduction in the parser against main.
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
+  - query: "benchmark whether this branch leaves more memory headroom than main does"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
 topic_shifts:
   - query: is migrate/date-fns faster than main? the bundle feels bigger — measure it
     history:

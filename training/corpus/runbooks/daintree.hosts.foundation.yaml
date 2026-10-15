@@ -234,6 +234,14 @@ boundaries:
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
 
+  - query: "the hub couldn't get usage from the build host because the send came back opted_out, how do I allow messaging with it"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    docs: true
+    run: runbook-2026-10-issue-91
+  - query: "why can't I reach the assistant on my second mac to ask it anything, even its usage"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    docs: true
+    run: runbook-2026-10-issue-91
 followups:
   - query: where do I change that
     docs: true

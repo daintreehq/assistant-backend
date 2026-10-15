@@ -217,6 +217,36 @@ boundaries:
   - query: 'how much codex usage is left on each of my machines'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: "claude usage on this mac only, what's left of it"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "check my codex limits here, not on the other machines"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "read the usage screen in my claude pane"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "how much of the weekly codex allowance is left on this machine"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "what's my claude plan's five hour usage at"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "before I hand work to the hosts, check how much codex I have left locally"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "check usage on this computer for claude and codex"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "run /status in the codex terminal and tell me what's left"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "the remote hosts can wait, just check my own claude usage"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "how much allowance does the codex agent in this workspace have left"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
 followups:
   - query: now do grok
     history:
