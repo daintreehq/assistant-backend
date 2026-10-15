@@ -195,11 +195,11 @@ cases:
   - id: shard-test-suite-reverse-local-agents
     category: routing-trap
     note: >-
-      Test files split between agents on this machine, each fixing its own:
-      daintree.orchestration.fan-out-work ("split one goal into disjoint file-scoped tasks").
+      Failing test files worked through by agents on this machine under a cap:
+      daintree.orchestration.fan-out-work ("a list of work plus a cap is this runbook").
     messages:
       - role: user
-        content: give each failing test file to its own agent in a separate worktree here and have it fix that file
+        content: work through the twelve failing test files with agents on this machine, three at once, each in its own worktree
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
