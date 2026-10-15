@@ -1,8 +1,8 @@
 # daintree.runtime.free-busy-port across machines: a port clash when this Shell drives a
 # Remote Host. These pin the requests that now route to it because its whenToUse says the
-# clash is "on this machine or a Remote Host" and is "settled by which machine holds the
-# listener": a remote worktree's server that cannot bind, a forward that took another local
-# port, a browser panel refused because the port is taken here, and the hub and lane
+# clash is "on this machine or a Remote Host, where a remote server's port and the same number
+# on the local machine are two different ports": a remote worktree's server that cannot bind,
+# a forward that took another local port, a browser panel refused because the port is taken here, and the hub and lane
 # phrasings of the same ask. Traps hold its boundary with daintree.worktree.manage-resource
 # (a worktree's cloud devbox) both ways, and with daintree.runtime.debug-web-app.
 
@@ -10,8 +10,8 @@ cases:
   - id: fbp-hosts-user-free-remote-worktree
     category: single-runbook
     note: >-
-      The issue's own request. Decided by "a remote worktree's server that cannot bind ... is
-      settled by which machine holds the listener".
+      The issue's own request. Decided by "on this machine or a Remote Host" and "a remote
+      worktree's server that cannot bind".
     messages:
       - role: user
         content: Free the port blocking this remote worktree's server.
@@ -23,7 +23,7 @@ cases:
     category: single-runbook
     note: >-
       The issue's own agent-phrased request. Decided by "a local port held by a forward or a
-      local process, is settled by which machine holds the listener". The hosts foundation may
+      local process". The hosts foundation may
       ride along: a hub asking this needs its addressing rules to reach the host.
     messages:
       - role: user
@@ -60,8 +60,7 @@ cases:
     category: single-runbook
     note: >-
       The browser panel's refusal when the host's port is taken on this machine. Decided by "a
-      local port held by a forward or a local process, is settled by which machine holds the
-      listener".
+      local port held by a forward or a local process".
     messages:
       - role: user
         content: the browser panel says port 3000 is in use on this machine so the host's page can't open here
@@ -73,7 +72,7 @@ cases:
     category: single-runbook
     note: >-
       The hub's phrasing: the listener is on the other machine, not here. Decided by "a remote
-      worktree's server that cannot bind ... is settled by which machine holds the listener".
+      worktree's server that cannot bind" and "who holds the port and on which machine".
     messages:
       - role: user
         content: "From the Shell sidebar: the server in the worktree on my other machine says the port is taken; find the holder over there"
@@ -98,7 +97,7 @@ cases:
     note: >-
       The issue's own request, and the contested boundary: "remote server" pulls
       daintree.worktree.manage-resource ("a worktree's cloud devbox or remote resource"). The
-      text decides it ("A remote server's port and the same number on the local machine are two
+      text decides it ("a remote server's port and the same number on the local machine are two
       different ports"), but two text attempts left it a rank miss: owed to a retrain on the
       boundary rows in both files.
     messages:
