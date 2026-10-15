@@ -1,0 +1,227 @@
+# daintree.hosts.execute-distributed-workflow: the hub carries a PLAN of dependent units across
+# Remote Hosts and their repositories to the end, sending a dependent only once its
+# predecessors' exact commits are verified on the shared remote, keeping failed and blocked
+# units visible, and resuming the plan after a hub restart. Recall cases are the issue's three
+# requests plus agent- and user-phrased plans, a blocked predecessor and a restart mid-plan.
+# Routing traps: this runbook wins against each declared neighbour (one unit or one relay,
+# independent placement, the same work everywhere, a plan on this machine, an account after a
+# restart). Reverse traps: the neighbour wins and this runbook must not ride along. The hosts
+# foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: execute-distributed-workflow-issue-frontend-backend
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "a multi-stage PLAN across their Remote Hosts" and
+      "often in different repositories".
+    messages:
+      - role: user
+        content: Run this dependent workflow across the frontend and backend projects on different hosts.
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-issue-api-before-client
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "several wait on others" and "a stage released
+      only once the commits it depends on are verified".
+    messages:
+      - role: user
+        content: The API must land before the client starts; coordinate the whole cross-host plan.
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-issue-dependency-graph
+    category: single-runbook
+    note: >-
+      The issue's third request, in agent words. Decided by "a dependency graph of three or more
+      units" and "a stage released only once the commits it depends on are verified";
+      execute-durable-workflow now fences work on another machine, "several that depend on each
+      other: daintree.hosts.execute-distributed-workflow". Fails on the untrained head
+      (rank_miss behind execute-durable-workflow): retrain owed.
+    messages:
+      - role: user
+        content: Execute a host/project-scoped dependency graph from verified artifacts.
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-agent-contract-two-repos
+    category: single-runbook
+    note: >-
+      Agent-phrased: a shared contract in one repository, then two dependents in their own
+      repositories on other hosts. Decided by "often in different repositories" and "every
+      unit with its host, project and repository".
+    messages:
+      - role: user
+        content: >-
+          Run a three-unit plan across remote hosts: the shared contract in one repository
+          first, then the server and the web client in their own repositories on two other
+          hosts once the contract commit is verified
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-user-schema-api-ui
+    category: single-runbook
+    note: >-
+      User-phrased chain over three named machines. Decided by "a dependency graph of three or
+      more units in which several wait on others".
+    messages:
+      - role: user
+        content: have the workstation do the db migration, then when that's pushed the mini does the api, and after that the laptop does the ui
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-blocked-predecessor
+    category: single-runbook
+    note: >-
+      The issue's blocked-predecessor scenario. Decided by "failed or blocked units kept
+      visible" inside "the whole graph carried through stage by stage".
+    messages:
+      - role: user
+        content: the contract unit failed on the build box, hold everything downstream of it and keep the independent parts of the cross-machine plan going
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  # -------------------------------------------------------------- routing traps
+  - id: execute-distributed-workflow-resume-not-recover
+    category: routing-trap
+    note: >-
+      The issue's hub-restart scenario: the plan continues, the dependents are dispatched.
+      Decided by "the whole graph carried through stage by stage"; recover-and-clean-up is
+      fenced as "only an account of where exchanges stand after a restart".
+    messages:
+      - role: user
+        content: >-
+          Resume the multi-host plan: the API unit completed before the hub went down, so the
+          client units can go now if its commit checks out
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      Four units with two levels of dependency are a plan, not one relay. Decided by "a
+      dependency graph of three or more units"; this runbook fences "a single relay where one
+      host's verified result starts one unit on a second host (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: >-
+          Four units across three hosts with dependencies between them: shared schema first,
+          then the server and the CLI, then the docs once both land
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-not-place-work
+    category: routing-trap
+    note: >-
+      A list of tickets for the hosts where some must wait for another is a dependent plan,
+      not independent placement. This runbook fences "independent pieces placed on whichever
+      host can take them (daintree.hosts.place-work)".
+    messages:
+      - role: user
+        content: >-
+          I have a list of issues for the remote machines, and two of them depend on the first
+          one landing, so sequence them across the hosts
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-not-durable-workflow
+    category: routing-trap
+    note: >-
+      A dependent plan whose units sit on named machines. This runbook fences "a dependent
+      plan for agents on this machine (daintree.orchestration.execute-durable-workflow)".
+    messages:
+      - role: user
+        content: >-
+          Coordinate the backend contract on the linux host and the frontend implementation on
+          the mac host, frontend only after the backend contract is verified, and the mobile
+          app after that
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-not-swarm-fan-out
+    category: routing-trap
+    note: >-
+      Different units in dependency order, not one brief copied to every host. This runbook
+      fences "the same work on every host (daintree.hosts.swarm-fan-out)".
+    messages:
+      - role: user
+        content: Run the API, client and docs units across my machines in dependency order and tell me when the whole plan is done
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------- reverse traps
+  - id: execute-distributed-workflow-reverse-delegate-relay
+    category: routing-trap
+    note: >-
+      One dependency between two hosts is delegate-to-host's relay: "a second host starting
+      once the first host's change lands". This runbook fences "a single relay where one host's
+      verified result starts one unit on a second host".
+    messages:
+      - role: user
+        content: The dashboard work on the laptop needs the rate limiter the build box is writing; start the laptop once that one commit is pushed and checked
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-reverse-place-work
+    category: routing-trap
+    note: >-
+      Unrelated bugs with no order between them are place-work's: "DIFFERENT, independent
+      pieces of work ... put on whichever Remote Host this Shell reaches can best take it".
+    messages:
+      - role: user
+        content: Here are six unrelated bugs, spread them over whichever machines have room
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-reverse-durable-local
+    category: routing-trap
+    note: >-
+      Dependent phases for agents on this machine stay with execute-durable-workflow: "a
+      substantial multi-step goal with dependent phases that must survive turns, restarts or
+      asynchronous waits".
+    messages:
+      - role: user
+        content: Plan the four-phase database migration for the agents on this machine, each phase depending on the last
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: execute-distributed-workflow-reverse-recover
+    category: routing-trap
+    note: >-
+      An account of exchanges after a restart, with no plan to continue, is
+      recover-and-clean-up's: "which delegated exchanges finished, which are still open, which
+      will never be answered".
+    messages:
+      - role: user
+        content: Since the restart, which of the exchanges with my remote hosts finished and which will never be answered?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-reverse-swarm
+    category: routing-trap
+    note: >-
+      The same fix on every host is swarm-fan-out's: "the SAME WORK done on EVERY Remote Host
+      ... one copy per machine".
+    messages:
+      - role: user
+        content: Have every host try the same parser fix on its own branch and show me what each got
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
