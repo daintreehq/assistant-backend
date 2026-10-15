@@ -1,0 +1,223 @@
+# daintree.hosts.demo-for-hub: a lane's demo for the hub. The Daintree assistant on a Remote
+# Host, enrolled for one Shell's hub, is asked to get a feature running on this host at the
+# hub's commit with invented data, and to reply with the SHA served, the host listener and how
+# the Shell would reach it.
+#
+# Recall: the issue's own three requests, an agent-phrased and a user-phrased description, and
+# a request naming the hub's own words for the deliverable. Traps: against the local demo
+# (daintree.workflow.prepare-feature-demo), the envelope (daintree.hosts.handle-hub-message), a
+# port clash (daintree.runtime.free-busy-port) and the hub's own side
+# (daintree.hosts.delegate-to-host), each with a reverse case where the neighbour wins. The
+# envelope is optional wherever a hub request is the frame: the lane holds it for the reply.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: demo-for-hub-issue-revision-and-port
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "Use on a Remote Host's lane when the hub asks THIS
+      machine to prepare a DEMO of a feature" and "one reply naming the SHA served, the host
+      listener and port". At base the envelope took it (0.99) with
+      daintree.hosts.recover-and-clean-up riding along.
+    messages:
+      - role: user
+        content: The hub asked me to prepare a runnable demo and return its revision and host port.
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-issue-leave-running
+    category: single-runbook
+    note: >-
+      The issue's second request, framed as the hub's message itself. Decided by "prepare a DEMO
+      of a feature, or leave it running, for the person to look at from their main machine";
+      the envelope may ride along. The shipped selector still gives it to the envelope alone
+      (rank_miss, 0.004): a leading hub-message label is the envelope's trained vocabulary, and
+      nothing in it says demo. Retrain owed.
+    messages:
+      - role: user
+        content: "Hub message: leave this feature running so the user can inspect it from the Shell."
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-issue-service-ownership
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "The deliverable is a demo served on this host and
+      the hub told how to reach it" and "only the requested services running with their panel
+      ids, start command and who stops them". At base daintree.workflow.prepare-feature-demo
+      took it.
+    messages:
+      - role: user
+        content: "Receiver: prepare a remote feature demo with verified service ownership."
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-agent-phrased
+    category: single-runbook
+    note: >-
+      How a lane describes the task to search_runbooks: the whole deliverable. Decided by
+      "synthetic seed data proven confined to that worktree's own database" and "one reply
+      naming the SHA served, the host listener and port, and that the Shell reaches it only
+      through its own forward". At base daintree.workflow.prepare-feature-demo took it alone.
+    messages:
+      - role: user
+        content: Prepare a demo of the checkout feature on this host for the hub, seed only synthetic data, and reply with the commit SHA, the listening port and how the Shell reaches it.
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-user-casual
+    category: single-runbook
+    note: >-
+      Casual, no punctuation, "box" for this host. Decided by "hub message: get the dashboard
+      branch running here with sample data and reply with the port". At base the envelope took
+      it with daintree.worktree.manage-resource and daintree.hosts.ask-host-assistant riding
+      along.
+    messages:
+      - role: user
+        content: hub says get the billing feature up on this box with sample data and tell it which port its serving on
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-team-page-report
+    category: single-runbook
+    note: >-
+      The hub's demo with its constraints and a report back. Decided by "the worktree at the
+      exact SHA the hub named, synthetic seed data".
+    messages:
+      - role: user
+        content: "Demo request from the hub: put the team page up on this host at the commit it sent, invented members only, then report back"
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps
+  - id: demo-for-hub-trap-not-local-demo
+    category: routing-trap
+    note: >-
+      A demo for the hub, not for a person at this screen. Decided by this runbook's "Do not use
+      for ... a demo the person asks for at this machine (daintree.workflow.prepare-feature-demo)"
+      and that runbook's "or for a demo the hub asked this Remote Host's lane to prepare (use
+      daintree.hosts.demo-for-hub)".
+    messages:
+      - role: user
+        content: On the hub's behalf, run the pricing calculator here as a demo and tell it the exact revision it is serving
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-trap-not-the-envelope
+    category: routing-trap
+    note: >-
+      Answering the exchange is the end of the demo, not the envelope's job alone. Decided by
+      "one reply naming the SHA served, the host listener and port" and the fence "Do not use
+      for reading the inbox, or answering a hub message that asks for no demo
+      (daintree.hosts.handle-hub-message)": nothing here is about reading or fitting the
+      message. The envelope is left out of optional on purpose.
+    messages:
+      - role: user
+        content: The hub wants the onboarding branch demoed on this Remote Host; start it with a walkthrough, then answer the exchange with the port and pane ids.
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-trap-not-a-port-clash
+    category: routing-trap
+    note: >-
+      Finding the demo's own listener is part of reporting it, not a clash. Decided by "the host
+      listener and port" and the fence "a port another process holds
+      (daintree.runtime.free-busy-port)"; free-busy-port is "for a ONE-OFF port clash right now".
+    messages:
+      - role: user
+        content: The hub wants the scheduling page demo running on this host; work out which port the preview really listens on before telling it
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-trap-not-the-hub-side
+    category: routing-trap
+    note: >-
+      This host is the one asked; "delegated" is the hub's word for it. Decided by "the hub asks
+      THIS machine to prepare a DEMO" and the fence "the hub's own side of handing a host work
+      (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: "The hub delegated a demo to this machine: get the invoice search running at its commit and send back the port"
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps
+  - id: demo-for-hub-reverse-local-demo
+    category: routing-trap
+    note: >-
+      The person at this machine wants to try it themselves: daintree.workflow.prepare-feature-demo
+      ("Use when the user wants to SEE or SHOW a feature the agents built"). No hub is involved,
+      so this runbook ("when the hub asks THIS machine") must not ride along.
+    messages:
+      - role: user
+        content: get the referral page the agents built running so I can poke at it before lunch
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+
+  - id: demo-for-hub-reverse-envelope
+    category: routing-trap
+    note: >-
+      Two exchanges to read and answer in order is the envelope's ("The deliverable is the
+      exchange handled: read once with assistant.getInbox, checked against this lane's
+      project"); a demo mentioned among them does not make this runbook the task yet, and this
+      runbook's "Do not use for reading the inbox" keeps it out.
+    messages:
+      - role: user
+        content: The hub sent two messages, a demo request and a question about the build; read them both and answer in order
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-reverse-port-clash
+    category: routing-trap
+    note: >-
+      A port held by something else, even for the hub's demo, is daintree.runtime.free-busy-port
+      ("Use for a ONE-OFF port clash right now"; "who holds the port"), the fence this runbook
+      draws with "a port another process holds".
+    messages:
+      - role: user
+        content: port 8080 is taken on this host and the dev server for the hub's demo can't start, who's holding it
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation]
+
+  - id: demo-for-hub-reverse-hub-side
+    category: routing-trap
+    note: >-
+      The person on the Shell asking another machine's assistant for a running page is the
+      hub's side: daintree.hosts.delegate-to-host ("Use when the person wants ONE piece of WORK
+      done by the Daintree assistant on another machine"), with the hosts foundation along.
+      This runbook ("Use on a Remote Host's lane") must not ride along.
+    messages:
+      - role: user
+        content: Ask the assistant on the build server to get the new reports page running and send back the port
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-reverse-hub-side-my-host
+    category: routing-trap
+    note: >-
+      The same boundary in the person's own words, naming "my remote host" and "from here".
+      daintree.hosts.delegate-to-host owns it today ("ONE piece of WORK done by the Daintree
+      assistant on another machine"); this runbook's fence "the hub's own side of handing a host
+      work" does not hold yet: the shipped selector gives it to this runbook at 1.00 with
+      daintree.workflow.prepare-feature-demo next, and two text attempts on the boundary did not
+      move it. Retrain owed.
+    messages:
+      - role: user
+        content: Get the feature running on my remote host so I can demo it from here
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]

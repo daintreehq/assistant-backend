@@ -420,12 +420,17 @@ cases:
   - id: handle-hub-message-receiver-demo
     category: routing-trap
     note: >-
-      A demo the hub wants prepared on this machine: today
-      daintree.workflow.prepare-feature-demo ("The deliverable is a running, reproducible
-      demonstration").
+      A demo the hub wants prepared on this machine: the host-side receiver
+      daintree.hosts.demo-for-hub ("Use on a Remote Host's lane when the hub asks THIS machine
+      to prepare a DEMO of a feature"). The local owner is fenced both ways: demo-for-hub's "a
+      demo the person asks for at this machine (daintree.workflow.prepare-feature-demo)" and
+      prepare-feature-demo's "or for a demo the hub asked this Remote Host's lane to prepare
+      (use daintree.hosts.demo-for-hub)". Re-pointed from prepare-feature-demo when the
+      receiver landed; the shipped selector still loads prepare-feature-demo beside it (both
+      near 1.00, a strict extra) until the retrain.
     messages:
       - role: user
         content: The hub wants a demo of the new onboarding flow running on this machine with a short walkthrough.
     expect:
-      required: [daintree.workflow.prepare-feature-demo]
+      required: [daintree.hosts.demo-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
