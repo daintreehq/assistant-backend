@@ -81,6 +81,12 @@ boundaries:
   - query: Split docs/search-v3.md into buildable units with owned files and dependencies, then file them.
     confusable_with: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6
+  - query: "break this epic into independent tickets first, I'll spread them over my machines once you've drafted them"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-93
+  - query: "plan the chunks for the billing rewrite so they could later be split across the hosts"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-93
 followups:
   - query: merge 2 and 5 like you suggested and drop the analytics unit, then show me the waves again
     history:

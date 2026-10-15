@@ -188,6 +188,12 @@ boundaries:
   - query: "Send the second laptop a fresh brief for its unit with the corrected base commit and have its assistant report the PR."
     confusable_with: [daintree.hosts.steer-for-hub]
     run: runbook-2026-10-issue-106
+  - query: "the linux workstation has the most room, so hand it the export bug"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-93
+  - query: "put the auth refactor on the mac mini, I've already checked it's the least busy"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-93
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

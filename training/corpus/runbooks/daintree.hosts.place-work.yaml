@@ -1,0 +1,158 @@
+# daintree.hosts.place-work: the hub places DIFFERENT, independent pieces of work (or one piece
+# with no host chosen) on the Remote Hosts that can take them, weighing each host's load, the
+# agent CLIs signed in there, allowance left and an enrolled assistant in the right project,
+# shows the placement table, then delegates each piece and verifies one row per piece.
+#
+# Positives are invented situations in agent and user words, short and long, some with a
+# social lead-in, a constraint or an earlier turn; a few how-to questions carry docs. Boundaries
+# are requests this runbook wins against a neighbour whose vocabulary they share: the same work
+# everywhere (swarm-fan-out), a host already named (delegate-to-host), a usage table
+# (check-usage-limits), readiness with no work (start-swarm), local agents (fan-out-work),
+# breaking a spec down (decompose-work), this machine's load (relieve-resource-contention), a
+# work already sent (recover-and-clean-up). Followups and topic
+# shifts are placement as a second turn after a usage check, a readiness turn or a survey.
+# Machine names are generic.
+runbook: daintree.hosts.place-work
+run: runbook-2026-10-issue-93
+
+positives:
+  - got a pile of five unrelated tickets and three other macs, work out which machine takes which and send them out
+  - the linux box is pegged on a build, so put these bug fixes on whichever of the other hosts are quiet
+  - can you hand these issues out across my remote machines but keep the claude ones off the hosts that only have codex
+  - Assign each of the six open milestone issues to a Remote Host with an enrolled assistant in this repository, preferring hosts with low memory pressure, and report where each went
+  - Place four independent bug fixes on Remote Hosts by CPU load and remaining Codex allowance; show the proposed host per bug before sending
+  - pick a host for the dark mode ticket, I don't care which one as long as it isn't swamped
+  - whichever machine is least busy right now should take the flaky export test fix
+  - 'share these out among the hosts: the rate limiter, the pdf export and the onboarding copy fix, each on its own branch'
+  - morning! I've got a backlog of small fixes, could you parcel them out to whichever remote macs have the most headroom
+  - we're behind on the sprint. take the seven ready issues and distribute them over the hosts so nothing sits idle, but show me the plan first
+  - figure out which of my machines has room for the search reindex job and send it there
+  - who should get the websocket reconnect bug, the mini or the workstation? whichever is less loaded
+  - give the three docs tasks to the hosts with spare claude allowance and the two refactors to the codex machines
+  - the hosts have different agents signed in, so match each of these issues to a machine that can actually run the right CLI
+  - Survey the Remote Hosts' load and agent usage, then propose which host takes each of these independent tasks before delegating
+  - allocate these issues across the swarm by capacity, I'll approve the table before anything goes out
+  - 'just do it, no need to check with me: spread these four bugs over the remote hosts by load'
+  - which of my other macs should take the database migration ticket given how loaded they all are?
+  - I'm away for the afternoon. please send each of these small issues to whichever host is free and tell me where they all ended up
+  - route each item on this list to a remote host, the csv import fix, the timezone bug and the avatar upload issue
+  - dole out the remaining issues to the remote boxes, keeping no more than two on any one machine
+  - place these jobs where there's capacity, not all on the same machine
+  - the codex-only hosts can take the python tasks, put the typescript ones wherever claude has allowance left
+  - which remote machine is the best fit for the billing refactor right now?
+  - hand out these unrelated chores to the hosts, one apiece if they can take it
+  - I have five feature flags to remove and none depends on another, put them on my remote machines by how busy each is
+  - Allocate independent tasks to Remote Hosts from host load samples, enrolled assistants and signed-in CLIs, and propose a placement table
+  - Pick the least-loaded Remote Host that has this repository and a Claude Code lane for one bug fix, then delegate it
+  - Distribute pending work items across connected remote machines based on available agent allowance and load
+  - honestly no idea which host should do the cache invalidation fix, you pick and send it
+  - put the remaining tickets on whatever hosts are free; the mini is out, it's running the nightly
+  - one of my hosts has most of its codex week left and the others are low, so spread the four migration issues accordingly
+  - query: how do you decide which of my machines gets which issue? explain it, then split these six that way
+    docs: true
+  - query: what do you look at when choosing a host for a task, load or usage? then pick one for the logging cleanup
+    docs: true
+  - query: >-
+      I've got eight issues in the ready column and four remote machines. Two of them only have
+      Codex signed in, one is busy running a long benchmark, and the Claude week on the first
+      host is nearly used up. Work out a sensible split, show me the table, and once I say go,
+      send each issue to its host.
+  - query: >-
+      User asked to distribute twelve independent GitHub issues over their Remote Hosts. Hosts
+      differ in CPU load, thermal state and which agent CLIs are signed in. Need to choose a host
+      per issue, skip hosts that lack the repository, present the placement, then delegate each
+      issue and track the PRs.
+  - query: >-
+      The build box is thermal throttling again and the laptop host keeps dropping its
+      connection. I still need these five tickets worked on today. Put them on whichever machines
+      can actually take them and leave the build box out of it.
+  - query: >-
+      thanks for sorting the hosts out yesterday. today there are four small bugs in the tracker,
+      none of them related; get each one onto a machine that has room and the repo checked out,
+      and tell me which went where
+  - query: and the other three go wherever there's room, same as before
+    history:
+      - "user: put the auth refactor on whichever host is least loaded"
+      - "assistant: Placed on the second host (Claude Code, 12% CPU); sent, waiting on its reply."
+
+boundaries:
+  - query: don't give every machine the same thing, each host gets a different bug from this list
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: send these issues out to the hosts, one issue per machine, whichever can take it
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: split this batch across all my remote hosts so each one takes different tickets
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: I want one machine to fix the login redirect bug, you decide which host
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: hand the dependency audit to a remote host, whichever has the most free CPU
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: not sure if the mini or the linux box should do the export fix, pick by load and send it
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: look at the claude and codex usage left on each host, then decide which machine gets each of these tasks
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: which host has the most allowance to spare? give it the big refactor
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: use the hosts' remaining weekly usage to divide up these three issues
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: which of my machines can take work right now? put these four tickets on those
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: the lanes are already enrolled on every host, so just decide who takes each of these bugs and send them
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: get the six issues onto the hosts, wherever an assistant is ready and the load is low
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: parallelize these independent issues across my remote machines, not local worktrees
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: one agent per ticket, but on the other hosts, picked by how loaded they are
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: batch of six unrelated bugs, run them on the remote hosts rather than here
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: work through this list of issues in parallel using the remote machines' assistants
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: carve up this list of tickets among my remote machines so each one gets a fair share
+    confusable_with: [daintree.orchestration.decompose-work]
+  - query: split the ready issues between my machines
+    confusable_with: [daintree.orchestration.decompose-work]
+  - query: my other machines are all at different loads; send the heavy build task to the coolest one
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: which remote host has the lowest cpu and memory pressure? give it the video transcode issue
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: the last run on the hosts is finished; here's a new list of issues, put each on whichever host has room
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: give my remote machines a ticket each from this list, not all the same one
+    confusable_with: [daintree.hosts.swarm-fan-out]
+
+followups:
+  - query: yes, go ahead with that split
+    history:
+      - "user: here are five bugs, place them on the hosts"
+      - "assistant: Proposed: three on the first host (Claude Code), two on the Codex host. Send them?"
+  - query: fine, use the other host for it then
+    history:
+      - "user: the dependency audit needs a home, pick a quiet machine for it"
+      - "assistant: The quietest host has no assistant in this repository; the second host has one and 30% CPU."
+  - query: swap the docs ticket onto the codex machine and then send them all
+    history:
+      - "user: spread these four issues over my remote machines"
+      - "assistant: Placement table ready: docs ticket on host A, the rest split between B and C."
+  - query: actually there are three more issues, place those as well
+    history:
+      - "user: I've got four tickets for the remote machines, share them out"
+      - "assistant: Sent four issues to three hosts; replies pending."
+
+topic_shifts:
+  - query: ok, put these five issues on the hosts based on that
+    history:
+      - "user: check usage on all my hosts"
+      - "assistant: The first host has 31% of its Claude week left, the second 100%."
+  - query: now hand out these six tickets to whichever of them is least loaded
+    history:
+      - "user: get assistants ready on all the hosts in this repo"
+      - "assistant: All four hosts have an assistant ready, with their generations."
+  - query: then give the quiet one the auth refactor and spread the rest by load
+    history:
+      - "user: how are my remote machines doing"
+      - "assistant: One host is at 85% CPU with serious thermal state, another is nearly idle."
+  - query: put the issues that haven't started onto the remote hosts instead, whichever have room
+    history:
+      - "user: start agents here on these eight issues"
+      - "assistant: Five are running; this machine is under memory pressure, three are not started."
