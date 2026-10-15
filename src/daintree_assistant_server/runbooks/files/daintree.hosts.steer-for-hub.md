@@ -21,14 +21,14 @@ After daintree.hosts.handle-hub-message has read it: steer only the agents this 
    - At its input line (`idle`, `completed`, `waiting` `prompt`): nothing to stop; a change is its next prompt.
    - `exited` or missing: gone.
    - Mid-turn (`working`, or `waiting` on a question, approval or error): step 3 first, unless the hub lets a change wait for a `working` one (queued; it may miss this turn).
-3. `terminal.interruptOwned` once, then `terminal.waitUntilIdle` `timeoutMs:15000` and `terminal.getStatus` with `includeOutput`. Stopped: the turn shown interrupted at an empty input line, no spinner (may read `waiting`). Still working: unconfirmed; send nothing, never interrupt again. Refused as not mid-turn: read the screen again. Other refusals (a Ctrl+C CLI, locked input): nothing was sent; a blocker, never keys or a prompt instead.
-4. A change: one send per agent; keep its `submissionToken`.
+3. `terminal.interruptOwned` once, then `terminal.waitUntilIdle` `timeoutMs:15000` and `terminal.getStatus` with `includeOutput`. Stopped: the turn shown interrupted at an empty input line, no spinner (may read `waiting`). Still working: unconfirmed; send nothing, never interrupt again. Refused as not mid-turn: read the screen again. Other refusals (Ctrl+C CLI, locked input): a blocker; never keys or a prompt instead.
+4. A change to act on now: one send per agent; keep its `submissionToken`. Under a pause, hold it for the resume.
 
 ```json tool=terminal.sendCommand surface=lane-full
 {"terminalId":"<pane id>","command":"Correction from the hub: <change>. The rest of your task still applies; re-read <files>. First state in one line what you will now do differently, then continue.","notify":true,"handback":true}
 ```
 
-5. In each worktree `git status --short`, `git log -1 --oneline`. Reply per agent: pane id; before; what you did; after, as read (stopped, stop unconfirmed, change sent, already done, waiting, gone, blocked); branch, HEAD, uncommitted files; next step from its brief and screen. A change sent: end the turn.
+5. In each worktree `git status --short`, `git log -1 --oneline`. Reply per agent: pane id; before; what you did; after, as read (stopped, stop unconfirmed, change sent, already done, waiting, gone, blocked); branch, HEAD, uncommitted files; next step (brief, screen). A change sent: end the turn.
 
 On notice or resume: a stopped or paused unit's notice restarts nothing until the hub asks. A changed agent's notice: its one-line statement and work on the new course acknowledge it; verify its result as its launching runbook says, then answer that unit's exchange if open, else one `assistant.sendMessage` hand-off.
 

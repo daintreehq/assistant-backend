@@ -87,8 +87,8 @@ cases:
   - id: steer-for-hub-mid-turn-stop
     category: single-runbook
     note: >-
-      The live scenario of a stop mid-turn with the work kept: "interrupted ... confirmed
-      from its own screen with nothing it made thrown away".
+      The live scenario of a stop mid-turn with the work kept: "each of that run's agents
+      interrupted" and "confirmed from its own screen with nothing it made thrown away".
     messages:
       - role: user
         content: The hub wants the Claude agent on its search unit stopped mid-turn; leave its changes in the worktree and tell the hub where it got to.
@@ -193,7 +193,7 @@ cases:
     category: routing-trap
     note: >-
       Reverse: the person steering an agent on this machine, no hub. steer-running-agent
-      owns "Use when an agent that is ALREADY WORKING on a task ... must change course or
+      owns "Use when an agent that is ALREADY WORKING on a task" that "must change course or
       stop"; its fence "on a Remote Host's lane steering work the hub delegated there
       (daintree.hosts.steer-for-hub)" keeps this runbook out.
     messages:
@@ -220,8 +220,8 @@ cases:
     category: routing-trap
     note: >-
       Reverse: the hub's message is a question about this lane's agents, not a request to
-      change them. The envelope owns it: "the exchange handled: read once with
-      assistant.getInbox ... and answered with assistant.reply".
+      change them. The envelope owns it: "The deliverable is the exchange handled: read
+      once with assistant.getInbox".
     messages:
       - role: user
         content: The hub's message only asks which agents this lane has running; read it and reply.
