@@ -79,7 +79,7 @@ boundaries:
   - query: two agents are still building overlapping versions of the search index, keep the one that fits the brief and keep the other's branch
     confusable_with: [daintree.git.integrate-agent-branches]
     run: 2026-09-28-round6
-  - query: claude-2 and codex-1 are both still implementing the rate limiter right now and contradicting each other; sort out who owns it.
+  - query: two of my agents each believe the webhook retry change is theirs and keep rewriting each other's approach in their own branches; settle which one carries on.
     confusable_with: [daintree.git.resolve-semantic-conflict]
     run: 2026-09-28-round6
   - query: I didn't mean for claude and codex to both build the export; it was accidental. Keep the stronger one and redirect the other.
@@ -97,7 +97,7 @@ boundaries:
   - query: diff wt rate-limit-a vs rate-limit-b, both agents are doing the same ticket, keep the better one going
     confusable_with: [daintree.worktree.compare-worktrees]
     run: 2026-09-28-round6
-  - query: 'Check whether gemini''s and claude-3''s branches overlap; they were both assigned #88 and are still coding. Settle who owns it.'
+  - query: 'Check whether gemini''s and claude-3''s branches overlap; they were both assigned #412 and are still coding. Settle who owns it.'
     confusable_with: [daintree.worktree.compare-worktrees]
     run: 2026-09-28-round6
   - query: Two agents in the same checkout are both implementing the same caching layer; pick one owner and stop the other.
