@@ -11,9 +11,9 @@ cases:
   - id: reassign-host-work-issue-machine-dropped
     category: single-runbook
     note: >-
-      The issue's first request. Decided by "a unit of work ALREADY SENT to one Remote Host
-      must be finished by a DIFFERENT HOST because the first cannot carry on: the machine
-      dropped off or went unreachable mid-task".
+      The issue's first request. Decided by "work this Shell already handed to one
+      Remote Host has to MOVE TO A DIFFERENT MACHINE because the first cannot finish
+      it: that machine went offline or silent mid-task".
     messages:
       - role: user
         content: The remote machine dropped; move its unfinished task safely to another host.
@@ -24,9 +24,9 @@ cases:
   - id: reassign-host-work-issue-required-cli
     category: single-runbook
     note: >-
-      The issue's second request. Decided by "it ran out of allowance on the agent CLI the
-      work needs or lacks that CLI" and the example "move that blocked task to a host with
-      Codex without losing what it did".
+      The issue's second request. Decided by "or cannot run the CLI the work needs"
+      and the example "move that blocked task to a host with Codex without losing what
+      it did".
     messages:
       - role: user
         content: Move this blocked task to a host with the required CLI without losing its work.
@@ -37,9 +37,9 @@ cases:
   - id: reassign-host-work-issue-verified-artifacts
     category: single-runbook
     note: >-
-      The issue's third request. Decided by the title "Reassign a remote host's unfinished
-      work to another host" and "briefed from what the first host verifiably pushed and
-      reported".
+      The issue's third request. Decided by the title "Reassign a remote host's
+      unfinished work to another host" and "briefed from what the first one verifiably
+      pushed".
     messages:
       - role: user
         content: Reassign one remote work unit from verified artifacts.
@@ -50,8 +50,9 @@ cases:
   - id: reassign-host-work-agent-phrased
     category: single-runbook
     note: >-
-      How an agent describes the task to search. Decided by "went unreachable mid-task" and
-      the deliverable "exactly one owner allowed to push or publish".
+      How an agent describes the task to search. Decided by "that machine went offline
+      or silent mid-task" and the deliverable "exactly one machine allowed to push or
+      publish".
     messages:
       - role: user
         content: Move a delegated unit off a Remote Host that went unreachable to another host, reconciling its pushed branch and ownership first so two workers never publish the same result
@@ -62,8 +63,8 @@ cases:
   - id: reassign-host-work-user-went-offline
     category: single-runbook
     note: >-
-      A user's words for a host that dropped mid-task. Decided by "the machine dropped off or
-      went unreachable mid-task" and "finished by a DIFFERENT HOST".
+      A user's words for a host that dropped mid-task. Decided by "that machine went
+      offline or silent mid-task" and "MOVE TO A DIFFERENT MACHINE".
     messages:
       - role: user
         content: the remote host went offline in the middle of the cache fix, move what's left of it to another host
@@ -74,8 +75,8 @@ cases:
   - id: reassign-host-work-user-allowance-used-up
     category: single-runbook
     note: >-
-      Out of allowance on a remote host, not on this machine. Decided by "it ran out of
-      allowance on the agent CLI the work needs" and "finished by a DIFFERENT HOST".
+      Out of allowance on a remote host, not on this machine. Decided by "ran out of
+      usage" and "MOVE TO A DIFFERENT MACHINE because the first cannot finish it".
     messages:
       - role: user
         content: the build host used up its codex allowance halfway through the importer unit, get another machine to finish it
@@ -86,8 +87,8 @@ cases:
   - id: reassign-host-work-user-stuck-keep-pushed
     category: single-runbook
     note: >-
-      A stuck host, keeping what it pushed. Decided by "its assistant or agent is stuck" and
-      "briefed from what the first host verifiably pushed".
+      A stuck host, keeping what it pushed. Decided by "is stuck" and "briefed from
+      what the first one verifiably pushed".
     messages:
       - role: user
         content: the linux server is stuck on the auth refactor give it to the other host and keep what it pushed
@@ -98,8 +99,8 @@ cases:
   - id: reassign-host-work-first-host-returns
     category: continuation
     note: >-
-      The first host reconnects after its unit was moved. Decided by "if the first host comes
-      back online, both attempts reconciled with neither lost".
+      The first host reconnects after its unit was moved. Decided by "if the first
+      machine comes back online, both attempts reconciled with neither lost".
     messages:
       - role: user
         content: the workstation dropped mid-unit, give the search indexing task to the studio
@@ -115,9 +116,9 @@ cases:
   - id: reassign-host-work-not-recover-and-clean-up
     category: routing-trap
     note: >-
-      Not an account of open exchanges: the unit is to MOVE. Fence: "Do not use for where
-      delegated exchanges stand with nothing moved, a resend to the same host, or cleanup
-      (daintree.hosts.recover-and-clean-up)".
+      Not an account of open exchanges: the unit is to MOVE. Fence: "Do not use for
+      where delegated exchanges stand with nothing moved, a resend to the same host,
+      or cleanup (daintree.hosts.recover-and-clean-up)".
     messages:
       - role: user
         content: the link to the build box is gone for the day; rather than an account of its open exchanges, get its half-finished unit onto another machine
@@ -128,8 +129,8 @@ cases:
   - id: reassign-host-work-not-place-work
     category: routing-trap
     note: >-
-      A placed piece that stalled is moved, not placed afresh. Fence: "first placement of new
-      pieces (daintree.hosts.place-work)".
+      A placed piece that stalled is moved, not placed afresh. Fence: "first placement
+      of new pieces (daintree.hosts.place-work)".
     messages:
       - role: user
         content: the piece the hub placed on the second host stopped moving; give that piece to a different host, carrying over what it pushed
@@ -140,8 +141,8 @@ cases:
   - id: reassign-host-work-not-delegate-to-host
     category: routing-trap
     note: >-
-      The target host is named, but the unit already started elsewhere. Fence: "new work for
-      one named host (daintree.hosts.delegate-to-host)".
+      The target host is named, but the unit already started elsewhere. Fence: "new
+      work for one named host (daintree.hosts.delegate-to-host)".
     messages:
       - role: user
         content: have the studio take over the unit the laptop host was working on before it dropped off, starting from what the laptop pushed
@@ -152,9 +153,9 @@ cases:
   - id: reassign-host-work-not-hand-off-task
     category: routing-trap
     note: >-
-      Out of usage on a remote host, continued on another machine rather than by another agent
-      in the same checkout. Fence: "a different agent taking over in the same checkout
-      (daintree.agents.hand-off-task)".
+      Out of usage on a remote host, continued on another machine rather than by
+      another agent in the same checkout. Fence: "another agent taking over in the
+      same checkout (daintree.agents.hand-off-task)".
     messages:
       - role: user
         content: the remote host's codex is out of usage on its unit; get another machine with claude to continue it, not a swap on that host
@@ -165,8 +166,10 @@ cases:
   - id: reassign-host-work-not-steer-for-hub
     category: routing-trap
     note: >-
-      The hub's side of stopping the old worker as part of a move. Fence: "a host's own
-      assistant stopping its agents for the hub (daintree.hosts.steer-for-hub)".
+      The hub's side of a move, stopping the old worker on the way: "the first one
+      stopped or its risk put to the person" and "the work continued on the new
+      machine". steer-for-hub is the lane's own side: "Use on a Remote Host's lane to
+      STOP, PAUSE or CHANGE the work of the AGENTS it launched".
     messages:
       - role: user
         content: stop the worker on the unreachable host if it can still be reached and have a different host carry on its unit
@@ -178,9 +181,9 @@ cases:
   - id: reassign-host-work-reverse-recover-and-clean-up
     category: routing-trap
     note: >-
-      Status only, nothing moved: recover-and-clean-up's "where things stand with the work
-      handed to another machine ... the link to a Remote Host dropped". This runbook's fence:
-      "where delegated exchanges stand with nothing moved".
+      Status only, nothing moved: recover-and-clean-up's "where things stand with the
+      work handed to another machine ... the link to a Remote Host dropped". This
+      runbook's fence: "where delegated exchanges stand with nothing moved".
     messages:
       - role: user
         content: the link to my remote hosts dropped for twenty minutes; just tell me which delegated exchanges are still open
@@ -191,9 +194,9 @@ cases:
   - id: reassign-host-work-reverse-place-work
     category: routing-trap
     note: >-
-      New pieces with nothing started: place-work's "DIFFERENT, independent pieces of work ...
-      put on whichever Remote Host this Shell reaches can best take it". This runbook's fence:
-      "first placement of new pieces".
+      New pieces with nothing started: place-work's "DIFFERENT, independent pieces of
+      work ... put on whichever Remote Host this Shell reaches can best take it". This
+      runbook's fence: "first placement of new pieces".
     messages:
       - role: user
         content: these four tickets are brand new and nothing has started; put each on whichever remote host has room
@@ -204,9 +207,9 @@ cases:
   - id: reassign-host-work-reverse-delegate-to-host
     category: routing-trap
     note: >-
-      New work for a named host, nothing started elsewhere: delegate-to-host's "ONE piece of
-      WORK done by the Daintree assistant on another machine". This runbook's fence: "new work
-      for one named host".
+      New work for a named host, nothing started elsewhere: delegate-to-host's "ONE
+      piece of WORK done by the Daintree assistant on another machine". This runbook's
+      fence: "new work for one named host".
     messages:
       - role: user
         content: have the other mac pick up the logging ticket on a fresh branch and tell me the SHA
@@ -217,10 +220,10 @@ cases:
   - id: reassign-host-work-reverse-hand-off-task
     category: routing-trap
     note: >-
-      A limit hit in a pane on this machine, continued by another agent in the same checkout:
-      hand-off-task's "a task an agent has STARTED must be finished by a DIFFERENT agent ...
-      in the same checkout". This runbook's fence: "a different agent taking over in the same
-      checkout".
+      A limit hit in a pane on this machine, continued by another agent in the same
+      checkout: hand-off-task's "a task an agent has STARTED must be finished by a
+      DIFFERENT agent or a fresh session, in the same checkout". This runbook's fence:
+      "another agent taking over in the same checkout".
     messages:
       - role: user
         content: codex stopped on its weekly limit in the pane beside me; let gemini take over its half-done task right there in that checkout
@@ -230,9 +233,10 @@ cases:
   - id: reassign-host-work-reverse-steer-for-hub
     category: routing-trap
     note: >-
-      The lane's side: steer-for-hub's "Use on a Remote Host's lane to STOP, PAUSE or CHANGE
-      the work of the AGENTS it launched for one of the hub's runs". This runbook's fence: "a
-      host's own assistant stopping its agents for the hub".
+      The lane's side: steer-for-hub's "Use on a Remote Host's lane to STOP, PAUSE or
+      CHANGE the work of the AGENTS it launched for one of the hub's runs". This
+      runbook is the Shell's side: "work this Shell already handed to one Remote
+      Host".
     messages:
       - role: user
         content: I'm the assistant on this host; the hub says it is moving its unit elsewhere, so stop the agent I launched for it and keep its changes
