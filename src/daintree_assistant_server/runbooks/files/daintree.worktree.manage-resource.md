@@ -2,7 +2,7 @@
 id: daintree.worktree.manage-resource
 title: Manage a worktree remote resource
 summary: Inspect and interactively provision, pause or resume a worktree's configured remote resource, verifying with fresh status and refusing unsafe unattended or unpreviewed lifecycle actions.
-whenToUse: Use when the user asks about a worktree's cloud devbox or remote resource status, wants to provision, pause or resume it, asks to save resource cost, or asks for a future pause/resume. Also use for teardown or connect requests so the assistant can route those unsupported-safe paths honestly. Do not use for creating or deleting an ordinary git worktree (use daintree.worktree.create-plain-worktree or daintree.orchestration.workspace-cleanup), Daintree's own CPU/memory resource profile, starting a local dev server, or the assistant on another machine (daintree.hosts.foundation).
+whenToUse: Use when the user asks about a worktree's cloud devbox or remote resource status, wants to provision, pause or resume it, asks to save resource cost, or asks for a future pause/resume. Also use for teardown or connect requests so the assistant can route those unsupported-safe paths honestly. Do not use for creating or deleting an ordinary git worktree (use daintree.worktree.create-plain-worktree or daintree.orchestration.workspace-cleanup), Daintree's own CPU/memory resource profile, starting a local dev server, the assistant on another machine (daintree.hosts.foundation), or readying an assistant in a project on each Remote Host (daintree.hosts.start-swarm).
 risk: system
 requiredTools:
   - worktree.list
