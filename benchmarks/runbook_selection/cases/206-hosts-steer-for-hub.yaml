@@ -76,8 +76,8 @@ cases:
   - id: steer-for-hub-user-cancelled-still-going
     category: single-runbook
     note: >-
-      Casual: the hub cancelled, the child is still working. "an agent still working after
-      the hub cancelled its exchange" decides it; at base a similar line went to
+      Casual: the hub cancelled, the child is still working. "or an agent still working on a
+      job the hub has called off" decides it; at base a similar line went to
       daintree.agents.recover-agent.
     messages:
       - role: user
@@ -211,8 +211,8 @@ cases:
     note: >-
       A stop with nothing removed is not the run's cleanup: "to STOP, PAUSE or CHANGE the
       work of the AGENTS it launched for one of the hub's runs".
-      daintree.hosts.clean-up-for-hub fences it: "for stopping, pausing or correcting an
-      agent of that run that is still at work (daintree.hosts.steer-for-hub)".
+      daintree.hosts.clean-up-for-hub owns removing "what it made on this machine for one of
+      the hub's runs", and nothing here is removed.
     messages:
       - role: user
         content: The hub cancelled the run; stop its agents but don't delete anything yet.
@@ -223,9 +223,9 @@ cases:
   - id: steer-for-hub-not-hung-agent
     category: routing-trap
     note: >-
-      A healthy agent still working on a job the hub dropped is a stop, not a recovery: "an
-      agent still working after the hub cancelled its exchange". recover-agent owns "a hung
-      or unresponsive agent", which this one is not.
+      A healthy agent still working on a job the hub dropped is a stop, not a recovery: "or
+      an agent still working on a job the hub has called off". recover-agent owns "a hung or
+      unresponsive agent", which this one is not.
     messages:
       - role: user
         content: hub dropped the job it gave me; the codex pane for it is fine, just still working, halt it
