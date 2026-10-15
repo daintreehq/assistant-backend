@@ -24,8 +24,8 @@ cases:
   - id: diagnose-messaging-agent-gate-evidence
     category: single-runbook
     note: >-
-      An agent's query carrying the observations: a send that "came back ...
-      policy_rejected" and a host's assistant "listed as ... without a generation". The
+      An agent's query carrying the observations named in the positive clause, a send
+      that came back "policy_rejected" and an assistant listed "without a generation". The
       deliverable is "a diagnosis per host and assistant: the gate, what the tools showed".
     messages:
       - role: user
@@ -40,7 +40,7 @@ cases:
   - id: diagnose-messaging-rate-limited-user
     category: single-runbook
     note: >-
-      A user naming the refusal: "a send or start that came back ... rate_limited". The
+      A user naming a refusal the positive clause lists: "rate_limited". The
       foundation's one line on limits may ride along; the diagnosis is this runbook's.
       RETRAIN OWED: the shipped selector picks the hosts foundation alone (rank_miss).
     messages:
@@ -53,8 +53,8 @@ cases:
   - id: diagnose-messaging-see-server-not-assistant
     category: single-runbook
     note: >-
-      The issue's user-phrased request: "can SEE another machine from this Shell ... but
-      cannot message or start the Daintree assistant on it". RETRAIN OWED: the shipped
+      The issue's user-phrased request: the user "can SEE another machine from this Shell"
+      but "cannot message or start the Daintree assistant on it". RETRAIN OWED: the shipped
       selector selects nothing here (rank_miss); an untrained runbook does not reach the
       cut on this short question.
     messages:
@@ -69,8 +69,8 @@ cases:
     note: >-
       The issue's measured baseline query (the issue saw daintree.diagnostics take it).
       Nothing on this machine misbehaves; the host is visible and its assistant cannot be
-      messaged or started: "can SEE another machine ... but cannot message or start the
-      Daintree assistant on it". The carve-out "Do not use for Daintree itself misbehaving
+      messaged or started: the user "cannot message or start the Daintree assistant on
+      it". The carve-out "Do not use for Daintree itself misbehaving
       on this machine (daintree.diagnostics)" keeps diagnostics out, and no lane is
       handling a message, so daintree.hosts.handle-hub-message is an extra too.
     messages:
@@ -84,7 +84,7 @@ cases:
     category: routing-trap
     note: >-
       A tool refusal sounds like daintree.diagnostics ("why is this tool missing"), but it
-      is the messaging gate "this sidebar session refused ... as Core" while the hosts are
+      is the messaging gate "this sidebar session refused as not enrolled or as Core" while the hosts are
       listed. Diagnostics is fenced off: "Do not use for Daintree itself misbehaving on
       this machine (daintree.diagnostics)".
     messages:
@@ -97,11 +97,10 @@ cases:
   - id: diagnose-messaging-outcomes-not-lane-handler
     category: routing-trap
     note: >-
-      The issue's request naming two refusals: "a send or start that came back
-      opted_out, ... lane_unavailable". The person is at this Shell, not a host's
-      assistant handling the hub's message, so daintree.hosts.handle-hub-message ("Use on
-      a Remote Host's Daintree assistant enrolled as a lane when the hub ... has messaged
-      it") is an extra. RETRAIN OWED: the shipped selector picks handle-hub-message and
+      The issue's request naming two refusals the positive clause lists ("opted_out,
+      paused, lane_unavailable"). The person is at this Shell, not a host's assistant
+      handling the hub's message, so daintree.hosts.handle-hub-message ("Use on a Remote
+      Host's Daintree assistant enrolled as a lane") is an extra. RETRAIN OWED: the shipped selector picks handle-hub-message and
       daintree.diagnostics (rank_miss); two text attempts that won it pulled lane cases.
     messages:
       - role: user
@@ -157,7 +156,7 @@ cases:
     note: >-
       Reverse trap. Rebuilding where every delegated exchange stands after a restart is
       daintree.hosts.recover-and-clean-up ("where things stand with the work handed to
-      another machine ... usually after Daintree restarted"); no gate is in question.
+      another machine"); no gate is in question.
     messages:
       - role: user
         content: After the Shell came back from a restart, go through each Remote Host's task records and tell me which delegated exchanges are still open
@@ -170,7 +169,7 @@ cases:
     note: >-
       Reverse trap. A host's own assistant whose reply to the hub was refused is
       daintree.hosts.handle-hub-message ("Use on a Remote Host's Daintree assistant enrolled
-      as a lane when the hub ... has messaged it"); the hub's diagnosis does not apply.
+      as a lane"); the hub's diagnosis does not apply.
     messages:
       - role: user
         content: This lane's reply to the hub came back EXCHANGE_CLOSED; what now?

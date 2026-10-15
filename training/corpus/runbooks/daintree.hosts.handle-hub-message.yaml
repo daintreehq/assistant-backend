@@ -200,4 +200,5 @@ boundaries:
     run: runbook-2026-10-issue-103
   - query: 'the hub messaged this machine''s assistant, but this machine has messaging paused; can I still answer it'
     confusable_with: [daintree.hosts.diagnose-messaging]
+    docs: true
     run: runbook-2026-10-issue-103
