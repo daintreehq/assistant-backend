@@ -209,7 +209,7 @@ cases:
   - id: demo-for-hub-reverse-hub-side-my-host
     category: routing-trap
     note: >-
-      The same boundary in the person's own words, naming "my remote host" and "from here".
+      The same boundary in the person's own words: their own remote host, seen from the Shell.
       daintree.hosts.delegate-to-host owns it today ("ONE piece of WORK done by the Daintree
       assistant on another machine"); this runbook's fence "the hub's own side of handing a host
       work" does not hold yet: the shipped selector gives it to this runbook at 1.00 with
