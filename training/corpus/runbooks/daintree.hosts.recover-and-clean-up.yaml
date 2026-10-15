@@ -133,3 +133,6 @@ boundaries:
   - query: 'while I was out the Shell crashed; which of the jobs on my other machines actually came back'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: "close the usage panes the last check left open on the hosts"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91

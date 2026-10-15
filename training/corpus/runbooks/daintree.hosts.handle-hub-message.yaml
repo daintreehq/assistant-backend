@@ -126,3 +126,9 @@ boundaries:
   - query: is the hub's message in my inbox something I'm allowed to act on
     confusable_with:
     - daintree.hosts.foundation
+  - query: "the hub wants usage figures from here but doesn't say for which agent, ask it which one it means"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "tell the hub its usage request is stuck: claude code here is sitting on a login prompt"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91

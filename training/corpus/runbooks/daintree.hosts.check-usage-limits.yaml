@@ -94,6 +94,10 @@ boundaries:
   - query: message every host assistant for its usage numbers
     confusable_with: [daintree.hosts.foundation]
 
+  - query: get each remote machine's assistant to look at its claude usage screen and send me the numbers
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: tell the assistant on the office mac to check its codex limits and report back here
+    confusable_with: [daintree.hosts.handle-hub-message]
 followups:
   - query: and claude on those same machines?
     history:
