@@ -73,7 +73,7 @@ positives:
   - Bring up Claude for the hub's change in the unit's fresh worktree; its folder trust question needs the trusting option picked, since Enter exits
   - The hub's unit says to check with pytest, which isn't installed on this machine; brief the agent so it reports that rather than passing on unittest
   - The hub's change is half done here, the worktree exists but the agent never launched because the earlier turn ended; carry on from there
-  - Creating the unit's worktree errored out but the branch seems to exist now; find out what's really there before anything is made again
+  - Creating the worktree for the hub's unit errored out on this host but the branch seems to exist now; find out what's really there before anything is made again
 
 followups:
   - query: now get claude started in it
