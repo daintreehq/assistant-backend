@@ -1,12 +1,13 @@
 # daintree.hosts.run-local-cohort: a Remote Host's lane given SEVERAL pieces by the hub at
 # once (a batch of independent units for this project, or rival attempts the hub asked for)
 # splits them across its own worktrees and visible agents, within the hub's cap and this
-# machine's load, verifies each piece and answers the hub once with a row per piece.
+# project's running agents, verifies each piece and answers the hub once with a row per piece.
 #
 # Recall: the two issues' own requests, an agent-phrased and a user-phrased request, and the
 # request as a second turn after the hub's message was read. Traps: this runbook wins against
 # each declared neighbour (one unit, the envelope, the same split asked by the person here,
-# rival entries, options to prototype, a spec to break down, the hub side). Reverse traps: the neighbour wins and
+# rival entries, options to prototype, a spec to break down, agents already running for the hub,
+# the hub side). Reverse traps: the neighbour wins and
 # this runbook must not ride along; the one-fix trap pins the guard that a hub asking for one
 # fix has not asked for attempts. The envelope and the hosts foundation may ride along on a
 # hub-framed request (the lane holds the exchange for the reply).
@@ -170,6 +171,20 @@ cases:
       required: [daintree.hosts.run-local-cohort]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
+  - id: run-local-cohort-not-steer-for-hub
+    category: routing-trap
+    note: >-
+      New pieces to start beside agents still running, nothing to redirect. "the hub hands THIS
+      machine SEVERAL pieces of work at once" and "no more at once than the hub's cap and this
+      machine allow"; the fence sends "changing or stopping agents already running for the hub"
+      to daintree.hosts.steer-for-hub.
+    messages:
+      - role: user
+        content: the hub sent this host three more units while two of its earlier agents are still running; start the new ones
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
   - id: run-local-cohort-not-swarm-fan-out
     category: routing-trap
     note: >-
@@ -244,6 +259,19 @@ cases:
         content: Prototype three different caching approaches on this machine and recommend one
     expect:
       required: [daintree.orchestration.spike-options]
+
+  - id: run-local-cohort-reverse-steer-running
+    category: routing-trap
+    note: >-
+      The hub redirecting agents already at work here. daintree.hosts.steer-for-hub ("to STOP,
+      PAUSE or CHANGE the work of the AGENTS it launched for one of the hub's runs"); this runbook
+      fences "changing or stopping agents already running for the hub".
+    messages:
+      - role: user
+        content: the hub changed its mind about the units already running on this box; pause the two agents still working
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-reverse-decompose
     category: routing-trap
