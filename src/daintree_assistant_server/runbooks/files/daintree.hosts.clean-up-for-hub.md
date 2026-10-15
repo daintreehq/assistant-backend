@@ -12,22 +12,20 @@ requiredTools:
   - worktree.deleteOwned
   - worktree.delete
   - assistant.reply
-optionalTools:
-  - assistant.getInbox
 ---
-Follow daintree.hosts.handle-hub-message first (read, fit, reply). Then remove only what this lane made for the run the hub names.
+Follow daintree.hosts.handle-hub-message first (read, fit, reply); then remove only what this lane made for the run the hub names.
 
-1. The set: items named for that run by the hub's text or your own record (this conversation, hand-offs in `assistant.getInbox` `view:"sent"`), matched exactly by id, name or branch in `terminal.list` (also `location:"background"`) and `worktree.list`. Nothing merely similar or stale; never the main worktree. Not listed: already gone. No record (a restart): ask the hub for the items your replies named.
-2. Panes: one `terminal.getStatus` over them. An agent `working`, or `waiting` with no `lastHandback`, stays for the list. Close the rest in one `terminal.closeMany`, but any not in `terminal.list` `owned:true` puts the whole call behind one confirmation: those go in a second call.
+1. The set: items named for that run by the hub's text or this conversation, only of the kinds it asks for (panes only means panes), matched exactly by id, name or branch in `terminal.list` (also `location:"background"`) and `worktree.list`. Nothing merely similar or stale; never the main worktree. Not listed: already gone. No record (a restart): ask the hub for the items your replies named.
+2. Panes: one `terminal.getStatus` (`includeOutput`) over them. An agent `working`, or `waiting` with no `lastHandback` after its `lastTypedInputAt`, stays for the list. Close the rest in one `terminal.closeMany`, but any not in `terminal.list` `owned:true` puts the whole call behind one confirmation: those go in a second call.
 
 ```json tool=terminal.closeMany surface=lane-full
 {"terminalIds":["<pane id>","<pane id>"]}
 ```
 
-3. A worktree goes only if no pane is open in it, `git -C <path> status --porcelain` is empty, `git -C <path> ls-remote origin <branch>` shows its `rev-parse HEAD` (or the text calls it abandoned), and its teardown reaches nothing off this machine (no `resource`, `resources` or remote `teardown` in `.daintree/config.json`, worktree then project). `worktree.deleteOwned` if this session's `worktree.createWithRecipe` made it, else `worktree.delete` with only `worktreeId`. Never `force`; a branch only if the text asks (`git branch -d`, main checkout, after). Proof: gone from `worktree.list`; read a lost result there, never resend.
-4. Unwatched, a confirmation ends in `CONFIRMATION_TIMEOUT` after about 28 s (no window: `CONFIRMATION_REQUIRED`) unless this host's "Daintree confirmations" is Never ask. The item stands, never routed around (`git worktree remove`); nobody is watching, so no further gated call this round.
-5. Reply: one `input-required` listing what you removed and, per item, exactly what would go (unpushed commits, a dirty tree, an agent mid-task, a teardown off this machine, a branch on the shared remote, which a host never deletes: the person decides through the hub). Nothing to decide: `completed`, each item removed or kept, and why.
+3. A worktree goes only if no pane is open in it, `git -C <path> status --porcelain` is empty, `git -C <path> ls-remote origin <branch>` shows its `rev-parse HEAD` (or the text calls it abandoned), and its teardown reaches nothing off this machine: no `resource`, `resources`, `resourceEnvironments` or remote `teardown` in the `config.json` or `settings.json` under `~/.daintree/projects/<project>/` or `.daintree/` (worktree, project); unsure is remote. `worktree.deleteOwned` if this session's `worktree.createWithRecipe` made it, else `worktree.delete` with only `worktreeId`. Never `force`; a branch only if the text asks (`git branch -d` after). Proof: gone from `worktree.list`, a lost result too; never resend.
+4. Unwatched, a confirmation ends in `CONFIRMATION_TIMEOUT` after about 28 s (no window: `CONFIRMATION_REQUIRED`) unless this host skips them ("Daintree confirmations" Never ask, or following a global Skip permission prompts). The item stands, never routed around (`git worktree remove`); no further gated call this round.
+5. Reply: one `input-required` listing what you removed and, per item, exactly what would go (unpushed commits, a dirty tree, an agent mid-task, a teardown off this machine, a branch on the shared remote, which a host never deletes: the person's, via the hub). Nothing to decide: `completed`, each item removed or kept, and why.
 
-On the hub's answer: act within it and these rules; a timed-out item is tried again only if it says someone now watches this window or confirmations are off.
+On the hub's answer: act within it and these rules.
 
-Report back: per item, removed or kept and why, with ids.
+Report back: per item, removed or kept, why, ids.
