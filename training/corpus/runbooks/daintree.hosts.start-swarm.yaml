@@ -118,6 +118,18 @@ boundaries:
   - query: "the machines show connected under hosts; ready a codex lane on each before I split the work"
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
+  - query: 'get claude ready on each host for this project, but no work goes out yet'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'before I hand out the parser task, make sure every machine has an assistant in this repo'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'spin up the swarm for the web repo on all the hosts, assistants only, the tasks come tomorrow'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'I need an enrolled assistant on each of the four machines in the billing project before anything else'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 
 followups:
   - query: 'now get them ready'

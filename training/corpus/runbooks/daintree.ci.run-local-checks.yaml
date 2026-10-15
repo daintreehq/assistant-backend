@@ -92,6 +92,9 @@ boundaries:
     confusable_with:
     - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
+  - query: 'run the lint and unit checks on this branch here before I push'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 followups:
   - query: and the unit tests?
     history:

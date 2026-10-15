@@ -368,6 +368,9 @@ boundaries:
   - query: Get three agents to debate monorepo vs polyrepo until they agree on one recommendation.
     confusable_with: [daintree.orchestration.spike-options]
     run: 2026-09-28-catalog-expansion
+  - query: 'get claude and codex on this machine working together on the same feature, sharing notes'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 followups:
   - query: how's it going?
     history:

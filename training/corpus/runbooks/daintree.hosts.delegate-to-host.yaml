@@ -167,6 +167,15 @@ boundaries:
   - query: 'have the build server look over the PR my desktop opened and report back what it finds'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
+  - query: 'only the linux box should do the debounce helper, leave the other hosts alone'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'give this one bug to the mini''s assistant and verify its commit, nobody else gets it'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'the second machine should start on the importer only after the first one''s branch is pushed and checked'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

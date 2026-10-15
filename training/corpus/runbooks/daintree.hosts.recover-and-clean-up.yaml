@@ -148,3 +148,9 @@ boundaries:
   - query: 'ask the linux host''s assistant to close only the panes it opened for the usage check, nothing else'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: 'two of the machines went quiet after the hub came back; work out from the task records where each exchange stands'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'clean up the panes and worktrees the last run across the hosts left behind on each machine'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92

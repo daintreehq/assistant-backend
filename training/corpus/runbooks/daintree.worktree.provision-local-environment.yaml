@@ -262,6 +262,9 @@ boundaries:
   - query: 'give each worktree its own dev server port so they can all run at once'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: 'give every local worktree a separate postgres and dev server port before the agents start'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:

@@ -1,0 +1,146 @@
+# daintree.hosts.swarm-fan-out: the hub sends the SAME work to the assistant on every chosen
+# Remote Host at once, each on its own run branch, ends the turn, and brings back one table
+# with a row per host, each result verified by artifact and any host still open named as open.
+#
+# Positives are invented situations in agent and user words, short and long, some with a
+# social lead-in or an earlier turn. Boundaries are requests this runbook wins against a
+# neighbour whose vocabulary they share: one host (delegate), readiness only (start-swarm), a
+# per-host table of usage (check-usage-limits), a question (ask-host-assistant), work already
+# sent (recover-and-clean-up), the lane's side (handle-hub-message), and local fan-out,
+# competition and the generic local runbooks the starting sweep picked. Topic shifts are the
+# work going out after a readiness or usage turn. Machine names are generic.
+runbook: daintree.hosts.swarm-fan-out
+run: runbook-2026-10-issue-92
+
+positives:
+  - throw the slugify helper at every one of my other machines and show me what each one writes
+  - get all the remote boxes to have a go at the retry wrapper, each on its own branch
+  - 'same job on every host please: a tiny todo CLI with tests, committed on its own branch'
+  - can each of my servers take a crack at porting the install script from bash to python?
+  - put every connected host on the date-fns migration of the reports module, one branch per host
+  - every machine builds its own version of the rate limiter, then give me a table of their shas
+  - let all four minis try the svg optimiser task and give me each one's branch and commit
+  - give the whole swarm the cache warmer task each on a fresh branch and table the results
+  - i want the json schema validator written on every remote mac separately, codex on all of them
+  - 'hey, quick one: can all my other machines independently write the markdown table formatter? own branches, no pushing'
+  - morning! let's see what every host does with the retry decorator, same brief for all of them
+  - have the laptop host and both minis each build the throttle util so I can see the three versions
+  - roll the same prototype out to every host, a websocket echo server with a test, and bring back the commits
+  - run the scaffold generator for the new plugin on each of the hosts and get me each one's commit
+  - claude on the first two hosts, codex on the other two, everyone writes the lru cache with tests
+  - each remote host should implement the config diff command on its own branch and push it when its tests pass
+  - 'send every machine the same spike: replace the hand-rolled argument parser with click, one branch each'
+  - get every host working on the csv export endpoint in parallel and tell me as each one finishes
+  - can you get all my remote macs to each try the dark mode toggle? i'll look at the branches later
+  - all the other machines, write the base64 url helper with tests, commit, and send me back the sha
+  - spin the same coding exercise out to the whole swarm and show me a row per machine
+  - put the word-frequency kata on every host I've connected, each with whatever agent it has signed in
+  - Brief each connected Remote Host's assistant identically, with its own branch, and assemble the per-host branch, commit and test outcome once all replies are in
+  - Replicate one coding task across all Remote Hosts at once, end the turn, and verify each host's reported commit before reporting
+  - Give the assistants on three named remote hosts an identical objective with host-specific branch names, Claude Code on two and Codex on one, and report a row per host
+  - Dispatch the same experiment to every enrolled host lane in this project without waiting on each send, then gather each host's artifacts as replies arrive
+  - Have each Remote Host's assistant build the same prototype on its own run branch and check every reported SHA on the shared remote
+  - The user wants every remote machine to attempt the same refactor independently; brief all hosts at once and table the branches and checks each reports
+  - Broadcast one task to the assistants on all Remote Hosts with per-host branches and report which hosts answered, which are still open, and what each verified
+  - Fan the same feature out to every Remote Host this Shell reaches and bring back one table of host, agent CLI, branch, SHA and test result
+  - Ask every host assistant in the swarm to implement the same small module from the main commit, without pushing, and confirm each commit by a follow-up question
+  - query: >-
+      The user has four Remote Hosts connected to this Shell and wants each of them to
+      independently implement a small LRU cache module with unit tests, on a branch named for
+      that host. Claude Code is signed in on two hosts and Codex on the others. Nothing should
+      be pushed; the user wants one table of branch, commit and test result per host, checked
+      rather than taken on trust.
+  - query: >-
+      ok so here's the plan. every one of my other machines should write the image thumbnailer
+      from scratch, own branch each, push it when the tests pass. then give me a table with each
+      machine's branch, sha and whether the tests passed, and don't tell me it's all done if one
+      of them hasn't answered
+  - query: >-
+      The person asked for the same refactor, extracting the config loader into its own module,
+      on every remote host this Shell reaches so they can look at each approach. Each host works on
+      its own branch from the current main commit, runs the project's tests and reports back;
+      one host has no assistant in this project yet.
+  - query: >-
+      I've got the build server, the linux workstation and the old mac mini all hooked up. I'd
+      like each of them to take the same ticket, adding retry with backoff to the webhook
+      sender, in their own worktree with whichever agent they have. Report back branch and
+      commit for each one.
+  - do the timezone bug on every machine, but codex on the ones without a claude login, and nothing gets pushed
+  - 'you''re a star. alright, same spike on all three hosts now: swap the json parser for orjson, a branch per host'
+  - query: >-
+      Three hosts are connected and each has an enrolled lane in the web project. The person
+      wants the same accessibility fix applied on each so they can look at the diffs later:
+      every host gets its own branch from the current main commit, no pushing, and the report
+      says which hosts finished, with commit and test output per host.
+  - thanks for setting that up! now get every host to write the url shortener exercise on its own branch
+  - 'nice, that worked. ok next: all the remote machines do the same port of the logger to structured json, and tell me each sha'
+  - query: all four, claude on the first two and codex on the rest
+    history:
+      - 'user: can every host build the toy expression parser?'
+      - 'assistant: Four hosts are connected. All of them, or only some?'
+  - query: yes, same brief everywhere, a branch per host, no push
+    history:
+      - 'user: I want the other machines to each try the cache layer rewrite'
+      - 'assistant: Should every host get the same task, and may they push?'
+
+boundaries:
+  - query: have the mini and the linux workstation each do the session timeout fix, separately, on their own branches
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: not just the linux machine, every host should implement the debounce helper and report its commit
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: Send the same bug fix brief to all three remote hosts' assistants instead of one, and verify each commit
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the assistants are ready on every host, now hand them all the same task, the webhook signature check
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: every machine already has claude enrolled, give each the same refactor and bring back their shas
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: have every host run the code generator and report back a table of the commits, one row per machine
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: ask each remote machine's assistant to build the same feature and give me a per-host table of branch and sha
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: I don't want their opinions, I want each remote machine's assistant to build the feature flag on a branch
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: get the assistants on all my other machines to implement the fix rather than just tell me what they think
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: 'start a fresh run: every host implements the throttle helper on a new branch'
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: kick off a new swarm run on the remote hosts, same feature for each, and table what comes back
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: these should run on the remote boxes, one copy each, not as parallel panes on my laptop
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: fan the task out across my other machines rather than local worktrees, one copy per host
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: Replicate this task on every remote host's assistant, not as parallel agents here
+    confusable_with: [daintree.orchestration.fan-out-work]
+  - query: have each remote host attempt the same refactor so I can see the different takes side by side
+    confusable_with: [daintree.orchestration.competition]
+  - query: let every one of my other macs write its own version of the tokenizer and show me all of them
+    confusable_with: [daintree.orchestration.competition]
+  - query: "I'm on the Shell: send the build task to every host's assistant and collect what each one replies"
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: from the Shell I'm on, broadcast the dependency bump to every enrolled lane and list what each one committed
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: I want the minis to all implement the feature flag, a branch apiece, commits back to me
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: run the formatter fix on all my remote hosts and bring back each machine's commit
+    confusable_with: [daintree.ci.run-local-checks]
+  - query: swarm the remote hosts with this task, the same brief for each machine
+    confusable_with: [daintree.orchestration.multi-agent]
+  - query: I want the importer written on all of my remote boxes, each lane making its own worktree, and the commits listed for me
+    confusable_with: [daintree.hosts.do-delegated-work]
+
+followups:
+  - query: actually, have every other host do the same one too, each on its own branch
+    history:
+      - 'user: have the linux box implement the debounce helper'
+      - 'assistant: Sent to the linux box; I will verify its branch when it replies.'
+
+topic_shifts:
+  - query: great, now give them all the same task, write the csv exporter with tests on their own branches
+    history:
+      - 'user: make sure each of my remote machines has claude waiting in the api project'
+      - 'assistant: All four hosts have an assistant ready in this project, with their generations.'
+  - query: ok then send each of them the json validator task, codex everywhere
+    history:
+      - 'user: check codex usage on every host'
+      - 'assistant: One table: every host has most of its weekly allowance left.'

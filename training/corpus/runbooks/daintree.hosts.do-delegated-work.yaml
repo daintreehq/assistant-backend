@@ -130,3 +130,6 @@ boundaries:
   - query: 'the hub''s earlier unit was tidied away; now it wants the follow-up fix built in a new worktree on this host'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: 'the hub gave each host the same retry helper to build; make the worktree here, launch codex on it and send back the commit'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92

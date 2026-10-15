@@ -423,6 +423,9 @@ boundaries:
   - query: claude and codex each wrote their own version of the parser, judge which is better and go with the winner
     confusable_with: [daintree.orchestration.salvage-failed-attempt]
     run: 2026-09-28-round6
+  - query: 'have three agents on this machine race on the same bug and pick the best fix'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 followups:
   - query: how's it going?
     history:

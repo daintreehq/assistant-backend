@@ -157,3 +157,6 @@ boundaries:
   - query: "check with the laptop host whether it switched to codex because claude ran out, and what it says"
     confusable_with: [daintree.hosts.check-usage-limits]
     run: runbook-2026-10-issue-91
+  - query: 'ask the assistant on the build box what it makes of the parser approach, it should change nothing'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92

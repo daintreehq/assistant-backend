@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 19207,
-  "compiled_sha256": "a778c2578a13ac25c80c90a4c1ac846d244ab945136d660e8496ae75561d9414",
-  "label_space_sha256": "b77ab382a98b95849cb8ddb4907e402b94ee31ade77031b1409e54973ccbbce5",
-  "label_space_size": 119,
+  "rows": 19294,
+  "compiled_sha256": "4cdcb90d0a5abfa368734cbd3df58de129a117b0884ee0a1b44ac81d72ed2be2",
+  "label_space_sha256": "d4058e44fc02ba87a20a9f515f1e9a57c0811a151c1abd43a3679bab2bbeca73",
+  "label_space_size": 120,
   "by_source": {
-    "boundary": 5887,
+    "boundary": 5929,
     "docs": 841,
-    "followup": 890,
+    "followup": 891,
     "foundation": 446,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -16,8 +16,8 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 6147,
-    "topic_shift": 3012,
+    "positive": 6189,
+    "topic_shift": 3014,
     "wake": 150
   },
   "by_run": {
@@ -50,6 +50,7 @@
     "runbook-2026-10-issue-89": 96,
     "runbook-2026-10-issue-90": 77,
     "runbook-2026-10-issue-91": 83,
+    "runbook-2026-10-issue-92": 87,
     "runbook-2026-10-issue-95": 86,
     "runbook-2026-10-issue-96": 38,
     "runbook-2026-10-issue-98": 73,
@@ -151,10 +152,10 @@
       "sha256": "3dbdcbff240f843291b65e6986d6bca306aa75208783becc81de505f726656d4"
     },
     "runbooks/daintree.ci.run-local-checks.yaml": {
-      "examples": 61,
-      "rows": 61,
+      "examples": 62,
+      "rows": 62,
       "runbook": "daintree.ci.run-local-checks",
-      "sha256": "ddc46ddd6441a8ca29630a68dc8c928b3c076cc17fa0febf9c6b17cc7ced7f3b"
+      "sha256": "e3a2c0410c04c5e920f6173f64f9be8451630cfe4540af502e77b5dd7221ca24"
     },
     "runbooks/daintree.context.curate-copytree-bundle.yaml": {
       "examples": 163,
@@ -319,16 +320,16 @@
       "sha256": "c45a8b179c18b5a710469a1dc4782229b0c6275096a94c250af8dbd8f91ab5d1"
     },
     "runbooks/daintree.hosts.ask-host-assistant.yaml": {
-      "examples": 73,
-      "rows": 73,
+      "examples": 74,
+      "rows": 74,
       "runbook": "daintree.hosts.ask-host-assistant",
-      "sha256": "7a58743ceca28c2c220298f0abaeb50a8a9e1410519b078691a4b10fc3e13088"
+      "sha256": "354b3ff2b44b534fd10479b6d73a624b6b5e2552247b476e1c7ebcedaefbc7e5"
     },
     "runbooks/daintree.hosts.check-usage-limits.yaml": {
-      "examples": 64,
-      "rows": 64,
+      "examples": 66,
+      "rows": 66,
       "runbook": "daintree.hosts.check-usage-limits",
-      "sha256": "baa7818e87e7e0d1514a1e77986af8dba27296371c7b9db80acf87640c64a225"
+      "sha256": "f31757507c48cb05ac65c94941115132b0615aa28c2d224c5b3e16770eb3275d"
     },
     "runbooks/daintree.hosts.clean-up-for-hub.yaml": {
       "examples": 65,
@@ -343,10 +344,10 @@
       "sha256": "5b54201c57d3cc5cafc7589217a87b1c066fe9e81d8e88b7ced5f20ed7b7de17"
     },
     "runbooks/daintree.hosts.delegate-to-host.yaml": {
-      "examples": 82,
-      "rows": 82,
+      "examples": 85,
+      "rows": 85,
       "runbook": "daintree.hosts.delegate-to-host",
-      "sha256": "38cc912667ac8b0de68fb3dcb682d892966111caff37c19313e1575db4d51d8a"
+      "sha256": "6cd3d1add9530f39213cb1039d24dea828d079a8d1dd764def9ee16fcdc1d141"
     },
     "runbooks/daintree.hosts.demo-for-hub.yaml": {
       "examples": 65,
@@ -355,10 +356,10 @@
       "sha256": "57611617c36e2a76489ed92a2aca41fca6959b98d1c36e2edffffbf791fb3565"
     },
     "runbooks/daintree.hosts.do-delegated-work.yaml": {
-      "examples": 68,
-      "rows": 68,
+      "examples": 69,
+      "rows": 69,
       "runbook": "daintree.hosts.do-delegated-work",
-      "sha256": "3c663b73c1657ceec5b317784c38d123287fc48a31917ff37a62c5e47c2cea5e"
+      "sha256": "938df0944c9f386f701e4a14fc6d7866df620c5c984d75313ab3d52ba957cdca"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
       "examples": 95,
@@ -367,16 +368,16 @@
       "sha256": "7e8bc6a09341a87160a4806e72fda87cbaeeb2e014271845f8fa3988820c0c22"
     },
     "runbooks/daintree.hosts.handle-hub-message.yaml": {
-      "examples": 81,
-      "rows": 81,
+      "examples": 82,
+      "rows": 82,
       "runbook": "daintree.hosts.handle-hub-message",
-      "sha256": "a89dc54a89d15f196d70ac8668f4a2dddc1f870d9601958943ab121f099d7d81"
+      "sha256": "d239aed56e4503a87494033c4a7fc471b06055244c9509db5a367dc5ca26a8fd"
     },
     "runbooks/daintree.hosts.recover-and-clean-up.yaml": {
-      "examples": 74,
-      "rows": 74,
+      "examples": 76,
+      "rows": 76,
       "runbook": "daintree.hosts.recover-and-clean-up",
-      "sha256": "c2b9a4f8af6cd7745827a9e78d9f75c822f68124d41385936a26eec2bc14750d"
+      "sha256": "d07b70ec481df9d9b3f3d8c85bc7513e7b234f2a3dc6f6b7f40b7fe7a77cec53"
     },
     "runbooks/daintree.hosts.review-for-hub.yaml": {
       "examples": 71,
@@ -385,10 +386,16 @@
       "sha256": "311bde3fe49bf5a0120b4523eab4b9cfb19061644e41cb2ea776d48c48304170"
     },
     "runbooks/daintree.hosts.start-swarm.yaml": {
-      "examples": 70,
-      "rows": 70,
+      "examples": 74,
+      "rows": 74,
       "runbook": "daintree.hosts.start-swarm",
-      "sha256": "953f7fcfa60233c598c49becc0a937ca0b539819437c63749b7002545d4843eb"
+      "sha256": "e6372db369e550e11cf4ac036f20282db77d59befcca6176ea89f5e00eb3d76e"
+    },
+    "runbooks/daintree.hosts.swarm-fan-out.yaml": {
+      "examples": 67,
+      "rows": 67,
+      "runbook": "daintree.hosts.swarm-fan-out",
+      "sha256": "929ddc40f5dd7c1776a92b0ef7b837fef50709c58c0386868dd1ba718dbc9fac"
     },
     "runbooks/daintree.hosts.verify-for-hub.yaml": {
       "examples": 70,
@@ -409,10 +416,10 @@
       "sha256": "449f150ed39e1a1757885655e4d035550b42a723c58a3740f5570fb695cea9b3"
     },
     "runbooks/daintree.orchestration.competition.yaml": {
-      "examples": 254,
-      "rows": 254,
+      "examples": 255,
+      "rows": 255,
       "runbook": "daintree.orchestration.competition",
-      "sha256": "5c24f288e9f31e74357800fcec08241ab6eed617e018abd6eeb59156cdab00e5"
+      "sha256": "d8f4eef6204a5d4cf986be8ec8701521468784dd2809117251951a5cefb052a9"
     },
     "runbooks/daintree.orchestration.contract-first-split.yaml": {
       "examples": 48,
@@ -445,10 +452,10 @@
       "sha256": "67cbd2d635a577f3fa91c412b2f7a4d58a1240be49a891f070c19cc2de342aef"
     },
     "runbooks/daintree.orchestration.fan-out-work.yaml": {
-      "examples": 364,
-      "rows": 364,
+      "examples": 366,
+      "rows": 366,
       "runbook": "daintree.orchestration.fan-out-work",
-      "sha256": "85085c9d6e46fe973cb39839170dfc825ca76a585369a87d578ef478c5b04473"
+      "sha256": "da6ff234197cc3aa04b5076692a17695df12fde476f7968d9da1fef38e81ed58"
     },
     "runbooks/daintree.orchestration.hand-off-orchestration.yaml": {
       "examples": 47,
@@ -475,10 +482,10 @@
       "sha256": "6eae243d6370dc0da858b25701a273b78e56cb400ecb51f35f776d7992ef6506"
     },
     "runbooks/daintree.orchestration.multi-agent.yaml": {
-      "examples": 225,
-      "rows": 225,
+      "examples": 226,
+      "rows": 226,
       "runbook": "daintree.orchestration.multi-agent",
-      "sha256": "fec0436b984452659f29ef2a164ac3d233aceeffacf71e287712d556786e02b9"
+      "sha256": "4ac43fc845074dbab4ec626758e144f8c8d4ee47f6f7da44393574142228c438"
     },
     "runbooks/daintree.orchestration.park-work.yaml": {
       "examples": 82,
@@ -769,10 +776,10 @@
       "sha256": "e12e1a3bc744f890c1612173d4f8d112c6cb83430a56f0692fa6deedd300cee5"
     },
     "runbooks/daintree.worktree.provision-local-environment.yaml": {
-      "examples": 129,
-      "rows": 129,
+      "examples": 130,
+      "rows": 130,
       "runbook": "daintree.worktree.provision-local-environment",
-      "sha256": "b4abf09cae0b13407f54969c259dd6a4270c12c17f91695257af994b365f3d0e"
+      "sha256": "4507cb587e57632b5d5240394a2983c9105254c8486af17f0ef64d205fbdb833"
     },
     "runbooks/daintree.worktree.relocate-agents.yaml": {
       "examples": 770,

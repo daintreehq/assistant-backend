@@ -186,3 +186,6 @@ boundaries:
   - query: 'the hub''s job is finished here; give it the commit and the branch name as the answer'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
+  - query: 'an inbox wake just came in from the hub with the task the whole swarm got; go through it and answer'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92

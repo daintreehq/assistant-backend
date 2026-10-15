@@ -104,6 +104,12 @@ boundaries:
     confusable_with: [daintree.hosts.ask-host-assistant]
   - query: ask the office host's assistant what its claude usage screen shows right now
     confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: 'how much codex allowance does each of my other machines have left, host by host'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: 'before the next run across the hosts, find out which one has the most claude headroom'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
 followups:
   - query: and claude on those same machines?
     history:
