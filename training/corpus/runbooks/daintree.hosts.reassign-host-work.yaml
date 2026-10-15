@@ -1,0 +1,160 @@
+# daintree.hosts.reassign-host-work: the hub moves ONE unit already delegated to a Remote Host
+# that cannot carry on (dropped off the network, unreachable, stuck, out of allowance on the
+# agent CLI the work needs, or missing that CLI) to a different host, as a new task that
+# references the original: what the first host pushed is checked first, the old worker is
+# stopped with an acknowledgement or its risk is put to the person, one owner publishes, and a
+# returning first host is reconciled with neither attempt lost.
+#
+# Positives are invented situations in agent and user words, short and long, some with a
+# social lead-in, a constraint or an earlier turn; two how-to questions carry docs. Boundaries
+# are requests this runbook wins against a neighbour sharing its words: an account of
+# exchanges with nothing moved (recover-and-clean-up), first placement (place-work), new work
+# for a named host (delegate-to-host), another agent in the same checkout (hand-off-task), a
+# lane stopping its own agents (steer-for-hub), a host that will not connect or take messages
+# (connect-host, diagnose-messaging), usage figures (check-usage-limits), re-planning local
+# agents (reprioritize-work), two local agents on one task (resolve-task-collisions). Followups
+# and topic shifts are a move decided after an account, a usage table or a cleanup, and the
+# first host coming back after a move. Machine names are generic.
+runbook: daintree.hosts.reassign-host-work
+run: runbook-2026-10-issue-113
+
+positives:
+  - the studio running the checkout refactor fell off the network an hour ago, get one of the other machines to carry on from whatever it pushed
+  - The Remote Host handling the payments webhook unit stopped responding twenty minutes ago and the user wants it finished today on a different connected host, without losing the commits it already pushed
+  - codex on the linux box is out of credits for the week and it was halfway through the csv importer, hand that piece to a machine that still has allowance
+  - my laptop host went to sleep in the middle of the search indexing ticket, can another host pick it up without redoing what's done
+  - the remote assistant has been sitting on the migration task since lunch and nobody is near that machine, move the job to the workstation
+  - move the onboarding copy fix off the mini, it turns out claude isn't signed in there and the task needs it
+  - A delegated unit's host shows disconnected and its exchange is still open; the user has accepted the risk that the old worker may still be running and wants the remainder done elsewhere on a fresh branch
+  - hey quick one, the tower crashed while working on the cache invalidation bug. can another machine take over? keep whatever it already committed
+  - the host doing the api pagination change has gone dark. fine for another machine to finish it, just don't let both of them open a PR
+  - The Remote Host assigned the flaky end to end test fix exhausted its Claude Code usage; the unit should continue on a host with Codex signed in, without retrying the approaches that already failed
+  - one of the studios dropped mid task, rehome its unfinished work on a healthy machine
+  - shift the half done rate limiter job from the third host to the first, it has been wedged for two hours
+  - the build server lost power during the dependency bump and its branch has two commits pushed. resume from there on a different host
+  - The original host for the schema split unit is offline and its branch on the remote stops at an earlier commit; the user wants another host to finish the unit and be the only one that pushes it
+  - can the other mac finish what the dead one was doing on the export feature? I don't want to lose its progress
+  - the assistant on the old intel box keeps timing out on the docs task, give it to a different machine
+  - move the stalled ticket to whichever other host is free, but carry over what it found so far
+  - the remote job is wedged and the only person who can sort that machine out is off today, reassign it
+  - hand the leftover part of the sync refactor to another host, the first one died after pushing the schema change
+  - take the stuck accessibility audit off the workstation and give it to the mini, don't start it from scratch
+  - The release run's fourth unit has had no progress for three hours and its host keeps flapping between connected and disconnected; the user wants it off that machine
+  - A unit's host can no longer run the agent CLI the brief named after a sign-out there; another enrolled host has that CLI and the same repository
+  - morning! the mini disappeared from the host list overnight with the logging cleanup half finished, can the studio take it from where it got to
+  - the box doing the image resizing work is out of codex quota till friday, move that task somewhere with quota
+  - I think the second host is hung on the auth refactor. stop it if you can and let the fourth host finish the job
+  - get the half finished translation work off the machine that keeps disconnecting and onto a stable one
+  - One in-flight unit sits on a Remote Host that dropped off; the user wants a second host to carry it on and is worried about two hosts publishing the same change
+  - the remote that had the parser rewrite is unreachable; whatever it pushed should go to another host and that host carries on from there
+  - the windows host can't run the cli this ticket needs, move the ticket over to a mac host and keep its notes
+  - its usage ran out on the ubuntu machine mid way through the migration, move the rest of it to the other ubuntu host
+  - that machine is toast for today. put its unfinished unit on another one
+  - the tower's been offline since the power cut and the deadline is tonight, give its task to someone else
+  - pull the half done search work off the overloaded host and let a quieter one finish it from its last push
+  - user says the linux host is going in for repairs mid-run; its open unit needs a new home before it goes
+  - ok the second host is out of claude for the week, its ticket needs to go somewhere that still has some
+  - query: how does moving a half finished task from a dead host to another one work without both of them pushing? then do it for the cache unit
+    docs: true
+  - query: what happens to the unpushed changes if you move a task off a host that went offline? explain, then move the parser task to the tower
+    docs: true
+  - query: >-
+      So the box that was doing the Postgres upgrade work vanished from the hosts list about
+      thirty minutes ago. Its branch on the remote has the first migration pushed but I know it
+      had more locally. This has to land today, so get another machine going on it from what is
+      pushed, and make sure that if the old box comes back it does not also push a competing
+      version.
+  - query: >-
+      The agent on the remote mac hit its weekly Claude limit partway through the feature flag
+      cleanup. Its assistant still answers messages. Have it stop and push what it has, I'm fine
+      with that push, then get the other host with Claude allowance left to finish the job on its
+      own branch.
+  - query: >-
+      Context: a unit delegated to a Remote Host has had no progress for three hours, the host
+      shows as disconnected, and the user has a demo in the morning. They want the unit finished
+      on another host today, carrying over the commits that reached the remote and what the old
+      host already ruled out, with one clear owner.
+  - query: >-
+      the studio I gave the export ticket to has been offline since this morning and I'm not
+      going to be near it until tomorrow. don't wait for it. have one of the other machines take
+      over, but tell me first what we lose by doing that
+  - query: ok, move it to the tower then
+    history:
+      - "user: how's the parser unit going on the mini?"
+      - "assistant: The mini has been disconnected for 40 minutes; its last push was the lexer commit."
+  - query: then put its half finished export task on a host that still has some left
+    history:
+      - "user: check codex usage on the hosts"
+      - "assistant: The linux host shows its Codex allowance used up; the two macs have plenty left."
+  - query: just move it, don't wait for that machine
+    history:
+      - "user: is the second host ever coming back with the cache fix?"
+      - "assistant: It is disconnected; the exchange is still open and its branch has one pushed commit."
+
+boundaries:
+  - query: the link to the tower dropped and it won't be back today; don't just tell me what's open, move its half done unit to another host
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: after the restart the mini never came back as an assistant and its unit is half done, put it on the studio instead of waiting
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the job I sent to the build box is stuck, rather than sending it to that box again give it to a different host
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the piece you placed on the mini this morning is stuck, pick a different host for it and carry over its work
+    confusable_with: [daintree.hosts.place-work]
+  - query: one of the hosts from this morning's split went offline; give its unfinished piece to whichever remaining host has room
+    confusable_with: [daintree.hosts.place-work]
+  - query: the workstation dropped midway through its task, send what it was doing to the mini and carry on from its pushed commits
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: have the tower continue the unit the mini started before it went offline, from the mini's branch
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: claude ran out on the remote build box mid task, have a different machine carry it on
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: the codex agent on the other mac is out of usage, move its unfinished work to another host rather than swapping agents there
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: if the dead host's worker can still be reached stop it, then get the unit going on another machine
+    confusable_with: [daintree.hosts.steer-for-hub]
+  - query: the mini isn't answering messages at all; don't debug it, just move its task to another host
+    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: the remote host shows no reply since this morning and I can't get to it, have another host finish its task
+    confusable_with: [daintree.hosts.connect-host]
+  - query: the linux host is out of codex credit, move its unfinished task to a host that has credit left
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: the host doing the urgent login fix went down; get that unit onto another remote machine now
+    confusable_with: [daintree.orchestration.reprioritize-work]
+  - query: one remote host is unreachable and I want its task finished elsewhere, but make sure only one of them ends up publishing
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+  - query: the unit on the stuck host should move to another machine; first get it to stop if it still answers
+    confusable_with: [daintree.agents.steer-running-agent]
+  - query: the host I sent the parser unit to says its claude code isn't signed in there; move the unit to a host that has it
+    confusable_with: [daintree.hosts.handle-hub-message]
+
+followups:
+  - query: fine, move that one to the tower then
+    history:
+      - "user: give me a rundown of the remote hosts"
+      - "assistant: The mini is disconnected with the parser unit open for two hours; its branch has three pushed commits."
+  - query: the mini is back online now, what happens to its copy?
+    history:
+      - "user: move the parser unit off the mini, it's offline"
+      - "assistant: The tower now has the parser unit as a new task on its own branch, from the mini's last pushed commit."
+  - query: yes, go ahead and move it without waiting
+    history:
+      - "user: the second host dropped mid task, get someone else on it"
+      - "assistant: Its last push is two commits in; anything after that stays on that host, and if it is still running it could push too. Move it now?"
+  - query: it's back, and it says it kept working while it was offline. which one do we keep?
+    history:
+      - "user: give the export unit to the studio, the laptop host is gone"
+      - "assistant: Sent. The laptop never answered the stop request, so its agent may still be running."
+  - query: use the mini instead of the tower for it
+    history:
+      - "user: the build box is out of claude usage, move its half-done ticket"
+      - "assistant: The tower has Claude Code with allowance left and the same repository; I'd move the ticket there. Go ahead?"
+
+topic_shifts:
+  - query: ok forget the cleanup, the third host's unfinished ticket should go to another machine
+    history:
+      - "user: clean up the panes the last run left on the hosts"
+      - "assistant: Two hosts removed their panes; the third is disconnected and still has an open unit."
+  - query: that one's still dead, move its task to the studio
+    history:
+      - "user: which of my hosts can't take messages right now?"
+      - "assistant: The mini has been disconnected since 09:40; it still holds the open search unit."
