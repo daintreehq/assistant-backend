@@ -203,6 +203,12 @@ boundaries:
   - query: 'ask the mini''s assistant to rebase its branch onto the latest main and report the new commit'
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
+  - query: 'The build box finished the parser change but skipped the docs; send it a follow-up task to add them on the same branch.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'Once the server''s branch is pushed, have my other Mac start the client work on top of it.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

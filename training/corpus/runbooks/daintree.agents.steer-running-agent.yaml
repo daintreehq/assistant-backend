@@ -126,6 +126,9 @@ boundaries:
   - query: "Stop the turn of the Codex agent I opened in the payments worktree this morning; it is adding a second HTTP client instead of using ours."
     confusable_with: [daintree.hosts.steer-for-hub]
     run: runbook-2026-10-issue-106
+  - query: 'the claude agent in my left pane is editing migrations, interrupt it and tell it to leave them alone'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
 followups:
   - query: also tell it to keep the old /v1/users response shape working
     history:

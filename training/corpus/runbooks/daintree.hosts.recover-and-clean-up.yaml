@@ -169,3 +169,12 @@ boundaries:
   - query: 'Daintree restarted while the tower was merging the hosts'' branches; which of the exchanges I sent are still open?'
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
+  - query: 'After the hub came back up, give me a per-host account of everything I''d sent out: answered, still pending, or lost.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'The run on my other machines is over; have each host''s assistant take down the panes and worktrees it made.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'the remote run is done, nothing to stop, just tell me what each machine finished and what never got answered'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110

@@ -156,3 +156,15 @@ boundaries:
   - query: 'hub update says the attempts running on this machine should all use the new API version from now on'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: 'hub''s message: the whole swarm is cancelled, so halt the codex pane I started for its unit and say what it left uncommitted'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'A message from the main machine says its run is off; stop the agents this assistant launched for it and reply with their state.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'the hub wants every agent here on its migration run to switch to the new schema name, rest of the brief unchanged'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'Hub follow-up: the task it gave this host was withdrawn, but my Claude pane for it had already started. Stop it and tell the hub what it changed.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110

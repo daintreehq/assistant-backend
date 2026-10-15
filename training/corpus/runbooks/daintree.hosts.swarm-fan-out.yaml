@@ -150,6 +150,12 @@ boundaries:
   - query: 'send the same migration to all my hosts, each on its own branch, and give me a table of what each pushed'
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
+  - query: 'I stopped the old run; now send the corrected brief to every host as a fresh run on new branches.'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
+  - query: 'have all my machines try the caching idea, each on its own branch, and show me what each got'
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-110
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch
