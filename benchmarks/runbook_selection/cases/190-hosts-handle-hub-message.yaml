@@ -363,14 +363,20 @@ cases:
   - id: handle-hub-message-receiver-verify
     category: routing-trap
     note: >-
-      Checking an agent's claimed result before the hub trusts it: today
-      daintree.orchestration.verify-agent-work ("a finished agent's work checked before it
-      is trusted").
+      Checking a claimed fix on a branch before the hub trusts it: the host-side receiver
+      daintree.hosts.verify-for-hub ("Use when the hub asks this lane to TEST or VERIFY a
+      commit or branch here and report the results"). The local owner is fenced both ways:
+      verify-for-hub's "a local agent's result (daintree.orchestration.verify-agent-work)" and
+      verify-agent-work's "for a hub's checks (daintree.hosts.verify-for-hub)". Re-pointed
+      from verify-agent-work when the receiver landed; the shipped selector still gives it to
+      verify-agent-work (rank_miss: a claimed fix checked before it is trusted is that
+      runbook's trained trigger, "a finished agent's work checked before it is trusted"), so
+      it stays red until the retrain.
     messages:
       - role: user
         content: The hub asked me to check whether the agent's claimed fix on the cache branch really works before it trusts it.
     expect:
-      required: [daintree.orchestration.verify-agent-work]
+      required: [daintree.hosts.verify-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-cohort
