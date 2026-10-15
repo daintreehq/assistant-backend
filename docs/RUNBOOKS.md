@@ -177,6 +177,12 @@ migration tests says it names real actions with valid arguments. Neither says an
 agent executes it well, or that a Daintree notice actually wakes the pane. Only a
 live trial in a Daintree pane shows that, so don't claim it from offline checks.
 
+`/runbook <issue or description>` (`.claude/skills/runbook`) runs this whole process
+end to end, for a new runbook or an improvement: the baseline and measurement, grounding
+in the app's action source, cases and blind-verified corpus rows, and a live trial in an
+isolated Daintree (its kit is in the skill's `scripts/trial/`). Given an issue it ends in
+a pull request into `develop`; given a description it commits on the current branch.
+
 ## Learning from real sessions
 
 A transcript of an agent doing the work is the best evidence. It shows the query

@@ -38,7 +38,10 @@ no provider adapters, no prompt layers, no auth modes, no state tokens.
 grows. Real sessions are the main input: `/learn-from-transcript <path>` takes a Claude Code
 or Codex transcript, measures what matched and what should have, and lands the lessons as
 runbooks, cases and training rows on the current branch. It replaced the retired
-`assistant-lab` missions; no issue or PR is involved.
+`assistant-lab` missions; no issue or PR is involved. Issue-driven work, a new runbook or an
+improvement to one, goes through `/runbook <issue>` (`.claude/skills/runbook`): baseline,
+measure, ground every action in the app, author, trial live in an isolated Daintree, review,
+and a PR into `develop`. Runbook issues follow `references/issue-format.md` there.
 
 ## Layout
 
@@ -175,8 +178,8 @@ not that a notice is delivered: only a live trial in a Daintree pane shows that.
    resolves to nothing. `bench lint` ranks the most confusable pairs.
 3. Add a case under `benchmarks/runbook_selection/cases/` that REQUIRES it (and a routing
    trap if it declares neighbours). `bench coverage` exits non-zero otherwise.
-4. Run `pytest tests/unit` (~5s). Do **not** narrow it with `-k`; concern-named filters
-   silently deselect the loader tests.
+4. Run `pytest tests/unit` (~2 min; the runbook test files alone take ~2s). Do **not**
+   narrow it with `-k`; concern-named filters silently deselect the loader tests.
 5. Run `bench local`. Its floors are a ratchet; a new runbook that drops recall elsewhere
    is a routing problem to fix in the text or with a retrain, not a floor to loosen.
 
