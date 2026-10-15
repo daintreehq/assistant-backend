@@ -215,8 +215,10 @@ cases:
     category: routing-trap
     note: >-
       Local agents that merely talked to a remote server are still local panes and
-      worktrees (daintree.orchestration.workspace-cleanup); "remote" does not make a Remote
-      Host.
+      worktrees: the hub runbook says "Do not use for agents, terminals or worktrees on
+      this machine: ... tearing down local panes and worktrees
+      (daintree.orchestration.workspace-cleanup)". A remote deployment target does not
+      make a Remote Host.
     messages:
       - role: user
         content: close the agent panes that were deploying to the remote staging server and delete their worktrees
