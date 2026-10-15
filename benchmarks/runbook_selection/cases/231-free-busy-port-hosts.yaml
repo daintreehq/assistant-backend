@@ -160,3 +160,88 @@ cases:
     expect:
       required: [daintree.runtime.free-busy-port]
       optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: fbp-hosts-trap-reverse-delegate-config-pr
+    category: routing-trap
+    note: >-
+      Reverse of fbp-hosts-hub-free-over-there-not-handoff: a port made configurable in the
+      code is delegated work, "ONE piece of WORK done by the Daintree assistant on another
+      machine" whose deliverable is "that host's commit, branch or PR"; no port is held, so
+      free-busy-port must not ride along.
+    messages:
+      - role: user
+        content: have the workstation's assistant make the storybook port configurable through an env var, push a branch and send me the PR
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: fbp-hosts-trap-forward-not-messaging
+    category: routing-trap
+    note: >-
+      A forward's local port held on this machine: free-busy-port's "a local port held by a
+      forward or a local process". Nothing goes to "the Daintree assistant on ANOTHER MACHINE",
+      so daintree.hosts.foundation must not ride along.
+    messages:
+      - role: user
+        content: the host's server answers on its own machine, but the port this laptop forwards to it is busy here; who holds it?
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation]
+
+  - id: fbp-hosts-trap-reverse-messaging-setup
+    category: routing-trap
+    note: >-
+      Reverse: switching messaging on is the hosts foundation's "how to switch it on"; the
+      ports are only what the person means to ask about later, so free-busy-port must not ride
+      along.
+    messages:
+      - role: user
+        content: messaging with the other Mac's assistant is switched off; how do I turn it on so I can ask it about its ports?
+    expect:
+      required: [daintree.hosts.foundation]
+      optional: [daintree.foundation]
+
+  - id: fbp-hosts-trap-bare-port-not-issue
+    category: routing-trap
+    note: >-
+      A bare number asked about as a listener is a port, free-busy-port's "what's running on 5173?",
+      not daintree.workflow.follow-up-on-issue's "a one-off READ of an issue or PR's current
+      forge state".
+    messages:
+      - role: user
+        content: anything listening on 4321 here, and whose is it?
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation]
+
+  - id: fbp-hosts-trap-reverse-pr-number
+    category: routing-trap
+    note: >-
+      Reverse: a bare number with checks is an issue or PR, follow-up-on-issue's "did CI pass?"
+      and "a one-off READ of an issue or PR's current forge state"; free-busy-port must not
+      ride along.
+    messages:
+      - role: user
+        content: where does 5174 stand, did its checks go green?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: fbp-hosts-continuation-remote-holder
+    category: continuation
+    note: >-
+      After a turn that put the failing server on another machine, the bare follow-up is
+      free-busy-port's "a remote worktree's server that cannot bind". The hub asks that host's
+      assistant, so the hosts foundation or daintree.hosts.ask-host-assistant may ride along.
+    messages:
+      - role: user
+        content: the api in the feature worktree on the build machine won't start
+      - role: assistant
+        content: >-
+          Its log on that host says "Error: listen EADDRINUSE: address already in use
+          :::4000".
+      - role: user
+        content: find what has it over there, don't stop anything
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.ask-host-assistant]
