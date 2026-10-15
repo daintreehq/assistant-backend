@@ -1,0 +1,236 @@
+# daintree.hosts.start-swarm: the hub readies one enrolled assistant per Remote Host in
+# the right project before any work goes out, and reports who is ready. Recall cases are
+# the requests that asked for it (scrubbed), in users' and agents' words; traps hold its
+# boundary, both ways, with the runbooks that took these requests before it existed:
+# daintree.worktree.manage-resource (a worktree's cloud devbox),
+# daintree.worktree.provision-local-environment (per-worktree resources on this machine),
+# daintree.orchestration.fan-out-work (parallel agents on this machine),
+# daintree.orchestration.supervise-fleet (agents already running here) and
+# daintree.edits.spawn-visible-agent (one local agent doing a change). The hosts
+# foundation rides along as the domain foundation and is optional everywhere.
+
+cases:
+  - id: start-swarm-set-up-remote-hosts
+    category: single-runbook
+    note: >-
+      The issue's first request, verbatim. The positive clause claims it: "a swarm SET
+      UP across their other machines before handing out work".
+    messages:
+      - role: user
+        content: Set up a swarm for this project across my remote hosts.
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-reuse-what-is-there
+    category: single-runbook
+    note: >-
+      Reuse before starting, in the issue's words: "reusing the one already enrolled and
+      starting the missing ones".
+    messages:
+      - role: user
+        content: Get an assistant ready on each selected server; reuse what is already there.
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-bootstrap-generations
+    category: single-runbook
+    note: >-
+      The issue's lane-level phrasing. "Bootstrap" pulled it to
+      daintree.deps.upgrade-dependency before; the clause "bootstrapping each host's
+      assistant lane" and the deliverable "(host, project, slot, agent, generation)"
+      decide it.
+    messages:
+      - role: user
+        content: Bootstrap host/project assistant lanes and return their current generations.
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-every-machine-repo
+    category: single-runbook
+    note: >-
+      A user's short form: "an assistant ready on every Remote Host, other Mac or server
+      ... in this project or repository".
+    messages:
+      - role: user
+        content: get an assistant on every machine for this repo
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-across-the-machines
+    category: single-runbook
+    note: >-
+      "a swarm SET UP across their other machines". Before this runbook the same words
+      selected daintree.orchestration.fan-out-work, which launches agents on this machine.
+    messages:
+      - role: user
+        content: set up a swarm on this project across the machines
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-which-machines-take-work
+    category: single-runbook
+    note: >-
+      "or asks which machines can take work right now": the who-is-ready question is the
+      same deliverable without the starts.
+    messages:
+      - role: user
+        content: which machines can take work on this project right now
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-agent-outcome
+    category: single-runbook
+    note: >-
+      How Claude Code or Codex describes the task to search: reuse the enrolled lanes,
+      report "(host, project, slot, agent, generation)".
+    messages:
+      - role: user
+        content: >-
+          Get one enrolled assistant per remote host in the target project, reusing lanes
+          already enrolled for this Shell, and report each one's slot, agent and generation
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-claude-on-other-macs
+    category: single-runbook
+    note: >-
+      Casual, naming the CLI and the machines: "Claude Code or Codex ready on every Remote
+      Host, other Mac or server". Without that clause it went to daintree.diagnostics.
+    messages:
+      - role: user
+        content: can u get claude going on all my other macs for this repo
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-who-can-take-work
+    category: continuation
+    note: >-
+      Bare, "who can I give work to" is ambiguous with agents on this machine; after a
+      turn about the remote hosts it is "asks which machines can take work right now".
+    active: [daintree.hosts.foundation]
+    messages:
+      - role: user
+        content: are my other machines connected?
+      - role: assistant
+        content: >-
+          Three remote hosts are connected; two have an assistant enrolled for this Shell
+          in this project.
+      - role: user
+        content: who can I give work to right now
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-not-remote-resource
+    category: routing-trap
+    note: >-
+      The issue's baseline query, which selected daintree.worktree.manage-resource. Remote
+      hosts' assistants are not "a worktree's cloud devbox or remote resource", which
+      start-swarm fences to daintree.worktree.manage-resource.
+    messages:
+      - role: user
+        content: Set up assistants for this project across my remote hosts and tell me which are ready
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-not-worktree-environment
+    category: routing-trap
+    note: >-
+      An assistant per machine, not a resource per worktree: start-swarm fences
+      "per-worktree databases, ports or setup scripts on this machine" to
+      daintree.worktree.provision-local-environment.
+    messages:
+      - role: user
+        content: every machine needs its own assistant in this repo before I split the work
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-not-local-fan-out
+    category: routing-trap
+    note: >-
+      Readiness with "no work sent", not a batch of agents: start-swarm fences "launching
+      parallel agents on this machine" to daintree.orchestration.fan-out-work.
+    messages:
+      - role: user
+        content: prepare the swarm one assistant per machine dont start any coding yet
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-not-fleet-sweep
+    category: routing-trap
+    note: >-
+      "what still needs me" about hosts being readied, not "sweeping agents already
+      running here" (daintree.orchestration.supervise-fleet).
+    messages:
+      - role: user
+        content: Get a Codex assistant ready on each remote host for this project and list what still needs me
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: start-swarm-reverse-remote-resource
+    category: routing-trap
+    note: >-
+      A worktree's devbox: daintree.worktree.manage-resource's "wants to provision, pause
+      or resume it". start-swarm must not ride along.
+    messages:
+      - role: user
+        content: the cloud devbox for this worktree is still running, pause it to save money
+    expect:
+      required: [daintree.worktree.manage-resource]
+
+  - id: start-swarm-reverse-worktree-environment
+    category: routing-trap
+    note: >-
+      Per-worktree resources on this machine stay with
+      daintree.worktree.provision-local-environment ("each branch needs its own
+      database"); nothing about other machines.
+    messages:
+      - role: user
+        content: each worktree needs its own database and port so the branches can run side by side
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+
+  - id: start-swarm-reverse-local-fan-out
+    category: routing-trap
+    note: >-
+      A batch of issues, one agent each, on this machine: daintree.orchestration.fan-out-work.
+      No remote host, no readiness question.
+    messages:
+      - role: user
+        content: launch an agent for each of these four issues, each in its own worktree
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+
+  - id: start-swarm-reverse-fleet-sweep
+    category: routing-trap
+    note: >-
+      Agents already running here: daintree.orchestration.supervise-fleet's "is anyone
+      stuck?". Not a question about which machines can take work.
+    messages:
+      - role: user
+        content: which of the running agents is stuck right now
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+
+  - id: start-swarm-reverse-local-agent
+    category: routing-trap
+    note: >-
+      Starting one agent here to change code is daintree.edits.spawn-visible-agent ("asks
+      for a visible agent to do it"), even though it says "open a Codex agent".
+    messages:
+      - role: user
+        content: open a Codex agent in this worktree and have it split the config loader into two modules
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
