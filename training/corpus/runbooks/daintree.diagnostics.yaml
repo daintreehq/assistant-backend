@@ -358,6 +358,9 @@ boundaries:
   - query: "no notifications from daintree on this machine since the update, what's broken"
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
+  - query: 'Daintree on this machine says every agent fails to start, can you check what''s broken'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: and the key thing too?
     history:

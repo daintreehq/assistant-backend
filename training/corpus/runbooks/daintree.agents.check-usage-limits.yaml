@@ -214,6 +214,9 @@ boundaries:
   - query: "check claude's weekly limit, I want to know whether I can afford another big run"
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: transcript-2026-09-29-launch-effort-cut-off-turns
+  - query: 'how much codex usage is left on each of my machines'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: now do grok
     history:

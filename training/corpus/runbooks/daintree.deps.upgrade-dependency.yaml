@@ -98,6 +98,9 @@ boundaries:
   - query: "bump the graphql codegen to its latest release here and fix whatever breaks"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: 'bootstrap the newer version of the test runner across this repo and fix what breaks'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: bring react-dom and @types/react along with it, obviously
     history:

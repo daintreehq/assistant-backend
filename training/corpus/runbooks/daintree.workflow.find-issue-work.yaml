@@ -328,6 +328,9 @@ boundaries:
   - query: list the open PRs waiting for review on develop - just the list, nothing else
     confusable_with: [daintree.review.review-pr-queue]
     run: 2026-09-28-catalog-expansion
+  - query: 'find me unassigned issues I could hand to the other machines'
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-102
 followups:
   - query: any of those small enough for an hour?
     history:

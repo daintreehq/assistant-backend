@@ -207,9 +207,11 @@ boundaries:
     run: runbook-2026-10-issue-90
   - query: 'where is the setting that lets the hub start assistants on a remote host'
     confusable_with: [daintree.hosts.start-swarm]
+    docs: true
     run: runbook-2026-10-issue-102
   - query: 'the hub''s start on my other mac came back opted out, how do I fix that'
     confusable_with: [daintree.hosts.start-swarm]
+    docs: true
     run: runbook-2026-10-issue-102
 
 followups:
