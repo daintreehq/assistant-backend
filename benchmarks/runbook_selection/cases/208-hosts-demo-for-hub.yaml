@@ -72,8 +72,8 @@ cases:
   - id: demo-for-hub-user-casual
     category: single-runbook
     note: >-
-      Casual, no punctuation, "box" for this host. Decided by "hub message: get the dashboard
-      branch running here with sample data and reply with the port". At base the envelope took
+      Casual, no punctuation, "box" for this host. Decided by "hub message: run the dashboard
+      branch here as a demo with sample data and reply with the port". At base the envelope took
       it with daintree.worktree.manage-resource and daintree.hosts.ask-host-assistant riding
       along.
     messages:
@@ -151,6 +151,19 @@ cases:
       required: [daintree.hosts.demo-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
+  - id: demo-for-hub-trap-not-delegated-code
+    category: routing-trap
+    note: >-
+      Code already built, to be shown, not changed. Decided by "the hub asks THIS machine to
+      prepare a DEMO of a feature" and the fence "code the hub asks this host to implement, fix
+      or build (daintree.hosts.do-delegated-work)".
+    messages:
+      - role: user
+        content: The import wizard is already built on the branch the hub named; the hub wants it demoed on this host, not changed, with the port to open
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
   # ------------------------------------------------------------------ reverse traps
   - id: demo-for-hub-reverse-local-demo
     category: routing-trap
@@ -221,3 +234,17 @@ cases:
     expect:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-reverse-delegated-code
+    category: routing-trap
+    note: >-
+      Code for the hub to write here is daintree.hosts.do-delegated-work ("Use on a Remote
+      Host's lane when the hub asks THIS machine to implement, fix or build something as one
+      unit of work"), whose fence "for a demo it asks this host to prepare and leave running
+      (daintree.hosts.demo-for-hub)" keeps this runbook out.
+    messages:
+      - role: user
+        content: hub wants claude here to add pagination to the orders api on its run branch and send the sha
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
