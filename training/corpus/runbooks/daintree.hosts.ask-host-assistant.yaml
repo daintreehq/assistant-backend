@@ -151,3 +151,9 @@ boundaries:
     confusable_with: [daintree.ci.diagnose-and-fix]
   - query: ask the mini's assistant whether it has room for one more job today
     confusable_with: [daintree.hosts.start-swarm]
+  - query: "ask the build box's assistant whether the usage limit slowed down its test run yesterday"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91
+  - query: "check with the laptop host whether it switched to codex because claude ran out, and what it says"
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: runbook-2026-10-issue-91

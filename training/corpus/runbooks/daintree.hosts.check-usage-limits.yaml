@@ -98,6 +98,12 @@ boundaries:
     confusable_with: [daintree.hosts.handle-hub-message]
   - query: tell the assistant on the office mac to check its codex limits and report back here
     confusable_with: [daintree.hosts.handle-hub-message]
+  - query: how much codex usage is left on each of my machines
+    confusable_with: [daintree.hosts.start-swarm, daintree.agents.check-usage-limits]
+  - query: "put a question to the build host's assistant: how much codex allowance does that machine have left"
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: ask the office host's assistant what its claude usage screen shows right now
+    confusable_with: [daintree.hosts.ask-host-assistant]
 followups:
   - query: and claude on those same machines?
     history:
