@@ -36,7 +36,7 @@ cases:
     note: >-
       The issue's third request, agent-phrased. Decided by "a cross-platform or cross-runtime
       validation matrix, coordinated from the hub and pinned to one revision". An honest measurement
-      of an untrained runbook: daintree.edits.spawn-visible-agent rides along on "Coordinate".
+      of an untrained runbook: daintree.edits.spawn-visible-agent rides along on the verb.
     messages:
       - role: user
         content: Coordinate a revision-pinned cross-host validation matrix.
@@ -49,7 +49,7 @@ cases:
     note: >-
       Agent-phrased outcome. Decided by the deliverable "one matrix with a row per requested
       environment (platform, architecture, runtime versions, checks)" and "shown as passed, failed
-      ... incomplete ... or unavailable".
+      with the failing tests".
     messages:
       - role: user
         content: >-
@@ -62,8 +62,8 @@ cases:
   - id: run-validation-matrix-user-two-pythons
     category: single-runbook
     note: >-
-      Casual user wording naming machines and runtime versions. Decided by "ONE EXACT COMMIT ...
-      TESTED UNDER SEVERAL ENVIRONMENTS on the Remote Hosts this Shell reaches".
+      Casual user wording naming machines and runtime versions. Decided by "ONE EXACT COMMIT" and
+      "TESTED UNDER SEVERAL ENVIRONMENTS on the Remote Hosts this Shell reaches".
     messages:
       - role: user
         content: can you check that commit passes on the linux box and on my mac with python 3.11 and 3.12
@@ -168,7 +168,7 @@ cases:
     category: routing-trap
     note: >-
       The person, from the hub, wants two hosts to verify a commit. daintree.hosts.verify-for-hub must
-      not be picked: the text excludes "a host's own assistant testing its one row
+      not be picked: the text excludes "one host testing its own row for the hub
       (daintree.hosts.verify-for-hub)".
     messages:
       - role: user
@@ -230,7 +230,7 @@ cases:
     category: routing-trap
     note: >-
       The lane's side: the hub asked this machine for one environment. daintree.hosts.verify-for-hub,
-      "the hub asks this lane to TEST or VERIFY a commit ... one environment row of the hub's matrix".
+      "the hub asks this lane to TEST or VERIFY a commit" and "one environment row of the hub's matrix".
       This runbook must not ride along.
     messages:
       - role: user
