@@ -1399,3 +1399,11 @@ examples:
   - query: Fix the out-of-date setup guide, and add a rule to AGENTS.md that agents must update docs/config.md whenever they add a config key.
     expect: [daintree.edits.sync-project-docs, daintree.memory.manage-project-memory]
     run: 2026-09-28-round6
+  - query: "get the workstation's assistant to see what is bound to 6000 over there and stop it only if it's one of ours"
+    expect: [daintree.runtime.free-busy-port, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-131
+  - query: "ask the build box's assistant which process has 8080 in its worktree. no code changes, I just want the answer"
+    expect: [daintree.runtime.free-busy-port, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-131

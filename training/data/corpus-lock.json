@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18708,
-  "compiled_sha256": "83ee026a03bbb1632354a1075fb27c440028c3af7928d95146c46a58b6ba023a",
+  "rows": 18711,
+  "compiled_sha256": "8c207a3c2de5930b51cac34b46e89ec3a403f9c4536689d6c6472070c3f8a9f3",
   "label_space_sha256": "4e7562a406bf49ab1c5b15ecbc0d73309df11b891bdd9b8fe3d6b6b518c94086",
   "label_space_size": 113,
   "by_source": {
-    "boundary": 5697,
+    "boundary": 5698,
     "docs": 841,
     "followup": 855,
     "foundation": 446,
     "foundation_boundary": 309,
-    "multi_runbook": 488,
+    "multi_runbook": 490,
     "near_miss": 116,
     "no_task": 117,
     "no_task_stateful": 592,
@@ -40,7 +40,7 @@
     "2026-09-28-round6-stateful": 256,
     "pre-split": 9808,
     "runbook-2026-10-issue-102": 85,
-    "runbook-2026-10-issue-131": 43,
+    "runbook-2026-10-issue-131": 46,
     "runbook-2026-10-issue-86": 83,
     "runbook-2026-10-issue-88": 100,
     "runbook-2026-10-issue-89": 96,
@@ -325,10 +325,10 @@
       "sha256": "baa7818e87e7e0d1514a1e77986af8dba27296371c7b9db80acf87640c64a225"
     },
     "runbooks/daintree.hosts.delegate-to-host.yaml": {
-      "examples": 70,
-      "rows": 70,
+      "examples": 71,
+      "rows": 71,
       "runbook": "daintree.hosts.delegate-to-host",
-      "sha256": "47880c9a1050e947c7fa733e039349a8bbfe6dd16ea82b6cb934284702ac0bb2"
+      "sha256": "a2deb41da6dbacb96dfdaa0ebdfadba12187570038c0a08e4c66a424c73724af"
     },
     "runbooks/daintree.hosts.foundation.yaml": {
       "examples": 92,
@@ -757,10 +757,10 @@
       "sha256": "ae5da6466d72617433c7d2cc3a827bfd34450a6e7ba1c31ebc39bf0810667589"
     },
     "shared/multi-runbook.yaml": {
-      "examples": 488,
-      "rows": 488,
+      "examples": 490,
+      "rows": 490,
       "runbook": null,
-      "sha256": "f45cecf28fed6426550790994d1581eae41d1fbe1b3e44e5d2dd2fc5439f3a4d"
+      "sha256": "09697e1193e556fcd84fbf9db527a999cde59b20c8bec6733eecb3071e37444b"
     },
     "shared/near-miss.yaml": {
       "examples": 57,

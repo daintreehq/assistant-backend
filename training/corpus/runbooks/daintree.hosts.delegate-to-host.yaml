@@ -128,6 +128,9 @@ boundaries:
   - query: could the linux host's assistant bump the dependencies and tell me the commit
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: have the other Mac's assistant change the dev server's default port in the project config and open a PR for it
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: runbook-2026-10-issue-131
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit
