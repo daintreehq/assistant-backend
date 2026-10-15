@@ -45,8 +45,8 @@ cases:
     note: >-
       How a lane describes the unit to search_runbooks. Decided by the deliverable: "a new
       worktree on the brief's branch from its base commit, the agent CLI the brief names
-      launched in it with the hub's objective and acceptance ... and the agent's commit
-      checked by the lane".
+      launched in it with the hub's objective and acceptance". delegate-to-host rides along
+      today (strict miss; retrain owed).
     messages:
       - role: user
         content: Carry out the hub's delegated change on this host, a new worktree on the brief's branch from its base commit, the agent it names makes the change, and I verify the commit and the tests before answering
@@ -100,7 +100,7 @@ cases:
     note: >-
       Hub-delegated work on this host, not a request from the person at this machine.
       Fence: "for the same work asked by the person at this machine
-      (daintree.edits.spawn-visible-agent ...)".
+      (daintree.edits.spawn-visible-agent".
     messages:
       - role: user
         content: "The hub's brief: add request ids to the gateway logs on its run branch here, then report the commit"
@@ -151,7 +151,7 @@ cases:
       next. "the agent CLI the brief names launched in it with the hub's objective and
       acceptance" decides it; the fence keeps "reading, judging or answering the hub's
       message itself (daintree.hosts.handle-hub-message)" out. start-work-on-issue rides
-      along on "worktree ... start" today; retrain owed.
+      along today on the worktree-and-start wording; retrain owed.
     messages:
       - role: user
         content: The worktree for the hub's unit is ready; start Codex there with the hub's objective and acceptance criteria

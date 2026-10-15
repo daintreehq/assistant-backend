@@ -43,7 +43,7 @@ positives:
   - the hub sent a coding task for this repo, set up the worktree and an agent for it
   - 'hub task: port the date helpers to the new library with codex on its branch'
   - hub wants the invoice numbering off-by-one fixed here, branch and base are in its brief
-  - Carry out the implementation the hub assigned this lane, from its worktree to a checked commit
+  - The hub assigned this lane one change, trimming whitespace in imported contact names; take it from a fresh worktree to a commit I've checked
   - hub delegated a docs fix, correct the install steps in the README on its unit branch, codex
   - The hub's assignment for this host is making the health endpoint report the build SHA, on a new branch from the base it pinned
   - Do the hub's piece of the work here; the rate limiter needs a burst setting and the brief names the branch and the tests
@@ -53,10 +53,10 @@ positives:
   - hub message for this lane, make the password rules configurable in the auth service on its run branch with Codex, and I verify the commit after
   - the main machine's assistant handed this host one change, a CSV header fix in the reports module; get it built in its own worktree
   - 'Hub unit for this repo: move the feature flags into a config file, branch from the commit it pinned, run the repo''s lint and tests'
-  - Start the hub-assigned feature work in this repository, a new worktree off the pinned commit and the named agent briefed with its acceptance criteria
+  - The hub's unit for this repo is an export-to-PDF button on the invoices page; it pinned main at 5f0e2a7 and wants Claude Code on it
   - query: The hub just delegated a change to this host. It wants the cache TTL read from the environment instead of being hard-coded, on branch run-14/unit-2 cut from main at a91c3d0, with the integration tests run and nothing pushed. Codex is signed in here. Set it up and get it done.
   - query: Nobody's at this desk. The hub's message asks this machine to add pagination to the admin users list, using the repository's own lint and test commands, on a new branch from the commit it pinned. I want the agent in its own worktree and the result checked before anything goes back.
-  - query: 'Execute the hub-delegated implementation unit in this project: create the unit''s worktree from the pinned base SHA, start Claude Code there with the objective and acceptance criteria, get it past its folder trust prompt, then confirm the commit and rerun the named checks.'
+  - query: 'Working a unit the hub delegated to this lane: the brief asks for a retry wrapper around the S3 uploader, names Codex, pins develop at c41b7e9 and lists `make test` as the check. Codex shows ready in this project and nothing exists yet for the unit''s branch.'
   - query: The hub's unit asks for a feature flag around the new checkout flow. The brief pins main at 6b2d8e4, names Claude Code, and says the PR is allowed once the e2e smoke test passes. Get the worktree and the agent going.
   - query: morning! the hub dropped a job on this machine overnight, add an audit log entry whenever a role changes. branch run-2/unit-6, base in the brief. can you run with it
     history:
