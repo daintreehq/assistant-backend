@@ -1,0 +1,223 @@
+# daintree.hosts.connect-host: the person adds another Mac or Linux machine to Daintree as a
+# Remote Host through Settings → Hosts (SSH check, exact-build install or update, Host mode),
+# or gets an added host that will not connect working again, with messaging and
+# assistant-start consent left as they chose. Recall cases in agent and user words (the
+# issue's three requests among them), a routing trap per declared neighbour where this
+# runbook wins, and reverse traps where the neighbour wins and this one must not ride along:
+# the hosts foundation (messaging on a host already added), daintree.diagnostics (Daintree's
+# own health here), daintree.worktree.manage-resource (a worktree's cloud devbox),
+# daintree.hosts.delegate-to-host (work for a connected host) and a dev server, which is
+# daintree.terminals.run-visible-command. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: connect-host-agent-phrased
+    category: single-runbook
+    note: >-
+      The issue's first request, agent-phrased. Decided by "ANOTHER MAC OR LINUX MACHINE
+      added to Daintree as a Remote Host, so this Shell opens its projects and runs agents
+      there over SSH".
+    messages:
+      - role: user
+        content: Help connect another server as a Daintree Remote Host.
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-linux-host-mode
+    category: single-runbook
+    note: >-
+      The issue's second request: a Linux machine and Host mode. "ANOTHER MAC OR LINUX
+      MACHINE added to Daintree as a Remote Host" and "turning on Host mode there".
+    messages:
+      - role: user
+        content: Add my Linux machine to Daintree and explain the host-mode setup.
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-first-host-onboarding
+    category: single-runbook
+    note: >-
+      The issue's third request, decided by "first-host onboarding".
+    messages:
+      - role: user
+        content: Guide first-host onboarding with supported Daintree settings.
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-compatible-build
+    category: single-runbook
+    note: >-
+      An existing host the Shell cannot connect to because of its build: "an added host that
+      will not connect (unreachable, Host mode off, needs a compatible build)".
+    messages:
+      - role: user
+        content: the new host says can't connect needs a compatible build
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-agent-no-start-at-login
+    category: single-runbook
+    note: >-
+      Agent-phrased, with the start-at-login choice the body keeps apart from Host mode:
+      "ANOTHER MAC OR LINUX MACHINE added to Daintree as a Remote Host" and "turning on Host
+      mode there".
+    messages:
+      - role: user
+        content: Set up the spare Linux desktop as a Daintree Remote Host; the user wants host mode but not start at login
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-agent-failed-ssh-check
+    category: single-runbook
+    note: >-
+      The issue's second scenario, agent-phrased: an existing host that fails its check.
+      "what the host check found (SSH did not connect, ...)" and "an added host that will
+      not connect".
+    messages:
+      - role: user
+        content: The Remote Host added earlier fails its SSH check; walk the user through fixing it without changing their ssh config
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-different-build-connected
+    category: single-runbook
+    note: >-
+      A host that connects on a different build: "what the host check found (... Daintree
+      missing or a different build)".
+    messages:
+      - role: user
+        content: the linux host connects but says it runs a different Daintree build than this machine
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------- routing traps
+  - id: connect-host-unreachable-host-not-diagnostics
+    category: routing-trap
+    note: >-
+      An added host that ssh will not log in to is "an added host that will not connect
+      (unreachable, ...)", not "Daintree misbehaving on this machine (daintree.diagnostics)";
+      diagnostics riding along is an extra.
+    messages:
+      - role: user
+        content: the remote host I added last week shows Unreachable in Settings and ssh says permission denied
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-add-mac-not-diagnostics
+    category: routing-trap
+    note: >-
+      Adding a machine is not Daintree misbehaving here, which this runbook fences off as
+      "Daintree misbehaving on this machine (daintree.diagnostics)"; the positive clause
+      decides it: "ANOTHER MAC OR LINUX MACHINE added to Daintree as a Remote Host".
+      Diagnostics riding along is an extra.
+    messages:
+      - role: user
+        content: hook my mac studio up to daintree as a remote host
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-server-not-devbox
+    category: routing-trap
+    note: >-
+      A server whose projects should open here is a Remote Host ("so this Shell opens its
+      projects and runs agents there over SSH"), not "a worktree's cloud devbox or remote
+      resource (daintree.worktree.manage-resource)".
+    messages:
+      - role: user
+        content: connect my ubuntu server to daintree so I can open its projects here
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-onboard-before-messaging
+    category: routing-trap
+    note: >-
+      Onboarding a host and reporting readiness before messaging is this runbook's
+      deliverable: "first-host onboarding" and "The deliverable is the host saved and
+      connected, its projects listed here, and messaging and assistant-start consent left as
+      the person chose". A Remote Host is not "a worktree's cloud devbox or remote resource
+      (daintree.worktree.manage-resource)", which must not ride along; the hosts foundation
+      may, as the domain foundation.
+    messages:
+      - role: user
+        content: Onboard the first Remote Host on this Shell through Settings and report what is ready before messaging is enabled
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ reverse traps
+  - id: connect-host-reverse-messaging-is-foundation
+    category: routing-trap
+    note: >-
+      Reverse trap. The host is already added, so nothing here is this runbook's ("ANOTHER
+      MAC OR LINUX MACHINE added to Daintree as a Remote Host"); switching messaging on is
+      the foundation's: "wants to know how messaging between the assistants on two machines
+      works, whether it is set up, how to switch it on".
+    messages:
+      - role: user
+        content: turn on assistant messaging for the build box host I added yesterday
+    expect:
+      required: [daintree.hosts.foundation]
+
+  - id: connect-host-reverse-devbox-is-manage-resource
+    category: routing-trap
+    note: >-
+      Reverse trap. A worktree's devbox is daintree.worktree.manage-resource ("a worktree's
+      cloud devbox or remote resource status, wants to provision, pause or resume it"),
+      fenced off here as "a worktree's cloud devbox or remote resource"; nothing is added as
+      a host.
+    messages:
+      - role: user
+        content: did provisioning finish for the devbox on the search-index worktree
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: connect-host-reverse-local-tools-is-diagnostics
+    category: routing-trap
+    note: >-
+      Reverse trap. Tools missing from the sidebar assistant on this machine is
+      daintree.diagnostics ("why is this tool missing"), fenced off here as "Daintree
+      misbehaving on this machine".
+    messages:
+      - role: user
+        content: my sidebar assistant can't see any tools after the update
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: connect-host-reverse-work-is-delegate
+    category: routing-trap
+    note: >-
+      Reverse trap. Work for a host that already answers is daintree.hosts.delegate-to-host
+      ("ONE piece of WORK done by the Daintree assistant on another machine"); nothing here
+      adds or repairs a host, so this runbook must not ride along.
+    messages:
+      - role: user
+        content: have the linux host's assistant write the migration and push a branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-reverse-dev-server
+    category: routing-trap
+    note: >-
+      Reverse trap for the issue's dev-server distinction. A dev server is a command in a
+      visible terminal (daintree.terminals.run-visible-command: "spin up the dev server for
+      the api worktree", "for a server or watcher its ready line or URL"), not another
+      machine added as a Remote Host.
+    messages:
+      - role: user
+        content: run the dev server and tell me the port
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
