@@ -320,15 +320,17 @@ cases:
   - id: handle-hub-message-receiver-implement
     category: routing-trap
     note: >-
-      A code change the hub asked for: today daintree.edits.spawn-visible-agent ("any
-      request to CHANGE project code", "ONE visible agent in the right worktree"). Chosen by
-      probe: phrasings that ended by asking for the commit SHA back left spawn-visible-agent
-      out of the shortlist (candidate_miss), the reply vocabulary dominating.
+      A code change the hub asked for goes to its host-side receiver,
+      daintree.hosts.do-delegated-work ("asks THIS machine to implement, fix or build
+      something as one unit of work"), not to daintree.edits.spawn-visible-agent ("the
+      same work asked by the person at this machine"). Before that receiver landed it
+      pinned spawn-visible-agent, which still rides along untrained (strict miss; retrain
+      owed).
     messages:
       - role: user
         content: On the hub's request, launch a Claude agent in a new worktree to add tests for the CSV exporter and report back.
     expect:
-      required: [daintree.edits.spawn-visible-agent]
+      required: [daintree.hosts.do-delegated-work]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-review
