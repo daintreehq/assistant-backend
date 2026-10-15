@@ -283,6 +283,9 @@ boundaries:
   - query: "is the remote machine provisioned for the data-sync worktree up yet"
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
+  - query: 'the payments branch''s cloud box can sleep from friday night to monday, nobody needs it running'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111
 followups:
   - query: pause it then
     history:

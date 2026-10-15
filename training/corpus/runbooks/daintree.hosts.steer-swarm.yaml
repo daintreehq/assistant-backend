@@ -144,3 +144,12 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: The swarm has to stop on every machine it went to, and I want each one's own confirmation.
     confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: 'stop the remote run on every host now, we are not coming back to it'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111
+  - query: 'call off the swarm and confirm which hosts stopped; I don''t need notes to resume it'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111
+  - query: 'the run on my other machines is pointless now, kill it everywhere but keep what they wrote'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111

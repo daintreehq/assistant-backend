@@ -236,6 +236,9 @@ boundaries:
   - query: phased upgrade here in this checkout, step two only after step one passes, and keep a checkpoint
     confusable_with: [daintree.hosts.execute-distributed-workflow]
     run: runbook-2026-10-issue-115
+  - query: 'set up a checkpointed plan for the auth rewrite on this machine so I can stop and resume it between sessions'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111
 followups:
   - query: run the next one
     history:

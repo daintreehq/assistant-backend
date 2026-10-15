@@ -135,6 +135,12 @@ boundaries:
   - query: 'I''m logging off, get the agents running in this window to a clean stop and leave notes; the remote run already finished'
     confusable_with: [daintree.hosts.steer-swarm]
     run: runbook-2026-10-issue-110
+  - query: 'park the agents in my local panes for the night with resume notes'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111
+  - query: 'wrap up the agents on this laptop and leave the worktrees, back tomorrow'
+    confusable_with: [daintree.hosts.park-swarm]
+    run: runbook-2026-10-issue-111
 followups:
   - query: remind claude-4 again, it's still going
     history:
