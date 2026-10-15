@@ -2,7 +2,7 @@
 id: daintree.hosts.delegate-to-host
 title: Delegate work to a remote host's assistant
 summary: Hand one unit of work to the assistant on one Remote Host with a brief by reference, end the turn, verify the branch, commit or PR it reports, and relay a verified result to the next host when one piece depends on another.
-whenToUse: 'Use when the person wants ONE piece of WORK done by the Daintree assistant on another machine, a Remote Host this Shell reaches, whatever the work is (a bug, a flaky or failing test, a feature, docs): "get the build box to fix the failing checkout test and open a PR", "have the assistant on my other Mac implement this issue and tell me the SHA", or a second host starting once the first host''s change lands ("when that machine pushes the API change, have the other one build the client on it"). The deliverable is that host''s commit, branch or PR, verified by reference before anything advances, and for that single dependency a deliberate relay of the verified result to the second host. Do not use for work by an agent on THIS machine (daintree.edits.spawn-visible-agent; several units here, daintree.orchestration.fan-out-work; a started task moved to another local agent, daintree.agents.hand-off-task), for a later start or wake-up on this machine (daintree.orchestration.watch-outcome), for a dependent plan on this machine (daintree.orchestration.execute-durable-workflow), or for a question to that machine''s assistant whose deliverable is its answer (daintree.hosts.ask-host-assistant).'
+whenToUse: 'Use when the person wants ONE piece of WORK done by the Daintree assistant on another machine, a Remote Host this Shell reaches, whatever the work is (a bug, a flaky or failing test, a feature, docs): "get the build box to fix the failing checkout test and open a PR", "have the assistant on my other Mac implement this issue and tell me the SHA", or a second host starting once the first host''s change lands ("when that machine pushes the API change, have the other one build the client on it"). The deliverable is that host''s commit, branch or PR, verified by reference before anything advances, and for that single dependency a deliberate relay of the verified result to the second host. Do not use for work by an agent on THIS machine (daintree.edits.spawn-visible-agent; several units here, daintree.orchestration.fan-out-work; a started task moved to another local agent, daintree.agents.hand-off-task), for a later start or wake-up on this machine (daintree.orchestration.watch-outcome), for a dependent plan on this machine (daintree.orchestration.execute-durable-workflow), for a question to that machine''s assistant whose deliverable is its answer (daintree.hosts.ask-host-assistant), or on the receiving host''s lane, doing the work the hub sent (daintree.hosts.do-delegated-work).'
 risk: external
 requiredTools:
   - host.list
@@ -15,9 +15,9 @@ optionalTools:
   - host.cancelTask
 ---
 1. Resolve the named host (`host.list`), then in `host.listAssistants` the project holding the work's repository and its lane. Two fit or none: ask. No lane: start one only if the request covers it.
-2. In your own shell pin the remote URL (the person's or your clone's), the base branch's SHA (`git ls-remote`), a run id and, for a change, a run/unit branch not yet on the remote.
+2. In your own shell pin the remote URL (yours or the person's), the base branch's SHA (`git ls-remote`), a run id and, for a change, a run/unit branch not yet on the remote.
 3. One `host.sendMessage`, no `waitMs`, briefing:
-   - Objective: the person's words, the deliverable named plainly (implement, fix, review) so it searches for its own runbook, and checkable acceptance criteria. Named commands and skills resolve on that host.
+   - Objective: the person's words, the deliverable named so the lane finds its runbook (a change: `daintree.hosts.do-delegated-work`), and checkable acceptance criteria. Named commands and skills resolve on that host.
    - Inputs: run and unit ids, remote URL, base branch at SHA, the new branch or the SHA to review, issue or PR URL.
    - Scope: this project, if its remote matches; the agent CLI if named; the checks to run; push or open a PR only if the person said so.
    - Report: `completed` with branch, SHA, PR URL, each check's command and result, pane id (a review: findings); `input-required` on another remote or base SHA, a missing CLI or command, or doubt.
@@ -35,6 +35,6 @@ On notice or resume:
 
   The branch must reach the remote: without push authority, ask before the first send.
 
-Stop and recovery: one send and one evidence question per unit; more work after a failed or wrong unit is a new message referencing it, on the person's go. `host.cancelTask` only on request. More than one dependency is not a relay: say so.
+Stop and recovery: one send and one evidence question per unit; rework of a failed or wrong unit is a new message referencing it, on the person's go. `host.cancelTask` only on request. More than one dependency is not a relay: say so.
 
 Report back: per unit, branch and SHA claimed vs verified (how), the host's checks, the next hop and its condition.
