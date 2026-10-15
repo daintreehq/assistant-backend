@@ -1,0 +1,267 @@
+# daintree.hosts.place-work: the hub places DIFFERENT, independent pieces of work (or one
+# piece with no host chosen) on the Remote Hosts that can take them, by load, signed-in agent
+# CLIs, allowance left and an enrolled assistant, shows the placement, then delegates each
+# piece. Recall cases are the issue's five requests (scrubbed) plus agent- and user-phrased
+# outcomes. Routing traps: this runbook wins against each declared or measured neighbour.
+# Reverse traps: the neighbour wins and this runbook must not ride along. The hosts
+# foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: place-work-split-eight-issues
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "wants each put on whichever Remote Host this
+      Shell reaches can best take it" and its own example "here are eight issues, split them
+      across my machines".
+    messages:
+      - role: user
+        content: Here are eight issues, split them across the studios.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-whichever-machine-room
+    category: single-runbook
+    note: >-
+      The issue's request: one piece, no machine chosen. Decided by "or one piece with no
+      machine chosen" and the example "put this on whichever host has room".
+    messages:
+      - role: user
+        content: Put this on whichever machine has room.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-split-issues-studios
+    category: single-runbook
+    note: >-
+      The issue's request. Decided by "DIFFERENT, independent pieces of work (a list of
+      issues, bugs or tasks ...)" placed "on whichever Remote Host this Shell reaches can best
+      take it".
+    messages:
+      - role: user
+        content: Split these issues across the studios.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-whichever-host-capacity
+    category: single-runbook
+    note: >-
+      The issue's request. Decided by "or one piece with no machine chosen" and "The hub
+      weighs each host's load".
+    messages:
+      - role: user
+        content: Put this on whichever host has capacity.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-which-machine-take
+    category: single-runbook
+    note: >-
+      The issue's request, quoted as an example in the positive clause: "which machine should
+      take this?". The deliverable is the placement table, "shown before anything is sent".
+    messages:
+      - role: user
+        content: Which machine should take this?
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-agent-phrased
+    category: single-runbook
+    note: >-
+      An agent's search query for the outcome. Decided by "The hub weighs each host's load,
+      the agent CLIs signed in there, allowance left and an enrolled assistant in the right
+      project" and "a placement table (piece, host, project, CLI, reason)".
+    messages:
+      - role: user
+        content: Choose a Remote Host for each of five unrelated issues by host load, signed-in agent CLI and remaining allowance, show the placement, then delegate each issue to its host's assistant
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-user-divide-sensibly
+    category: single-runbook
+    note: >-
+      A user's own words. Decided by "DIFFERENT, independent pieces of work" put "on
+      whichever Remote Host this Shell reaches can best take it".
+    messages:
+      - role: user
+        content: I have four separate issues and three remote hosts, divide them up sensibly
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-user-farm-out
+    category: single-runbook
+    note: >-
+      A user's casual request. Decided by "wants each put on whichever Remote Host this Shell
+      reaches can best take it" and "put this on whichever host has room".
+    messages:
+      - role: user
+        content: can you farm these tickets out to the remote machines, whichever ones have room
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  # -------------------------------------------------------------- routing traps
+  - id: place-work-not-swarm-fan-out
+    category: routing-trap
+    note: >-
+      Different bugs, one host each: placement, not replication. place-work's fence: "Do not
+      use for the same work on every host (daintree.hosts.swarm-fan-out)".
+    messages:
+      - role: user
+        content: 'these are six different bugs, not one task for every machine: give each to whichever remote host is least busy'
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      One piece but no host named: the hub chooses. place-work's "or one piece with no
+      machine chosen" against its fence "one piece for a host the person named
+      (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: I haven't picked a machine for the export bug, you choose whichever remote host has the most room and send it there
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-not-local-fan-out
+    category: routing-trap
+    note: >-
+      Independent issues over the remote hosts, not agents here. place-work's fence:
+      "independent pieces for agents on this machine (daintree.orchestration.fan-out-work)".
+    messages:
+      - role: user
+        content: spread these five issues over my remote hosts instead of agents on this laptop, by how busy each machine is
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-not-check-usage
+    category: routing-trap
+    note: >-
+      Allowance decides where the tickets go; the deliverable is the placement, not a usage
+      table. place-work: "The hub weighs each host's load, the agent CLIs signed in there,
+      allowance left"; check-usage-limits' deliverable is "one table of figures".
+    messages:
+      - role: user
+        content: put each of these three tickets on whichever remote machine has the most claude allowance left this week
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-not-start-swarm
+    category: routing-trap
+    note: >-
+      The assistants are already up and the work is in hand: choosing a host per issue.
+      start-swarm's deliverable is "a ready table ... with no work sent"; place-work's is
+      "a placement table".
+    messages:
+      - role: user
+        content: the machines are ready; now decide which host gets each of these five issues
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-not-recover
+    category: routing-trap
+    note: >-
+      New pieces, nothing sent before: placement, not recovery. place-work's fence: "what
+      became of work already sent (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: 'these are new pieces, not a resend: give each of the three issues to whichever host can take it'
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ reverse traps
+  - id: place-work-reverse-swarm-fan-out
+    category: routing-trap
+    note: >-
+      The same task everywhere is swarm-fan-out: "the SAME WORK done on EVERY Remote Host".
+      place-work's fence: "the same work on every host (daintree.hosts.swarm-fan-out)".
+    messages:
+      - role: user
+        content: give every remote host the same cache warmer task on its own branch and table what each one commits
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-reverse-delegate-to-host
+    category: routing-trap
+    note: >-
+      The person named the host. place-work's fence: "one piece for a host the person named
+      (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: get the build box's assistant to implement the retry header issue and tell me the sha
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-reverse-check-usage
+    category: routing-trap
+    note: >-
+      Usage left with no work to place: check-usage-limits' "how much Claude Code or Codex
+      allowance each Remote Host this Shell reaches has left".
+    messages:
+      - role: user
+        content: tell me the claude weekly allowance each remote host still has, one row per machine
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-reverse-start-swarm
+    category: routing-trap
+    note: >-
+      Readying assistants with no work: start-swarm's "a ready table ... with no work sent".
+    messages:
+      - role: user
+        content: make sure every remote host has a codex lane enrolled in the api project before anything is assigned
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: place-work-reverse-local-fan-out
+    category: routing-trap
+    note: >-
+      Independent issues for agents on this machine: fan-out-work's "a BATCH of independent
+      issues or tasks, one agent terminal per issue or worktree".
+    messages:
+      - role: user
+        content: start an agent per issue here on this mac, each in its own worktree, for these four issues
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+
+  - id: place-work-reverse-relieve-contention
+    category: routing-trap
+    note: >-
+      This machine is struggling: relieve-resource-contention's "the MACHINE is struggling
+      under the agents' load". Nothing is being placed.
+    messages:
+      - role: user
+        content: everything on this mac stutters while the agent test runs go, what's using the cpu and can you slow it down
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
+
+  - id: place-work-reverse-recover
+    category: routing-trap
+    note: >-
+      Where earlier exchanges stand after a restart: recover-and-clean-up's "rebuild where
+      every exchange with the Remote Hosts stands after a restart". place-work's fence: "what
+      became of work already sent (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: after the hub restarted, which of the exchanges I sent to my remote hosts are still open?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
