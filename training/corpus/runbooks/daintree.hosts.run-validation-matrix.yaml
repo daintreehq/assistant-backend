@@ -47,7 +47,7 @@ positives:
   - 'same tests, same commit, three boxes: the linux server, the arm mac and the intel mac. which ones go green?'
   - can you ask the hosts to run pytest at 1f0c3d2 under 3.12 on linux and on macos? if one of them doesn't have 3.12 say so
   - grab the release tag's sha and have every host platform run the build plus the unit tests, a row for each
-  - The user is preparing a point release and wants evidence that the lockfile change at c2e81a4 installs and tests cleanly on both Linux x64 and macOS arm64 hosts, with any missing toolchain reported rather than worked around
+  - The user is preparing a point release and wants evidence that the lockfile change at c2e81a4 passes its test suite on both Linux x64 and macOS arm64 hosts, with any missing toolchain reported rather than worked around
   - 'yo, quick sanity check across the machines for this commit: node 20 on linux, node 22 on mac, tests only'
   - Pin the release tag to its commit and get per-platform test results from the connected hosts; platforms no host offers still belong in the table as unavailable
   - query: now run that exact commit on both hosts under node 20 and node 22
