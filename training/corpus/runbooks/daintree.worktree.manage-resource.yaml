@@ -237,6 +237,21 @@ boundaries:
   - query: Decommission the configured remote environment for wt perf-tuning since nobody uses it now.
     confusable_with: [daintree.orchestration.workspace-cleanup]
     run: 2026-09-28-agent-queries-2
+  - query: pause the cloud devbox for this worktree while I'm away
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: is my worktree's remote environment still provisioned
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: resume the remote resource on the feature worktree
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: the remote box for this branch is costing money, can we stop it
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: provision the remote resource configured for this worktree
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
 followups:
   - query: pause it then
     history:

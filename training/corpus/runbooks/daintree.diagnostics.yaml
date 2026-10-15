@@ -331,6 +331,24 @@ boundaries:
   - query: Daintree itself is using 4 GB and the UI lags when switching panels.
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
+  - query: half the daintree actions are gone from the assistant panel here
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: my sidebar assistant can't reach daintree at all on this machine
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: daintree on this laptop keeps showing the mcp as disconnected
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: why is the assistant here missing tools it had yesterday
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: show me daintree's recent errors on this machine, something is off with the assistant
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
+  - query: I type into the sidebar assistant and nothing happens
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-86
 followups:
   - query: and the key thing too?
     history:
