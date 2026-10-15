@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 19442,
-  "compiled_sha256": "5afa738263da02bee5aca5f882f41232ee4d4b3db82cab1f27d63ab0b2d96618",
+  "rows": 19440,
+  "compiled_sha256": "023a9db159c71e4646712f48c567b3bcba72ea1b1774edea6581449f83e8948d",
   "label_space_sha256": "f7fe620f9a0f11fb20782c81a8dd08719673ed86ecfe1f93a5e14aea402199cb",
   "label_space_size": 122,
   "by_source": {
-    "boundary": 5981,
+    "boundary": 5980,
     "docs": 841,
-    "followup": 897,
+    "followup": 896,
     "foundation": 446,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -41,7 +41,7 @@
     "pre-split": 9808,
     "runbook-2026-10-issue-100": 80,
     "runbook-2026-10-issue-102": 85,
-    "runbook-2026-10-issue-103": 76,
+    "runbook-2026-10-issue-103": 74,
     "runbook-2026-10-issue-104": 83,
     "runbook-2026-10-issue-107": 74,
     "runbook-2026-10-issue-108": 82,
@@ -358,10 +358,10 @@
       "sha256": "57611617c36e2a76489ed92a2aca41fca6959b98d1c36e2edffffbf791fb3565"
     },
     "runbooks/daintree.hosts.diagnose-messaging.yaml": {
-      "examples": 63,
-      "rows": 63,
+      "examples": 61,
+      "rows": 61,
       "runbook": "daintree.hosts.diagnose-messaging",
-      "sha256": "b6602382cd983ee1566730bc3c9116a3c4e5a1af1ab5836fa5c4d209b86dcb39"
+      "sha256": "b96ca5b221c04d11e4aa2f2925b93b541fa7400f39f88a7013e68816f869e52d"
     },
     "runbooks/daintree.hosts.do-delegated-work.yaml": {
       "examples": 71,

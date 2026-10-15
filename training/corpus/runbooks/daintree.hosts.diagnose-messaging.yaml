@@ -27,11 +27,6 @@ positives:
       which gate it is and what they should check on that host, without sending or
       starting anything.
   - query: >-
-      The person can see their spare MacBook under Remote Hosts and its projects list
-      fine, but the question the hub sent there came back policy_rejected and none of its
-      assistants has a generation. They want to know why and what to do on that laptop,
-      and they do not want the question sent again.
-  - query: >-
       A send to the studio host just came back lane_unavailable, although
       host.listAssistants showed its Codex assistant with a generation a minute ago.
       Nothing has restarted on either machine. Find out which gate it is and who has to
@@ -51,6 +46,7 @@ positives:
   - every message to every host fails since this morning
   - morning! the build box is up but the hub can't get through to its assistant, can you see why?
   - sorry to bug you again, the laptop host keeps refusing messages from here, which gate is it this time
+  - sends to the build box come back conflict; is that a messaging gate or something about that one message?
   - the old intel mac host answers unsupported to every send while my other hosts work fine; what's different about it?
   - pause is off on this machine but the build box's assistant still reads available false; is it paused over there or just stopped?
   - the hub can't message the laptop's assistant, and the laptop's own window says another machine turned messages on for it; what does that mean for my hub?
@@ -58,11 +54,12 @@ positives:
       Ten sends went to the render host in under a minute and the eleventh came back
       rate_limited. The person wants to know how long to wait, whether the hub's reads are
       limited too, and whether anything is wrong with the host itself.
+    docs: true
   - query: >-
       I pointed the mini's host entry at its new tailnet name this morning, nothing else.
       Since then the hub can't reach the assistant there, although the mini shows up as
       connected. Which setting did that change undo, and where do I put it back?
-  - Find out why sends to the linux tower come back policy_rejected even though its project lists an assistant with a generation for another Shell
+  - Find out why sends to the linux tower come back policy_rejected after its person enrolled the assistant from a different Shell this morning
   - query: see what's in the way
     history:
       - "user: ask the tower to rerun the flaky test"
@@ -112,8 +109,6 @@ boundaries:
     confusable_with: [daintree.hosts.foundation]
   - query: a fresh send to the tower was turned away at once; I need the gate behind it, not a rundown of open tasks
     confusable_with: [daintree.hosts.recover-and-clean-up]
-  - query: the hub and the mini were both up all day, yet sends to the mini have bounced since lunch; what changed?
-    confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: why does the hub's start on the tower keep failing with no window here shows this host
     confusable_with: [daintree.hosts.start-swarm]
   - query: why does every start the hub tries on the render host fail? I only want the reason, not a swarm
@@ -140,10 +135,6 @@ followups:
     history:
       - "user: send the docs fix to the build box"
       - "assistant: The send came back policy_rejected; nothing was sent."
-  - query: is that this machine's pause or theirs?
-    history:
-      - "user: why didn't my message reach the tower?"
-      - "assistant: It came back paused; nothing was sent."
 
 topic_shifts:
   - query: different thing, the linux host won't take messages at all now, check why
