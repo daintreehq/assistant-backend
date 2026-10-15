@@ -132,6 +132,12 @@ boundaries:
   - query: "the laptop host lost its sign-in mid-unit and nobody's there to fix it; let a different host pick up that unit without redoing what was pushed"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: 'the build box died while writing the new integration tests; move that work to the laptop host and keep what it pushed'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'the tower ran out of usage halfway through adding test coverage for the importer; have another host finish it from its branch'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
 
 followups:
   - query: fine, move that one to the tower then

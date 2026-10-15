@@ -142,3 +142,7 @@ boundaries:
     confusable_with: [daintree.hosts.integrate-host-branches]
   - query: each host runs its part of the integration tests at this commit, then merge the outcomes
     confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: 'a shard of the split test run died with the mini; give that shard to the tower and finish the merged report'
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: 'the linux box went quiet during its part of the sharded suite; run that part elsewhere once it is confirmed stopped, then merge'
+    confusable_with: [daintree.hosts.reassign-host-work]
