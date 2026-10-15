@@ -111,6 +111,13 @@ boundaries:
     confusable_with: [daintree.hosts.do-delegated-work]
   - query: the hub wants the reports feature that landed on main stood up here to show off, with a short walkthrough
     confusable_with: [daintree.hosts.do-delegated-work]
+  # vs the lane's check of a commit: this leaves the commit running to be looked at.
+  - query: The hub doesn't need test results; it wants the tagged release served from this host so the person can poke at it tonight
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: hub wants the commit it sent running on this box afterwards, not just checked, and the port it is on
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: Leave the hub's candidate build running here for the person to look over and report which revision is up
+    confusable_with: [daintree.hosts.verify-for-hub]
   # vs a broken or bare preview: the preview is a means to the demo.
   - query: Start a dev preview of the hub's branch here so it can be demoed, and report the port it picked
     confusable_with: [daintree.runtime.debug-web-app]

@@ -121,3 +121,9 @@ boundaries:
     confusable_with: [daintree.hosts.do-delegated-work]
   - query: no implementation in this brief, the hub only wants to know if commit 7c2e4a9 passes our tests on this box
     confusable_with: [daintree.hosts.do-delegated-work]
+  - query: "the hub wants the payments branch at its SHA checked with lint and the API tests here, then the results; nothing has to stay up"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+  - query: "Run the hub's smoke suite against its release candidate on this machine and send back pass and fail counts per check"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
