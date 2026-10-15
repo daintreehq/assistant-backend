@@ -77,8 +77,8 @@ cases:
     category: single-runbook
     note: >-
       The issue's second scenario, agent-phrased: an existing host that fails its check.
-      "what the host check found (SSH did not connect, ...)" and "an added host that will
-      not connect".
+      Decided by "what the host check found (SSH did not connect" and "an added host that
+      will not connect".
     messages:
       - role: user
         content: The Remote Host added earlier fails its SSH check; walk the user through fixing it without changing their ssh config
@@ -89,8 +89,7 @@ cases:
   - id: connect-host-different-build-connected
     category: single-runbook
     note: >-
-      A host that connects on a different build: "what the host check found (... Daintree
-      missing or a different build)".
+      A host that connects on a different build: "Daintree missing or a different build".
     messages:
       - role: user
         content: the linux host connects but says it runs a different Daintree build than this machine
@@ -103,7 +102,7 @@ cases:
     category: routing-trap
     note: >-
       An added host that ssh will not log in to is "an added host that will not connect
-      (unreachable, ...)", not "Daintree misbehaving on this machine (daintree.diagnostics)";
+      (unreachable", not "Daintree misbehaving on this machine (daintree.diagnostics)";
       diagnostics riding along is an extra.
     messages:
       - role: user
@@ -240,9 +239,9 @@ cases:
     category: routing-trap
     note: >-
       Reverse trap. The hosts are already added; an assistant ready on each before work goes
-      out is start-swarm's ("Claude Code or Codex ready on every Remote Host ... bootstrapping
-      each host's assistant lane"), and this runbook fences it off as "getting an assistant
-      ready on hosts already added (daintree.hosts.start-swarm)".
+      out is start-swarm's ("Claude Code or Codex ready on every Remote Host" and
+      "bootstrapping each host's assistant lane"), and this runbook fences it off as
+      "getting an assistant ready on hosts already added (daintree.hosts.start-swarm)".
     messages:
       - role: user
         content: all three machines are already hosts here; line up one claude assistant on each for this repo, no work yet

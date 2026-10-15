@@ -244,6 +244,7 @@ boundaries:
     run: runbook-2026-10-issue-131
   - query: "the mac mini already shows connected under hosts; what has to be on for my assistant to message the one there"
     confusable_with: [daintree.hosts.connect-host]
+    docs: true
     run: runbook-2026-10-issue-122
   - query: "my linux host is connected now, let the assistant here start an assistant on it when nobody is there"
     confusable_with: [daintree.hosts.connect-host]

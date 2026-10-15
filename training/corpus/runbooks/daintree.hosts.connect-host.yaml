@@ -14,7 +14,7 @@ run: runbook-2026-10-issue-122
 positives:
   - Walk the person through adding their office iMac as a Daintree Remote Host and tell them which settings are still off afterwards
   - Guide setup of a Linux workstation as a host for this Shell; Daintree has never been installed on it
-  - The person's new host fails the SSH row of the host check; explain what to fix outside Daintree without touching their ssh config
+  - The server being added only accepts password logins, so the host check's SSH row fails; explain what has to change on the person's side for Daintree to connect
   - Help the user bring a headless Ubuntu box into Daintree as a Remote Host and confirm its projects are listed on this Mac
   - The user wants the build server added as a host but does not want Daintree starting at login there; guide the Host mode step to match
   - A host saved yesterday reads "Daintree isn't running in Host mode there"; get it connecting again
@@ -36,7 +36,8 @@ positives:
   - i want daintree to run my projects on the mac mini in the closet
   - the host check says didn't connect for my ubuntu box
   - set up my old macbook as a host
-  - daintree says my workstation runs a different build, what do i click
+  - query: daintree says my workstation runs a different build, what do i click
+    docs: true
   - my linux server keeps showing unreachable in the hosts list
   - add the office imac as a host but don't turn on messaging or anything yet
   - it says host mode is off on the mac mini
@@ -123,6 +124,7 @@ followups:
       - "assistant: Plan update copies this machine's build there. Tell me what it shows."
     active: [daintree.hosts.connect-host]
   - query: how do I get it added then?
+    docs: true
     history:
       - "user: can daintree run agents on my other mac?"
       - "assistant: Yes, once that Mac is added as a Remote Host and runs Daintree in Host mode."

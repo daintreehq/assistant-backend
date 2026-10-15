@@ -12,15 +12,15 @@ The person does every step in Daintree's UI (no action can) and reads you what i
 1. macOS or Linux at both ends. Daintree runs their `ssh` unattended: `ssh <target>` must log in with no password prompt (agent approvals are fine); a new or changed host key they verify themselves.
 2. Settings → Hosts → Add host. SSH target: `user@host`, host name, IPv4 or `~/.ssh/config` alias (ports go in the alias).
 3. Check host, row by row:
-   - SSH "Didn't connect": they fix ssh's own error outside Daintree (a Mac host needs Remote Login), then Check again; an unresolved name: the `.local` button.
-   - "Matches this machine" (version and commit): Same build, Continue. Else Plan install or Plan update copies this build there (a Linux .deb ends in a sudo command on the host); updating a running host ends its terminals: their call. "Continue anyway" connects best effort.
-4. Say first that "Turn on Host mode" also sets start at login there (Linux: a user service asking to run after logout; Mac: someone logged in, first launch approved there). Without that: Skip, then on that machine Settings → Hosts → "Allow this machine to be a host", "Start at login" off. "Advertise on this network" (on by default) is theirs.
+   - SSH "Didn't connect": they fix ssh's own error outside Daintree (a Mac host needs Remote Login), then Check again; an unresolved name: the offered "Try …" button.
+   - "Matches this machine" (version and commit): Same build, Continue. Else Plan install or Plan update, then Install on host or Update host, copies this build there (a Linux .deb ends in a sudo command run on the host); updating a running host ends its terminals: their call. "Continue anyway" connects best effort.
+4. Say first that "Turn on Host mode" also sets start at login there (Linux: a user service asking to run after logout; Mac: someone logged in, first launch approved there). Without that: Skip, then there: Settings → Hosts → "Allow this machine to be a host", "Start at login" off. "Advertise on this network" (on by default) is theirs.
 5. Advise, then Add host or Done.
 
-An added host, Settings → Hosts → Details "Status": "Unreachable · …" ends in ssh's words (step 1, then Retry if offered); "Daintree isn't running in Host mode there": Set up…; "Can't connect · needs a compatible build" blocks: Check for update, or update this machine if the host is newer. Connected with a differing "Daintree build" row: aligning is optional.
+An added host's Details "Status": "Unreachable · …" ends in ssh's words (step 1, then Retry if offered); "Daintree isn't running in Host mode there": Set up…; "Can't connect · needs a compatible build" blocks: Check for update, or update this machine if the host is newer. Connected with a differing "Daintree build" row: aligning is optional.
 
-Verify: Status "Connected" (not "no reply since"); its projects under "Other hosts" in the project switcher with no note, or "No projects yet" (other notes mean an older list). Picking one moves the window. `host.list` omits it until messaging with it is on: never turn that on to verify. A session begun before the first host may need a new one for `host.*` tools.
+Verify: Status "Connected" (not "no reply since"); its projects under "Other hosts" in the project switcher with no note beside it (a note means an older list; no rows: unverified). Picking one moves the window. `host.list` omits it until messaging with it is on: never turn that on to verify. A session begun before the first host may lack `host.*` tools.
 
 Unless asked, leave Details → Communication alone: "Allow assistant messaging with this host" and "Let the assistant start assistants on this host" start off (a changed SSH target turns both off).
 
-Report back: per host, saved, status, build match, Host mode and start at login, projects, consents, what still blocks.
+Report back: per host, saved, status, build match, Host mode, start at login, projects, consents, blocker.
