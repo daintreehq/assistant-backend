@@ -65,7 +65,17 @@ def test_a_runbook_vector_does_not_depend_on_what_it_was_synced_with() -> None:
     catalog = load_catalog(default_runbooks_dir())
     from daintree_assistant_server.runbooks.catalog import Catalog
 
-    narrow = Catalog(catalog.runbooks[::7])
+    # Every seventh runbook, closed over `requires`: a sampled runbook that requires
+    # another (a domain foundation requires daintree.foundation) refuses to load alone.
+    by_id = {r.id: r for r in catalog.runbooks}
+    picked = {r.id for r in catalog.runbooks[::7]}
+    pending = list(picked)
+    while pending:
+        for ref in by_id[pending.pop()].meta.requires:
+            if ref not in picked:
+                picked.add(ref)
+                pending.append(ref)
+    narrow = Catalog([r for r in catalog.runbooks if r.id in picked])
     assert 0 < len(narrow) < len(catalog), "fixture must actually narrow the catalog"
 
     def fresh_table(cat):  # type: ignore[no-untyped-def]
