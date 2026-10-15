@@ -121,6 +121,10 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: the hub crashed halfway through the staged plan across machines; work out where it stands and keep it going
     confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the two app branches don't just get merged, they each wait on the shared schema host first and the release notes wait on both, run that across the machines
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: the units are finished on the first host, so start the stages on the other machines that depend on that commit, there is nothing to merge yet
+    confusable_with: [daintree.hosts.integrate-host-branches]
 
 followups:
   - query: yes, run it
