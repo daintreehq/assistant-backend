@@ -98,6 +98,9 @@ boundaries:
   - query: start npm run dev in the api worktree in a terminal I can watch
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: "open a terminal in .daintree/plugins/acme.board and run its watch build so I can see the output"
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-96
 followups:
   - query: what did it exit with?
     history:

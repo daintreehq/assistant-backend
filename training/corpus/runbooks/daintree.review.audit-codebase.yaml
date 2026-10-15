@@ -162,3 +162,9 @@ topic_shifts:
       - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
     active: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6-stateful
+  - query: how much of that looks like dead code to you
+    history:
+      - 'user: im new here, give me a tour of the billing module'
+      - 'assistant: internal/billing splits into pricing (plan maths), invoice (line items, rounding, totals), and dunning (retry schedule for failed charges). The store interface is defined at the package root.'
+    active: [daintree.explore.repository]
+    run: runbook-2026-10-issue-96

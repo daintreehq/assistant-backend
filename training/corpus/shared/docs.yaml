@@ -1520,3 +1520,19 @@ examples:
       - 'assistant: Renamed them to ''auth refactor'', ''csv exporter'' and ''search API''.'
     active: [daintree.terminals.rename]
     run: 2026-09-28-catalog-expansion-refine
+  - query: unrelated but quick — does a spawned agent get daintree tools too?
+    history:
+      - 'user: what does this repo do'
+      - 'assistant: Read-only explore agent running with instructions to cite files. Summary when it lands.'
+    active: [daintree.explore.repository, daintree.foundation]
+    expect: []
+    docs: true
+    run: runbook-2026-10-issue-96
+  - query: does daintree index the repo up front or does the agent just grep?
+    history:
+      - 'user: where is auth implemented'
+      - 'assistant: Three places — middleware, session store, and a legacy path. Citations coming.'
+    active: [daintree.explore.repository, daintree.foundation]
+    expect: []
+    docs: true
+    run: runbook-2026-10-issue-96

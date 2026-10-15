@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18051,
-  "compiled_sha256": "f53a22909f5d0a68bce62239544f580cc9d1d94204cb5eaea3cdd1b6c7f87b54",
+  "rows": 18055,
+  "compiled_sha256": "9055b9db25712bedf254ef6676fdb789ed47cfd3744cf6e91a48600a75b4ab19",
   "label_space_sha256": "a7f0d839690a9dec183ac1e1f01bfc9672ae1ebdd814cfecb5ab752a1b8b0990",
   "label_space_size": 106,
   "by_source": {
-    "boundary": 5420,
-    "docs": 839,
+    "boundary": 5424,
+    "docs": 841,
     "followup": 815,
     "foundation": 409,
     "foundation_boundary": 309,
@@ -17,7 +17,7 @@
     "no_task_stateful": 592,
     "off_domain": 212,
     "positive": 5585,
-    "topic_shift": 3000,
+    "topic_shift": 2998,
     "wake": 149
   },
   "by_run": {
@@ -31,15 +31,15 @@
     "2026-09-26-same-question-named-agents": 75,
     "2026-09-28-agent-queries": 1776,
     "2026-09-28-agent-queries-2": 527,
-    "2026-09-28-catalog-expansion": 2321,
+    "2026-09-28-catalog-expansion": 2320,
     "2026-09-28-catalog-expansion-late": 201,
     "2026-09-28-catalog-expansion-late-stateful": 16,
     "2026-09-28-catalog-expansion-refine": 348,
     "2026-09-28-catalog-expansion-stateful": 663,
     "2026-09-28-round6": 1029,
     "2026-09-28-round6-stateful": 256,
-    "pre-split": 9811,
-    "runbook-2026-10-issue-96": 30,
+    "pre-split": 9808,
+    "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
     "transcript-2026-09-26-fact-contest-named-agents": 7,
     "transcript-2026-09-26-reviewer-fixer-relay": 10,
@@ -191,10 +191,10 @@
       "sha256": "f5ca2b400c7cad89131521a125d6d807ca173623e3af79a556551eb15c82b527"
     },
     "runbooks/daintree.explore.repository.yaml": {
-      "examples": 357,
-      "rows": 357,
+      "examples": 354,
+      "rows": 354,
       "runbook": "daintree.explore.repository",
-      "sha256": "9a5450c7f569fb8c27848652703b216b99188fe2f54635d8962e20a7f55917cb"
+      "sha256": "2b99bcaba2fc719f5b600bd1c7f6796ad188333c5844a71ec0d3bb43beab9f19"
     },
     "runbooks/daintree.forge.address-pr-review.yaml": {
       "examples": 53,
@@ -491,10 +491,10 @@
       "sha256": "da02fe50d9e72f6b4dd8d8c43218a3cc7d5608883c7d85dcecd66369071b330d"
     },
     "runbooks/daintree.plugins.develop-project-plugin.yaml": {
-      "examples": 72,
-      "rows": 72,
+      "examples": 75,
+      "rows": 75,
       "runbook": "daintree.plugins.develop-project-plugin",
-      "sha256": "f68601b0d34ab2b7df94f8a0edbb9ae605976876caa5b9a3462c532a2657e9c5"
+      "sha256": "416d6b6358dd6737399c6af604d014ea05b77d0b54cd13f60a459af167cc78f8"
     },
     "runbooks/daintree.recipe.run-or-create.yaml": {
       "examples": 274,
@@ -533,10 +533,10 @@
       "sha256": "ee3073b8a2a1ce7f653b4de99bb84e3e38d58a558fa5fdb6847482972dcfdd4c"
     },
     "runbooks/daintree.review.audit-codebase.yaml": {
-      "examples": 58,
-      "rows": 58,
+      "examples": 59,
+      "rows": 59,
       "runbook": "daintree.review.audit-codebase",
-      "sha256": "97fd2437c40a7fbe373259b7107555ba212b400de1a2546fe9d698d9e7b8cb04"
+      "sha256": "6e3af555618938f675323e232322ae52d500de477514ddc95204bd8c578bf13f"
     },
     "runbooks/daintree.review.audit-spec-coverage.yaml": {
       "examples": 58,
@@ -617,10 +617,10 @@
       "sha256": "2b01f33497275516ce52220c9439a8989b54cfdd74505e8dca9c7b785b18dcde"
     },
     "runbooks/daintree.terminals.run-visible-command.yaml": {
-      "examples": 68,
-      "rows": 68,
+      "examples": 69,
+      "rows": 69,
       "runbook": "daintree.terminals.run-visible-command",
-      "sha256": "b7abe44db9109a8272ae1adf4f5320a235a3cb1d079659f794bb9d6ebed6104f"
+      "sha256": "dc764d34da4ebbc709e6c1e7ed211392e3c8ff889d0fd7b9914c995e9b733695"
     },
     "runbooks/daintree.workflow.find-issue-work.yaml": {
       "examples": 234,
@@ -695,10 +695,10 @@
       "sha256": "7f48ba50c78131fc27502c12420cea306710bfe01cd7a42f8f1be20215aa1a2a"
     },
     "shared/docs.yaml": {
-      "examples": 618,
-      "rows": 618,
+      "examples": 620,
+      "rows": 620,
       "runbook": null,
-      "sha256": "1de11e2e7c5705dbff1f30867cab9dcb4e23d22509ae2920c7eda25fd7321fad"
+      "sha256": "d7619ecc2dc255328dcc45e7438764c7d4695db0940ad3db90aa7b58427272fc"
     },
     "shared/foundation-boundary.yaml": {
       "examples": 124,

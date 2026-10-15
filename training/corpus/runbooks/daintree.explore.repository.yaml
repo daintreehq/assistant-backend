@@ -504,17 +504,6 @@ topic_shifts:
       - 'user: run this overnight and wake me'
       - 'assistant: Async wait armed with a narrow grant so the wake can act.'
     active: [daintree.orchestration.watch-outcome]
-  - query: unrelated but quick — does a spawned agent get daintree tools too?
-    history:
-      - 'user: what does this repo do'
-      - 'assistant: Read-only explore agent running with instructions to cite files. Summary when it lands.'
-    active: [daintree.explore.repository, daintree.foundation]
-  - query: does daintree index the repo up front or does the agent just grep?
-    history:
-      - 'user: where is auth implemented'
-      - 'assistant: Three places — middleware, session store, and a legacy path. Citations coming.'
-    active: [daintree.explore.repository, daintree.foundation]
-    docs: true
   - query: what does an explore agent actually get access to? get one to tell me what this repo does
     history:
       - 'user: new repo, no idea whats in it'
@@ -581,11 +570,6 @@ topic_shifts:
       - 'assistant: internal/db/migrate.go — ApplyPending is called from cmd/server/main.go before the listener starts.'
     active: [daintree.explore.repository]
   - im new here, give me a tour of the billing module
-  - query: how much of that looks like dead code to you
-    history:
-      - 'user: im new here, give me a tour of the billing module'
-      - 'assistant: internal/billing splits into pricing (plan maths), invoice (line items, rounding, totals), and dunning (retry schedule for failed charges). The store interface is defined at the package root.'
-    active: [daintree.explore.repository]
   - where does the rate limiter live in here
   - query: does it cope with bursts or is it a flat bucket
     history:

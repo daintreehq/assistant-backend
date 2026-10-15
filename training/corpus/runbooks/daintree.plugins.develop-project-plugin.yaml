@@ -12,7 +12,8 @@ positives:
   - The plugin manager lists our project plugin as Staged after the rename; explain what state it is in and why.
   - Rebuild dist/ for the local todo-panel plugin after the view change and get Daintree to reload it.
   - Our project plugin loads but its panel renders blank; diagnose it and have an agent fix the view.
-  - Add a command to the existing .daintree/plugins/ops.oncall plugin that opens the runbook URL, and verify it registers after reload.
+  - query: "Add a command to the existing .daintree/plugins/ops.oncall plugin that opens the on-call handbook URL, and verify it registers after reload."
+    run: runbook-2026-10-issue-96
   - The plugin shows Unreadable in the plugin manager since codex edited the manifest; find the cause.
   - Agents launched in this project can't see the tools our project plugin declares; work out why.
   - Have claude write a zero-build Daintree plugin that adds a panel listing open incidents from our status API.
@@ -103,8 +104,17 @@ boundaries:
   - query: "should I relaunch daintree with a remote debugging port so you can see my plugin panel"
     confusable_with: [daintree.terminals.run-visible-command]
     run: runbook-2026-10-issue-96
-  - query: "Attach a CDP client to the running Daintree so the agent can inspect our plugin's view."
-    confusable_with: [daintree.diagnostics]
+  - query: "Attach a CDP client or the devtools to the running Daintree so the agent can inspect our plugin's view."
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: runbook-2026-10-issue-96
+  - query: "Our project plugin's 'Start stack' button should kick off the dev-env recipe but does nothing; fix the plugin."
+    confusable_with: [daintree.recipe.run-or-create]
+    run: runbook-2026-10-issue-96
+  - query: "Add a command to the acme.ops plugin that applies our staging recipe from the palette, and get Daintree to reload it."
+    confusable_with: [daintree.recipe.run-or-create]
+    run: runbook-2026-10-issue-96
+  - query: "Build a Daintree plugin panel that lists the team's recipe files with a run button beside each."
+    confusable_with: [daintree.recipe.run-or-create]
     run: runbook-2026-10-issue-96
   - query: "describe how the incident board panel from our .daintree plugin looks today"
     confusable_with: [daintree.explore.repository]
