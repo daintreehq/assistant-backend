@@ -26,7 +26,7 @@ Readies one lane per host and sends no work. Start only what the person asked to
    - `opted_out` "Starting assistants is turned off": the person turns on "Let the assistant start assistants on this host" (Settings, Hosts, that host).
    - "No window here shows this host": the person opens the host in a window here.
    - "different agent CLI" with none asked: re-list, then step 3 with theirs.
-   - "already runs 3 assistants": the limit; end or take none.
+   - "already runs 3 assistants": the limit; never end one to make room.
    - "didn't reach its prompt", "while this ran", "couldn't be enrolled", `disconnected`, `ambiguous`, no reply or a tool error: uncertain. Re-list (once reachable): a new lane with a `generation` is yours; an assistant without one in a slot free before is this start's, unenrolled (maybe on a question in its window); nothing new may still be starting: list again in a minute. A repeat can open another: only on the person's word.
 
 Report back, per host: project (its own name and path), slot, agent, generation, reused or started, ready or the blocker and the exact setting; omitted projects; unavailable or other assistants seen. Then stop; sending work is another runbook's.
