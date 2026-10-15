@@ -111,8 +111,8 @@ cases:
     category: routing-trap
     note: >-
       Four units with two levels of dependency are a plan, not one relay. Decided by "a
-      dependency graph of three or more units"; this runbook fences "a single relay where one
-      host's verified result starts one unit on a second host (daintree.hosts.delegate-to-host)".
+      dependency graph of three or more units"; this runbook fences "one unit, or one hand-over
+      between two hosts (daintree.hosts.delegate-to-host)".
     messages:
       - role: user
         content: >-
@@ -184,8 +184,8 @@ cases:
     category: routing-trap
     note: >-
       One dependency between two hosts is delegate-to-host's relay: "a second host starting
-      once the first host's change lands". This runbook fences "a single relay where one host's
-      verified result starts one unit on a second host".
+      once the first host's change lands". This runbook fences "one unit, or one hand-over
+      between two hosts".
     messages:
       - role: user
         content: The dashboard work on the laptop needs the rate limiter the build box is writing; start the laptop once that one commit is pushed and checked
