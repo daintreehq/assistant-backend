@@ -145,3 +145,34 @@ cases:
     expect:
       required: [daintree.agents.check-usage-limits]
       optional: [daintree.foundation]
+
+  - id: hosts-check-usage-hub-asks-not-lane-handler
+    category: routing-trap
+    note: >-
+      The hub asking another machine's assistant for its usage is this runbook's
+      "figures each host's assistant read off that machine's own usage screen", not the
+      lane's side, which its fence leaves out: "a host's own assistant answering such a
+      request from the hub (daintree.hosts.handle-hub-message)". handle-hub-message is
+      excluded. The untrained selector gives it to handle-hub-message (0.99); owed to the
+      retrain.
+    messages:
+      - role: user
+        content: have the build box's assistant read its codex usage and send it back
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-handle-hub-message-usage-not-hosts-check
+    category: routing-trap
+    note: >-
+      Reverse trap, on the host. The hub's usage request arriving at this machine's
+      assistant is daintree.hosts.handle-hub-message ("the hub sent me a message, read it
+      and deal with it"), with the local usage check as the work; the hub-side runbook is
+      fenced off it: "a host's own assistant answering such a request from the hub".
+      daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: the hub wants this machine's codex usage, read it and reply with the figures
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.agents.check-usage-limits, daintree.hosts.foundation, daintree.foundation]
