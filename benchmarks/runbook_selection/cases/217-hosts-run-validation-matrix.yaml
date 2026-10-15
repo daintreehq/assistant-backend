@@ -1,0 +1,254 @@
+# daintree.hosts.run-validation-matrix: the hub puts ONE exact commit through the same checks under
+# each environment the person asks for (OS, architecture, runtime versions) on the Remote Hosts able
+# to meet it, each row sent to one host lane, and brings back one matrix with a row per environment.
+# Recall cases are the issue's three requests plus agent- and user-phrased outcomes, short and long.
+# Routing traps: this runbook wins against each declared neighbour. Reverse traps: the neighbour
+# wins and this runbook must not ride along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: run-validation-matrix-linux-macos-runtimes
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "ONE EXACT COMMIT, tag or release candidate TESTED UNDER
+      SEVERAL ENVIRONMENTS on the Remote Hosts this Shell reaches".
+    messages:
+      - role: user
+        content: Run the same commit on Linux and macOS hosts with the requested runtimes.
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-rc-per-platform
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "ONE EXACT COMMIT, tag or release candidate TESTED UNDER
+      SEVERAL ENVIRONMENTS" and the deliverable "one matrix with a row per requested environment".
+    messages:
+      - role: user
+        content: Validate this release candidate across the hosts, with one result per platform.
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-revision-pinned-agent
+    category: single-runbook
+    note: >-
+      The issue's third request, agent-phrased. Decided by "a cross-platform or cross-runtime
+      validation matrix, coordinated from the hub and pinned to one revision". An honest measurement
+      of an untrained runbook: daintree.edits.spawn-visible-agent rides along on "Coordinate".
+    messages:
+      - role: user
+        content: Coordinate a revision-pinned cross-host validation matrix.
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-agent-outcome
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by the deliverable "one matrix with a row per requested
+      environment (platform, architecture, runtime versions, checks)" and "shown as passed, failed
+      ... incomplete ... or unavailable".
+    messages:
+      - role: user
+        content: >-
+          From the hub, have each remote host test the exact SHA under its own OS and Node version
+          and bring back a pass/fail/could-not-run row per environment
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-user-two-pythons
+    category: single-runbook
+    note: >-
+      Casual user wording naming machines and runtime versions. Decided by "ONE EXACT COMMIT ...
+      TESTED UNDER SEVERAL ENVIRONMENTS on the Remote Hosts this Shell reaches".
+    messages:
+      - role: user
+        content: can you check that commit passes on the linux box and on my mac with python 3.11 and 3.12
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-long-every-platform
+    category: single-runbook
+    note: >-
+      Long user request with a SHA and an outcome. Decided by "TESTED UNDER SEVERAL ENVIRONMENTS on
+      the Remote Hosts this Shell reaches" and "a row per requested environment".
+    messages:
+      - role: user
+        content: >-
+          I want the test suite run against 4f2a91c on every platform we support, using my other
+          machines. Tell me which environments failed
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-failure-is-a-finding
+    category: single-runbook
+    note: >-
+      A release candidate across the hosts' platforms, nothing fixed. Decided by "with nothing
+      fixed" and "shown as passed, failed with the failing tests".
+    messages:
+      - role: user
+        content: test release candidate rc.3 on each platform the remote hosts cover; a failure on one platform is just a finding
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------- routing traps (this runbook wins)
+  - id: run-validation-matrix-not-swarm-fan-out
+    category: routing-trap
+    note: >-
+      Two hosts test one commit, no change built. daintree.hosts.swarm-fan-out must not be picked:
+      this runbook's text excludes "the same change made on every host (daintree.hosts.swarm-fan-out)"
+      and wins on "TESTED UNDER SEVERAL ENVIRONMENTS".
+    messages:
+      - role: user
+        content: the build box and the mac mini should both test rc-2 at the same commit and tell me what passed or couldn't run on each
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-verify-tagged-build-not-swarm
+    category: routing-trap
+    note: >-
+      Hosts verifying one tagged build per platform. daintree.hosts.swarm-fan-out must not be
+      picked: "the same change made on every host (daintree.hosts.swarm-fan-out)" is excluded; the
+      ask is "one result per platform for this tag".
+    messages:
+      - role: user
+        content: have my remote hosts verify the tagged build on their platforms and send me one result per environment
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-not-place-work
+    category: routing-trap
+    note: >-
+      Which host takes which environment row is placement inside this runbook, not
+      daintree.hosts.place-work, which this text excludes as "different pieces of work spread over
+      hosts (daintree.hosts.place-work)".
+    messages:
+      - role: user
+        content: >-
+          Which host should take the arm64 row and which the x64 row? I need the same tests run
+          against this commit on both and a result for each
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-not-run-local-checks
+    category: routing-trap
+    note: >-
+      Two runtime versions on other machines. daintree.ci.run-local-checks must not be picked: the
+      text excludes "checks on this machine alone (daintree.ci.run-local-checks)".
+    messages:
+      - role: user
+        content: run the unit and integration tests for tag v3.4.0 on python 3.11 and 3.13 on my other machines, one row per version
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-not-assess-readiness
+    category: routing-trap
+    note: >-
+      The release candidate's tests per platform, before the person decides.
+      daintree.release.assess-readiness must not be picked: the text excludes "a go or no-go on
+      shipping (daintree.release.assess-readiness)".
+    messages:
+      - role: user
+        content: before I call the release candidate ready, put it through the tests on the linux and mac hosts and show me per-platform results
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-not-verify-for-hub
+    category: routing-trap
+    note: >-
+      The person, from the hub, wants two hosts to verify a commit. daintree.hosts.verify-for-hub must
+      not be picked: the text excludes "a host's own assistant testing its one row
+      (daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: verify commit 2d81f0c on the linux host and the mac host, each under its own node version, and give me both results
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------- reverse traps (neighbour wins)
+  - id: run-validation-matrix-reverse-swarm-builds-a-change
+    category: routing-trap
+    note: >-
+      Every host implements a fix on its own branch: daintree.hosts.swarm-fan-out, "the SAME WORK done
+      on EVERY Remote Host". This runbook must not ride along: it excludes "the same change made on
+      every host".
+    messages:
+      - role: user
+        content: get each of my machines to implement the retry fix on its own branch and report the SHAs back
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-reverse-place-work-tickets
+    category: routing-trap
+    note: >-
+      Different tickets, one per host by allowance: daintree.hosts.place-work, "DIFFERENT, independent
+      pieces of work". This runbook must not ride along.
+    messages:
+      - role: user
+        content: I have four unrelated tickets, put each on whichever remote machine has the most allowance left
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-reverse-local-two-nodes
+    category: routing-trap
+    note: >-
+      Two runtime versions on this machine: daintree.ci.run-local-checks, "the project's checks RUN
+      and the results reported". This runbook must not ride along: it is for "the Remote Hosts this
+      Shell reaches".
+    messages:
+      - role: user
+        content: run the tests here under node 20 and then node 22 and tell me which one fails
+    expect:
+      required: [daintree.ci.run-local-checks]
+
+  - id: run-validation-matrix-reverse-readiness-verdict
+    category: routing-trap
+    note: >-
+      Results already in, a ship decision wanted: daintree.release.assess-readiness, "a go/no-go on
+      shipping a release". This runbook must not ride along.
+    messages:
+      - role: user
+        content: we already have the per-platform test results from the hosts; is 3.2 good to ship?
+    expect:
+      required: [daintree.release.assess-readiness]
+
+  - id: run-validation-matrix-reverse-lane-one-row
+    category: routing-trap
+    note: >-
+      The lane's side: the hub asked this machine for one environment. daintree.hosts.verify-for-hub,
+      "the hub asks this lane to TEST or VERIFY a commit ... one environment row of the hub's matrix".
+      This runbook must not ride along.
+    messages:
+      - role: user
+        content: the hub wants this machine to test commit 3f9e0d1 under node 20 only and send back the counts
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.foundation]
+
+  - id: run-validation-matrix-reverse-lane-matrix-row
+    category: routing-trap
+    note: >-
+      The lane's side in matrix words: daintree.hosts.verify-for-hub, "one environment row of the
+      hub's matrix". This runbook must not ride along; it excludes "one host testing its own row for
+      the hub (daintree.hosts.verify-for-hub)". An honest measurement of an untrained runbook: its
+      "matrix" vocabulary still pulls it in as an extra until a retrain on the boundary rows.
+    messages:
+      - role: user
+        content: the hub asked this machine to run its matrix row for a commit, macOS arm64 with python 3.12, no fixes
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.foundation]
