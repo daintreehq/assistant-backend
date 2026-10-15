@@ -6,8 +6,10 @@
 # Recall: the issue's own three requests, an agent-phrased and a user-phrased description, and
 # a request naming the hub's own words for the deliverable. Traps: against the local demo
 # (daintree.workflow.prepare-feature-demo), the envelope (daintree.hosts.handle-hub-message), a
-# port clash (daintree.runtime.free-busy-port) and the hub's own side
-# (daintree.hosts.delegate-to-host), each with a reverse case where the neighbour wins. The
+# port clash (daintree.runtime.free-busy-port), the hub's own side
+# (daintree.hosts.delegate-to-host) and the lane's other receivers
+# (daintree.hosts.do-delegated-work, daintree.hosts.verify-for-hub), each with a reverse case
+# where the neighbour wins. The
 # envelope is optional wherever a hub request is the frame: the lane holds it for the reply.
 
 cases:
@@ -164,6 +166,19 @@ cases:
       required: [daintree.hosts.demo-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
+  - id: demo-for-hub-trap-not-a-test-run
+    category: routing-trap
+    note: >-
+      A commit left running to be looked at, not checked. Decided by "prepare a DEMO of a
+      feature, or leave it running" and the fence "checks of a commit that leave nothing running
+      (daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: "Not a test run: the hub wants its release candidate up on this host as a demo the person can click through"
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
   # ------------------------------------------------------------------ reverse traps
   - id: demo-for-hub-reverse-local-demo
     category: routing-trap
@@ -247,4 +262,19 @@ cases:
         content: hub wants claude here to add pagination to the orders api on its run branch and send the sha
     expect:
       required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: demo-for-hub-reverse-test-run
+    category: routing-trap
+    note: >-
+      Checks of the hub's commit with nothing left running are daintree.hosts.verify-for-hub
+      ("Use when the hub asks this lane to TEST or VERIFY a commit or branch here and report the
+      results"); this runbook's fence "checks of a commit that leave nothing running" keeps it
+      out. A reciprocal fence in verify-for-hub was scored twice and backed out: both wordings
+      broke handle-hub-message-report-is-not-branch-prep.
+    messages:
+      - role: user
+        content: Put the hub's commit through the unit tests here and report the counts; nothing should be left running afterwards
+    expect:
+      required: [daintree.hosts.verify-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
