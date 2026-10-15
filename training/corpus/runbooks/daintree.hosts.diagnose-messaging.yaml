@@ -2,7 +2,8 @@
 # starts reaching the assistant on a Remote Host it can see (tool set, the per-host
 # switches, the link, a pause, a missing or stale enrollment, a rate limit), and naming
 # the person's fix, sending nothing.
-# Boundaries hold it against the hosts foundation (how messaging works, first-time setup),
+# Boundaries hold it against the hosts foundation (how messaging works, first-time setup;
+# the refusal-diagnosis rows it held before this runbook existed were moved here),
 # adding or reconnecting a host, the lane handling a hub message, Daintree's own health
 # here, the account of exchanges that never came back, readying a swarm, asking a host a
 # question, usage checks and delegating work.
@@ -98,15 +99,15 @@ boundaries:
   - query: tell me whether it's this Shell's pause or the host's that is holding my messages to the mini
     confusable_with: [daintree.hosts.foundation]
   - query: the build box keeps answering lane_unavailable to the hub, what do I change on my side
-    confusable_with: [daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
   - query: from my main machine, why does every message to the studio get policy_rejected
-    confusable_with: [daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
   - query: the hub's send to the mini is refused with lane_unavailable every time, even right after listing it; which gate is it
-    confusable_with: [daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
   - query: is something wrong with daintree? it shows my linux host but messages to it all fail
-    confusable_with: [daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
   - query: the hub's host tool says not permitted for the core tier when I message a host
-    confusable_with: [daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
   - query: a fresh send to the tower was turned away at once; I need the gate behind it, not a rundown of open tasks
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: why does the hub's start on the tower keep failing with no window here shows this host
@@ -114,7 +115,7 @@ boundaries:
   - query: why does every start the hub tries on the render host fail? I only want the reason, not a swarm
     confusable_with: [daintree.hosts.start-swarm]
   - query: I tried to ask the laptop's assistant a question and it came back paused, find out where the pause is
-    confusable_with: [daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.ask-host-assistant]
   - query: the question for the build box was refused with policy_rejected, so which machine needs a setting changed?
     confusable_with: [daintree.hosts.foundation]
   - query: my usage check to the hosts came back rate_limited on two of them, is that the agents' allowance or the message limit
@@ -125,6 +126,71 @@ boundaries:
     confusable_with: [daintree.hosts.connect-host]
   - query: the mini connects fine now and its projects show up here, but the hub still can't message its assistant
     confusable_with: [daintree.hosts.connect-host]
+  - query: 'the hub says the other mac''s assistant isn''t enrolled, is something broken'
+    confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
+    run: runbook-2026-10-issue-103
+  - query: 'host.listAssistants shows nothing with a generation for the build box'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'is it a bug that the other machine''s assistant shows unavailable for every project'
+    confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
+    run: runbook-2026-10-issue-103
+  - query: 'sending to the remote host keeps coming back opted out, is daintree broken'
+    confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
+    run: runbook-2026-10-issue-103
+  - query: 'the remote host is up but its assistant won''t accept anything from me'
+    confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
+    run: runbook-2026-10-issue-103
+  - query: 'the hub''s start on my other mac came back opted out, how do I fix that'
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.start-swarm]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'the question I sent the mini came back opted out'
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-103
+  - query: 'my question to the linux host came back paused, what does that mean'
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.ask-host-assistant]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'both machines are already set up in daintree, why can''t their assistants talk to each other'
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-103
+  - query: 'the hub says only the enrolled hub can reach other hosts, what does that mean'
+    confusable_with: [daintree.hosts.foundation]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'the assistant on my other machine isn''t showing up as something I can message'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'my assistant can list the hosts but can''t send them anything, what''s missing'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'why is every assistant on my remote host marked unavailable'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'I''ve got the Mac mini added under Remote Hosts and it shows connected, but when I ask the assistant here to message the one on the mini it says only the enrolled hub can reach other hosts. I haven''t changed any messaging settings yet. What do I turn on, and on which machine?'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'Work out why host.sendMessage is not offered in this sidebar assistant session'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'Explain why a host''s assistant is listed with no generation and cannot be messaged'
+    confusable_with: [daintree.hosts.foundation]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'Resolve a NOT_ELIGIBLE refusal from the host messaging tools'
+    confusable_with: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
+    run: runbook-2026-10-issue-103
+  - query: 'Interpret an opted_out result from a send to a remote host and say how the person fixes it'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
+  - query: 'The user''s Shell lists a second Mac as a connected Remote Host, but host.listAssistants shows its project with no assistant carrying a generation. Starting assistants there is not allowed and the user does not want it allowed. Explain how they enroll the assistant already running there for this Shell.'
+    confusable_with: [daintree.hosts.foundation]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'Hub session at Tool set Full. A host.sendMessage to one remote host came back opted_out with no taskId, and the user insists messaging with that host was on yesterday. Work out which setting governs this and what the user should check, without sending again.'
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-103
 
 followups:
   - query: check the other hosts the same way
@@ -135,6 +201,24 @@ followups:
     history:
       - "user: send the docs fix to the build box"
       - "assistant: The send came back policy_rejected; nothing was sent."
+  - query: 'where do I change that'
+    history:
+      - 'user: message the assistant on the build machine'
+      - 'assistant: Sending to another host needs the Full tool set, and this session is on Core.'
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'which setting is that exactly'
+    history:
+      - 'user: ask the laptop''s assistant something for me'
+      - 'assistant: The send came back opted_out: assistant messaging is turned off for that host in this Shell''s host settings.'
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'how do I give it one'
+    history:
+      - 'user: who can I message on the mac mini?'
+      - 'assistant: There''s an assistant in that project, but none has a generation for this Shell yet.'
+    docs: true
+    run: runbook-2026-10-issue-103
 
 topic_shifts:
   - query: different thing, the linux host won't take messages at all now, check why

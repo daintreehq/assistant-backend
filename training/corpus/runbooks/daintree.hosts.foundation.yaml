@@ -12,23 +12,18 @@ run: runbook-2026-10-issue-86
 positives:
   - query: Explain how the Shell's sidebar assistant reaches the assistant on a Remote Host and which settings have to be on first
     docs: true
-  - Work out why host.sendMessage is not offered in this sidebar assistant session
   - Check whether the assistant in a remote host's project is enrolled for this Shell before messaging it
   - query: Find out what the person must allow before the hub may start an assistant on a host
     docs: true
   - Set up assistant messaging between this Shell and a remote host that was just added
-  - query: Explain why a host's assistant is listed with no generation and cannot be messaged
-    docs: true
   - query: Describe how a host assistant's reply comes back to the hub and how to read it
     docs: true
   - query: Explain why an agent in a Daintree pane cannot use the host messaging tools
     docs: true
-  - Resolve a NOT_ELIGIBLE refusal from the host messaging tools
   - query: Clarify which cross-host messaging tools need the Full tool set and which work at Core
     docs: true
   - query: Explain what pausing messages between machines stops and what keeps working
     docs: true
-  - Interpret an opted_out result from a send to a remote host and say how the person fixes it
   - query: Confirm whether two remote hosts can message each other directly or only through the hub
     docs: true
   - query: "Explain what a \"delegated exchange update\" line typed into the hub means"
@@ -38,17 +33,6 @@ positives:
   - query: Explain what completed means on a message the hub sent to another machine
     docs: true
 
-  - query: >-
-      The user's Shell lists a second Mac as a connected Remote Host, but host.listAssistants
-      shows its project with no assistant carrying a generation. Starting assistants there
-      is not allowed and the user does not want it allowed. Explain how they enroll the
-      assistant already running there for this Shell.
-    docs: true
-  - query: >-
-      Hub session at Tool set Full. A host.sendMessage to one remote host came back
-      opted_out with no taskId, and the user insists messaging with that host was on
-      yesterday. Work out which setting governs this and what the user should check,
-      without sending again.
   - query: >-
       The user asks whether the assistant on their Linux build host can message this
       Shell's assistant first, unprompted, how such a message would show up here and how
@@ -73,14 +57,10 @@ foundation:
     docs: true
   - query: I added the build box as a remote host, now how do I get its assistant talking to this one
     docs: true
-  - query: the hub says only the enrolled hub can reach other hosts, what does that mean
-    docs: true
-  - the assistant on my other machine isn't showing up as something I can message
   - query: is it possible for daintree's assistant to hand things off to the assistant on another computer
     docs: true
   - query: what does accept messages from other machines actually do
     docs: true
-  - my assistant can list the hosts but can't send them anything, what's missing
   - query: do I need the full tool set to message assistants on other hosts
     docs: true
   - query: can a claude agent in one of my panes message the assistant on another host
@@ -91,7 +71,6 @@ foundation:
     docs: true
   - query: what setting lets my assistant start an assistant on the mac mini by itself
     docs: true
-  - why is every assistant on my remote host marked unavailable
   - hook up the assistant on my desktop to the one on my laptop
   - query: does the assistant on the remote machine act on the hub's messages without asking me
     docs: true
@@ -128,11 +107,6 @@ foundation:
       - "assistant: It can message the assistant enrolled there, and start one if you allow that for the host."
 
   - query: >-
-      I've got the Mac mini added under Remote Hosts and it shows connected, but when I
-      ask the assistant here to message the one on the mini it says only the enrolled hub
-      can reach other hosts. I haven't changed any messaging settings yet. What do I turn
-      on, and on which machine?
-  - query: >-
       My laptop's sidebar assistant runs on the Core tool set and I'd like to keep it that
       way. I only want it to send the build machine an occasional question. Is Full
       required for that, and is there anything it could do at Core instead?
@@ -155,15 +129,7 @@ foundation:
 boundaries:
   - query: messaging tools are missing from my sidebar assistant even though I added a remote host
     confusable_with: [daintree.diagnostics]
-  - query: the hub says the other mac's assistant isn't enrolled, is something broken
-    confusable_with: [daintree.diagnostics]
   - query: why can't my assistant see any assistant it can message on my second mac
-    confusable_with: [daintree.diagnostics]
-  - query: host.listAssistants shows nothing with a generation for the build box
-    confusable_with: [daintree.diagnostics]
-  - query: is it a bug that the other machine's assistant shows unavailable for every project
-    confusable_with: [daintree.diagnostics]
-  - query: sending to the remote host keeps coming back opted out, is daintree broken
     confusable_with: [daintree.diagnostics]
   - query: is the remote machine's assistant ready to take work from this shell
     confusable_with: [daintree.worktree.manage-resource]
@@ -171,8 +137,6 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
   - query: get the remote box's assistant set up so this shell can send it tasks
     confusable_with: [daintree.worktree.manage-resource]
-  - query: the remote host is up but its assistant won't accept anything from me
-    confusable_with: [daintree.worktree.manage-resource, daintree.diagnostics]
   - query: "before I hand work to my other mac's assistant, what has to be switched on for this shell to reach it"
     docs: true
     confusable_with: [daintree.hosts.delegate-to-host]
@@ -209,10 +173,6 @@ boundaries:
     confusable_with: [daintree.hosts.start-swarm]
     docs: true
     run: runbook-2026-10-issue-102
-  - query: 'the hub''s start on my other mac came back opted out, how do I fix that'
-    confusable_with: [daintree.hosts.start-swarm]
-    docs: true
-    run: runbook-2026-10-issue-102
   - query: the other mac's assistant never gets my questions, what's blocking it
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
@@ -220,13 +180,6 @@ boundaries:
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
   - query: what has to be switched on before I can send the other machine's assistant a question
-    docs: true
-    confusable_with: [daintree.hosts.ask-host-assistant]
-    run: runbook-2026-10-issue-88
-  - query: the question I sent the mini came back opted out
-    confusable_with: [daintree.hosts.ask-host-assistant]
-    run: runbook-2026-10-issue-88
-  - query: my question to the linux host came back paused, what does that mean
     docs: true
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
@@ -247,9 +200,6 @@ boundaries:
     docs: true
     run: runbook-2026-10-issue-122
   - query: "my linux host is connected now, let the assistant here start an assistant on it when nobody is there"
-    confusable_with: [daintree.hosts.connect-host]
-    run: runbook-2026-10-issue-122
-  - query: "both machines are already set up in daintree, why can't their assistants talk to each other"
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
 
@@ -273,21 +223,6 @@ boundaries:
     confusable_with: [daintree.hosts.diagnose-messaging]
     run: runbook-2026-10-issue-103
 followups:
-  - query: where do I change that
-    docs: true
-    history:
-      - "user: message the assistant on the build machine"
-      - "assistant: Sending to another host needs the Full tool set, and this session is on Core."
-  - query: which setting is that exactly
-    docs: true
-    history:
-      - "user: ask the laptop's assistant something for me"
-      - "assistant: The send came back opted_out: assistant messaging is turned off for that host in this Shell's host settings."
-  - query: how do I give it one
-    docs: true
-    history:
-      - "user: who can I message on the mac mini?"
-      - "assistant: There's an assistant in that project, but none has a generation for this Shell yet."
   - query: can the panes do it instead
     docs: true
     history:
