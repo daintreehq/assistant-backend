@@ -188,6 +188,47 @@ cases:
       required: [daintree.hosts.steer-for-hub]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
+  - id: steer-for-hub-not-hub-side-redo
+    category: routing-trap
+    note: >-
+      A change to a unit the hub already delegated here, received by this lane for the agent
+      it launched: "when the hub asks it to STOP, PAUSE or CHANGE work it delegated here".
+      Sending new or reworked work from the hub is "the hub's own side
+      (daintree.hosts.delegate-to-host)", which must not be picked.
+    messages:
+      - role: user
+        content: "The hub has amended the unit it delegated to this host: the agent already working on it here must keep the v1 endpoints. Redirect that agent; this is not a new job."
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: steer-for-hub-not-clean-up
+    category: routing-trap
+    note: >-
+      A stop with nothing removed is not the run's cleanup: "when the hub asks it to STOP,
+      PAUSE or CHANGE work it delegated here". daintree.hosts.clean-up-for-hub fences it:
+      "for stopping, pausing or correcting an agent of that run that is still at work
+      (daintree.hosts.steer-for-hub)".
+    messages:
+      - role: user
+        content: The hub cancelled the run; stop its agents but don't delete anything yet.
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: steer-for-hub-not-hung-agent
+    category: routing-trap
+    note: >-
+      A healthy agent still working on a job the hub dropped is a stop, not a recovery:
+      "or the hub cancelling an exchange whose agent is still working". recover-agent owns
+      "a hung or unresponsive agent", which this one is not.
+    messages:
+      - role: user
+        content: hub dropped the job it gave me; the codex pane for it is fine, just still working, halt it
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
   # ------------------------------------------------------------------ reverse traps
   - id: steer-for-hub-trap-local-steer
     category: routing-trap
@@ -268,3 +309,16 @@ cases:
     expect:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: steer-for-hub-trap-clean-up
+    category: routing-trap
+    note: >-
+      Reverse: the run's agents are finished and the hub wants what it left here removed.
+      clean-up-for-hub owns "asks it to remove what it made on this machine for one of the
+      hub's runs"; nothing is left to stop or correct.
+    messages:
+      - role: user
+        content: hub says tear down what you made for the race, the agents are finished
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
