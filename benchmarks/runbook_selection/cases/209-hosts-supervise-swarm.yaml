@@ -1,0 +1,393 @@
+# daintree.hosts.supervise-swarm: the hub follows work already out on the Remote Hosts to the
+# end of the run, on its delegated exchange update lines: waits quietly, answers a host's
+# question within the person's request, brings decisions to the person, verifies each finished
+# unit by artifact, and checks once on a host left quiet after its peers are in. Recall cases are
+# the requests from the two issues that proposed it (machine names generic) plus agent- and
+# user-phrased outcomes. The hub's own update line, a host's question, a quiet host and a host's
+# own message to the hub are honest measurements of an untrained runbook against trained owners
+# (execute-durable-workflow, answer-waiting-agent, recover-agent, handle-hub-message): retrain
+# owed. Routing traps: this runbook wins against each declared neighbour. Reverse traps: the
+# neighbour wins and this runbook must not ride along. The hosts foundation may ride along.
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: supervise-swarm-long-run-blockers
+    category: single-runbook
+    note: >-
+      An issue request. Decided by "the person wants the run followed to its end" and "decisions
+      brought to the person"; the work is already out, so not a sending runbook.
+    messages:
+      - role: user
+        content: Supervise the long swarm run across the remote hosts and handle blockers.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-keep-jobs-moving
+    category: single-runbook
+    note: >-
+      An issue request. Decided by "The deliverable is the run kept moving" and "decisions
+      brought to the person".
+    messages:
+      - role: user
+        content: Keep these remote jobs moving and tell me when a decision is needed.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-resume-from-notices
+    category: single-runbook
+    note: >-
+      An issue request. Decided by the title, "Supervise a run on the Remote Hosts through its
+      delegated exchange updates". execute-durable-workflow rides along on "resume" and
+      "delegated" (its "delegate-then-verify work" and "resume it later"); that extra is the
+      untrained-runbook cost, retrain owed.
+    messages:
+      - role: user
+        content: Resume swarm supervision from delegated exchange notices.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-studios-tell-me-done
+    category: single-runbook
+    note: >-
+      The issue's "keep an eye on the studios and tell me when they're done" (quoted in the
+      positive clause), reworded to stay clear of a training row with the same shape. Decided by
+      that quote and "once this Shell's work is OUT on the Remote Hosts" (the message's "have their
+      jobs").
+      watch-outcome owns "keep an eye on it while I'm out" for work on this machine.
+    messages:
+      - role: user
+        content: the studios have their jobs; keep an eye on them and tell me once they're all through
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-keep-going-answer
+    category: single-runbook
+    note: >-
+      An issue request, quoted in the positive clause: "keep the swarm going and answer what you
+      can".
+    messages:
+      - role: user
+        content: keep the swarm going and answer what you can
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-agent-phrased
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "once this Shell's work is OUT on the Remote Hosts", "a
+      host's question answered within the person's request", "each finished unit verified by
+      branch, SHA or PR" and "one row per unit at the end".
+    messages:
+      - role: user
+        content: >-
+          Follow the run already out on the Remote Hosts to its end: read each exchange as it
+          moves, answer a host's question inside the original request, check every finished
+          unit's branch and SHA, and give one row per unit.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-user-lunch-decisions
+    category: single-runbook
+    note: >-
+      User-phrased. Decided by "once this Shell's work is OUT on the Remote Hosts" and
+      "decisions brought to the person". A third quoted request in the positive clause pushed
+      daintree.hosts.start-swarm's knife-edge case under its floor, so this one is carried by
+      corpus rows: retrain owed if it misses.
+    messages:
+      - role: user
+        content: babysit the remote machines while I'm at lunch, only ping me if something needs a decision
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-host-asks-skip-suite
+    category: single-runbook
+    note: >-
+      A host's question mid-run. Decided by "a remote host asking whether it may do something"
+      and "a host's question answered within the person's request". answer-waiting-agent
+      (agents on this machine) wins on "asking"; retrain owed.
+    messages:
+      - role: user
+        content: one of the remote hosts is asking whether it may skip the flaky e2e suite; the others are still going
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-update-line
+    category: background-wake
+    note: >-
+      The hub's own wake line for work it sent, quoted in the positive clause: "the line
+      "Daintree: delegated exchange update (exchanges …)" for work it sent". Before this
+      runbook it routed to execute-durable-workflow at 0.95; two text attempts on each side of
+      that boundary did not move it past the trained owner (measure.md). Retrain owed.
+    messages:
+      - role: user
+        content: "Daintree: delegated exchange update (exchanges 5d0e2a71-8c3f-4e9b-a6d2-7f1c0b9e3a48, b2c4e6f8-1a3b-4c5d-9e7f-2a4b6c8d0e1f)."
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-quiet-fourth-host
+    category: single-runbook
+    note: >-
+      A host left quiet after its peers came back. Decided by "one host still working long after
+      the others came back" and "a quiet host checked once". recover-agent owns a hung agent on
+      this machine and its own text sends a delegated task that never came back elsewhere; its
+      routing document is at the encoder cap. Retrain owed.
+    messages:
+      - role: user
+        content: three of the hosts are back but the fourth has sat on working for twenty minutes with nothing new
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-host-message-to-hub
+    category: single-runbook
+    note: >-
+      A host's own message to the hub mid-run. Decided by "a host's own message answered";
+      handle-hub-message is the lane receiving the hub's message ("Use on a Remote
+      Host's Daintree assistant enrolled as a lane when the hub, the assistant on the person's main machine, has messaged it"), the
+      other direction. Retrain owed.
+    messages:
+      - role: user
+        content: the build box's assistant just messaged the hub asking which base branch it should use
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------- routing traps
+  - id: supervise-swarm-not-swarm-fan-out
+    category: routing-trap
+    note: >-
+      The work is already on every host. Decided by this runbook's "once this Shell's work is OUT
+      on the Remote Hosts" and its own fence, "Do not use for sending the work in the first
+      place"; swarm-fan-out is "the SAME WORK done on EVERY Remote Host".
+    messages:
+      - role: user
+        content: the work is already out on every host; keep it moving and answer their questions as they come in
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-not-place-work
+    category: routing-trap
+    note: >-
+      The pieces are placed and sent. Decided by this runbook's "the run followed to its end" and
+      "decisions brought to the person"; place-work's deliverable is "a placement table (piece,
+      host, project, CLI, reason), shown before anything is sent".
+    messages:
+      - role: user
+        content: the pieces are placed and sent; now follow them until each host is done and tell me what needs me
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      The single unit is already delegated. Decided by this runbook's "once this Shell's work is
+      OUT on the Remote Hosts" and "each finished unit verified by branch, SHA or PR";
+      delegate-to-host is for when "the person wants ONE piece of WORK done by the Daintree
+      assistant on another machine", sent by it.
+    messages:
+      - role: user
+        content: the single unit I delegated to the other Mac is out; follow its updates until it is in and check what it reports
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-not-recover-and-clean-up
+    category: routing-trap
+    note: >-
+      Nothing restarted and the run is live. Decided by this runbook's "The deliverable is the run
+      kept moving: every update read"; recover-and-clean-up is "usually after Daintree restarted,
+      the hub was replaced or the link to a Remote Host dropped".
+    messages:
+      - role: user
+        content: the hosts are mid-run and nothing restarted; keep following their updates and handle what comes up
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-not-supervise-fleet
+    category: routing-trap
+    note: >-
+      The person says the remote hosts, not agents here: "agents on this machine
+      (daintree.orchestration.supervise-fleet)" is carved out; decided by "once this Shell's work
+      is OUT on the Remote Hosts".
+    messages:
+      - role: user
+        content: not the agents on this machine, the remote hosts; keep their run going until everything is in
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-not-handle-hub-message
+    category: routing-trap
+    note: >-
+      Said on the hub about the lanes, so not daintree.hosts.handle-hub-message, which is "Use on
+      a Remote Host's Daintree assistant enrolled as a lane when the hub, the assistant on the person's main machine, has messaged it";
+      decided by "the run kept moving" and "a host's question answered within the person's
+      request".
+    messages:
+      - role: user
+        content: as the hub, keep the run on the remote hosts moving, answer the lanes' in-scope questions and verify each reply
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ reverse traps
+  - id: supervise-swarm-reverse-recover
+    category: routing-trap
+    note: >-
+      Reverse trap. An account of the exchanges after a restart is daintree.hosts.recover-and-clean-up
+      ("which delegated exchanges finished, which are still open, which will never be
+      answered"); this runbook keeps a run moving ("the person wants the run followed to its
+      end") and must not ride along.
+    messages:
+      - role: user
+        content: Daintree restarted an hour ago; tell me which of the exchanges I sent the remote hosts finished and which never will
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-swarm-fan-out
+    category: routing-trap
+    note: >-
+      Reverse trap. Sending the same work to every host is daintree.hosts.swarm-fan-out ("the SAME
+      WORK done on EVERY Remote Host"); nothing is out yet, so this runbook must not ride along.
+    messages:
+      - role: user
+        content: send each remote host the same flaky-test fix on its own branch and table the shas
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-delegate
+    category: routing-trap
+    note: >-
+      Reverse trap. One piece of work for one named host, not yet sent, is
+      daintree.hosts.delegate-to-host ("ONE piece of WORK done by the Daintree assistant on
+      another machine"); this runbook must not ride along.
+    messages:
+      - role: user
+        content: get the other Mac's assistant to fix the date parsing bug on a new branch and tell me the sha
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-supervise-fleet
+    category: routing-trap
+    note: >-
+      Reverse trap. Agents running on this machine are daintree.orchestration.supervise-fleet
+      ("anything need me?"); no Remote Host is involved, so this runbook must not ride along.
+    messages:
+      - role: user
+        content: are any of the agents in my worktrees here blocked on me right now?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+
+  - id: supervise-swarm-reverse-handle-hub-message
+    category: routing-trap
+    note: >-
+      Reverse trap. On a lane, the hub's message is daintree.hosts.handle-hub-message ("the hub
+      sent me a message, read it and deal with it"); this runbook is the hub's side and must not ride
+      along.
+    messages:
+      - role: user
+        content: the hub's message just landed in this lane's inbox asking for the lint results; handle it
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation]
+
+  # ----------------------------------------------- steer-swarm, landed meanwhile
+  - id: supervise-swarm-not-steer-swarm
+    category: routing-trap
+    note: >-
+      Nothing is to be stopped or changed, so not daintree.hosts.steer-swarm, which is for work
+      "STOPPED, CALLED OFF or CHANGED while it is under way"; this runbook's own fence is
+      "changing its course (daintree.hosts.steer-swarm)". Decided by "the person wants the run
+      followed to its end".
+    messages:
+      - role: user
+        content: no changes to the brief, the remote hosts just carry on; follow them to the end and confirm each commit
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-steer-swarm
+    category: routing-trap
+    note: >-
+      Reverse trap. Calling off a run already sent is daintree.hosts.steer-swarm ("Use when the
+      person wants work they ALREADY SENT to their other machines, one run on one or several
+      Remote Hosts, STOPPED, CALLED OFF or CHANGED while it is under way"); this runbook's "changing its course" fence sends it there
+      and it must not ride along.
+    messages:
+      - role: user
+        content: stop the remote run on every host, the spec changed; leave whatever they committed in place
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation]
+
+  # ---------------------------------------- reassign-host-work, landed meanwhile
+  - id: supervise-swarm-not-reassign-host-work
+    category: routing-trap
+    note: >-
+      The slow host is still on its unit and nothing moves, so not
+      daintree.hosts.reassign-host-work, which is for work that "has to MOVE TO A DIFFERENT
+      MACHINE because the first cannot finish it". Decided by "the person wants the run
+      followed to its end".
+    messages:
+      - role: user
+        content: the other mac is slow but still on its unit; nothing needs moving to another host, keep following it until it reports
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-reassign-host-work
+    category: routing-trap
+    note: >-
+      Reverse trap. A host gone offline mid-task, its unit moved to a machine that is up, is
+      daintree.hosts.reassign-host-work ("that machine went offline or silent mid-task"); this
+      runbook only follows a run still moving and must not ride along.
+    messages:
+      - role: user
+        content: the tower went dark in the middle of its unit and won't be back today; move the unfinished part to a machine that's up, keeping what it pushed
+    expect:
+      required: [daintree.hosts.reassign-host-work]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------ execute-distributed-workflow, landed meanwhile
+  - id: supervise-swarm-not-execute-distributed-workflow
+    category: routing-trap
+    note: >-
+      The units are independent and already out, so not daintree.hosts.execute-distributed-workflow,
+      which is for "a dependency graph of three or more units in which several wait on others".
+      Decided by "once this Shell's work is OUT on the Remote Hosts" and "decisions brought to the
+      person".
+    messages:
+      - role: user
+        content: the swarm's units are independent and already out; keep it moving and bring me any decision
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-execute-distributed-workflow
+    category: routing-trap
+    note: >-
+      Reverse trap. Stages that wait on each other across hosts are
+      daintree.hosts.execute-distributed-workflow ("a stage released only once the commits it
+      depends on are verified"); this runbook follows units with no order between them and must
+      not ride along.
+    messages:
+      - role: user
+        content: the schema unit on the server must land before the two app units start on the minis; carry the whole thing through
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
