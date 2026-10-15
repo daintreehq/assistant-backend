@@ -6,7 +6,8 @@
 # runbook wins, and reverse traps where the neighbour wins and this one must not ride along:
 # the hosts foundation (messaging on a host already added), daintree.diagnostics (Daintree's
 # own health here), daintree.worktree.manage-resource (a worktree's cloud devbox),
-# daintree.hosts.delegate-to-host (work for a connected host) and a dev server, which is
+# daintree.hosts.delegate-to-host (work for a connected host), daintree.hosts.start-swarm
+# (assistants readied on hosts already added) and a dev server, which is
 # daintree.terminals.run-visible-command. The hosts foundation may ride along (optional).
 
 cases:
@@ -154,17 +155,30 @@ cases:
       required: [daintree.hosts.connect-host]
       optional: [daintree.hosts.foundation]
 
+  - id: connect-host-new-machine-for-swarm-not-start-swarm
+    category: routing-trap
+    note: >-
+      The machine is not a host yet, so adding it comes first: "ANOTHER MAC OR LINUX
+      MACHINE added to Daintree as a Remote Host". A swarm on hosts already added is fenced
+      off: "getting an assistant ready on hosts already added (daintree.hosts.start-swarm)".
+    messages:
+      - role: user
+        content: bring the new build machine into daintree as a host so it can be part of the swarm
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
   # ------------------------------------------------------------ reverse traps
   - id: connect-host-reverse-messaging-is-foundation
     category: routing-trap
     note: >-
-      Reverse trap. The host is already added, so nothing here is this runbook's ("ANOTHER
-      MAC OR LINUX MACHINE added to Daintree as a Remote Host"); switching messaging on is
-      the foundation's: "wants to know how messaging between the assistants on two machines
-      works, whether it is set up, how to switch it on".
+      Reverse trap. The host already exists, so nothing here is this runbook's ("ANOTHER
+      MAC OR LINUX MACHINE added to Daintree as a Remote Host"); what to switch on for the
+      assistants to talk is the foundation's: "wants to know how messaging between the
+      assistants on two machines works, whether it is set up, how to switch it on".
     messages:
       - role: user
-        content: turn on assistant messaging for the build box host I added yesterday
+        content: what do I have to enable so this shell's assistant can reach the assistant on my existing linux host
     expect:
       required: [daintree.hosts.foundation]
 
@@ -221,3 +235,17 @@ cases:
     expect:
       required: [daintree.terminals.run-visible-command]
       optional: [daintree.foundation]
+
+  - id: connect-host-reverse-ready-lanes-is-start-swarm
+    category: routing-trap
+    note: >-
+      Reverse trap. The hosts are already added; an assistant ready on each before work goes
+      out is start-swarm's ("Claude Code or Codex ready on every Remote Host ... bootstrapping
+      each host's assistant lane"), and this runbook fences it off as "getting an assistant
+      ready on hosts already added (daintree.hosts.start-swarm)".
+    messages:
+      - role: user
+        content: all three machines are already hosts here; line up one claude assistant on each for this repo, no work yet
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
