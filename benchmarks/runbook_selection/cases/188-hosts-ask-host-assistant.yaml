@@ -1,0 +1,134 @@
+# daintree.hosts.ask-host-assistant: this Shell's hub puts ONE question to the assistant on
+# one Remote Host and relays its answer with attribution. Recall cases pin the requests the
+# issue named, in an agent's and a person's words (machine names replaced), plus a host named
+# only by its nickname. Routing traps hold the boundary with each declared neighbour on this
+# machine (an agent already open, a new local agent launched to answer, a local agent waiting
+# on a question), both ways. The hosts foundation co-loads by design, so it is optional.
+
+cases:
+  - id: ask-host-agent-phrased
+    category: single-runbook
+    note: >-
+      The issue's agent-phrased request. The positive clause claims it: "wants ONE QUESTION
+      answered by the Daintree assistant on ANOTHER MACHINE, a Remote Host this Shell
+      reaches". The hosts foundation rides along as the domain foundation.
+    messages:
+      - role: user
+        content: Put one question to the assistant on a remote host and relay its answer
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-release-prep
+    category: single-runbook
+    note: >-
+      The issue's first request, the host named by what it is. "The deliverable is that
+      assistant's ANSWER, relayed with attribution and its caveats".
+    messages:
+      - role: user
+        content: Ask the Mac mini how the release prep is going.
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-failing-build
+    category: single-runbook
+    note: >-
+      The issue's second request. Its content words (a failing build) pull toward CI; the
+      deciding words are "answered by the Daintree assistant on ANOTHER MACHINE" and "The
+      deliverable is that assistant's ANSWER". Untrained, the count head selects nothing
+      here: owed to the retrain.
+    messages:
+      - role: user
+        content: What does the assistant on the other Mac make of the failing build?
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-bare-host-name
+    category: single-runbook
+    note: >-
+      A host named only by its nickname, the way people name their machines: "ONE
+      QUESTION answered by the Daintree assistant on ANOTHER MACHINE, a Remote Host this
+      Shell reaches". Only the name says it is another machine, so the encoder reads it
+      as an agent and daintree.agents.ask-running-agent wins untrained: owed to the
+      retrain, which has rows for this shape.
+    messages:
+      - role: user
+        content: Ask orion how the release prep is going.
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-not-an-open-agent-here
+    category: routing-trap
+    note: >-
+      An assistant on another machine, not an agent open here. The fence: "Do not use for a
+      question to an agent on THIS machine (daintree.agents.ask-running-agent for one
+      already open". ask-running-agent riding along is an extra.
+    messages:
+      - role: user
+        content: ask the assistant on my other machine what branch it is working on
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-not-a-local-launch
+    category: routing-trap
+    note: >-
+      Asking the remote host's own assistant, not launching an agent here to answer: the
+      fence names "daintree.agents.ask-and-relay to launch one". ask-and-relay riding
+      along is an extra.
+    messages:
+      - role: user
+        content: check with the remote host's assistant whether its tests are green, just ask
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-not-a-waiting-agent
+    category: routing-trap
+    note: >-
+      Waiting for another machine's answer is not answering an agent that waits here: "to
+      answer a question an agent here is asking (daintree.agents.answer-waiting-agent)".
+      answer-waiting-agent riding along is an extra.
+    messages:
+      - role: user
+        content: Put a question to the remote host's assistant and wait for its answer
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-reverse-open-agent
+    category: routing-trap
+    note: >-
+      Reverse trap. A terminal on this machine holds the context: ask-running-agent's
+      "Use when the user wants an answer FROM an agent that already exists". Nothing
+      crosses machines, so the hosts runbook must not ride along.
+    messages:
+      - role: user
+        content: ask the codex agent in terminal 3 what it decided about the schema
+    expect:
+      required: [daintree.agents.ask-running-agent]
+
+  - id: ask-host-reverse-local-launch
+    category: routing-trap
+    note: >-
+      Reverse trap. A new agent launched here for its opinion is ask-and-relay's "ONE agent
+      asked ONE question and its answer brought back"; no other machine is involved.
+    messages:
+      - role: user
+        content: launch codex and get its opinion of the caching layer, read only
+    expect:
+      required: [daintree.agents.ask-and-relay]
+
+  - id: ask-host-reverse-waiting-agent
+    category: routing-trap
+    note: >-
+      Reverse trap. A local agent stopped on a prompt is answer-waiting-agent's "waiting on
+      a QUESTION and the user wants them answered"; the hosts runbook must not ride along.
+    messages:
+      - role: user
+        content: codex is stuck on a yes or no prompt in its pane, answer it with yes
+    expect:
+      required: [daintree.agents.answer-waiting-agent]
