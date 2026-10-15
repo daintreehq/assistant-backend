@@ -24,16 +24,14 @@ positives:
   reply
 - hub asked for competing implementations of the rate limiter here; run each attempt in its own worktree
   and report the strongest
-- orchestrate the hub's batch of independent tickets locally, verify each agent's commit, reply with a
-  per-ticket table
+- the main machine just sent this box three unrelated billing bugs that touch different files; put a local agent on each, check every commit myself, then answer it once with a row per bug
 - lane has a list of five refactors from the hub; launch one agent per refactor in separate worktrees
   and roll up the outcomes
 - the hub wants two rival approaches to the search indexing fix built on this host and the better one
   named
 - work through the hub's queue of six small fixes here, two agents at a time, then one reply with branch
   and SHA per fix
-- carry out this machine's portion of the hub run, several units in local worktrees, one verified summary
-  back
+- 'Hub batch for this host: rename the logger in the api package, bump the date library in the web package, and fix the flaky export test, each in its own worktree with a local agent, then one checked reply'
 - parallelise the hub's units across claude agents on this host without exceeding its concurrency limit
 - hub dropped three tickets on this mac, get them all going
 - the main machine sent over a bunch of little fixes for this repo, spread them over a few agents and
@@ -56,7 +54,7 @@ positives:
 - the hub said up to four agents at once on this host for its seven tasks
 - the hub's request is a set of small refactors across separate packages; split them over agents here
 - best-of-three attempt at the flaky upload test, requested by the hub for this machine
-- as the hub's submanager here, spread its tickets over local agents and report one summary
+- the other mac handed this one two docs fixes and two lint cleanups for the monorepo with a cap of two agents at once, and wants a single answer listing each branch and SHA
 - The hub just sent this machine its slice of tonight's run, the CSV export bug, the pagination off-by-one
   and the stale cache header, all in this repo. Each should get its own branch from the commit it gave,
   Claude doing the work, and I want a single answer back to the hub listing what passed and what didn't.
