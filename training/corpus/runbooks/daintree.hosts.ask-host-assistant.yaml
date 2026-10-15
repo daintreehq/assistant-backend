@@ -17,9 +17,9 @@ positives:
   - Ask a remote host's assistant what state its release branch is in, question only
   - Ask the assistant on a host to explain the test failure it reported and relay the explanation
   - Learn from a Remote Host's assistant which branch carries the login fix
-  - query: The user wants to know whether the database migration on their second machine finished. Ask that host's assistant once, wait briefly for its reply, and report what it says without changing anything there.
-  - query: A Remote Host's assistant has context about a deploy the user cares about. Put the user's question to it, relay its answer, and keep anything it says it is unsure of separate from what can be checked here.
-  - query: The person asked what the assistant on their laptop host concluded about a flaky upload test it was looking into yesterday. One question to that assistant, answer brought back attributed, nothing on that machine touched.
+  - query: The database migration on the user's second machine was left running overnight and they want to know whether it completed and whether any tables were skipped; the assistant in that project there ran it.
+  - query: Staging on the remote host was redeployed this morning by the assistant in that project there, and the user wants to know from it whether the session-timeout fix went out with that deploy.
+  - query: The person's laptop host spent yesterday looking into a flaky upload test, and they want that assistant's conclusion, not a fresh investigation started from this machine.
   - ask the mini if the release branch is ready to tag
   - what does the linux host's assistant think about the slow integration tests
   - can you ask my other mac whether it pushed yet
@@ -114,7 +114,7 @@ boundaries:
     confusable_with: [daintree.ci.diagnose-and-fix]
   - query: check with the linux host's assistant on the status of the login issue
     confusable_with: [daintree.workflow.follow-up-on-issue]
-  - query: what does the other mac's assistant think about the new retry change
+  - query: ask the other mac's assistant whether the retry change it wrote is safe to merge
     confusable_with: [daintree.review.review-change]
   - query: ask the linux host's assistant whether the flaky upload test failed again there
     confusable_with: [daintree.ci.hunt-flaky-test]

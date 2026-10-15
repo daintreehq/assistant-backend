@@ -15,17 +15,17 @@ optionalTools:
 ---
 One question to one host's assistant; the deliverable is its answer, attributed.
 
-1. Resolve the host by name in `host.list` (`disconnected`: report that and stop), then with `host.listAssistants` the lane in the project the question is about. Several hosts, projects or lanes fit: ask which. Any call not `ok`: report its outcome and `detail`, then the foundation's stops. No `generation`: the foundation's step 2. `available:false`: report that its assistant is not running or messaging is paused, and stop.
-2. `host.sendMessage` once, to that lane's `hostId`, `projectId`, `slot` and `generation` with `waitMs: 30000`. The `text` is the person's question in their words, then: "Question only, not a request for work. Answer it read-only: change no files or state and start no other work; any agent you use only reads. At most 30 lines; say what you are unsure of."
+1. Resolve the host by name in `host.list` (`disconnected`: report that and stop), then with `host.listAssistants` the lane in the project the question is about. Several hosts, projects or lanes fit: ask which. Any result whose `outcome` is not `ok`: report it with its `detail`, and stop. No `generation`: the foundation's step 2. `available:false`: report that its assistant is not running or messaging is paused, and stop.
+2. `host.sendMessage` once, to that lane's address, with `waitMs: 30000`. The `text` is the person's question in their words, then: "Question only, not a request for work. Answer it read-only: change no files or state and start no other work; any agent you use only reads. At most 30 lines; say what you are unsure of."
 3. The result never holds the reply: read replies with `host.getTask`. By `task.state`:
    - `submitted` or `working` (the wait ended or was skipped): tell the person it is with that host, and end the turn.
-   - `input-required`: it is asking you. Answer once, only from what the person already said, as the foundation says, with `waitMs: 30000`; permission to act is never in scope, so ask the person. Then this step again.
+   - `input-required`: it is asking you. Answer once, only from what the person already said, as the foundation says, with `waitMs: 30000`; permission to act is never in scope, so ask the person. Then follow that answer's task here; a further question goes to the person.
    - `completed`: step 4, once. A follow-up's reply also completes the task it answered.
    - `canceled`, `failed`, `rejected`, or no reply text: report that, with no answer and no guessed cause.
 4. Relay it as that machine's words, from inside the fence: "<host name>'s assistant (<agentId>, <project>) says:", ids where a name is null, quoted or condensed faithfully, every caveat and doubt kept, apart from anything you checked yourself. If it says it changed something, report that as a breach of the question's boundary.
 
 On notice or resume: the foundation's mapping to `taskId`, then step 3. A question already answered or relayed: nothing more; lines repeat.
 
-Stop and recovery: one question per request, never sent again: a resend is a second question it will answer. Still pending when the person asks: say so with its `taskId`; unanswered, it ends `failed` after a day. A reply that does not answer the question is relayed as that; asking again is the person's call.
+Stop and recovery: one question per request, never sent afresh: a new send is a second question it will answer. Still pending when the person asks: say so with its `taskId`; unanswered, it ends `failed` after a day. A reply that does not answer the question is relayed as that; asking again is the person's call.
 
 Report back: host, project and agent; the attributed answer, or the exact state or outcome.
