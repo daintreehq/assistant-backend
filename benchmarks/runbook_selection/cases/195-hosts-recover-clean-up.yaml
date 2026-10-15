@@ -95,7 +95,7 @@ cases:
     category: continuation
     note: >-
       The issue's fifth request. After a usage check that each host's assistant ran in its
-      own panes, "close all the usage panes" means panes on the Remote Hosts, which only
+      own panes, closing all the usage panes means panes on the Remote Hosts, which only
       their assistants can close ("its panes (usage-check panes included) ... cleaned up
       through each host's own assistant"). Panes only: nothing else is in scope. The
       usage turn pulls daintree.agents.check-usage-limits (rank_miss): retrain owed.

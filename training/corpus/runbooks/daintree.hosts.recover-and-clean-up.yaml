@@ -10,18 +10,18 @@ runbook: daintree.hosts.recover-and-clean-up
 run: runbook-2026-10-issue-95
 
 positives:
-  - Reconcile the delegated exchanges on each Remote Host after the Shell came back from a crash, using the task lists rather than waiting for update lines
-  - Rebuild the status of every task this hub sent to the other hosts before Daintree restarted and say which ones still have a live assistant behind them
-  - Page through host.listTasks for each host from the oldest record and summarise which exchanges completed while the Shell was offline
-  - Work out which open exchanges on the remote hosts lost their assistant when a host rebooted and report them as unanswerable
+  - The Shell crashed an hour ago and came back; nothing has been heard from the hosts since. Find out where the delegated exchanges stand
+  - Daintree restarted while five tasks were out on the other hosts; which of them still have someone working on them
+  - The Shell was offline for most of the night with four hosts mid-task; find out which of those exchanges completed and which are still out
+  - One of the remote hosts rebooted during the night; which of the exchanges I had open there are now dead
   - Determine whether the migration task sent to the second host is still being worked on, given its assistant now lists with no generation
   - After the network link to the hosts was down for a while, check each host's task records and report what moved during the outage
   - This is a fresh hub session; recover what the previous hub delegated to the Remote Hosts and report each exchange's state and delivery times
-  - Report how long each still-open exchange on the remote machines has been waiting since it was accepted
+  - Two of the jobs on the remote machines feel like they've been running forever; tell me how long each has actually been open and whether anyone is still on it
   - A host's assistant replied that its Daintree tools fail with SESSION_BINDING_GONE; work out what that means for its open task and what the person has to do
   - Check whether the lint task delegated to the linux host is in progress or orphaned now that its assistant was restarted
-  - The person wants the lost docs task sent again; get it to an assistant on that host as a new message referencing the old exchange
-  - Look up the exchanges the remote hosts finished overnight and relay their replies with branch and commit
+  - The docs task to the second host was lost when its assistant restarted, and the user wants it redone there
+  - Three hosts were working overnight on the API split; find out what they finished and which branch and commit each one landed
   - morning, did the other macs finish the jobs I left them last night?
   - daintree crashed on me, are the remote machines still doing what I asked?
   - which of the hosts still owe me an answer?
@@ -35,11 +35,11 @@ positives:
   - new sidebar session, the old one had handed out work to my other machines, where is all that at
   - every remote lane shows unavailable since I got back, what happened to the work I sent them
   - Have each host's assistant close the agent panes and delete the clean worktrees it created for the pagination experiment, keeping anything unpushed for the user to decide
-  - Ask the remote assistants to list what they made for yesterday's benchmark run, close those panes, and report what they kept and why
-  - Brief every enrolled lane to tear down its leftovers from the parallel refactor run without forcing anything or deleting branches
+  - Yesterday's benchmark run on the remote machines left terminals open everywhere; close them through each host's assistant and tell me what's left
+  - The parallel refactor across the hosts is merged; get rid of what it left on each machine, but I don't want any branch touched
   - Clean up the remote worktrees from the cross-machine race except the winning branch
   - Get the host assistants to close the usage-check terminals they opened earlier today
-  - Coordinate cleanup on all Remote Hosts after the test campaign, panes closed, clean worktrees removed, unpushed work reported back as a question
+  - query: We finished the test campaign on the remote hosts yesterday and every machine still has its panes and worktrees open. Clear them out, and ask me about anything that hasn't been pushed.
   - tidy up what the swarm left on the other macs, but nothing that hasn't been pushed
   - can you get the other machines to bin the panes they opened for the cache experiment
   - eight panes and four worktrees are still hanging around across my hosts from the test runs, clean them up properly
@@ -52,6 +52,11 @@ positives:
   - query: Before I sign off, make sure nothing I sent to the other machines is silently stuck since this morning's restart
   - query: The relaunched assistant on the second host never answered the old task, and I want it redone. Send it again there, pointing back at the original exchange, and tell me when it replies
 
+  - query: I left four jobs running on the other Macs before my flight. The hub here was restarted by an update while I was gone, so it has no memory of them. Tell me which finished, which are still going, and which I need to deal with.
+  - query: "Observed: the build host lists its project's first assistant with no generation, and the exchange sent there this morning still reads working. Decide whether that task can still be answered and what the user should do about it"
+  - query: The swarm on the remote hosts is done and merged. Each machine still has two or three agent panes and a worktree for it. Clear those up through each host's assistant; one of them has a commit I never pushed, so check with me before anything with unpushed work goes.
+  - query: I'm watching the second host's window now. Last time the worktree removal there timed out because nobody was around to approve it, so try that one again.
+
 followups:
   - query: ok all done, now clean up after it on every machine
     history:
@@ -60,7 +65,7 @@ followups:
     active: [daintree.hosts.foundation]
   - query: daintree restarted in between, where is that at now?
     history:
-      - "user: hand the migration to the build machine's assistant"
+      - "user: hand the schema migration to the assistant on the database host"
       - "assistant: Sent; the exchange is open on that host."
     active: [daintree.hosts.foundation]
   - query: that open one, is its assistant still there or do we need to send it again?
@@ -71,11 +76,11 @@ followups:
   - query: great, now get rid of those panes on all of them
     history:
       - "user: check usage on each remote host"
-      - "assistant: Each host's assistant opened a usage pane: two have about half the week left, one resets tomorrow."
+      - "assistant: Usage read on all three hosts; the Codex one resets tomorrow, the others have about half the week left."
     active: [daintree.agents.check-usage-limits]
   - query: keep that one, remove the rest
     history:
-      - "user: clean up after the race on the hosts"
+      - "user: the parser race is over, have the hosts tidy their worktrees"
       - "assistant: Two hosts finished. The third asks whether to delete a worktree with two unpushed commits."
     active: [daintree.hosts.recover-and-clean-up]
   - query: send that one again then

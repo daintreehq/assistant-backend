@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 18316,
-  "compiled_sha256": "3ab7a9731fd13398506200ee90bbbaab1cbe65da5210169c7b91e473a0a9b264",
+  "rows": 18320,
+  "compiled_sha256": "d40608f07b588f18fcd1f995210d58b307151f6174aa179821859e92396f60c7",
   "label_space_sha256": "9ddd5324da38ee289a3dbff91fcfb3f2cebfc5cd5a8dfb6baa43dd6c99b32e38",
   "label_space_size": 109,
   "by_source": {
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 5689,
+    "positive": 5693,
     "topic_shift": 2998,
     "wake": 149
   },
@@ -41,7 +41,7 @@
     "pre-split": 9808,
     "runbook-2026-10-issue-86": 83,
     "runbook-2026-10-issue-89": 96,
-    "runbook-2026-10-issue-95": 82,
+    "runbook-2026-10-issue-95": 86,
     "runbook-2026-10-issue-96": 38,
     "transcript-2026-09-26-competition-relocate": 12,
     "transcript-2026-09-26-fact-contest-named-agents": 7,
@@ -317,13 +317,13 @@
       "examples": 77,
       "rows": 77,
       "runbook": "daintree.hosts.foundation",
-      "sha256": "3db9a12e56fa6c56b20851fb2b03eceb2077cd285b66a604493d2ea89e13da84"
+      "sha256": "ba97104bc4abe06358885b203fdfc1e6c3def75ae1fc0399dfb9a55396b9230f"
     },
     "runbooks/daintree.hosts.recover-and-clean-up.yaml": {
-      "examples": 64,
-      "rows": 64,
+      "examples": 68,
+      "rows": 68,
       "runbook": "daintree.hosts.recover-and-clean-up",
-      "sha256": "6f758d8ce5a7b15372644d3291869b747b4e4475aa7de3f50ca51e9effe6b680"
+      "sha256": "3fa75d28b4237398cc5cd71fa6f1a4429b54321afe122e53610c5f52fbff0025"
     },
     "runbooks/daintree.memory.manage-project-memory.yaml": {
       "examples": 228,
