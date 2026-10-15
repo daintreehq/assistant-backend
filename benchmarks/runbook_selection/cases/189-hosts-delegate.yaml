@@ -35,9 +35,9 @@ cases:
   - id: delegate-to-host-relay-user
     category: single-runbook
     note: >-
-      The issue's relay request with the machine names scrubbed: "one host starting once
-      another host's change lands" and "a deliberate relay of the verified result to the
-      next host".
+      The issue's relay request with the machine names scrubbed: "a second host starting
+      once the first host's change lands" and "for that single dependency a deliberate relay
+      of the verified result to the second host".
     messages:
       - role: user
         content: once the server box has pushed the API change, have the laptop host build the client against that commit
@@ -48,11 +48,11 @@ cases:
   - id: delegate-to-host-flaky-test-on-other-mac
     category: single-runbook
     note: >-
-      The issue's second request, scrubbed. The work's content (a flaky test) is
-      daintree.ci.hunt-flaky-test's vocabulary; the clause "whatever the work is (a bug, a
-      flaky or failing test, a feature, docs)" keeps this runbook selected beside it. The
-      flaky-test owner riding along is an extra, so this passes recall, not strict, until a
-      retrain separates them.
+      The issue's second request, scrubbed. The work is a flaky test, but it is for another
+      machine's assistant: "ONE piece of WORK done by the Daintree assistant on another
+      machine ... whatever the work is (a bug, a flaky or failing test, a feature, docs)".
+      This runbook is the answer; daintree.ci.hunt-flaky-test's know-how belongs to the host
+      that does the work.
     messages:
       - role: user
         content: get my other mac to fix the flaky login test and open a pr
@@ -64,8 +64,8 @@ cases:
   - id: delegate-to-host-not-durable-workflow
     category: routing-trap
     note: >-
-      A two-step dependency across machines is a relay ("one host starting once another
-      host's change lands"), not a dependent plan on this machine
+      A two-step dependency across machines is a relay ("a second host starting once the
+      first host's change lands"), not a dependent plan on this machine
       (daintree.orchestration.execute-durable-workflow).
     messages:
       - role: user
@@ -102,8 +102,9 @@ cases:
   - id: delegate-to-host-not-watch-outcome
     category: routing-trap
     note: >-
-      A start that waits on another host's pushed fix is a relay to the next host, not a
-      later start on this machine (daintree.orchestration.watch-outcome).
+      A start that waits on another host's pushed fix is "a second host starting once the
+      first host's change lands", not "a later start or wake-up on this machine
+      (daintree.orchestration.watch-outcome)".
     messages:
       - role: user
         content: after the remote host pushes its fix, get the second host to write the tests against that commit
@@ -127,11 +128,12 @@ cases:
   - id: delegate-to-host-trap-spawn-here
     category: routing-trap
     note: >-
-      A code change by an agent in a worktree on this machine: spawn-visible-agent, and the
-      remote-delegation runbook must not ride along.
+      A code change by an agent here. spawn-visible-agent: "any request to CHANGE project
+      code or files that no more specific workflow owns ... The work goes to ONE visible agent
+      in the right worktree"; this runbook fences "work by an agent on THIS machine".
     messages:
       - role: user
-        content: spin up claude in a new worktree to add rate limiting to the upload endpoint
+        content: start claude in a fresh worktree and have it add request ids to every log line in the gateway
     expect:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
@@ -139,11 +141,12 @@ cases:
   - id: delegate-to-host-trap-hand-off
     category: routing-trap
     note: >-
-      A started task moved to another agent in the same worktree on this machine:
-      hand-off-task, not delegation to another machine.
+      A started task given to a different local agent. hand-off-task: "a task an agent has
+      STARTED must be finished by a DIFFERENT agent or a fresh session, in the same
+      checkout"; this runbook fences "a started task moved to another local agent".
     messages:
       - role: user
-        content: codex hit its usage limit halfway through the parser rewrite, have claude finish it in the same worktree
+        content: the gemini pane keeps undoing its own fixes on the cache layer, have codex take over that task in the same checkout
     expect:
       required: [daintree.agents.hand-off-task]
       optional: [daintree.foundation]
@@ -151,7 +154,9 @@ cases:
   - id: delegate-to-host-trap-watch-outcome
     category: routing-trap
     note: >-
-      A delayed start on this machine with no other host involved: watch-outcome.
+      A delayed start here, no other host. watch-outcome: "Any deferred action belongs
+      here, INCLUDING one that spawns an agent"; this runbook fences "a later start or
+      wake-up on this machine".
     messages:
       - role: user
         content: in an hour start an agent on the flaky export test
@@ -162,10 +167,11 @@ cases:
   - id: delegate-to-host-trap-fan-out
     category: routing-trap
     note: >-
-      One agent per issue in its own worktree here: fan-out-work, not delegation.
+      One agent per issue here. fan-out-work: "a BATCH of independent issues or tasks, one
+      agent terminal per issue or worktree"; this runbook fences "several units here".
     messages:
       - role: user
-        content: open an agent per issue for these four bugs, each in its own worktree
+        content: split the open typo and broken-link reports into one agent per report, each with its own worktree
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
@@ -173,7 +179,9 @@ cases:
   - id: delegate-to-host-trap-durable-workflow
     category: routing-trap
     note: >-
-      Dependent phases tracked across sessions on this machine: execute-durable-workflow.
+      Dependent phases tracked across sessions. execute-durable-workflow: "a substantial
+      multi-step goal with dependent phases that must survive turns, restarts or
+      asynchronous waits"; this runbook fences "a dependent plan on this machine".
     messages:
       - role: user
         content: run the payments migration as dependent phases and track the plan across sessions
