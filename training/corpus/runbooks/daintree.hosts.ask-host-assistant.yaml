@@ -118,6 +118,8 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: ask the linux host's assistant whether the flaky upload test failed again there
     confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: Get one answer from the assistant on a remote machine by asking it a question and collecting its reply
+    confusable_with: [daintree.agents.answer-waiting-agent]
   - query: ask the remote host's assistant through the hub one thing and give me its reply
     confusable_with: [daintree.hosts.foundation]
   - query: message the assistant on my other machine with a question and show me what comes back
