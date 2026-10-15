@@ -134,3 +134,5 @@ boundaries:
     confusable_with: [daintree.hosts.verify-for-hub]
   - query: 'the unit I built for the hub got merged, and its message now says to close that agent''s pane and drop the worktree'
     confusable_with: [daintree.hosts.do-delegated-work]
+  - query: 'the person has seen the demo on this host, and the hub now asks me to stop its preview and get rid of the demo worktree'
+    confusable_with: [daintree.hosts.demo-for-hub]

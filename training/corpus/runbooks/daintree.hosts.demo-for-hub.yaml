@@ -126,6 +126,9 @@ boundaries:
     confusable_with: [daintree.runtime.migrate-worktree-database]
   - query: seed the demo data for the hub's preview of the leaderboard, prove the database is this worktree's, then start it
     confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: 'the last demo here was cleaned up, and the hub wants the onboarding branch served again for the person to try'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-100
 
 followups:
   - query: good, start the preview and check it serves that commit
