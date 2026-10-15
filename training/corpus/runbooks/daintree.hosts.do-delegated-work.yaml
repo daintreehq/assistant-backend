@@ -106,3 +106,15 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: make the worktree the hub's unit needs from its pinned commit, then launch Claude in it
     confusable_with: [daintree.worktree.create-plain-worktree]
+  - query: The hub wants the flaky retry fixed on its run branch here. Have Claude do it in a new worktree; I'll rerun the tests on whatever it commits before I tell the hub.
+    confusable_with: [daintree.hosts.verify-for-hub]
+    run: runbook-2026-10-issue-104
+  - query: hub brief says add CSV export to the admin page from its base commit with Codex doing the work, and I want the tests green on the agent's commit before replying
+    confusable_with: [daintree.hosts.verify-for-hub]
+    run: runbook-2026-10-issue-104
+  - query: the hub handed this machine a schema migration to write; when the agent commits, run the suite on that commit and then send the hub the SHA
+    confusable_with: [daintree.hosts.verify-for-hub]
+    run: runbook-2026-10-issue-104
+  - query: make the hub's requested logging change here and double-check the resulting commit passes lint before the reply goes out
+    confusable_with: [daintree.hosts.verify-for-hub]
+    run: runbook-2026-10-issue-104

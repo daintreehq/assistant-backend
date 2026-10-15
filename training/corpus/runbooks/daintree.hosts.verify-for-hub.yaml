@@ -115,3 +115,9 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: this machine is the host the hub handed a test run to, so do the run
     confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the hub doesn't want anything changed this time, only its branch head tested here by an agent in a new worktree, with the results back
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: the code was written on the other machine, so all the hub needs from here is the integration suite on its pushed commit and a list of failures
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: no implementation in this brief, the hub only wants to know if commit 7c2e4a9 passes our tests on this box
+    confusable_with: [daintree.hosts.do-delegated-work]
