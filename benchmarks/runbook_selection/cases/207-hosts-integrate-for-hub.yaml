@@ -83,8 +83,9 @@ cases:
   - id: integrate-for-hub-conflict-escalated
     category: single-runbook
     note: >-
-      A conflict between the hub's inputs with no rule in the brief: "a merge conflict or an
-      acceptance clash goes back as a question, never resolved by guessing". The shipped
+      A conflict between the hub's inputs with no rule in the brief: "a merge conflict the brief
+      does not settle or an acceptance clash goes back as a question, never resolved by
+      guessing". The shipped
       selector also loads daintree.git.resolve-semantic-conflict, which would settle the clash
       here; a fence there raised it on this request instead (measured twice), so the boundary
       is left to corpus rows and the retrain.

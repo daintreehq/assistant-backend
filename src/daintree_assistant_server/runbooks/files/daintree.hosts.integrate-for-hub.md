@@ -18,8 +18,8 @@ optionalTools:
 ---
 Message and reply: daintree.hosts.handle-hub-message.
 
-1. From the brief: repository, base SHA, inputs in order (branch, SHA, acceptance), checks, integration branch, CLI, push or PR authority and target. Missing, short, or a remote not `git remote get-url origin` here: ask back. Git: `git -C <project path>` (`actions.getContext`).
-2. `git fetch origin <base SHA> <each SHA>`, one by one if that fails; a pin origin will not serve: ask back for a ref holding that commit, never its tip. Keep each `git ls-remote origin refs/heads/<branch>`: a tip off its pin is a finding; the pin merges.
+1. From the brief: repository, base SHA, inputs in order (branch, SHA, acceptance), checks, integration branch, CLI, push or PR authority and target. Missing, short or a remote not `git remote get-url origin` here: ask back. Git: `git -C <project path>` (`actions.getContext`).
+2. `git fetch --prune origin`; a pin, base too, that `git branch -r --contains <SHA>` lists nowhere: ask back for a ref holding that commit, never its tip. Keep each `git ls-remote origin refs/heads/<branch>`: a tip off its pin is a finding; the pin merges.
 3. Reconcile: the integration branch's worktree (`worktree.list`), HEAD descending from the base, and its integrator (`terminal.list`) continue; the branch existing otherwise: ask back. Else create, then `worktree.waitUntilReady` on its id while `pending` or `running`, at most three times; only `ready` proceeds:
 
 ```json tool=worktree.createWithRecipe
@@ -28,7 +28,7 @@ Message and reply: daintree.hosts.handle-hub-message.
 
 4. Launch the integrator there, `notify:true, handback:true`. Brief: pins, acceptance, checks, authority, and "Checks on the base, then per input in order: `git merge --no-ff --no-edit <SHA>` (already in: note it), the checks, HEAD before and after. A conflict the brief does not settle, or a check failing or not running: record files, output and SHA; `git merge --abort` if a merge is open, else `git reset --hard <HEAD before>`; stop. Never guess, touch a source branch or force; push or PR only as authorised." End the turn.
 
-On notice or resume: worktree clean, no merge in progress; `git log --first-parent --reverse --format='%H %P' <base>..HEAD` shows the merges in input order, second parent each SHA; a noted input passes `git merge-base --is-ancestor <SHA> HEAD`; checks rerun on HEAD; `ls-remote` again: moved or deleted sources, the integration branch absent unless pushed (then HEAD). Reply `completed`: branch, HEAD, base, per input SHA, merge, checks and tip; worktree and pane. A stop or missing input: `input-required` with the evidence, last good HEAD and inputs left. The hub's answer, a new exchange: re-read the worktree, send its decision once (`terminal.sendCommand`, `notify`, `handback`); reply to that exchange.
+On notice or resume: worktree clean, no merge in progress; `git log --first-parent --reverse --format='%H %P' <base>..HEAD` shows the merges in input order, second parent each SHA; a noted input passes `git merge-base --is-ancestor <SHA> HEAD`; checks rerun on HEAD; `ls-remote` again: moved or deleted sources, the integration branch absent unless pushed (then HEAD). Reply `completed`: branch, HEAD, base, per input SHA, merge, checks and tip; worktree and pane. A stop or missing input: `input-required` with the evidence, last good HEAD and inputs left. The hub's answer, a new exchange: re-read the worktree, send it once (`terminal.sendCommand`, `notify`, `handback`); reply to that exchange.
 
 Stop and recovery: one worktree, integrator and correction round; never replay a merge.
 
