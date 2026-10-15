@@ -1,7 +1,6 @@
 # daintree.hosts.diagnose-messaging: this Shell's hub working out why a Remote Host it can
 # see cannot have its assistant messaged or started (the tool set, the per-host switches,
-# the link, a pause, a missing or stale enrollment, a rate limit, or where one exchange's
-# delivery stopped), sending nothing. Recall cases in agent and user words; traps where it
+# the link, a pause, a missing or stale enrollment, a rate limit), sending nothing. Recall cases in agent and user words; traps where it
 # must win against daintree.diagnostics (its one declared neighbour) and against
 # daintree.hosts.handle-hub-message, daintree.hosts.start-swarm and
 # daintree.hosts.recover-and-clean-up; reverse traps where each of those, or the hosts
@@ -125,18 +124,17 @@ cases:
       required: [daintree.hosts.diagnose-messaging]
       optional: [daintree.hosts.foundation]
 
-  - id: diagnose-messaging-stalled-delivery-not-recover
+  - id: diagnose-messaging-refused-not-recover
     category: routing-trap
     note: >-
-      One live exchange that reached the host but never its assistant, with nothing
-      restarted: the person "cannot message or start the Daintree assistant on it" and the
-      answer is where delivery stopped, "sending nothing".
-      daintree.hosts.recover-and-clean-up is for the account of exchanges "usually after
-      Daintree restarted, the hub was replaced or the link to a Remote Host dropped", so it
-      is an extra here.
+      New messages refused while the link is up and nothing restarted: the person "cannot
+      message or start the Daintree assistant on it, and wants to know which gate is in the
+      way". No exchange is being accounted for, so daintree.hosts.recover-and-clean-up
+      ("why a task sent to a Remote Host never came back, usually after Daintree
+      restarted") is an extra.
     messages:
       - role: user
-        content: The message to the laptop host's assistant shows acceptedAt but wakeTypedAt is still null. Where did delivery stop? Do not resend it.
+        content: Nothing restarted and the link is up, but every new message to the studio is refused. Which gate is it?
     expect:
       required: [daintree.hosts.diagnose-messaging]
       optional: [daintree.hosts.foundation]
