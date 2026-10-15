@@ -14,23 +14,21 @@ optionalTools:
   - host.cancelTask
   - host.startAssistant
 ---
-A new task on another host, never a resend under the old id; one owner.
-
 1. The original: your brief (lost: ask the person), its `taskId` (else `host.listTasks`), `host.getTask` (`disconnected`: stale or null, no replies), `host.list` `connection`, `lastSeenAt`. On the remote, `git ls-remote` and `gh pr list --head` its branch: that SHA, not its claims, is the checkpoint.
 2. Stop it:
    - Maybe unread: `host.cancelTask`; only `canceled` rules out delivery.
    - Lane reachable: one `host.sendMessage`: "Follow daintree.hosts.steer-for-hub for unit <u>: stop its agents, keep their work; reply per agent as it says, plus done, half-done and failed approaches." With the person's push authority add "then commit what each left, push to <branch>, leave them stopped". End the turn; on the reply, re-read the remote.
    - Host `disconnected` (a send records nothing) or silent: not stopped, may still push. Tell the person what is verified, that unpushed edits stay there, and the two-publisher risk.
-   Go on only when every agent is stopped, gone or done, or on the person's word.
-3. Target: daintree.hosts.place-work steps 1-5 for this piece (a named host its only candidate), exempt from its in-flight screen; never the original.
-4. One `host.sendMessage`, no `waitMs`: daintree.hosts.delegate-to-host's brief at the verified SHA (none: the original base), on a new branch not on the remote, plus the handoff and "continue from this commit, never restart; you are the sole owner; push, PR or merge only as authorised; leave <old branch>". End the turn.
+   Go on only when every agent is stopped, gone or done, or the person accepts that risk; else ask and end the turn.
+3. Target: daintree.hosts.place-work steps 1-5 for this piece (a named host its only candidate), its step 4 ignoring only the original; never its host.
+4. One `host.sendMessage` without the old `taskId`, no `waitMs`: daintree.hosts.delegate-to-host's brief at the verified SHA (none: the original base), on a new branch not on the remote, plus the handoff and "continue from this commit, never restart; you are the sole owner; push, PR or merge only as authorised; leave <old branch>". End the turn.
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","text":"<brief>","referenceTaskIds":["<old taskId>"]}
 ```
 
-On notice or resume: the successor's reply gets delegate-to-host's checks. The old host back (`connected`, or a late reply): not the owner; its reply advances nothing. Step 2's message plus "push nothing"; compare its reported diffs and the remote with the successor's. Porting any is the person's call, via the owner.
+On notice or resume: the successor's reply gets delegate-to-host's checks. The old host back (`connected`, or a late reply): not the owner; its reply advances nothing. Step 2's message plus "push nothing; reply with `git diff --stat <SHA>` and commits past it"; end the turn; compare with the successor's branch. Porting any is the person's call, via the owner.
 
 Stop and recovery: one successor per unit; one stop message, one more if the old host returns. Never settle ownership by force-push, deletion, PR closing or merge.
 
-Report back: original `taskId`, state, verified SHA, what stayed unpushed; stop confirmed, unconfirmed or unreachable; owner; successor host, `taskId`, branch, base.
+Report back: old `taskId`, state, verified SHA, what stayed unpushed; stop confirmed, unconfirmed or unreachable; owner; successor host, `taskId`, branch, base.

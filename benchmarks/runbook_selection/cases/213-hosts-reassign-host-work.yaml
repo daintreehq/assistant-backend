@@ -182,7 +182,7 @@ cases:
     category: routing-trap
     note: >-
       Status only, nothing moved: recover-and-clean-up's "where things stand with the
-      work handed to another machine ... the link to a Remote Host dropped". This
+      work handed to another machine" and "the link to a Remote Host dropped". This
       runbook's fence: "where delegated exchanges stand with nothing moved".
     messages:
       - role: user
@@ -195,8 +195,8 @@ cases:
     category: routing-trap
     note: >-
       New pieces with nothing started: place-work's "DIFFERENT, independent pieces of
-      work ... put on whichever Remote Host this Shell reaches can best take it". This
-      runbook's fence: "first placement of new pieces".
+      work" and "wants each put on whichever Remote Host this Shell reaches can best
+      take it". This runbook's fence: "first placement of new pieces".
     messages:
       - role: user
         content: these four tickets are brand new and nothing has started; put each on whichever remote host has room
