@@ -1,0 +1,262 @@
+# daintree.hosts.recover-and-clean-up: the hub picking up after a Shell restart, a new hub
+# session or a dropped link from each Remote Host's task records, and cleaning up after a
+# named run through each host's own assistant. Recall cases in agents' and users' words
+# (the user ones are the issue's own requests, with machine names generalised); one
+# routing trap per declared neighbour where this runbook wins, because the work is on
+# other machines; and the reverse traps, where the same words about THIS machine keep the
+# local runbook and this one must not ride along.
+
+cases:
+  - id: recover-and-clean-up-agent-restart
+    category: single-runbook
+    note: >-
+      Agent-phrased recovery: "after Daintree restarted ... which delegated exchanges
+      finished, which are still open, which will never be answered" and "a per-host
+      account of every exchange from the records".
+    messages:
+      - role: user
+        content: >-
+          After the Shell restarted, reconcile every exchange this hub sent to the Remote
+          Hosts from each host's task records and report which finished, which are still
+          open and which will never be answered
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-agent-cleanup
+    category: single-runbook
+    note: >-
+      Agent-phrased cleanup: "what a run left on the Remote Hosts, its panes, worktrees and
+      branches, cleaned up through each host's own assistant", with "what each host
+      removed and kept".
+    messages:
+      - role: user
+        content: >-
+          Ask each Remote Host's assistant to close the panes and remove the clean worktrees
+          it made for the named run, and report per host what was removed and kept
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-user-away
+    category: single-runbook
+    note: >-
+      The issue's first request with the machine names generalised: "what happened on
+      their other machines while they were away". daintree.orchestration.status-and-resume
+      owns the same words for this machine, so this is the contested boundary.
+    messages:
+      - role: user
+        content: What happened on my other machines while I was away?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-user-where-are-we
+    category: single-runbook
+    note: >-
+      The issue's second request, generalised: "where things stand with the work handed
+      to another machine". Untrained, it loses to daintree.orchestration.status-and-resume
+      (rank_miss): retrain owed.
+    messages:
+      - role: user
+        content: Where are we with the stuff on the other Mac?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-user-never-came-back
+    category: single-runbook
+    note: >-
+      The issue's fourth request, generalised: "why a task sent to a Remote Host never
+      came back". Not the foundation's "why one is not reachable": the lane was reached;
+      its answer is what is missing. Untrained, it loses to the foundation and
+      daintree.diagnostics (rank_miss): retrain owed.
+    messages:
+      - role: user
+        content: The task I sent to the build machine's assistant never came back.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-user-cleanup
+    category: single-runbook
+    note: >-
+      The issue's third request with the machines named: "what a run left on the Remote
+      Hosts ... cleaned up through each host's own assistant". The bare request with no
+      machines in it stays local (the reverse trap below).
+    messages:
+      - role: user
+        content: Clean up after the swarm run on the other machines.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-usage-panes-after-host-check
+    category: continuation
+    note: >-
+      The issue's fifth request. After a usage check that each host's assistant ran in its
+      own panes, "close all the usage panes" means panes on the Remote Hosts, which only
+      their assistants can close ("its panes (usage-check panes included) ... cleaned up
+      through each host's own assistant"). Panes only: nothing else is in scope. The
+      usage turn pulls daintree.agents.check-usage-limits (rank_miss): retrain owed.
+    messages:
+      - role: user
+        content: Check how much usage the agents on each of my Remote Hosts have left.
+      - role: assistant
+        content: >-
+          Each host's assistant opened a usage pane and read it: the two Claude Code hosts
+          have about 40% of the week left, the two Codex hosts reset on Friday.
+      - role: user
+        content: Close all the usage panes.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  # --- traps: this runbook wins against each declared neighbour -------------------------
+  - id: recover-and-clean-up-not-status-and-resume
+    category: routing-trap
+    note: >-
+      A restart while work was out on other machines: the record is each host's task
+      list, not this machine's terminals ("after Daintree restarted ... which delegated
+      exchanges finished"). daintree.orchestration.status-and-resume is fenced "catching
+      up on local work".
+    messages:
+      - role: user
+        content: >-
+          Daintree restarted while the remote hosts were still working on what I
+          delegated; which of those exchanges finished?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-not-workspace-cleanup
+    category: routing-trap
+    note: >-
+      Teardown of what a run left on other machines goes through each host's assistant
+      ("cleaned up through each host's own assistant");
+      daintree.orchestration.workspace-cleanup is fenced "tearing down local panes and
+      worktrees".
+    messages:
+      - role: user
+        content: tear down the panes and worktrees the run left on the Remote Hosts, through each host's own assistant
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-not-recover-agent
+    category: routing-trap
+    note: >-
+      A delegated exchange stuck after the host's assistant restarted: "which will never
+      be answered, and whether to send one again". Not a broken local agent
+      (daintree.agents.recover-agent is fenced "a broken or hung local agent").
+    messages:
+      - role: user
+        content: >-
+          the exchange I delegated to the second host is stuck since its assistant was
+          restarted; does it need sending again?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-not-supervise-fleet
+    category: routing-trap
+    note: >-
+      After a dropped link, which delegated exchanges still need the user: "the link to a
+      Remote Host dropped ... which are still open". Not the local fleet
+      (daintree.orchestration.supervise-fleet is fenced "triaging the local fleet").
+    messages:
+      - role: user
+        content: the link to the Remote Hosts dropped for an hour; which delegated exchanges still need me?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: recover-and-clean-up-not-diagnostics
+    category: routing-trap
+    note: >-
+      No update lines after a hub restart is the expected behaviour (notices go only to
+      the hub that sent), so the answer is the records, not a health check:
+      daintree.diagnostics is fenced "Daintree itself misbehaving on this machine".
+    messages:
+      - role: user
+        content: the hub restarted and no update lines have come for the exchanges it sent to the hosts earlier
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  # --- reverse traps: the same words about this machine stay local ----------------------
+  - id: recover-and-clean-up-reverse-local-restart
+    category: routing-trap
+    note: >-
+      A restart with nothing sent to another machine is catching up on local work
+      (daintree.orchestration.status-and-resume, "what happened while I was away ... pick
+      up something from an earlier session"); this runbook's "other machines" clause does
+      not apply.
+    messages:
+      - role: user
+        content: Daintree restarted on this Mac; what were my agents in the middle of before?
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: recover-and-clean-up-reverse-bare-usage-panes
+    category: routing-trap
+    note: >-
+      The bare request with no Remote Hosts in the conversation is this machine's
+      teardown (daintree.orchestration.workspace-cleanup, "close these, clean up").
+    messages:
+      - role: user
+        content: Close all the usage panes.
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: recover-and-clean-up-reverse-remote-service
+    category: routing-trap
+    note: >-
+      Local agents that merely talked to a remote server are still local panes and
+      worktrees (daintree.orchestration.workspace-cleanup); "remote" does not make a Remote
+      Host.
+    messages:
+      - role: user
+        content: close the agent panes that were deploying to the remote staging server and delete their worktrees
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: recover-and-clean-up-reverse-local-stuck-agent
+    category: routing-trap
+    note: >-
+      A stuck agent pane on this machine is daintree.agents.recover-agent ("my agent is
+      stuck", "cut off when the laptop slept"), not a delegated exchange.
+    messages:
+      - role: user
+        content: the codex pane has been stuck for an hour since the laptop woke up
+    expect:
+      required: [daintree.agents.recover-agent]
+      optional: [daintree.foundation]
+
+  - id: recover-and-clean-up-reverse-local-fleet
+    category: routing-trap
+    note: >-
+      Triage of the agents running on this machine after a network blip is
+      daintree.orchestration.supervise-fleet ("anything need me?", "is anyone stuck?");
+      nothing was delegated to another machine.
+    messages:
+      - role: user
+        content: after the link dropped, how are the agents on this machine doing, anything stuck?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: recover-and-clean-up-reverse-local-sidebar-dead
+    category: routing-trap
+    note: >-
+      Daintree's own sidebar on this machine not responding after a restart is
+      daintree.diagnostics ("nothing is responding"), not a record of exchanges.
+    messages:
+      - role: user
+        content: Daintree restarted and now nothing responds in my sidebar
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
