@@ -23,10 +23,11 @@ cases:
   - id: develop-project-plugin-look-settings-panel
     category: routing-trap
     note: >-
-      "What does X look like" reads like a code question, and daintree.explore.repository
-      took it 0.99 to 0.23 before the plugin runbook's positive clause gained "what does my
-      plugin's panel look like". It now selects the plugin runbook; explore still rides
-      along until a retrain (boundary rows written), so this fails strict for now.
+      "What does X look like" also reads as a question about the project's code, which
+      daintree.explore.repository owns ("the user wants to UNDERSTAND the project"). A
+      panel the user's plugin contributes is decided by the plugin runbook's "what does my
+      plugin's panel look like" and its deliverable "a panel seen through its preview where
+      it has one"; explore must not ride along.
     messages:
       - role: user
         content: What does the settings panel in my plugin look like now?
@@ -71,4 +72,30 @@ cases:
         content: what does the settings screen in this codebase look like in code, which components make it up
     expect:
       required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-trap-dev-preview
+    category: routing-trap
+    note: >-
+      Console errors from a panel the user's plugin contributes, not a web app in a
+      browser preview. Decided by "debugging a Daintree PROJECT PLUGIN" against the fence
+      "for a web app in a Dev Preview panel (use daintree.runtime.debug-web-app)".
+    messages:
+      - role: user
+        content: show me the console errors from our project plugin's panel
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-trap-recipe
+    category: routing-trap
+    note: >-
+      A plugin button that should start a recipe and does nothing is a plugin fault.
+      Decided by "the button in my plugin does nothing" against the fence "for running a
+      workspace recipe (use daintree.recipe.run-or-create)".
+    messages:
+      - role: user
+        content: our project plugin's panel has a button to launch the team recipe and nothing happens when I click it
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
       optional: [daintree.foundation]
