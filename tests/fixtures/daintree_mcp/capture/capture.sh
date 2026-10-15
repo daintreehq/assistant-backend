@@ -104,13 +104,23 @@ mkdir -p "$out"
     CAPTURE_APP_BRANCH="$branch" \
     CAPTURE_AT="${CAPTURE_AT:-}" \
     ./node_modules/.bin/vitest run src/services/actions/__tests__/captureMcpSurfaces.test.ts
+  # The messaging contract a listing cannot show (start consent, the assistant
+  # limit, one CLI per project, consent withdrawn mid-start, outcomes, the hub's
+  # update line), proven by the app's own tests at the same commit.
+  ./node_modules/.bin/vitest run \
+    electron/remote/assistant/__tests__/HostAssistantStarter.test.ts \
+    electron/remote/assistant/__tests__/HubMessagingRuntime.test.ts \
+    electron/remote/assistant/__tests__/install.test.ts \
+    electron/services/mcp-server/__tests__/hostMessagingTools.test.ts \
+    electron/services/mcp-server/__tests__/assistantMessagingTools.test.ts
 )
 
 node -e '
 const fs = require("node:fs");
 const path = require("node:path");
-for (const name of ["pane-core", "pane-full", "help-core", "help-full", "external"]) {
-  const f = JSON.parse(fs.readFileSync(path.join(process.argv[1], name + ".json"), "utf8"));
-  console.log(`${name}.json  tools=${f.tools.length}  hash=${f.capture.surface_hash}`);
+for (const file of fs.readdirSync(process.argv[1]).filter((f) => f.endsWith(".json")).sort()) {
+  const f = JSON.parse(fs.readFileSync(path.join(process.argv[1], file), "utf8"));
+  const delta = f.capture.delta_of ? `  delta_of=${f.capture.delta_of} +${f.added.length} ~${f.changed.length} -${f.removed.length}` : "";
+  console.log(`${file}  tools=${f.capture.tool_count}  hash=${f.capture.surface_hash}${delta}`);
 }
 ' "$out"

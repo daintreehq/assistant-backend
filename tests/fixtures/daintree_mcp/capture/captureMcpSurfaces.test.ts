@@ -24,6 +24,18 @@
  *      wire-measurement helper (`measureWireSurface`), and the listed id set
  *      against the tier allowlists, and fail on any disagreement.
  *
+ * Cross-host messaging (#13335, #13336, #13338): every session is given the
+ * real `bindAssistantMessaging` / `bindHostMessaging` access, bound to its help
+ * session exactly as `httpLifecycle` binds it, over a stand-in runtime that
+ * answers only the listing questions for the machine the spec describes (a
+ * Shell with a host configured, a machine listening as a host, both, or
+ * neither). Nothing is enrolled: the app lists the hub and lane tools from the
+ * start of any help session messaging could reach, and that is the listing
+ * captured. Every other runtime call throws. The renderer's added-hosts list
+ * follows the same machine, since host-gated actions read it in `isVisible`.
+ * The hub and lane surfaces are written as `<surface>.delta.json` against the
+ * sidebar surface of the same tier.
+ *
  * Environment:
  *   CAPTURE_OUT_DIR     directory to write <surface>.json into (required)
  *   CAPTURE_APP_COMMIT  full sha of the app commit being captured (required)
@@ -56,6 +68,15 @@ vi.mock("@/services/KeybindingService", () => ({
 }));
 vi.mock("@/lib/notify", () => ({ notify: vi.fn() }));
 
+// The renderer's list of added Remote Hosts, which host-gated actions
+// (`host.switch`, `project.openOnHost`, ...) read in `isVisible`. Set per
+// machine below; empty means this machine has added no host.
+const hostList = vi.hoisted(() => ({ hosts: [] as unknown[] }));
+vi.mock("@/components/Hosts/hostList", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getHostListSnapshot: () => ({ hosts: hostList.hosts, localSummary: null }),
+}));
+
 // Main reads only `app.getVersion()` at session construction. The version is
 // the app's package.json version, so `serverInfo` and `mcp.surface` report what
 // a build of this commit would.
@@ -76,6 +97,21 @@ import { ActionService } from "@/services/ActionService";
 import { createActionRegistry, measureWireSurface } from "./helpers/wireSurface";
 import { MCP_EXTERNAL_OMITTED_ARGS } from "@shared/config/mcpExternalTierAllowlist";
 import { omitWireSchemaArgs } from "@shared/utils/mcpWireSchema";
+import {
+  ASSISTANT_MESSAGING_TOOL_IDS,
+  ASSISTANT_SEND_MESSAGE_TOOL,
+} from "@shared/types/assistantMessaging";
+import { HOST_MESSAGING_TOOL_IDS } from "@shared/types/hostMessaging";
+import {
+  bindAssistantMessaging,
+  setAssistantMessagingRuntime,
+  type AssistantMessagingRuntimeHandle,
+} from "../../../../electron/services/mcp-server/assistantMessagingTools";
+import {
+  bindHostMessaging,
+  setHostMessagingRuntime,
+  type HostMessagingRuntimeHandle,
+} from "../../../../electron/services/mcp-server/hostMessagingTools";
 
 import {
   createSessionServer,
@@ -113,8 +149,34 @@ interface SurfaceSpec {
   workspaceBound: boolean;
   /** Only an agent pane is handed an approval route (#12692). */
   paneApproval: boolean;
+  /**
+   * The machine the session runs on, as cross-host messaging sees it.
+   * `hosts`: a Shell with at least one Remote Host configured, so its help
+   * session could become the hub (`HubMessagingRuntime.isReachable`).
+   * `listening`: the machine listens as a Remote Host, so a remote Shell could
+   * enroll its lane (`AssistantMessagingRuntime.isSendReachable`). A lane's
+   * inbox is reachable on either (`AssistantMessagingRuntime.isReachable`).
+   */
+  machine: { hosts: boolean; listening: boolean };
+  /**
+   * Written as a delta against this surface (captured earlier in SURFACES, same
+   * tier, same commit) rather than as a whole copy: the hub and lane surfaces
+   * are the sidebar assistant's plus a handful of messaging tools.
+   */
+  deltaOf?: string;
+  /**
+   * Captured and checked like any surface, but not written: what it adds to its
+   * `deltaOf` base is recorded in this other surface's delta as `core_listing`.
+   */
+  summaryInto?: string;
   description: string;
 }
+
+// Panes and API-key clients are captured on a machine where messaging is live
+// both ways, so their fixtures show that neither is ever offered the hub or
+// lane tools: they are not help sessions.
+const MESSAGING_LIVE = { hosts: true, listening: true } as const;
+const NO_MESSAGING = { hosts: false, listening: false } as const;
 
 const SURFACES: SurfaceSpec[] = [
   {
@@ -124,6 +186,7 @@ const SURFACES: SurfaceSpec[] = [
     tier: "core",
     workspaceBound: true,
     paneApproval: true,
+    machine: MESSAGING_LIVE,
     description:
       "An agent CLI (Claude Code, Codex, ...) running in a Daintree terminal pane with the project's Daintree MCP set to Core. Authenticated by the per-pane bearer Daintree writes into its --mcp-config; origin 'external', workspace-bound to its launch workspace, with an approval route.",
   },
@@ -134,6 +197,7 @@ const SURFACES: SurfaceSpec[] = [
     tier: "full",
     workspaceBound: true,
     paneApproval: true,
+    machine: MESSAGING_LIVE,
     description:
       "The same agent-pane caller with the project's Daintree MCP set to Full.",
   },
@@ -144,8 +208,9 @@ const SURFACES: SurfaceSpec[] = [
     tier: "core",
     workspaceBound: false,
     paneApproval: false,
+    machine: NO_MESSAGING,
     description:
-      "Daintree's own sidebar assistant (help session), Tool set = Core. Help-token bearer, origin 'help' (renderer-owned), pinned to the WebContents that minted it; no approval route.",
+      "Daintree's own sidebar assistant (help session), Tool set = Core, on a machine with no Remote Host configured that does not listen as a host. Help-token bearer, origin 'help' (renderer-owned), pinned to the WebContents that minted it; no approval route.",
   },
   {
     name: "help-full",
@@ -154,7 +219,56 @@ const SURFACES: SurfaceSpec[] = [
     tier: "full",
     workspaceBound: false,
     paneApproval: false,
+    machine: NO_MESSAGING,
     description: "The same sidebar help session with Tool set = Full.",
+  },
+  {
+    name: "hub-core",
+    deltaOf: "help-core",
+    summaryInto: "hub-full",
+    callerOrigin: "help-hub",
+    origin: "help",
+    tier: "core",
+    workspaceBound: false,
+    paneApproval: false,
+    machine: { hosts: true, listening: false },
+    description: "The hub sidebar session with Tool set = Core: the reads only.",
+  },
+  {
+    name: "hub-full",
+    deltaOf: "help-full",
+    callerOrigin: "help-hub",
+    origin: "help",
+    tier: "full",
+    workspaceBound: false,
+    paneApproval: false,
+    machine: { hosts: true, listening: false },
+    description:
+      "The sidebar assistant on a Shell with a Remote Host configured (the hub), Tool set = Full, captured at session start before enrollment. The hub's host.* tools and its own lane's inbox tools are listed from the start; the calls refuse until the session is enrolled as the hub. At Core the hub is offered only the reads (help-core's allowlisted_but_not_listed shows which).",
+  },
+  {
+    name: "lane-core",
+    deltaOf: "help-core",
+    summaryInto: "lane-full",
+    callerOrigin: "help-lane",
+    origin: "help",
+    tier: "core",
+    workspaceBound: false,
+    paneApproval: false,
+    machine: { hosts: false, listening: true },
+    description: "The lane sidebar session with Tool set = Core.",
+  },
+  {
+    name: "lane-full",
+    deltaOf: "help-full",
+    callerOrigin: "help-lane",
+    origin: "help",
+    tier: "full",
+    workspaceBound: false,
+    paneApproval: false,
+    machine: { hosts: false, listening: true },
+    description:
+      "The sidebar assistant on a machine listening as a Remote Host (a lane a remote Shell can enroll), Tool set = Full, captured at session start before enrollment. The lane tools are listed from the start, at Core as at Full; the calls refuse until a remote Shell enrolls the lane.",
   },
   {
     name: "external",
@@ -163,10 +277,55 @@ const SURFACES: SurfaceSpec[] = [
     tier: "external",
     workspaceBound: false,
     paneApproval: false,
+    machine: MESSAGING_LIVE,
     description:
       "A third-party MCP client authenticated with the Daintree API key (or with no key configured), not bound to a workspace. Origin 'external', tier 'external'.",
   },
 ];
+
+/**
+ * Stand-in messaging runtimes for one machine. Only the listing questions are
+ * answered, the way the real runtimes answer them for a help session bound to
+ * a project slot, before any enrollment (`isAvailable` is false: nothing is
+ * enrolled at a session's start). Anything else would be a call, and throws.
+ */
+function messagingRuntimes(machine: SurfaceSpec["machine"]): {
+  lane: AssistantMessagingRuntimeHandle;
+  hub: HostMessagingRuntimeHandle;
+} {
+  const lane = {
+    isAvailable: () => false,
+    isSendAvailable: () => false,
+    isReachable: () => machine.listening || machine.hosts,
+    isSendReachable: () => machine.listening,
+    getInbox: unreachable("assistant.getInbox"),
+    reply: unreachable("assistant.reply"),
+    sendMessage: unreachable("assistant.sendMessage"),
+  } as AssistantMessagingRuntimeHandle;
+  const hub = {
+    isAvailable: () => false,
+    isReachable: () => machine.hosts,
+    list: unreachable("host.list"),
+    listAssistants: unreachable("host.listAssistants"),
+    sendMessage: unreachable("host.sendMessage"),
+    getTask: unreachable("host.getTask"),
+    listTasks: unreachable("host.listTasks"),
+    cancelTask: unreachable("host.cancelTask"),
+    startAssistant: unreachable("host.startAssistant"),
+  } as HostMessagingRuntimeHandle;
+  return { lane, hub };
+}
+
+/** What `sessionServer` offers this session, derived independently and cross-checked below. */
+function expectedMessaging(spec: SurfaceSpec) {
+  const helpSession = spec.origin === "help";
+  const lane = helpSession && (spec.machine.listening || spec.machine.hosts);
+  return {
+    assistantMessaging: lane,
+    assistantSending: lane && spec.machine.listening,
+    hubMessaging: helpSession && spec.machine.hosts,
+  };
+}
 
 const WORKSPACE_BINDING = {
   kind: "project",
@@ -186,6 +345,11 @@ function fakeSessionStore(sessionId: string, spec: SurfaceSpec): SessionStore {
     sessionTierMap: new Map([[sessionId, spec.tier]]),
     sessionWebContentsMap: new Map(),
     sessionOriginMap,
+    // Only a help-token session is bound to a help session id; messaging reads
+    // its lane through this, so a pane or API-key session has none.
+    sessionHelpIdMap: new Map<string, string>(
+      spec.origin === "help" ? [[sessionId, `help-${sessionId}`]] : []
+    ),
     // Derived from the origin exactly as the real store derives it.
     isRendererOwnedOrigin: (id: string) => {
       const origin = sessionOriginMap.get(id) ?? "external";
@@ -219,8 +383,14 @@ function sessionDeps(
   spec: SurfaceSpec,
   manifest: ActionManifestEntry[]
 ): SessionServerDeps {
+  const sessionStore = fakeSessionStore(sessionId, spec);
+  const helpSessionId = () => sessionStore.sessionHelpIdMap.get(sessionId);
   const deps: SessionServerDeps = {
-    sessionStore: fakeSessionStore(sessionId, spec),
+    sessionStore,
+    // Bound for every session, as httpLifecycle binds them: whether a session
+    // is offered anything is the session server's and runtime's decision.
+    assistantMessaging: bindAssistantMessaging(helpSessionId),
+    hostMessaging: bindHostMessaging(helpSessionId),
     // Fresh structured clones per request, as the renderer IPC would deliver.
     requestManifest: async () => structuredClone(manifest),
     getCachedManifest: () => structuredClone(manifest),
@@ -274,7 +444,7 @@ async function openRawSession(server: ReturnType<typeof createSessionServer>) {
   return { request, notify, close: () => clientTransport.close() };
 }
 
-async function buildManifest(): Promise<{
+async function buildManifest(machineHasHosts: boolean): Promise<{
   manifest: ActionManifestEntry[];
   contextual: string[];
 }> {
@@ -290,8 +460,11 @@ async function buildManifest(): Promise<{
   // What `useMcpBridge` answers a manifest request with, minus the live
   // context: `list()` evaluates `isVisible` against it. Any MCP-reachable action
   // that declares `isVisible` is reported in the capture so the dependence is
-  // visible rather than silent.
+  // visible rather than silent. The one piece of renderer state set here is
+  // the added-hosts list, from the machine being captured.
+  hostList.hosts = machineHasHosts ? [{ descriptor: { id: "capture-host" } }] : [];
   const manifest = service.list({}, { includeSchemas: true });
+  hostList.hosts = [];
   return { manifest, contextual };
 }
 
@@ -306,15 +479,30 @@ describe("capture Daintree MCP surfaces", () => {
     const capturedAt = process.env.CAPTURE_AT || new Date().toISOString().slice(0, 10);
     mkdirSync(outDir, { recursive: true });
 
-    const { manifest, contextual } = await buildManifest();
-    const byId = new Map(manifest.map((entry) => [entry.id, entry]));
+    // One manifest per machine state: a machine that has added a Remote Host
+    // shows the host-gated actions its `isVisible` admits.
+    const manifests = new Map([
+      [false, await buildManifest(false)],
+      [true, await buildManifest(true)],
+    ]);
 
     // The app's independent wire measurement: registry -> z.toJSONSchema ->
     // toWireSchema, without ActionService or the session server.
     const measured = new Map((await measureWireSurface()).map((tool) => [tool.id, tool]));
 
+    const summaries = new Map<string, Record<string, unknown>>();
+    const captured = new Map<
+      string,
+      { capture: Record<string, unknown>; tools: Array<Record<string, unknown>> }
+    >();
     for (const spec of SURFACES) {
       const sessionId = `capture-${spec.name}`;
+      const runtimes = messagingRuntimes(spec.machine);
+      const uninstallLane = setAssistantMessagingRuntime(runtimes.lane);
+      const uninstallHub = setHostMessagingRuntime(runtimes.hub);
+      const messaging = expectedMessaging(spec);
+      const { manifest, contextual } = manifests.get(spec.machine.hosts)!;
+      const byId = new Map(manifest.map((entry) => [entry.id, entry]));
       const server = createSessionServer(sessionId, sessionDeps(sessionId, spec, manifest));
       const session = await openRawSession(server);
 
@@ -340,6 +528,7 @@ describe("capture Daintree MCP surfaces", () => {
         workspaceBound: spec.workspaceBound,
         paneApproval: spec.paneApproval,
         rendererOwnedOrigin: spec.origin === "help" || spec.origin === "assistant-pane",
+        ...messaging,
       };
       const direct = buildSurfaceManifest(manifest, spec.tier, appVersion, surfacePolicy);
       let surfaceHash: string | null = null;
@@ -365,6 +554,8 @@ describe("capture Daintree MCP surfaces", () => {
       }
       await session.close();
       await server.close();
+      uninstallHub();
+      uninstallLane();
 
       const rendererOwned = surfacePolicy.rendererOwnedOrigin;
       const expectedIds = [...getReachableActionIds(spec.tier, rendererOwned, spec.paneApproval)]
@@ -384,7 +575,13 @@ describe("capture Daintree MCP surfaces", () => {
             ? "mcpVisibility: hidden"
             : entry.danger === "restricted"
               ? "danger: restricted"
-              : "unexplained";
+              : HOST_MESSAGING_TOOL_IDS.has(id) && !messaging.hubMessaging
+                ? "hub messaging not offered: no Remote Host configured on this Shell"
+                : id === ASSISTANT_SEND_MESSAGE_TOOL && !messaging.assistantSending
+                  ? "lane send not offered: this machine does not listen as a Remote Host"
+                  : ASSISTANT_MESSAGING_TOOL_IDS.has(id) && !messaging.assistantMessaging
+                    ? "lane messaging not offered: no Remote Host configured and not listening as one"
+                    : "unexplained";
         return { action_id: id, reason };
       });
       expect(
@@ -470,6 +667,17 @@ describe("capture Daintree MCP surfaces", () => {
             renderer_owned_origin: rendererOwned,
           },
           caller: spec.description,
+          // Cross-host messaging: the machine the session runs on, and what
+          // the listing offered from it. Nothing is enrolled at capture time.
+          messaging: {
+            help_session: spec.origin === "help",
+            machine_has_hosts: spec.machine.hosts,
+            machine_listening_as_host: spec.machine.listening,
+            enrolled: false,
+            hub_tools_offered: messaging.hubMessaging,
+            lane_tools_offered: messaging.assistantMessaging,
+            lane_send_offered: messaging.assistantSending,
+          },
           captured_at: capturedAt,
           mcp_protocol_version: initResult.protocolVersion,
           method:
@@ -495,12 +703,75 @@ describe("capture Daintree MCP surfaces", () => {
         },
         tools,
       };
-      writeFileSync(path.join(outDir, `${spec.name}.json`), JSON.stringify(fixture, null, 2) + "\n", "utf8");
+      captured.set(spec.name, fixture);
+      if (spec.deltaOf === undefined) {
+        writeFileSync(path.join(outDir, `${spec.name}.json`), JSON.stringify(fixture, null, 2) + "\n", "utf8");
+        continue;
+      }
+      // A delta: the base surface's tools, minus `removed`, with `changed`
+      // replacing their entries, plus `added`. Rebuilding it must give back
+      // exactly the listing captured above, or the run fails.
+      const base = captured.get(spec.deltaOf);
+      if (!base || base.capture.tier !== spec.tier) {
+        throw new Error(`${spec.name}: delta base ${spec.deltaOf} missing or another tier`);
+      }
+      const baseById = new Map(base.tools.map((t) => [String(t["action_id"]), t]));
+      if (spec.summaryInto !== undefined) {
+        const ownIds = tools.map((t) => String(t["action_id"]));
+        summaries.set(spec.summaryInto, {
+          surface: spec.name,
+          tier: spec.tier,
+          tool_count: tools.length,
+          surface_hash: fixture.capture.surface_hash,
+          delta_of: spec.deltaOf,
+          delta_of_surface_hash: base.capture.surface_hash,
+          added: ownIds.filter((id) => !baseById.has(id)),
+          removed: [...baseById.keys()].filter((id) => !ownIds.includes(id)),
+          changed: tools
+            .filter((t) => {
+              const prior = baseById.get(String(t["action_id"]));
+              return prior !== undefined && JSON.stringify(prior) !== JSON.stringify(t);
+            })
+            .map((t) => String(t["action_id"])),
+        });
+        continue;
+      }
+      const ownById = new Map(tools.map((t) => [String(t["action_id"]), t]));
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      const delta = {
+        capture: {
+          ...fixture.capture,
+          delta_of: spec.deltaOf,
+          delta_of_surface_hash: base.capture.surface_hash,
+          ...(summaries.has(spec.name) ? { core_listing: summaries.get(spec.name) } : {}),
+        },
+        added: tools.filter((t) => !baseById.has(String(t["action_id"]))),
+        changed: tools.filter((t) => {
+          const prior = baseById.get(String(t["action_id"]));
+          return prior !== undefined && !same(prior, t);
+        }),
+        removed: base.tools
+          .map((t) => String(t["action_id"]))
+          .filter((id) => !ownById.has(id)),
+      };
+      const rebuilt = base.tools
+        .filter((t) => !delta.removed.includes(String(t["action_id"])))
+        .map((t) => delta.changed.find((c) => c["action_id"] === t["action_id"]) ?? t)
+        .concat(delta.added)
+        .sort((a, b) => (String(a["action_id"]) < String(b["action_id"]) ? -1 : 1));
+      expect(same(rebuilt, tools), `${spec.name}: delta does not rebuild the listing`).toBe(true);
+      writeFileSync(
+        path.join(outDir, `${spec.name}.delta.json`),
+        JSON.stringify(delta, null, 2) + "\n",
+        "utf8"
+      );
     }
 
-    // Sanity: the file we wrote parses.
+    // Sanity: the files we wrote parse.
     for (const spec of SURFACES) {
-      JSON.parse(readFileSync(path.join(outDir, `${spec.name}.json`), "utf8"));
+      if (spec.summaryInto !== undefined) continue;
+      const file = spec.deltaOf === undefined ? `${spec.name}.json` : `${spec.name}.delta.json`;
+      JSON.parse(readFileSync(path.join(outDir, file), "utf8"));
     }
   }, 120_000);
 });

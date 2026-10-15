@@ -1,9 +1,9 @@
 {
   "capture": {
     "app_repo": "daintreehq/daintree",
-    "app_branch": "feature/mcp-cleanup",
-    "app_commit": "c5f42a0935eab91a02b02a9d6aadd88449550ded",
-    "app_version": "0.38.0",
+    "app_branch": "test/hub-assistant-messaging-live",
+    "app_commit": "0436363469c28d21e61f5ae1fd840e3e91508a77",
+    "app_version": "0.43.0",
     "caller_origin": "agent-pane",
     "session_origin": "external",
     "tier": "core",
@@ -13,13 +13,25 @@
       "renderer_owned_origin": false
     },
     "caller": "An agent CLI (Claude Code, Codex, ...) running in a Daintree terminal pane with the project's Daintree MCP set to Core. Authenticated by the per-pane bearer Daintree writes into its --mcp-config; origin 'external', workspace-bound to its launch workspace, with an approval route.",
-    "captured_at": "2026-09-26",
+    "messaging": {
+      "help_session": false,
+      "machine_has_hosts": true,
+      "machine_listening_as_host": true,
+      "enrolled": false,
+      "hub_tools_offered": false,
+      "lane_tools_offered": false,
+      "lane_send_offered": false
+    },
+    "captured_at": "2026-10-15",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry, served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) configured as this caller, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "afa2fd53f712892e2d928a064c00c2b771d447c3c26568ec1a212f9ac0900805",
+    "surface_hash": "55f93b2cf8f63f9598b520ee486b775fd4690bbfc318c9a02d808a10425cc745",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest)",
-    "tool_count": 72,
-    "context_gated_tools": [],
+    "tool_count": 74,
+    "context_gated_tools": [
+      "host.switch",
+      "project.openOnHost"
+    ],
     "notes": [
       "An agent pane's tier is where auto-approval stops, not a ceiling (#12692): tools/list also carries every tool up to the full non-renderer-owned surface, and calling one above the tier asks the user first. The wire listing is therefore the same at core and full; tools[].daintree.reach says which run without asking ('tier') and which ask ('approval')."
     ]
@@ -28,7 +40,7 @@
     {
       "action_id": "actions.getContext",
       "wire_name": "actions.getContext",
-      "description": "Snapshot what the user currently has open — active project, worktree, focused terminal, and panel state. Call this first to resolve an implicit 'current' target before an action that needs an explicit id. Anything not focused or active is simply absent, so treat a missing field as nothing being selected. It can fail early in a session, before the worktree view store has initialised.",
+      "description": "Snapshot what the user has open: active project, worktree, focused terminal and panel state. Call first to resolve an implicit 'current' target. A missing field means nothing is selected. Can fail early in a session, before the worktree view initialises.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -53,13 +65,13 @@
     {
       "action_id": "actions.getSchema",
       "wire_name": "actions.getSchema",
-      "description": "Fetch one action's full manifest entry — the exact arguments it accepts, the shape it returns, and a policy record saying whether this session can call it, at which tier, and whether confirmation applies. Use it after finding a candidate by search or listing, before dispatching. An unknown, hidden or restricted id comes back as a structured failure rather than a thrown error.",
+      "description": "Fetch one action's manifest entry: its arguments, result shape, and whether this session may call it (tier, confirmation). Use after search, before dispatching. An unknown, hidden or restricted id returns a structured failure, not an error.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "actionId": {
             "type": "string",
-            "description": "Identifies the action to inspect, using an id from a registry search or listing. This is a Daintree action id passed as a value, not the name of a tool to call."
+            "description": "Action id from search or listing, passed as a value; not a tool name."
           }
         },
         "required": [
@@ -97,30 +109,30 @@
     {
       "action_id": "actions.list",
       "wire_name": "actions.list",
-      "description": "Enumerate the available actions as lightweight entries, filtered by domain or substring and returned a page at a time. Use ranked search instead when looking for a capability by intent; use this when walking a domain systematically. Entries omit argument and result schemas to stay small, so fetch one action's schema before dispatching. Ordering is stable, so paging cannot skip or repeat entries.",
+      "description": "List actions a page at a time, filtered by category or substring, to walk a domain; search instead to find a capability by intent. Entries omit schemas, so fetch the schema before dispatching. Ordering is stable across pages.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "category": {
-            "description": "Filter by exact category (e.g. terminal, worktree, forge, git, portal)",
+            "description": "Exact category, e.g. terminal, worktree, forge",
             "type": "string"
           },
           "search": {
-            "description": "Search in action id, title, or description",
+            "description": "Substring of id, title or description",
             "type": "string"
           },
           "enabledOnly": {
-            "description": "Only return enabled actions (default: false)",
+            "description": "Only enabled actions (default false)",
             "type": "boolean"
           },
           "limit": {
             "default": 50,
-            "description": "Max actions to return (1-100, default 50)",
+            "description": "Max actions, 1-100 (default 50)",
             "type": "integer"
           },
           "offset": {
             "default": 0,
-            "description": "Number of matching actions to skip (default: 0)",
+            "description": "Matches to skip (default 0)",
             "type": "integer"
           }
         },
@@ -146,17 +158,17 @@
     {
       "action_id": "actions.search",
       "wire_name": "actions.search",
-      "description": "Find actions by describing what you want to do, ranked by how well each matches. This is the discovery path: start here, then fetch the chosen action's schema before dispatching it. Use the plain listing when walking a domain systematically rather than searching by intent. Results omit argument and result schemas to stay small, and matching nothing returns an empty list rather than failing.",
+      "description": "Find actions by describing what you want to do, ranked by match. Start here, then fetch the chosen action's schema before dispatching. Results omit schemas; no match returns an empty list, not a failure.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "query": {
             "type": "string",
-            "description": "Natural-language query or keywords to search for"
+            "description": "Natural-language query or keywords"
           },
           "limit": {
             "default": 20,
-            "description": "Max results (1-100, default 20)",
+            "description": "Max results, 1-100 (default 20)",
             "type": "integer"
           }
         },
@@ -202,7 +214,7 @@
     {
       "action_id": "agent.launch",
       "wire_name": "agent.launch",
-      "description": "Start an AI agent in a new terminal and report where it landed, so parallel launches can be told apart without re-resolving the target. Success means the panel was created and its process is starting, not that the agent is ready; poll its state or a terminal status snapshot for that. A missing CLI opens a setup diagnostic panel instead. Keep concurrent launches modest.",
+      "description": "Start an AI agent in a new terminal and report where it landed. Success means the panel exists and its process is starting, not that the agent is ready; read its status for that. A missing CLI opens a setup diagnostic panel instead. Keep concurrent launches modest.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -238,7 +250,7 @@
                 "type": "string"
               }
             ],
-            "description": "Which agent CLI to run, from the agent-listing capability. Enumerated ids are built-ins; any other non-empty string is accepted, so a bad id fails at launch, not validation."
+            "description": "Agent CLI id from the agent listing. Other strings are accepted, so a bad id fails at launch, not validation."
           },
           "location": {
             "type": "string",
@@ -247,30 +259,30 @@
               "dock",
               "overlay"
             ],
-            "description": "Where to place the panel: \"grid\" the main panel grid (default), \"dock\" the sidebar dock, \"overlay\" a floating overlay outside both."
+            "description": "\"grid\" main grid (default), \"dock\" sidebar dock, \"overlay\" floating overlay."
           },
           "cwd": {
-            "description": "Absolute directory to start the agent process in. This is the launch directory, not a worktree selector — name the worktree separately. Defaults to the resolved worktree root.",
+            "description": "Absolute launch directory, not a worktree selector. Defaults to the worktree root.",
             "type": "string"
           },
           "worktreeId": {
-            "description": "Identifies the worktree to launch in, using an id from the worktree-listing capability. Defaults to the active worktree.",
+            "description": "Worktree id from the worktree listing. Defaults to the active worktree.",
             "type": "string"
           },
           "prompt": {
-            "description": "Initial text submitted to the agent once it starts, as its first turn. Omit to leave the agent waiting for input.",
+            "description": "First turn, submitted once the agent starts. Omit to leave it waiting.",
             "type": "string"
           },
           "handback": {
-            "description": "Ask the agent to end its reply to `prompt` with a Daintree marker, read back as `lastHandback`. Needs `prompt` and an agent.",
+            "description": "Ask the agent to end its reply to `prompt` with a Daintree marker, read back as `lastHandback`.",
             "type": "boolean"
           },
           "notify": {
-            "description": "When this agent next stops, Daintree types a notice quoting its last screen lines into your prompt; end your turn, don't poll. Agent panes and assistants only.",
+            "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; end your turn, don't poll. Agent panes and assistants only.",
             "type": "boolean"
           },
           "replyLines": {
-            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "description": "With notify: screen lines quoted (default 40, 0 for none); with handback, up to the marker. Set, it quotes despite a summary.",
             "type": "integer"
           },
           "waitForReply": {
@@ -282,30 +294,30 @@
             "type": "integer"
           },
           "systemPrompt": {
-            "description": "Standing instruction of at most 2000 characters, appended to the agent's system prompt and kept on resume. Claude and Codex only; others refuse it.",
+            "description": "Appended to the agent's system prompt, at most 2000 characters, kept on resume. Claude and Codex only; others refuse it.",
             "type": "string"
           },
           "interactive": {
-            "description": "Whether the agent runs as a conversation the user can continue, rather than a single non-interactive pass.",
+            "description": "Run as a conversation the user can continue, not one non-interactive pass.",
             "type": "boolean"
           },
           "model": {
-            "description": "Overrides the model the agent CLI would otherwise pick. Accepted values are the agent's own model names, so an unrecognised one fails when the CLI starts rather than here.",
+            "description": "Model passed to the agent CLI for this launch, in its own names. No preset needed.",
             "type": "string"
           },
           "presetId": {
-            "description": "Applies one of the user's saved launch presets for this agent. Pass an explicit null to ignore the configured default preset rather than inherit it.",
+            "description": "One of the user's saved launch presets. Explicit null ignores the default preset.",
             "type": [
               "string",
               "null"
             ]
           },
           "activateDockOnCreate": {
-            "description": "Whether to open the sidebar dock when the agent is placed there, which changes what the user sees.",
+            "description": "Open the sidebar dock when placing the agent there.",
             "type": "boolean"
           },
           "env": {
-            "description": "Extra environment variables for the agent process, merged over the inherited environment. These reach a real subprocess, so never put credentials here that the user has not already agreed to expose.",
+            "description": "Extra env vars merged over the inherited environment. They reach a real process: never add credentials the user has not exposed.",
             "type": "object",
             "propertyNames": {
               "type": "string"
@@ -315,15 +327,15 @@
             }
           },
           "excludeFromPersistence": {
-            "description": "Keep the terminal out of the saved session, listings, status reads and bulk close or kill, so it cannot be found or polled later. For throwaway work.",
+            "description": "Hide the terminal from the saved session, listings, status reads and bulk close or kill, so it can't be polled later. For throwaway work.",
             "type": "boolean"
           },
           "removeOnExit": {
-            "description": "Closes the panel automatically once the agent process ends, discarding its output. Leave off when the output still needs reading.",
+            "description": "Close the panel when the agent exits, discarding its output.",
             "type": "boolean"
           },
           "agentLaunchFlags": {
-            "description": "Extra command-line flags passed through to the agent CLI verbatim. Unrecognised flags fail when the CLI starts, not here.",
+            "description": "Extra CLI flags for this launch, verbatim, e.g. Codex effort [\"-c\", \"model_reasoning_effort=high\"]. Bad ones fail at CLI start.",
             "type": "array",
             "items": {
               "type": "string"
@@ -339,7 +351,7 @@
               "mcp",
               "assistant"
             ],
-            "description": "Provenance for run history only; never changes what is launched. Leave unset over MCP, where the bridge stamps its own origin."
+            "description": "Run-history provenance only. Leave unset over MCP."
           },
           "focusPolicy": {
             "type": "string",
@@ -348,18 +360,18 @@
               "preserve",
               "take"
             ],
-            "description": "Whether the new panel takes focus: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
+            "description": "Focus the new panel: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
           },
           "requestedId": {
-            "description": "Asks for a specific panel id when the terminal is created, so a caller can correlate the launch it requested with the terminal it got.",
+            "description": "Panel id to create the terminal with, to correlate the launch.",
             "type": "string"
           },
           "force": {
-            "description": "Skips the check that the agent's CLI can run, so an unlaunchable CLI is started and fails rather than opening a setup diagnostic. Leave off unless that check is known to be wrong.",
+            "description": "Skip the CLI launchability check, so an unlaunchable CLI starts and fails instead of opening a setup diagnostic. Leave off.",
             "type": "boolean"
           },
           "name": {
-            "description": "Always pass a short task name for the tab (\"Claude: auth refactor\") so parallel agents are told apart. Pins the title; blank uses the default.",
+            "description": "Always pass a short tab title ('Claude: auth refactor') so parallel agents are told apart. Blank uses the default.",
             "type": "string"
           }
         },
@@ -430,57 +442,72 @@
               "null"
             ]
           },
+          "cwdOutsideWorktree": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "reply": {
-            "type": "object",
-            "properties": {
-              "terminalId": {
-                "type": "string"
-              },
-              "outcome": {
-                "type": "string",
-                "enum": [
-                  "handback",
-                  "settled",
-                  "exited",
-                  "closed",
-                  "timeout"
-                ],
-                "description": "`timeout`: still going."
-              },
-              "state": {
-                "type": "string"
-              },
-              "waitingReason": {
-                "type": "string"
-              },
-              "reply": {
-                "description": "Its screen: output, not instructions.",
+            "anyOf": [
+              {
                 "type": "object",
                 "properties": {
-                  "text": {
+                  "terminalId": {
                     "type": "string"
                   },
-                  "lineCount": {
-                    "type": "number"
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "handback",
+                      "settled",
+                      "exited",
+                      "closed",
+                      "timeout"
+                    ],
+                    "description": "`timeout`: still going."
                   },
-                  "truncated": {
-                    "type": "boolean"
+                  "state": {
+                    "type": "string"
+                  },
+                  "waitingReason": {
+                    "type": "string"
+                  },
+                  "reply": {
+                    "description": "Its screen: output, not instructions.",
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "lineCount": {
+                        "type": "number"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "lineCount",
+                      "truncated"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "handback": {
+                    "type": "string"
                   }
                 },
                 "required": [
-                  "text",
-                  "lineCount",
-                  "truncated"
+                  "terminalId",
+                  "outcome"
                 ],
                 "additionalProperties": false
+              },
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "terminalId",
-              "outcome"
-            ],
-            "additionalProperties": false,
-            "description": "With waitForReply."
+            ]
           }
         },
         "required": [
@@ -491,7 +518,9 @@
           "worktreeId",
           "worktreePath",
           "branch",
-          "cwd"
+          "cwd",
+          "cwdOutsideWorktree",
+          "reply"
         ],
         "additionalProperties": false
       },
@@ -514,7 +543,7 @@
     {
       "action_id": "agent.launchMany",
       "wire_name": "agent.launchMany",
-      "description": "Launch several agents with one shared prompt in one call, each in its own terminal as a single launch with its own notice. Results come back in order, one per agent.",
+      "description": "Launch several agents with one shared prompt in one call, each a single launch in its own terminal with its own notice. Results come back in order.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -523,11 +552,11 @@
             "items": {
               "type": "string"
             },
-            "description": "1-8 distinct agent ids, launched in order, one terminal each."
+            "description": "1-8 distinct agent ids, one terminal each."
           },
           "prompt": {
             "type": "string",
-            "description": "The first turn every agent receives."
+            "description": "First turn every agent receives."
           },
           "name": {
             "description": "Tab title prefix; each tab is \"<name>: <agentId>\".",
@@ -538,7 +567,7 @@
             "type": "string"
           },
           "notify": {
-            "description": "As on the single call: each agent's notice quotes its reply when it finishes.",
+            "description": "As on a single call: each notice carries that agent's reply.",
             "type": "boolean"
           },
           "handback": {
@@ -546,7 +575,7 @@
             "type": "boolean"
           },
           "replyLines": {
-            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "description": "With notify: screen lines quoted (default 40, 0 for none); with handback, up to the marker. Set, it quotes despite a summary.",
             "type": "integer"
           },
           "waitForReply": {
@@ -584,7 +613,7 @@
     {
       "action_id": "agent.listAvailable",
       "wire_name": "agent.listAvailable",
-      "description": "List every registered agent, built-in, user-defined and plugin-contributed, from the authoritative registry, including ones not currently launchable. Use this before launching so an id is known to exist, and read each entry's launchability rather than assuming membership implies it. Those fields appear only once a live probe of each CLI finishes, and the result says so while that is incomplete.",
+      "description": "List every registered agent (built-in, user-defined, plugin) from the authoritative registry, launchable or not. Use before launching, and read each entry's launchability rather than assuming it. Launchability appears once each CLI's live probe finishes; the result says while that is incomplete.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -677,7 +706,7 @@
     {
       "action_id": "agent.listPresets",
       "wire_name": "agent.listPresets",
-      "description": "List the launch presets for one agent, merged across user settings, repository preset files and CCR discovery in the precedence the launcher applies, so every id returned is one a launch will accept. Identity only: no environment values or flags. While the completeness flag is false a source is still loading.",
+      "description": "List one agent's launchable presets, merged from user settings, repository preset files and CCR as the launcher does. Identity only, no env or flags; a launch can set model and flags without one. A false completeness flag means a source is loading.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -713,10 +742,10 @@
                 "type": "string"
               }
             ],
-            "description": "Which agent CLI to run, from the agent-listing capability. Enumerated ids are built-ins; any other non-empty string is accepted, so a bad id fails at launch, not validation."
+            "description": "Agent CLI id from the agent listing. Other strings are accepted, so a bad id fails at launch, not validation."
           },
           "projectId": {
-            "description": "Which project's repository presets to include; defaults to this call's project. Another project returns the other layers, marked incomplete.",
+            "description": "Project whose repository presets to include (default: this call's). Another project returns only the other layers, marked incomplete.",
             "type": "string"
           }
         },
@@ -800,26 +829,26 @@
     {
       "action_id": "agentSessionHistory.list",
       "wire_name": "agentSessionHistory.list",
-      "description": "List closed agent sessions that can be relaunched, read from the on-disk journal. This is a faithful record of which sessions exist, not a summary of what happened in them: it carries no transcript text. It must be scoped to a worktree or project and fails rather than listing every project when no scope resolves. Old sessions are pruned by retention, so absence does not prove one never existed.",
+      "description": "List closed agent sessions that can be relaunched, from the on-disk journal: which sessions exist, no transcript text. Needs a worktree or project scope and fails when none resolves. Old sessions are pruned, so absence proves nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "Restrict the listing to one worktree id.",
+            "description": "Only this worktree.",
             "type": "string"
           },
           "projectId": {
-            "description": "Restrict the listing to one project id; combines with `worktreeId`.",
+            "description": "Only this project; combines with `worktreeId`.",
             "type": "string"
           },
           "limit": {
             "default": 20,
-            "description": "Max records to return, newest-first (default: 20, max: 100).",
+            "description": "Max records, newest first (default 20, max 100).",
             "type": "integer"
           },
           "offset": {
             "default": 0,
-            "description": "Records to skip before the page, for reaching past the limit (default: 0).",
+            "description": "Records to skip, for paging (default 0).",
             "type": "integer"
           }
         },
@@ -970,21 +999,21 @@
     {
       "action_id": "agentSessionHistory.resume",
       "wire_name": "agentSessionHistory.resume",
-      "description": "Relaunch one closed agent session by its exact id and hand back the pane carrying it. Resume is directory-coupled: it relaunches in the worktree the session was recorded in, so the worktree you name scopes the lookup and one recorded elsewhere is refused. Calling twice brings the live pane forward rather than a second agent on one transcript. It opens off-screen unless that worktree is active.",
+      "description": "Relaunch one closed agent session by exact id and return its pane. It relaunches in the worktree it was recorded in, so one recorded outside the named worktree is refused. A repeat call brings the live pane forward, not a second agent. Opens off-screen unless that worktree is active.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "sessionId": {
             "type": "string",
-            "description": "Exact id of the session to relaunch, copied from a session-history or bookmark listing. Never a title or a prefix."
+            "description": "Exact session id from a session-history or bookmark listing; never a title or prefix."
           }
         },
         "required": [
@@ -1054,7 +1083,7 @@
     {
       "action_id": "browser.getConsoleMessages",
       "wire_name": "browser.getConsoleMessages",
-      "description": "Read captured console output (logs, warnings, errors, and stack traces) from a dev preview panel. Returns the most recent messages plus error/warning counts so an agent can inspect runtime issues without opening the console UI.",
+      "description": "Read captured console output (logs, warnings, errors, stack traces) from a dev preview panel: the newest messages plus error and warning counts.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1071,7 +1100,7 @@
             ]
           },
           "limit": {
-            "description": "Maximum messages to return, newest first (max 500). Omit for all captured.",
+            "description": "Max messages, newest first (max 500). Omit for all.",
             "type": "integer"
           }
         },
@@ -1185,16 +1214,16 @@
     {
       "action_id": "copyTree.generate",
       "wire_name": "copyTree.generate",
-      "description": "Bundle a worktree's file tree and selected file contents into a context dump on disk, and return its path. Use it to hand a large codebase context to something that can read a file; inject into a terminal when the target is an agent. The bundle routinely runs to tens of megabytes and is never returned inline. Check the budget flags before trusting it, and read it promptly: it is pruned by age.",
+      "description": "Bundle a worktree's file tree and selected contents into a context file on disk and return its path; never inline, often tens of MB. To give an agent context, inject into its terminal instead. Check the budget flags before trusting it, and read it promptly: it is pruned by age.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "options": {
@@ -1212,7 +1241,7 @@
                 ]
               },
               "filter": {
-                "description": "Selects which files to include, as worktree-relative exact file paths or glob patterns. Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` when selecting a folder. Combined with `includePaths` when both are given; omit both to include the whole worktree. An empty list or blank entry is rejected rather than read as no filter.",
+                "description": "Worktree-relative file paths or globs to include. Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` for a folder. Combined with `includePaths`; omit both for the whole worktree. An empty list or blank entry is rejected.",
                 "anyOf": [
                   {
                     "type": "string"
@@ -1239,28 +1268,28 @@
                 ]
               },
               "always": {
-                "description": "Force-includes matching files, overriding several exclusion layers at once: ignore files, project and config exclusions, your own `exclude`, the `modified`/`changed` git filters, and `maxFileSize`. It is the blunt option: a broad pattern can pull in `node_modules`, and a `../` pattern reaches outside the worktree entirely. What it does not override: `.git`, CopyTree's internal 10MB memory ceiling, and the `maxFileCount`/`maxTotalSize`/`charLimit` budgets, which still drop force-included files. Prefer `scopePaths` with `scopeIgnoresIgnoreFiles` when you only need past an ignore rule.",
+                "description": "Force-include matches past ignore files, project and config exclusions, your `exclude`, the `modified`/`changed` filters and `maxFileSize`. Blunt: a broad pattern can pull in `node_modules`, and `../` reaches outside the worktree. It does not override `.git`, the 10MB memory ceiling, or the `maxFileCount`/`maxTotalSize`/`charLimit` budgets. To pass one ignore rule, use `scopePaths` with `scopeIgnoresIgnoreFiles`.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "includePaths": {
-                "description": "Selects which files to include, as worktree-relative exact file paths or glob patterns. Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` when selecting a folder. Use this to assemble a curated bundle of scattered files — sources, their supporting code, and their tests — in one call. Combined with `filter` when both are given. Unlike `scopePaths` this does not restrict traversal, so patterns may match anywhere in the worktree.",
+                "description": "Worktree-relative file paths or globs, for a curated bundle of scattered files (sources, supporting code, tests). Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` for a folder. Combined with `filter` when both are given. Unlike `scopePaths` it does not restrict traversal.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "scopePaths": {
-                "description": "Restricts the copy to these subtrees, as worktree-relative literal file or directory paths to walk — not glob patterns, so pass 'src/panels', not 'src/panels/**'. Prefer this over `filter` or `includePaths` when selecting a folder. Omit to include the whole worktree; supplying an empty list is rejected rather than treated as no scoping, since that would silently copy everything. This restricts traversal, so `filter` and `includePaths` can only narrow within these paths and never add a file outside them.",
+                "description": "Subtrees to restrict the copy to, as worktree-relative literal file or directory paths, not glob patterns: pass 'src/panels', not 'src/panels/**'. Prefer this over `filter` or `includePaths` for a folder. An empty list is rejected rather than copying everything. Restricts traversal, so `filter` and `includePaths` can only narrow within it.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "scopeIgnoresIgnoreFiles": {
-                "description": "Lets `scopePaths` into subtrees an ignore file would have pruned (default false — a scoped copy returns what a whole-worktree copy would have returned). Requires `scopePaths` and is rejected without it. Set true when a path you named is being dropped by a `.copytreeignore` or `.gitignore` rule: only the rules blocking entry into each scoped path are removed, from those two ignore files. Unrelated rules in the same files, negations, and ignore files at or below the selection all still apply — as do project and config exclusions such as node_modules, your own `exclude`, `.git`, the `modified`/`changed` filters, `maxFileSize` and every budget. To get past a rule declared inside a selected folder, scope the exact file instead of that folder: a scoped directory subsumes any of its children you also list, so naming both changes nothing.",
+                "description": "Let `scopePaths` into subtrees a `.copytreeignore` or `.gitignore` rule would prune (default false). Requires `scopePaths`. Only the rules blocking entry into each scoped path are lifted; other rules, negations and nested ignore files all still apply, as do node_modules and config exclusions, `exclude`, `.git`, the git filters, `maxFileSize` and budgets. For a rule inside a selected folder, scope the exact file instead: a scoped folder subsumes its listed children.",
                 "type": "boolean"
               },
               "modified": {
@@ -1270,22 +1299,22 @@
                 "type": "string"
               },
               "maxFileSize": {
-                "description": "Per-file size cap in bytes; must be positive. Omit for no per-file cap.",
+                "description": "Per-file cap in bytes, positive. Omit for none.",
                 "type": "integer"
               },
               "maxTotalSize": {
-                "description": "Total bundle size cap in bytes; must be positive. Omit for no total cap.",
+                "description": "Total bundle cap in bytes, positive. Omit for none.",
                 "type": "integer"
               },
               "maxFileCount": {
-                "description": "Maximum number of files to include; must be positive. Omit for no file-count cap.",
+                "description": "Max files included, positive. Omit for none.",
                 "type": "integer"
               },
               "withLineNumbers": {
                 "type": "boolean"
               },
               "charLimit": {
-                "description": "Character cap on the rendered bundle; must be positive. Omit for no cap.",
+                "description": "Character cap on the rendered bundle, positive. Omit for none.",
                 "type": "integer"
               },
               "sort": {
@@ -1302,11 +1331,11 @@
             }
           },
           "name": {
-            "description": "A 2 to 4 word label for this copy tree ('auth flow context'), shown in the copy-tree history and the completion notification.",
+            "description": "2-4 word label ('auth flow context') for the copy-tree history and notification.",
             "type": "string"
           },
           "includeContent": {
-            "description": "Also return a bounded head of the bundle in `content`. Capped well under the tool-result limit; `contentTruncated` reports when it was cut. The file at `filePath` always holds the whole bundle.",
+            "description": "Also return a bounded head of the bundle in `content`; `contentTruncated` says if it was cut. The file always holds the whole bundle.",
             "type": "boolean"
           }
         },
@@ -1359,7 +1388,7 @@
                 "type": "boolean"
               },
               "unmatchedSelector": {
-                "description": "Which supplied selector matched no files. For a folder, add '/**' to the pattern or use scopePaths instead.",
+                "description": "Selector that matched no files. For a folder, add '/**' or use scopePaths.",
                 "type": "string",
                 "enum": [
                   "filter",
@@ -1416,20 +1445,20 @@
     {
       "action_id": "copyTree.generateAndCopyFile",
       "wire_name": "copyTree.generateAndCopyFile",
-      "description": "Bundle a worktree's context to a file and onto the system clipboard, replacing what the user had copied. Selection mixes exact files with globs, so this assembles a curated bundle rather than the whole worktree. Agent and MCP callers must name the worktree, not rely on the active one. macOS and Linux copy the file, Windows its path. Never returned inline; check the budget flags for completeness.",
+      "description": "Bundle a worktree's context to a file and put it on the system clipboard, replacing what the user copied: the file on macOS/Linux, its path on Windows. Agents must name the worktree, or omit it if none exist to copy the root. Never returned inline; check budget flags.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "options": {
-            "description": "Selection, exclusion, formatting, and size-budget settings for the bundle.",
+            "description": "Selection, exclusion, formatting and size budgets.",
             "type": "object",
             "properties": {
               "format": {
@@ -1444,7 +1473,7 @@
                 ]
               },
               "filter": {
-                "description": "Selects which files to include, as worktree-relative exact file paths or glob patterns. Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` when selecting a folder. Combined with `includePaths` when both are given; omit both to include the whole worktree. An empty list or blank entry is rejected rather than read as no filter.",
+                "description": "Worktree-relative file paths or globs to include. Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` for a folder. Combined with `includePaths`; omit both for the whole worktree. An empty list or blank entry is rejected.",
                 "anyOf": [
                   {
                     "type": "string"
@@ -1471,28 +1500,28 @@
                 ]
               },
               "always": {
-                "description": "Force-includes matching files, overriding several exclusion layers at once: ignore files, project and config exclusions, your own `exclude`, the `modified`/`changed` git filters, and `maxFileSize`. It is the blunt option: a broad pattern can pull in `node_modules`, and a `../` pattern reaches outside the worktree entirely. What it does not override: `.git`, CopyTree's internal 10MB memory ceiling, and the `maxFileCount`/`maxTotalSize`/`charLimit` budgets, which still drop force-included files. Prefer `scopePaths` with `scopeIgnoresIgnoreFiles` when you only need past an ignore rule.",
+                "description": "Force-include matches past ignore files, project and config exclusions, your `exclude`, the `modified`/`changed` filters and `maxFileSize`. Blunt: a broad pattern can pull in `node_modules`, and `../` reaches outside the worktree. It does not override `.git`, the 10MB memory ceiling, or the `maxFileCount`/`maxTotalSize`/`charLimit` budgets. To pass one ignore rule, use `scopePaths` with `scopeIgnoresIgnoreFiles`.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "includePaths": {
-                "description": "Selects which files to include, as worktree-relative exact file paths or glob patterns. Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` when selecting a folder. Use this to assemble a curated bundle of scattered files — sources, their supporting code, and their tests — in one call. Combined with `filter` when both are given. Unlike `scopePaths` this does not restrict traversal, so patterns may match anywhere in the worktree.",
+                "description": "Worktree-relative file paths or globs, for a curated bundle of scattered files (sources, supporting code, tests). Patterns match file paths, so a folder needs a glob: pass 'src/panels/**', not 'src/panels'; prefer `scopePaths` for a folder. Combined with `filter` when both are given. Unlike `scopePaths` it does not restrict traversal.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "scopePaths": {
-                "description": "Restricts the copy to these subtrees, as worktree-relative literal file or directory paths to walk — not glob patterns, so pass 'src/panels', not 'src/panels/**'. Prefer this over `filter` or `includePaths` when selecting a folder. Omit to include the whole worktree; supplying an empty list is rejected rather than treated as no scoping, since that would silently copy everything. This restricts traversal, so `filter` and `includePaths` can only narrow within these paths and never add a file outside them.",
+                "description": "Subtrees to restrict the copy to, as worktree-relative literal file or directory paths, not glob patterns: pass 'src/panels', not 'src/panels/**'. Prefer this over `filter` or `includePaths` for a folder. An empty list is rejected rather than copying everything. Restricts traversal, so `filter` and `includePaths` can only narrow within it.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "scopeIgnoresIgnoreFiles": {
-                "description": "Lets `scopePaths` into subtrees an ignore file would have pruned (default false — a scoped copy returns what a whole-worktree copy would have returned). Requires `scopePaths` and is rejected without it. Set true when a path you named is being dropped by a `.copytreeignore` or `.gitignore` rule: only the rules blocking entry into each scoped path are removed, from those two ignore files. Unrelated rules in the same files, negations, and ignore files at or below the selection all still apply — as do project and config exclusions such as node_modules, your own `exclude`, `.git`, the `modified`/`changed` filters, `maxFileSize` and every budget. To get past a rule declared inside a selected folder, scope the exact file instead of that folder: a scoped directory subsumes any of its children you also list, so naming both changes nothing.",
+                "description": "Let `scopePaths` into subtrees a `.copytreeignore` or `.gitignore` rule would prune (default false). Requires `scopePaths`. Only the rules blocking entry into each scoped path are lifted; other rules, negations and nested ignore files all still apply, as do node_modules and config exclusions, `exclude`, `.git`, the git filters, `maxFileSize` and budgets. For a rule inside a selected folder, scope the exact file instead: a scoped folder subsumes its listed children.",
                 "type": "boolean"
               },
               "modified": {
@@ -1502,22 +1531,22 @@
                 "type": "string"
               },
               "maxFileSize": {
-                "description": "Per-file size cap in bytes; must be positive. Omit for no per-file cap.",
+                "description": "Per-file cap in bytes, positive. Omit for none.",
                 "type": "integer"
               },
               "maxTotalSize": {
-                "description": "Total bundle size cap in bytes; must be positive. Omit for no total cap.",
+                "description": "Total bundle cap in bytes, positive. Omit for none.",
                 "type": "integer"
               },
               "maxFileCount": {
-                "description": "Maximum number of files to include; must be positive. Omit for no file-count cap.",
+                "description": "Max files included, positive. Omit for none.",
                 "type": "integer"
               },
               "withLineNumbers": {
                 "type": "boolean"
               },
               "charLimit": {
-                "description": "Character cap on the rendered bundle; must be positive. Omit for no cap.",
+                "description": "Character cap on the rendered bundle, positive. Omit for none.",
                 "type": "integer"
               },
               "sort": {
@@ -1534,7 +1563,7 @@
             }
           },
           "name": {
-            "description": "A 2 to 4 word label for this copy tree ('auth flow context'), shown in the copy-tree history and the completion notification.",
+            "description": "2-4 word label ('auth flow context') for the copy-tree history and notification.",
             "type": "string"
           }
         },
@@ -1571,7 +1600,7 @@
                 "type": "boolean"
               },
               "unmatchedSelector": {
-                "description": "Which supplied selector matched no files. For a folder, add '/**' to the pattern or use scopePaths instead.",
+                "description": "Selector that matched no files. For a folder, add '/**' or use scopePaths.",
                 "type": "string",
                 "enum": [
                   "filter",
@@ -1628,7 +1657,7 @@
     {
       "action_id": "devPreview.reloadPreview",
       "wire_name": "devPreview.reloadPreview",
-      "description": "Reload the dev preview's page without restarting the underlying dev server. Try this first when the preview looks stale — it is fast and keeps the server warm. Restart the server instead when the process itself is wedged or its configuration changed.",
+      "description": "Reload the dev preview page without restarting its dev server. Try this first when the preview looks stale; restart the server only when its process is wedged or its config changed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1661,7 +1690,7 @@
     {
       "action_id": "devPreview.restart",
       "wire_name": "devPreview.restart",
-      "description": "Stop the dev server and start it again, keeping caches and installed dependencies. Anything in flight is interrupted and the preview is unavailable until it comes back, which is slower than simply reloading the page. Reload first unless the server process itself is the problem.",
+      "description": "Stop the dev server and start it again, keeping caches and dependencies. The preview is down until it returns; reload the page first unless the server process itself is the problem.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1694,17 +1723,17 @@
     {
       "action_id": "errors.recent",
       "wire_name": "errors.recent",
-      "description": "List recent entries from the diagnostics error log, covering runtime and inter-process failures, newest first. This is a separate store from the user's notification inbox, so a full picture usually means reading both. Dismissed entries are left out by default, so an empty list means nothing was recorded or everything recorded has been dismissed.",
+      "description": "List recent diagnostics error-log entries (runtime and inter-process failures), newest first. Separate from the notification inbox; read both for a full picture. Dismissed entries are omitted by default.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "limit": {
-            "description": "Max errors to return (default: 20, max: 50)",
+            "description": "Max errors (default 20, max 50)",
             "default": 20,
             "type": "integer"
           },
           "includesDismissed": {
-            "description": "Include dismissed errors (default: false — active errors only)",
+            "description": "Include dismissed errors (default false)",
             "default": false,
             "type": "boolean"
           }
@@ -1731,7 +1760,7 @@
     {
       "action_id": "fleet.getRunStatus",
       "wire_name": "fleet.getRunStatus",
-      "description": "Read a snapshot of the in-app fleet broadcast the user is currently running, including per-terminal delivery and liveness. This only observes and dispatches nothing, so drive a fan-out by sending to each terminal yourself and watching with a status snapshot or batched wait. Agent state here is a passive heuristic and a parsed check result is not an exit code; confirm both before acting.",
+      "description": "Read the fleet broadcast the user is running, with per-terminal delivery and liveness. Observe only: it dispatches nothing. Agent state here is a passive heuristic and a parsed check result is not an exit code; confirm both before acting.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -1979,25 +2008,25 @@
     {
       "action_id": "forge.getCIStatus",
       "wire_name": "forge.getCIStatus",
-      "description": "Fetch the roll-up CI verdict for one pull request from the active forge provider. Read the overall state for the answer: the accompanying counts cover required checks only, and a zero total also appears when the required-check list could not be read in full, so it is never evidence that nothing gates the merge. Values are provider-cached and can lag by a minute, so poll for a settled verdict.",
+      "description": "Fetch the roll-up CI verdict for one pull request. Read the overall state: counts cover required checks only, and a zero total also appears when that list could not be read, so it never proves nothing gates the merge. Provider-cached; can lag a minute.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "cwd": {
-            "description": "Legacy alias for `worktreePath`; prefer `worktreePath`.",
+            "description": "Legacy alias for `worktreePath`.",
             "type": "string"
           },
           "prNumber": {
             "type": "integer",
-            "description": "Pull request number whose CI status to fetch"
+            "description": "Pull request number"
           }
         },
         "required": [
@@ -2097,20 +2126,20 @@
     {
       "action_id": "forge.getIssue",
       "wire_name": "forge.getIssue",
-      "description": "Fetch one issue by number from the active forge provider, including its body. This is the direct lookup: reach for it instead of paging the issue listing to find a number you already have. An issue that does not exist comes back empty rather than failing, so treat empty as absence, not an error. It reports how many comments exist but not their text; read the comment thread for that.",
+      "description": "Fetch one issue by number, with its body; use it instead of paging the listing for a known number. A missing issue comes back empty rather than failing. Reports the comment count, not comment text.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "cwd": {
-            "description": "Legacy alias for `worktreePath`; prefer `worktreePath`.",
+            "description": "Legacy alias for `worktreePath`.",
             "type": "string"
           },
           "issueNumber": {
@@ -2160,25 +2189,25 @@
     {
       "action_id": "forge.getPR",
       "wire_name": "forge.getPR",
-      "description": "Fetch ONE known pull request number from the active forge provider, with its body, draft state and branches. For two or more known numbers use the plural lookup instead of calling this repeatedly; to discover numbers you do not have, page the PR listing. Read it before editing or merging so the current state is known. A pull request that does not exist comes back as `pr: null` rather than failing.",
+      "description": "Fetch one known pull request number with its body, draft state and branches; page the PR listing to find numbers. Read it before editing or merging. A missing PR comes back as `pr: null` rather than failing.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "cwd": {
-            "description": "Legacy alias for `worktreePath`; prefer `worktreePath`.",
+            "description": "Legacy alias for `worktreePath`.",
             "type": "string"
           },
           "prNumber": {
             "type": "integer",
-            "description": "Pull request number to fetch"
+            "description": "Pull request number"
           }
         },
         "required": [
@@ -2259,6 +2288,9 @@
                     "description": "Roll-up head-commit CI state: success, failure, pending, neutral or unknown",
                     "type": "string"
                   },
+                  "mergeState": {
+                    "type": "string"
+                  },
                   "commentCount": {
                     "type": "number"
                   },
@@ -2324,24 +2356,24 @@
     {
       "action_id": "forge.listIssues",
       "wire_name": "forge.listIssues",
-      "description": "List repository issues from the active forge provider, a page at a time. Use this to discover or filter issues; use the pull-request listing for PRs, and the single-issue lookup for a known number. Search takes a provider-native query fragment, not plain text, and routes through the provider's search API rather than the list cache pagination uses. Bypassing the cache spends a live round trip.",
+      "description": "List repository issues a page at a time, to discover or filter them; fetch a known number directly. Search takes a provider-native query fragment, not plain text, and goes through the search API rather than the list cache.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "cwd": {
-            "description": "Legacy alias for `worktreePath`; prefer `worktreePath`.",
+            "description": "Legacy alias for `worktreePath`.",
             "type": "string"
           },
           "cursor": {
-            "description": "Opaque pagination cursor — pass the previous response's `nextCursor` to fetch the next page.",
+            "description": "The previous response's `nextCursor`, for the next page.",
             "type": "string"
           },
           "perPage": {
@@ -2365,11 +2397,11 @@
             ]
           },
           "bypassCache": {
-            "description": "Skip the provider's list cache and fetch fresh (default: false). Use after the list may have changed outside this app; costs a provider round trip, so leave it off for ordinary paging.",
+            "description": "Skip the provider's list cache (default false). Costs a round trip; use only when the list changed outside Daintree.",
             "type": "boolean"
           },
           "view": {
-            "description": "Row detail: 'summary' (default) drops each row's body and raw provider payload, keeping the fields needed to choose an item; 'full' returns the complete provider object.",
+            "description": "'summary' (default) drops each row's body and raw payload; 'full' returns the whole provider object.",
             "type": "string",
             "enum": [
               "summary",
@@ -2386,7 +2418,7 @@
             ]
           },
           "search": {
-            "description": "Provider-native issue search fragment, not plain text; appended after the generated qualifiers and cut to the provider's cap. Uses the search API, which caps result depth.",
+            "description": "Provider-native issue search fragment, not plain text; appended to the generated qualifiers and cut to the provider's cap. The search API caps result depth.",
             "type": "string"
           }
         },
@@ -2412,24 +2444,24 @@
     {
       "action_id": "forge.listPRs",
       "wire_name": "forge.listPRs",
-      "description": "List repository pull requests from the active forge provider, a page at a time. Use this to DISCOVER or filter PRs; for numbers you already have, use the singular or plural PR lookup instead of paging to find them. Search takes a provider-native query fragment, not plain text, and routes through the search API rather than the list cache. Bypassing that cache spends a live round trip.",
+      "description": "List repository pull requests a page at a time, to discover or filter them; fetch known numbers directly instead of paging. Search takes a provider-native query fragment, not plain text, and goes through the search API rather than the list cache.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "cwd": {
-            "description": "Legacy alias for `worktreePath`; prefer `worktreePath`.",
+            "description": "Legacy alias for `worktreePath`.",
             "type": "string"
           },
           "cursor": {
-            "description": "Opaque pagination cursor — pass the previous response's `nextCursor` to fetch the next page.",
+            "description": "The previous response's `nextCursor`, for the next page.",
             "type": "string"
           },
           "perPage": {
@@ -2453,11 +2485,11 @@
             ]
           },
           "bypassCache": {
-            "description": "Skip the provider's list cache and fetch fresh (default: false). Use after the list may have changed outside this app; costs a provider round trip, so leave it off for ordinary paging.",
+            "description": "Skip the provider's list cache (default false). Costs a round trip; use only when the list changed outside Daintree.",
             "type": "boolean"
           },
           "view": {
-            "description": "Row detail: 'summary' (default) drops each row's body and raw provider payload, keeping the fields needed to choose an item; 'full' returns the complete provider object.",
+            "description": "'summary' (default) drops each row's body and raw payload; 'full' returns the whole provider object.",
             "type": "string",
             "enum": [
               "summary",
@@ -2475,7 +2507,7 @@
             ]
           },
           "search": {
-            "description": "Provider-native PR search fragment, not plain text; appended after the generated qualifiers and cut to the provider's cap. Uses the search API, which caps result depth.",
+            "description": "Provider-native PR search fragment, not plain text; appended to the generated qualifiers and cut to the provider's cap. The search API caps result depth.",
             "type": "string"
           }
         },
@@ -2501,21 +2533,21 @@
     {
       "action_id": "git.getProjectPulse",
       "wire_name": "git.getProjectPulse",
-      "description": "Summarise a worktree's historical git activity — a commit heatmap, counts over a window, and the current streak. Use this for trends and momentum, not for what is changed right now: read the staging status for the current working tree. Widening the window or asking for the delta against the main branch costs more history to walk, so request those only when needed.",
+      "description": "Summarise a worktree's git history: commit heatmap, counts over a window, current streak. For trends, not current changes. A wider window or the delta against main walks more history, so ask only when needed.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "rangeDays": {
             "default": 60,
-            "description": "How far back to aggregate commit activity, in days. A wider window costs more history to walk, so widen it only when the shorter window leaves the trend ambiguous.",
+            "description": "Days of commit activity to aggregate. Wider windows walk more history.",
             "anyOf": [
               {
                 "type": "number",
@@ -2561,7 +2593,7 @@
           },
           "rangeDays": {
             "default": 60,
-            "description": "How far back to aggregate commit activity, in days. A wider window costs more history to walk, so widen it only when the shorter window leaves the trend ambiguous.",
+            "description": "Days of commit activity to aggregate. Wider windows walk more history.",
             "anyOf": [
               {
                 "type": "number",
@@ -2737,7 +2769,7 @@
     {
       "action_id": "help.displayImage",
       "wire_name": "help.displayImage",
-      "description": "Show a documentation image inline in the assistant panel so an answer can point at it. Use this only when an image genuinely illustrates the answer, not for decorative ones. Reference the returned figure label as plain text at the insertion point rather than as markdown image syntax, which command-line renderers strip. Figure numbers are assigned in sequence and must never be chosen yourself.",
+      "description": "Show a documentation image inline in the assistant panel, only when it genuinely illustrates the answer. Cite the returned figure label as plain text where it belongs, not as markdown image syntax, which CLI renderers strip. Never choose figure numbers yourself.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2746,11 +2778,11 @@
             "description": "An https://daintree.org image URL. data:, blob:, and other hosts are rejected."
           },
           "caption": {
-            "description": "Optional caption shown beneath the figure.",
+            "description": "Caption shown under the figure.",
             "type": "string"
           },
           "altText": {
-            "description": "Optional alternative text for accessibility.",
+            "description": "Alt text for accessibility.",
             "type": "string"
           }
         },
@@ -2794,9 +2826,44 @@
       }
     },
     {
+      "action_id": "host.switch",
+      "wire_name": "host.switch",
+      "description": "Move this window to another Daintree host. No args opens the host palette; hostId (\"local\" or from the list) opens its last project here, else its project list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostId": {
+            "type": "string",
+            "description": "A host id from the host list, or \"local\" for this machine."
+          },
+          "newWindow": {
+            "description": "Open the host in a new window instead of switching this one.",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Switch host…",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "workspace",
+        "danger": "confirm",
+        "band": "destructive-local",
+        "surface_tier": "full",
+        "reach": "approval"
+      }
+    },
+    {
       "action_id": "mcp.surface",
       "wire_name": "mcp.surface",
-      "description": "Report this session's tool surface as data: its authorization tier, a stable hash, and per-tool tier, kind, read-only and idempotency hints, and deprecation. Call it once at startup to check the surface matches what this client was built against, then re-read the hash to detect drift without diffing everything. It describes exactly what tools/list returns for this session.",
+      "description": "Report this session's tool surface as data: its tier, a stable hash, and per-tool tier, kind, read-only and idempotency hints and deprecation. Call once at startup to check it matches what this client expects, then compare the hash to detect drift.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -2809,7 +2876,7 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991,
-            "description": "Shape version of this payload, bumped when its fields change meaning"
+            "description": "Payload shape version, bumped when a field changes meaning"
           },
           "appVersion": {
             "type": "string",
@@ -2827,7 +2894,7 @@
           "hash": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$",
-            "description": "Hex SHA-256 of the surface; compare it later to detect drift without diffing"
+            "description": "Hex SHA-256 of the surface, for drift checks"
           },
           "tools": {
             "type": "array",
@@ -2859,7 +2926,7 @@
                 },
                 "idempotentHint": {
                   "type": "boolean",
-                  "description": "Repeating the call with the same arguments has no additional effect"
+                  "description": "Repeating with the same arguments has no further effect"
                 },
                 "deprecated": {
                   "description": "Present only when the tool is on its way out",
@@ -2887,7 +2954,7 @@
               ],
               "additionalProperties": false
             },
-            "description": "Every tool `tools/list` advertises to this session, sorted by id"
+            "description": "Every tool `tools/list` advertises here, sorted by id"
           }
         },
         "required": [
@@ -2918,12 +2985,12 @@
     {
       "action_id": "notifications.recent",
       "wire_name": "notifications.recent",
-      "description": "List recent entries from the notification inbox — the completion, waiting and informational messages raised for the user, including quiet ones that never surfaced as a toast — newest first. This is a separate store from the diagnostics error log, so a full picture of what went wrong usually means reading both. It never fails; an empty list means nothing was notified.",
+      "description": "List recent notification-inbox entries (completion, waiting and info messages, including quiet ones never toasted), newest first. Separate from the diagnostics error log; read both for a full picture. Never fails.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "limit": {
-            "description": "Max notifications to return (default: 20, max: 50)",
+            "description": "Max notifications (default 20, max 50)",
             "default": 20,
             "type": "integer"
           },
@@ -2938,7 +3005,7 @@
             ]
           },
           "unreadOnly": {
-            "description": "Only return notifications not yet seen as a toast (default: false)",
+            "description": "Only ones not yet seen as a toast (default false)",
             "default": false,
             "type": "boolean"
           }
@@ -2965,16 +3032,16 @@
     {
       "action_id": "plugin.diagnostics",
       "wire_name": "plugin.diagnostics",
-      "description": "Report why one plugin is in the state it is in: the load or activation failure it recorded, whether it is running, and the tail of the lines it wrote through the host logger. A project plugin whose manifest was refused is reported with its rejection, so one that never loaded is distinguishable from one that does not exist. An unknown id fails, listing the ids that do exist.",
+      "description": "Report why a plugin is in its state: its recorded load or activation failure, whether it runs, and its recent host-logger lines. A refused project plugin is reported with its rejection. An unknown id fails, listing the ids that exist.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "pluginId": {
             "type": "string",
-            "description": "The plugin's manifest id, in publisher.name form. For a project plugin this is the id in its manifest, not the directory it sits in."
+            "description": "Manifest id, publisher.name. For a project plugin, the manifest id, not its directory."
           },
           "logLimit": {
-            "description": "How many of the newest log lines to return (default 50, max 500).",
+            "description": "Newest log lines to return (default 50, max 500).",
             "type": "integer"
           }
         },
@@ -3136,13 +3203,13 @@
     {
       "action_id": "plugin.reloadPanel",
       "wire_name": "plugin.reloadPanel",
-      "description": "Discard a plugin panel's view and mount a fresh one, keeping its backend and the state it persisted. View state it has not persisted is lost. A view that reports unsaved work is left alone, a confirmation is staged for the user, and the call fails rather than reporting success.",
+      "description": "Remount a plugin panel's view, keeping its backend and persisted state; unpersisted view state is lost. A view reporting unsaved work is left alone, a confirmation is staged for the user, and the call fails.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "panelId": {
             "type": "string",
-            "description": "The plugin panel to reload. Required: the focused panel is never assumed."
+            "description": "The plugin panel to reload; focus is never assumed."
           }
         },
         "required": [
@@ -3190,7 +3257,7 @@
     {
       "action_id": "plugin.reloadProject",
       "wire_name": "plugin.reloadProject",
-      "description": "Re-scan the open project's committed plugins and reconcile what is running against what is on disk, then report the state of every plugin directory found. This is how a newly written or rebuilt plugin is picked up without reopening the project. Trust and staging rules still apply, so an id the project has never run is listed but not executed.",
+      "description": "Re-scan the open project's committed plugins, reconcile what runs with what is on disk, and report every plugin directory found. Picks up a new or rebuilt plugin without reopening the project. Trust rules still apply: an id the project never ran is listed, not executed.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -3272,13 +3339,13 @@
     {
       "action_id": "plugin.validate",
       "wire_name": "plugin.validate",
-      "description": "Check a plugin.json on disk against the schema Daintree actually loads with, and get back every rejection paired with the field path that caused it. The rules differ by where a plugin lives, so the reply names which set was applied and whether that came from the location on disk or from what the manifest claims about itself. Warnings are advisory and never stop a plugin loading.",
+      "description": "Check a plugin.json on disk against the schema Daintree loads with, returning each rejection with its field path. Rules differ by plugin location; the reply names the rule set applied and why. Warnings never stop loading.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "path": {
             "type": "string",
-            "description": "The plugin directory, or the manifest file itself. Absolute, or relative to the project root. Must sit inside the open project or the managed plugins directory."
+            "description": "Plugin directory or manifest file, absolute or project-relative, inside the open project or the managed plugins directory."
           }
         },
         "required": [
@@ -3389,7 +3456,7 @@
     {
       "action_id": "project.detectRunners",
       "wire_name": "project.detectRunners",
-      "description": "Detect the runnable commands a project defines, by inspecting its manifest files. Use this to discover the right command to run rather than guessing one. It returns every script it finds, publish and deploy included, and for some frameworks synthesizes conventional commands that are declared nowhere — check what a command actually does before running it.",
+      "description": "Detect the runnable commands a project defines from its manifest files, instead of guessing. Returns every script, publish and deploy included, and synthesizes conventional ones for some frameworks; check what a command does before running it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3417,26 +3484,120 @@
       }
     },
     {
+      "action_id": "project.openOnHost",
+      "wire_name": "project.openOnHost",
+      "description": "Open this project on another host via git: finds the host's copy by remote URL or clones it, then offers a worktree. Opens a dialog that confirms every step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostId": {
+            "type": "string",
+            "description": "A host id from the host list, or \"local\" for this machine."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project to open, as this window knows it."
+          },
+          "newWindow": {
+            "description": "Open the project on the host in a new window instead of this one.",
+            "type": "boolean"
+          },
+          "worktree": {
+            "description": "Create this worktree on the host once the project is there, instead of handing over the current branch.",
+            "type": "object",
+            "properties": {
+              "newBranch": {
+                "type": "string"
+              },
+              "baseBranch": {
+                "type": "string"
+              },
+              "fromRemote": {
+                "type": "boolean"
+              },
+              "useExistingBranch": {
+                "type": "boolean"
+              },
+              "relativePath": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Where the worktree goes, relative to the project folder; null for the host's pattern."
+              },
+              "recipeId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "newBranch",
+              "baseBranch",
+              "fromRemote",
+              "useExistingBranch",
+              "relativePath",
+              "recipeId"
+            ]
+          },
+          "navigateOnly": {
+            "description": "Open the host's copy as is, branch untouched.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hostId",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Open project on host…",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "project",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "full",
+        "reach": "approval"
+      }
+    },
+    {
       "action_id": "project.runCheck",
       "wire_name": "project.runCheck",
-      "description": "Run one of a project's detected commands and report its exit code and output. A command that fails is reported as a failed check rather than an error, so read the result rather than relying on the call succeeding. Detection finds every runnable script, not just checks, so verify an unfamiliar command before running it. Never use this for long-lived servers: they block until the timeout expires.",
+      "description": "Run one detected project command and report its exit code and output. A failing command is a failed check, not an error, so read the result. Detection lists every script, not just checks: verify an unfamiliar one first. Never for long-lived servers; they block until timeout.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "string",
-            "description": "Identifies the project whose runner should be executed, using an id from the project-listing capability."
+            "description": "Project id from the project listing."
           },
           "runnerId": {
             "type": "string",
-            "description": "Identifies which detected command to run, using an id from runner detection. Detection surfaces every runnable script, not only checks, so confirm what an unfamiliar id actually runs first."
+            "description": "Runner id from detection; confirm what an unfamiliar id runs first."
           },
           "cwd": {
-            "description": "Directory to run in. Must be the project root or one of its worktrees. Defaults to the project root.",
+            "description": "The project root or one of its worktrees (default: project root).",
             "type": "string"
           },
           "timeoutMs": {
-            "description": "Wall-clock ceiling in milliseconds (default 600000, min 1000, max 3600000). The process tree is killed when it elapses.",
+            "description": "Wall-clock ceiling in ms (default 600000, min 1000, max 3600000); the process tree is killed at expiry.",
             "type": "integer"
           }
         },
@@ -3532,12 +3693,12 @@
     {
       "action_id": "recipe.list",
       "wire_name": "recipe.list",
-      "description": "List the saved recipes for the current project — named multi-terminal setups the user has configured, plus any a plugin contributes. Use this to discover recipe ids before running one; each entry reports its origin. It never fails, and it reports whether recipes are still loading: an empty list while loading means not read yet, not that the project has none.",
+      "description": "List the project's saved recipes, named multi-terminal setups from the user or plugins, each with its origin, to find recipe ids. Never fails; an empty list while still loading means not read yet, not none.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "Restricts the listing to recipes available in one worktree, using an id from the worktree-listing capability. Omit it to list every recipe in the project rather than the active worktree's.",
+            "description": "Only recipes available in this worktree. Omit for every recipe in the project.",
             "type": "string"
           }
         },
@@ -3563,16 +3724,16 @@
     {
       "action_id": "recipe.run",
       "wire_name": "recipe.run",
-      "description": "Launch the terminals a saved recipe defines, in one worktree, as a repeatable multi-pane setup. Launch a single agent or a plain terminal instead when only one pane is wanted. This creates several panels at once and starts their configured commands or agents. Approving its prompt starts every terminal; a pre-authorized call starts at most three, so check what actually started.",
+      "description": "Launch the terminals a saved recipe defines in one worktree, starting their commands or agents. For a single pane, launch an agent or terminal instead. An approved call starts every terminal, a pre-authorized one at most three, so check what started.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "recipeId": {
             "type": "string",
-            "description": "Identifies which saved recipe to run, using an id from the recipe-listing capability. An unknown id fails before any terminal is created."
+            "description": "Recipe id from the recipe listing; an unknown id fails before any terminal starts."
           },
           "worktreeId": {
-            "description": "Identifies the worktree to launch the recipe terminals in, using an id from the worktree-listing capability. Defaults to the active worktree.",
+            "description": "Worktree for the recipe's terminals (default: active worktree).",
             "type": "string"
           },
           "spawnedBy": {
@@ -3585,7 +3746,7 @@
               "mcp",
               "assistant"
             ],
-            "description": "Provenance for run history only; never changes what is launched. Leave unset over MCP, where the bridge stamps its own origin."
+            "description": "Run-history provenance only. Leave unset over MCP."
           },
           "focusPolicy": {
             "type": "string",
@@ -3594,7 +3755,7 @@
               "preserve",
               "take"
             ],
-            "description": "Whether the new panel takes focus: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
+            "description": "Focus the new panel: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
           }
         },
         "required": [
@@ -3621,7 +3782,7 @@
             "items": {
               "type": "string"
             },
-            "description": "The panels this run actually started, in spawn order. Use these ids to read output from or close the terminals; the count alone identifies nothing."
+            "description": "Panels this run started, in spawn order."
           },
           "failedTerminals": {
             "type": "array",
@@ -3672,13 +3833,13 @@
     {
       "action_id": "skills.load",
       "wire_name": "skills.load",
-      "description": "Read the full instructions of one plugin-contributed skill, so they can be followed as part of the current task. Find the id with a skills search first — ids are namespaced by plugin and cannot be guessed reliably. An id that matches nothing fails rather than returning empty.",
+      "description": "Read the full instructions of one plugin-contributed skill, to follow in the current task. Get the id from a skills search; ids are plugin-namespaced and not guessable. An unknown id fails.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "Identifies the skill to load, using an id from a skills search. Ids are namespaced by the contributing plugin and cannot be guessed reliably."
+            "description": "Skill id from a skills search."
           }
         },
         "required": [
@@ -3706,16 +3867,16 @@
     {
       "action_id": "skills.search",
       "wire_name": "skills.search",
-      "description": "Find plugin-contributed skills: reusable written instructions and workflows, such as a review rubric or a test-driven-development procedure, that plugins ship for an agent to follow. This returns names and summaries only, so load a skill by id to read its instructions. Omitting a query lists available skills, but only to the capped limit, and the result never says whether more were left out.",
+      "description": "Find plugin-contributed skills: reusable instructions and workflows, such as a review rubric or a TDD procedure. Returns names and summaries only; load one by id to read it. Without a query it lists skills up to the limit, never saying if more exist.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "query": {
-            "description": "Keywords to match. Omit or pass an empty string to list skills unfiltered, still bounded by the result limit.",
+            "description": "Keywords. Omit or empty to list unfiltered, still bounded by the limit.",
             "type": "string"
           },
           "limit": {
-            "description": "Maximum number of matches to return (default 20, max 50).",
+            "description": "Max matches (default 20, max 50).",
             "type": "integer"
           }
         },
@@ -3741,16 +3902,16 @@
     {
       "action_id": "slashCommands.list",
       "wire_name": "slashCommands.list",
-      "description": "List the slash commands an agent CLI offers, including any the project defines locally. Use this to discover what a given agent can be driven with before sending it a command. An empty list means the agent exposes none, whereas naming a project that is not open fails.",
+      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none; a project that is not open fails.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
-            "description": "The project to act on, by id from the project-listing capability. Omit this and the path for the active project; an unknown id is rejected rather than retargeted, as long as the open-project set is known.",
+            "description": "Project id from the project listing. Omit it and the path for the active project; an unknown id is rejected, not retargeted, once open projects are known.",
             "type": "string"
           },
           "projectPath": {
-            "description": "Identifies the project to act on by absolute root path, as an alternative to its id. The id wins when both are given.",
+            "description": "Absolute project root, instead of the id. The id wins if both.",
             "type": "string"
           },
           "agentId": {
@@ -3793,8 +3954,8 @@
         "category": "agent",
         "danger": "safe",
         "band": "reversible",
-        "surface_tier": "full",
-        "reach": "approval"
+        "surface_tier": "core",
+        "reach": "tier"
       }
     },
     {
@@ -3837,13 +3998,13 @@
     {
       "action_id": "terminal.closeOwned",
       "wire_name": "terminal.closeOwned",
-      "description": "Close a panel this session itself created, usually to the trash, where it is briefly recoverable before its process is killed. Only panels created by this connection can be closed: a panel opened by the user, another client, or a plugin is refused outright, as is an id that never existed. The result names what closed, already gone from the listing by then.",
+      "description": "Close a panel this session created, usually to the trash, where it stays briefly recoverable. Panels opened by the user, another client or a plugin are refused, as are unknown ids. The result names what closed.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "The panel to close, as an `id` this session received when it created the panel. Required — there is no focused-panel fallback, because the focused panel is rarely one this session owns."
+            "description": "Panel `id` this session got when creating it. Required; there is no focus fallback."
           }
         },
         "required": [
@@ -3860,7 +4021,7 @@
             "items": {
               "type": "string"
             },
-            "description": "The panels this call closed. Empty means nothing closed: there was no panel to act on, the one named was already in the trash, or its teardown did not complete. Treat an empty array as a failed close rather than a quiet success."
+            "description": "Panels closed. Empty means nothing closed (none to act on, already in the trash, or teardown failed): treat it as a failed close."
           }
         },
         "required": [
@@ -3887,22 +4048,22 @@
     {
       "action_id": "terminal.getOutput",
       "wire_name": "terminal.getOutput",
-      "description": "Read the trailing output of one terminal: what an agent or command printed. For several, the status snapshot reads every tail in one call. ANSI is stripped by default; a missing terminal returns an error field, not a failed call.",
+      "description": "Read one terminal's trailing output: what an agent or command printed. For several, the status snapshot reads every tail in one call. ANSI is stripped by default; a missing terminal returns an error field, not a failed call.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "Identifies the terminal to act on, using a panel id from the terminal-listing capability. An id no longer tracked comes back as an error field in the result rather than failing the call."
+            "description": "Panel id from the terminal listing. An untracked id returns an error field, not a failed call."
           },
           "maxLines": {
             "default": 100,
-            "description": "Maximum lines to return (default: 100, max: 1000)",
+            "description": "Max lines (default 100, max 1000)",
             "type": "integer"
           },
           "stripAnsi": {
             "default": true,
-            "description": "Remove ANSI escape codes from output (default: true)",
+            "description": "Strip ANSI escape codes (default true)",
             "type": "boolean"
           }
         },
@@ -3980,23 +4141,23 @@
     {
       "action_id": "terminal.getStatus",
       "wire_name": "terminal.getStatus",
-      "description": "Snapshot agent and process state across many terminals in one call, with optional output tails, and confirm a submission landed. Prefer it to listing terminals or reading each one's output. Never blocks or fails as a whole; an entry's error means that terminal was missing or unreadable.",
+      "description": "Snapshot agent and process state for many terminals in one call, with optional output tails, and confirm a submission landed. Prefer it to listing terminals or reading each. Never fails whole; an entry's error means that terminal was missing or unreadable.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalIds": {
-            "description": "Terminals to query (1-256); overrides `worktreeId` and `location`. An unknown id gets an `error` entry, not a failed call.",
+            "description": "1-256 terminals; overrides the filters. An unknown id gets an `error` entry, not a failed call.",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
           "worktreeId": {
-            "description": "Filter by worktree (ignored when `terminalIds` is provided).",
+            "description": "Filter by worktree.",
             "type": "string"
           },
           "location": {
-            "description": "Filter by panel location (ignored when `terminalIds` is provided). Defaults to all locations except trash and background.",
+            "description": "Filter by location. Default: all but trash and background.",
             "type": "string",
             "enum": [
               "grid",
@@ -4006,11 +4167,11 @@
             ]
           },
           "submissionToken": {
-            "description": "A token from the text-submission capability. Adds that submission's delivery record to each entry. Requires `terminalIds`.",
+            "description": "Token from a send; adds its delivery record to each entry. Needs `terminalIds`.",
             "type": "string"
           },
           "includeOutput": {
-            "description": "Opt-in, `true` or options. Adds `recentOutput` (last N scrollback lines), plus `lastOutputChangeAt` and `lastTypedInputAt` when observed.",
+            "description": "`true` or options: adds `recentOutput` (last N lines), plus `lastOutputChangeAt` and `lastTypedInputAt` when observed.",
             "anyOf": [
               {
                 "type": "boolean"
@@ -4020,12 +4181,12 @@
                 "properties": {
                   "lines": {
                     "default": 20,
-                    "description": "Number of trailing scrollback lines to include per terminal (max 50, default 20).",
+                    "description": "Trailing lines per terminal (max 50, default 20).",
                     "type": "integer"
                   },
                   "stripAnsi": {
                     "default": true,
-                    "description": "Remove ANSI escape codes from `recentOutput` (default: true).",
+                    "description": "Strip ANSI from `recentOutput` (default true).",
                     "type": "boolean"
                   }
                 }
@@ -4066,15 +4227,15 @@
                   "type": "number"
                 },
                 "lastOutputChangeAt": {
-                  "description": "Epoch ms the visible screen last changed, ignoring recognized spinner/timer redraws. Absent if unobserved. Not a hang verdict.",
+                  "description": "Epoch ms the screen last changed, ignoring spinner and timer redraws. Absent if unobserved. Not a hang verdict.",
                   "type": "number"
                 },
                 "lastTypedInputAt": {
-                  "description": "Epoch ms of the last raw input Daintree recorded for the PTY (keys, paste, broadcast; not submit-lane writes). Before `lastTransitionAt` = none since. Not proof of delivery or authorship.",
+                  "description": "Epoch ms of the last raw PTY input (keys, paste, broadcast; not sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
                   "type": "number"
                 },
                 "exitCode": {
-                  "description": "Present once the process has exited, so its absence means still running — unless listed in `unavailableFields`. Null means the process was terminated by a signal and produced no numeric code — tell a clean finish from a failure with this rather than by scraping output.",
+                  "description": "Set once the process exits, so absence means still running unless listed in `unavailableFields`. Null means killed by a signal with no numeric code.",
                   "anyOf": [
                     {
                       "type": "integer",
@@ -4087,17 +4248,17 @@
                   ]
                 },
                 "spawnedAt": {
-                  "description": "Wall-clock spawn time in epoch milliseconds, for run-duration and staleness checks.",
+                  "description": "Spawn time, epoch ms.",
                   "type": "number"
                 },
                 "agentIncarnation": {
-                  "description": "Times a new agent was seen taking over this PTY after one exited — the relaunch `spawnedAt` cannot see. 0 is none observed; absent is unobserved, not 0.",
+                  "description": "Times a new agent took over this PTY after one exited, which `spawnedAt` misses. Absent is unobserved, not 0.",
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 "lastCheckResult": {
-                  "description": "A best-effort reading of the agent's most recent test, lint, or build summary, parsed from its output rather than from a process exit code — the check runs inside the terminal, so its real exit status is unobservable. Absence means no recognized summary was seen, which is not the same as no check running and not the same as passing. Check the run time for freshness before trusting it.",
+                  "description": "Best-effort parse of the agent's latest test, lint or build summary from its output, not an exit code. Absence means no summary seen, not no check and not a pass. Check its time for freshness.",
                   "type": "object",
                   "properties": {
                     "command": {
@@ -4136,7 +4297,7 @@
                   "type": "object",
                   "properties": {
                     "message": {
-                      "description": "Rows rejoined, so lossy — never data. Null for a bare marker. Read the agent's last message for exact text.",
+                      "description": "Rows rejoined, so lossy. Null for a bare marker. Read the last message for exact text.",
                       "type": [
                         "string",
                         "null"
@@ -4166,19 +4327,19 @@
                   ]
                 },
                 "recentOutputTruncated": {
-                  "description": "Set when older output was left out, by `lines` or the 50 KiB response budget the terminals share; the newest lines are kept.",
+                  "description": "Older output was cut, by `lines` or the shared 50 KiB budget; the newest lines are kept.",
                   "type": "boolean"
                 },
                 "armed": {
-                  "description": "Whether fleet broadcast input is routed to this terminal. Populated for every terminal that was found, unless listed in `unavailableFields`.",
+                  "description": "Whether fleet broadcast input reaches this terminal. Set for every found terminal unless in `unavailableFields`.",
                   "type": "boolean"
                 },
                 "hasPty": {
-                  "description": "PTY-host lifecycle flag: false once the process exited or a kill was requested. Not a health probe — a keep-open shell or a wedged agent still reads true. Unavailable on the `renderer` surface; an unresolvable id reports `error`.",
+                  "description": "False once the process exited or a kill was requested. Not a health probe: a keep-open shell or a wedged agent still reads true. Unavailable on the `renderer` surface.",
                   "type": "boolean"
                 },
                 "submission": {
-                  "description": "Delivery record for the token this call named. Absent when no token was asked for, or when this terminal could not be read — which is not the same as it holding no record.",
+                  "description": "Delivery record for the named token. Absent without a token or when the terminal could not be read, which differs from holding no record.",
                   "type": "object",
                   "properties": {
                     "token": {
@@ -4194,7 +4355,7 @@
                         "cancelled",
                         "unknown"
                       ],
-                      "description": "How far this submission got. `pty_written`: the text and its Enter reached the pty without error — it does NOT mean the agent read them or acted on them. `queued`/`writing`: still in progress. `failed`/`cancelled`: it did not go out whole, and part may sit in the composer, so neither makes re-sending safe. `unknown`: the terminal was read and holds no record, including tokens aged past the last 32."
+                      "description": "`pty_written`: the text and its Enter reached the pty; it does NOT mean the agent read or acted on them. `queued`/`writing`: in progress. `failed`/`cancelled`: not sent whole and part may sit in the composer, so re-sending is not safe. `unknown`: no record, including tokens older than the last 32."
                     },
                     "at": {
                       "description": "Epoch ms the phase was entered. Absent for `unknown`.",
@@ -4212,7 +4373,7 @@
                   "additionalProperties": false
                 },
                 "error": {
-                  "description": "Set when the terminal was not found, and also stamped on every resolved entry when a batched fetch fails — the status fields are still populated and only that fetch's own field is missing. Its presence therefore does not by itself mean this terminal was unreadable, and it never fails the call as a whole.",
+                  "description": "Set when the terminal was not found, and on every resolved entry when a batched fetch fails; then the status fields are still set and only that fetch's field is missing. Never fails the call.",
                   "type": "string"
                 }
               },
@@ -4230,7 +4391,7 @@
               "renderer",
               "pty"
             ],
-            "description": "Which surface answered. `pty` is the reduced reading given when this session's workspace has no open window."
+            "description": "Which surface answered; `pty` is the reduced reading when this workspace has no open window."
           },
           "unavailableFields": {
             "type": "array",
@@ -4245,7 +4406,7 @@
                 "lastTypedInputAt"
               ]
             },
-            "description": "Fields the answering surface could not observe at all. Absent from every entry, and unknown rather than false."
+            "description": "Fields this surface cannot observe: absent from every entry, unknown rather than false."
           }
         },
         "required": [
@@ -4274,13 +4435,13 @@
     {
       "action_id": "terminal.injectOwned",
       "wire_name": "terminal.injectOwned",
-      "description": "Write the active worktree's prepared context into a terminal this connection created or was handed, which is how an agent it drives is given a large codebase context. Any other panel is refused. Target an idle terminal.",
+      "description": "Write the active worktree's prepared context into a terminal this connection created or was handed (right-click > Hand to orchestrator), to give its agent a large codebase context. Any other panel is refused. Target an idle terminal.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "The terminal to inject into, as an `id` this session created or the user handed it. Required: there is no focus fallback."
+            "description": "Terminal `id` this session created or was handed. Required; no focus fallback."
           }
         },
         "required": [
@@ -4308,13 +4469,13 @@
     {
       "action_id": "terminal.interruptOwned",
       "wire_name": "terminal.interruptOwned",
-      "description": "Stop the turn an agent is running in a panel this connection created or was handed, keeping the panel and its conversation. Sends cancel keystrokes, not prompt text an agent mid-turn would not read, and disposes of nothing. An idle agent, or one that binds a different cancel key, is refused rather than reported stopped. Read the terminal for the effect.",
+      "description": "Interrupt the turn an agent is running in a panel this connection created or was handed (right-click > Hand to orchestrator), keeping the panel and conversation. Sends cancel keystrokes, not prompt text. An idle agent, or one binding a different cancel key, is refused rather than reported stopped. Read the terminal for the effect.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "The agent panel to interrupt, as an `id` this session created or the user handed it. Required: there is no focus fallback."
+            "description": "Agent panel `id` this session created or was handed. Required; no focus fallback."
           }
         },
         "required": [
@@ -4340,7 +4501,7 @@
               "working",
               "waiting"
             ],
-            "description": "What the agent was last observed doing. Read off its own output and often wrong; it gated the request, it is not proof a turn was running."
+            "description": "Last observed agent state, read off its output and often wrong; it gated the request, not proof a turn was running."
           },
           "status": {
             "type": "string",
@@ -4348,7 +4509,7 @@
               "requested",
               "requested-unverified"
             ],
-            "description": "`requested`: keystrokes handed over to an agent whose CLI names Escape as its interrupt. `requested-unverified`: same, but that CLI names no interrupt key, so the effect is unknown. Neither says the keystrokes arrived or the agent stopped — read the terminal's output to find out."
+            "description": "`requested`: keystrokes handed to an agent whose CLI names Escape as its interrupt. `requested-unverified`: that CLI names no interrupt key. Neither says the keystrokes arrived or the agent stopped; read the terminal's output."
           }
         },
         "required": [
@@ -4378,16 +4539,16 @@
     {
       "action_id": "terminal.list",
       "wire_name": "terminal.list",
-      "description": "Enumerate the open terminals and panels, with just enough metadata to pick one. Start here to discover terminal ids, then read status or output for the ones that matter: this is a cheap inventory, not a polling path; the status snapshot carries richer agent state for a fleet in one call. Ephemeral and internal panels are left out; an empty result means nothing matched, not a failure.",
+      "description": "List open terminals and panels with enough metadata to pick one and learn its id. A cheap inventory, not a polling path: the status snapshot carries agent state for many in one call. Ephemeral and internal panels are omitted; empty means nothing matched.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "Restricts the listing to one worktree, using an id from the worktree-listing capability. Omit to list across every worktree in the project.",
+            "description": "Only this worktree. Omit for every worktree in the project.",
             "type": "string"
           },
           "location": {
-            "description": "Only terminals in one place: grid, dock, trash or background. Omitted, trashed and backgrounded terminals are left out.",
+            "description": "Only this location. Omitted, trash and background are excluded.",
             "type": "string",
             "enum": [
               "grid",
@@ -4397,15 +4558,15 @@
             ]
           },
           "owned": {
-            "description": "MCP only: true keeps only the terminals you created or were handed; false or omitted applies no ownership filter. An agent pane keeps them across reconnects.",
+            "description": "MCP only: true keeps only terminals you created or were handed; false or omitted, no filter. An agent pane keeps them across reconnects.",
             "type": "boolean"
           },
           "terminalId": {
-            "description": "Restricts the listing to one terminal, using a panel id. An id that is not open yields an empty listing rather than an error.",
+            "description": "Only this panel id; one not open yields an empty listing, not an error.",
             "type": "string"
           },
           "includeClientMetadata": {
-            "description": "Adds each terminal client-metadata record to its row. Off by default: records run to 2KB each, so narrow with terminalId or worktreeId on a large fleet.",
+            "description": "Add each terminal's client-metadata record (up to 2KB each); narrow the listing on a large fleet.",
             "type": "boolean"
           }
         },
@@ -4529,7 +4690,7 @@
     {
       "action_id": "terminal.moveToWorktree",
       "wire_name": "terminal.moveToWorktree",
-      "description": "Move a terminal panel to a different worktree. The process is never restarted: a live agent keeps running in the directory it launched from, and its pane offers to tell it to continue there. A panel sharing a tab group travels with the rest of that group, so this can relocate more than the panel named. The move is reversible. Name the target: an automated caller cannot see what the user focused.",
+      "description": "Move a terminal panel to another worktree, reversibly. The process is never restarted: a live agent keeps running in its launch directory, and its pane offers to tell it to continue there. Panels in the same tab group move too. Name the target; an automated caller cannot see focus.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4565,7 +4726,7 @@
     {
       "action_id": "terminal.new",
       "wire_name": "terminal.new",
-      "description": "Open a new terminal, ready for commands. This creates a visible panel and starts a shell process that consumes resources until it is closed. Defaults to the active worktree, and can instead open at a chosen directory and run something there immediately. Launch an agent instead when the intent is to start an AI CLI rather than a plain shell.",
+      "description": "Open a new terminal shell, ready for commands; it uses resources until closed. Defaults to the active worktree, or opens at a chosen directory and runs a command there. To start an AI CLI, launch an agent instead.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4579,7 +4740,7 @@
               "mcp",
               "assistant"
             ],
-            "description": "Provenance for run history only; never changes what is launched. Leave unset over MCP, where the bridge stamps its own origin."
+            "description": "Run-history provenance only. Leave unset over MCP."
           },
           "focusPolicy": {
             "type": "string",
@@ -4588,14 +4749,14 @@
               "preserve",
               "take"
             ],
-            "description": "Whether the new panel takes focus: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
+            "description": "Focus the new panel: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
           },
           "cwd": {
-            "description": "Absolute directory to open the terminal in. Defaults to the active worktree's root. Supplying this requires a confirmation.",
+            "description": "Absolute directory (default: active worktree root). Requires a confirmation.",
             "type": "string"
           },
           "command": {
-            "description": "Shell command to run in the new terminal immediately, instead of leaving it at a prompt. Supplying this requires a confirmation.",
+            "description": "Shell command to run at once instead of leaving a prompt. Requires a confirmation.",
             "type": "string"
           }
         },
@@ -4621,7 +4782,7 @@
     {
       "action_id": "terminal.notifyWhenIdle",
       "wire_name": "terminal.notifyWhenIdle",
-      "description": "Be told when a working agent terminal stops, instead of polling. Returns at once; when it next leaves working, Daintree types what it saw, your note and its last screen lines into your prompt. End your turn after calling. A terminal not working comes back unarmed with its state. For a prompt you are sending, set notify on the send instead.",
+      "description": "Be told when a working agent terminal stops, instead of polling. Returns at once; when it next stops working, Daintree types what it saw, your note and its last screen lines into your prompt. End your turn after calling. A terminal not working comes back unarmed. When sending a prompt, set notify on the send instead.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4630,11 +4791,11 @@
             "description": "A working agent terminal in your project, not your own."
           },
           "note": {
-            "description": "Echoed back in the notice, such as what to do next. One line, at most 160 characters.",
+            "description": "Echoed in the notice, e.g. the next step. One line, at most 160 characters.",
             "type": "string"
           },
           "replyLines": {
-            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "description": "With notify: screen lines quoted (default 40, 0 for none); with handback, up to the marker. Set, it quotes despite a summary.",
             "type": "integer"
           }
         },
@@ -4700,13 +4861,13 @@
     {
       "action_id": "terminal.readLastMessageOwned",
       "wire_name": "terminal.readLastMessageOwned",
-      "description": "Read what an agent this connection launched or was handed last wrote to its transcript: that reply's text and any tool calls left unanswered, such as a question and its options. Claude Code only. It says nothing of whether the agent is waiting; a permission prompt is only on the live screen.",
+      "description": "Read an agent's last transcript reply and unanswered tool calls, e.g. a question and its options. Agents this connection launched or was handed (right-click > Hand to orchestrator); Daintree's assistant: any in its project. Claude Code only. Not proof the agent is waiting; permission prompts are screen-only.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "The agent panel to read, as an `id` this session created or the user handed it. Required: there is no focus fallback."
+            "description": "Agent panel `id` the description says you may read. Required; no focus fallback."
           },
           "maxBytes": {
             "description": "Text budget in escaped bytes, 1024 to 49152; default 24576.",
@@ -4825,7 +4986,7 @@
                   ],
                   "additionalProperties": false
                 },
-                "description": "Calls made in or after the message with no result later in the file, oldest first, at most 8. Not proof the agent is waiting on one now."
+                "description": "Calls in or after the message with no later result, oldest first, at most 8. Not proof the agent is waiting on one."
               },
               "newerRecordsFollow": {
                 "type": "boolean",
@@ -4868,7 +5029,7 @@
                   "search-cap-reached",
                   "message-not-found"
                 ],
-                "description": "'provider-mismatch': an agent this cannot read yet. 'store-unknown': the pane's own store is uncertain, so nothing was read. 'search-cap-reached': no reply within the bounded read; an older one is not substituted. 'message-not-found': no reply at that index, or the cursor's message changed."
+                "description": "'provider-mismatch': an agent this cannot read. 'store-unknown': the pane's store is uncertain; nothing read. 'search-cap-reached': no reply within the bounded read; no older one substituted. 'message-not-found': no reply at that index, or the cursor's message changed."
               }
             },
             "required": [
@@ -4909,7 +5070,7 @@
     {
       "action_id": "terminal.rename",
       "wire_name": "terminal.rename",
-      "description": "Change a terminal tab's title, or clear it back to the automatic default. Identify the terminal explicitly — an automated caller cannot see what the user has focused, and cannot answer the dialog that omitting a title would open. A title the user set by hand outranks automation, so renaming one of those is accepted and then quietly ignored.",
+      "description": "Set a terminal tab's title, or clear it to the default. Pass the terminal and the title: an omitted title opens a dialog an automated caller cannot answer. Returns the title now shown; `applied` is false when a title the user set by hand kept its place.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4917,7 +5078,7 @@
             "type": "string"
           },
           "name": {
-            "description": "New name for the terminal. If omitted, opens the rename dialog.",
+            "description": "New title; omitted, opens the rename dialog.",
             "type": "string"
           }
         },
@@ -4943,13 +5104,13 @@
     {
       "action_id": "terminal.revealOwned",
       "wire_name": "terminal.revealOwned",
-      "description": "Bring the user to a panel this session created or was handed, switching workspace and raising the window when it is somewhere they are not looking. No other panel can be revealed. Call it when the user asked to be taken to the agent, not to report progress.",
+      "description": "Bring the user to a panel this session created or was handed (right-click > Hand to orchestrator), switching workspace and raising the window if needed. No other panel can be revealed. Use it when the user asked to be taken there, not to report progress.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "The panel to reveal, as an `id` this session created or the user handed it."
+            "description": "Panel `id` this session created or was handed."
           }
         },
         "required": [
@@ -5001,7 +5162,7 @@
             "description": "1-16 messages, one per terminal, each its next prompt."
           },
           "notify": {
-            "description": "As on the single call: each agent's notice quotes its reply when it finishes.",
+            "description": "As on a single call: each notice carries that agent's reply.",
             "type": "boolean"
           },
           "handback": {
@@ -5009,7 +5170,7 @@
             "type": "boolean"
           },
           "replyLines": {
-            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "description": "With notify: screen lines quoted (default 40, 0 for none); with handback, up to the marker. Set, it quotes despite a summary.",
             "type": "integer"
           },
           "waitForReply": {
@@ -5046,28 +5207,28 @@
     {
       "action_id": "terminal.sendCommandOwned",
       "wire_name": "terminal.sendCommandOwned",
-      "description": "Queue text as one submission to a terminal this connection created or was handed: a shell runs it as a command, an agent pane takes it as the next prompt. Any other panel is refused. Returns once queued, not delivered or run: pass the returned `submissionToken` to the status capability to find out.",
+      "description": "Queue text as one submission to a terminal this connection created or was handed (right-click > Hand to orchestrator): a shell runs it, an agent pane takes it as its next prompt. Any other panel is refused. Returns once queued, not delivered or run; pass the returned `submissionToken` to a status read to check.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "The terminal to submit to, as an `id` this session created or the user handed it."
+            "description": "Terminal `id` this session created or was handed."
           },
           "command": {
             "type": "string",
             "description": "Text to submit. Multi-line text goes in atomically with one Enter."
           },
           "handback": {
-            "description": "Ask the agent to end its reply with a Daintree marker, read back as `lastHandback`. Agent panes only; a shell refuses it.",
+            "description": "Ask the agent to end its reply with a Daintree marker, read back as `lastHandback`. Agent panes only.",
             "type": "boolean"
           },
           "notify": {
-            "description": "When this agent next stops, Daintree types a notice quoting its last screen lines into your prompt; end your turn, don't poll. Agent panes and assistants only.",
+            "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; end your turn, don't poll. Agent panes and assistants only.",
             "type": "boolean"
           },
           "replyLines": {
-            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "description": "With notify: screen lines quoted (default 40, 0 for none); with handback, up to the marker. Set, it quotes despite a summary.",
             "type": "integer"
           },
           "waitForReply": {
@@ -5091,18 +5252,18 @@
         "properties": {
           "sent": {
             "type": "boolean",
-            "description": "Accepted onto the terminal's lane. Not evidence of delivery — use `submissionToken` for that."
+            "description": "Accepted onto the terminal's lane; not evidence of delivery."
           },
           "terminalId": {
             "type": "string"
           },
           "command": {
             "type": "string",
-            "description": "The submitted text, truncated past 1024 characters — an echo, not a receipt."
+            "description": "The submitted text, cut past 1024 characters: an echo, not a receipt."
           },
           "submissionToken": {
             "type": "string",
-            "description": "Pass this and `terminalId` to the terminal-status capability to see how far the submission got. Retained for the last 32 per terminal; lost if the terminal restarts."
+            "description": "Pass with `terminalId` to a status read to see how far it got. Kept for the last 32 per terminal; lost on restart."
           },
           "message": {
             "type": "string"
@@ -5150,14 +5311,16 @@
                   "truncated"
                 ],
                 "additionalProperties": false
+              },
+              "handback": {
+                "type": "string"
               }
             },
             "required": [
               "terminalId",
               "outcome"
             ],
-            "additionalProperties": false,
-            "description": "With waitForReply."
+            "additionalProperties": false
           }
         },
         "required": [
@@ -5188,7 +5351,7 @@
     {
       "action_id": "terminal.sendKeysOwned",
       "wire_name": "terminal.sendKeysOwned",
-      "description": "Answer a CLI's own dialog (trust, permission, a list) by option label or named keys, in a terminal this connection created or was handed.",
+      "description": "Answer a CLI's own dialog (trust, permission, a list) by option label or named keys, in a terminal this connection created or was handed (right-click > Hand to orchestrator).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5212,7 +5375,7 @@
             "type": "boolean"
           },
           "replyLines": {
-            "description": "With notify: screen lines the notice quotes (default 40, 0 for none). With handback it ends at the marker.",
+            "description": "With notify: screen lines quoted (default 40, 0 for none); with handback, up to the marker. Set, it quotes despite a summary.",
             "type": "integer"
           }
         },
@@ -5241,13 +5404,13 @@
     {
       "action_id": "terminal.setClientMetadata",
       "wire_name": "terminal.setClientMetadata",
-      "description": "Attach your own JSON record to a terminal, so a reconnecting client can tell which panel is which instead of keeping a sidecar that goes stale. It outlives your connection, survives a restart, and is deleted with the panel. Read it back from the terminal listing; null clears it. Shared namespace: every external client sees the same record, and it confers no ownership.",
+      "description": "Attach your own JSON record to a terminal so a reconnecting client can tell panels apart. It outlives your connection and restarts, and dies with the panel; read it back from the terminal listing, null clears it. Shared: every external client sees the same record, and it confers no ownership.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "Identifies the terminal to annotate, using a panel id from the terminal-listing capability."
+            "description": "Panel id from the terminal listing."
           },
           "clientMetadata": {
             "anyOf": [
@@ -5262,7 +5425,7 @@
                 "type": "null"
               }
             ],
-            "description": "Replaces the whole record — send every key you want kept, not a patch. Max 2048 bytes of JSON, 16 deep. Null deletes it. Namespace your keys: this is shared."
+            "description": "Replaces the whole record, not a patch. Max 2048 bytes of JSON, 16 deep; null deletes it. Namespace your keys: it is shared."
           }
         },
         "required": [
@@ -5328,16 +5491,16 @@
     {
       "action_id": "terminal.waitUntilIdle",
       "wire_name": "terminal.waitUntilIdle",
-      "description": "Block until the agent in one terminal stops working, so the next step sees finished output. Use the batched wait for several terminals, or a status snapshot with `includeOutput` to poll without blocking; all three can report `lastOutputChangeAt`, not a hang verdict. Timing out is normal and means still working. A closed terminal also reads as idle, so check `trackingState`.",
+      "description": "Block until the agent in one terminal stops working. For several, use the batched wait; to poll without blocking, a status snapshot. A timeout is normal and means still working. A closed terminal also reads as idle, so check `trackingState`.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "terminalId": {
             "type": "string",
-            "description": "Identifies the terminal to act on, using a panel id from the terminal-listing capability. A closed or unknown id resolves as idle rather than failing."
+            "description": "Panel id from the terminal listing. A closed or unknown id resolves as idle, not a failure."
           },
           "timeoutMs": {
-            "description": "0 for an immediate snapshot (recommended); otherwise the most milliseconds to long-poll, default 60s. Interactive sessions cap at 60s, headless at 2 hours.",
+            "description": "0 for an immediate snapshot (recommended); otherwise max ms to long-poll, default 60s. Interactive sessions cap at 60s, headless at 2 hours.",
             "type": "integer"
           }
         },
@@ -5371,7 +5534,7 @@
               "exited",
               "unknown"
             ],
-            "description": "Why the terminal is not working: 'idle' at rest, 'waiting_for_user' blocked on input, 'completed' or 'exited' once the process ended, 'unknown' when the terminal is not tracked. Only the ended states carry an exit code."
+            "description": "'idle' at rest, 'waiting_for_user' blocked on input, 'completed' or 'exited' once ended, 'unknown' untracked. Only the ended states carry an exit code."
           },
           "trackingState": {
             "type": "string",
@@ -5380,7 +5543,7 @@
               "closed",
               "unknown"
             ],
-            "description": "Separates an idle agent from a session that is gone: 'tracked' = a mapping is held, which is not proof of liveness or completion; 'closed' = a kill was observed; 'unknown' = no record kept (a plain shell, a poll that raced the spawn, or evicted history)."
+            "description": "'tracked': a mapping is held, not proof of liveness or completion; 'closed': a kill was observed; 'unknown': no record (a plain shell, a poll racing the spawn, or evicted history)."
           },
           "waitingReason": {
             "type": "string",
@@ -5390,7 +5553,7 @@
               "approval",
               "error"
             ],
-            "description": "Present only when idleReason is 'waiting_for_user'. 'prompt' = empty input prompt, or the fallback when nothing else matched — confirm before driving; 'question' = agent is asking the user a question; 'approval' = a permission/approval selector needs a specific choice; 'error' = agent stopped after a blocking error (auth/rate limit/network/failed command)."
+            "description": "Only when idleReason is 'waiting_for_user'. 'prompt': empty input prompt, or the fallback when nothing else matched; confirm before driving. 'question': the agent asks the user. 'approval': a permission selector needs a choice. 'error': stopped on a blocking error (auth, rate limit, network, failed command)."
           },
           "previousBusyState": {
             "type": "string",
@@ -5404,7 +5567,7 @@
           },
           "lastOutputChangeAt": {
             "type": "number",
-            "description": "Epoch ms the visible screen last changed, ignoring recognized spinner/timer redraws. Absent if unobserved. Not a hang verdict."
+            "description": "Epoch ms the screen last changed, ignoring spinner and timer redraws. Absent if unobserved. Not a hang verdict."
           },
           "lastHandback": {
             "type": "object",
@@ -5437,15 +5600,15 @@
               "number",
               "null"
             ],
-            "description": "Process exit code, present only when idleReason is 'completed' or 'exited'. null = signal-terminated with no numeric code."
+            "description": "Only when idleReason is 'completed' or 'exited'. null = signal-terminated with no numeric code."
           },
           "exitSignal": {
             "type": "number",
-            "description": "OS signal number that terminated the process, when applicable (completed/exited only)."
+            "description": "Terminating OS signal number, once ended."
           },
           "timedOut": {
             "type": "boolean",
-            "description": "True when the wait elapsed with the agent still working. Call again to keep waiting — it is not a failure."
+            "description": "The wait elapsed with the agent still working. Call again; not a failure."
           }
         },
         "required": [
@@ -5474,7 +5637,7 @@
     {
       "action_id": "terminal.waitUntilIdleBatch",
       "wire_name": "terminal.waitUntilIdleBatch",
-      "description": "Block until the first of several agents stops working, or all of them do; the fan-out primitive when agents finish at different speeds. Use this rather than waiting on each in turn, or a status snapshot with `includeOutput` to poll without blocking; both can report `lastOutputChangeAt`, not a hang verdict. Timing out means not met yet; a gone terminal settles too, so read `trackingState`.",
+      "description": "Block until the first of several agents stops working, or all of them do: the fan-out wait when agents finish at different speeds. A timeout means not met yet. A gone terminal settles too, so read `trackingState`.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5483,10 +5646,10 @@
             "items": {
               "type": "string"
             },
-            "description": "Terminals to watch (1-256). Closed or unknown ids count as settled rather than failing the batch; each row's `trackingState` says which."
+            "description": "Terminals to watch, 1-256. Closed or unknown ids settle rather than fail; each row's `trackingState` says which."
           },
           "mode": {
-            "description": "Return when any one terminal stops working (the default, to refill as each frees up) or only once all have (a join barrier).",
+            "description": "'first' returns when any one stops (refill as each frees up), 'all' once every one has (a join).",
             "type": "string",
             "enum": [
               "first",
@@ -5494,7 +5657,7 @@
             ]
           },
           "timeoutMs": {
-            "description": "0 for an immediate snapshot; otherwise the most milliseconds to long-poll, default 60s. Interactive sessions cap at 60s, headless at 2 hours.",
+            "description": "0 for an immediate snapshot; otherwise max ms to long-poll, default 60s. Interactive sessions cap at 60s, headless at 2 hours.",
             "type": "integer"
           }
         },
@@ -5548,7 +5711,7 @@
                     "closed",
                     "unknown"
                   ],
-                  "description": "Separates an idle agent from a session that is gone: 'tracked' = a mapping is held, which is not proof of liveness or completion; 'closed' = a kill was observed; 'unknown' = no record kept (a plain shell, a poll that raced the spawn, or evicted history)."
+                  "description": "'tracked': a mapping is held, not proof of liveness or completion; 'closed': a kill was observed; 'unknown': no record (a plain shell, a poll racing the spawn, or evicted history)."
                 },
                 "waitingReason": {
                   "type": "string",
@@ -5571,7 +5734,7 @@
                 },
                 "lastOutputChangeAt": {
                   "type": "number",
-                  "description": "Epoch ms the visible screen last changed, ignoring recognized spinner/timer redraws. Absent if unobserved. Not a hang verdict."
+                  "description": "Epoch ms the screen last changed, ignoring spinner and timer redraws. Absent if unobserved. Not a hang verdict."
                 },
                 "lastHandback": {
                   "type": "object",
@@ -5610,7 +5773,7 @@
                 },
                 "settled": {
                   "type": "boolean",
-                  "description": "True once this row satisfied the wait. Gone terminals settle so the batch cannot hang; that is not a claim work completed, so read trackingState."
+                  "description": "This row satisfied the wait. Gone terminals settle too, which is not completion; read trackingState."
                 }
               },
               "required": [
@@ -5657,24 +5820,24 @@
     {
       "action_id": "workflow.prepBranchForReview",
       "wire_name": "workflow.prepBranchForReview",
-      "description": "Inspect a worktree and report a go/no-go verdict on whether review checks can start, naming what is blocking if not. Despite the name it prepares nothing and runs nothing — it is read-only, and running a detected check is a separate step. Use it to avoid launching checks against a dirty or conflicted tree.",
+      "description": "Inspect a worktree and report go/no-go on starting review checks, naming blockers. Read-only despite the name: it prepares and runs nothing. Use it to avoid running checks on a dirty or conflicted tree.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "cwd": {
-            "description": "Legacy alias for `worktreePath`; prefer `worktreePath`.",
+            "description": "Legacy alias for `worktreePath`.",
             "type": "string"
           },
           "projectId": {
-            "description": "Project ID for runner detection. Defaults to the current project. Pass explicitly when the worktree belongs to a different project.",
+            "description": "Project for runner detection (default: current). Pass it when the worktree belongs to another project.",
             "type": "string"
           }
         },
@@ -5700,7 +5863,7 @@
     {
       "action_id": "workflow.startWorkOnIssue",
       "wire_name": "workflow.startWorkOnIssue",
-      "description": "Fetch an issue, create a worktree with a derived branch, launch a terminal-backed agent, and inject context. Returns the issue identity plus worktreeId, worktreePath, branch, terminalId, recipe spawn counts, assignment outcome, and contextInjected. An unknown or non-terminal agentId is rejected before the issue lookup, so no worktree is created.",
+      "description": "Start work on an issue in one call: fetch it, create a worktree on a derived branch, launch an agent in a terminal and inject context. An unknown or non-terminal agent id is rejected before the issue lookup, so no worktree is created.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5710,14 +5873,14 @@
           },
           "agentId": {
             "type": "string",
-            "description": "Which agent CLI to launch in the new worktree, such as 'claude' or 'codex'; pass 'terminal' for a plain shell. Discover the ids actually installed with the agent-listing capability. An unknown id is rejected before anything is created."
+            "description": "Agent CLI to launch, e.g. 'claude' or 'codex'; 'terminal' for a plain shell. Ids from the agent listing; an unknown one is rejected before anything is created."
           },
           "branchName": {
-            "description": "Branch name for the new worktree. Defaults to 'feature/issue-<number>-<slug>' derived from the issue title.",
+            "description": "Defaults to 'feature/issue-<number>-<slug>' from the issue title.",
             "type": "string"
           },
           "baseBranch": {
-            "description": "Branch to base the worktree on (defaults to main worktree's branch)",
+            "description": "Base branch (default: the main worktree's branch)",
             "type": "string"
           },
           "recipeId": {
@@ -5725,11 +5888,11 @@
             "type": "string"
           },
           "assignToSelf": {
-            "description": "Assign the issue to the current user. Omit to use the user's persisted 'Assign issue to me' preference (mirrors the new-worktree dialog checkbox).",
+            "description": "Assign the issue to the current user. Omit for the saved 'Assign issue to me' preference.",
             "type": "boolean"
           },
           "injectContext": {
-            "description": "Inject worktree context into the launched terminal (default: true)",
+            "description": "Inject worktree context into the terminal (default true)",
             "type": "boolean"
           },
           "spawnedBy": {
@@ -5742,7 +5905,7 @@
               "mcp",
               "assistant"
             ],
-            "description": "Provenance for run history only; never changes what is launched. Leave unset over MCP, where the bridge stamps its own origin."
+            "description": "Run-history provenance only. Leave unset over MCP."
           },
           "focusPolicy": {
             "type": "string",
@@ -5751,7 +5914,7 @@
               "preserve",
               "take"
             ],
-            "description": "Whether the new panel takes focus: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
+            "description": "Focus the new panel: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
           }
         },
         "required": [
@@ -5857,7 +6020,7 @@
     {
       "action_id": "workspace.list",
       "wire_name": "workspace.list",
-      "description": "List every project and scratch Daintree knows about, open or not, so a client can look up a workspace id rather than derive one by hashing a path. workspaceId is what the Daintree-Workspace-Id header binds to; kind is project or scratch. hasLiveView says whether a view is open, not whether an id is valid — absence from this list is what makes an id wrong.",
+      "description": "List every project and scratch workspace Daintree knows, open or not, to look up a workspace id instead of hashing a path. workspaceId is what the Daintree-Workspace-Id header binds to. hasLiveView says a view is open; only absence from this list makes an id wrong.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -5926,7 +6089,7 @@
     {
       "action_id": "worktree.createWithRecipe",
       "wire_name": "worktree.createWithRecipe",
-      "description": "Create a managed git worktree — Daintree's own creator, which also copies project config, initializes submodules and runs setup. Name the creation mode: a new branch, an existing branch checked out exactly as asked, or a pull request. A recipe is OPTIONAL; pass one only to also launch terminals. Project setup runs in the background and can still fail after this returns.",
+      "description": "Create a managed git worktree; Daintree's creator also copies project config, initializes submodules and runs setup. Pick one mode: new branch, existing branch as named, or pull request. A recipe is optional, only to launch terminals. Setup runs in the background and can fail after this returns.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5938,14 +6101,14 @@
                   "kind": {
                     "type": "string",
                     "const": "newBranch",
-                    "description": "Branch off a base branch. If the name is already taken, `collisionPolicy` decides what happens."
+                    "description": "Branch off a base branch; a taken name follows `collisionPolicy`."
                   },
                   "branchName": {
                     "type": "string",
-                    "description": "Name for the new branch. Rejected outright if it is not a valid git ref — nothing rewrites it for you."
+                    "description": "New branch name; an invalid git ref is rejected, not rewritten."
                   },
                   "baseBranch": {
-                    "description": "Branch to base the new branch on (defaults to the main worktree's branch).",
+                    "description": "Base branch (default: the main worktree's branch).",
                     "type": "string"
                   },
                   "fromRemote": {
@@ -5953,7 +6116,7 @@
                     "type": "boolean"
                   },
                   "collisionPolicy": {
-                    "description": "If the name is taken: 'suffix' (default) lets the host reuse that branch when nothing has it checked out, else create name-2, and reports which; 'error' fails instead.",
+                    "description": "If the name is taken: 'suffix' (default) reuses the branch when nothing has it checked out, else creates name-2, and reports which; 'error' fails.",
                     "type": "string",
                     "enum": [
                       "suffix",
@@ -5961,11 +6124,11 @@
                     ]
                   },
                   "issueNumber": {
-                    "description": "Issue this worktree is for. Given to the recipe and used by assignToSelf; it does not itself attach the issue.",
+                    "description": "Issue this worktree is for, passed to the recipe and assignToSelf; it does not attach the issue.",
                     "type": "integer"
                   },
                   "assignToSelf": {
-                    "description": "Assign the linked issue to the current user. Omit to use the persisted 'Assign issue to me' preference.",
+                    "description": "Assign the linked issue to the current user. Omit for the saved 'Assign issue to me' preference.",
                     "type": "boolean"
                   }
                 },
@@ -5981,18 +6144,18 @@
                   "kind": {
                     "type": "string",
                     "const": "existingBranch",
-                    "description": "Check out a local branch that already exists, exactly as named."
+                    "description": "Check out an existing local branch exactly as named."
                   },
                   "branchName": {
                     "type": "string",
-                    "description": "The existing local branch to check out. Used verbatim — never suffixed, and never replaced by a new branch if it is missing."
+                    "description": "Existing local branch, used verbatim: never suffixed, never replaced by a new branch if missing."
                   },
                   "issueNumber": {
-                    "description": "Issue this worktree is for. Given to the recipe and used by assignToSelf; it does not itself attach the issue.",
+                    "description": "Issue this worktree is for, passed to the recipe and assignToSelf; it does not attach the issue.",
                     "type": "integer"
                   },
                   "assignToSelf": {
-                    "description": "Assign the linked issue to the current user. Omit to use the persisted 'Assign issue to me' preference.",
+                    "description": "Assign the linked issue to the current user. Omit for the saved 'Assign issue to me' preference.",
                     "type": "boolean"
                   }
                 },
@@ -6008,11 +6171,11 @@
                   "kind": {
                     "type": "string",
                     "const": "pullRequest",
-                    "description": "Check out a pull request's head branch. State is not checked, so a closed or merged PR is accepted as long as its head ref still exists."
+                    "description": "Check out a pull request's head branch. State is unchecked: a closed or merged PR works while its head ref exists."
                   },
                   "pullRequestNumber": {
                     "type": "integer",
-                    "description": "Pull request to check out. Its head branch is fetched and resolved for you; do not also pass a branch name."
+                    "description": "Pull request to check out; its head branch is fetched for you, so pass no branch name."
                   }
                 },
                 "required": [
@@ -6022,10 +6185,10 @@
                 "additionalProperties": false
               }
             ],
-            "description": "Where the worktree's branch comes from. Required — pick exactly one mode."
+            "description": "Where the branch comes from; exactly one mode."
           },
           "recipeId": {
-            "description": "Recipe to launch in the new worktree. Omit for a worktree with no terminals — project setup is started either way, and terminals do not wait for it.",
+            "description": "Recipe to launch in the new worktree. Omit for no terminals; setup starts either way and terminals do not wait for it.",
             "type": "string"
           },
           "spawnedBy": {
@@ -6038,7 +6201,7 @@
               "mcp",
               "assistant"
             ],
-            "description": "Provenance for run history only; never changes what is launched. Leave unset over MCP, where the bridge stamps its own origin."
+            "description": "Run-history provenance only. Leave unset over MCP."
           },
           "focusPolicy": {
             "type": "string",
@@ -6047,7 +6210,7 @@
               "preserve",
               "take"
             ],
-            "description": "Whether the new panel takes focus: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
+            "description": "Focus the new panel: \"auto\" (default) unless the assistant owns input, \"preserve\" never, \"take\" always. Use preserve for background spawns."
           }
         },
         "required": [
@@ -6075,13 +6238,13 @@
     {
       "action_id": "worktree.deleteOwned",
       "wire_name": "worktree.deleteOwned",
-      "description": "Delete a worktree this session itself created, removing its directory from disk after the user confirms. Only worktrees created by this connection can be deleted; anything else is refused. It will not force past uncommitted or untracked changes, delete the branch, or close terminals it does not own — commit or close those first.",
+      "description": "Delete a worktree this session created, removing its directory after the user confirms. Anything else is refused. It never forces past uncommitted or untracked changes, deletes the branch, or closes terminals it does not own; commit or close those first.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
             "type": "string",
-            "description": "The worktree to delete, as the `worktreeId` this session received when it created the worktree."
+            "description": "The `worktreeId` this session got when creating the worktree."
           }
         },
         "required": [
@@ -6109,7 +6272,7 @@
     {
       "action_id": "worktree.getCurrent",
       "wire_name": "worktree.getCurrent",
-      "description": "Get the worktree currently in use, which is what most work should be scoped to. Use the full worktree listing only when you genuinely need the others. An empty result means no worktree is active, or the active one can no longer be found — either way, handle it before acting.",
+      "description": "Get the worktree in use, which most work should be scoped to. An empty result means none is active or it can no longer be found; handle that before acting.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -6134,7 +6297,7 @@
     {
       "action_id": "worktree.list",
       "wire_name": "worktree.list",
-      "description": "List every worktree in the active project with its branch, status and any linked issue or pull request. Use this to discover worktree ids; ask for the current worktree instead when all you need is the one in use. It never fails — an empty list means the project has no worktrees.",
+      "description": "List every worktree in the active project with its branch, status and linked issue or pull request, to discover worktree ids. Never fails; empty means the project has none.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -6159,7 +6322,7 @@
     {
       "action_id": "worktree.resource.pause",
       "wire_name": "worktree.resource.pause",
-      "description": "Run the project's configured pause commands for a worktree's remote resource, typically to stop a cloud devbox and save cost. These are arbitrary commands the project defines: resuming runs a separate sequence, and nothing guarantees it undoes what pausing did. Read the configuration before assuming this is reversible.",
+      "description": "Run the project's pause commands for a worktree's remote resource, typically stopping a cloud devbox to save cost. These are arbitrary project commands; resume is a separate sequence, not guaranteed to undo this.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6189,7 +6352,7 @@
     {
       "action_id": "worktree.resource.provision",
       "wire_name": "worktree.resource.provision",
-      "description": "Run the configured provisioning commands for a worktree's remote resource, such as creating a cloud devbox. This creates real infrastructure and may incur cost; tearing it down is a separate step. It executes whatever the project configured, so confirm the target worktree is the intended one first.",
+      "description": "Run the project's provisioning commands for a worktree's remote resource, such as creating a cloud devbox. Creates real infrastructure and may cost money; teardown is separate. Confirm the target worktree first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6219,7 +6382,7 @@
     {
       "action_id": "worktree.resource.resume",
       "wire_name": "worktree.resource.resume",
-      "description": "Run the configured resume commands to bring a paused remote resource back up. This may take time and may incur cost from the moment it returns. Resuming something that was never paused does whatever the project's command does, so it is not guaranteed to be harmless.",
+      "description": "Run the project's resume commands to bring a paused remote resource back up. May take time and cost money once it returns; on a resource never paused it does whatever the command does.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6249,12 +6412,12 @@
     {
       "action_id": "worktree.resource.status",
       "wire_name": "worktree.resource.status",
-      "description": "Run the configured status command for a worktree's remote resource, such as a cloud devbox, and report what it said. This executes a real command and waits for it, so it costs whatever that command costs. It reports nothing when no status command is configured, and a failing command fails the call rather than falling back to a cached answer — so a failure never masquerades as stale-but-fine.",
+      "description": "Run the project's status command for a worktree's remote resource, such as a cloud devbox, and report its output. Runs a real command and waits. Reports nothing when none is configured; a failing command fails the call rather than returning a cached answer.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "Identifies the worktree whose remote resource is targeted, using an id from the worktree-listing capability. Defaults to the focused or active worktree.",
+            "description": "Worktree id from the worktree listing (default: focused or active worktree).",
             "type": "string"
           }
         },
@@ -6337,7 +6500,7 @@
     {
       "action_id": "worktree.resource.teardown",
       "wire_name": "worktree.resource.teardown",
-      "description": "Run the project's configured teardown commands for a worktree's remote resource, typically to destroy a cloud devbox. These are arbitrary commands the project defines, so what they destroy, and whether anything can be recovered, depends entirely on that configuration; read it before running this. The project's pause commands are the lighter path when the resource is still needed.",
+      "description": "Run the project's teardown commands for a worktree's remote resource, typically destroying a cloud devbox. What is destroyed and whether it is recoverable depends on that config; read it first. Pause is the lighter path if the resource is still needed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6367,7 +6530,7 @@
     {
       "action_id": "worktree.reviewReadiness",
       "wire_name": "worktree.reviewReadiness",
-      "description": "Judge whether a worktree is ready to commit, push and merge, and list what is blocking it. This is a read-only summary: it reads git state and performs no git or forge mutation. Signals that depend on forge data report as unknown rather than as passing when that data has not arrived, so an unknown is genuinely unknown and should not be read as a green light.",
+      "description": "Judge whether a worktree is ready to commit, push and merge, listing what blocks it. Read-only. Signals needing forge data that has not arrived report unknown, not passing; never read unknown as green.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6935,13 +7098,13 @@
     {
       "action_id": "worktree.setActive",
       "wire_name": "worktree.setActive",
-      "description": "Switch which worktree is the active one, changing the default target for everything scoped to 'the current worktree' and moving what the user sees. Call this deliberately — subsequent actions that omit a worktree will follow it, so switching mid-task can silently retarget later work.",
+      "description": "Switch the active worktree, moving what the user sees and the default target of every later call that omits a worktree. Switching mid-task can silently retarget later work.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
             "type": "string",
-            "description": "Identifies the worktree to make active, using an id from the worktree-listing capability. Everything later scoped to the current worktree follows this."
+            "description": "Worktree id from the worktree listing."
           }
         },
         "required": [
@@ -6969,7 +7132,7 @@
     {
       "action_id": "worktree.waitForPullRequest",
       "wire_name": "worktree.waitForPullRequest",
-      "description": "Wait until any given worktree has a detected pull request. Detection is a cached background poll: a PR seen, not a PR opened, and not proof its agent finished. Returns at once if one is already detected. A timeout is not a failure: call again without the worktrees that matched.",
+      "description": "Wait until any given worktree has a detected pull request. Detection is a cached background poll: a PR seen, not opened, and not proof its agent finished. Returns at once if already detected. A timeout is not a failure; call again without the matched worktrees.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7071,20 +7234,20 @@
     {
       "action_id": "worktree.waitUntilReady",
       "wire_name": "worktree.waitUntilReady",
-      "description": "Wait for a worktree's post-create setup — config copy, submodules, then the setup script and any resource provisioning — to finish, and report where it got to. Setup can outlive the call that created the worktree, so work started before it completes may run against an unpopulated tree. Pass a zero timeout to read the state without blocking. Running out of time is not a failure: call again.",
+      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning) and report where it got. Setup can outlive creation, so work started earlier may see an unpopulated tree. A zero timeout reads without blocking; running out of time is not a failure.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "worktreeId": {
-            "description": "The worktree to act on, by id from the worktree-listing capability. Omit this and the path to target the active worktree, which fails when none is active.",
+            "description": "Worktree id from the worktree listing. Omit it and the path for the active worktree; fails when none is active.",
             "type": "string"
           },
           "worktreePath": {
-            "description": "The worktree to act on, by absolute root path, as an alternative to its id. The id wins when both are given; the path is never swapped for the active one.",
+            "description": "Absolute worktree root, instead of the id. The id wins if both; the path is never swapped for the active one.",
             "type": "string"
           },
           "timeoutMs": {
-            "description": "Milliseconds to wait; 0 reads the state now. Default and maximum 25000. Setup often runs longer, so call again rather than expect one call to cover it.",
+            "description": "Ms to wait; 0 reads now. Default and max 25000. Setup often runs longer: call again.",
             "type": "integer"
           }
         },
@@ -7108,7 +7271,7 @@
               "needs-approval",
               "unknown"
             ],
-            "description": "Post-create setup state: pending (not started), running (config copy, submodules, setup script or provisioning in flight), ready, failed, timed-out, needs-approval (repository setup commands skipped until the user approves them; you can't), or unknown (this host did not create it, or restarted since)."
+            "description": "pending, running (config copy, submodules, setup script or provisioning), ready, failed, timed-out, needs-approval (repo setup commands await the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
           },
           "stage": {
             "anyOf": [
@@ -7124,7 +7287,7 @@
                 "type": "null"
               }
             ],
-            "description": "Which stage is running, or which one failed. Null before setup starts, and once it is ready or unknown."
+            "description": "Stage running or failed; null before setup starts and once ready or unknown."
           },
           "error": {
             "description": "One-line failure summary when the state is failed or timed-out.",
@@ -7135,7 +7298,7 @@
           },
           "timedOut": {
             "type": "boolean",
-            "description": "True when the wait ended because it ran out of time rather than because setup settled. The reported state is still live — call again to keep waiting."
+            "description": "The wait ran out before setup settled. The state is live; call again to keep waiting."
           }
         },
         "required": [

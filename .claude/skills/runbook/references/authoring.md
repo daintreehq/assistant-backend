@@ -96,10 +96,11 @@ is checked against two sources:
 
 2. **What this repo will accept**: the captured surfaces in
    `tests/fixtures/daintree_mcp/` (`pane-core`, `pane-full`, `help-core`, `help-full`,
-   `external`), all from one app commit (the README names it). `requiredTools`,
-   `optionalTools`, tagged examples and any action-shaped name in a body are checked
-   against them. `requiredTools` must be on `pane-core`
-   (`test_required_tools_are_on_the_agent_pane_surface`).
+   `hub-full`, `lane-full`, `external`), all from one app commit (the README names
+   it). `requiredTools`, `optionalTools`, tagged examples and any action-shaped name in
+   a body are checked against them. `requiredTools` must be on the caller's surface:
+   `pane-core`, or for `daintree.hosts.*` one of `hub-full`/`lane-full`
+   (`test_required_tools_are_on_the_callers_surface`, `CALLER_POLICY`).
 
 When the two disagree, the capture is stale. Refreshing it is a change to every
 runbook's validation, so it is in scope only when the issue authorises it (see
@@ -120,11 +121,14 @@ and stated with its date ("September 2026 builds; revalidate").
   (cross-host messaging, for instance).
 - **API-key client** (`external`): a curated subset with **no `notify`** on
   `agent.launch` or the sends and no `terminal.notifyWhenIdle`.
+- **Hub and lane** (`hub-full`, `lane-full`): the sidebar assistant in cross-host
+  messaging. Only these are offered `host.*` and `assistant.*` messaging tools.
 
-A runbook's baseline path is the agent-pane path. A sidebar-only variant is one short
-line plus `optionalTools`. A runbook whose *baseline* cannot run in a pane is a policy
-question the issue has to settle (the hygiene rule is a test, and tests change only
-with authorisation).
+A runbook's baseline path is the agent-pane path, except in `daintree.hosts`, whose
+baseline runs on the hub or a lane (`CALLER_POLICY`). A sidebar-only variant is one
+short line plus `optionalTools`; a pane runbook's hub branch lists `host.*` there too.
+Another domain whose *baseline* cannot run in a pane is a policy question the issue
+has to settle (the policy is a test, and tests change only with authorisation).
 
 ## Frontmatter
 
@@ -259,7 +263,7 @@ fences with the runbook they serve.
 ## Capture refresh (only when the issue authorises it)
 
 `tests/fixtures/daintree_mcp/capture/capture.sh <app commit-ish> [branch-label]`
-regenerates all five captures from one app commit in a throwaway detached worktree of
+regenerates every capture from one app commit in a throwaway detached worktree of
 `$APP_REPO` (it needs `$APP_REPO/node_modules` installed and writes nothing into the
 app checkout). New caller scenarios (a configured host, an enrolled lane) are
 changes to `capture/captureMcpSurfaces.test.ts`. Update the fixtures README (commit,

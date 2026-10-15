@@ -47,6 +47,18 @@ maintainers wrote the traps into it.
   `terminal.sendCommand` and `terminal.close`.
 - `external`: an API-key client. It gets a curated subset, and **no `notify`** on
   `agent.launch` or the send, and no `terminal.notifyWhenIdle`.
+- `hub-full` / `lane-full`: the sidebar assistant in cross-host messaging, as the
+  hub on a Shell with a Remote Host (`host.*`) or as a lane on a machine listening
+  as a host (`assistant.getInbox`, `assistant.reply`, `assistant.sendMessage`).
+  No other caller is ever offered these tools.
+
+**Which caller a runbook is checked against** is decided by its id namespace,
+never by its tool lists (`CALLER_POLICY` in `tests/daintree_mcp_surfaces.py`).
+Every runbook is followed from an agent pane, so its `requiredTools` must be on
+`pane-core`, except `daintree.hosts.*`: sidebar-only by design, its whole
+baseline must be on ONE of `hub-full` or `lane-full`. A pane runbook with a hub
+branch (asking the hosts too) lists the `host.*` tools in `optionalTools`, never
+`requiredTools`.
 
 The capture proves what is listed, not what happens when an action is called. Notice
 delivery in particular is only proven by a live trial in a Daintree pane.
@@ -148,7 +160,7 @@ It gets no empty notice or checkpoint sections.
 | `whenToUse` | yes | the routing text above |
 | `foundation` | no | `true` for a domain's base-judgment runbook |
 | `risk` | no | `read local ui terminal project external git system`, descriptive only, not a permission |
-| `requiredTools` | no | app action ids the baseline path calls; must be on the agent-pane surface |
+| `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `hub-full` or `lane-full` for `daintree.hosts.*`) |
 | `optionalTools` | no | app action ids a conditional branch, caller variant or enhancement calls |
 | `requires` | no | other runbook ids whose instructions must be read first |
 

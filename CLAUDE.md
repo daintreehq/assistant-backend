@@ -56,7 +56,7 @@ and a PR into `develop`. Runbook issues follow `references/issue-format.md` ther
 | `src/daintree_assistant_server/runbooks/` | Catalog (incl. dependency validation and `supporting_for`), loader, frontmatter model, and `local/` — the selector. |
 | `training/` | The selector's training pipeline, corpus and experiment log. |
 | `benchmarks/runbook_selection/` | The routing benchmark and its quality gate. |
-| `tests/fixtures/daintree_mcp/` | The Daintree app's MCP surfaces per caller (pane, sidebar, API-key), captured from one app commit: the authority on which actions runbooks may name. |
+| `tests/fixtures/daintree_mcp/` | The Daintree app's MCP surfaces per caller (pane, sidebar, the sidebar as cross-host hub and lane, API-key), captured from one app commit: the authority on which actions runbooks may name. |
 | `infra/gcp/`, `cloudbuild.yaml`, `Dockerfile` | The Cloud Run deployment. |
 
 ## Commands
@@ -147,7 +147,7 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 | `whenToUse` | yes | the *primary* routing signal (→ `when_to_use`) |
 | `foundation` | no | `true` marks a domain foundation (base judgment for a dotted namespace) |
 | `risk` | no | enum `read local ui terminal project external git system` — descriptive only |
-| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the agent-pane surface (→ `required_tools`) |
+| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the caller's surface: `pane-core`, or for `daintree.hosts.*` one of `hub-full`/`lane-full` (`CALLER_POLICY`) (→ `required_tools`) |
 | `optionalTools` | no | action ids a conditional branch or caller variant calls (→ `optional_tools`); never also required |
 | `requires` | no | other runbook ids whose instructions must be read first; validated for existence, visibility and cycles (the implicit foundation edge included), and delivered as `supporting_runbooks` |
 
@@ -161,12 +161,13 @@ per session), and a caller that prints the whole result pays for both the text b
 **Runbooks name Daintree app MCP actions**, and `tests/fixtures/daintree_mcp/` is the
 authority on which exist and what each caller is offered: an agent pane (owned tools such as
 `terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand`),
-and an API-key client (no `notify`, no `terminal.notifyWhenIdle`). The hygiene test checks
+the sidebar as a cross-host messaging hub or lane (`host.*`, `assistant.*`; nobody else), and an
+API-key client (no `notify`, no `terminal.notifyWhenIdle`). The hygiene test checks
 every declared tool against them, `test_runbook_examples.py` validates tagged
 ```` ```json tool=<action> [surface=<caller>] ```` examples against that caller's schema, and
 `test_runbook_migration.py` fails any action-shaped name no caller is offered — which is
 what keeps the retired Assistant CLI's tools (`agentTask.*`, `terminal.awaitAll`,
-`queue.*`, `timer.*`, …) out. The five captures come from one app commit; refresh them
+`queue.*`, `timer.*`, …) out. The captures come from one app commit; refresh them
 together with `tests/fixtures/daintree_mcp/capture/capture.sh`. They prove what is listed,
 not that a notice is delivered: only a live trial in a Daintree pane shows that.
 

@@ -6,22 +6,76 @@ sends each class of caller in `tools/list`: the exact wire tool entries
 captured from the app itself rather than written by hand. Runbooks that show
 Daintree MCP calls can validate their tagged JSON examples against these.
 
-**Source:** `daintreehq/daintree`, branch `feature/mcp-cleanup`, commit
-`c5f42a0935` ("feat(mcp): let a send or launch wait for the agent's reply"),
-app version 0.38.0, MCP SDK 1.30.0, protocol `2025-11-25`. Captured
-2026-09-26. It has the batch tools (`agent.launchMany`,
-`terminal.sendCommandMany`, `terminal.closeMany`) and `waitForReply` /
-`waitSeconds` on `agent.launch`, the sends and both batches, external included.
+**Source:** `daintreehq/daintree` commit `0436363469` ("feat(services): give
+the hub and host assistants their swarm roles"), the head of branch
+`test/hub-assistant-messaging-live` (app `develop` plus the hub/lane messaging
+fixes, `host.listAssistants`, `host.startAssistant` and the swarm-role
+addendum; pinned by the user while that branch awaits merge), app version
+0.43.0, MCP SDK 1.30, protocol `2025-11-25`. Captured 2026-10-15. Previous
+capture: `c5f42a0935` (2026-09-26).
 
 | file | caller | tier | tools | `mcp.surface` hash |
 |---|---|---|---|---|
-| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 72 (32 run, 40 ask first) | `afa2fd53…` |
-| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 72 | `9b5e257e…` |
-| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 32 | `09ddea22…` |
-| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 77 | `cf208e7a…` |
-| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `fd13e204…` |
+| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 74 (33 run, 41 ask first) | `55f93b2c…` |
+| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 74 | `047bcaa6…` |
+| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 35 | `c4ce4baa…` |
+| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 78 | `18ce9aba…` |
+| `hub-full.delta.json` | the sidebar assistant on a Shell with a Remote Host (the hub), Full | `full` | 89 = help-full + 11 | `a53ac6a4…` |
+| `lane-full.delta.json` | the sidebar assistant on a machine listening as a host (a lane), Full | `full` | 81 = help-full + 3 | `27d6ac4a…` |
+| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `af5e418c…` |
 
 Full hashes are in each file's `capture.surface_hash`.
+
+**The machine matters.** Each surface is captured on a described machine
+(`capture.messaging`): whether it has added a Remote Host, and whether it
+listens as one. Panes and the API-key client are captured on a machine that
+does both, so their files show what a pane gets where hosts exist
+(`host.switch` and `project.openOnHost`, ask first) and that neither is ever
+offered the messaging tools. `help-*` is the sidebar on a machine with
+neither, so no messaging tool is listed there.
+
+## Cross-host messaging: the hub and lane surfaces
+
+The `host.*` hub tools and a lane's `assistant.*` inbox are offered only to a
+sidebar-assistant session (a help-session bearer, `sessionHelpIdMap`), and only
+on a machine messaging can reach (`sessionServer.ts`, the `*Offered` gates):
+
+- **Hub** (`hub-full`): a Shell with at least one Remote Host. `host.list`,
+  `host.listAssistants`, `host.getTask`, `host.listTasks` are on Core;
+  `host.sendMessage`, `host.cancelTask` and `host.startAssistant` are Full only
+  (`help-core`'s `allowlisted_but_not_listed` shows the Core set). The hub's own
+  lane also gets `assistant.getInbox` and `assistant.reply` (host-initiated
+  messages). It is not offered `assistant.sendMessage` here; a Shell that also
+  listens as a host would list it, but the hub's own calls refuse, since it has
+  no hub to write to. The machine has a host, so
+  `host.switch` and `project.openOnHost` are listed too.
+- **Lane** (`lane-full`): a machine listening as a host, so a remote Shell
+  can enroll its assistant: `assistant.getInbox`, `assistant.reply`,
+  `assistant.sendMessage`, all on Core.
+
+They are listed from the start of such a session, before anything is
+enrolled: Codex reads the tool list once and never acts on
+`tools/list_changed`, so the app offers them on reachability alone, and the
+calls refuse (`NOT_ELIGIBLE`) until the person enrolls the lane. The capture
+is that start-of-session listing.
+
+**Stored as deltas.** A hub or lane surface is the sidebar surface of the same
+tier plus a handful of tools, so it is written as `<name>.delta.json`:
+`capture` (its own full metadata, plus `delta_of` and the base's
+`delta_of_surface_hash`), `added` (full wire entries), `changed` (full entries
+for any shared tool that differs; none today) and `removed` (ids). The hub
+and lane sessions at Tool set = Core are captured and checked too, and recorded
+in the Full delta as `capture.core_listing` (what each lists beyond
+`help-core`), not as files of their own.
+`tests/daintree_mcp_surfaces.py` rebuilds the surface from its base, and the
+capture run fails if the rebuild differs from what the session listed.
+
+**Caller policy.** A runbook's `requiredTools` and untagged examples are
+checked against its caller's surface, decided by the id namespace alone
+(`CALLER_POLICY` in `tests/daintree_mcp_surfaces.py`): `pane-core` by default,
+and for `daintree.hosts.*` one of `hub-full` or `lane-full`, the whole
+baseline on one of them. Outside `daintree.hosts` a messaging tool can only be
+`optionalTools`, the sidebar hub variant of a pane runbook.
 
 ## Shape
 
@@ -29,15 +83,16 @@ Full hashes are in each file's `capture.surface_hash`.
 {
   "capture": {
     "app_repo", "app_branch", "app_commit", "app_version",
-    "caller_origin",        // agent-pane | help | api-key
+    "caller_origin",        // agent-pane | help | help-hub | help-lane | api-key
     "session_origin",       // what main records: external | help
     "tier",                 // core | full | external
     "session": { "workspace_bound", "pane_approval", "renderer_owned_origin" },
     "captured_at", "mcp_protocol_version", "method",
     "surface_hash",         // what a real tools/call mcp.surface returned for this session
     "surface_hash_method",
+    "messaging",            // the machine (has hosts, listens as one) and what was offered
     "tool_count",
-    "context_gated_tools",  // listed tools whose presence depends on live UI context (none today)
+    "context_gated_tools",  // tools whose presence depends on renderer state (isVisible)
     "omitted_args",         // external only: args removed from the listing
     "withheld_when_workspace_bound", // external only
     "notes"                 // pane only
@@ -68,7 +123,7 @@ in the pane's `--mcp-config` and in the help session's settings, so Claude Code
 shows these as `mcp__daintree__<name>`; whatever further character mapping a
 client applies to the dots is the client's and is not captured here.
 
-**Agent panes list the same 72 tools at core and full.** A pane's tier is where
+**Agent panes list the same 74 tools at core and full.** A pane's tier is where
 auto-approval stops, not a ceiling (#12692): `tools/list` carries everything up to
 the full surface a non-assistant origin may hold, and a call above the tier asks
 the user instead of being refused. The two pane files are identical on the wire;
@@ -85,7 +140,7 @@ owned form in their place, and loses the tools that have none:
 | `terminal.inject` (full) | `terminal.injectOwned` |
 | `terminal.close` | `terminal.closeOwned` |
 | `terminal.sendKeys` | `terminal.sendKeysOwned` |
-| `worktree.delete` (full) | only `worktree.deleteOwned`, which help also has |
+| `worktree.delete` | only `worktree.deleteOwned`, which help also has |
 | `terminal.kill`, `terminal.restart`, `terminal.closeAll`, `copyTree.injectToTerminal` (full) | none |
 
 **`notify`.** `terminal.sendCommand`, `terminal.sendCommandOwned` and
@@ -108,7 +163,7 @@ Needs the app checked out with `node_modules` installed (`npm ci`).
 
 ```bash
 tests/fixtures/daintree_mcp/capture/capture.sh <commit-ish> [branch-label]
-# e.g. tests/fixtures/daintree_mcp/capture/capture.sh cab0d52531 feature/mcp-cleanup
+# e.g. tests/fixtures/daintree_mcp/capture/capture.sh 0436363469 test/hub-assistant-messaging-live
 ```
 
 `DAINTREE_APP_REPO` points it at the app checkout (default
@@ -116,13 +171,16 @@ tests/fixtures/daintree_mcp/capture/capture.sh <commit-ish> [branch-label]
 at that commit, links `node_modules` into it (workspace packages re-pointed at
 the worktree's own `packages/`), copies `capture/captureMcpSurfaces.test.ts`
 into `src/services/actions/__tests__/` there, runs that one vitest file, writes
-the five JSON files here and removes the worktree. It never writes into the app
-checkout.
+the seven files here (two as deltas) and removes the worktree. It never writes
+into the app checkout. Refresh them all together: the hygiene test fails when
+they come from different builds.
 
 How the test captures a surface: the real `ActionService` over the real action
 registry builds the manifest the renderer hands main (`actionService.list()`);
 the real `createSessionServer` serves it to a session configured as the caller
-(tier, origin, workspace binding, pane approval route); a raw JSON-RPC client
+(tier, origin, workspace binding, pane approval route, and the real
+`bindHostMessaging` / `bindAssistantMessaging` bound to its help session over a
+stand-in runtime that answers only the listing questions for its machine); a raw JSON-RPC client
 does `initialize` then `tools/list` then `tools/call mcp.surface` over the SDK's
 in-memory transport, and the result is JSON round-tripped. The run fails if any
 listed input schema or description differs from the app's own independent wire
@@ -139,6 +197,12 @@ the test: it is the one place the harness says what each caller is.
 - **Only the listing.** Nothing is dispatched. Ownership checks, the confirm
   dialog, the pane approval ask, refusing `notify` from an API-key client, and
   whether a notice is actually typed into the caller's prompt are not exercised.
+  Messaging past the listing (start consent, the assistant limit, one CLI per
+  project, consent withdrawn mid-start, send outcomes, the hub's update line) is
+  proven offline only by the app's own tests at the same commit, which
+  `capture.sh` runs after the capture (`HostAssistantStarter`,
+  `HubMessagingRuntime`, `install`, `hostMessagingTools`,
+  `assistantMessagingTools`; 73 passed at `0436363469`), and fully only live.
 - **The wire schema is looser than what the app accepts.** The listing strips
   `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `minItems`,
   `maxItems` and similar bounds (`shared/utils/mcpWireSchema.ts`); the app
@@ -152,11 +216,12 @@ the test: it is the one place the harness says what each caller is.
 - **Harness, not a running app.** The session store and transport are stand-ins;
   the tool-listing and `mcp.surface` handlers are the app's own. No bearer auth
   or HTTP transport is involved, and those do not alter the listed payload.
-- **Empty UI context.** The manifest is built with an empty `ActionContext`.
-  No tool on any of these surfaces declares `isVisible` (`context_gated_tools` is
-  empty everywhere), and `isEnabled` only sets the manifest's `enabled` flag,
-  which is not listed. If a future tool gates on context, its presence here will
-  reflect an empty context and it will be named in `context_gated_tools`.
+- **Empty UI context, one exception.** The manifest is built with an empty
+  `ActionContext`. The one piece of renderer state set is the list of added
+  Remote Hosts, from the machine described: `host.switch` and
+  `project.openOnHost` declare `isVisible` on it, so they are listed where the
+  machine has a host and named in `context_gated_tools`. `isEnabled` only sets
+  the manifest's `enabled` flag, which is not listed.
 - **Not captured separately:** the `assistant-pane` origin (Daintree's own
   assistant running in a pane). By the code it is renderer-owned with no approval
   route, so it should match `help-*` at the same tier. Not measured. Plugin agent

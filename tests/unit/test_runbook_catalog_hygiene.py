@@ -17,7 +17,19 @@ from __future__ import annotations
 
 import re
 
-from daintree_mcp_surfaces import SURFACES, action_ids, capture, known_action_ids
+from daintree_mcp_surfaces import (
+    CALLER_POLICY,
+    HUB_TOOLS,
+    LANE_TOOLS,
+    MESSAGING_TOOLS,
+    PANE_CALLERS,
+    SURFACES,
+    action_ids,
+    baseline_callers,
+    baseline_violation,
+    capture,
+    known_action_ids,
+)
 
 from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
 from daintree_assistant_server.runbooks.local.documents import (
@@ -27,9 +39,9 @@ from daintree_assistant_server.runbooks.local.documents import (
 
 
 def test_the_captures_are_one_app_build_and_not_truncated() -> None:
-    """Five files, one capture. A half refresh — one surface re-captured from a newer
-    app, the others left behind — would let a runbook validate against a caller that
-    never existed. The floor catches a truncated capture that would make every check
+    """Every surface file, one capture. A half refresh — one surface re-captured from a
+    newer app, the others left behind — would let a runbook validate against a caller
+    that never existed. The floor catches a truncated capture that would make every check
     below pass vacuously."""
     commits = set()
     for surface in SURFACES:
@@ -55,18 +67,148 @@ def test_declared_tools_are_real_app_actions() -> None:
     )
 
 
-def test_required_tools_are_on_the_agent_pane_surface() -> None:
-    """The documented baseline path is the one a Claude Code or Codex pane can take.
-    An action only the sidebar assistant is offered (the unscoped send and close)
-    belongs in `optionalTools`, as the caller variant it is."""
-    pane = action_ids("pane-core")
-    off_pane = [
+def test_required_tools_are_on_the_callers_surface() -> None:
+    """The documented baseline path is the one its caller can take, checked against
+    that caller's capture. The caller comes from the runbook's id namespace
+    (`CALLER_POLICY`), never from its tool lists.
+
+    Every runbook outside a listed domain is followed by Claude Code or Codex in an
+    agent pane, so its `requiredTools` must be on `pane-core`. An action only the
+    sidebar assistant is offered (the unscoped send and close) belongs in
+    `optionalTools`, as the caller variant it is.
+
+    `daintree.hosts` is the one sidebar-only domain: an agent pane is never a hub or
+    an enrolled lane, and is never offered `host.*` or a lane's inbox. A hosts
+    runbook's whole baseline must be offered to ONE of its callers, the hub
+    (`hub-full`) or an enrolled lane (`lane-full`).
+    """
+    violations = [
+        violation
+        for runbook in load_catalog().runbooks
+        if (violation := baseline_violation(runbook.id, runbook.meta.required_tools))
+    ]
+    assert not violations, f"required tools the runbook's caller is not offered: {violations}"
+
+
+def test_supporting_runbooks_run_on_the_same_caller() -> None:
+    """A runbook is delivered with its domain foundation and its `requires`, and the
+    caller follows all of them, so the bundle's baselines together must still run on
+    one of this runbook's callers. Otherwise a pane runbook could pull in hub-only
+    instructions through `requires`, or a lane runbook inherit a hub-only foundation
+    baseline."""
+    catalog = load_catalog()
+    violations = []
+    for runbook in catalog.runbooks:
+        bundle = [runbook, *catalog.supporting_for([runbook.id])]
+        required = sorted({tool for member in bundle for tool in member.meta.required_tools})
+        if violation := baseline_violation(runbook.id, required):
+            violations.append(violation)
+    assert not violations, f"bundles no single caller can follow: {violations}"
+    # What this catches: a hub-only requirement reaching a lane or a pane bundle.
+    assert baseline_violation("daintree.hosts.example", ["assistant.sendMessage", "host.list"])
+    assert baseline_violation("daintree.release.example", ["terminal.list", "host.list"])
+
+
+def test_the_caller_policy_names_one_sidebar_only_domain() -> None:
+    """Pinned, so widening who escapes the pane check is a deliberate edit here."""
+    assert PANE_CALLERS == ("pane-core",)
+    assert CALLER_POLICY == {"daintree.hosts": ("hub-full", "lane-full")}
+
+
+def test_every_other_runbook_is_still_checked_against_the_pane() -> None:
+    """The policy exempts nothing it does not name: every runbook outside
+    `daintree.hosts` keeps the pane check, whatever tools it declares."""
+    catalog = load_catalog()
+    off_pane = [rid for rid in catalog.known_ids if baseline_callers(rid) != PANE_CALLERS]
+    assert all(rid.startswith("daintree.hosts.") for rid in off_pane), off_pane
+    for rid in ("daintree.hostsx.ask", "daintree.orchestration.hosts", "daintree.host.ask"):
+        assert baseline_callers(rid) == PANE_CALLERS, rid
+
+
+def test_metadata_cannot_make_a_runbook_a_hub_or_lane_runbook() -> None:
+    """Declaring hub or lane tools never moves a runbook off the pane check: outside
+    `daintree.hosts` they can only ever be `optionalTools`, the sidebar hub variant
+    of a pane runbook (like the unscoped send). And a hosts runbook's baseline cannot
+    borrow a pane's owned tools, or span the hub and a lane."""
+    for tool in sorted(MESSAGING_TOOLS):
+        assert baseline_violation("daintree.release.ask-a-host", [tool]) is not None, tool
+    hosts = "daintree.hosts.example"
+    assert baseline_violation(hosts, ["host.list", "host.sendMessage"]) is None
+    assert baseline_violation(hosts, ["host.list", "project.openOnHost"]) is None
+    assert baseline_violation(hosts, sorted(LANE_TOOLS)) is None
+    assert baseline_violation(hosts, ["assistant.reply", "terminal.sendKeys"]) is None
+    assert baseline_violation(hosts, ["terminal.sendCommandOwned"]) is not None
+    assert baseline_violation(hosts, ["host.sendMessage", "assistant.sendMessage"]) is not None
+    assert baseline_violation(hosts, ["host.listAssistants", "assistant.sendMessage"]) is not None
+
+    off_caller = [
         f"{runbook.id}: {tool}"
         for runbook in load_catalog().runbooks
-        for tool in runbook.meta.required_tools
-        if tool not in pane
+        if baseline_callers(runbook.id) != PANE_CALLERS
+        for tool in runbook.meta.optional_tools
+        if not any(tool in action_ids(caller) for caller in baseline_callers(runbook.id))
     ]
-    assert not off_pane, f"required tools an agent pane is not offered: {off_pane}"
+    assert not off_caller, f"optional tools no caller of the runbook is offered: {off_caller}"
+
+
+def test_pane_and_api_key_callers_are_never_offered_messaging() -> None:
+    """Captured where messaging is live both ways (a Shell with a host that also
+    listens as one), an agent pane and an API-key client are still offered none of
+    it: they are not sidebar-assistant sessions. Nor is the ordinary sidebar
+    assistant on a machine with no host and no listener."""
+    for surface in ("pane-core", "pane-full", "external"):
+        recorded = capture(surface)["capture"]["messaging"]
+        assert recorded["machine_has_hosts"] and recorded["machine_listening_as_host"]
+        assert not recorded["help_session"]
+        assert not action_ids(surface) & MESSAGING_TOOLS, surface
+    for surface in ("help-core", "help-full"):
+        assert not action_ids(surface) & MESSAGING_TOOLS, surface
+
+
+def test_the_hub_reads_on_core_and_writes_on_full() -> None:
+    """The hub's sends, cancels and starts act on another machine, so the sidebar
+    assistant is offered them only at Tool set = Full: the plain sidebar captures
+    record what each tier's allowlist holds, and the hub and lane Core sessions what
+    they list. The hub's own lane receives host-initiated messages but has no hub
+    to write to; a lane on a host has no `host.*` reach."""
+
+    def allowlisted_messaging(surface: str) -> set[str]:
+        withheld = capture(surface)["capture"].get("allowlisted_but_not_listed", [])
+        return {w["action_id"] for w in withheld} & MESSAGING_TOOLS
+
+    reads = {"host.list", "host.listAssistants", "host.getTask", "host.listTasks"}
+    writes = {"host.sendMessage", "host.cancelTask", "host.startAssistant"}
+    inbox = {"assistant.getInbox", "assistant.reply"}
+    assert allowlisted_messaging("help-core") == reads | LANE_TOOLS
+    assert allowlisted_messaging("help-full") == reads | writes | LANE_TOOLS
+    # The Core sessions themselves, captured with messaging reachable and recorded
+    # as what they list beyond help-core.
+    hub_core = capture("hub-full")["capture"]["core_listing"]
+    lane_core = capture("lane-full")["capture"]["core_listing"]
+    for listing in (hub_core, lane_core):
+        assert listing["delta_of_surface_hash"] == capture("help-core")["capture"]["surface_hash"]
+        assert not listing["removed"] and not listing["changed"]
+    assert set(hub_core["added"]) == reads | inbox
+    assert set(lane_core["added"]) == LANE_TOOLS
+    assert action_ids("hub-full") & HUB_TOOLS == reads | writes
+    assert action_ids("hub-full") & LANE_TOOLS == inbox
+    assert action_ids("lane-full") & MESSAGING_TOOLS == LANE_TOOLS
+
+
+def test_hub_and_lane_surfaces_are_the_sidebar_plus_messaging() -> None:
+    """Stored as deltas against the sidebar surface of the same tier, from the same
+    capture. Rebuilt, each matches the tool count the app listed, and differs from
+    its base only by what the machine adds: messaging, and the host-gated actions a
+    Shell with a Remote Host shows."""
+    host_gated = {"host.switch", "project.openOnHost"}
+    for surface in ("hub-full", "lane-full"):
+        recorded = capture(surface)["capture"]
+        base = recorded["delta_of"]
+        assert capture(base)["capture"]["tier"] == recorded["tier"], surface
+        assert capture(base)["capture"]["surface_hash"] == recorded["delta_of_surface_hash"]
+        assert len(capture(surface)["tools"]) == recorded["tool_count"], surface
+        assert action_ids(base) <= action_ids(surface), surface
+        assert action_ids(surface) - action_ids(base) <= MESSAGING_TOOLS | host_gated, surface
 
 
 # ---------------------------------------------------------------------------

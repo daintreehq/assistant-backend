@@ -3,10 +3,12 @@
 Only fences explicitly tagged ``json tool=<action id>`` opt in; the JSON is the
 action's arguments alone. An optional ``surface=<name>`` annotation (a test
 annotation, never an MCP argument) says which caller the example is written for —
-``pane-core``, ``pane-full``, ``help-core``, ``help-full`` or ``external`` —
-and it is validated against THAT caller's schema. Without one, the example is validated against the
-first surface offering the action, in that order, so the ordinary pane path is
-the default reading.
+any captured surface (``pane-core``, ``help-full``, ``hub-full``, ``lane-core``,
+``external``, ...) — and it is validated against THAT caller's schema. Without one, the
+example is validated against the first surface offering the action among the runbook's
+own callers (``baseline_callers``): for most runbooks every surface, pane first, so the
+ordinary pane path is the default reading; for a ``daintree.hosts`` runbook only the hub
+and lane surfaces, because no other caller ever follows it.
 
 The surfaces differ at the property level, which is the point of validating per
 caller: an API-key ``external`` client is not offered ``notify`` at all, so an
@@ -21,7 +23,7 @@ import json
 import re
 
 import pytest
-from daintree_mcp_surfaces import SURFACES, input_schemas
+from daintree_mcp_surfaces import PANE_CALLERS, SURFACES, baseline_callers, input_schemas
 from jsonschema import Draft202012Validator
 
 from daintree_assistant_server.runbooks.catalog import load_catalog
@@ -59,8 +61,10 @@ def test_example_matches_the_callers_captured_schema(
         schemas = input_schemas(surface)
         assert tool in schemas, f"{runbook_id}: {tool} is not offered to {surface}"
     else:
-        offering = [s for s in SURFACES if tool in input_schemas(s)]
-        assert offering, f"{runbook_id}: {tool} is not an action any captured caller is offered"
+        callers = baseline_callers(runbook_id)
+        order = SURFACES if callers == PANE_CALLERS else callers
+        offering = [s for s in order if tool in input_schemas(s)]
+        assert offering, f"{runbook_id}: {tool} is not offered to any of its callers {order}"
         surface = offering[0]
         schemas = input_schemas(surface)
     arguments = json.loads(text)

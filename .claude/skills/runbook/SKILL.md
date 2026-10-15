@@ -327,8 +327,8 @@ need, the issue's claims about them, and this brief:
 > <APP_SHA>:<path>`. Never read the checkout's working tree, which may be another
 > branch. Report: the description string verbatim, the args and result schema fields
 > that matter, `danger`/`kind`, any MCP gating in `electron/services/mcp-server/`, and
-> which captured surfaces in `tests/fixtures/daintree_mcp/*.json` list it (pane-core,
-> pane-full, help-core, help-full, external). Then check each listed claim: true,
+> which captured surfaces in `tests/fixtures/daintree_mcp/` list it (pane-core,
+> pane-full, help-core, help-full, hub-full, lane-full, external). Then check each listed claim: true,
 > false, or unverifiable, each with `file:line`. Report actions the claims need that
 > do not exist. No opinions about the design.
 
@@ -364,7 +364,7 @@ It must settle:
 - the orchestration framing: what the caller reads, runs and verifies; what goes to a
   visible agent; the caller and the surface the baseline path runs on;
 - the routing text (title, summary, `whenToUse`) and every neighbour fence, both ways;
-- frontmatter: `risk`, `requiredTools` (on `pane-core`), `optionalTools`, `requires`;
+- frontmatter: `risk`, `requiredTools` (on the caller's surface: `pane-core`, or `hub-full`/`lane-full` for `daintree.hosts`), `optionalTools`, `requires`;
 - the procedure: steps, the brief to the agent (objective, output, scope, stop,
   must-not), "On notice or resume" and "Stop and recovery" when it ends a turn on a
   notice, "Report back", the tagged examples, the size target;
