@@ -367,6 +367,12 @@ boundaries:
   - query: "daintree keeps saying disconnected on this machine and nothing responds to the sidebar"
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
+  - query: 'the toolbar buttons in daintree do nothing on this mac since this morning; my other machines are fine'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
+  - query: 'before I rely on it, confirm the claude sign-in on this machine actually works; never mind the hosts'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
 followups:
   - query: and the key thing too?
     history:

@@ -110,6 +110,9 @@ boundaries:
   - query: 'before the next run across the hosts, find out which one has the most claude headroom'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'how much codex allowance is left on each remote host? one of them hit its limit earlier'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
 followups:
   - query: and claude on those same machines?
     history:

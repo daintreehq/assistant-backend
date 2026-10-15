@@ -1,0 +1,150 @@
+# daintree.hosts.diagnose-messaging: this Shell's hub finding which gate stops messages or
+# starts reaching the assistant on a Remote Host it can see (tool set, the per-host
+# switches, the link, a pause, a missing or stale enrollment, a rate limit), and naming
+# the person's fix, sending nothing.
+# Boundaries hold it against the hosts foundation (how messaging works, first-time setup),
+# adding or reconnecting a host, the lane handling a hub message, Daintree's own health
+# here, the account of exchanges that never came back, readying a swarm, asking a host a
+# question, usage checks and delegating work.
+runbook: daintree.hosts.diagnose-messaging
+run: runbook-2026-10-issue-103
+
+positives:
+  - Work out why this Shell cannot message the assistant on the Linux build host even though the host shows as connected; read the host and assistant listings and report the blocking setting without sending anything
+  - Diagnose a policy_rejected result from host.sendMessage to a remote lane and name what the person must change
+  - Identify which gate makes host.sendMessage to the studio return paused when this Shell's own messaging is not paused
+  - Find the gate behind lane_unavailable from host.sendMessage after the remote assistant was relaunched this morning
+  - Determine why host.startAssistant on the render host returns unsupported and what has to be updated there
+  - Figure out why every lane on every remote host lists available false at the same moment
+  - Find out why host.sendMessage is missing from this session's tools while host.list works
+  - Report which messaging gate blocks the hub from the assistant on the second Mac; the host is connected and the project is listed, but no assistant there carries a generation
+  - Messages to one host began coming back opted_out right after the person edited that host's SSH target; explain why and what has to be switched on again
+  - host.sendMessage keeps returning rate_limited with a retryAfterMs while the hub messages five hosts in a row; explain the limits and when sends can go again
+  - Diagnose why a remote assistant has a generation but available false while this Shell is not paused
+  - query: >-
+      Hub session on Full. host.list shows the Linux build host connected and
+      host.listAssistants lists the api project with one Codex assistant, generation set,
+      available false. The person says nobody paused anything on this machine. Work out
+      which gate it is and what they should check on that host, without sending or
+      starting anything.
+  - query: >-
+      The person can see their spare MacBook under Remote Hosts and its projects list
+      fine, but the question the hub sent there came back policy_rejected and none of its
+      assistants has a generation. They want to know why and what to do on that laptop,
+      and they do not want the question sent again.
+  - query: >-
+      A send to the studio host just came back lane_unavailable, although
+      host.listAssistants showed its Codex assistant with a generation a minute ago.
+      Nothing has restarted on either machine. Find out which gate it is and who has to
+      act.
+  - why won't the mac mini's assistant take my messages
+  - every send to the linux box says lane_unavailable, what's wrong
+  - the hub says my old laptop doesn't support assistant messaging
+  - it says unsupported when I try to message the imac host
+  - why does it say policy_rejected when I message the studio
+  - i changed my server's ssh address and now messaging it says opted out
+  - my tower shows connected but listing its assistants says nothing is enrolled for me
+  - I can see the build machine from here but can't reach the assistant on it
+  - why does every new message to the linux host bounce before it's even sent
+  - the hub can see my laptop but says it can't message anything there, check what's off
+  - figure out why the mac studio won't take messages, don't resend anything
+  - the hub's sends started failing with a tier error
+  - is it a pause or a setting? the other machine stopped taking messages
+  - are my messages to the server being throttled?
+  - every message to every host fails since this morning
+  - what's blocking messages to the second mac right now
+  - morning! the build box is up but the hub can't get through to its assistant, can you see why?
+  - sorry to bug you again, the laptop host keeps refusing messages from here, which gate is it this time
+  - query: >-
+      I've got the Mac mini showing as connected in Remote Hosts and I can open its
+      projects from here, but whenever the assistant here tries to message the one over
+      there it fails. I haven't changed anything on either machine. Can you check what's
+      actually blocking it and tell me what to flip, without sending it anything?
+  - query: >-
+      Yesterday I moved the Linux tower to a new address and updated it in the hosts
+      settings. Since then the hub can't message it at all. Messaging was definitely on
+      before. What happened, and what do I need to do?
+  - query: >-
+      The hub tried to start an assistant on my old iMac host and got unsupported. I think
+      it is still on an older Daintree. Is that the reason, and is there anything else to
+      check before I update it?
+  - query: why not?
+    history:
+      - "user: send the build box the lint fix"
+      - "assistant: The send came back lane_unavailable; nothing was sent."
+  - query: so what is stopping it then
+    history:
+      - "user: ask the studio what it thinks of the PR"
+      - "assistant: The studio's assistant is listed with no generation for this Shell, so I couldn't message it."
+  - query: check why, and don't try it again yet
+    history:
+      - "user: send the docs task to the mini"
+      - "assistant: The send came back paused; nothing was sent."
+  - query: and is it the same problem on the tower?
+    history:
+      - "user: why can't the hub message the studio?"
+      - "assistant: Messaging is off for the studio in this Shell's host settings."
+
+boundaries:
+  - query: the hub can list the laptop but none of its assistants has a generation, find out which switch is missing on which machine
+    confusable_with: [daintree.hosts.foundation]
+  - query: messages to my linux host stopped going through this afternoon, check what changed
+    confusable_with: [daintree.hosts.foundation]
+  - query: tell me whether it's this Shell's pause or the host's that is holding my messages to the mini
+    confusable_with: [daintree.hosts.foundation]
+  - query: the build box keeps answering lane_unavailable to the hub, what do I change on my side
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: from my main machine, why does every message to the studio get policy_rejected
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: the hub's send to the mini is refused with lane_unavailable every time, even right after listing it; which gate is it
+    confusable_with: [daintree.hosts.handle-hub-message]
+  - query: every send from the sidebar fails with a tier error though the hosts list fine, is daintree broken
+    confusable_with: [daintree.diagnostics]
+  - query: is something wrong with daintree? it shows my linux host but messages to it all fail
+    confusable_with: [daintree.hosts.foundation]
+  - query: the hub's host tool says not permitted for the core tier when I message a host
+    confusable_with: [daintree.diagnostics]
+  - query: a fresh send to the tower was turned away at once; I need the gate behind it, not a rundown of open tasks
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the hub and the mini were both up all day, yet sends to the mini have bounced since lunch; what changed?
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: why does the hub's start on the tower keep failing with no window here shows this host
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: why does every start the hub tries on the render host fail? I only want the reason, not a swarm
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: I tried to ask the laptop's assistant a question and it came back paused, find out where the pause is
+    confusable_with: [daintree.hosts.foundation]
+  - query: the question for the build box was refused with policy_rejected, so which machine needs a setting changed?
+    confusable_with: [daintree.hosts.foundation]
+  - query: my usage check to the hosts came back rate_limited on two of them, is that the agents' allowance or the message limit
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: the bug fix I handed to the mini bounced with lane_unavailable, why did it bounce
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: A send to the Linux tower returned disconnected while host.list shows it connecting; separate the link problem from any messaging setting
+    confusable_with: [daintree.hosts.connect-host]
+  - query: the mini connects fine now and its projects show up here, but the hub still can't message its assistant
+    confusable_with: [daintree.hosts.connect-host]
+
+followups:
+  - query: check the other hosts the same way
+    history:
+      - "user: why are my messages to the tower paused?"
+      - "assistant: Every assistant on the tower reads unavailable; the other hosts are unchecked."
+  - query: look into it
+    history:
+      - "user: send the docs fix to the build box"
+      - "assistant: The send came back policy_rejected; nothing was sent."
+  - query: is that this machine's pause or theirs?
+    history:
+      - "user: why didn't my message reach the tower?"
+      - "assistant: It came back paused; nothing was sent."
+
+topic_shifts:
+  - query: different thing, the linux host won't take messages at all now, check why
+    history:
+      - "user: ask the mini how the build went"
+      - "assistant: The mini's assistant says the build passed and the branch is pushed."
+  - query: forget the question for now, why does the build box say lane_unavailable
+    history:
+      - "user: ask the build box whether the migration finished"
+      - "assistant: The send came back lane_unavailable; nothing was sent."

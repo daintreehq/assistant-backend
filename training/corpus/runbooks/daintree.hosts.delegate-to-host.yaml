@@ -179,6 +179,9 @@ boundaries:
   - query: 'get the other mac to build the client on top of the API commit the first machine just pushed, then send me its SHA'
     confusable_with: [daintree.hosts.integrate-for-hub]
     run: runbook-2026-10-issue-107
+  - query: 'messaging with the build box is back on, so hand its assistant the lint fix now and get me the PR'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

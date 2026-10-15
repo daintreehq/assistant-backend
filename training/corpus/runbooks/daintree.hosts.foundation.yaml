@@ -261,6 +261,17 @@ boundaries:
     confusable_with: [daintree.hosts.check-usage-limits]
     docs: true
     run: runbook-2026-10-issue-91
+  - query: 'how does the hub decide whether it may message a host''s assistant at all?'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'what''s the difference between allowing messaging with a host and letting the assistant start assistants there'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    docs: true
+    run: runbook-2026-10-issue-103
+  - query: 'set up assistant messaging with the mac studio I just added as a host'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
 followups:
   - query: where do I change that
     docs: true

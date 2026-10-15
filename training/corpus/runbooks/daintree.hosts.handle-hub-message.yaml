@@ -195,3 +195,9 @@ boundaries:
   - query: 'read the hub''s newest message first, it may be about merging the units, and work out which project here it means'
     confusable_with: [daintree.hosts.integrate-for-hub]
     run: runbook-2026-10-issue-107
+  - query: 'I''m the assistant on the build box; the hub asked me to run the migration but my reply to it keeps failing, what do I do'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
+  - query: 'the hub messaged this machine''s assistant, but this machine has messaging paused; can I still answer it'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103

@@ -160,3 +160,6 @@ boundaries:
   - query: 'ask the assistant on the build box what it makes of the parser approach, it should change nothing'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'have the linux box''s assistant tell me why its deploy script failed'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103

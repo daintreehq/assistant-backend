@@ -180,3 +180,6 @@ boundaries:
     confusable_with: [daintree.hosts.start-swarm]
   - query: "Add the newly bought Mac mini to Daintree as a Remote Host so a later swarm can include it; nothing should start on it yet"
     confusable_with: [daintree.hosts.start-swarm]
+  - query: 'the tower I added as a host yesterday won''t connect anymore, the host check says SSH failed'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103

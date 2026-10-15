@@ -154,3 +154,9 @@ boundaries:
   - query: 'clean up the panes and worktrees the last run across the hosts left behind on each machine'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'Daintree restarted while three tasks were out on the hosts; which of them will never be answered now?'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
+  - query: 'the link to the tower dropped overnight, rebuild where each exchange I sent it stands'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103

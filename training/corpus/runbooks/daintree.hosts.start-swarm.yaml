@@ -130,6 +130,12 @@ boundaries:
   - query: 'I need an enrolled assistant on each of the four machines in the billing project before anything else'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: 'get an assistant going on every host in this repo, and if any refuse tell me what to switch on'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
+  - query: 'set up claude on the mini and the tower for this project, no work yet'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-103
 
 followups:
   - query: 'now get them ready'
