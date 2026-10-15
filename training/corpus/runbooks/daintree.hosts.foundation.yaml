@@ -213,6 +213,26 @@ boundaries:
     confusable_with: [daintree.hosts.start-swarm]
     docs: true
     run: runbook-2026-10-issue-102
+  - query: the other mac's assistant never gets my questions, what's blocking it
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: set things up so I can ask the build box's assistant questions from here
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: what has to be switched on before I can send the other machine's assistant a question
+    docs: true
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: the question I sent the mini came back opted out
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: my question to the linux host came back paused, what does that mean
+    docs: true
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: is the second machine's assistant able to take questions from this shell yet
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 
 followups:
   - query: where do I change that

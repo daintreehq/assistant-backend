@@ -490,6 +490,9 @@ boundaries:
   - query: CI is red because STRIPE_SECRET_KEY isn't set in the Actions env for the integration tests; get it passing.
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
+  - query: CI went red right after the build machine's branch merged, find out why and fix it
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: how's it going?
     history:

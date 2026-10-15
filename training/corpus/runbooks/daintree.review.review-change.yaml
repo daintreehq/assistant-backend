@@ -505,6 +505,9 @@ boundaries:
   - query: code review claude-2's feat/oauth-refresh branch, especially how it stores refresh tokens
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
+  - query: the other machine pushed a retry change, give it a proper code review with findings
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: how's it going?
     history:

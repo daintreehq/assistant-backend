@@ -111,6 +111,21 @@ boundaries:
     confusable_with:
     - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
+  - query: ask the claude terminal on this machine what it found in the server logs
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: ask the codex agent in the remote-cache worktree why it chose an LRU
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: the agent that set up the staging host, ask it which env file it used
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: check with the running claude in tab 2 whether the build passed on its branch
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: ask the agent here that's deploying to the remote server whether it's done
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: ask it how it plans to handle refresh tokens then
     history:

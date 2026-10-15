@@ -1,0 +1,126 @@
+# daintree.hosts.ask-host-assistant: one question to the assistant on one Remote Host, its
+# answer relayed with attribution. Rows are invented situations in agents' search wording
+# and people's own words; host names are invented nicknames or what the machine is. The
+# boundaries name only neighbours whose routing text does not already exclude another
+# machine's assistant.
+runbook: daintree.hosts.ask-host-assistant
+run: runbook-2026-10-issue-88
+
+positives:
+  - Ask a remote host's assistant whether the nightly build passed and report its reply
+  - Send another machine's Daintree assistant a question about its open pull request and relay the answer
+  - Get a Remote Host's assistant's take on a slow test suite and pass it on attributed
+  - Ask the assistant on another machine which migration it last ran and quote its reply
+  - Ask a remote host's assistant why its dev server keeps crashing and report its caveats
+  - Put a quick question about free disk space to the assistant on another machine, changing nothing there
+  - Find out from the other machine's assistant whether its refactor there has finished
+  - Ask a remote host's assistant what state its release branch is in, question only
+  - Ask the assistant on a host to explain the test failure it reported and relay the explanation
+  - Learn from a Remote Host's assistant which branch carries the login fix
+  - query: The user wants to know whether the database migration on their second machine finished. Ask that host's assistant once, wait briefly for its reply, and report what it says without changing anything there.
+  - query: A Remote Host's assistant has context about a deploy the user cares about. Put the user's question to it, relay its answer, and keep anything it says it is unsure of separate from what can be checked here.
+  - query: The person asked what the assistant on their laptop host concluded about a flaky upload test it was looking into yesterday. One question to that assistant, answer brought back attributed, nothing on that machine touched.
+  - ask the mini if the release branch is ready to tag
+  - what does the linux host's assistant think about the slow integration tests
+  - can you ask my other mac whether it pushed yet
+  - check with the build box if the nightly job finished
+  - ask the laptop host what it's working on right now
+  - find out from kestrel's assistant why the docker build broke over there
+  - ask the render box whether its last export finished cleanly
+  - what's the assistant on my second machine doing about the auth bug, just ask it
+  - quick question for the office iMac's assistant, is the staging env still up
+  - which branch did the fix land on, ask whatever assistant is on the other machine
+  - query: hey, morning! can you ask the mini how far along the docs update is
+  - query: thanks for that. now ask the build box whether its tests went green
+  - query: ok cool, before we merge, check with my other mac's assistant whether it saw any failures
+  - query: I left the other Mac working on the payments refactor overnight. Can you ask its assistant whether it finished and whether anything is blocked? Don't have it change anything, I just want to know.
+  - query: The linux host has been running the benchmark suite all afternoon. Ask whatever assistant is in that project there what the numbers looked like, and tell me what it says, including anything it isn't sure about.
+  - ask the assistant on the vega host whether the cache migration is safe to run
+  - ask the remote machine's assistant which node version that project uses there
+  - the mini's assistant has seen the new lint warnings, ask it which ones matter
+  - ask the second machine's assistant whether its worktree has uncommitted changes
+  - relay my question to the assistant on the build box, did the last deploy roll back
+  - ask atlas whether it's still busy with the schema migration
+  - ask sirius how the docs rewrite is coming along
+  - ask kestrel what it thinks went wrong with the release build
+  - query: ask it whether the API tests pass there
+    history:
+      - "user: is the build box online?"
+      - "assistant: Yes, it's connected, and its assistant in the api project is enrolled for this Shell."
+  - query: ok, ask the mini's assistant what it's in the middle of
+    history:
+      - "user: which assistants can you reach on the mini?"
+      - "assistant: One, in the web project, running Claude Code."
+
+followups:
+  - query: now ask it whether that fix is pushed
+    history:
+      - "user: what does the linux box think about the token refresh bug?"
+      - "assistant: The linux host's assistant says the fix is in the auth module, but it isn't sure it covers refresh."
+  - query: and ask the build box the same thing
+    history:
+      - "user: ask the mini if its dependencies are up to date"
+      - "assistant: The mini's assistant says two packages are behind."
+  - query: it says the deploy rolled back, ask it why
+    history:
+      - "user: check with the other mac whether the deploy went out"
+      - "assistant: The other Mac's assistant says the deploy rolled back at 14:02."
+  - query: ask it what it's unsure about there
+    history:
+      - "user: get the second machine's view on the flaky upload test"
+      - "assistant: Its assistant thinks the test races the cleanup job, with some doubt."
+
+  - query: ask it one more thing, whether the hotfix branch is merged there
+    history:
+      - "user: ask the build box whether the nightly passed"
+      - "assistant: The build box's assistant says the nightly passed, with one flaky retry."
+  - query: follow up with the linux host's assistant, does that change cover token refresh
+    history:
+      - "user: ask the linux box what it changed in the auth module"
+      - "assistant: The linux host's assistant says it moved session checks into middleware."
+
+topic_shifts:
+  - query: separate thing, ask the mini's assistant whether it updated the lockfile
+    history:
+      - "user: rename this terminal to api"
+      - "assistant: Renamed it to api."
+  - query: also, can you check with the other mac whether its tests passed
+    history:
+      - "user: how is the pull request looking"
+      - "assistant: It's open with one approval and green checks."
+  - query: never mind that, ask the build box's assistant if the release notes are drafted
+    history:
+      - "user: start a worktree for the docs fix"
+      - "assistant: Created the worktree docs-fix from main."
+
+boundaries:
+  - query: ask the other mac's assistant why its project picked that schema
+    confusable_with: [daintree.agents.ask-running-agent]
+  - query: what did the assistant on the build box decide about the retry policy, ask it
+    confusable_with: [daintree.agents.ask-running-agent]
+  - query: ask the assistant on the linux host whether it ran the integration tests there
+    confusable_with: [daintree.agents.ask-running-agent]
+  - query: ask the mini how the changelog is coming along
+    confusable_with: [daintree.agents.ask-running-agent]
+  - query: get the remote host's assistant to look at the auth module and tell me what it finds
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: have the other machine's assistant tell me the risks in this migration
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the laptop host's assistant knows about the vendor API change, find out from it what changed
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: the CI run is red, get the other mac's assistant's read on it
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: ask the build box's assistant why the pipeline is red over there
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: check with the linux host's assistant on the status of the login issue
+    confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: what does the other mac's assistant think about the new retry change
+    confusable_with: [daintree.review.review-change]
+  - query: ask the linux host's assistant whether the flaky upload test failed again there
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: ask the remote host's assistant through the hub one thing and give me its reply
+    confusable_with: [daintree.hosts.foundation]
+  - query: message the assistant on my other machine with a question and show me what comes back
+    confusable_with: [daintree.hosts.foundation]
+  - query: get a reply from the Daintree assistant on the linux host about whether the cache was cleared
+    confusable_with: [daintree.hosts.foundation]

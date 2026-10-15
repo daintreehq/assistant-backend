@@ -132,6 +132,9 @@ boundaries:
   - query: "chase down the intermittent timeout in the integration suite and push a fix"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: the upload test fails one run in five on the build machine too, measure it here and find the trigger
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: have it try with random ordering as well, I bet something else is polluting it
     history:

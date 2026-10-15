@@ -445,6 +445,18 @@ boundaries:
   - query: ask codex what it thinks of the cart total logic and relay its answer
     confusable_with: [daintree.explore.repository]
     run: 2026-09-28-catalog-expansion-refine
+  - query: launch a claude on this machine and ask it what it thinks of the retry code
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: spawn an agent here to tell me whether the deploy script for the remote server is safe
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: get a fresh codex to give me its opinion on how we talk to the build machine
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: start an agent read-only and ask it what the ssh config for the other box does
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: hows it going
     history:

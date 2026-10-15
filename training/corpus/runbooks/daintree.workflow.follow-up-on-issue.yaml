@@ -497,6 +497,9 @@ boundaries:
     confusable_with:
     - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
+  - query: is the PR the other machine opened for the login bug green yet
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
 followups:
   - query: and the review?
     history:
