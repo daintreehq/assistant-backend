@@ -3,7 +3,8 @@
 # issue named, in an agent's and a person's words (machine names replaced), plus a host named
 # only by its nickname. Routing traps hold the boundary with each declared neighbour on this
 # machine (an agent already open, a new local agent launched to answer, a local agent waiting
-# on a question), both ways. The hosts foundation co-loads by design, so it is optional.
+# on a question) and with work handed to the host, both ways. The hosts foundation co-loads
+# by design, so it is optional.
 
 cases:
   - id: ask-host-agent-phrased
@@ -132,3 +133,29 @@ cases:
         content: codex is stuck on a yes or no prompt in its pane, answer it with yes
     expect:
       required: [daintree.agents.answer-waiting-agent]
+
+  - id: ask-host-not-work-for-the-host
+    category: routing-trap
+    note: >-
+      A question about work, not the work itself: the deliverable is the host assistant's
+      answer, not "for work that machine's assistant should carry out
+      (daintree.hosts.delegate-to-host)". delegate-to-host riding along is an extra.
+    messages:
+      - role: user
+        content: ask my other mac's assistant whether it could take on the docs update this week
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: ask-host-reverse-delegate
+    category: routing-trap
+    note: >-
+      Reverse trap. Work handed to the host's assistant is delegate-to-host's "ONE piece of
+      WORK done by the Daintree assistant on another machine", whose deliverable is "that
+      host's commit, branch or PR"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: get the linux host's assistant to write the migration and push a branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
