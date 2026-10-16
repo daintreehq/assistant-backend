@@ -153,3 +153,6 @@ boundaries:
   - query: 'stop the swarm on every host and keep their worktrees as they are, no resume record needed, we''re done with it'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
+  - query: "the run on the hosts is heading the wrong way; tell every host to stop where it is and keep its commits"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109

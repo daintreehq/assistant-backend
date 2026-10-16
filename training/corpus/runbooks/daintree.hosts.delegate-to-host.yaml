@@ -236,6 +236,9 @@ boundaries:
   - query: have the mac host chase down the slow startup on its own and send me the branch with its fix
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: "hand the export-flag change to the build box's assistant on a fresh branch and follow it until it reports the sha"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

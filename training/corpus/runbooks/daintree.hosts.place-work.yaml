@@ -144,6 +144,9 @@ boundaries:
   - query: split this sprint's backlog across the remote hosts by load and signed-in CLI
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: "split these five unrelated tickets across whichever hosts have room, then see each one through"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 
 followups:
   - query: yes, go ahead with that split

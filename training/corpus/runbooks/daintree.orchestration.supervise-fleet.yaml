@@ -462,6 +462,9 @@ boundaries:
   - query: 'anything need me across the running agents?'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: "the codex and claude panes in this project have been going all morning; triage them and handle whatever needs me"
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
 followups:
   - query: ok show me the failed one
     history:

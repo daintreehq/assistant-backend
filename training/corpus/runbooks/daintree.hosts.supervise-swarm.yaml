@@ -5,11 +5,14 @@
 #
 # Positives are invented situations in agent and user words, short and long, some with a social
 # lead-in or an earlier turn, plus the hub's own update line for work it sent (hex ids invented).
-# Boundaries are requests this runbook wins against neighbours whose vocabulary they share: local
-# watching and waiting (watch-outcome), the durable-plan owner the update line used to reach,
-# answering local agents, a hung local agent, the lane's side of messaging, local fleet triage,
-# the sending runbooks, the after-restart account, readiness and one-off questions. Followups and
-# topic shifts are supervision asked for right after the work went out. Machine names are generic.
+# Boundaries are requests this runbook wins against neighbours whose vocabulary they share: the
+# sending runbooks (swarm-fan-out, place-work, delegate-to-host), changing a run's course
+# (steer-swarm), local fleet triage (supervise-fleet), local watching (watch-outcome), the lane's
+# side of messaging (handle-hub-message), the after-restart account (recover-and-clean-up),
+# readiness (start-swarm), one-off questions (ask-host-assistant) and a dependent plan
+# (execute-distributed-workflow). Questions from a host and a quiet host, which land on
+# answer-waiting-agent and recover-agent today, are positives. Followups and topic shifts are
+# supervision asked for right after the work went out. Machine names are generic.
 runbook: daintree.hosts.supervise-swarm
 run: runbook-2026-10-issue-109
 
@@ -60,21 +63,26 @@ positives:
   - the remote host has said working for forty minutes while its peers finished long ago, find out where it stands
   - one host seems stuck on its unit and never sent an update, the rest are done
   - is the last remote machine hung or just slow? it's the only one that hasn't replied
-  - forget the local panes, it's the jobs on the other machines I care about; see those through to verified commits
   - anything need me from the run on my other machines? keep it moving
-  - every machine got the identical brief an hour ago; from here on just shepherd them to the finish and field their questions
   - all the hosts have their copies of the brief, follow each exchange and table the verified shas at the end
-  - the eight issues are placed and sent across the hosts, now keep them moving until each piece is verified
   - one of the remote hosts' assistants is waiting on an answer from me about its unit, answer it if it's inside the brief
   - the lanes on two hosts both asked questions, answer them within what I originally asked
   - the server host is waiting on a yes or no about skipping a slow test, decide it within the scope I gave
-  - the build box already has the one task, see it through and answer what it asks along the way
-  - they're on the right track, I don't want anything stopped or rewritten, just stay with the hosts until all the units are in
   - keep the linux box and both minis working as briefed and tell me only if one of them needs a decision from me
   - the mini is behind the others but still committing; don't shift its unit anywhere, keep following it till it's done
   - one machine is plodding through its unit long after the rest finished, and that's fine; stay with it and verify what it pushes
 
 boundaries:
+  - query: every machine got the identical brief an hour ago; from here on just shepherd them to the finish and field their questions
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: the eight issues are placed and sent across the hosts, now keep them moving until each piece is verified
+    confusable_with: [daintree.hosts.place-work]
+  - query: the build box already has the one task, see it through and answer what it asks along the way
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: they're on the right track, I don't want anything stopped or rewritten, just stay with the hosts until all the units are in
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: forget the local panes, it's the jobs on the other machines I care about; see those through to verified commits
+    confusable_with: [daintree.orchestration.supervise-fleet]
   - query: the units I sent the hosts don't depend on each other; keep each one going till it's verified
     confusable_with: [daintree.hosts.execute-distributed-workflow]
   - query: nothing waits on anything else here, four separate fixes on four hosts; see them all through and tell me what needs me
