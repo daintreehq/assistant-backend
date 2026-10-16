@@ -1,0 +1,184 @@
+# One owner for a deploy or a package publish when the swarm builds and checks in
+# parallel: the hub's brief to the one designated host, that host's own target check,
+# and a lost reply read from the platform or registry instead of handed to another host.
+# Targets: daintree.release.deploy-and-verify, daintree.release.publish-package.
+# Neighbours the cases pin: daintree.hosts.run-validation-matrix (read-only checks),
+# daintree.hosts.reassign-host-work (a unit moved to another machine), the release
+# neighbours already fenced in their own files.
+cases:
+  # --- daintree.release.deploy-and-verify across hosts ---
+  - id: release-owner-deploy-agent-hub
+    category: single-runbook
+    note: >-
+      Agent-phrased hub request. The deploy clause "Also when a swarm of hosts shares the
+      work and exactly one host is the deployer: the hub's brief to it, its check of its
+      own target, and its lost reply reconciled against the platform." names it; the
+      matrix may ride along because the builds and checks are its deliverable.
+    messages:
+      - role: user
+        content: >-
+          Coordinate a release across my Remote Hosts: every host builds and tests the
+          pinned SHA, but one designated host runs the deploy to staging and proves which
+          revision is serving.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.hosts.run-validation-matrix, daintree.hosts.foundation, daintree.hosts.delegate-to-host]
+
+  - id: release-owner-deploy-user-one-host-only
+    category: single-runbook
+    note: >-
+      Casual user wording, one host deploys and the others must not. The deploy clause
+      "exactly one host is the deployer" is the signal.
+    messages:
+      - role: user
+        content: deploy the api to production from the linux host only and make sure the other hosts do not run the deploy
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.hosts.foundation]
+
+  - id: release-owner-deploy-issue-build-everywhere
+    category: single-runbook
+    note: >-
+      The issue's own phrasing for the whole swarm job. "exactly one host is the
+      deployer" decides it; the plan runbooks (start-swarm, execute-distributed-workflow)
+      carry the build side and may ride along.
+    messages:
+      - role: user
+        content: Build across the swarm but deploy once from the designated host.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional:
+        - daintree.hosts.foundation
+        - daintree.hosts.start-swarm
+        - daintree.hosts.execute-distributed-workflow
+        - daintree.hosts.swarm-fan-out
+        - daintree.hosts.run-validation-matrix
+
+  - id: release-owner-deploy-lane-preflight
+    category: single-runbook
+    note: >-
+      The receiving lane's wording: "its check of its own target" before it writes, then
+      what serves. The lane-side envelope runbooks may ride along.
+    messages:
+      - role: user
+        content: >-
+          The hub asked this host to deploy commit 4be19c2 to staging. First check that
+          this machine's cloud account is the staging one, then deploy once and report
+          what is serving.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.hosts.do-delegated-work]
+
+  - id: release-owner-deploy-trap-lost-reply-not-reassign
+    category: routing-trap
+    note: >-
+      "its lost reply reconciled against the platform" is the deploy clause; moving the
+      work to another machine is reassign-host-work's job, which this deploy must never
+      get (a submitted deploy is read, not handed over).
+    messages:
+      - role: user
+        content: >-
+          the build box started the staging deploy and then went silent. don't let another
+          machine run it, find out what staging is actually serving
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.hosts.foundation]
+
+  - id: release-owner-deploy-trap-after-matrix
+    category: routing-trap
+    note: >-
+      The matrix has already passed; what is asked now is the deploy from one host.
+      Deploy clause: "The deliverable is the project's own deploy mechanism ... run once
+      for a pinned SHA to the named environment". The matrix runbook tests under several
+      environments and deploys nothing.
+    messages:
+      - role: user
+        content: >-
+          The matrix passed for tag v2.5.0 on every platform. Now deploy it to staging
+          from the designated host only and prove staging serves it.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.hosts.foundation]
+
+  - id: release-owner-matrix-trap-nothing-deployed
+    category: routing-trap
+    note: >-
+      Matrix clause: "ONE EXACT COMMIT, tag or release candidate TESTED UNDER SEVERAL
+      ENVIRONMENTS ... with nothing fixed". Release candidate wording without any deploy
+      or publish stays with the matrix.
+    messages:
+      - role: user
+        content: >-
+          Run the full checks for this release candidate SHA on the Linux, Mac and Windows
+          hosts and give me one row per platform; nothing is to be deployed or published.
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  # --- daintree.release.publish-package across hosts ---
+  - id: release-owner-publish-agent-designate
+    category: single-runbook
+    note: >-
+      Agent-phrased. The publish clause "Also when a swarm of hosts shares the work and
+      exactly one host is the publisher: the hub's brief to it, its check of its own
+      registry account and channel, and its lost reply reconciled against the registry."
+    messages:
+      - role: user
+        content: >-
+          Designate one host to publish sdk 2.1.0 to the registry under latest while the
+          other hosts only build and compare tarball hashes; none of them may publish.
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.hosts.foundation]
+
+  - id: release-owner-publish-user-only-machine
+    category: single-runbook
+    note: >-
+      Casual user wording: "exactly one host is the publisher" while the others verify.
+    messages:
+      - role: user
+        content: only the release machine may push 3.0.1 to npm, the other machines just verify the tarball
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.hosts.foundation]
+
+  - id: release-owner-publish-lane-timeout
+    category: single-runbook
+    note: >-
+      The lane's view of a lost reply: "its lost reply reconciled against the registry".
+      The lane-side envelope runbook may ride along.
+    messages:
+      - role: user
+        content: >-
+          hub message: publish the sdk 2.1.0 from here, the other hosts only verify. the
+          publish call timed out, did it go through
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: release-owner-publish-trap-no-other-machine
+    category: routing-trap
+    note: >-
+      A publish whose reply was lost is read from the registry, never handed to another
+      host: "its lost reply reconciled against the registry". Moving a unit to another
+      machine is reassign-host-work, which this is not.
+    messages:
+      - role: user
+        content: the publish from the release machine got no answer, have a different machine run npm publish now
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.hosts.foundation]
+
+  - id: release-owner-publish-after-builds
+    category: single-runbook
+    note: >-
+      The other hosts are done; the one publisher goes: "exactly one host is the
+      publisher".
+    messages:
+      - role: user
+        content: >-
+          the other hosts finished building and testing 4.2.0; the release host alone
+          should now publish it to npm and the rest stay out of it
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.hosts.foundation]
