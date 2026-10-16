@@ -1,0 +1,174 @@
+# daintree.hosts.migrate-across-repositories: one mechanical change carried through the
+# repositories the person selected, from this Shell's hub, each repository counted once however
+# many Remote Hosts hold a clone. Lanes' visible agents inventory with recorded searches, a pilot
+# fixes the rulebook every host follows, a form nobody listed holds dispatch until the person
+# amends the rulebook, each repository's units are integrated on their own, and the searches are
+# rerun on each integrated commit, one row per repository.
+#
+# Rows: campaign requests in agents' task descriptions and people's own words (codemods, library
+# and API swaps, config and lint rollouts over several repositories on the hosts, duplicate
+# clones, an unreachable repository, a new form found mid-run, residual counts per repository,
+# push authority); followups after a survey or a pilot; docs questions; and boundaries against
+# one codebase on this machine (daintree.orchestration.migration-sweep), the same work on every
+# host (daintree.hosts.swarm-fan-out), independent pieces placed by load
+# (daintree.hosts.place-work), a dependent plan (daintree.hosts.execute-distributed-workflow) and
+# combining finished branches (daintree.hosts.integrate-host-branches), each with reverse rows
+# in that neighbour's file.
+runbook: daintree.hosts.migrate-across-repositories
+run: runbook-2026-10-issue-149
+
+positives:
+  - move the billing, auth and gateway repos off the old metrics client, they're all on my remote machines
+  - the mini and the tower both have the web app checked out; swap its date library once, plus the same swap in the admin repo that only the tower has
+  - convert all our services from the callback style db driver to the promise one, using the hosts, and show me which repos still have callbacks afterwards
+  - roll the new prettier config through the five frontend repos on the other Macs and give me a line per repo
+  - 'Hub task: the person selected four repositories cloned across three Remote Hosts. Apply the same import rename in each, count each repository once even where it is cloned twice, pilot it in one, and report remaining matches per repository.'
+  - drop the deprecated feature-flag helper from every repo I listed, the hosts have them; try one directory first so we agree on the rewrite
+  - Replace console.log with our logger in the four Node repos on the build box and the mini, one pilot first, then the rest the same way.
+  - we're renaming the internal package scope from @old to @acme; do it in the three repos on my machines and prove nothing still imports @old
+  - 'Agent task: run a codemod over the repositories the person named on the Remote Hosts. Inventory each with recorded search commands, freeze who owns which directories, pilot one, then send the rest the exact rules.'
+  - hey, could you get the hosts to upgrade our call sites to the v3 sdk in all four service repos, testing the change in one repo first
+  - switch the yaml config loader to the toml one across the infra repos on the studios, a pilot in the smallest one, then the rest
+  - get every selected repo on my hosts off the old assert library and onto node:assert, and give me the leftover matches for each repo
+  - the same mechanical rename in six repos spread over three machines, don't run it twice where a repo is on two machines
+  - 'Hub agent: migrate the selected repositories from request to fetch through their hosts'' lanes. Each repository keeps its own base branch and lockfile. Pilot one partition, then dispatch by the frozen rulebook.'
+  - push the lodash removal through the three ui repos on the remote hosts, one owner per folder, no PRs, I'll look at the branches
+  - morning! could the other machines take the enum-to-union refactor through our two typescript repos, pilot first?
+  - can you sweep the deprecated api calls out of all the client repos on my hosts and tell me per repo what's left
+  - The analytics, search and notifications repositories are on the linux box and the mini. Move each one off the legacy event emitter, the same rewrite everywhere, and give me one row per repository with the residual count.
+  - Apply the eslint flat config migration to every repository I selected on my machines; where a repo has its own lint setup keep that, and tell me which repos still have the old config files.
+  - rewrite every jest.mock call to vi.mock in the four repos on the hosts, one test folder as the pilot
+  - 'Agent task: one translation, many repositories. The person wants the http client replaced in three repositories on two hosts, with search commands recorded per repository so the same counts can be rerun on the final commits.'
+  - the hosts have five of our python repos; replace os.path with pathlib in each, but leave the vendored code alone
+  - convert the old logging format strings to f-strings in the selected repos on the remote machines, pilot on the cli repo
+  - hi there, quick one, the deprecated config getter needs to go from all three backend repos, they're on my other Macs, I want proof each repo is clean
+  - migrate the graphql queries to the new client in web, mobile and admin; all three live on remote hosts, use a pilot and a fixed set of rewrite rules
+  - roll the copyright header change through every selected repo on the hosts, same rule in all of them, and list the files each repo still lacks it in
+  - get my machines to replace the old uuid package in all four services and confirm per service that nothing imports it any more
+  - we picked seven repos for the logger swap; three of them are cloned on two machines; I want seven rows back, not ten
+  - >-
+    The old auth middleware has to go from our service repositories. They are cloned across the
+    tower and the two Macs, and two of them are on more than one machine. Have each repository
+    done once, try the rewrite on one small folder first so we can agree the rules, and then tell
+    me per repository how many old calls are left and on which commit.
+  - >-
+    Agent task: the person selected the api, worker and dashboard repositories for a mechanical
+    move from moment to dayjs, using the Remote Hosts. The worker repository is cloned on two
+    hosts. Inventory each repository read-only, keep the exact search commands, pilot one
+    directory, freeze the before-and-after rules, then send the remaining directories to one
+    owner each and integrate each repository separately.
+  - >-
+    I want the deprecated retry helper gone from the four repositories I listed. They live on my
+    remote machines, not here. Each repo has its own package manager and lockfile rules, so keep
+    those. If the agents find a call shape nobody listed, stop and ask me rather than inventing
+    a rewrite, and don't push anything to main.
+  - >-
+    Run the openapi client regeneration across our three consumer repositories on the hosts.
+    Pilot it in the smallest one, then the other two with the same rules. One of them might not
+    be on any machine; if so, say so in its row rather than skipping it.
+  - >-
+    Hub task: a cross-repository codemod over five repositories reached through four Remote
+    Hosts. Two repositories have clones on two hosts each. Choose one writer per repository,
+    inventory with recorded git grep commands, pilot one partition, freeze the rulebook, and
+    finish with residual counts rerun on each repository's integrated commit.
+  - the replacement of the deprecated toast component should go through every frontend repo on my machines, but nothing gets deployed or merged into main
+  - use the hosts to swap our old feature toggle calls for the new client in all three repos, and tell me which repo was only partly done
+  - 'Agent task: same deprecation removed in each selected repository through the hosts, one row per repository including any repository no host can reach.'
+  - every selected repo needs the node 18 polyfill imports removed; do it through the remote machines with one pilot
+  - could the studios handle the string-enum migration across our three shared libraries? one row per library please
+  - 'thanks for the earlier help. Next up: the old currency formatter has to disappear from the shop, checkout and reports repositories, which are on the studios and the linux box. Do a pilot, keep the rules fixed, and tell me what remains in each.'
+  - 'Agent task: a person asked for the deprecated tracing decorator to be removed from every repository they selected on their Remote Hosts. Establish which repositories are the same project cloned twice, run one pilot, then give each repository one owner for the rest.'
+  - 'The person wants all of these repositories on the hosts moved from CommonJS require calls to ES imports: gateway, scheduler, emailer. The emailer repository has its own lint rules that must stay. Pilot in the scheduler, then the rest, and report any call form the rules missed.'
+  - can the other machines convert our python services from unittest to pytest? four repos, trial one first, then the rest the same way, and show me how many unittest imports remain in each
+  - if a repository is only on the mini and the mini is offline, mark it unreachable and still do the other repos; this is the changelog format rewrite across the docs, site and sdk repos
+  - rename the config key retries to maxRetries in every repository I picked that lives on the remote hosts, and don't touch anything outside the config files
+  - 'Hub request: three selected repositories, one host each, the same deprecated hook replaced in all three. No repository may be changed by two hosts. Report each repository separately with how the leftover count was verified.'
+  - the build box and the tower both have the mobile repo; I want the analytics sdk bumped and its call sites rewritten in mobile and in the web repo, each repo done one time
+
+followups:
+  - query: one of the repos I listed isn't on any of the machines, that's fine, do the other three and mark it
+    history:
+      - 'user: replace the old date helper in these four repos, using my other machines'
+      - 'assistant: The survey found three of them cloned on the hosts; the fourth has no clone on any machine.'
+  - query: one repo is on both the laptop and the tower; make sure only one of them changes it while the other repos go ahead
+    history:
+      - 'user: swap the logging calls in all five service repos on my hosts, pilot first'
+      - 'assistant: One repository turns out to be cloned on both of those machines.'
+  - query: ok, now roll it through the other three repos the same way
+    history:
+      - 'user: try the new logger call in the api repo on the tower first'
+      - 'assistant: The pilot is back: one directory migrated, the search finds no old calls there, and the rewrite rules are written up from it.'
+  - query: the pilot looks right, send the rest of the repos out with those rules
+    history:
+      - 'user: swap the date library across our four repos on the hosts, pilot first'
+      - 'assistant: The pilot changed eight files in the web repo; before and after for both call shapes are in the rules, and its tests pass.'
+  - query: yes, handle the new form that way and carry on with the remaining repos
+    history:
+      - 'user: replace the deprecated sdk calls in the three repos on my machines'
+      - 'assistant: The worker repo''s lane reported a call shape the rules do not cover, a chained call through a wrapper. I have held the units not sent yet.'
+  - query: 'good, finish the migration for every repo: integrate each one separately and give me the leftover counts from rerunning the searches on each result'
+    history:
+      - 'user: run the import rename across the selected repos on the hosts'
+      - 'assistant: Every unit is back: four in web, three in admin, two in mobile, each branch pushed at the SHA it reported.'
+  - query: that repo on two machines, make sure only one of them does it
+    history:
+      - 'user: move the five service repos off the old metrics client using my other Macs'
+      - 'assistant: The survey is in. The orders repo is cloned on both the mini and the tower.'
+  - query: fine, mark the payments one as unreachable and do the rest
+    history:
+      - 'user: move our four services off the old payments client, using my machines'
+      - 'assistant: No host has a project whose origin is the payments repository.'
+
+boundaries:
+  - query: the same lint migration but across several repositories that only live on my remote hosts
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: migrate the old logger out of the api and worker repos, which are on the build box and the mini, not this machine
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: a codemod over three repositories on the other Macs, pilot first, one result per repository
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: 'not one monorepo here: four separate repos on my hosts all need the same deprecated call replaced'
+    confusable_with: [daintree.orchestration.migration-sweep]
+  - query: not the same job copied to every machine; one migration per repository, wherever the hosts have it, one row per repo
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: the hosts each hold some of the repos; replace the old client once per repository rather than once per host
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: every machine has a clone of the web repo; do its config migration once, by one of them, plus the same in the docs repo
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: these aren't separate tasks to place, it's one rewrite rule applied in all four repos on the hosts with a pilot
+    confusable_with: [daintree.hosts.place-work]
+  - query: split the date library migration across my machines by repository, same rules everywhere, residual counts per repo
+    confusable_with: [daintree.hosts.place-work]
+  - query: 'no dependency chain here: one mechanical rename in each selected repo on the hosts, pilot first, then the rest in parallel'
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: pilot the sdk swap in one repo, then the other repos on the hosts follow the same rules, and integrate each repo separately
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: the migration hasn't started yet; I want it inventoried, piloted, sent out and integrated per repository across my machines
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: run the whole retry-helper migration over the three repos on the hosts, including combining each repo's branches at the end
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: 'migrate every selected repo on my machines to the new api, one row per repository, and don''t count the clone on the second host as another repo'
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the hosts should apply the same rewrite in each repo I picked, with recorded searches per repo, not one task to one machine
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: how do you stop two machines from rewriting the same repo when it is cloned on both? explain it, then move our four services off the old client on the hosts
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    docs: true
+  - query: what happens when one of the machines meets a call shape the pilot's rules don't cover? explain it, then roll the deprecated logger out of the three repos on the hosts
+    confusable_with: [daintree.orchestration.migration-sweep]
+    docs: true
+
+  - query: 'the deprecated orders field has to be dropped from every consuming repo on my hosts with the same rewrite, nothing to negotiate, pilot first'
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+topic_shifts:
+  - query: now take the same logger swap through the other four repos on my machines, pilot first
+    history:
+      - 'user: how much of my weekly claude allowance is left on the other machines?'
+      - 'assistant: Plenty on both Macs; the linux box is nearly out.'
+  - query: forget the single repo, I actually want the deprecated helper gone from every repo I listed on the hosts, with a count left in each
+    history:
+      - 'user: have the tower remove the deprecated helper from the billing repo'
+      - 'assistant: The tower has billing checked out; I can send it one task for that repository.'
+  - query: the web repo is done; do the same swap across the rest of the selected repos on the remote machines now
+    history:
+      - 'user: run the tests for the web repo on the build box'
+      - 'assistant: All 412 tests pass on the build box at the commit you named.'

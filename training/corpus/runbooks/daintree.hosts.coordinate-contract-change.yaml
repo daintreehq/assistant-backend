@@ -116,6 +116,9 @@ boundaries:
   - query: have each remote side run the contract's compatibility test at its final commit and tell me which contract version it passed against
     confusable_with: [daintree.hosts.verify-for-hub]
 
+  - query: 'the web client on one machine needs an extra field in the orders payload that the api repo on another produces; settle the payload version first, then get both hosts onto it'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
 followups:
   - query: ok, freeze that version and send it to both machines
     history:
