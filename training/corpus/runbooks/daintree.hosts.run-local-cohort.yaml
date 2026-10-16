@@ -212,6 +212,6 @@ boundaries:
 - query: 'hub sent this machine a second round of units to run; the first round''s agents haven''t finished'
   confusable_with:
   - daintree.hosts.steer-for-hub
-- query: 'hub message for this box: try the importer twice in separate worktrees and tell the hub which attempt is stronger'
+- query: 'the hub''s latest message wants this mac to make three independent passes at the slow report query, each on its own branch here, and send back the fastest with timings'
   confusable_with: [daintree.hosts.race-and-review]
   run: runbook-2026-10-issue-94

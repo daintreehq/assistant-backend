@@ -178,6 +178,7 @@ boundaries:
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
   - query: 'have every host write the json flattener on its own branch and give me each one''s sha, no judging needed'
+  - query: 'I just want to see what each remote machine does with the json flattener: their branches and commits in a table, nobody wins'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
   - query: 'same task on all my machines, I only want to see each version listed side by side'

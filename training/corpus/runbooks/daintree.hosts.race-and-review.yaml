@@ -30,7 +30,7 @@ positives:
   - which of my machines writes the better migration script? have two of them try and get it judged
   - let all three hosts attempt the importer and have the attempts scored against the acceptance criteria, unlabelled
   - race it across the boxes and give me a ranking with reasons, I'll pick the winner myself
-  - The user wants the same dependency upgrade done on two Remote Hosts, each on its own pushed branch, and the attempts compared by an agent that built neither
+  - Upgrading the ORM broke half the fixtures; the user wants two of their machines to attempt the upgrade separately and push, and a judge who did neither to pick the cleaner one
   - Run a best-of-three across the user's Remote Hosts for the search indexing change and return a ranking with the judge's reasons
   - Have several remote hosts implement the same rate limiter, verify each pushed SHA on the remote, then get a blind comparison against the user's criteria
   - User asked to race the config loader fix on two hosts; the attempts must be judged by someone independent, without host names, and nothing merged
@@ -54,7 +54,7 @@ positives:
   - have the tower review the mini's branch and then send the problems back to the mini to fix, max two rounds
   - 'review loop between hosts: the laptop host fixes, the build box reviews, stop after two rounds'
   - get another host's opinion on the branch the tower just pushed, I don't trust it to review its own work
-  - The user wants the commit a Remote Host pushed reviewed by a different Remote Host, ideally under another agent CLI, with the findings brought back as claims
+  - The tower's Claude Code agent wrote the session store and pushed it; the user distrusts same-model review and wants Codex on a different machine to read that commit and list problems
   - The tower's push to the payments branch changes refund rounding; the user wants a host that never touched it to review that commit, with anything blocking sent back to the tower, two rounds at most
   - The build box pushed the new search filters an hour ago and the user is about to merge; a different machine should read that exact commit first and report what it finds without editing it
   - 'Cross-host review: Codex on one remote machine reviews the work Claude Code pushed from another, findings relayed to the builder for fixes'
