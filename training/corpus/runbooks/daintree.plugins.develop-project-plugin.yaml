@@ -72,8 +72,10 @@ positives:
   - query: 'Check whether the team plugin installed on this Mac also exists on the host I''m working against, and tell me what has to be put there and who has to do it.'
     run: runbook-2026-10-issue-137
   - query: 'The host''s plugin list and mine disagree about the version of acme.metrics. Which copy actually runs in the host''s windows?'
+    docs: true
     run: runbook-2026-10-issue-137
   - query: 'Why does this Shell keep asking me to approve the code of a plugin the host already trusts?'
+    docs: true
     run: runbook-2026-10-issue-137
   - query: 'Watching the shared project from my window, the plugin panel says it shows in the window driving this project. Check the plugin''s state on the host and tell me what the notice means.'
     run: runbook-2026-10-issue-137
@@ -88,15 +90,16 @@ positives:
   - query: 'I pushed the rebuilt dist/ and the panel works locally, but the remote machine''s checkout never shows the plugin. Where does it stop?'
     run: runbook-2026-10-issue-137
   - query: 'A call from my plugin''s panel on the remote host fails with PLUGIN_NOT_ON_HOST. What does that mean and what do I do about it?'
+    docs: true
     run: runbook-2026-10-issue-137
   - query: 'The Linux host reports PLUGIN_INCOMPATIBLE with reason platform for a plugin that runs fine on my Mac. Work out what is wrong and how to get it running there.'
     run: runbook-2026-10-issue-137
   - query: 'hey, quick one: my plugin works on this machine but the Shell says it isn''t installed on the remote host. can you sort that out?'
     run: runbook-2026-10-issue-137
   - query: 'Next to the host''s name, Settings shows the plugin under only on this machine. What gets it onto the host without copying my settings or secrets?'
+    docs: true
     run: runbook-2026-10-issue-137
   - query: 'Check the plugin view consent for this host and tell me whether the bundle the Shell allowed is the one the host serves now, without widening any trust.'
-    docs: true
     run: runbook-2026-10-issue-137
   - query: 'how do I get my project plugin installed on the remote host and its panel allowed on this computer?'
     docs: true
