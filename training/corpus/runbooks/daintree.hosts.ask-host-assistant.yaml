@@ -172,3 +172,9 @@ boundaries:
   - query: "what does the mac host's assistant make of the failing date tests over there"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: "put one question to the assistant on the Linux server: is the release branch merged there yet?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "check with the mini's assistant whether the schema change is merged over there, I just want its word on it"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87

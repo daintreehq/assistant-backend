@@ -155,6 +155,15 @@ boundaries:
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
 
+  - query: "get the hosts ready: an assistant in this repo on every remote machine, reuse what's there"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "I'm about to send work out, so first make sure every remote machine has an assistant of its own in this project"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "which machines can I give work to right now? start assistants where they are missing and allowed"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: 'now get them ready'
     history:

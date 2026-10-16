@@ -222,6 +222,9 @@ boundaries:
   - query: 'set up assistant messaging with the mac studio I just added as a host'
     confusable_with: [daintree.hosts.diagnose-messaging]
     run: runbook-2026-10-issue-103
+  - query: "how does messaging between the assistants on two of my machines work, and how do I switch it on?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: can the panes do it instead
     docs: true

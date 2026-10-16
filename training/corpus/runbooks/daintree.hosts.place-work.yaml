@@ -181,6 +181,9 @@ boundaries:
   - query: 'these four bug fixes are in separate repositories and have nothing to do with each other, place each on a host that can take it'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: "here are eight tickets; spread them over my remote hosts according to how busy each is and who has allowance left"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: yes, go ahead with that split
     history:

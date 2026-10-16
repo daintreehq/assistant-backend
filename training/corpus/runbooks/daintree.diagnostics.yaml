@@ -376,6 +376,9 @@ boundaries:
   - query: 'the sidebar assistant on this machine stopped responding at all; before I blame my remote hosts, gather what Daintree shows for a bug report'
     confusable_with: [daintree.hosts.diagnose-messaging]
     run: runbook-2026-10-issue-103
+  - query: "the Daintree tools disappeared from my sidebar assistant on this Mac and the app feels broken, work out what is wrong"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: and the key thing too?
     history:

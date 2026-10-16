@@ -114,6 +114,12 @@ boundaries:
     confusable_with: [daintree.hosts.supervise-swarm]
   - query: while you follow the run, the tower's memory pressure has gone critical; lighten its load onto the quiet hosts
     confusable_with: [daintree.hosts.supervise-swarm]
+  - query: "one remote host has been swapping for an hour while two others sit idle, take the pressure off it"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "the mini is pegged with agents and the tower has nothing running, move the unstarted pieces over"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: ok, take some load off the second one then
     history:

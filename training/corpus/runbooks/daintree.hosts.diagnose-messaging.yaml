@@ -201,6 +201,15 @@ boundaries:
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
 
+  - query: "the assistant on my second Mac shows as unavailable and my messages to it bounce; which setting is in the way?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "my send to the build box came back paused, what do I need to switch on?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "the tower is listed but its assistant has no generation and nothing reaches it; find out which gate is blocking"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: check the other hosts the same way
     history:

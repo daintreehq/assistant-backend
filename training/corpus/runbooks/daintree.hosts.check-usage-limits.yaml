@@ -128,6 +128,12 @@ boundaries:
   - query: 'which of my remote machines has the most claude allowance left? only the numbers, change nothing'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: "tell me the remaining Claude and Codex quota on every other machine I have connected"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "which of my machines will run out of Codex first at this rate"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: and claude on those same machines?
     history:

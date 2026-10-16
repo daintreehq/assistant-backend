@@ -1,0 +1,156 @@
+# daintree.hosts.survey-hosts: the hub's read-only report on the Remote Hosts (connection,
+# observed load and agents, projects and assistants, open exchanges, what needs the person).
+# Positives are current overview requests with nothing restarted or sent. Boundaries hold it
+# against the local fleet sweep, readying assistants, usage, messaging diagnosis, rebuilding
+# sent work after a restart, following a run, a question for one host's assistant and
+# adding a machine; the reverse rows live in each neighbour's file.
+runbook: daintree.hosts.survey-hosts
+run: runbook-2026-10-issue-87
+
+positives:
+  - "The user has four Remote Hosts connected and is leaving for the day. They want one read-only picture before they go: which hosts are reachable, when each one's load was last sampled, which of their projects have an assistant enrolled for this Shell and whether it is available, and any exchange still open. Nothing should be sent or started."
+  - "The person is travelling and asks, from their laptop, what is going on across their other Macs. They have two Remote Hosts configured and want to know in one go what each is up to and whether anything needs them."
+  - "After a long meeting the user wants to see where all their remote machines stand before deciding what to do next: which are up, how loaded each is, and whether any host's assistant asked them something. No work to send, no assistants to start."
+  - "The user's second Mac dropped off the network earlier. They want to know which hosts are connected right now, what was last seen for the ones that are not, and whether an open exchange is sitting on a question for them."
+  - "The user is about to ask a colleague to cover for them and wants to know what that colleague could reach: every project open on each remote host, and which of them already have a Daintree assistant in them."
+  - "Tell the person how many agents each remote host has working, waiting or idle and how hot or loaded each machine is, as last observed, in one report with the time of each reading."
+  - "Before dinner the user wants one quick current look at each of their remote hosts: whether it is connected, how busy it seems, which exchanges with it are open right now, and whether any is waiting for their input."
+  - "The user asked whether anything on their other machines needs them. Look at each connected host's open exchanges and assistants and report what is waiting on a person, naming the host."
+  - "Put together a status page for the user's remote hosts before their standup: connection, load, assistants and open exchanges per host, with a note of anything that could not be read."
+  - "The user has a Mac mini and a Linux tower as Remote Hosts and has lost track of what each one is up to. Give one section per host with its projects, assistants and any open exchanges, and the time of every observation. Do not message either host."
+  - "Before the user decides which machine to trust with tonight's job, they want to look at every remote host's current load, thermal state and agent counts, and which assistants are up. Report what the tools show and what they do not."
+  - "I keep three remote hosts connected to this Shell and one of them has been quiet. Can you check how each looks right now, including which have assistants enrolled and which exchanges are still open, and flag whatever is waiting on me?"
+  - "what's up with my other macs"
+  - "is every one of my remote hosts reachable at the moment"
+  - "anything on the other computers waiting for me?"
+  - "show me the state of all my hosts"
+  - "how loaded are the remote machines right now"
+  - "which hosts have an assistant ready and which don't"
+  - "give me a rundown of my remote hosts"
+  - "is the mac mini still connected, and is its assistant up"
+  - "what's open with the other machines"
+  - "any questions from the hosts for me"
+  - "remote hosts: status?"
+  - "see if any of my other machines are stuck waiting on something from me"
+  - "list my remote hosts and the projects on each"
+  - "which projects on the other machines have no assistant yet"
+  - "how busy are my hosts"
+  - "a read-only overview of all the remote machines please"
+  - "tell me what each of my remote hosts is doing and when you saw it"
+  - "do any of my hosts have exchanges that need an answer"
+  - "is the linux box connected and what's its load"
+  - "what does my fleet of other computers look like right now"
+  - "hey, before I start: what's going on across my remote hosts, any of them waiting on me?"
+  - "morning! can you tell me how my other machines are doing and if anything is open with them"
+  - "thanks, now can you show me where all the hosts stand"
+  - "quick one, no rush: which of my remote machines are connected and what do they have going"
+
+boundaries:
+  - query: "any of the remote machines offline? and give me the agent count on each"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: "give me a report on the other machines, not this one: connected, load, who is waiting"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: "is there anything on the remote hosts that needs me"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: "are the remote machines all up, and has any of them parked itself on a question for me"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: "check the remote hosts and tell me which have gone quiet"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+  - query: "which remote hosts have an enrolled assistant right now? Just report, don't start anything"
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: "report each host's projects and whether its assistant is up, read only, nothing readied"
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: "I only want to see what's already on the other machines: projects, assistants, generations. Don't change a thing."
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: "list the remote hosts' assistants with their slots and whether they are available, nothing started"
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: "for each remote host show connection, load and agent counts, I don't need allowance"
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: "how loaded is each of the other machines and how many agents are working on them"
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: "give me every host's connection status and last load sample in one report"
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: "give me an overview of all the remote hosts and their assistants; I'm not chasing a specific failure"
+    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: "which hosts are connected and which of their assistants are listed as unavailable, as a report"
+    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: "survey the hosts: any with an assistant not enrolled for this Shell? Just list them"
+    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: "see how my remote machines look overall, connection and assistants, no troubleshooting yet"
+    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: "which exchanges with the other machines are open right now, a plain list per host"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: "show every host's currently open exchanges and which need an answer from me"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: "nothing restarted, I just want a current picture of my remote hosts and what is open with them"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: "what is still open with each remote host at this moment, plus which hosts are connected"
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: "snapshot only: how do my remote hosts stand and which exchanges are open? I'm not asking you to babysit anything"
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: "take one look at the remote machines and tell me what's waiting on me, then stop"
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: "report the hosts' state once, no waiting around for updates"
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: "what do the tools show for each remote host right now, without asking any of their assistants anything"
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: "give me the hosts' own listed state (connection, load, assistants), no questions to any of them"
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: "without messaging a single host, tell me how each one looks from here"
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: "all my hosts are already added; tell me which are connected and what projects and assistants each one has"
+    confusable_with: [daintree.hosts.connect-host]
+  - query: "now that the remote machines are set up, give me a status of each: connection, load, assistants"
+    confusable_with: [daintree.hosts.connect-host]
+  - query: "the hosts are connected already, show me an overview of them rather than setting anything up"
+    confusable_with: [daintree.hosts.connect-host]
+  - query: "what's going on across the remote hosts specifically: connections, assistants, open exchanges"
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: "catch me up on how my other machines stand right now: which are online, which assistants are up, what is open"
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: "what are the other computers up to, are they connected, anything need me"
+    confusable_with: [daintree.diagnostics]
+  - query: "overview of the remote hosts and their assistants please, this isn't a bug"
+    confusable_with: [daintree.diagnostics]
+  - query: "show the current state of every remote host and what is waiting on me"
+    confusable_with: [daintree.hosts.foundation]
+  - query: "before I decide where to run things, give me a plain status of every remote host: load, agents, assistants"
+    confusable_with: [daintree.hosts.place-work]
+  - query: "show me how loaded each remote host is, I only want to look and don't want anything moved"
+    confusable_with: [daintree.hosts.rebalance-load]
+  - query: "which of my remote machines is carrying the most agents at the moment, just a report"
+    confusable_with: [daintree.hosts.rebalance-load]
+  - query: "what's the thermal and memory state of each host right now, no changes please"
+    confusable_with: [daintree.hosts.rebalance-load]
+
+followups:
+  - query: "and what about the exchanges?"
+    history:
+      - "user: give me a status of my remote hosts"
+      - "assistant: Two hosts are connected and one disconnected since this morning; the two connected ones each have one assistant available."
+  - query: "which of those have no assistant at all?"
+    history:
+      - "user: list the projects on my remote hosts"
+      - "assistant: The Mac mini lists three projects and the Linux tower lists two."
+  - query: "now do the same for the other host"
+    history:
+      - "user: how is the Mac mini looking, load and assistants?"
+      - "assistant: Connected, load sampled a minute ago at moderate CPU, one assistant available in the main project."
+  - query: "does any of it need me?"
+    history:
+      - "user: where do the remote hosts stand?"
+      - "assistant: Three hosts connected. The tower has two open exchanges; the mini has none."
+
+topic_shifts:
+  - query: "separately from that: how are the remote machines getting on?"
+    history:
+      - "user: rename my terminals after their worktrees"
+      - "assistant: Done, all six tabs renamed."
+  - query: "ok, and the remote hosts, how are they all doing?"
+    history:
+      - "user: is the dev server up on this machine?"
+      - "assistant: Yes, it is listening on port 5173."
+  - query: "separate question, are my remote machines all connected and does any need me"
+    history:
+      - "user: summarise the diff on the auth branch"
+      - "assistant: It adds token refresh and removes the legacy session check."

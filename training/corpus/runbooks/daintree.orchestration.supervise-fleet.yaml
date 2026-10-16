@@ -465,6 +465,18 @@ boundaries:
   - query: "the codex and claude panes in this project have been going all morning; triage them and handle whatever needs me"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: "how's everyone doing on this machine, any agents waiting on me?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "sweep the agents running here and tell me which are stuck, finished or asking something"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "give me a status of the agents in my panes right now and what needs me"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "is any agent in my open terminals waiting for an answer?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: ok show me the failed one
     history:

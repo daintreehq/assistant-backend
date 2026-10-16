@@ -474,6 +474,9 @@ boundaries:
   - query: "pick up the session I had going here before the app crashed"
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
+  - query: "catch me up on where I left off yesterday across my sessions"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: close the stale ones
     history:

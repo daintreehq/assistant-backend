@@ -193,3 +193,9 @@ boundaries:
   - query: "the mac mini host keeps failing its connection test since I moved it to another network, get it connected again"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: "bring my spare Linux box into Daintree as a Remote Host, it already has the repo cloned"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "I added a second Mac under Hosts but it never connects, get it working"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87

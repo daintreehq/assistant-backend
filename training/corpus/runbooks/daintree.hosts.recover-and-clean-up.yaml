@@ -244,3 +244,15 @@ boundaries:
   - query: clean up the panes and worktrees the run left on the remote machines now it's done
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
+  - query: "daintree restarted while tasks were out on the hosts; rebuild which finished, which are open and which will never be answered"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "I was away and the link dropped; what happened to the work I'd handed to my remote machines?"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "why did the task I sent to the build box never come back, and should I send it again"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "clean up what that run left on the remote hosts: panes, worktrees and branches, through each host's assistant"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87

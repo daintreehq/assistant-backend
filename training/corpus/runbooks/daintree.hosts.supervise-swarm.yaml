@@ -138,6 +138,15 @@ boundaries:
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
 
+  - query: "keep an eye on the remote hosts until their work is finished, answer what they ask and tell me when everything is in"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "babysit the swarm while I'm out, only bother me for decisions"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: "one host has been quiet far longer than the others; check on it once and keep the run moving"
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
 followups:
   - query: ok, now keep an eye on all of them and answer what you can
     history:
