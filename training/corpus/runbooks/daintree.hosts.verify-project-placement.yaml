@@ -14,7 +14,7 @@ positives:
   - Have the assistant in each candidate host project report its remotes, branch, HEAD SHA and whether the working tree is dirty, then compare with this checkout
   - Decide whether the project on the other machine is a fork of our repository or the repository itself, without relying on its folder name
   - A host project was moved to a different folder; verify it still tracks the same remote before dispatching work to it
-  - The host's project list was truncated and the repository we need is not visible; work out whether it is simply unlisted or absent, and what to ask the person
+  - The host's project list was truncated and the repository we need is not visible; explain what the truncated listing means for checking it and what to ask the person
   - Check the host's project for repository identity and for whether the dependencies the task needs are installed there, changing nothing
   - Before delegating, compare the origin and head commit of the matching project on each machine against the commit I pinned, and report mismatches as unresolved choices
   - Two Remote Hosts each expose a project with an identical project id; find out if they are really one repository
@@ -81,7 +81,7 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: have each host's assistant report its remotes and head commit, then tell me which of the projects is ours
     confusable_with: [daintree.hosts.ask-host-assistant]
-  - query: find out which remote machines hold the right repository at the right commit, with nothing started and nothing sent
+  - query: find out which remote machines hold the right repository at the right commit, with no assistants started and no work sent
     confusable_with: [daintree.hosts.start-swarm]
   - query: the server hasn't been used for this yet; ahead of the first job, confirm its project tracks our upstream and sits on my commit
     confusable_with: [daintree.hosts.diagnose-host-differences]
