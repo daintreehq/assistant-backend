@@ -152,12 +152,6 @@ boundaries:
     confusable_with:
     - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
-  - query: "the Linux server should bring up the signup flow from main in a preview; have its assistant do it and tell me how I would open it on this Mac"
-    confusable_with: [daintree.hosts.demo-for-hub]
-    run: runbook-2026-10-issue-108
-  - query: "get my other Mac to stand up the export feature with sample data and send me back its port"
-    confusable_with: [daintree.hosts.demo-for-hub]
-    run: runbook-2026-10-issue-108
   - query: 'the codex box should go over what my laptop pushed to feature/ingest at 3e9c1a7 and send the problems back to me'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
@@ -275,6 +269,15 @@ boundaries:
   - query: 'Ask the other Mac to run the migration branch''s tests and tell me which commit it checked'
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
+  - query: "ask the other Mac's assistant to write a fixtures loader for the sample orders, commit it to its own branch, and send me the commit"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "ask the Linux host's assistant to implement the new settings page on a feature branch and open a PR when the tests pass"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "get the build machine's assistant to add a dev server config to the web app and push it, I'll review the diff here"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
 
   - query: 'get the tower to swap the date library in the admin repo and tell me the commit'
     confusable_with: [daintree.hosts.migrate-across-repositories]

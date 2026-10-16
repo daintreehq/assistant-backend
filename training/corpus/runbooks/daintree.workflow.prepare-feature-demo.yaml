@@ -77,6 +77,15 @@ boundaries:
   - query: "Before I head into the review, get the CSV export running on this computer with made-up rows so I can try it myself"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: "set up a demo of the new onboarding in the worktree the agents built it in, here on this machine"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "get the feature running locally with sample data so I can click through it, and list what is stubbed"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "I need to show the integrated branch to the team from my laptop in an hour; get it running with safe data in a preview on this machine"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
 followups:
   - query: use fake customers only — nothing from the staging dump
     history:

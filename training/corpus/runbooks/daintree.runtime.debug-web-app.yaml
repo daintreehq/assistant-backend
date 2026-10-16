@@ -293,6 +293,12 @@ boundaries:
   - query: the open preview panel keeps failing to fetch /api/items, read the console and have an agent fix it
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: runbook-2026-10-issue-126
+  - query: "the preview panel in my window throws a TypeError in the console after my last edit; find the cause and fix it"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "my dev preview shows a blank page in this window and the console has a red error, sort it out and reload"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
 followups:
   - query: and the second one?
     history:

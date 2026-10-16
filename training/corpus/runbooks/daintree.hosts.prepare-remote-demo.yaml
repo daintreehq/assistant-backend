@@ -1,0 +1,160 @@
+# Training examples whose answer is `daintree.hosts.prepare-remote-demo` and nothing else.
+#
+# The hub's side of a demo on a Remote Host: the person, at their Shell, wants a change
+# running on another machine at an exact commit and wants to look at it from here. The hub
+# briefs that host's assistant, checks its reply against the commit it pinned and tells the
+# person how this Shell reaches the page, never claiming the host's localhost for them.
+# Boundaries are mined from its "do not use for" clauses; the local demo, a preview that is
+# already open, a busy port, a question for the host's assistant, plain work on a host and
+# the lane's own receiver each win their reverse rows in their own files.
+runbook: daintree.hosts.prepare-remote-demo
+run: runbook-2026-10-issue-125
+
+positives:
+  # Agent-written search_runbooks task descriptions.
+  - Have the build server's assistant bring up the loyalty points page from the pushed branch as a demo and tell the person how to open it on this Mac
+  - Ask the Remote Host to serve the new reporting screens at commit 5be12a0 with fake customers, confirm it reports that commit, then explain how the Shell reaches the page
+  - The person wants to look at the saved-searches feature running on their other machine; get it running there on invented data and give them the route from this Shell
+  - Prepare a demo of the invoice approval flow on the Linux host and verify its reply names the commit before telling the person to open it
+  - Get a Remote Host to leave the team directory demo running at the exact commit that was pushed, and say which address to use here and why it is not the host's localhost
+  - Delegate a demo of the mobile checkout to the assistant on the studio machine, then guide the person through reaching it from the Shell's dev preview or ports list
+  - Remote demo request from the person, hub side, the calendar import at its pushed tip served on the host with sample data, plus the steps to view it from this window
+  - Arrange for the host's assistant to run the notifications drawer in a preview, then tell the person which local port the Shell chose rather than assuming the host's number
+  - Have the other machine show the person the onboarding checklist as a demo, check the commit it says it is serving matches the one pinned, and hand over the way to open it
+  - Coordinate a hosted demo of the comment threads feature with a verified commit and a clear explanation of how the Shell forwards the host's port
+  - The demo must run on the remote machine, not here; get its assistant to start the export wizard from the pushed branch and tell the person how to browse to it from here
+  - Brief the host assistant to serve the audit trail screens with invented data only and leave them running, then report back how the person opens them from this Shell
+  - Make the remote host's assistant stand up the saved-views feature as a demo, collect the commit, port and panel it reports, and give the person the supported way in
+  - Person wants the search rewrite demonstrated from the build host; pin the commit, ask the host to prepare it, and tell them how the Shell's forward gets them to the page
+  # Users' own words.
+  - get the other mac to run the new dashboard so i can click around in it from here
+  - can the build box show me the settings redesign running? i'll open it from this laptop
+  - I want to try the refund flow, but it only runs on the remote machine. Get it up there and tell me where to point my browser
+  - have the linux server spin up what i pushed this morning and walk me through looking at it from my laptop
+  - show me the new profile page, the one the remote assistant built, running at the commit it pushed
+  - the remote machine should host a demo of the tags editor for me, and i need to know how to get to it from this one
+  - set up a demo of the pricing changes on the remote host and tell me what to click to open it here
+  - hey, could you get my other computer to run the billing branch with test data and show me how I reach it?
+  - "Quick one: get the studio machine to run the project timeline demo from what I pushed, then tell me how to open it"
+  - please have the remote host start the demo for the new nav bar and tell me how to see it from this window
+  # Social lead-ins.
+  - query: Thanks for the earlier help. Now I'd like the build host to run the activity feed work as a demo so I can view it from here, can you set that up?
+  - query: Morning! The remote assistant says the carts feature is finished; get it running as a demo on that machine and show me how to open it on mine
+  # With history.
+  - query: go ahead with the remote machine, then tell me how I get into it
+    history:
+      - "user: the assistant on my other Mac says the gift cards work is pushed"
+      - "assistant: Do you want to see it running? I can have that Mac prepare a demo of it."
+  - query: do that on the linux server instead of here, i'll look at it from this machine
+    history:
+      - "user: i'd like a demo of the export wizard"
+      - "assistant: I can set one up in a worktree on this Mac, or on one of your Remote Hosts."
+  - query: the host's assistant finished the sidebar work. Show it to me running.
+    history:
+      - "user: have the studio machine's assistant rebuild the sidebar"
+      - "assistant: Done. It pushed feat/sidebar-rework at 3fa9e21 and its checks pass."
+  # Long-form messages and agent queries with observations, constraints and the outcome wanted.
+  - query: >-
+      The remote host's assistant reports it finished the multi-currency checkout and pushed
+      feat/multi-currency at 8c41d07. I want to actually use it, not read a summary. Have that
+      machine run it as a demo with invented orders only, keep it going afterwards, and then
+      tell me exactly how to open it from this Mac, remembering my own port 3000 is probably
+      taken by something else.
+  - query: >-
+      Goal: the person asked to see the new admin audit screens running on the Linux build
+      machine. Constraints: the demo must be at the commit the assistant there pushed, data must
+      be invented and local to that checkout, nothing exposed publicly, and no other listener on
+      the host touched. Outcome wanted: its reply names the commit it serves, and the person
+      knows how this Shell reaches the page.
+  - query: >-
+      I'd like my other machine to host a demo of the shipping estimator so I can show it to
+      myself on this laptop before I decide to merge. It has to be the exact commit on the
+      branch I pushed, with sample addresses only. Tell me how I get to it from here and what I
+      can trust about what I'm looking at versus what I'd have to check myself.
+  - query: >-
+      Orchestrate a host-side demo: send the host assistant the repository, the branch and the
+      commit, wait for its report of the port and panel, compare the commit it served with the
+      one we pinned, then give the person the on-screen steps to open the page from the Shell.
+  - query: >-
+      The demo is running on the remote machine's port 8080, but nothing useful loads at
+      localhost:8080 on this Mac, which is another app entirely. Explain how the Shell reaches
+      the host's demo and make sure it is the commit we asked for.
+  - Once the cart service is merged I'd like to click through it myself; can the build host run it with fake shoppers and show me the way in from here?
+  - query: >-
+      The user asked for a look at the new bulk-edit screen, which only exists in the remote
+      host's checkout. Orchestrate a demo there at the pushed commit, check what the host's
+      assistant reports, and give the person the route to it from this Shell.
+  - my laptop's fans are screaming, so run the analytics board demo on the Linux box and point me to it from this window
+  - I want the remote host to keep the localization demo up overnight on throwaway data, and I need to know how to reach it from here in the morning
+  - Dispatch a demo build of the wiki editor to the host assistant, wait for its port report, and make sure the person can open it from the Shell without guessing the address
+  - the remote assistant says the shipping calculator is running. I want to see it from this machine, and I want it to be the commit it was supposed to be
+
+boundaries:
+  - query: Set up the saved-filters demo on the build server instead of this machine and say how I reach it from here
+    confusable_with: [daintree.workflow.prepare-feature-demo, daintree.hosts.demo-for-hub]
+  - query: I want to see the new reports page, but my laptop can't run it. Have the Linux host start it and tell me how to open it from my window
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+  - query: demo of the order history screens, running on my remote machine rather than this one, and tell me how to look at it
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+  - query: The team calendar demo should run on the remote host at the pushed commit; show me the way to it from this side
+    confusable_with: [daintree.workflow.prepare-feature-demo]
+  - query: the remote host's demo page comes up blank at localhost:3000 on my Mac, so what address does the Shell give me for it
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the preview of the demo on the host isn't what I get here at the host's port, which commit is it and how do I open the right one
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: Get the remote host to serve the staff dashboard demo, even though my own machine already has something on port 4200, and tell me how to open it
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: A local server holds port 8080 on this Mac. The host's demo uses 8080 too; set the host's demo up and explain how my window gets to it anyway
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: Ask the other Mac's assistant to prepare a demo of the wishlist feature on seed data and tell me how to see it from here
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: Have the assistant on the build host get a demo of the refund flow running at the pushed commit, not just describe it, then tell me how I reach it
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: tell the remote assistant to leave a demo of the new onboarding up, at the tip of the branch I pushed, then show me how to look at it from this Mac
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: Delegate to the Linux host a running demo of the import wizard, verify the commit it says it serves, and tell me how to open it from here
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: send the studio machine's assistant the feature branch and have it stand the feature up for me to click through, then tell me how my Mac gets to it
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: From the Shell, ask the host's assistant for a demo of the new search at the pushed commit and walk the person through viewing it
+    confusable_with: [daintree.hosts.demo-for-hub]
+  - query: The person asked me, the hub, for a demo of the settings rewrite on the build machine; brief that host and then explain how the Shell reaches it
+    confusable_with: [daintree.hosts.demo-for-hub]
+  - query: I'm on the Shell and the person wants a demo hosted on a remote machine. Message the assistant there, check what it reports and tell the person the route in
+    confusable_with: [daintree.hosts.demo-for-hub]
+
+  # Moved from the delegate-to-host file, where they were labelled for the hub's side of handing work.
+  - query: "the Linux server should bring up the signup flow from main in a preview; have its assistant do it and tell me how I would open it on this Mac"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+  - query: "get my other Mac to stand up the export feature with sample data and send me back its port"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-108
+
+followups:
+  - query: right, bring it up on the other machine instead; I'll look at it from this one
+    history:
+      - "user: the sidebar rework is merged to the feature branch"
+      - "assistant: Good. Do you want to see it working?"
+  - query: and how do I open it from this Mac?
+    history:
+      - "user: have the build box run the dashboard demo"
+      - "assistant: Sent. Its assistant says the demo is up at the commit I pinned, host port 5173, preview panel p-41."
+  - query: Show me. The remote one, not a local copy.
+    history:
+      - "user: the remote assistant fixed the signup validation and pushed it"
+      - "assistant: Pushed as 77ab3e2 on its fix branch, with the checks passing."
+  - query: that port doesn't work on my laptop, how do I get there
+    history:
+      - "assistant: The demo is serving at the commit you asked for on the host's port 3000."
+      - "user: I opened localhost:3000 and it's a different app"
+
+topic_shifts:
+  - query: separate thing, can the remote host also put the survey builder up as a demo for me to look at from here?
+    history:
+      - "user: what's the state of the release branch?"
+      - "assistant: Green on all checks; two commits ahead of the last tag."
+  - query: forget the changelog for now, I want to see the new filters running on the Linux machine and open them from this Mac
+    history:
+      - "user: draft the changelog for this release"
+      - "assistant: Drafted: four features, six fixes, two breaking changes."

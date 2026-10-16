@@ -187,3 +187,12 @@ boundaries:
   - query: ask the mini's assistant which branch its checkout is on and relay its answer
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: "ask the build host's assistant whether the demo it started earlier is still running"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "what does the other Mac's assistant say the demo server is listening on? just a question, nothing restarted"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "check with the Linux host's assistant which commit its demo is on and what it exercised, read only"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125

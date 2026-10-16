@@ -170,6 +170,15 @@ boundaries:
   - query: which process is on 5432 on this machine and is it one of my worktrees' servers?
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: runbook-2026-10-issue-126
+  - query: "port 4200 on this Mac is held by something I didn't start, who has it"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "my local server won't start because port 3000 is taken by a forward to one of my hosts, which process is in the way"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "which worktree's server is on 8080 on this machine"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
 followups:
   - query: it's mine actually, I forgot about it — go ahead and kill it
     history:

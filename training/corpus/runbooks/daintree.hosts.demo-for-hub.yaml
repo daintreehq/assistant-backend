@@ -138,6 +138,18 @@ boundaries:
   - query: start the dashboard branch on this machine for the hub and say how the Shell would reach it
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: runbook-2026-10-issue-126
+  - query: "Hub request for this host: leave the checkout flow demo up on the dev preview, then tell it which port and commit it serves"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "The hub wants a demo of the invoicing branch running on this machine with fake customers; I'm the assistant here, how do I tell it the person has to forward the port"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "I'm the assistant on the build machine and a hub message asks me to prepare the inventory demo at 21fc90a; what do I reply about reaching it"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
+  - query: "Message from the hub asking this host to start the reports preview as a demo for the person at the Shell, with the SHA and host port in the reply"
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: runbook-2026-10-issue-125
 
 followups:
   - query: good, start the preview and check it serves that commit
