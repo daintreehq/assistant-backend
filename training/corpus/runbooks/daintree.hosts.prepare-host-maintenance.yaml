@@ -106,6 +106,8 @@ boundaries:
     confusable_with: [daintree.hosts.hand-off-swarm]
   - query: before the update, checkpoint what the assistants on the host have done and say what isn't covered
     confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the host restarts for its update tonight; find which of its projects hold unpushed work from the swarm and get that saved first
+    confusable_with: [daintree.hosts.audit-host-workspaces]
 
 followups:
   - query: ok it's back

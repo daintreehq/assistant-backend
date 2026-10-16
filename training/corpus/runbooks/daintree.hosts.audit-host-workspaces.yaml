@@ -144,3 +144,9 @@ boundaries:
   - query: which worktrees and dev servers did last night's run leave on my other machines, and does any hold unpushed work
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: go through what the finished swarm left on my remote hosts and tell me which worktrees and panes are still in use or hold unsaved work, changing nothing
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: read-only inventory of the remote worktrees and dev servers, grouped by run and owner
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
