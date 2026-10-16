@@ -1,0 +1,285 @@
+# daintree.hosts.copy-portable-settings: the person compares this machine's Daintree settings
+# with a connected Remote Host, copies chosen categories there once through Settings → Hosts →
+# the host → Copy settings, checks the applied and skipped counts, or undoes the last copy.
+# Recall cases in agent and user words (the issue's three requests among them), a routing trap
+# per declared neighbour where this runbook wins (daintree.hosts.connect-host,
+# daintree.memory.manage-project-memory, daintree.plugins.develop-project-plugin,
+# daintree.hosts.diagnose-host-differences, daintree.hosts.undo-swarm-changes,
+# daintree.hosts.survey-hosts), and reverse traps where the neighbour wins and this one must
+# not ride along. The hosts foundation may ride along (optional).
+
+cases:
+- id: copy-portable-settings-agent-phrased
+  category: single-runbook
+  note: Agent-phrased outcome. Decided by "put this machine's Daintree settings (agent flags and presets,
+    notification preferences, recipes, theme) on a Remote Host that is already connected, see which categories
+    a copy would change there before anything is written".
+  messages:
+  - role: user
+    content: Walk the person through comparing this machine's Daintree settings with the connected host,
+      previewing the differences and copying only the categories they choose.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-issue-copy-after-showing
+  category: single-runbook
+  note: A copy requested with the changes shown first. Decided by "only the categories the person chose
+    copied after a preview, the applied and skipped counts checked on the host".
+  messages:
+  - role: user
+    content: Copy my portable Daintree settings to this host after showing the changes.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-issue-why-configured-differently
+  category: single-runbook
+  note: 'A settings comparison. Decided by "see which categories a copy would change there before anything
+    is written" under "wants to use COPY SETTINGS". Misses today (the word differently pulls toward the
+    hosts diagnosis runbooks): retrain owed.'
+  messages:
+  - role: user
+    content: Why is the other server configured differently, and what would Copy settings change?
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-issue-undo-keep-later-edits
+  category: single-runbook
+  note: Undo of a settings copy. Decided by "take the last copy back while keeping edits made on the host
+    since" and "the last copy undone leaf by leaf".
+  messages:
+  - role: user
+    content: Undo the last settings copy while keeping changes made afterwards.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-verify-skipped-counts
+  category: single-runbook
+  note: Reading the outcome of a copy. Decided by "check what the last copy applied or skipped" and "the
+    applied and skipped counts checked on the host".
+  messages:
+  - role: user
+    content: The settings copy to the host said some were skipped, which ones and did the rest take?
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-opt-in-categories
+  category: single-runbook
+  note: Opt-in categories named by the person. Decided by "put this machine's Daintree settings (agent
+    flags and presets, notification preferences, recipes, theme) on a Remote Host that is already connected".
+  messages:
+  - role: user
+    content: also bring my environment variables and the permission bypass setting over to the host
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-user-no-credentials
+  category: single-runbook
+  note: A casual request that excludes credentials. Decided by "credentials, consent and trust, project
+    and run state and plugin installs never travel".
+  messages:
+  - role: user
+    content: Keep my agent configuration on the host the same as here but leave the credentials out.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-user-roll-back-push
+  category: single-runbook
+  note: A casual undo. Decided by "take the last copy back while keeping edits made on the host since"
+    and "never host to host and never syncing afterwards".
+  messages:
+  - role: user
+    content: Roll back the settings I pushed to the host this morning.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-preview-before-pushing
+  category: single-runbook
+  note: Compare before any write. Decided by "see which categories a copy would change there before anything
+    is written".
+  messages:
+  - role: user
+    content: Before pushing anything to the server, tell me what my agent settings and theme would change
+      there and whether any credentials would go along.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-trap-not-connect-host
+  category: routing-trap
+  note: 'The host is already connected, so adding it is not the ask. Decided by "a Remote Host that is
+    already connected"; fence: "Do not use for adding the machine (daintree.hosts.connect-host)".'
+  messages:
+  - role: user
+    content: The host is connected and working, now bring my notification and recipe settings over to
+      it.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-trap-not-project-memory
+  category: routing-trap
+  note: 'Daintree agent presets, not durable instructions. Fence: "Do not use for ... durable instructions
+    and project memory (daintree.memory.manage-project-memory)".'
+  messages:
+  - role: user
+    content: Mirror my agent presets and notification setup on the host, secrets stay here.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-trap-not-plugin-development
+  category: routing-trap
+  note: 'Settings travel, plugins are installed on the host separately. Fence: "a plugin the person is
+    writing (daintree.plugins.develop-project-plugin)".'
+  messages:
+  - role: user
+    content: Carry my agent presets and notification settings to the remote host, I will install the plugins
+      there myself.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-trap-not-diagnose-host-differences
+  category: routing-trap
+  note: 'Differences in Daintree settings, not a code result. Fence: "why the same code behaves differently
+    on two hosts (daintree.hosts.diagnose-host-differences)".'
+  messages:
+  - role: user
+    content: The host behaves differently from my laptop on notifications and default agents, show me
+      which settings differ.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-trap-not-undo-swarm-changes
+  category: routing-trap
+  note: 'A settings copy taken back, not a run''s commits. Fence: "code changes a run made on the hosts
+    (daintree.hosts.undo-swarm-changes)".'
+  messages:
+  - role: user
+    content: Take back the last settings copy to the host, but leave anything I edited there afterwards.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-trap-not-survey-hosts
+  category: routing-trap
+  note: 'Settings categories that differ, not host health. Fence: "a read-only report of how the hosts
+    are doing (daintree.hosts.survey-hosts)".'
+  messages:
+  - role: user
+    content: Which categories of my settings differ from the ones on the host?
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-reverse-connect-host
+  category: routing-trap
+  note: Adding a machine is daintree.hosts.connect-host's deliverable; no settings are mentioned, so Copy
+    settings must not ride along.
+  messages:
+  - role: user
+    content: Set up a second Mac as a Remote Host so I can run projects on it over SSH.
+  expect:
+    required:
+    - daintree.hosts.connect-host
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-reverse-diagnose-host-differences
+  category: routing-trap
+  note: The same code passing on one machine and failing on another is daintree.hosts.diagnose-host-differences.
+  messages:
+  - role: user
+    content: The tests pass on my laptop and fail on the Linux host, find out why.
+  expect:
+    required:
+    - daintree.hosts.diagnose-host-differences
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-reverse-survey-hosts
+  category: routing-trap
+  note: A host-by-host status report is daintree.hosts.survey-hosts.
+  messages:
+  - role: user
+    content: 'Give me a read-only report on each Remote Host: its connection, load and open exchanges.'
+  expect:
+    required:
+    - daintree.hosts.survey-hosts
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-reverse-project-memory
+  category: routing-trap
+  note: A durable rule for the host's assistant is daintree.memory.manage-project-memory.
+  messages:
+  - role: user
+    content: Remember that the assistant on the host should always run the linter first.
+  expect:
+    required:
+    - daintree.memory.manage-project-memory
+- id: copy-portable-settings-reverse-plugin-development
+  category: routing-trap
+  note: A project plugin that fails to load is daintree.plugins.develop-project-plugin.
+  messages:
+  - role: user
+    content: My project plugin will not load on the host, help me debug it.
+  expect:
+    required:
+    - daintree.plugins.develop-project-plugin
+- id: copy-portable-settings-reverse-undo-swarm-changes
+  category: routing-trap
+  note: Backing out a run's commits across hosts is daintree.hosts.undo-swarm-changes.
+  messages:
+  - role: user
+    content: Back out what last night's remote run committed in the API repository on each host.
+  expect:
+    required:
+    - daintree.hosts.undo-swarm-changes
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-reverse-start-swarm
+  category: routing-trap
+  note: Readying assistants on hosts is daintree.hosts.start-swarm, nothing about settings.
+  messages:
+  - role: user
+    content: Bootstrap an assistant for this project on each of my remote hosts and report which are ready.
+  expect:
+    required:
+    - daintree.hosts.start-swarm
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-match-host-defaults
+  category: single-runbook
+  note: 'Settings to match a machine''s own. Decided by "put this machine''s Daintree settings (agent
+    flags and presets, notification preferences, recipes, theme) on a Remote Host that is already connected".
+    Misses today (agent and idle wording pulls toward the usage-limits runbook): retrain owed.'
+  messages:
+  - role: user
+    content: Match the host's default agent and idle-terminal handling to what I use on this machine.
+  expect:
+    required:
+    - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
