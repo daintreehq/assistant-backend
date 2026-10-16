@@ -202,6 +202,18 @@ boundaries:
   - query: "here are six issues, put each on the machine best placed to take it, each in its own worktree"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
+  - query: "I've got eleven small issues, spread them across whichever of my remote hosts have capacity"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "which remote machine should take the billing bug? two of them are busy"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "put each of these three tasks on the host with the most room and show me the plan before sending"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "decide where each of these refactors should run among my servers"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
 followups:
   - query: yes, go ahead with that split
     history:

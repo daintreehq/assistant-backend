@@ -317,6 +317,18 @@ boundaries:
     confusable_with:
     - daintree.release.deploy-and-verify
     run: runbook-2026-10-issue-138
+  - query: "send the pagination fix to my remote server and verify the branch it comes back with"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "get the linux server to add the retry backoff and report which branch it landed on"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "let the studio machine take the lint cleanup and report the sha"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "give this bug to the remote host, I want its PR link back"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:

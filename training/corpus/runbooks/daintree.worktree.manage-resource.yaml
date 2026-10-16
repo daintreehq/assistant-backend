@@ -122,6 +122,16 @@ positives:
     run: 2026-09-28-agent-queries
   - query: pause the devbox on the staging-fix worktree
     run: 2026-09-28-catalog-expansion-refine
+  - query: "is the cloud environment for the worktree i'm in running or paused"
+    run: runbook-2026-10-issue-134
+  - query: "Task: report the state of the devbox that this worktree's project config provisions. Use the resource status call on the exact worktree and change nothing."
+    run: runbook-2026-10-issue-134
+  - query: "hey quick one, can you see if the cloud machine for my search-index checkout is still up?"
+    run: runbook-2026-10-issue-134
+  - query: "The worktree has a resource block in its config and I want that environment running for the day. Bring it up, then confirm with a status read that it came up healthy."
+    run: runbook-2026-10-issue-134
+  - query: "open a shell on the cloud box attached to the pricing worktree"
+    run: runbook-2026-10-issue-134
 boundaries:
   - query: how's the cloud box for this checkout doing
     confusable_with: [daintree.worktree.provision-local-environment]
@@ -301,6 +311,54 @@ boundaries:
   - query: "provision the remote resource for the api worktree and tell me its status"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
+  - query: "my remote servers are fine, it's the cloud box tied to this worktree that has been running all weekend, pause it"
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-134
+  - query: "Leave my Remote Hosts alone. Check the status of this worktree's cloud resource and tell me whether it is healthy."
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-134
+  - query: "the environment for the checkout-redesign worktree lives on a cloud devbox, start it again"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-134
+  - query: "put the devbox behind the migration worktree to sleep, nothing is using it"
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-134
+  - query: "which of my worktrees have a cloud devbox running right now? I want to stop paying for the idle ones"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-134
+  - query: "We run each worktree's environment on a cloud devbox that our project config spins up, and the one for the invoice-export branch has sat unpaused since Friday. I don't want a new one created and nothing sent to my other machines. Look at its status and pause it if nothing is running there."
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-134
+  - query: "tear down the cloud resource for the throwaway-spike worktree, the one our config provisions, not any of my remote machines"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-134
+  - query: "remote resource on the okta-migration worktree: status?"
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-134
+  - query: "the box that worktree talks to in the cloud went to sleep, wake it and tell me when its status says running"
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-134
+  - query: "Is the worktree's devbox paused or has someone's remote host taken over? I only mean the devbox the project config manages."
+    confusable_with: [daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-134
+  - query: "the worktree for feat/export already exists, I only need the cloud devbox behind it started"
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: runbook-2026-10-issue-134
+  - query: "don't make a new checkout, just resume the devbox attached to the one I have"
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: runbook-2026-10-issue-134
+  - query: "I'm not after a local server, I mean the cloud environment tied to this worktree. Is it running?"
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: runbook-2026-10-issue-134
+  - query: "the server for this branch lives on a cloud devbox that our config provisions, not on this machine. What does its status say?"
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: runbook-2026-10-issue-134
+  - query: "my dev server is fine, it's the devbox for the worktree that I want paused overnight"
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: runbook-2026-10-issue-134
+  - query: "status of the cloud devbox for the worktree please, not the npm process running in my terminal"
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: runbook-2026-10-issue-134
 followups:
   - query: pause it then
     history:
@@ -392,6 +450,16 @@ followups:
       - 'user: Connect to the resource.'
       - 'assistant: The connect action is not exposed to the Assistant MCP.'
     active: [daintree.worktree.manage-resource]
+  - query: "ok and is the box actually stopped now, or did the pause only get acknowledged"
+    history:
+      - "user: stop the cloud environment on the search-index tree"
+      - "assistant: The stop command was accepted."
+    run: runbook-2026-10-issue-134
+  - query: "separately, what state is the cloud box for the checkout tree in?"
+    history:
+      - "user: ask the assistant on the linux server how its build is going"
+      - "assistant: It says the build is green and the exchange is complete."
+    run: runbook-2026-10-issue-134
 topic_shifts:
   - query: is the cloud box on that worktree still burning money?
     history:
