@@ -1,0 +1,236 @@
+# daintree.hosts.migrate-across-repositories: the hub's side of one mechanical change carried
+# through the repositories the person selected on their Remote Hosts. Each repository is counted
+# once however many hosts clone it; lanes' visible agents inventory it with recorded searches, a
+# pilot fixes the rulebook, each repository's units are integrated on their own, and the searches
+# are rerun on each integrated commit, one row per repository.
+#
+# Recall: the issue's three requests, an agent-phrased and a user-phrased campaign, and a second
+# turn answering a form the rulebook lacked. Traps where this runbook wins over each declared
+# neighbour: one codebase on this machine (daintree.orchestration.migration-sweep), the same work
+# on every host (daintree.hosts.swarm-fan-out), independent pieces placed by load
+# (daintree.hosts.place-work), a dependent plan (daintree.hosts.execute-distributed-workflow) and
+# combining finished branches (daintree.hosts.integrate-host-branches). Reverse traps where that
+# neighbour wins and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: migrate-across-repositories-issue-new-api
+    category: single-runbook
+    note: >-
+      The issue's first request. The positive clause owns it: "carried
+      through SEVERAL REPOSITORIES held on their Remote Hosts". Before this
+      runbook it selected daintree.orchestration.migration-sweep with
+      daintree.hosts.execute-distributed-workflow.
+    messages:
+      - role: user
+        content: Migrate these repositories to the new API using the remote hosts.
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-issue-pilot
+    category: single-runbook
+    note: >-
+      The issue's second request, with no machine named: "a pilot whose rulebook every host
+      follows" and "one row per selected repository" decide it. Before this runbook it selected
+      daintree.orchestration.migration-sweep with daintree.orchestration.fan-out-work.
+    messages:
+      - role: user
+        content: Run one pilot, then roll the same mechanical change through every selected project.
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-issue-residual
+    category: single-runbook
+    note: >-
+      The issue's third request: "its searches rerun on the integrated commit" per repository.
+      Before this runbook it selected daintree.orchestration.execute-durable-workflow alone; the
+      untrained runbook is now co-selected beside it (recall, not strict).
+    messages:
+      - role: user
+        content: Coordinate a cross-repository migration sweep with per-repository residual evidence.
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-agent-phrased
+    category: single-runbook
+    note: >-
+      How the hub describes the campaign to search: "one row per selected repository, counted once
+      however many hosts hold a clone", with a pilot and residuals per repository.
+    messages:
+      - role: user
+        content: 'Hub task: carry one codemod through the four repositories the person selected on the Remote Hosts, each repository once even where two hosts clone it, with a pilot first and residual matches reported per repository.'
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-user-phrased
+    category: single-runbook
+    note: >-
+      A casual library swap over several repositories on the hosts, piloted in one: "carried
+      through SEVERAL REPOSITORIES held on their Remote Hosts".
+    messages:
+      - role: user
+        content: swap the old http client for the new one in our three backend repos, they live on the studios, try it in one repo first
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-new-form-answered
+    category: continuation
+    note: >-
+      Second turn: the person settles a form the rulebook lacked and the campaign carries on, "a
+      pilot whose rulebook every host follows and only the person amends".
+    messages:
+      - role: user
+        content: replace the legacy logging calls in the api and billing repos, both on my other machines
+      - role: assistant
+        content: The billing repository's lane reported a logging call made through a wrapper that the rules do not cover. I have held the units not sent yet.
+      - role: user
+        content: rewrite those through the new logger too, add that to the rules, and carry on with both repos
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps
+  - id: migrate-across-repositories-not-local-sweep
+    category: routing-trap
+    note: >-
+      Two repositories that live only on the hosts. daintree.orchestration.migration-sweep is
+      excluded: "Do not use for one codebase migrated by agents on this machine
+      (daintree.orchestration.migration-sweep)".
+    messages:
+      - role: user
+        content: the api and billing repos only exist on my remote hosts; replace the legacy logging calls in both, pilot in one, then the other, and tell me what matches are left in each
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-not-copy-per-host
+    category: routing-trap
+    note: >-
+      Each repository once, not one copy per machine: "counted once however many hosts hold a
+      clone". daintree.hosts.swarm-fan-out is excluded: "the same work once on every host".
+    messages:
+      - role: user
+        content: every one of my machines has some of our repos checked out; move all of them off the deprecated config loader, one repository at a time, not a copy per machine
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-not-placement
+    category: routing-trap
+    note: >-
+      One rewrite through five repositories, wherever the hosts hold them, a row per repository.
+      daintree.hosts.place-work is excluded: "different independent pieces placed on hosts".
+    messages:
+      - role: user
+        content: use whichever hosts have the repos to push the same date-library rewrite through all five of them, and give me one row per repository
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-not-dependent-plan
+    category: routing-trap
+    note: >-
+      A trial run in one repository, then the rest under unchanged rules: "a pilot whose rulebook
+      every host follows". daintree.hosts.execute-distributed-workflow is excluded: "a generic plan of
+      dependent units".
+    messages:
+      - role: user
+        content: rewrite the deprecated assert calls in all our repos on the other machines; trial run in one repo first, then the rest without changing the rules, and give me a leftover count per repo
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-not-only-combining
+    category: routing-trap
+    note: >-
+      The whole campaign, ending in one integrated branch per repository: "the repository's units
+      integrated on their own, its searches rerun on the integrated commit".
+      daintree.hosts.integrate-host-branches is excluded: "only combining branches already
+      finished".
+    messages:
+      - role: user
+        content: Take the tracing-library swap through the web and worker repos on the hosts from inventory to an integrated branch per repo, with the leftover count on each.
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps
+  - id: migrate-across-repositories-reverse-local-sweep
+    category: routing-trap
+    note: >-
+      One codebase, local agents: daintree.orchestration.migration-sweep ("a large MECHANICAL
+      change repeated across many files or packages by several agents"); the hosts runbook must
+      not ride along.
+    messages:
+      - role: user
+        content: migrate every component in this repo off the old router, split by folder across a few agents
+    expect:
+      required: [daintree.orchestration.migration-sweep]
+
+  - id: migrate-across-repositories-reverse-every-host
+    category: routing-trap
+    note: >-
+      The same fix replicated on every machine for comparison: daintree.hosts.swarm-fan-out ("the
+      SAME WORK done on EVERY Remote Host"); not a campaign over repositories.
+    messages:
+      - role: user
+        content: send the identical timeout bump to each of my machines, one branch apiece, and show me how each one fared
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-reverse-dependent-repos
+    category: routing-trap
+    note: >-
+      Repositories that wait on each other's verified results: daintree.hosts.execute-distributed-workflow
+      ("a dependency graph of three or more units in which several wait on others, often in
+      different repositories"); no shared mechanical rule.
+    messages:
+      - role: user
+        content: on the hosts, the auth repo depends on the new token format from the identity repo, so do identity first, then auth, then the gateway once both are verified
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-reverse-combine-pushed
+    category: routing-trap
+    note: >-
+      The hosts' parts are already pushed and only need combining: daintree.hosts.integrate-host-branches
+      ("work that SEVERAL Remote Hosts finished has to end up on ONE branch"); no inventory, pilot or
+      rulebook is wanted, so the campaign runbook must not ride along.
+    messages:
+      - role: user
+        content: my other Macs finished their parts of the retry-helper change in the web repo and pushed branches; combine them on one machine into a single branch and check it builds
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-reverse-place-unrelated
+    category: routing-trap
+    note: >-
+      Unrelated fixes with no machine chosen: daintree.hosts.place-work ("wants each put on
+      whichever Remote Host this Shell reaches can best take it"); no one rewrite is
+      repeated.
+    messages:
+      - role: user
+        content: which of my machines should take the invoice export bug, and the two other unrelated fixes, given what is running on each
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-user-spread-services
+    category: single-runbook
+    note: >-
+      Services named only by where they are checked out, one change with a pilot and a count left in
+      each: "carried through SEVERAL REPOSITORIES held on their Remote Hosts".
+    messages:
+      - role: user
+        content: swap the logger in the five services we have, they are checked out on the build box and the mini, pilot it in one and tell me what is left in each
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
