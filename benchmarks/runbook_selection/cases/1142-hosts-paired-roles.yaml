@@ -1,0 +1,704 @@
+# Paired hub/lane scenarios: one piece of work seen from both ends, with a wrong-role trap each.
+#
+# The hub end is the person's own request, worded as the app tells the assistant to search
+# (one sentence, 8-15 words, specifics left out). The lane end is the receiving assistant's
+# search for the work after it has read the hub's brief; the brief is carried beside the case
+# (`brief`) and the query is drawn from its objective. Neither query names a runbook id: a
+# search that is handed the id proves nothing about discovery.
+#
+# A case with `scenario` and `role` fails when it loads a runbook its caller cannot execute (a
+# lane handed a hub baseline, the hub handed a lane's), on top of the usual recall check. The
+# traps are the person asking on the machine itself (a local runbook owns it, and the hub and
+# lane runbooks must stay out), a question rather than work, the lane's bare wake line, and a
+# role the caller does not hold. `bench pairs` reports each end with what it loaded.
+#
+# Where a case misses on the shipped selector the note says where and why; none of these cases
+# bends a runbook's text, and the misses are owed to the user's one retrain.
+
+cases:
+  # ------------------------------------------------------------------ implement
+  - id: pair-implement-hub-request
+    scenario: implement
+    role: hub
+    category: single-runbook
+    note: >-
+      The person's request on the hub. Decided by "ONE piece of WORK done by the Daintree
+      assistant on another machine" and "get the build box to fix the failing checkout test and
+      open a PR".
+    messages:
+      - role: user
+        content: Have the other Mac's assistant repair the flaky login test and raise a PR
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-implement-lane-brief
+    scenario: implement
+    role: lane
+    category: single-runbook
+    note: >-
+      The receiving lane after reading the hub's brief. Decided by "asks THIS machine to
+      implement, fix or build something as one unit of work" and "a new worktree on the brief's
+      branch from its base commit".
+    brief: |-
+      Objective: Fix the flaky login test so it passes ten runs in a row. Deliverable: one commit on the unit branch.
+      Scope: This project only. Unit branch cut from the base SHA given. Run the unit tests only. No push, no PR.
+      Report: Branch, full SHA, each check's command and result, the pane id.
+      Stop: Ask back if the remote or base SHA differs, or the fix needs a schema change.
+    messages:
+      - role: user
+        content: Implement the hub's login test fix on its own branch in a new worktree
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-implement-lane-local-trap
+    scenario: implement
+    role: lane
+    category: routing-trap
+    note: >-
+      The person at the host's own machine asks for the same work. A lane has no hub in it:
+      "the same work asked by the person at this machine (daintree.edits.spawn-visible-agent"
+      sends it to the local runbook, and the delegated-work procedure must stay out.
+    messages:
+      - role: user
+        content: Have Claude fix the login bug in a new worktree on this machine
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.do-delegated-work]
+
+  - id: pair-implement-hub-local-trap
+    scenario: implement
+    role: hub
+    category: routing-trap
+    note: >-
+      Work for an agent on the hub's own machine. Decided by "Do not use for work by an agent on
+      THIS machine (daintree.edits.spawn-visible-agent", so neither the remote delegation nor the
+      lane's runbook may load.
+    messages:
+      - role: user
+        content: Have an agent on this machine fix the login bug in a new worktree
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.delegate-to-host]
+
+  # ------------------------------------------------------------------ review
+  - id: pair-review-hub-request
+    scenario: review
+    role: hub
+    category: single-runbook
+    note: >-
+      Judging a pushed branch from another machine. Decided by "have another machine review
+      what that host built" and "its findings reported as claims"; the single-unit delegation
+      may ride along.
+    messages:
+      - role: user
+        content: Have another machine review the branch my other Mac just pushed, findings only
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.delegate-to-host, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-review-lane-brief
+    scenario: review
+    role: lane
+    category: single-runbook
+    note: >-
+      The reviewing lane. Decided by "asks THIS machine to review work it did not write,
+      findings only, at the exact commit the hub names".
+    brief: |-
+      Objective: Review the payments branch at the exact commit below and report findings only. Deliverable: a findings list, nothing changed.
+      Scope: Read-only review of this project at that SHA. Do not edit, commit or push. A moved branch or missing commit is reported, not substituted.
+      Report: Findings with severity, file and line, and what is wrong; the SHA reviewed.
+      Stop: Ask back if the commit is missing or the criteria are unclear.
+    messages:
+      - role: user
+        content: Review the hub's branch at its exact commit and change nothing
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-review-lane-local-trap
+    scenario: review
+    role: lane
+    category: routing-trap
+    note: >-
+      The person's own review on the host machine. Decided by "a review the person at this
+      machine asks for (daintree.review.review-change)".
+    messages:
+      - role: user
+        content: Review my own branch for problems before I open a pull request
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.review-for-hub]
+
+  - id: pair-review-hub-local-trap
+    scenario: review
+    role: hub
+    category: routing-trap
+    note: >-
+      A review by an agent on the hub's own machine. Decided by "rival attempts or a review by
+      agents on this machine (daintree.orchestration.competition, daintree.review.review-change)".
+    messages:
+      - role: user
+        content: Review my branch with an agent on this machine before I push
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.race-and-review, daintree.hosts.delegate-to-host]
+
+  # ------------------------------------------------------------------ verify
+  - id: pair-verify-hub-request
+    scenario: verify
+    role: hub
+    category: single-runbook
+    note: >-
+      One commit tested on several hosts. Decided by "ONE EXACT COMMIT, tag or release candidate
+      TESTED UNDER SEVERAL ENVIRONMENTS" and "test this SHA on the Linux host and the Mac host".
+    messages:
+      - role: user
+        content: Test this exact commit on my Linux host and my Mac host, no fixes
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-verify-lane-brief
+    scenario: verify
+    role: lane
+    category: single-runbook
+    note: >-
+      The verifying lane. Decided by "asks this lane to TEST or VERIFY a commit or branch here
+      and report the results, with no fixes".
+    brief: |-
+      Objective: Run lint and the unit tests on the commit below and report the results. Deliverable: a test run bound to that SHA, no fixes.
+      Scope: Isolated worktree at that SHA. Only the two named checks. No edits, installs or pushes.
+      Report: HEAD before and after, each command's pass, fail and skip counts, what could not run.
+      Stop: Ask back if the SHA is missing or a check needs a service that is not running.
+    messages:
+      - role: user
+        content: Test the hub's commit here with lint and the unit tests, no fixes
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-verify-lane-local-trap
+    scenario: verify
+    role: lane
+    category: routing-trap
+    note: >-
+      The person's own checks on the host machine. Decided by "the person's own checks here
+      (daintree.ci.run-local-checks)".
+    messages:
+      - role: user
+        content: Run the tests on my current branch before I push
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.verify-for-hub]
+
+  - id: pair-verify-hub-local-trap
+    scenario: verify
+    role: hub
+    category: routing-trap
+    note: >-
+      Checks on the hub's own machine, with no remote host in the request. The hub's matrix
+      and suite-sharding runbooks both need Remote Hosts.
+    messages:
+      - role: user
+        content: Run the tests on this machine before I push
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.run-validation-matrix, daintree.hosts.shard-test-suite]
+
+  # ------------------------------------------------------------------ cohort
+  - id: pair-cohort-hub-request
+    scenario: cohort
+    role: hub
+    category: single-runbook
+    note: >-
+      Different tickets spread over the person's machines. Decided by "DIFFERENT, independent
+      pieces of work" and "here are eight issues, split them across my machines".
+    messages:
+      - role: user
+        content: Split these five bug tickets across my machines by who has room
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-cohort-lane-brief
+    scenario: cohort
+    role: lane
+    category: single-runbook
+    note: >-
+      Several pieces from the hub at once. Decided by "the hub hands THIS machine SEVERAL
+      pieces of work at once".
+    brief: |-
+      Objective: Work the four independent tickets below, each in its own worktree and branch. Deliverable: one reply with a row per ticket.
+      Scope: This project only. At most two agents at once. The tickets touch disjoint files. No push.
+      Report: Per ticket: branch, SHA, checks, pane id; failures and open questions in the same reply.
+      Stop: Ask back if two tickets need the same file.
+    messages:
+      - role: user
+        content: Run the hub's four independent tickets here, each in its own worktree
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-cohort-lane-one-unit-trap
+    scenario: cohort
+    role: lane
+    category: routing-trap
+    note: >-
+      One piece is not a cohort. Decided by "Do not use for one unit of work, or one fix with no
+      attempts asked for (daintree.hosts.do-delegated-work)".
+    messages:
+      - role: user
+        content: The hub sent me one bug to fix here, nothing else
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.hosts.run-local-cohort]
+
+  - id: pair-cohort-lane-local-trap
+    scenario: cohort
+    role: lane
+    category: routing-trap
+    note: >-
+      The person at the host's machine splitting tickets over local agents. Decided by "the same
+      split asked for by the person at this machine (daintree.orchestration.fan-out-work".
+    messages:
+      - role: user
+        content: Work these four tickets in parallel on this machine with separate agents
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.run-local-cohort]
+
+  - id: pair-cohort-hub-local-trap
+    scenario: cohort
+    role: hub
+    category: routing-trap
+    note: >-
+      Tickets for agents on the hub's own machine. Decided by "independent pieces for agents on
+      this machine (daintree.orchestration.fan-out-work".
+    messages:
+      - role: user
+        content: Give each of these four tickets its own agent on this machine
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.place-work, daintree.hosts.swarm-fan-out]
+
+  # ------------------------------------------------------------------ steer
+  - id: pair-steer-hub-request
+    scenario: steer
+    role: hub
+    category: single-runbook
+    note: >-
+      Work already sent, stopped from the hub. Decided by "work they ALREADY SENT to their other
+      machines" and "STOPPED, CALLED OFF or CHANGED".
+    messages:
+      - role: user
+        content: Stop the work I sent to my remote hosts, and keep what they did
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-steer-lane-brief
+    scenario: steer
+    role: lane
+    category: single-runbook
+    note: >-
+      The receiving lane told to stop. Decided by "to STOP, PAUSE or CHANGE the work of the
+      AGENTS it launched for one of the hub's runs".
+    brief: |-
+      Objective: Stop the agents you launched for the parser run and keep everything they changed. Deliverable: each agent stopped, redirected or found already done.
+      Scope: Only agents launched for this run. Throw nothing away. No new work.
+      Report: Each agent's state as its screen shows it; anything pushed or left running.
+      Stop: Ask back if an agent is mid-commit and stopping it would lose work.
+    messages:
+      - role: user
+        content: Stop the agents I started for the hub's run and keep their changes
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-steer-lane-local-trap
+    scenario: steer
+    role: lane
+    category: routing-trap
+    note: >-
+      The person changing their own agent's course on the host machine. Decided by "the person at
+      this machine changing an agent's course (daintree.agents.steer-running-agent)".
+    messages:
+      - role: user
+        content: Change course on my running agent here and tell it to use the new API
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.steer-for-hub]
+
+  - id: pair-steer-hub-local-trap
+    scenario: steer
+    role: hub
+    category: routing-trap
+    note: >-
+      An agent on the hub's own machine. Decided by "for agents on this machine
+      (daintree.agents.steer-running-agent".
+    messages:
+      - role: user
+        content: Tell the agent running on this machine to stop and keep its changes
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.steer-swarm]
+
+  # ------------------------------------------------------------------ integrate
+  - id: pair-integrate-hub-request
+    scenario: integrate
+    role: hub
+    category: single-runbook
+    note: >-
+      Hosts' finished work combined by one machine. Decided by "work that SEVERAL Remote Hosts
+      finished has to end up on ONE branch and one machine is to do the combining".
+    messages:
+      - role: user
+        content: Put the branches my two remote hosts finished together on the build box
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-integrate-lane-brief
+    scenario: integrate
+    role: lane
+    category: single-runbook
+    note: >-
+      The integrating lane. Decided by "several finished commits from other hosts' or units'
+      branches, each pinned by SHA, to merge in order into one new integration branch".
+    brief: |-
+      Objective: Merge the three pinned commits below, in order, into one new integration branch. Deliverable: that branch with checks after each merge.
+      Scope: Own worktree. Merge each exact SHA, never a branch's newer tip. Rewrite no source branch. No push.
+      Report: Each merge and its checks, the final branch and SHA, any conflict not settled by this brief.
+      Stop: Ask back on a missing commit, a conflict this brief does not settle, or an acceptance clash.
+    messages:
+      - role: user
+        content: Merge these exact commits from the other hosts into one integration branch
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.git.integrate-agent-branches, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-integrate-lane-local-trap
+    scenario: integrate
+    role: lane
+    category: routing-trap
+    note: >-
+      The person's own merge of local agents' branches on the host machine. Decided by "the
+      person's own local merge (daintree.git.integrate-agent-branches)".
+    messages:
+      - role: user
+        content: Combine my local agents' finished work into one branch, testing after every merge
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.integrate-for-hub]
+
+  - id: pair-integrate-hub-local-trap
+    scenario: integrate
+    role: hub
+    category: routing-trap
+    note: >-
+      Branches finished by agents on the hub's own machine, no host involved. The hub's
+      integration runbook is for what Remote Hosts finished.
+    messages:
+      - role: user
+        content: Merge the branches my agents here finished into one branch
+    expect:
+      required: [daintree.git.integrate-agent-branches]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.integrate-host-branches]
+
+  # ------------------------------------------------------------------ demo
+  - id: pair-demo-hub-request
+    scenario: demo
+    role: hub
+    category: single-runbook
+    note: >-
+      A feature to look at on a host. Decided by "wants to SEE a feature running on another
+      machine, a Remote Host this Shell reaches, and look at it from here".
+    messages:
+      - role: user
+        content: I want to click through the new checkout page running on my remote host
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-demo-lane-brief
+    scenario: demo
+    role: lane
+    category: single-runbook
+    note: >-
+      The lane asked to serve it. Decided by "asks THIS machine to prepare a DEMO of a feature,
+      or leave it running".
+    brief: |-
+      Objective: Serve the new checkout flow as a demo at the commit below. Deliverable: the demo running here and the hub told how to reach it.
+      Scope: Worktree at that SHA. Synthetic seed data only, kept to that worktree's own database. Only the requested services.
+      Report: SHA served, host listener and port, panel ids, start command, and who stops it.
+      Stop: Ask back if the data would touch a real database or the port is already taken.
+    messages:
+      - role: user
+        content: Serve the hub's checkout feature here as a demo with sample data
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.workflow.prepare-feature-demo, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-demo-lane-local-trap
+    scenario: demo
+    role: lane
+    category: routing-trap
+    note: >-
+      The person's own demo on the host machine. Decided by "a demo the person asks for at this
+      machine (daintree.workflow.prepare-feature-demo)".
+    messages:
+      - role: user
+        content: Prepare a demo of my feature branch on this machine for tomorrow
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.demo-for-hub]
+
+  - id: pair-demo-hub-local-trap
+    scenario: demo
+    role: hub
+    category: routing-trap
+    note: >-
+      A demo on the hub's own machine. Decided by "Do not use for a demo on THIS machine
+      (daintree.workflow.prepare-feature".
+    messages:
+      - role: user
+        content: Show me the new checkout page running on this machine with sample data
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.prepare-remote-demo]
+
+  # ------------------------------------------------------------------ clean-up
+  - id: pair-cleanup-hub-request
+    scenario: clean-up
+    role: hub
+    category: single-runbook
+    note: >-
+      What a run left on the hosts, cleaned through each host's assistant. Decided by "what a
+      run left on the Remote Hosts, its panes (usage-check panes included), worktrees and
+      branches, cleaned up through each host's own assistant".
+    messages:
+      - role: user
+        content: Clean up what the swarm left on my remote hosts, panes and worktrees
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-cleanup-lane-brief
+    scenario: clean-up
+    role: lane
+    category: single-runbook
+    note: >-
+      The lane asked to remove what it made. Decided by "asks it to remove what it made on this
+      machine for one of the hub's runs".
+    brief: |-
+      Objective: Close the panes and remove the worktrees you made for the parser run. Deliverable: those items gone and the hub told what stayed.
+      Scope: Only items made for this run. Remove a worktree only if its panes are closed and it is clean and pushed or abandoned.
+      Report: Each item removed or kept, and why.
+      Stop: Ask back with one list if anything unpushed or dirty would be lost.
+    messages:
+      - role: user
+        content: Remove the panes and worktrees I made for the hub's run
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.orchestration.workspace-cleanup, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-cleanup-lane-local-trap
+    scenario: clean-up
+    role: lane
+    category: routing-trap
+    note: >-
+      The person tidying their own machine. Decided by "the person tearing down panes and
+      worktrees on their own machine (daintree.orchestration.workspace-cleanup)".
+    messages:
+      - role: user
+        content: Close my finished panes and remove the merged worktrees on this machine
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.clean-up-for-hub]
+
+  - id: pair-cleanup-hub-local-trap
+    scenario: clean-up
+    role: hub
+    category: routing-trap
+    note: >-
+      Local tidying on the hub's own machine. Decided by "Do not use for agents, terminals or
+      worktrees on this machine".
+    messages:
+      - role: user
+        content: Tidy up the finished agents and merged worktrees on this laptop only
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.recover-and-clean-up]
+
+  # ------------------------------------------------------------------ question
+  - id: pair-question-hub-request
+    scenario: question
+    role: hub
+    category: single-runbook
+    note: >-
+      One question for the host's assistant. Decided by "ONE QUESTION answered by the Daintree
+      assistant on ANOTHER MACHINE".
+    messages:
+      - role: user
+        content: Ask the assistant on my Linux host which branch its project is on
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-question-lane-brief
+    scenario: question
+    role: lane
+    category: single-runbook
+    note: >-
+      The lane answering a question that sends no work. Decided by "the exchange handled" with
+      "answered with assistant.reply".
+    brief: |-
+      Objective: Answer the hub's question about which branch this project is on. Deliverable: one reply naming the branch.
+      Scope: Read-only. This project's checkout only. Change nothing.
+      Report: The branch name and whether the working tree is clean.
+      Stop: Ask back if this project has more than one checkout and it is unclear which is meant.
+    messages:
+      - role: user
+        content: Answer the hub's question about which branch this project is on
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-question-lane-wake-line
+    scenario: question
+    role: lane
+    category: routing-trap
+    note: >-
+      The lane's first turn is only the wake line, which names an exchange and never what it
+      says. Decided by "the inbox wake line "Daintree: assistant inbox has a new message
+      (exchange …). Read it with assistant.getInbox."". No deliverable is known yet, so only the
+      envelope may load; a work runbook would be guessed from nothing. The text is the app's
+      own fixed wake line (the plural form, three ids), so it resembles every other wake-line
+      case by construction.
+    messages:
+      - role: user
+        content: "Daintree: assistant inbox has 3 new messages (exchanges 8e1f, 91ab, c27d). Read them with assistant.getInbox."
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid:
+        - daintree.hosts.do-delegated-work
+        - daintree.hosts.verify-for-hub
+        - daintree.hosts.review-for-hub
+        - daintree.hosts.run-local-cohort
+
+  - id: pair-question-lane-fact-trap
+    scenario: question
+    role: lane
+    category: routing-trap
+    note: >-
+      A fact the hub wants back is a reply, not a unit of work or a verification. Decided by "an
+      unsolicited assistant.sendMessage to the hub", "answered with assistant.reply" and the
+      envelope's own "Do not use for the delegated unit of work itself once read".
+    messages:
+      - role: user
+        content: Tell the hub what operating system release this laptop runs
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.hosts.do-delegated-work, daintree.hosts.verify-for-hub]
+
+  - id: pair-question-hub-work-trap
+    scenario: question
+    role: hub
+    category: routing-trap
+    note: >-
+      A request for an opinion changes nothing. Decided by "the question asks it to change
+      nothing" and "work that machine's assistant should carry out (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: Check what my Linux host's assistant thinks went wrong in the nightly job
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.hosts.delegate-to-host]
+
+  # ------------------------------------------------------------------ designated role
+  - id: pair-role-hub-names-integrator
+    scenario: designated-role
+    role: hub
+    category: single-runbook
+    note: >-
+      The hub designates one host to do the combining. Decided by "one machine is to do the
+      combining" and "coordinate one host integrating pinned artifacts from the other lanes".
+    messages:
+      - role: user
+        content: Have my Mac host be the integrator for what the other hosts finished
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-role-lane-made-integrator
+    scenario: designated-role
+    role: lane
+    category: single-runbook
+    note: >-
+      The lane told it now holds the integrator's role. Decided by "the hub has chosen this lane
+      as its integrator".
+    brief: |-
+      Objective: Act as the integrator for the three finished branches below. Deliverable: one integration branch holding exactly those commits.
+      Scope: Own worktree. Each pinned SHA in order. No source branch rewritten. No push unless stated.
+      Report: The integration branch and SHA, each merge's checks, any conflict.
+      Stop: Ask back if a commit is missing or a conflict is not settled by this brief.
+    messages:
+      - role: user
+        content: The hub made this machine its integrator for three finished branches
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.git.integrate-agent-branches, daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-role-lane-asked-to-relay
+    scenario: designated-role
+    role: lane
+    category: routing-trap
+    note: >-
+      A role the lane does not hold: hosts never reach each other, so the hub relays, and a lane
+      has no `host.*` tools. The envelope is the place to answer that as a blocker; the hub's
+      delegation, whose baseline a lane cannot execute, must not load. Decided by "answered with
+      assistant.reply (completed with artifact references, or input-required for a real question)".
+    messages:
+      - role: user
+        content: The hub wants this machine to hand its task to a third machine's assistant
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: pair-role-hub-reads-host-message
+    scenario: designated-role
+    role: hub
+    category: no-task
+    note: >-
+      A host's message arriving at the hub is the hub's to answer within the user's request; the
+      app's own messaging addendum says so, and the receiving lane's envelope is not the hub's
+      ("If you are the enrolled hub, it is a host's message, not this."). Nothing to load beyond
+      the messaging foundation, and never a lane's runbook.
+    messages:
+      - role: user
+        content: My Linux host's assistant sent me a question, answer it for me
+    expect:
+      required: []
+      optional: [daintree.hosts.foundation, daintree.foundation]

@@ -8,6 +8,7 @@ Run from the repo root:
     python -m benchmarks.runbook_selection.bench lint        # most-confusable runbook pairs
     python -m benchmarks.runbook_selection.bench list
     python -m benchmarks.runbook_selection.bench coverage
+    python -m benchmarks.runbook_selection.bench pairs
     python -m benchmarks.runbook_selection.bench report results/<run>.json
     python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
 
@@ -116,6 +117,28 @@ def _cmd_coverage(args: argparse.Namespace) -> int:
     return 0 if rows and all(r.gate_ok for r in rows) else 1
 
 
+def _cmd_pairs(args: argparse.Namespace) -> int:
+    """The paired hub/lane scenarios, run on the shipped selector and reported by end.
+
+    A report, not a gate: ``bench local`` scores these cases with all the others and
+    is the verdict. This says, per scenario, which end missed, where it lost the
+    runbook, and what each caller would actually have been handed. Exit 1 when a pair
+    case fails, so a retrain-owed miss is loud rather than lost in the full run.
+    """
+    from daintree_assistant_server.runbooks.catalog import load_catalog
+
+    from .local_runner import run_local
+    from .pairs import pair_cases, print_pairs
+
+    catalog = load_catalog()
+    cases = pair_cases(load_cases(catalog))
+    if not cases:
+        print("no paired role cases", file=sys.stderr)
+        return 2
+    doc = run_local(catalog=catalog, cases=cases, quantized=not args.fp32)
+    return 1 if print_pairs(doc, cases) else 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     # Re-derives the verdict rather than trusting a stored `passed`, so an
     # artifact saved before a threshold existed is graded against today's — and so
@@ -215,6 +238,14 @@ def main(argv: list[str] | None = None) -> int:
         "declares confusable neighbours with no routing trap (no API calls)",
     )
     cov.set_defaults(func=_cmd_coverage)
+
+    pairs = sub.add_parser(
+        "pairs",
+        help="the paired hub/lane scenarios on the shipped selector, per end: what was "
+        "loaded, where a miss was lost, and any wrong-role load; exit 1 on a failure (free)",
+    )
+    pairs.add_argument("--fp32", action="store_true", help="score the fp32 graphs")
+    pairs.set_defaults(func=_cmd_pairs)
 
     report = sub.add_parser("report", help="re-print a saved results file")
     report.add_argument("path")

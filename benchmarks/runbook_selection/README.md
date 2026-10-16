@@ -54,6 +54,7 @@ python -m benchmarks.runbook_selection.bench local         # THE gate: shipped O
 python -m benchmarks.runbook_selection.bench local --fp32  # same, unquantised
 python -m benchmarks.runbook_selection.bench list          # validate cases
 python -m benchmarks.runbook_selection.bench coverage      # per-runbook coverage matrix
+python -m benchmarks.runbook_selection.bench pairs         # paired hub/lane scenarios, per end
 python -m benchmarks.runbook_selection.bench search "…"    # queries as search_runbooks ranks them
 
 python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
@@ -90,6 +91,46 @@ The `optional` slot exists mainly for the domain foundation
 documented default, but a lean pick of just the specific also passes. Expectations
 encode **product intent** — when a case's ground truth is debatable, the case
 carries a `note` saying why.
+
+### Paired hub/lane cases (`scenario` + `role`, `bench pairs`)
+
+A hosts scenario is one piece of work seen from both ends: the person's request on the
+hub, and the receiving lane's search after it has read the hub's brief. Cases that name
+a `scenario` and a `role` (`hub` or `lane`) are scored by `bench local` like any other,
+and additionally fail when they load a runbook their caller cannot execute:
+
+```yaml
+- id: pair-implement-lane-brief
+  scenario: implement
+  role: lane
+  category: single-runbook
+  brief: |-                       # what the hub sent: the query is drawn from its objective
+    Objective: ... Deliverable: ...
+    Scope: ...
+    Report: ...
+    Stop: ...
+  messages:
+    - role: user
+      content: Implement the hub's login test fix on its own branch in a new worktree
+  expect:
+    required: [daintree.hosts.do-delegated-work]
+    forbid: [daintree.hosts.run-local-cohort]     # optional, on top of the role's own
+```
+
+- **`forbid`** is `expect.forbid` plus, for a role, the other end's runbooks (a hosts
+  runbook whose baseline needs a `host.*` tool is the hub's; any other hosts baseline is
+  a lane's, `cases.baseline_role`). A forbidden runbook in the loaded set fails recall
+  even when the right one loaded: it would be delivered in full to a caller that must
+  not follow it. A case cannot expect what it forbids.
+- **Queries** are one sentence of 8 to 15 words, as the app tells the assistant to
+  search (the lane's bare wake line is the one exception), and never name a runbook id.
+- **Structure** (`pairs.validate_pairs`, run on every case load): each scenario has both
+  ends, a successful selection at each, a trap (`routing-trap` or `no-task`) and a lane
+  case carrying the hub's emitted `brief` with Objective, Scope, Report and Stop lines,
+  by reference and under 900 characters.
+- **`bench pairs`** runs only these cases on the shipped selector and prints each end's
+  loaded set, the stage that lost any missing runbook and any forbidden load; it exits 1
+  on a failure, so a retrain-owed miss is loud. `bench local` stays the verdict.
 
 ### Coverage (`bench coverage`)
 

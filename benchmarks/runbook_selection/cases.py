@@ -26,6 +26,16 @@ The rule is deliberately about the SHAPE of ``required``, not about the
 categories (a routing trap that must not over-pick, adversarial keyword bait, a
 background wake), and forcing those into the ``foundation-only`` category to
 satisfy a load check would gut the category signal the report groups on.
+
+**Paired role cases** (``scenario`` + ``role``). A hosts scenario is one piece of
+work seen from both ends: the person's request on the hub, and the receiving lane's
+search for the same work after reading the hub's brief. A case that names its
+``scenario`` and ``role`` (``hub`` or ``lane``) is checked for the WRONG ROLE as
+well as for recall: loading a procedure the role cannot execute (a lane given a
+hub's ``host.*`` baseline, the hub given a lane's) fails it, because that
+runbook would be delivered in full to a caller that must not follow it. The
+forbidden set is derived from the catalog (``wrong_role_ids``) plus any explicit
+``expect.forbid``, and ``pairs.py`` holds the structural checks and the report.
 """
 
 from __future__ import annotations
@@ -38,10 +48,41 @@ import yaml
 
 from daintree_assistant_server.contracts.openai import ChatMessage, FunctionCall, ToolCall
 from daintree_assistant_server.runbooks.catalog import Catalog
+from daintree_assistant_server.runbooks.models import Runbook
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
 _VALID_ROLES = {"user", "assistant", "tool"}
+
+#: The two ends of a paired scenario: the Shell's hub, and a lane enrolled on a host.
+CALLER_ROLES = ("hub", "lane")
+
+_HUB_ONLY_TOOL_PREFIX = "host."
+_HUB_ONLY_TOOLS = frozenset({"project.openOnHost"})
+
+
+def baseline_role(runbook: Runbook) -> str | None:
+    """Which end of the hub/lane pair a runbook's baseline path is written for.
+
+    Only a ``daintree.hosts.*`` runbook with a baseline has one. A baseline that
+    needs a ``host.*`` tool is the hub's, because a lane is never offered those; any
+    other hosts baseline is a lane's. ``tests/unit/test_paired_roles.py`` checks
+    this reading against the captured hub and lane surfaces, so it cannot drift
+    from what each caller is actually offered.
+    """
+    if not runbook.id.startswith("daintree.hosts.") or not runbook.meta.required_tools:
+        return None
+    hub_only = any(
+        tool.startswith(_HUB_ONLY_TOOL_PREFIX) or tool in _HUB_ONLY_TOOLS
+        for tool in runbook.meta.required_tools
+    )
+    return "hub" if hub_only else "lane"
+
+
+def wrong_role_ids(role: str, catalog: Catalog) -> list[str]:
+    """The runbooks a caller in ``role`` must never be handed: the other end's."""
+    other = "lane" if role == "hub" else "hub"
+    return sorted(r.id for r in catalog.runbooks if baseline_role(r) == other)
 
 
 class CaseError(Exception):
@@ -68,6 +109,17 @@ class BenchCase:
     # and classify the docs question wrongly, and a single pass/fail would hide
     # which half moved.
     expect_docs: bool | None = None
+    # Paired role cases: the scenario this case is one end of, and which end. Both
+    # or neither (``_build_case`` refuses a half).
+    scenario: str | None = None
+    role: str | None = None
+    # Runbooks that must NOT be loaded, whatever else is right: the role's wrong-end
+    # runbooks (derived) plus ``expect.forbid``. Scored by ``bench local`` as a recall
+    # failure; empty for every case without a role or an explicit ``forbid``.
+    forbid: tuple[str, ...] = ()
+    # The hub's emitted brief this lane case's query was drawn from (``pairs.py``
+    # checks its shape). Lane cases only.
+    brief: str | None = None
 
     @property
     def allowed(self) -> set[str]:
@@ -127,6 +179,24 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
     expect_docs = expect.get("docs")
     if expect_docs is not None and not isinstance(expect_docs, bool):
         raise CaseError(f"{case_id}: expect.docs must be true, false, or omitted")
+    optional = _validate_ids(expect.get("optional") or [], catalog, case_id, "optional")
+    scenario, role = raw.get("scenario"), raw.get("role")
+    if (scenario is None) != (role is None):
+        raise CaseError(f"{case_id}: scenario and role come together, or not at all")
+    if role is not None and (role not in CALLER_ROLES or not isinstance(scenario, str)):
+        raise CaseError(f"{case_id}: role must be one of {CALLER_ROLES} and scenario a string")
+    brief = raw.get("brief")
+    if brief is not None and (role != "lane" or not isinstance(brief, str)):
+        raise CaseError(f"{case_id}: a brief is a string on a lane case")
+    forbid = _validate_ids(expect.get("forbid") or [], catalog, case_id, "forbid")
+    if role is not None:
+        forbid = [*forbid, *wrong_role_ids(role, catalog)]
+    forbid = sorted(set(forbid))
+    if clash := sorted(set(forbid) & (set(required) | set(optional))):
+        raise CaseError(
+            f"{case_id}: {', '.join(clash)} is forbidden for this case (the wrong end of the "
+            "hub/lane pair, or named in expect.forbid) and also expected"
+        )
     return BenchCase(
         id=case_id,
         category=str(raw.get("category") or "uncategorized"),
@@ -134,11 +204,15 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
         messages=[_build_message(m, case_id, i) for i, m in enumerate(messages_raw)],
         active=_validate_ids(raw.get("active") or [], catalog, case_id, "active"),
         required=required,
-        optional=_validate_ids(expect.get("optional") or [], catalog, case_id, "optional"),
+        optional=optional,
         turn_context=raw.get("turn_context"),
         available_tools=list(raw.get("available_tools") or []),
         note=str(raw.get("note") or ""),
         expect_docs=expect_docs,
+        scenario=scenario,
+        role=role,
+        forbid=tuple(forbid),
+        brief=brief,
     )
 
 
@@ -163,6 +237,10 @@ def load_cases(
                 raise CaseError(f"duplicate case id {case.id!r} in {path.name}")
             seen.add(case.id)
             cases.append(case)
+    from .pairs import validate_pairs
+
+    if problems := validate_pairs(cases):
+        raise CaseError("paired role cases are malformed:\n  " + "\n  ".join(problems))
     if id_filter:
         needle = id_filter.lower()
         cases = [c for c in cases if needle in c.id.lower() or needle in c.category.lower()]

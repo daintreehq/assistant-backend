@@ -288,15 +288,25 @@ def build_local_doc(
     by_category: dict[str, list[bool]] = {}
     recall_pass = 0
     recall_flags: list[bool] = []
+    # Per case, what it loaded that it must NOT have (``BenchCase.forbid``: the wrong
+    # end of the hub/lane pair, or named in ``expect.forbid``). Failing recall, not
+    # merely counted as an extra: a forbidden runbook is delivered in full to a
+    # caller that cannot follow it.
+    forbidden_loads: list[list[str]] = []
     for case, got_ids in zip(cases, picked, strict=True):
         got = set(got_ids)
-        ok = not (set(case.required) - got) and (
-            bool(case.required) or not (got - case.allowed)
+        wrong = sorted(got & set(case.forbid))
+        forbidden_loads.append(wrong)
+        ok = (
+            not (set(case.required) - got)
+            and (bool(case.required) or not (got - case.allowed))
+            and not wrong
         )
         recall_pass += ok
         recall_flags.append(ok)
         by_category.setdefault(case.category, []).append(ok)
     summary["recall_pass_cases"] = recall_pass
+    summary["forbidden_cases"] = sum(1 for w in forbidden_loads if w)
     summary["recall_pass_categories"] = {
         name: {"cases": len(flags), "passed": sum(flags)}
         for name, flags in sorted(by_category.items())
@@ -351,6 +361,8 @@ def build_local_doc(
         # `losses`: a no-task case that loads anything fails recall and loses
         # no required runbook.
         "recall_pass": recall_flags,
+        # What each case loaded that it was forbidden to, aligned to `case_ids`.
+        "forbidden": forbidden_loads,
         "losses": [
             {
                 "case": loss.case_id,
@@ -389,6 +401,18 @@ def print_local(doc: dict[str, Any]) -> None:
             f"  {name:16} p50 {block['p50']:7.2f}  p90 {block['p90']:7.2f}  "
             f"max {block['max']:7.2f}"
         )
+
+    wrong = [
+        (cid, ids) for cid, ids in zip(doc["case_ids"], doc.get("forbidden") or [], strict=False)
+        if ids
+    ]
+    if wrong:
+        print(
+            f"\nforbidden loads ({len(wrong)}): wrong role or wrong owner, delivered in full "
+            "to a caller that must not follow it"
+        )
+        for cid, ids in wrong:
+            print(f"  {cid:42} {', '.join(ids)}")
 
     if doc["losses"]:
         print("\nlosses:")
