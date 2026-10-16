@@ -160,3 +160,12 @@ boundaries:
     confusable_with:
     - daintree.runtime.measure-performance
     run: runbook-2026-10-issue-139
+  - query: "split the end-to-end specs by file between my hosts so the run finishes sooner, then merge the reports"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "four hosts, one big cypress suite: divide it up and tell me no spec was skipped or run twice"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "the browser tests need two hours; spread them over the other machines and give me one report"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135

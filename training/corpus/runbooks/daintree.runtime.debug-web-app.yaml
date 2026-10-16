@@ -299,6 +299,12 @@ boundaries:
   - query: "my dev preview shows a blank page in this window and the console has a red error, sort it out and reload"
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
+  - query: "the dev preview for the worktree on the host shows a white screen after the redirect, read the console and sort it out"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "the preview panel on the build box logs hydration errors on load; look into it"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
 followups:
   - query: and the second one?
     history:

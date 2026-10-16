@@ -132,6 +132,15 @@ boundaries:
     confusable_with:
     - daintree.runtime.measure-performance
     run: runbook-2026-10-issue-139
+  - query: "run the same browser specs for this commit with chromium on the linux host and webkit on the mac host, tell me which pass on each"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "end-to-end tests for the release tag under node 20 and node 22 on whichever of my machines can, one result per version"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "which of my hosts pass the Playwright run on exactly this sha? one answer per machine, nothing fixed"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
 
 followups:
   - query: actually do it on the mac host too, and add node 22 on both, as one matrix

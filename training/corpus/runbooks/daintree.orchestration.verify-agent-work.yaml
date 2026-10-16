@@ -375,6 +375,12 @@ boundaries:
   - query: 'I don''t trust that the local agent actually fixed the bug, verify its claim'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: "the agent on the host says its end-to-end run was green; check what it did and the diff before I merge"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "it claims the browser tests passed on the remote machine, confirm that yourself before I trust it"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
 followups:
   - query: how's that going?
     history:

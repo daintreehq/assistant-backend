@@ -32,6 +32,42 @@ positives:
   - Run the e2e suite in the checkout worktree and report which specs fail - no fixing yet.
   - No exploratory poking needed, just run the existing Playwright suite against the release branch worktree.
   - playwright on the auth worktree pls - careful, my main checkout's dev server is sitting on 3000
+  - query: "Run the Playwright specs under e2e/billing in the invoices worktree on the build host, and tell me which process was listening on the app's port, its working directory and the commit it was built from, plus where the HTML report ended up."
+    run: runbook-2026-10-issue-135
+  - query: "feature/export-csv's worktree on the other machine still has something from an older checkout bound to 5174. Run its smoke specs against a server started fresh from that tree and say whether the result can be trusted."
+    run: runbook-2026-10-issue-135
+  - query: "got a green e2e on the mac mini but I don't believe it hit the right app. redo it so the server is provably from that checkout"
+    run: runbook-2026-10-issue-135
+  - query: "Run the Cypress specs in the remote worktree for the loyalty branch and give me the video and screenshot locations in a form that says which machine and which commit they belong to."
+    run: runbook-2026-10-issue-135
+  - query: "Task: on the machine that holds the orders-service checkout, run the integration tests that need the API and its Postgres running, headless, only the files under test/integration/payments. Confirm the API process serving them was started from that worktree at its current commit instead of reused from another branch, keep the HTML report, and tell me exactly where it lives and on which machine."
+    run: runbook-2026-10-issue-135
+  - query: "can you rerun the browser tests on the remote box, same worktree, and actually check it isn't hitting the dev server somebody left running yesterday"
+    run: runbook-2026-10-issue-135
+  - query: "Browser tests run on this Mac but the app they exercise lives on the remote host and gets here through a forwarded port; confirm that port really leads to the server of the worktree under test, at the commit I pushed."
+    run: runbook-2026-10-issue-135
+  - query: "run signup.spec.ts and nothing else against the remote worktree's app and list the screenshot paths with the host name"
+    run: runbook-2026-10-issue-135
+  - query: "Execute the Playwright suite for worktree wt-claims at its HEAD on the host, pin the base URL to a free port, and return the listener pid, working directory and build id along with pass and fail counts."
+    run: runbook-2026-10-issue-135
+  - query: "the e2e job on the linux host finished in forty seconds which is suspiciously quick. was it testing an old build that was already running?"
+    run: runbook-2026-10-issue-135
+  - query: "Hey, quick favour: run the end-to-end tests against the remote worktree's own server and show me which build served them."
+    run: runbook-2026-10-issue-135
+  - query: "On the Linux machine's checkout of this repo, run the end-to-end checks and make sure the app they hit was started from that checkout at the commit I just pushed."
+    run: runbook-2026-10-issue-135
+  - query: "The reviewers' worktree on the build box has a long-lived dev server on 3000 that belongs to the main checkout. Run the browser specs for the review branch without touching it, and show the run used its own."
+    run: runbook-2026-10-issue-135
+  - query: "run the integration suite that boots the API on the other host, then tell me what served it and keep the report somewhere I can reach from here"
+    run: runbook-2026-10-issue-135
+  - query: "I'm about to sign off on a remote e2e result. Re-run just the failing checkout spec in that worktree and attach evidence that the server was the branch's build, not a cached bundle."
+    run: runbook-2026-10-issue-135
+  - query: "need the cypress run for the remote feature worktree, headless, with the exact base URL it used and the host, the worktree and the sha written next to every trace path"
+    run: runbook-2026-10-issue-135
+  - query: "run the browser tests against the dashboard worktree on the remote host; the preview on my side forwards a different local port, so make clear which URL is which"
+    run: runbook-2026-10-issue-135
+  - query: "Start whatever the end-to-end tests need in the remote worktree for the search feature, run only the cart spec, and stop exactly what you started."
+    run: runbook-2026-10-issue-135
 boundaries:
   - query: Run the e2e tests in the checkout worktree and just list failures with screenshots, no fixing.
     confusable_with: [daintree.ci.diagnose-and-fix]
@@ -61,6 +97,36 @@ boundaries:
   - query: "run the end-to-end suite in the second host's worktree; its database and port are its own already, just give me the pass and fail list"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
+  - query: "run the Playwright suite for this commit on the Linux host and prove which server it exercised"
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-135
+  - query: "on the mac host alone, run only the e2e specs for this branch and show the server was its own"
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-135
+  - query: "run the whole e2e suite on the remote worktree in one piece, no splitting between machines, and prove which server answered"
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-135
+  - query: "the preview on the host looks fine; run the browser specs against that worktree's own server and tell me which listener they hit"
+    confusable_with: [daintree.runtime.debug-web-app]
+    run: runbook-2026-10-issue-135
+  - query: "make sure the integration tests on the other machine really hit this checkout's server and not another worktree's"
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: runbook-2026-10-issue-135
+  - query: "keep readable trace references for the e2e run on the remote worktree and show which server it used"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-135
+  - query: "check the end-to-end provenance of that remote worktree's server and give me report locations I can read"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-135
+  - query: "run the cypress spec for this worktree at the commit named and prove the server was this checkout's, then reply with the report location"
+    confusable_with: [daintree.hosts.verify-for-hub]
+    run: runbook-2026-10-issue-135
+  - query: "run the e2e specs on the other machine's worktree; those need the app up, so prove which server served them"
+    confusable_with: [daintree.ci.run-local-checks]
+    run: runbook-2026-10-issue-135
+  - query: "the integration run on the remote machine passed; demonstrate it never reached another worktree's app"
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: runbook-2026-10-issue-135
 followups:
   - query: rerun just those two with tracing on
     history:
@@ -92,6 +158,18 @@ followups:
       - 'assistant: In worktree feat/search (b3d9f02) the Playwright suite passed 31/31 against the server I started on port 4520, verified by its /health build sha.'
     active: [daintree.ci.run-e2e-suite]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "who started the server that ran those end-to-end specs, and was it already listening before you began?"
+    history:
+      - "user: run the Playwright suite in the remote worktree for feature/orders"
+      - "assistant: The suite passed 52 of 52 on the build host against http://localhost:4411, served by pid 8123 from that worktree with a build marker matching its HEAD 9f3c1aa; the HTML report is in playwright-report on that host."
+    active: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "ok, rerun it on a fresh port"
+    history:
+      - "user: run the Cypress suite in the remote worktree for feature/search"
+      - "assistant: Cypress finished on the host with 3 failures. The server's build marker did not match HEAD, so I rejected the run as a stale server and stopped what I had started."
+    active: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
 topic_shifts:
   - query: now the Playwright tests too — those need the server up
     history:
@@ -129,3 +207,15 @@ topic_shifts:
       - 'assistant: claude-3 rebased feat/cart onto main (now 8c7b6a5) in its worktree; conflicts in cart.ts resolved, unit tests pass.'
     active: [daintree.git.sync-with-base]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "now run the browser specs on that remote worktree and make sure the server is its own"
+    history:
+      - "user: pull main into the remote worktree for feature/orders"
+      - "assistant: The agent on the build host merged main into that worktree without conflicts."
+    active: [daintree.git.sync-with-base]
+    run: runbook-2026-10-issue-135
+  - query: "that's fixed, now run the e2e spec against the host worktree and prove it used its own server"
+    history:
+      - "user: the preview on the build host shows a white screen after login"
+      - "assistant: The agent fixed an undefined session lookup; the preview now loads and the console is clean."
+    active: [daintree.runtime.debug-web-app]
+    run: runbook-2026-10-issue-135

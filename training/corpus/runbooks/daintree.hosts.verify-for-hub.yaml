@@ -181,3 +181,9 @@ boundaries:
   - query: 'hub request: put commit 8a1d3b7 through the schema conformance checks on this machine and send back pass and fail counts without changing anything'
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
+  - query: "hub message: run npm test and the linter at this commit in a clean worktree on this machine and send back the failing tests by name"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "the hub asked this host to verify a commit with the unit tests, nothing changed, and to report the counts"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135

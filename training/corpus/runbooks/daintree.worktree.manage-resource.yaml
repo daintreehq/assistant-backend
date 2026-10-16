@@ -295,6 +295,12 @@ boundaries:
   - query: pause my worktree's cloud devbox overnight and tell me what it costs while it is paused
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: "what state is the api worktree's cloud box in, and can it be paused until monday to cut the bill"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
+  - query: "provision the remote resource for the api worktree and tell me its status"
+    confusable_with: [daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-135
 followups:
   - query: pause it then
     history:
