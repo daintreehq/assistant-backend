@@ -368,7 +368,7 @@ trials:
       - "Two hosts with enrolled lanes in {project}: {host_a} on Claude Code, {host_b} signed in to Codex only; Claude Code or Codex signed in on the Shell, with {project} open there."
     steps:
       - say: |-
-          Have {host_a} and {host_b} both add a --currency flag to the CLI in {project}, with tests, and pick the better one. Launch any agents with model haiku.
+          Have {host_a} and {host_b} both add a --currency flag to the CLI in {project}, with tests, and pick the better one. Use model haiku for any Claude Code agents.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
         expect:
           hub:
