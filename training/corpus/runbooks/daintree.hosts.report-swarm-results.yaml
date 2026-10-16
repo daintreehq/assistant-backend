@@ -87,6 +87,9 @@ boundaries:
     confusable_with: [daintree.git.summarize-activity]
   - query: don't tell me why it went wrong, just list for each host what it delivered, what failed and what is missing
     confusable_with: [daintree.agents.postmortem-run]
+  - query: 'the run on the other machines ended, so write up its final results from the hub, the hosts'' lanes only get a read-only question each'
+    confusable_with: [daintree.hosts.handle-hub-message]
+    run: runbook-2026-10-issue-120
 
 followups:
   - query: ok they're all in now, write the final report with every host's commit checked

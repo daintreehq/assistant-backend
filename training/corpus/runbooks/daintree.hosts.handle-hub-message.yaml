@@ -235,3 +235,12 @@ boundaries:
   - query: "on this host: the hub wants to know which node version we have, reply to it"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: 'the hub''s message in my assistant inbox wants a read-only account of its unit here, commits, check results and anything the work left running, and nothing changed. Read it and answer through the inbox.'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'a message from the hub is waiting in my inbox asking for the panes, worktrees and dev servers its run left on this machine, plus the SHA and exit codes for its unit. Handle it and reply.'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'the hub''s inbox message asks what is unpushed or still serving from the run it gave this lane, without touching anything. Read it and reply to the hub.'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120

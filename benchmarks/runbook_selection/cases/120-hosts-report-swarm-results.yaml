@@ -22,8 +22,7 @@ cases:
     category: single-runbook
     note: >-
       The issue's first request, after a run on the hosts. Decided by "when a run SENT to the
-      Remote Hosts is over, finished or stopped, and the person wants the FINAL ACCOUNT of it,
-      trusted". On its own the sentence reads as sending work to every host
+      Remote Hosts has ENDED, or been stopped, and the person wants its FINAL ACCOUNT, trusted". On its own the sentence reads as sending work to every host
       (daintree.hosts.swarm-fan-out); the history is what makes it a report.
     messages:
       - role: user
@@ -39,9 +38,8 @@ cases:
   - id: report-swarm-results-issue-summarise
     category: single-runbook
     note: >-
-      The issue's second request. Decided by "one report with a row for every assigned unit ...
-      each false or missing report named, and the dev servers, panes, worktrees and unpushed work
-      left behind with who decides". At base it selected daintree.git.summarize-activity and
+      The issue's second request. Decided by "each false or missing report named, and the dev
+      servers, panes, worktrees and unpushed work left behind with who decides". At base it selected daintree.git.summarize-activity and
       daintree.hosts.reassign-host-work.
     messages:
       - role: user
@@ -67,8 +65,7 @@ cases:
     category: single-runbook
     note: >-
       How an agent writes the search for this task. Decided by "one report with a row for every
-      assigned unit ... host, project, branch, exact SHA and checks, hub-verified versus
-      host-claimed".
+      assigned unit" and "hub-verified versus host-claimed".
     messages:
       - role: user
         content: >-
@@ -83,7 +80,7 @@ cases:
     category: single-runbook
     note: >-
       A casual line from the person after the hosts finished. Decided by "which machines really
-      finished, which only said so, and what did they leave running".
+      delivered, which only said so, and what did they leave running".
     messages:
       - role: user
         content: ok the hosts are all done, write it up and tell me which ones actually delivered and which only said they did
@@ -110,7 +107,7 @@ cases:
     category: single-runbook
     note: >-
       A reply that did not come through whole. Decided by "each false or missing report named"
-      and "It starts, pushes, publishes and cleans up nothing".
+      and "It changes nothing".
     messages:
       - role: user
         content: >-
@@ -124,9 +121,8 @@ cases:
   - id: report-swarm-results-not-supervise-swarm
     category: routing-trap
     note: >-
-      The hosts are all in and the person wants the final account. Decided by "Do not use for
-      keeping a run moving while it works (daintree.hosts.supervise-swarm)" and "over, finished
-      or stopped". The neighbour is wrong here: nothing is left to follow.
+      The hosts are all in and the person wants the final account. Decided by "keeping a run
+      moving while it works (daintree.hosts.supervise-swarm)" and "has ENDED, or been stopped". The neighbour is wrong here: nothing is left to follow.
     messages:
       - role: user
         content: All four hosts have reported on the run. Write the final report, which units are verified on the remote and which only say they finished.
@@ -138,9 +134,7 @@ cases:
     category: routing-trap
     note: >-
       The run ended and the person wants the account with leftovers listed, nothing removed.
-      Decided by "Do not use for what became of work after a restart
-      (daintree.hosts.recover-and-clean-up)" and "It starts, pushes, publishes and cleans up
-      nothing".
+      Decided by "what became of work after a restart (daintree.hosts.recover-and-clean-up)" and "It changes nothing".
     messages:
       - role: user
         content: The cross-machine run ended last night. Give me the final report of what each host produced, and list whatever is still running over there.
@@ -151,8 +145,8 @@ cases:
   - id: report-swarm-results-not-steer-swarm
     category: routing-trap
     note: >-
-      A run already stopped, now the account of it. Decided by "Do not use for ... stopping or
-      changing it (daintree.hosts.steer-swarm)" and "over, finished or stopped".
+      A run already stopped, now the account of it. Decided by "stopping or changing it
+      (daintree.hosts.steer-swarm)" and "has ENDED, or been stopped".
     messages:
       - role: user
         content: I stopped the remote run this morning. Write the final report of what each host had finished by then, with every commit checked.
@@ -163,8 +157,7 @@ cases:
   - id: report-swarm-results-not-delegate-to-host
     category: routing-trap
     note: >-
-      Several units done, one report wanted. Decided by "Do not use for one host's result before
-      the next step (daintree.hosts.delegate-to-host)" and "a row for every assigned unit".
+      Several units done, one report wanted. Decided by "one host's result before the next step (daintree.hosts.delegate-to-host)" and "a row for every assigned unit".
     messages:
       - role: user
         content: Both hosts finished their parts. Put it all in one final report with every commit checked on the remote and any checks that were skipped.
@@ -175,8 +168,7 @@ cases:
   - id: report-swarm-results-not-verify-agent-work
     category: routing-trap
     note: >-
-      Hosts' claims, not one local agent's. Decided by "Do not use for ... one agent on this
-      machine (daintree.orchestration.verify-agent-work)" and "hub-verified versus host-claimed".
+      Hosts' claims, not one local agent's. Decided by "one agent on this machine (daintree.orchestration.verify-agent-work)" and "hub-verified versus host-claimed".
     messages:
       - role: user
         content: One of the hosts claimed it was finished but I can't see its branch. Write up the run's results and call out any report that does not hold up.
@@ -187,8 +179,7 @@ cases:
   - id: report-swarm-results-not-summarize-activity
     category: routing-trap
     note: >-
-      A run's account, not a dated standup. Decided by "Do not use for ... dated repository
-      activity (daintree.git.summarize-activity)" and "a row for every assigned unit".
+      A run's account, not a dated standup. Decided by "dated repository activity (daintree.git.summarize-activity)" and "a row for every assigned unit".
     messages:
       - role: user
         content: Which of my machines really delivered? Show me the commits and the test results side by side, claimed versus checked.
@@ -199,12 +190,48 @@ cases:
   - id: report-swarm-results-not-postmortem-run
     category: routing-trap
     note: >-
-      What happened, not why it went wrong. Decided by "Do not use for ... why a local run
-      failed (daintree.agents.postmortem-run)" and "failed, expired, unreachable and silent ones
+      What happened, not why it went wrong. Decided by "why a local run failed (daintree.agents.postmortem-run)" and "failed, expired, unreachable and silent ones
       too".
     messages:
       - role: user
         content: The build box never answered and the two minis said done. Final report please, with a row for the silent one too.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-check-usage-limits
+    category: routing-trap
+    note: >-
+      The run's results, not the allowance left. Decided by "agent usage left on the hosts
+      (daintree.hosts.check-usage-limits)" and "one report with a row for every assigned unit".
+    messages:
+      - role: user
+        content: The run has ended. Write the final report of what each host got done with the Claude and Codex time it used, and what is verified.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      A difference between hosts is reported, not diagnosed. Decided by "why hosts behave
+      differently (daintree.hosts.diagnose-host-differences)" and "hub-verified versus
+      host-claimed".
+    messages:
+      - role: user
+        content: The run ended with one host failing a test the others passed. Write the final report with each unit's claimed and verified result; the cause can wait.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-integrate-host-branches
+    category: routing-trap
+    note: >-
+      Nothing is combined, only reported. Decided by "combining their branches
+      (daintree.hosts.integrate-host-branches)" and "It changes nothing".
+    messages:
+      - role: user
+        content: All the hosts' branches are pushed. Write the final report of what each one delivered and whether it is verified, with no merging.
     expect:
       required: [daintree.hosts.report-swarm-results]
       optional: [daintree.hosts.foundation, daintree.foundation]
@@ -343,3 +370,30 @@ cases:
     expect:
       required: [daintree.hosts.swarm-fan-out]
       optional: [daintree.hosts.foundation, daintree.foundation, daintree.orchestration.fan-out-work]
+
+  - id: report-swarm-results-reverse-delegate-to-host
+    category: routing-trap
+    note: >-
+      One piece of work for one host. daintree.hosts.delegate-to-host wins by "ONE piece of WORK
+      done by the Daintree assistant on another machine".
+    messages:
+      - role: user
+        content: Have the build box add the 0.3.1 changelog entry on a new branch pushed to origin, and tell me the SHA once it is checked.
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-handle-hub-message
+    category: routing-trap
+    note: >-
+      On the receiving host the hub's read-only question is a message to answer, not a report to
+      write. daintree.hosts.handle-hub-message wins by the message the hub sent its lane; the
+      hub's own report procedure must not load. At authoring this routed to the report
+      (untrained, shared vocabulary): the boundary is carried by corpus rows and owed to the next
+      retrain.
+    messages:
+      - role: user
+        content: The hub's message asks this host for a read-only account of its unit - branch, full SHA, each check's exit code, and every pane, worktree and dev server the run left here - changing nothing. Handle it.
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
