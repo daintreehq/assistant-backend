@@ -1,0 +1,319 @@
+# daintree.hosts.race-and-review: the hub has several Remote Hosts build the same task on their
+# own pushed branches and an agent that built none rank the attempts blind (race), or has a host
+# that built nothing review another host's pushed commit, findings carried back to the builder for
+# a capped number of rounds (cross-review). Recall cases are the issue's six requests, machine
+# names scrubbed (two as second turns after a host pushed a branch, which is what "this branch"
+# and "a second opinion" refer to), plus agent-phrased race and cross-review outcomes and a fix
+# loop. Routing traps: this runbook wins against each declared neighbour. Reverse traps: the
+# neighbour wins and this runbook must not ride along. The hosts foundation may ride along.
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: race-and-review-agent-race
+    category: single-runbook
+    note: >-
+      Agent-phrased race. Decided by "the hosts' attempts, each on its own pushed branch, ranked
+      with reasons by an agent that built none of them".
+    messages:
+      - role: user
+        content: The user wants the same pagination fix built by two Remote Hosts on separate pushed branches, then an agent that wrote neither attempt to rank them against the acceptance criteria
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-pick-better
+    category: single-runbook
+    note: >-
+      The issue's first request, machine names scrubbed. Decided by its own example "have two of
+      my machines both try this and pick the better one".
+    messages:
+      - role: user
+        content: have the mini and the tower both try the cache fix and pick the better one
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-best-of-three
+    category: single-runbook
+    note: >-
+      The issue's best-of-three request with the machine names scrubbed. Decided by "best of
+      three across my hosts".
+    messages:
+      - role: user
+        content: best of three across my machines for the retry wrapper
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-race-this
+    category: single-runbook
+    note: >-
+      The issue's race request with the machine names scrubbed. Decided by "race this across my
+      machines".
+    messages:
+      - role: user
+        content: Race this across my remote hosts.
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-codex-review-pushed
+    category: single-runbook
+    note: >-
+      The issue's second request, scrubbed: one host's pushed branch reviewed by another host's
+      Codex. Decided by "get Codex on the build box to review the branch the other Mac just
+      pushed"; daintree.hosts.delegate-to-host keeps "the person's own branch reviewed on one
+      host", and this branch was built by a host.
+    messages:
+      - role: user
+        content: get codex on the build box to review the branch the other mac just pushed
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-another-machine-this-branch
+    category: continuation
+    note: >-
+      The issue's request to have another machine review this branch, as the turn after a host
+      pushed it. Decided by "have another machine review what that host built".
+    messages:
+      - role: user
+        content: get the tower to build the csv export on a fresh branch and push it
+      - role: assistant
+        content: The tower finished and pushed its branch; the commit it reported is on the remote.
+      - role: user
+        content: Have another machine review this branch.
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-second-opinion
+    category: continuation
+    note: >-
+      The issue's request for a second opinion from Codex on a named machine, scrubbed, after a
+      host pushed its work. Decided by "get a second opinion from another host on that branch".
+    messages:
+      - role: user
+        content: have the mini write the retry helper on its own branch and push it
+      - role: assistant
+        content: The mini pushed its branch and I confirmed the commit on the remote.
+      - role: user
+        content: Now have Codex on the build box give a second opinion on it.
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-fix-loop
+    category: single-runbook
+    note: >-
+      Cross-review with findings returned to the builder under a round cap. Decided by "its
+      findings sent back to the builder to fix if the person wants" and "fixed for at most a
+      stated number of rounds".
+    messages:
+      - role: user
+        content: the linux box pushed the auth refactor; have the other mac review that commit and send what it finds back to the linux box to fix, two rounds at most
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-agent-cross-review
+    category: single-runbook
+    note: >-
+      Agent-phrased cross-review from the hub. Decided by "one host's pushed commit reviewed at
+      that SHA by a different host, ideally under another agent CLI".
+    messages:
+      - role: user
+        content: From the hub, have one Remote Host review the commit another Remote Host pushed, using a different agent CLI, and bring back the findings
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ routing traps
+  - id: race-and-review-trap-swarm-fan-out
+    category: routing-trap
+    note: >-
+      The attempts judged, not tabled. Decided by "ranked with reasons by an agent that built
+      none of them"; daintree.hosts.swarm-fan-out is "the same work on every host with no
+      judging".
+    messages:
+      - role: user
+        content: I don't want a table of every host's version, I want the hosts' attempts ranked by someone who built none of them
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-competition
+    category: routing-trap
+    note: >-
+      The builders are Remote Hosts; only the judge is local. Decided by "ranked with reasons by
+      an agent that built none of them"; daintree.orchestration.competition is "rival attempts
+      or a review by agents on this machine".
+    messages:
+      - role: user
+        content: two of my remote machines each build the rate limiter and an agent here judges which is better
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-integrate
+    category: routing-trap
+    note: >-
+      Choosing one attempt, not combining them. Decided by "the winner, any merge and branch
+      cleanup stay the person's" after a ranking; daintree.hosts.integrate-host-branches is "the hosts' branches combined
+      into one".
+    messages:
+      - role: user
+        content: don't merge the hosts' branches, just have a reviewer that built none of them say which attempt is best
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-delegate
+    category: routing-trap
+    note: >-
+      One host's work reviewed by another host. Decided by "one host's pushed commit reviewed
+      at that SHA by a different host"; daintree.hosts.delegate-to-host is "one unit of work or
+      the person's own branch reviewed on one host".
+    messages:
+      - role: user
+        content: from the hub, have one remote host review the work another remote host pushed
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-review-change
+    category: routing-trap
+    note: >-
+      The reviewer is another machine reviewing a host's commit. Decided by "one host's pushed
+      commit reviewed at that SHA by a different host"; daintree.review.review-change is "a
+      review by agents on this machine".
+    messages:
+      - role: user
+        content: have a second machine review the commit the build box pushed, findings only
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-review-for-hub
+    category: routing-trap
+    note: >-
+      The hub arranging a cross-review, not a lane carrying one out. Decided by "its findings
+      sent back to the builder to fix if the person wants" and "fixed for at most a stated
+      number of rounds"; daintree.hosts.review-for-hub is "on a host's lane, building or
+      reviewing what the hub sent".
+    messages:
+      - role: user
+        content: 'cross-review: the tower''s branch reviewed by codex on another host, findings back to the tower, at most two rounds'
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-run-local-cohort
+    category: routing-trap
+    note: >-
+      Rival attempts on several machines, asked at the hub. Decided by "have two of my machines
+      both try this and pick the better one"; daintree.hosts.run-local-cohort is "several
+      attempts there", on a host's lane.
+    messages:
+      - role: user
+        content: let both my macs have a go at the cache bug and tell me whose fix is better
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-trap-do-delegated-work
+    category: routing-trap
+    note: >-
+      Building is one phase of a race the hub runs. Decided by "the hosts' attempts, each on its
+      own pushed branch, ranked with reasons by an agent that built none of them";
+      daintree.hosts.do-delegated-work is "on a host's lane, building or reviewing what the hub
+      sent".
+    messages:
+      - role: user
+        content: have claude on one machine and codex on the other each build the retry logic then get a reviewer that didn't write either to pick one
+    expect:
+      required: [daintree.hosts.race-and-review]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ reverse traps
+  - id: race-and-review-reverse-swarm-fan-out
+    category: routing-trap
+    note: >-
+      Every host's version, no winner. daintree.hosts.swarm-fan-out wins on "the same work on
+      every host with no judging" (this runbook's fence).
+    messages:
+      - role: user
+        content: have every host build the slugify helper and show me a row per machine, no need to pick one
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-reverse-competition
+    category: routing-trap
+    note: >-
+      Rival entries by agents on this machine. daintree.orchestration.competition wins on "rival
+      attempts or a review by agents on this machine" (this runbook's fence).
+    messages:
+      - role: user
+        content: two agents on this laptop each take their own run at the date parser in separate worktrees, then judge whose is better
+    expect:
+      required: [daintree.orchestration.competition]
+
+  - id: race-and-review-reverse-delegate
+    category: routing-trap
+    note: >-
+      One unit for one host, nothing judged. daintree.hosts.delegate-to-host wins on "one unit of
+      work" (this runbook's fence).
+    messages:
+      - role: user
+        content: have the linux box's assistant add the retry wrapper on a new branch and report back the commit
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-reverse-review-change
+    category: routing-trap
+    note: >-
+      Reviewers on this machine. daintree.review.review-change wins on "a review by agents on this
+      machine" (this runbook's fence).
+    messages:
+      - role: user
+        content: have a couple of fresh reviewers here look over the branch I just pushed and merge their findings
+    expect:
+      required: [daintree.review.review-change]
+
+  - id: race-and-review-reverse-integrate
+    category: routing-trap
+    note: >-
+      Combining, not choosing. daintree.hosts.integrate-host-branches wins on "the hosts'
+      branches combined into one" (this runbook's fence).
+    messages:
+      - role: user
+        content: both hosts pushed their halves; get the build box to merge them into one branch and run the tests
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-reverse-review-for-hub
+    category: routing-trap
+    note: >-
+      A lane given a review to do. daintree.hosts.review-for-hub wins on "on a host's lane,
+      building or reviewing what the hub sent" (this runbook's fence).
+    messages:
+      - role: user
+        content: 'hub message: review the race attempt at commit 4be21f0 against the criteria and reply findings only'
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-reverse-run-local-cohort
+    category: routing-trap
+    note: >-
+      The hub asked THIS machine for rival attempts. daintree.hosts.run-local-cohort wins on
+      "several attempts there", on a host's lane (this runbook's fence).
+    messages:
+      - role: user
+        content: the hub asked this machine for two rival takes on the importer, each in its own worktree, and which one is better
+    expect:
+      required: [daintree.hosts.run-local-cohort]
+      optional: [daintree.hosts.foundation]
