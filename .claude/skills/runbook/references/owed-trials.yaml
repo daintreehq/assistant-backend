@@ -1342,6 +1342,7 @@ trials:
     execution:
       - "The hub asked each lane what node --test collects and supports before assigning parts (hub transcript)."
       - "The retry names the original task in referenceTaskIds and, in its text, the run, part, attempt and original taskId; the report counts the duplicate copy once and names it (hub transcript)."
+
   - id: undo-swarm-changes
     runbook: daintree.hosts.undo-swarm-changes
     also: [daintree.hosts.handle-hub-message, daintree.git.undo-agent-changes]
@@ -1489,3 +1490,128 @@ trials:
       - "The format's branch holds the first version and then the second; nothing force-pushed."
     execution:
       - "The hub reported {host_b}'s pause acknowledgement and adoption as unresolved, never as adopted or done, and named what brings it back: the person turning messaging on again there (hub transcript)."
+  - id: timebox-swarm
+    runbook: daintree.hosts.timebox-swarm
+    also: [daintree.orchestration.timebox-attempt, daintree.hosts.handle-hub-message]
+    issue: 152
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}, cloned on the Shell and on both hosts."
+    steps:
+      - say: |-
+          I need {host_a} and {host_b} stopped at exactly ten minutes no matter what, guaranteed. Have each of them try rewriting the tally CLI's argument parsing on its own new branch.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.timebox-swarm]
+            never: [host.sendMessage, host.startAssistant]
+      - say: |-
+          Best effort on each host is fine. {host_a}: five minutes to fix the spelling mistakes in the README. {host_b}: five minutes on the argument parsing rewrite with full test coverage. Each on its own new branch, no pushing; then tell me how far each got and whether it really stopped by the deadline. Launch any agents with model haiku.
+        expect:
+          hub:
+            calls: [host.listAssistants, host.sendMessage]
+            never: [host.cancelTask, host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.orchestration.timebox-attempt]
+            calls: [assistant.getInbox, worktree.createWithRecipe, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - say: Time is up. Which hosts stopped, and what did each one get?
+        expect:
+          hub:
+            calls: [host.getTask]
+            never: [host.sendMessage]
+    checks:
+      - "git ls-remote {remote} shows neither host's new branch: nothing was pushed."
+      - "On {host_b}: the worker pane is open at its prompt with its last turn interrupted at or soon after the deadline, and its worktree still holds the partial edits (git status before teardown)."
+      - "On {host_a}: the README fix is in its worktree, finished before the deadline; its pane is still open."
+      - "The Shell's record (Settings > Hosts overview): exactly one exchange per host for the bounded brief, completed; nothing resent or canceled."
+    execution:
+      - "On the first prompt the hub said a stop guaranteed on every host cannot be had and sent nothing until the person accepted best effort (hub transcript)."
+      - "Each brief named an absolute UTC deadline with its date; no send carried waitMs; the hub ended its turn after sending; a Claude Code hub set at most one native wakeup, a Codex hub set none (hub transcript)."
+      - "Each lane kept the hub's deadline through worktree setup instead of starting a new clock, and replied with its read time, its launch and stop-seen times and what enforced the stop (lane transcripts)."
+      - "The hub's table kept finished early, stopped by the deadline, stopped late and unconfirmed apart, using each lane's own times and the clock delta from delivery.acceptedAt (hub transcript)."
+
+  - id: timebox-swarm-wait-cut-short
+    runbook: daintree.hosts.timebox-swarm
+    also: [daintree.orchestration.timebox-attempt]
+    issue: 152
+    caller: hub
+    path: staged
+    hosts: 1
+    status: owed
+    combos:
+      - {hub: claude, lane: claude}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Start {host_a}'s instance with MCP_TOOL_TIMEOUT=60000 in its environment (the app keeps a value already set, lifecycle.ts:728-732), so its Claude Code lane's MCP calls end after a minute."
+      - "Enroll a Claude Code lane in {project} on {host_a}; {project} at {sha} on {remote}, cloned on the Shell and on {host_a}."
+    steps:
+      - say: |-
+          Give {host_a} eight minutes to rewrite the tally CLI's argument parsing with full test coverage on a new branch, then stop it and report how far it got. Best effort is fine; no pushing. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.timebox-swarm]
+            calls: [host.sendMessage]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.orchestration.timebox-attempt]
+            calls: [agent.launch, assistant.reply]
+            notices: [lane-wake]
+    checks:
+      - "On {host_a}: one worker pane for the unit, still open, its worktree and edits intact; nothing relaunched, closed or discarded."
+      - "The Shell's record: one exchange, completed after the deadline; nothing resent."
+    execution:
+      - "The lane's first held wait ended after about a minute with no reply; the lane then kept holding in short waits to the deadline or ended its turn on the agent's own clock, and its reply says which enforced the stop (lane transcript)."
+      - "The hub reported the stop as the lane described it (enforced by the lane's waits, or only by the agent's own clock, or late), never as a clean stop by the deadline the lane did not confirm (hub transcript)."
+
+  - id: timebox-swarm-disconnected-host
+    runbook: daintree.hosts.timebox-swarm
+    also: [daintree.orchestration.timebox-attempt]
+    issue: 152
+    caller: hub
+    path: fleet
+    hosts: 2
+    needs: [real-ssh]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Two real hosts with enrolled lanes in {project}; {project} at {sha} on {remote}, reachable from every machine."
+    steps:
+      - say: |-
+          Give {host_a} and {host_b} ten minutes each to try rewriting the tally CLI's argument parsing on their own new branches, then stop and tell me which really stopped. Best effort is fine; no pushing. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.timebox-swarm]
+            calls: [host.listAssistants, host.sendMessage]
+          lane:
+            selected: [daintree.orchestration.timebox-attempt]
+            notices: [lane-wake]
+      - person: "Once {host_b}'s worker has started, take {host_b} off the network (Wi-Fi off or cable out) and keep it off until twenty minutes past the deadline."
+      - say: The ten minutes are up. Where does each host stand?
+        expect:
+          hub:
+            calls: [host.getTask]
+            never: [host.startAssistant, host.cancelTask]
+      - person: "Bring {host_b} back online and wait for the Shell to show it connected."
+      - say: Is {host_b} back? What did it get, and did it stop?
+        expect:
+          hub:
+            calls: [host.getTask]
+            never: [host.startAssistant]
+    checks:
+      - "On {host_b} after the link returned: its worker's pane state (stopped at its prompt, or still working) and its worktree edits match what the hub finally reported."
+      - "The Shell's record: one bounded exchange per host; nothing resent after the link returned; {host_b}'s lane kept its generation."
+    execution:
+      - "During the outage the hub reported {host_b} as unconfirmed with its last known state, never as stopped (hub transcript)."
+      - "After the link returned the hub read {host_b}'s reply once and classified its stop from the lane's own times and screen evidence (hub transcript)."
