@@ -204,7 +204,7 @@ boundaries:
   - query: withdraw what I sent to the remote hosts that was not read yet and stop the rest
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
-  - query: 'stop the run on all my other machines now and keep what they''ve done'
+  - query: 'hold everything the remote boxes are doing, do not discard their edits, and tell me which ones confirmed'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
   - query: 'change the acceptance criteria for the work already out on the remote hosts; the rest of the brief stands'

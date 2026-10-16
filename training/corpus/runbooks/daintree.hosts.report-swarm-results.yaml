@@ -21,24 +21,24 @@ positives:
   - the remote run is done, give me the final report with a row for each machine and what you checked yourself
   - which of the hosts really finished the job and which ones only said they had?
   - write up the cross-machine run for me - commits, test results, and what's still unresolved
-  - put together the end-of-run summary for the swarm, verified against the remote, not just repeating what the hosts told you
+  - 'sign-off time for the schema upgrade the machines ran last night - for each one, which commit is really on origin, what was run against it, and what I still have to decide'
   - every host has either reported or gone quiet, so tell me where the whole run ended up, one row per machine
   - 'I need the closing report on the multi-machine job, including the box that never replied'
   - final account of the overnight run on my other macs, please, and flag anything a host claimed that you couldn't confirm
   - did all three machines actually push what they said they pushed? write the results up
-  - give me a verified results table for the swarm, each commit confirmed on the remote and each test claim marked as claimed or confirmed
+  - the lint cleanup went to four minis. which commits are really on origin, which test claims could you confirm, and which are only their word?
   - the hosts have all stopped, so produce the final write-up - what landed, what failed, what is missing, and what is still running over there
   - one of my remote machines is probably still running a dev server from that run. Can you write the final report and list everything it left behind?
   - after the run, list the leftover panes, worktrees and servers on each machine and who should decide what happens to them, in the final report
   - summarize the finished swarm for the team update - branch and exact commit for each host, which checks ran, and what is open
   - audit what each host told us about its unit against what is actually on the remote and in the task records
   - 'morning! the remote job finished while I slept. Can I get the full account, with the machines that never answered shown as missing?'
-  - 'Compile the outcome of the distributed run for the user as one report: host, project, branch, exact SHA, checks run, claimed versus verified, plus unpushed work and running services on each host.'
-  - 'Search task: final reporting for a cross-host run that has ended; needs every unit including failed, expired and unanswered ones, hub-verified commit evidence, and a list of what each host left running.'
+  - 'The overnight job was porting the date helpers to the new locale API on three machines. Two pushed branches I can see; the third says it did too and I cannot find it. Write me the closing report for all three without taking their word for any of it.'
+  - 'Four hosts were each assigned a flaky-test fix. One reported green, one was never answered, one record shows it expired, and the fourth pushed nothing I can see. The person wants the end-of-run report for all four assignments with only what is confirmed on the remote.'
   - collect what each of the hosts produced into one result I can trust, and call out any report that doesn't check out
   - the three minis are finished. which commits are real, which tests actually passed, and what did they leave open?
   - I called off the run on the other machines an hour ago. give me the report of what each one had actually delivered by then
-  - report on the swarm - for each host the commit on the remote, whether its checks were confirmed, and anything it still has unpushed
+  - the build box finished the cache work and says it pushed cache-v2, but the mac mini's log only says done. tell me what each really has on origin and unpushed, in one report
   - one host said 'all tests pass' but never gave me a branch. put that in a final report of the run alongside the others
   - 'Hey, quick one: can you produce the wrap-up for the remote run, verified, with leftovers and who owns each decision?'
   - wrap up the cross-machine job - one table, what came back, what's proven, what's missing
@@ -48,13 +48,13 @@ positives:
   - 'After that run I got a message from one machine saying it finished early, and nothing at all from another. Give me the final report that treats those two honestly next to the machines that behaved.'
   - 'we sent the refactor to every host last night. now build the final report. a failed host still gets a row, same for one that never answered'
   - the other machines are done. what does the verified result of the whole run look like, and what's still up over there?
-  - end of run - produce a results report that names every host's commit, shows which test claims were confirmed against the forge, and lists remaining dev servers and branches
-  - verify and report the swarm's completion claims, unit by unit, from the task records and the shared remote
+  - we stopped the retry-wrapper job after a day. report on each machine - the commit on origin, which test claims held up against CI, and which servers it left up
+  - the three machines that did the upgrade all say done. go through the task records and the remote and tell me which of the three I should believe
   - we're closing out the cross-host work. report what exists on the remote, what the hosts only claim, and which items need a decision from me
   - did the run produce what the hosts said it did? give me the final report with unresolved work and who owns it
-  - 'one machine''s reply was cut off in the middle of its failing tests. finish the report of the run, getting the missing failure details from that host as references, nothing posted publicly'
+  - 'the build box says its full test log is too big to send back and only gave me a path on its own disk. I still need the final report for the run, so get whatever summary it can give without putting that log anywhere public'
   - 'I can see a task record that says completed for the build box but no commit anywhere. include that in the final account'
-  - final report for the multi-host run please. keep what the hosts claimed apart from what you confirmed, and show the times from the task records
+  - wrap up Friday's migration for the team - per machine the commit that is really there, the times from the records, and who decides what happens to the half-finished branch
 
 boundaries:
   - query: all the hosts have reported on the run, write the verified final report with a row for each unit
@@ -114,7 +114,7 @@ followups:
   - query: and which of those claims did you actually confirm? write it all up
     history:
       - 'user: have every host run the full test suite on the release commit'
-      - 'assistant: Every host replied. Two say all green, one says two failures, one has not answered.'
+      - 'assistant: The run has ended. Two hosts say all green, one says two failures, and one never answered.'
   - query: perfect, final report please, and mention anything left running on any host
     history:
       - 'user: use the three minis to try the new build script, each on its own branch'

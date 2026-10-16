@@ -236,6 +236,32 @@ cases:
       required: [daintree.hosts.report-swarm-results]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
+  - id: report-swarm-results-not-handle-hub-message
+    category: routing-trap
+    note: >-
+      The hub writing up the lanes' answers, not a lane answering the hub. Decided by "a Remote
+      Host's own assistant answering the hub (daintree.hosts.handle-hub-message,
+      daintree.hosts.steer-for-hub)" and "hub-verified versus host-claimed".
+    messages:
+      - role: user
+        content: The assistants on my other machines replied about the index rebuild. Turn those replies and what origin shows into one closing report for me.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-steer-for-hub
+    category: routing-trap
+    note: >-
+      The agents are already halted and the person wants the account, not the stop. Decided by
+      "a swarm that has ENDED or been stopped" and "a Remote Host's own assistant answering the
+      hub (daintree.hosts.handle-hub-message, daintree.hosts.steer-for-hub)".
+    messages:
+      - role: user
+        content: The agents on the remote machines were told to halt and have gone quiet. Write the closing report on what each machine had finished, checked on origin.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
   # ------------------------------------------------------------------ reverse traps: the neighbour wins
   - id: report-swarm-results-reverse-supervise-swarm
     category: routing-trap
@@ -281,10 +307,10 @@ cases:
       or CHANGED while it is under way".
     messages:
       - role: user
-        content: Call off what I sent to every machine but keep what they have done, and tell me which hosts acknowledged.
+        content: Cancel everything I sent to the remote machines, keep whatever they did, and tell me which ones acknowledged.
     expect:
       required: [daintree.hosts.steer-swarm]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: report-swarm-results-reverse-integrate-host-branches
     category: routing-trap
@@ -308,7 +334,7 @@ cases:
         content: Which of my remote hosts still has Claude or Codex quota, and how much?
     expect:
       required: [daintree.hosts.check-usage-limits]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.agents.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: report-swarm-results-reverse-diagnose-host-differences
     category: routing-trap
@@ -369,7 +395,7 @@ cases:
         content: Try the new lint config on all my hosts at the same time, a separate branch on each.
     expect:
       required: [daintree.hosts.swarm-fan-out]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.orchestration.fan-out-work]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: report-swarm-results-reverse-delegate-to-host
     category: routing-trap
