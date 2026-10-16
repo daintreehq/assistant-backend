@@ -208,6 +208,19 @@ cases:
       required: [daintree.hosts.verify-project-placement]
       optional: [daintree.hosts.foundation]
 
+  - id: verify-project-placement-not-survey-hosts
+    category: routing-trap
+    note: >-
+      Repository identity of the projects that have an assistant, not an inventory of what
+      is there. This runbook's fence: "listing the hosts, projects and open exchanges
+      (daintree.hosts.survey-hosts)".
+    messages:
+      - role: user
+        content: Of the projects the build host has open with an assistant in them, which are really our repository?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
   # ------------------------------------------------------------ reverse traps
   - id: verify-project-placement-reverse-place-work
     category: routing-trap
@@ -279,4 +292,17 @@ cases:
         content: Add my new server as a remote host.
     expect:
       required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-survey-hosts
+    category: routing-trap
+    note: >-
+      An inventory of projects and assistants that take messages. survey-hosts: "which
+      projects have an assistant enrolled and taking messages". verify-project-placement
+      must not ride along.
+    messages:
+      - role: user
+        content: What projects does the build host have open, and are any of them taking messages
+    expect:
+      required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
