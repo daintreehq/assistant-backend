@@ -31,10 +31,15 @@ cases:
   - id: migrate-across-repositories-issue-pilot
     category: single-runbook
     note: >-
-      The issue's second request, with no machine named: "a pilot whose rulebook every host
-      follows" and "one row per selected repository" decide it. Before this runbook it selected
+      The issue's second request, as a continuation that places the repositories on the Remote
+      Hosts: "a pilot whose rulebook every host follows" and "one row per selected repository"
+      decide it. Without the history it is a local sweep (daintree.orchestration.migration-sweep). Before this runbook it selected
       daintree.orchestration.migration-sweep with daintree.orchestration.fan-out-work.
     messages:
+      - role: user
+        content: our api service, web client and docs site are cloned on the build box and the mini, and I want one logging call renamed in all of them
+      - role: assistant
+        content: Those projects are open on the two Remote Hosts.
       - role: user
         content: Run one pilot, then roll the same mechanical change through every selected project.
     expect:
@@ -48,6 +53,10 @@ cases:
       Before this runbook it selected daintree.orchestration.execute-durable-workflow alone; the
       untrained runbook is now co-selected beside it (recall, not strict).
     messages:
+      - role: user
+        content: the three services live on the studio and the mini and each has the old date helper in it
+      - role: assistant
+        content: Those projects are open on the two Remote Hosts.
       - role: user
         content: Coordinate a cross-repository migration sweep with per-repository residual evidence.
     expect:
