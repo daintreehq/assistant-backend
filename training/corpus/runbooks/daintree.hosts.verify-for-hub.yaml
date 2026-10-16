@@ -178,3 +178,6 @@ boundaries:
   - query: 'this lane got one slice of the hub''s split test run, run it here unchanged and report'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: 'hub request: put commit 8a1d3b7 through the schema conformance checks on this machine and send back pass and fail counts without changing anything'
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148

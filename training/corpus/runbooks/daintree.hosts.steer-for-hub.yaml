@@ -177,3 +177,6 @@ boundaries:
   - query: 'hub says park your agents here for tonight and keep their work, report branch and HEAD back to it'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
+  - query: the hub says pause the agent here that is building the consumer, the contract it uses is being revised
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148

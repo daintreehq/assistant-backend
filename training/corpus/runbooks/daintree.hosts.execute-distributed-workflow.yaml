@@ -140,6 +140,12 @@ boundaries:
   - query: "the api commit is verified, release the next stage of the cross-host plan"
     confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
+  - query: the schema unit is done and verified on the remote, release the server and client units on their hosts and keep the docs unit waiting
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148
+  - query: run my four-unit plan across the hosts; the interface between them is already settled, just carry the stages through
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148
 
 followups:
   - query: yes, run it

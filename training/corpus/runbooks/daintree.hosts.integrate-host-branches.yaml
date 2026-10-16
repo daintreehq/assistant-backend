@@ -156,3 +156,6 @@ boundaries:
   - query: 'two machines finished their halves of the migration; get one host to combine both branches and tell me if the tests pass'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: both hosts finished their parts of the same repo, get one machine to merge them into a single branch and run the tests
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148

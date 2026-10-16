@@ -58,6 +58,12 @@ boundaries:
   - query: one agent on the API, one on the UI at the same time, agree the schema first
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-refine
+  - query: two agents here, one per side of the new endpoint, against a schema committed first in this repo
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148
+  - query: agree the types first, then build the server and the web client in parallel worktrees on this machine
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148
 followups:
   - query: contract looks right, go ahead and start both sides
     history:

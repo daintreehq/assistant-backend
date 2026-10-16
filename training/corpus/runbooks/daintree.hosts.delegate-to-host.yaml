@@ -248,6 +248,9 @@ boundaries:
   - query: "have the build host fix the test that only fails there and push a branch"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: have the build box implement the consumer against the schema at commit 5e21c0d, push a branch and tell me the sha
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: runbook-2026-10-issue-148
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

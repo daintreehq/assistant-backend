@@ -1,0 +1,148 @@
+# daintree.hosts.coordinate-contract-change: the hub has one interface contract (an API, a schema, a
+# message format) between projects on different Remote Hosts agreed and frozen at a commit in the one
+# repository that holds it, briefs each side with that exact version on its own repository's base,
+# carries each change as a new version the affected hosts pause for and adopt, and rejects results
+# built on an older version.
+#
+# Positives are invented situations in agent and user words, short and long, some with a social
+# lead-in, an earlier turn or an observation; two how-to questions carry docs. Boundaries are
+# requests this runbook wins against a neighbour whose vocabulary they share: both sides on this
+# machine (contract-first-split), a staged plan (execute-distributed-workflow), one unit for one host
+# (delegate-to-host), a stop or change of sent work (steer-swarm), finished work combined
+# (integrate-host-branches), and the lanes' own building and testing (do-delegated-work,
+# verify-for-hub). Followups and topic shifts are the contract as a second turn. Machine names are
+# generic.
+runbook: daintree.hosts.coordinate-contract-change
+run: runbook-2026-10-issue-148
+
+positives:
+  - coordinate an interface contract between a server repository on one remote host and a client repository on another, then have both lanes implement it
+  - version a shared protobuf schema across two host projects and keep track of which version each lane builds against
+  - freeze the OpenAPI spec in the backend repository at a commit and have the remote frontend lane copy that exact file before it builds
+  - one remote lane asked for a contract amendment mid-build; pause the other side, get version two committed and record each side's adoption
+  - a remote side finished against a superseded contract version; reject that result and get it onto the current one
+  - settle the message format between a producer service and a consumer service that sit in separate repositories on different Remote Hosts
+  - hub workflow for a cross-repository API contract drafted by an agent, approved by the user, then handed to every implementing host
+  - after a schema change, track which repositories on which hosts have adopted the new contract and which have not
+  - check both remote implementations against the agreed contract version with the same compatibility test before calling either done
+  - the webhook payload has to be settled between the billing service on the tower and the notifier on the mini before either writes code
+  - hey, quick one, the mobile app machine wants pagination on the list endpoint; change the spec properly and get the api box onto it too
+  - lock the graphql schema first, then let my two other machines build the gateway and the dashboard against it
+  - the queue message shape between the ingest worker and the indexer needs agreeing, they're separate repos on separate macs
+  - the api host is still building on the first draft of the spec and the client host already took the revised one, sort that out
+  - don't let either machine start building until I've signed off the interface they share
+  - the indexer machine says the event is missing a timestamp. stop both sides, fix the schema, and roll both onto the new version
+  - we changed our minds about the error codes in the api contract, make sure both remote projects pick up the new revision
+  - which version of the contract did each of my hosts end up building against
+  - the sdk repo on the laptop and the service repo on the workstation have to speak the same protocol; set that up first and then have both implement it
+  - one of my hosts edited its own copy of the schema instead of asking; get everyone back on the agreed version
+  - both sides say done but the client was built on v1 of the contract and we're on v2 now
+  - the new version of the contract is out but the frontend box is offline, keep track of who has adopted it and who hasn't
+  - agree the avro schema between the producer repo and the consumer repo on my two remote machines and freeze it
+  - good morning! before the remote agents start on the export feature I want the api shape between the two repos nailed down and signed off by me
+  - query: >-
+      We're splitting the notifications work across machines: the delivery service lives in its own repo on the build
+      box and the preferences UI in another repo on the laptop. I want the payload format, the error responses and a
+      couple of example messages written up and agreed first, then each machine builds its side against exactly that
+      version. If either side needs the format changed partway, it should come back to me rather than improvise.
+  - query: >-
+      The user wants a typed client package in one repository on remote host A and the REST service it calls in another
+      repository on remote host B, built at the same time. The interface should be drafted on a branch by the service
+      side's lane, shown to the user, then sent to both lanes pinned to that commit; any change goes through the hub as a
+      new version.
+  - query: >-
+      Halfway through, the consumer host found the message needs a correlation id. I don't want each machine patching
+      its own copy. Hold the producer, get the shared format updated as a proper new version, then tell both machines
+      to move to it and let me know when each one has confirmed.
+  - contract drift between two remote host repositories, the consumer vendored a modified copy of the schema; restore the agreed version and route changes through the hub
+  - the shared schema for my two remote projects, can we version it so changes don't slip in quietly
+  - tell the producer machine to stop and wait, the event schema it builds against is being revised
+  - the contract between the cli repo and the api repo moved to a new commit; get both hosts onto it and check what they built against it
+  - before the two hosts hand anything back, make sure they're both on the same spec version
+  - we need an api contract the ios repo and the backend repo can both build against, and they're on different machines
+  - both remote lanes have to agree the rpc interface before either implements it; have an agent draft it and show me
+  - the host that owns the schema wants to add an enum value; treat it as a new contract version and work out who needs to adopt it
+  - manage a breaking change to an interface shared by services in three repositories on different Remote Hosts, from pause to confirmed adoption
+  - sorry to pile on, the payments host asked whether it can change the refund response. if yes, do it as a new contract version and get the checkout host onto it as well
+  - keep the backend host and the frontend host on one contract version while they build in parallel
+  - pin the shared types package version both of my remote repos build against and refuse any result built on an older one
+  - the consumer lane replied that the error shape in the contract doesn't cover timeouts; decide that with me and roll it out to both sides
+  - make the schema repository the source of truth for the two services on my other machines, and have each service copy it unchanged
+  - get the interface between the worker repo on the linux box and the scheduler repo on the mac agreed, frozen and built on both sides
+  - query: and do it as a proper contract the two of them share, not each one guessing at the shape
+    history:
+      - "user: the reporting service on the build box needs to call the new usage endpoint the api host is adding"
+      - "assistant: Those are two repositories on two hosts. I can brief both assistants once the interface is settled."
+  - query: then make sure nobody on either machine changes that file on their own
+    history:
+      - "user: write up the order event format with examples and have both remote repos build against it"
+      - "assistant: The producer host's agent will draft the format on a contract branch for you to approve."
+  - query: how do you keep two of my remote machines on the same version of an api contract while they build? set it up for the invoices feature
+    docs: true
+  - query: explain what happens when one remote side needs the shared schema changed halfway, then do it for the order events
+    docs: true
+
+boundaries:
+  - query: contract first and both halves built in parallel, except the halves are separate repositories on my other two macs
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: schema agreed and committed first, then one side built on the build box and the other on the laptop, each in its own repo
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: contract-first parallel build where the api and its client live in different repositories on separate remote hosts
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: the two sides of the interface are not on this machine, they're on two hosts in two repos; agree the types and have each host build its side
+    confusable_with: [daintree.orchestration.contract-first-split]
+  - query: before the units go out to the hosts, the contract the server and client repos share has to be agreed and pinned at a commit
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: the shared contract changed after the api host had started; hold it, put out the new version and get both sides to adopt it
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: an interface amendment in the middle of a cross-host build, record which version each repository has adopted
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: the client host is asking the hub to change the shared api spec; make it a new version that the server host adopts too
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: give the host building the consumer the agreed schema version, and the producer host the very same commit
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: halt the remote hosts that are building against the old spec version and move them onto the amended contract
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: pause the two machines until the revised message schema is committed, then have each confirm it switched over
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: the remote work needs a change, but it's the shared interface that changes, so both repos need the new contract version
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: both hosts pushed their sides; before anything else confirm each was built on the current contract and passes the shared compatibility test
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: the producer and consumer are separate repos so nothing gets merged, just confirm both sides match contract version three
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: brief the consumer host's lane with the frozen contract commit and tell it to stop and ask if the contract needs changing
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: have each remote side run the contract's compatibility test at its final commit and tell me which contract version it passed against
+    confusable_with: [daintree.hosts.verify-for-hub]
+
+followups:
+  - query: ok, freeze that version and send it to both machines
+    history:
+      - "user: draft the event contract between the producer repo and the consumer repo on my two hosts"
+      - "assistant: The contract agent on the producer host committed it at 3c9e1f0: three event types with examples and error cases. Freeze this version and brief both hosts?"
+  - query: the consumer side just asked for a new field, handle it
+    history:
+      - "user: have both machines build against the frozen order schema"
+      - "assistant: Both hosts are building against the contract at 7d21a4b."
+  - query: yes, approve that as the next version
+    history:
+      - "user: get the server host and the client host building against the agreed api spec"
+      - "assistant: The client host asks to make cursor optional in the list response, which changes what the server host builds. Approve it as version 2?"
+  - query: which side still hasn't moved to the new version?
+    history:
+      - "user: roll both machines onto the amended api contract"
+      - "assistant: Version 2 is at 91be0d2; the server host confirmed it paused and adopted it, the client host was unavailable."
+  - query: the server one finished, but was that built against the new schema or the old one?
+    history:
+      - "user: change the contract so ids are strings and move both remote sides to it"
+      - "assistant: Version 2 is committed at e04d7a2 and both hosts acknowledged the pause."
+topic_shifts:
+  - query: different thing, the two remote services need to agree their message schema before they build; set that up
+    history:
+      - "user: how much usage is left on each machine?"
+      - "assistant: The tower has about 40 percent left and the mini about 75 percent."
+  - query: forget the cleanup for now, the payload format between the two repos on my hosts changed and both sides need the new version
+    history:
+      - "user: tidy up the worktrees the hosts made yesterday"
+      - "assistant: I'll ask each host's assistant for its list before anything is removed."
