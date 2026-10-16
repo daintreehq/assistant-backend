@@ -153,7 +153,7 @@ cases:
     category: routing-trap
     note: >-
       New pieces, nothing sent: first placement. place-work's "the person has DIFFERENT,
-      independent pieces of work ... and wants each put on whichever Remote Host this Shell
+      independent pieces of work" and "wants each put on whichever Remote Host this Shell
       reaches can best take it".
     messages:
       - role: user
@@ -191,7 +191,7 @@ cases:
     category: routing-trap
     note: >-
       A stop with work kept, nothing moved. steer-swarm's "work they ALREADY SENT to their other
-      machines ... STOPPED, CALLED OFF or CHANGED while it is under way".
+      machines" and "STOPPED, CALLED OFF or CHANGED while it is under way".
     messages:
       - role: user
         content: Call off the run I sent to all my machines and keep whatever they've done.

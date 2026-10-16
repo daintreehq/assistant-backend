@@ -1632,7 +1632,7 @@ trials:
       - "Two hosts with enrolled lanes in {project} at {sha} on {remote}, cloned on each. On {host_a} the person keeps an unrelated pane of their own running, and keeps the machine busy (a long build or a CPU load of their own) so its load sample is visibly higher than {host_b}'s."
     steps:
       - say: |-
-          Send {host_a} this and bring back its one combined reply: "Four independent units for {project} at {sha}, at most one agent at a time: reject negative quantities in subtotal, on run/{run}/qty; round tax half-up, on run/{run}/tax; add a --currency flag to the CLI, on run/{run}/currency; trim whitespace in SKU names, on run/{run}/sku. Use model haiku for any Claude Code agent. Check each piece yourself and reply once."
+          Send {host_a} this and bring back its one combined reply: "Four independent units for {project} at {sha}, at most one agent at a time, each touching only its own two new files: src/qty.js exporting assertQuantity that rejects negative or fractional quantities, with test/qty.test.js, on run/{run}/qty; src/round.js exporting roundHalfUp for cents, with test/round.test.js, on run/{run}/round; src/money.js exporting formatMoney(cents, currency), with test/money.test.js, on run/{run}/money; src/sku.js exporting normalizeSku that trims and upper-cases, with test/sku.test.js, on run/{run}/sku. Use model haiku for any Claude Code agent. Check each piece yourself and reply once."
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
         expect:
           hub:
@@ -1641,6 +1641,7 @@ trials:
             selected: [daintree.hosts.run-local-cohort]
             calls: [worktree.createWithRecipe, agent.launch]
             notices: [lane-wake]
+      - person: "Before the next prompt, confirm on {host_a} that the first unit's agent is still working and the other three units have no worktree or agent yet; record each run/{run} pane's state and its worktree's git status. If the first unit has already finished, restage."
       - say: |-
           {host_a} is bogged down with that run while {host_b} has room. Rebalance run/{run} across the two without losing anything. Launch any agents with model haiku.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
@@ -1662,7 +1663,7 @@ trials:
           lane:
             calls: [assistant.getInbox, assistant.reply]
     checks:
-      - "Before the yes, {host_b} has no worktree, branch or pane for any run/{run} unit, and the Shell's record shows exactly one message to {host_a} for the rebalance."
+      - "Before the yes, {host_b} has no worktree, branch or pane for any run/{run} unit (a read-only survey message to {host_b} is allowed), and the Shell's record shows exactly one message to {host_a} for the rebalance."
       - "After the yes, every run/{run} unit has exactly one agent across both hosts: each unit {host_a} had not started has its worktree and agent on {host_b} only, and the unit already running on {host_a} stayed there."
       - "On {host_a} nothing was killed, deleted or restarted: the person's unrelated pane still runs, and every run/{run} worktree keeps its commits and uncommitted files (git status before and after)."
       - "{host_a} never ran more than one run/{run} agent at once, and its running agent was not interrupted by the throttle (pane states over time)."
@@ -1686,7 +1687,7 @@ trials:
       - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}, cloned on the Shell and on both hosts."
     steps:
       - say: |-
-          Three units for {project} at {sha}, all for {host_a}: reject negative quantities in subtotal, on run/{run}/qty; round tax half-up, on run/{run}/tax; add a --currency flag to the CLI, on run/{run}/currency. Send only the first one now and keep the other two until I say. Launch any agents with model haiku.
+          Three units for {project} at {sha}, all for {host_a}, each touching only its own two new files: src/qty.js exporting assertQuantity that rejects negative or fractional quantities, with test/qty.test.js, on run/{run}/qty; src/round.js exporting roundHalfUp for cents, with test/round.test.js, on run/{run}/round; src/money.js exporting formatMoney(cents, currency), with test/money.test.js, on run/{run}/money. Send only the first one now and keep the other two until I say. Launch any agents with model haiku.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
         expect:
           hub:
@@ -1701,8 +1702,8 @@ trials:
         expect:
           hub:
             selected: [daintree.hosts.rebalance-load]
-            calls: [host.list, host.listTasks, host.getTask]
-            never: [host.sendMessage, host.startAssistant]
+            calls: [host.list, host.listTasks, host.getTask, host.listAssistants]
+            never: [host.startAssistant]
       - say: Yes, go ahead.
         expect:
           hub:
@@ -1713,8 +1714,8 @@ trials:
             calls: [worktree.createWithRecipe, agent.launch, assistant.reply]
             notices: [lane-wake]
     checks:
-      - "Before the yes, the Shell's record shows no new exchange after {host_a} dropped; after it, exactly two work exchanges to {host_b} (tax and currency) and none for qty."
+      - "The Shell's record shows no message to {host_a} after it dropped; before the yes, no work exchange to {host_b} (a read-only survey of it is allowed); after it, exactly two work exchanges to {host_b} (round and money) and none for qty."
       - "run/{run}/qty has no worktree, branch or agent on {host_b}; on {remote} no run/{run}/qty ref moved after the drop."
-      - "{host_b} has exactly one worktree and agent each for run/{run}/tax and run/{run}/currency."
+      - "{host_b} has exactly one worktree and agent each for run/{run}/round and run/{run}/money."
     execution:
-      - "Hub transcript before the yes: {host_a} named disconnected, its load sample called old and its agent count not measured; qty kept as started (moving it only by reassignment, on the person's word); tax and currency proposed for {host_b}."
+      - "Hub transcript before the yes: {host_a} named disconnected, its load sample called old and its agent count not measured; qty kept as started (moving it only by reassignment, on the person's word); round and money proposed for {host_b}."
