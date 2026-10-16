@@ -791,7 +791,7 @@ scenarios:
     staged: owed
     real_host: "n/a: project identity is the host's own listing"
     runbook: daintree.hosts.delegate-to-host
-    also: [daintree.hosts.handle-hub-message]
+    also: [daintree.hosts.handle-hub-message, daintree.hosts.verify-project-placement]
     caller: hub
     path: staged
     hosts: 1
