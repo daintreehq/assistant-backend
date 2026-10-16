@@ -79,7 +79,7 @@ positives:
     run: runbook-2026-10-issue-137
   - query: 'Watching the shared project from my window, the plugin panel says it shows in the window driving this project. Check the plugin''s state on the host and tell me what the notice means.'
     run: runbook-2026-10-issue-137
-  - query: 'Establish which gate is holding a project plugin back on a remote host: not installed there, a platform it cannot run on, an unset secret, host trust, or the Shell''s consent to its view bundle. Report only; change nothing.'
+  - query: 'The deploy-board panel renders on my Mac but on the Linux build host it is a grey placeholder. Nothing in the host''s plugin list mentions it and the Shell never asked me anything about it. Find the reason and report it; change nothing.'
     run: runbook-2026-10-issue-137
   - query: 'Person on the Shell says the plugin panel never appears. From this host, report the plugin''s state here (loaded, staged, blocked or unknown) and what they must do on their side.'
     run: runbook-2026-10-issue-137
@@ -216,7 +216,7 @@ boundaries:
   - query: 'Daintree''s plugin manager on the remote host shows our project plugin as blocked; tell me why and what the person has to approve.'
     confusable_with: [daintree.diagnostics]
     run: runbook-2026-10-issue-137
-  - query: 'Is the plugin''s skill listed on the host? Only the plugin''s install and consent matter here, not what the skill says.'
+  - query: 'The review plugin is in the host''s plugin list but its panel is a placeholder on this Shell; find out whether the host copy is current and whether this Shell has allowed its view, and report.'
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-137
   - query: 'The Shell refuses my plugin''s panel while the host says it loaded; which approval is the Shell waiting for?'
