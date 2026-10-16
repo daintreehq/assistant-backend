@@ -148,6 +148,18 @@ cases:
       required: [daintree.hosts.rebalance-load]
       optional: [daintree.hosts.foundation]
 
+  - id: rebalance-load-not-supervise-swarm
+    category: routing-trap
+    note: >-
+      The run is being followed, but one host's load now has to be spread. Fence: "following a
+      run to its end with nothing moved (daintree.hosts.supervise-swarm)".
+    messages:
+      - role: user
+        content: keep the swarm going, but the mini just went critical on memory, so take some of its load first
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
   # ------------------------------------------------------------ reverse traps
   - id: place-work-not-rebalance-load
     category: routing-trap
@@ -209,3 +221,16 @@ cases:
         content: My own machine is crawling since the agents started their test runs here; what's eating the CPU?
     expect:
       required: [daintree.runtime.relieve-resource-contention]
+
+  - id: supervise-swarm-not-rebalance-load
+    category: routing-trap
+    note: >-
+      A slow host with nothing overloaded is followed and checked once, not rebalanced.
+      supervise-swarm's "one host still working long after the others came back" and "a quiet
+      host checked once".
+    messages:
+      - role: user
+        content: one host is slower than the others but nothing is overloaded; keep the run going and check on it once if it stays quiet
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
