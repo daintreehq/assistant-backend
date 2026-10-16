@@ -147,6 +147,12 @@ boundaries:
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
 
+  - query: 'first the shared schema change, then the api and the mobile client update to it on their own hosts, then the docs once both are in; run that across my machines'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'the client repos can only start once the server repo''s new endpoint is verified; carry the three stages through the hosts in order'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
 followups:
   - query: yes, run it
     history:

@@ -168,3 +168,9 @@ boundaries:
   - query: "combine what my other two macs finished into one branch without changing either of them"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
+  - query: 'the hosts already pushed their migration branches for the web repo; have one machine merge them into one branch and tell me if the tests pass'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'every partition of the api repo''s logger change is pushed from the hosts; get the build box to combine them in order and report the merged head'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149

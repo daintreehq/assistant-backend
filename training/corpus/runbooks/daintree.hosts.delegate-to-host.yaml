@@ -255,6 +255,12 @@ boundaries:
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
 
+  - query: 'get the tower to swap the date library in the admin repo and tell me the commit'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'have the mini''s assistant replace the deprecated client in the one billing repo it has and push a branch'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:

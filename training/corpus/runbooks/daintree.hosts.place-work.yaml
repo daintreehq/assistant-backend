@@ -175,6 +175,12 @@ boundaries:
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
 
+  - query: 'five unrelated tickets in different repos, nothing shared between them; put each one on whichever machine has room'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'these four bug fixes are in separate repositories and have nothing to do with each other, place each on a host that can take it'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
 followups:
   - query: yes, go ahead with that split
     history:

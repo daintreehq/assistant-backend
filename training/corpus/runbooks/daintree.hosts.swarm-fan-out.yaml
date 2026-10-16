@@ -199,6 +199,12 @@ boundaries:
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
 
+  - query: 'have every machine attempt the same logger swap in its own copy of the web repo so I can compare what each one did'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'send the identical config change to all three hosts, each on its own branch, and show me a row per machine'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
 followups:
   - query: actually, have every other host do the same one too, each on its own branch
     history:

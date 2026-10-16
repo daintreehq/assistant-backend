@@ -58,6 +58,15 @@ boundaries:
   - query: split the icon migration into disjoint per-package tasks and launch them in parallel
     confusable_with: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.fan-out-work]
     run: 2026-09-28-agent-queries
+  - query: 'migrate every package in this monorepo off the old metrics client, one local agent per package, pilot first'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'the code is all in this checkout; try the logger swap in one folder, then have agents here do the remaining folders the same way'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
+  - query: 'replace the deprecated sdk calls across this one codebase with three agents on this machine and prove none are left'
+    confusable_with: [daintree.hosts.migrate-across-repositories]
+    run: runbook-2026-10-issue-149
 followups:
   - query: exclude the vendored packages from the count
     history:
