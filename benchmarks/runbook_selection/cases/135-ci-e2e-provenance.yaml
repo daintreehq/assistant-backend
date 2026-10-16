@@ -1,0 +1,181 @@
+# daintree.ci.run-e2e-suite: a green end-to-end run must prove which server, host and revision it
+# exercised, including when the browser is on another machine than the server. Recall cases are the
+# issue's three requests plus agent-, user- and lane-phrased variants; the two that name host-side
+# provenance or readable artifact references lose to established neighbours (retrain owed, kept as
+# honest measurement). Routing traps: the neighbours win a cross-host matrix, a sharded suite and a
+# console-error preview, and this runbook wins one named spec on a host's own worktree.
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: e2e-prov-agent-listener-revision-trace
+    category: single-runbook
+    note: >-
+      Agent phrasing, one named spec on a remote worktree. The deliverable clause: "where the
+      runner, browser and server ran, the base URL used (a host's localhost is not a Shell's
+      forwarded URL), the server's directory and build revision against the exact HEAD".
+    messages:
+      - role: user
+        content: Run the Playwright spec checkout.spec.ts against the remote worktree's own dev server and report the listener's directory, the revision it serves and where the trace is kept
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-issue-browser-tests-remote-app
+    category: single-runbook
+    note: >-
+      The issue's first request, verbatim. Decided by the positive clause's own example "run the
+      browser tests against the remote worktree's own app".
+    messages:
+      - role: user
+        content: Run the browser tests against the remote worktree's own app.
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-user-cypress-linux-host
+    category: single-runbook
+    note: >-
+      Casual phrasing on a named host. "need the app (and maybe its database) up, and the green
+      result tied to the right server".
+    messages:
+      - role: user
+        content: run the cypress suite on the linux host against my branch and tell me which server it hit
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-agent-stale-listener-named-spec
+    category: single-runbook
+    note: >-
+      A stale listener already holds the port. "a wrong or stale server is rejected, never
+      green", with the scope kept to the one named spec.
+    messages:
+      - role: user
+        content: a stale server from an earlier checkout is still listening on 4173 on the build box; run the one named e2e spec for the feature worktree there and show it did not test the stale one
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-user-single-spec-trace-location
+    category: single-runbook
+    note: >-
+      One spec only, with the report reference carrying host and revision. "each failure with
+      report and trace references naming host, worktree and revision".
+    messages:
+      - role: user
+        content: run only login.spec.ts on the remote host's worktree, nothing else, and bring back the trace location with the host and sha
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-agent-lane-spec-this-worktree
+    category: single-runbook
+    note: >-
+      A host lane's own phrasing of the task it was handed: the server must be this worktree's at
+      the named commit. "the server's directory and build revision against the exact HEAD".
+    messages:
+      - role: user
+        content: run the checkout e2e spec in this worktree and prove the server it hit was started from this worktree at the sha I named, then reply with the report and trace paths
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-user-forwarded-port-this-commit
+    category: single-runbook
+    note: >-
+      The browser and the server are on different machines. "the base URL used (a host's
+      localhost is not a Shell's forwarded URL)".
+    messages:
+      - role: user
+        content: the browser is on my laptop but the app under test runs on the host through a forwarded port, check the tests hit that host's server for this commit
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-user-green-but-possibly-stale
+    category: single-runbook
+    note: >-
+      A green result whose server is in doubt. "a wrong or stale server is rejected, never
+      green".
+    messages:
+      - role: user
+        content: the e2e run on the other host was green but I want to know it exercised this worktree's server at this commit and not whatever was already on the port
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-issue-host-side-not-another-checkout
+    category: single-runbook
+    note: >-
+      The issue's second request, verbatim. The positive clause's example "check the host-side
+      integration tests did not hit another checkout's server" is not enough against
+      daintree.orchestration.verify-agent-work (retrain owed).
+    messages:
+      - role: user
+        content: Prove these host-side integration tests did not hit another checkout's server.
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-issue-provenance-artifact-references
+    category: single-runbook
+    note: >-
+      The issue's third request, verbatim. "verify the e2e server provenance and keep readable
+      trace references" loses to daintree.worktree.manage-resource on "remote" (retrain owed).
+    messages:
+      - role: user
+        content: Verify remote E2E server provenance and retain readable artifact references.
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------------------------------- traps
+  - id: e2e-prov-trap-one-spec-not-matrix
+    category: routing-trap
+    note: >-
+      One named spec on one host's own worktree is not a cross-host matrix: "one commit under
+      several environments across hosts (use daintree.hosts.run-validation-matrix)" is the other
+      runbook's, and this one wins a single worktree.
+    messages:
+      - role: user
+        content: one spec only, tests/e2e/cart.spec.ts, against this worktree's own app, and the trace paths with host and sha
+    expect:
+      required: [daintree.ci.run-e2e-suite]
+      optional: [daintree.foundation]
+
+  - id: e2e-prov-trap-matrix-wins-environments
+    category: routing-trap
+    note: >-
+      Reverse of the matrix fence: "one commit under several environments across hosts (use
+      daintree.hosts.run-validation-matrix)". One row per environment on several hosts belongs to
+      the matrix runbook; the e2e runbook must not ride along.
+    messages:
+      - role: user
+        content: run the e2e suite for this commit under node 20 and node 22 on the linux host and the mac host and give me one row per environment
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: e2e-prov-trap-shard-wins-split-suite
+    category: routing-trap
+    note: >-
+      Reverse of the shard fence: "one suite split between hosts (use
+      daintree.hosts.shard-test-suite)". Dividing a browser suite across machines is sharding.
+    messages:
+      - role: user
+        content: the playwright suite takes an hour, split it into shards over my two other machines and combine the results
+    expect:
+      required: [daintree.hosts.shard-test-suite]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: e2e-prov-trap-preview-console-errors
+    category: routing-trap
+    note: >-
+      Reverse of "to debug a page interactively in a dev preview (use
+      daintree.runtime.debug-web-app)": console errors in a preview are not a test run.
+    messages:
+      - role: user
+        content: the dev preview page on my other machine throws console errors after login, find out why
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
