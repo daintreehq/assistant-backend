@@ -40,6 +40,13 @@ from .cases import BenchCase
 #: The app's own wake line prefix. A first turn that is only this line is the
 #: lane's entry, and is exempt from the one-sentence query shape.
 WAKE_LINE_PREFIX = "Daintree: assistant inbox"
+#: The whole line, as the app formats it (``formatLaneWakeLine``): a first turn that only
+#: starts like it is not exempt from the query shape.
+WAKE_LINE = re.compile(
+    r"^Daintree: assistant inbox has (a new message|\d+ new messages) "
+    r"\(exchanges? [A-Za-z0-9, -]+\)\. Read (it|them) with assistant\.getInbox\.$"
+)
+_SENTENCE_BREAK = re.compile(r"[.!?]\s+\S")
 
 #: The cases that assert a wrong-role or wrong-owner answer is NOT given. A ``no-task``
 #: case is one where the right answer is that nothing needs loading.
@@ -53,7 +60,7 @@ BRIEF_LABELS = ("Objective", "Scope", "Report", "Stop")
 BRIEF_MAX_CHARS = 900
 QUERY_WORDS = (8, 15)
 
-_RUNBOOK_ID = re.compile(r"\bdaintree\.[a-z0-9-]+(?:\.[a-z0-9-]+)+", re.I)
+_RUNBOOK_ID = re.compile(r"\bdaintree\.[a-z0-9-]+(?:\.[a-z0-9-]+)*", re.I)
 _PROCEDURE_MARKERS = ("on notice or resume", "stop and recovery", "report back:")
 _WORD = re.compile(r"[a-z][a-z-]{3,}")
 _STOPWORDS = frozenset(
@@ -148,7 +155,9 @@ def validate_pairs(cases: list[BenchCase]) -> list[str]:
         for case in members:
             label = f"{name}/{case.id}"
             query = _query(case)
-            wake = query.startswith(WAKE_LINE_PREFIX)
+            wake = bool(WAKE_LINE.match(query))
+            if query.startswith(WAKE_LINE_PREFIX) and not wake:
+                problems.append(f"{label}: starts like the wake line but is not the app's line")
             if len(case.messages) != 1 or case.messages[0].role != "user":
                 problems.append(f"{label}: one user message, as one search is one sentence")
             if _RUNBOOK_ID.search(query):
@@ -157,6 +166,8 @@ def validate_pairs(cases: list[BenchCase]) -> list[str]:
             low, high = QUERY_WORDS
             if not wake and not low <= count <= high:
                 problems.append(f"{label}: query is {count} words, the app asks for {low}-{high}")
+            if not wake and _SENTENCE_BREAK.search(query):
+                problems.append(f"{label}: query is more than one sentence")
             if wake and case.role != "lane":
                 problems.append(f"{label}: a wake line is the lane's first turn, not the hub's")
             if case.brief is not None:

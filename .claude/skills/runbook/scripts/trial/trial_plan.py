@@ -384,7 +384,9 @@ def run_problems(
         problems.append("no independent checks: an agent's report is not an outcome")
 
     discovery = entry.get("discovery")
-    if discovery is not None and discovery not in DISCOVERY_MODES:
+    if discovery is not None and not (
+        isinstance(discovery, str) and discovery in DISCOVERY_MODES
+    ):
         problems.append(f"discovery must be one of {sorted(DISCOVERY_MODES)}")
     steps = entry["steps"]
     if not isinstance(steps, list) or not steps:

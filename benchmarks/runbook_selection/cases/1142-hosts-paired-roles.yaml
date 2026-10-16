@@ -68,7 +68,7 @@ cases:
         content: Implement the hub's login test fix on its own branch in a new worktree
     expect:
       required: [daintree.hosts.do-delegated-work]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: pair-implement-lane-local-trap
     scenario: implement
@@ -84,7 +84,7 @@ cases:
     expect:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.do-delegated-work, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-implement-hub-local-trap
     scenario: implement
@@ -100,7 +100,7 @@ cases:
     expect:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.delegate-to-host]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ review
   - id: pair-review-hub-request
@@ -135,7 +135,7 @@ cases:
         content: Review the hub's branch at its exact commit and change nothing
     expect:
       required: [daintree.hosts.review-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: pair-review-lane-local-trap
     scenario: review
@@ -150,7 +150,7 @@ cases:
     expect:
       required: [daintree.review.review-change]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.review-for-hub, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-review-hub-local-trap
     scenario: review
@@ -165,7 +165,7 @@ cases:
     expect:
       required: [daintree.review.review-change]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.race-and-review, daintree.hosts.delegate-to-host]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ verify
   - id: pair-verify-hub-request
@@ -199,7 +199,7 @@ cases:
         content: Test the hub's commit here with lint and the unit tests, no fixes
     expect:
       required: [daintree.hosts.verify-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: pair-verify-lane-local-trap
     scenario: verify
@@ -214,22 +214,23 @@ cases:
     expect:
       required: [daintree.ci.run-local-checks]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.verify-for-hub, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-verify-hub-local-trap
     scenario: verify
     role: hub
     category: routing-trap
     note: >-
-      Checks on the hub's own machine, with no remote host in the request. The hub's matrix
-      and suite-sharding runbooks both need Remote Hosts.
+      Checks on the hub's own machine, with no remote host in the request. The matrix is
+      for a commit "TESTED UNDER SEVERAL ENVIRONMENTS on the Remote Hosts this Shell reaches",
+      and the suite-sharding runbook needs Remote Hosts too.
     messages:
       - role: user
         content: Run the tests on this machine before I push
     expect:
       required: [daintree.ci.run-local-checks]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.run-validation-matrix, daintree.hosts.shard-test-suite]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ cohort
   - id: pair-cohort-hub-request
@@ -263,7 +264,7 @@ cases:
         content: Run the hub's four independent tickets here, each in its own worktree
     expect:
       required: [daintree.hosts.run-local-cohort]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: pair-cohort-lane-one-unit-trap
     scenario: cohort
@@ -277,7 +278,7 @@ cases:
         content: The hub sent me one bug to fix here, nothing else
     expect:
       required: [daintree.hosts.do-delegated-work]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
       forbid: [daintree.hosts.run-local-cohort]
 
   - id: pair-cohort-lane-local-trap
@@ -293,7 +294,7 @@ cases:
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.run-local-cohort, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-cohort-hub-local-trap
     scenario: cohort
@@ -308,7 +309,7 @@ cases:
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.place-work, daintree.hosts.swarm-fan-out]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ steer
   - id: pair-steer-hub-request
@@ -342,7 +343,7 @@ cases:
         content: Stop the agents I started for the hub's run and keep their changes
     expect:
       required: [daintree.hosts.steer-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: pair-steer-lane-local-trap
     scenario: steer
@@ -357,7 +358,7 @@ cases:
     expect:
       required: [daintree.agents.steer-running-agent]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.steer-for-hub, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-steer-hub-local-trap
     scenario: steer
@@ -372,7 +373,7 @@ cases:
     expect:
       required: [daintree.agents.steer-running-agent]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.steer-swarm]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ integrate
   - id: pair-integrate-hub-request
@@ -406,7 +407,8 @@ cases:
         content: Merge these exact commits from the other hosts into one integration branch
     expect:
       required: [daintree.hosts.integrate-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.git.integrate-agent-branches, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.git.integrate-agent-branches]
 
   - id: pair-integrate-lane-local-trap
     scenario: integrate
@@ -421,7 +423,7 @@ cases:
     expect:
       required: [daintree.git.integrate-agent-branches]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.integrate-for-hub, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-integrate-hub-local-trap
     scenario: integrate
@@ -429,14 +431,14 @@ cases:
     category: routing-trap
     note: >-
       Branches finished by agents on the hub's own machine, no host involved. The hub's
-      integration runbook is for what Remote Hosts finished.
+      integration is for "work that SEVERAL Remote Hosts finished has to end up on ONE branch".
     messages:
       - role: user
         content: Merge the branches my agents here finished into one branch
     expect:
       required: [daintree.git.integrate-agent-branches]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.integrate-host-branches]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ demo
   - id: pair-demo-hub-request
@@ -470,7 +472,8 @@ cases:
         content: Serve the hub's checkout feature here as a demo with sample data
     expect:
       required: [daintree.hosts.demo-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.workflow.prepare-feature-demo, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.workflow.prepare-feature-demo]
 
   - id: pair-demo-lane-local-trap
     scenario: demo
@@ -485,7 +488,7 @@ cases:
     expect:
       required: [daintree.workflow.prepare-feature-demo]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.demo-for-hub, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-demo-hub-local-trap
     scenario: demo
@@ -500,7 +503,7 @@ cases:
     expect:
       required: [daintree.workflow.prepare-feature-demo]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.prepare-remote-demo]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ clean-up
   - id: pair-cleanup-hub-request
@@ -535,7 +538,8 @@ cases:
         content: Remove the panes and worktrees I made for the hub's run
     expect:
       required: [daintree.hosts.clean-up-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.orchestration.workspace-cleanup, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.orchestration.workspace-cleanup]
 
   - id: pair-cleanup-lane-local-trap
     scenario: clean-up
@@ -550,7 +554,7 @@ cases:
     expect:
       required: [daintree.orchestration.workspace-cleanup]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
+      forbid: [daintree.hosts.*]
 
   - id: pair-cleanup-hub-local-trap
     scenario: clean-up
@@ -565,7 +569,7 @@ cases:
     expect:
       required: [daintree.orchestration.workspace-cleanup]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.recover-and-clean-up]
+      forbid: [daintree.hosts.*]
 
   # ------------------------------------------------------------------ question
   - id: pair-question-hub-request
@@ -683,7 +687,8 @@ cases:
         content: The hub made this machine its integrator for three finished branches
     expect:
       required: [daintree.hosts.integrate-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.git.integrate-agent-branches, daintree.hosts.foundation, daintree.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: [daintree.git.integrate-agent-branches]
 
   - id: pair-role-lane-asked-to-relay
     scenario: designated-role

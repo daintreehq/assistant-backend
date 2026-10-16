@@ -178,9 +178,10 @@ def test_an_entry_discovery_run_gives_no_search_instruction(tp: ModuleType) -> N
         broken["steps"][step]["say"] = said
         assert any("gives no search instruction" in p for p in _problems(tp, broken)), step
 
-    broken = copy.deepcopy(entry)
-    broken["discovery"] = "always"
-    assert any("discovery must be one of" in p for p in _problems(tp, broken))
+    for bad in ("always", [], {"entry": 1}):
+        broken = copy.deepcopy(entry)
+        broken["discovery"] = bad
+        assert any("discovery must be one of" in p for p in _problems(tp, broken)), bad
     # Without the key, the first prompt still has to end with the search line.
     plain = copy.deepcopy(entry)
     del plain["discovery"]

@@ -57,6 +57,9 @@ _VALID_ROLES = {"user", "assistant", "tool"}
 #: The two ends of a paired scenario: the Shell's hub, and a lane enrolled on a host.
 CALLER_ROLES = ("hub", "lane")
 
+#: In ``expect.forbid``: every hosts runbook with a baseline, at either end of the pair.
+HOSTS_WILDCARD = "daintree.hosts.*"
+
 _HUB_ONLY_TOOL_PREFIX = "host."
 _HUB_ONLY_TOOLS = frozenset({"project.openOnHost"})
 
@@ -188,7 +191,13 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
     brief = raw.get("brief")
     if brief is not None and (role != "lane" or not isinstance(brief, str)):
         raise CaseError(f"{case_id}: a brief is a string on a lane case")
-    forbid = _validate_ids(expect.get("forbid") or [], catalog, case_id, "forbid")
+    raw_forbid = list(expect.get("forbid") or [])
+    if HOSTS_WILDCARD in raw_forbid:
+        # A request that is the person's own, on one machine: no hosts procedure may load.
+        raw_forbid = [i for i in raw_forbid if i != HOSTS_WILDCARD] + [
+            r.id for r in catalog.runbooks if baseline_role(r) is not None
+        ]
+    forbid = _validate_ids(raw_forbid, catalog, case_id, "forbid")
     if role is not None:
         forbid = [*forbid, *wrong_role_ids(role, catalog)]
     forbid = sorted(set(forbid))

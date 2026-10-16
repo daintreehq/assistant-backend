@@ -122,6 +122,8 @@ and additionally fail when they load a runbook their caller cannot execute:
   a lane's, `cases.baseline_role`). A forbidden runbook in the loaded set fails recall
   even when the right one loaded: it would be delivered in full to a caller that must
   not follow it. A case cannot expect what it forbids.
+  `forbid: [daintree.hosts.*]` forbids every hosts procedure at both ends: the person's own
+  request on one machine, where nothing from the swarm may load.
 - **Queries** are one sentence of 8 to 15 words, as the app tells the assistant to
   search (the lane's bare wake line is the one exception), and never name a runbook id.
 - **Structure** (`pairs.validate_pairs`, run on every case load): each scenario has both

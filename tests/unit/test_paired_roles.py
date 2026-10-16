@@ -59,6 +59,7 @@ REQUIRED_SCENARIOS = {
     "steer",
     "integrate",
     "demo",
+    "clean-up",
     "question",
     "designated-role",
 }
@@ -211,8 +212,19 @@ def test_validation_names_each_structural_fault() -> None:
     drifted = _case("Bring the demo up on this host with sample data now", brief=GOOD_BRIEF)
     assert any("drawn from the brief" in p for p in validate_pairs([hub, drifted, trap]))
     # A wake line belongs to the lane.
-    wake = _case(f"{WAKE_LINE_PREFIX} has a new message (exchange 1). Read it.", role="hub")
+    full = f"{WAKE_LINE_PREFIX} has a new message (exchange 1). Read it with assistant.getInbox."
+    wake = _case(full, role="hub")
     assert any("not the hub's" in p for p in validate_pairs([wake, lane, trap]))
+    # Only the app's whole line is exempt from the query shape.
+    partial = _case(f"{WAKE_LINE_PREFIX} has a new message, deal with it", id="p")
+    assert any("not the app's line" in p for p in validate_pairs([hub, partial, trap]))
+    # A single-dot id (the general foundation) is an id too, in a query and in a brief.
+    dotted = _case("Fix the flaky login test with daintree.foundation first", brief=GOOD_BRIEF)
+    assert any("names a runbook id" in p for p in validate_pairs([hub, dotted, trap]))
+    assert any("runbook id" in p for p in brief_problems(GOOD_BRIEF + " See daintree.foundation"))
+    # One sentence, not two.
+    two = _case("Fix the flaky login test in a new worktree. Then report back", brief=GOOD_BRIEF)
+    assert any("more than one sentence" in p for p in validate_pairs([hub, two, trap]))
 
 
 def test_a_brief_carries_its_boundaries_and_stays_a_reference() -> None:
@@ -271,6 +283,27 @@ def test_the_role_reading_agrees_with_the_captured_hub_and_lane_surfaces() -> No
     assert set(wrong_role_ids("hub", catalog)) == set(lane_ids)
 
 
+def test_the_hosts_wildcard_forbids_every_procedure_at_both_ends(tmp_path: Any) -> None:
+    catalog = _catalog()
+    body = (
+        "cases:\n  - id: w\n    category: routing-trap\n    messages:\n"
+        "      - {role: user, content: x}\n    expect:\n"
+        "      required: [daintree.edits.spawn-visible-agent]\n"
+        "      forbid: [daintree.hosts.*]\n"
+    )
+    (tmp_path / "c.yaml").write_text(body, encoding="utf-8")
+    (case,) = load_cases(catalog, tmp_path)
+    procedures = {r.id for r in catalog.runbooks if baseline_role(r) is not None}
+    assert set(case.forbid) == procedures
+    assert {"daintree.hosts.delegate-to-host", "daintree.hosts.do-delegated-work"} <= procedures
+    assert "daintree.hosts.foundation" not in procedures
+    # Every shipped local-request trap uses it, at either end.
+    local = [c for c in _cases() if c.id.endswith("local-trap")]
+    assert len(local) == 16
+    for local_case in local:
+        assert set(local_case.forbid) >= procedures, local_case.id
+
+
 def test_a_case_cannot_expect_what_it_forbids() -> None:
     catalog = _catalog()
     lane_only = next(r.id for r in catalog.runbooks if baseline_role(r) == "lane")
@@ -323,6 +356,12 @@ def test_an_injected_load_beside_the_right_runbook_fails_these_traps() -> None:
         ("pair-question-lane-fact-trap", "daintree.hosts.do-delegated-work"),
         ("pair-role-lane-asked-to-relay", "daintree.hosts.do-delegated-work"),
         ("pair-implement-lane-local-trap", "daintree.hosts.handle-hub-message"),
+        ("pair-implement-lane-local-trap", "daintree.hosts.verify-for-hub"),
+        ("pair-implement-hub-local-trap", "daintree.hosts.place-work"),
+        ("pair-implement-hub-local-trap", "daintree.hosts.delegate-to-host"),
+        ("pair-integrate-lane-brief", "daintree.git.integrate-agent-branches"),
+        ("pair-demo-lane-brief", "daintree.workflow.prepare-feature-demo"),
+        ("pair-cleanup-lane-brief", "daintree.orchestration.workspace-cleanup"),
     ):
         case = by_id[case_id]
         outcomes = []
