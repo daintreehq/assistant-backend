@@ -136,6 +136,12 @@ boundaries:
   - query: "this machine slows to a crawl whenever the agents run the test suite here, find what's hogging it and ease off"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: 'my laptop has been swapping since the agents here started building, throttle them'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'this machine''s fans are screaming from the local agents'' test runs, find what''s eating it and calm it down'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
 followups:
   - query: do it, cap them all at 2 workers
     history:

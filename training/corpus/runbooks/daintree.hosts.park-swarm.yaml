@@ -166,3 +166,6 @@ boundaries:
   - query: 'the hosts have had their time on the indexing job; park it so we can pick it up tomorrow with a resume record'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: 'the hosts are all overloaded, so park the whole remote run until tomorrow with a resume record'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127

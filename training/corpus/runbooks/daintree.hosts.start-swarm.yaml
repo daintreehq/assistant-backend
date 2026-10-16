@@ -151,6 +151,9 @@ boundaries:
   - query: "get an assistant ready in this repo on every remote host before I hand anything out"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: 'which of my machines could take more work right now? just get an assistant ready on each, send nothing yet'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
 
 followups:
   - query: 'now get them ready'

@@ -177,3 +177,9 @@ boundaries:
   - query: 'the hosts are already working on the refactor; tell them to stop at once and keep what they have'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: 'stop the agents on the overheating host for that run and keep their work, I''ll decide what happens next later'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'change the remote run''s brief so every host uses at most two test workers from now on, nothing else changes'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127

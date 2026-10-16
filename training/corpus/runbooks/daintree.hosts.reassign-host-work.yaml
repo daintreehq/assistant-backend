@@ -138,6 +138,15 @@ boundaries:
   - query: 'the old mac mini''s disk filled up while it was adding contract tests; continue that piece on the linux host from the commits it already pushed'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: 'the tower went offline in the middle of the one unit it was working on, after pushing a commit; have another machine carry on from that commit'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'the mini ran out of codex quota halfway through the parser fix it had started, move that fix to a host with allowance and keep what it pushed'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'the overloaded host is stuck on its half done migration unit; move just that unit to another machine from what it pushed'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
 
 followups:
   - query: fine, move that one to the tower then

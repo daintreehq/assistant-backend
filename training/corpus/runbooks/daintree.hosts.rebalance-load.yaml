@@ -1,0 +1,143 @@
+# daintree.hosts.rebalance-load: the hub relieves pressure across a swarm ALREADY RUNNING on
+# the Remote Hosts. One host is overloaded (swapping, hot, pegged, too many agents), has dropped
+# out, or its agent CLI is out of allowance while others have room: the hub reads dated per-host
+# load, has the pressured host's own assistant run fewer agents and hold what it has not started,
+# moves only that unstarted work to hosts with room (never anything already running), and
+# compares a second reading.
+#
+# Positives are invented situations in agent and user words, short and long, some with a
+# social lead-in, a constraint or an earlier turn; two how-to questions carry docs. Boundaries
+# are requests this runbook wins against a neighbour sharing its words: first placement
+# (place-work), one started unit moved (reassign-host-work), usage read only
+# (check-usage-limits), a stop or change with nothing moved (steer-swarm), this machine's own
+# load (relieve-resource-contention), readying assistants (start-swarm), re-planning local agents
+# (reprioritize-work), parking a run (park-swarm). Followups and topic shifts are a rebalance
+# decided after a status answer, a usage table, a placement or a stop. Machine names are generic.
+runbook: daintree.hosts.rebalance-load
+run: runbook-2026-10-issue-127
+
+positives:
+  - the studio running four of the swarm's agents is swapping hard and the other two machines are doing nothing, even it out
+  - A swarm is mid-run across three Remote Hosts; one reports memory pressure critical with five agents working while the other two show nominal readings. Lower that host's agent count, move the units it has not started to the quiet hosts, and show per-host readings before and after
+  - the mini's fans have been maxed for an hour with three agents on it, take some of the swarm's queue off it
+  - codex ran out of quota on the build box partway through the batch; its tickets that haven't started should go to machines that still have allowance, leave the running ones alone
+  - hey, the swarm looks lopsided, one host has everything and the others are idle. can you rebalance
+  - one of the remote machines is thermally throttling, shift its not yet started work elsewhere and tell me whether it cools down
+  - too much of the run is piled on the tower, spread the rest over the other hosts
+  - Hub task. Per-host load in the running swarm is uneven, one host at ninety five percent CPU with thermal serious and the rest nominal. Propose a redistribution of its unstarted units and a lower agent cap for that host, and wait for approval before moving anything
+  - rebalance the swarm across my machines, just do it, no need to check with me first
+  - the laptop host has been pegged at full cpu since the swarm started, ease off it
+  - claude hit its weekly limit on the second studio, keep what is running there but put the rest of its share on hosts with headroom
+  - The Claude Code account on one Remote Host is exhausted while the running swarm still has unstarted units queued for that host; move those units by allowance per host and account, without adding allowances together
+  - good morning! the swarm ran overnight and the mini is drowning in agents while the studios sit idle, can you even things out
+  - is one of my hosts overloaded right now? if so move some of the swarm's pending units off it and show me the numbers before and after
+  - lower how many agents the overloaded host runs at once and hand its waiting units to the others
+  - memory pressure on the linux host is critical and it still has swarm units queued, get them onto other machines before it falls over
+  - the swarm is choking one machine, cut it to two agents there and send the rest of its queue elsewhere
+  - Spread the swarm's pending work more evenly; the host with the most agents is swapping and its readings keep getting worse
+  - why is everything landing on one host? move the backlog around so the busiest machine isn't melting
+  - The fourth Remote Host lost its enrolled assistant after taking three of the run's units, none of which were read; withdraw them and place them on hosts with room
+  - throttle the swarm on the hot machine and redistribute what it hasn't started
+  - one host is out of allowance and another is overheating, rebalance the remaining swarm work across the healthy ones
+  - I need the swarm balanced again before this afternoon, the studio is way over capacity
+  - the cohort on the mini is too big for it, have it run fewer at once and give the extra units to other hosts
+  - query: >-
+      We kicked off the migration swarm on four machines an hour ago. The old intel mac is
+      crawling, four agents on it and swap through the roof, while the two studios are barely
+      doing anything. Nothing that is already running there should be lost, but the units it
+      has not touched yet should go to the studios. Show me the plan before you move anything.
+  - query: >-
+      Running swarm across Remote Hosts is unbalanced: host A's load sample shows memory
+      pressure critical and six agents working, sampled two minutes ago; hosts B and C show one
+      agent each with nominal readings; host D has no load sample at all. Reduce A's concurrency
+      through its own assistant, move its unstarted units to B and C, leave started work where it
+      is, and compare readings afterwards.
+  - relieve the pressure on the overloaded remote host without killing anything
+  - the swarm is hitting one machine's limits, rebalance it by measured load and not by guesswork
+  - move the queued units off the host that ran out of codex and onto the ones that still have some
+  - one machine stopped answering mid run while the others are fine, rebalance whatever it never started
+  - the run is too heavy for the mini, dial it back and let the other hosts take up the slack
+  - host load is all over the place in this swarm, level it out and tell me what's still throttled afterwards
+  - Two hosts share one Claude account and both are near its limit, while a Codex-only host is idle; move the unstarted swarm units that allow Codex to the idle host, never treating the two hosts' allowance as separate
+  - ugh the studio is beachballing again with the swarm on it, fix the balance
+  - pull the overloaded host back to fewer agents and show me whether it helped
+  - query: the second host has a null load reading and the others are busy; is it really idle, and should the swarm's waiting units go there?
+  - query: >-
+      Quick one before my meeting. The remote run is lopsided: the tower is running hot with
+      most of the agents and the mini has room. Rebalance it so nothing gets duplicated, and
+      give me a short before and after per host.
+  - the hub sent too many units to the workstation and now it's thrashing, redistribute the ones it hasn't picked up
+  - a remote host dropped off halfway through the swarm with a few units still waiting on it, put those somewhere else and leave what it was running for later
+  - the hot studio's swarm units have all started already so there's nothing to move, just have it run fewer agents at once and tell me if its readings drop
+  - query: how do you decide which swarm units can move off an overloaded host without duplicating work? then rebalance mine
+    docs: true
+  - query: why isn't a null load sample treated as an idle machine when rebalancing the hosts? then go ahead and rebalance
+    docs: true
+
+boundaries:
+  - query: the units are already out on my machines and one of them is now swamped, move what it has not started
+    confusable_with: [daintree.hosts.place-work]
+  - query: since the placement went out the first host has been running hot, take some of its waiting units back and give them to the others
+    confusable_with: [daintree.hosts.place-work]
+  - query: the batch was split across the hosts an hour ago but the split was wrong, one host is buried; rebalance the rest
+    confusable_with: [daintree.hosts.place-work]
+  - query: several units the swarm queued on the dead host never started, give them to the hosts still up and keep anything it was running out of it
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: the hot host has a backlog of five swarm units it hasn't touched, spread them over the cooler machines
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: one host in the run is out of claude usage and still has three queued units, move those three to hosts with allowance
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: the codex machine is out of usage mid-swarm, don't just tell me the figures, move its waiting units to hosts with allowance left
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: use each host's usage left to shift the swarm's remaining units off the one that is nearly out
+    confusable_with: [daintree.hosts.check-usage-limits]
+  - query: don't stop the run, just have the swamped host run fewer agents and move its queued units to the quiet ones
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: change the swarm so the overloaded host takes on nothing new and its waiting units go elsewhere
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: it's the remote studio that is swapping under the swarm, not this machine; spread the load across the hosts
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: one remote host is overheating from all the swarm agents, ease it by moving units to the other machines
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: the agents on the remote host are crushing its memory, lower its count and hand the overflow to other hosts
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: which of my machines has room to take load off the overloaded one in the running swarm, then move it
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: the swarm on the remote machines is unbalanced, re-plan which host runs what so the overloaded one gets relief
+    confusable_with: [daintree.orchestration.reprioritize-work]
+  - query: don't park the swarm, keep it running but take the weight off the host that is struggling
+    confusable_with: [daintree.hosts.park-swarm]
+  - query: the remote run keeps getting slower on one overloaded host, rebalance its waiting units before it stalls completely
+    confusable_with: [daintree.hosts.reassign-host-work]
+
+followups:
+  - query: ok, take some load off the second one then
+    history:
+      - "user: how's the swarm doing on my machines?"
+      - "assistant: The second host has six agents working and memory pressure critical; the first and third have one each with nominal readings."
+  - query: so move the third host's remaining units to the ones with allowance
+    history:
+      - "user: check usage on every machine"
+      - "assistant: The third host's Codex window is 100% used until Thursday; the first and second have about 60% left."
+  - query: yes, go ahead with that rebalance
+    history:
+      - "user: the mini is swapping, rebalance the swarm"
+      - "assistant: Proposed: the mini runs at most two agents; its three unstarted units go to the studio and the tower. Move them?"
+  - query: and what did it look like after the change?
+    history:
+      - "user: the tower is too hot, move some swarm work off it"
+      - "assistant: The tower's assistant cut to two agents and held four units; those four went to the other hosts."
+
+topic_shifts:
+  - query: right, now one of them is drowning, spread the load better
+    history:
+      - "user: place these eight issues across my hosts"
+      - "assistant: Placed: three on the first host, three on the second, two on the third. All sent."
+  - query: instead of stopping it, rebalance the run so the hot host gets a break
+    history:
+      - "user: should I stop the swarm? the studio sounds like a jet engine"
+      - "assistant: Nothing has been stopped. The studio shows thermal serious with five agents working."
+  - query: the overload is on the remote hosts, not here; rebalance the swarm across them
+    history:
+      - "user: my machine is slow, what's using the CPU?"
+      - "assistant: This machine is at normal load; the hosts list shows one Remote Host at memory pressure critical."

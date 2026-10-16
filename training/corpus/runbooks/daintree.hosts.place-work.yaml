@@ -156,6 +156,15 @@ boundaries:
   - query: 'is the tower or the mini better placed to take the slow-test investigation, given what''s running on each?'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: 'six new issues for the remote machines, none sent anywhere yet; put each on whichever host is least loaded'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'the swarm hasn''t started, here is the list of units, split them across the hosts by load and allowance left'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'pick the host with the most headroom for this new refactor ticket and send it there'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
 
 followups:
   - query: yes, go ahead with that split
