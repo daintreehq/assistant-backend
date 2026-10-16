@@ -1,0 +1,271 @@
+# daintree.hosts.coordinate-dev-services: the hub gets development services that run on
+# DIFFERENT Remote Hosts reaching each other, with each connection's caller and address written
+# down and checked from where the caller runs, dependencies started first, and one marked request
+# proving the end-to-end path. Recall cases are the issue's three requests plus agent- and
+# user-phrased stacks and a deliberately broken address.
+# Routing traps: this runbook wins against each declared neighbour (a dependent code plan, the
+# interface contract, one hand-over, a host's own demo, a port clash, a preview's own failure,
+# per-worktree resources). Reverse traps: the neighbour wins and this runbook must not ride
+# along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: coordinate-dev-services-issue-frontend-backend
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "development services that live on DIFFERENT Remote
+      Hosts have to reach each other".
+    messages:
+      - role: user
+        content: Coordinate the frontend and backend development servers on different hosts.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-issue-right-api
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "per connection the process that calls and an
+      address checked to route from where that process runs".
+    messages:
+      - role: user
+        content: Run these two projects on different machines and verify the client reaches the right API.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-issue-owning-assistants
+    category: single-runbook
+    note: >-
+      The issue's third request, rewritten so the stack is explicit. Decided by "development
+      services that live on DIFFERENT Remote Hosts have to reach each other".
+    messages:
+      - role: user
+        content: >-
+          Bring up the web client and its API as one development stack, each started by the
+          assistant on the host that owns its project.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-agent-phrased
+    category: single-runbook
+    note: >-
+      How an agent writes the search: services, listener and owner, dependency first, marker.
+      Decided by "readiness kept apart from one request carrying a marker that the provider's
+      own log shows".
+    messages:
+      - role: user
+        content: >-
+          Two services on two Remote Hosts must call each other during development. Record each
+          service's listener and owner, start the dependency first, and verify one end-to-end
+          request carrying a revision marker.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-user-phrased
+    category: single-runbook
+    note: >-
+      A casual request with the stack named. Decided by "a web client on one machine and the API
+      it calls on another".
+    messages:
+      - role: user
+        content: >-
+          Get the storefront dev server on one remote machine pointed at the orders API on
+          another, then prove a real request gets through
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-broken-address
+    category: single-runbook
+    note: >-
+      The blocked-edge scenario: the hosts cannot reach each other, and that is the answer.
+      Decided by "an address that does not route reported as the blocked edge".
+    messages:
+      - role: user
+        content: >-
+          Start the dev API on one remote host and the dev web app on another with the web app's
+          API address set, run one request through, and if the hosts cannot reach each other say
+          so instead of working around it.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-order-and-address
+    category: single-runbook
+    note: >-
+      Start order plus the configured address. Decided by "providers started before consumers".
+    messages:
+      - role: user
+        content: >-
+          Start the API on the linux host before the web client on the mac host, and make sure
+          the address the client is configured with really reaches that API.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------- traps: this runbook wins
+  - id: coordinate-dev-services-not-execute-distributed-workflow
+    category: routing-trap
+    note: >-
+      Two live services, one started before the other, no plan of code units. Decided by "Do not
+      use for a stage-by-stage plan of dependent code units
+      (daintree.hosts.execute-distributed-workflow)".
+    messages:
+      - role: user
+        content: >-
+          Get the backend running on the second host, then the web client on the first host
+          pointed at it, and check one request makes it all the way through with the right
+          build on both ends.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-not-coordinate-contract-change
+    category: routing-trap
+    note: >-
+      The interface already exists; the work is running both sides and proving the address.
+      Decided by "agreeing or changing the interface between the sides
+      (daintree.hosts.coordinate-contract-change)" being fenced.
+    messages:
+      - role: user
+        content: >-
+          The web client and its API run on two different hosts. The base URL the client is
+          configured with must match what the API serves. Start both and prove a real request
+          goes through.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      Two hosts' assistants each start a service, then the connection is verified. Decided by
+      "one service or demo on one host (daintree.hosts.delegate-to-host)" being fenced.
+    messages:
+      - role: user
+        content: >-
+          Have the assistant on one host start the API and the assistant on the other start the
+          web client against it, then confirm the client reaches that API.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-not-free-busy-port
+    category: routing-trap
+    note: >-
+      A localhost address that belongs to the wrong machine is an addressing question, not a
+      port held by a process. Decided by "a port another process holds
+      (daintree.runtime.free-busy-port)" being fenced and "its localhost" being host-scoped in
+      the deliverable.
+    messages:
+      - role: user
+        content: >-
+          The front end on host A keeps calling localhost:4000 and gets nothing, but the API is
+          running on host B. Fix the address and prove the two reach each other.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-not-provision-local-environment
+    category: routing-trap
+    note: >-
+      Two services on different hosts each need the other's address; nothing is a per-worktree
+      resource on this machine. Decided by "services on this machine
+      (daintree.worktree.provision-local-environment)" being fenced.
+    messages:
+      - role: user
+        content: >-
+          The user service on one host and the billing service on another each need to be told
+          what the other one's address is. Work it out and verify it with a request, nothing
+          exposed to the internet.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------- reverse: the neighbour wins
+  - id: coordinate-dev-services-reverse-execute-distributed-workflow
+    category: routing-trap
+    note: >-
+      A dependent plan of code units over several hosts: the neighbour wins and this runbook
+      must not ride along. Decided by the neighbour's "a multi-stage PLAN across their Remote
+      Hosts".
+    messages:
+      - role: user
+        content: >-
+          Sequence this multi-stage plan over the remote machines: the schema package, then the
+          server and the client built against its commit, then the docs. Do not stop until every
+          stage has landed.
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-reverse-coordinate-contract-change
+    category: routing-trap
+    note: >-
+      Changing the interface between two hosts' sides: the neighbour wins. Decided by its
+      "the CONTRACT between them has to be agreed before they build or CHANGED while they do".
+    messages:
+      - role: user
+        content: >-
+          The schema for the events two remote hosts exchange needs one more field. Change the
+          interface once, tell both sides to pause and move onto the new version together.
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-reverse-delegate-to-host
+    category: routing-trap
+    note: >-
+      One piece of work for one host's assistant, no service to reach: the neighbour wins.
+      Decided by its "ONE piece of WORK done by the Daintree assistant on another machine".
+    messages:
+      - role: user
+        content: >-
+          Have the Linux host's assistant add retry logic to the payments client and report the
+          branch and SHA when it is pushed.
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-reverse-demo-for-hub
+    category: routing-trap
+    note: >-
+      The lane's own side: the hub asked THIS host to serve one service with sample data. Decided
+      by the neighbour's "when the hub asks THIS machine to prepare a DEMO of a feature".
+    messages:
+      - role: user
+        content: >-
+          Hub message: start the orders API here with sample data and reply with the port and the
+          commit you are serving.
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-reverse-free-busy-port
+    category: routing-trap
+    note: >-
+      One port clash on one host: the neighbour wins. Decided by its "ONE-OFF port clash right
+      now".
+    messages:
+      - role: user
+        content: >-
+          Port 5173 is already in use on the build host and my dev server will not start. What is
+          holding it?
+    expect:
+      required: [daintree.runtime.free-busy-port]
+
+  - id: coordinate-dev-services-reverse-debug-web-app
+    category: routing-trap
+    note: >-
+      An already-open preview failing at runtime: the neighbour wins. Decided by its "debug a web
+      app that is already open in Daintree Dev Preview".
+    messages:
+      - role: user
+        content: >-
+          The frontend dev preview on the second host shows network errors when it calls the API
+          running on the first host. Work out which address the page should be using.
+    expect:
+      required: [daintree.runtime.debug-web-app]
