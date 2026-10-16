@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 21563,
-  "compiled_sha256": "98cd1c073788babfa050b18953ad3790e9056d65895f9a49b8e684981acee98a",
+  "compiled_sha256": "fb9908a8d1fb65f8109b212ba2a704688b28b7b7295c47ac7d678dd902dac8eb",
   "label_space_sha256": "26f35cb115b86540b3c39908c279bebdd1a9159cbbb50507a879b336fef7051f",
   "label_space_size": 146,
   "by_source": {
@@ -60,7 +60,7 @@
     "runbook-2026-10-issue-118": 91,
     "runbook-2026-10-issue-119": 82,
     "runbook-2026-10-issue-120": 97,
-    "runbook-2026-10-issue-121": 87,
+    "runbook-2026-10-issue-121": 88,
     "runbook-2026-10-issue-122": 89,
     "runbook-2026-10-issue-127": 85,
     "runbook-2026-10-issue-131": 46,
@@ -78,7 +78,7 @@
     "runbook-2026-10-issue-92": 85,
     "runbook-2026-10-issue-93": 85,
     "runbook-2026-10-issue-94": 80,
-    "runbook-2026-10-issue-95": 87,
+    "runbook-2026-10-issue-95": 86,
     "runbook-2026-10-issue-96": 38,
     "runbook-2026-10-issue-98": 71,
     "runbook-2026-10-issue-99": 88,
@@ -488,7 +488,7 @@
       "examples": 120,
       "rows": 120,
       "runbook": "daintree.hosts.recover-and-clean-up",
-      "sha256": "8843724de4d48e0022127cc0464cc0c07dcabeeb5b2e3bbe138699257954daf3"
+      "sha256": "d707dbae8506127ed9420789721d6d2fd86ff386a5c90bed42f68a901b7dc85a"
     },
     "runbooks/daintree.hosts.report-swarm-results.yaml": {
       "examples": 65,
