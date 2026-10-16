@@ -184,8 +184,8 @@ cases:
     category: routing-trap
     note: >-
       Both sides by agents on this machine. Decided by "separate agents are to build the two sides AT
-      THE SAME TIME against an interface agreed first"; the local runbook now fences "sides built on
-      other machines by their hosts' assistants (use daintree.hosts.coordinate-contract-change)".
+      THE SAME TIME against an interface agreed first"; this runbook fences "both sides built by agents
+      on this machine (daintree.orchestration.contract-first-split)".
     messages:
       - role: user
         content: two agents on this machine build the billing endpoint and its page simultaneously, off a typed interface we commit first
