@@ -223,3 +223,20 @@ cases:
     expect:
       required: [daintree.runtime.migrate-worktree-database]
       optional: [daintree.foundation]
+
+  - id: provision-hosts-trap-service-reachability
+    category: routing-trap
+    note: >-
+      Reverse trap. Each worktree already has its own database and port; what fails is one
+      service reaching another on a different machine. That is daintree.hosts.coordinate-dev-services's
+      "development services that live on DIFFERENT Remote Hosts have to reach each other", so
+      provision-local-environment must not ride along.
+    messages:
+      - role: user
+        content: >-
+          The web client on the laptop host cannot reach the API on the build host even though
+          each worktree there has its own database and port. Find out what address is right and
+          prove the client reaches that API.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
