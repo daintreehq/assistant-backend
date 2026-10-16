@@ -55,6 +55,21 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: Launch an agent on the form validation now and after 15 minutes interrupt it and report progress, even if unfinished.
     confusable_with: [daintree.orchestration.watch-outcome]
+  - query: 'give the codex agent in my current worktree twenty minutes on the flaky date test, then stop it'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'time-box the agent in this window, not the hosts: fifteen minutes on the migration script'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'the hub''s message gives this host until 16:20 by its own clock for the cache rewrite; run the attempt here and stop the agent at that time'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'A hub request arrived: attempt the parser cleanup in a new worktree on this machine, the box ends 09:45 UTC, reply with partial results'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'Carry out the hub''s bounded attempt on this host: launch the agent with the deadline in its prompt, hold the wait, interrupt it at the deadline and verify the partial diff'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
 followups:
   - query: still going? it's past 14:35, stop it and get the report
     history:

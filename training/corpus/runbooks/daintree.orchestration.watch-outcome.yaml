@@ -555,6 +555,12 @@ boundaries:
   - query: "ping me when the PR I just opened gets merged"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: 'at six this evening, kick off the benchmark run on every host'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'remind me in forty minutes to look at what the hosts did'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:

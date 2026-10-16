@@ -192,6 +192,12 @@ boundaries:
   - query: 'each of my machines should try speeding up the slow test suite its own way on a separate branch'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: 'every host should build the parser on its own branch, take as long as it needs'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'run the dependency upgrade on all my machines and show me what each got, no time limit'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

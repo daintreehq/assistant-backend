@@ -1,0 +1,177 @@
+# daintree.hosts.timebox-swarm: the hub giving its Remote Hosts a fixed time on a task. Each
+# host's assistant enforces its own deadline on its own machine; the hub sends one bounded brief
+# per host, ends its turn and reports a row per host at the bound with that host's times and
+# partial work: finished early, stopped by the deadline, stopped late, blocked, unconfirmed.
+#
+# Rows: bounded attempts on one or several hosts in people's own words and as hub agents
+# describe them (short and long, with a social lead-in, with history), pre-launch "can they
+# enforce it" requests, explanation questions with docs: true; boundaries against a local time
+# box (daintree.orchestration.timebox-attempt), unbounded sends (daintree.hosts.swarm-fan-out,
+# daintree.hosts.delegate-to-host), stopping a run already sent (daintree.hosts.steer-swarm),
+# deferred starts (daintree.orchestration.watch-outcome), parking (daintree.hosts.park-swarm)
+# and catching up (daintree.hosts.recover-and-clean-up), each with reverse rows in that
+# neighbour's file; followups at the bound.
+runbook: daintree.hosts.timebox-swarm
+run: runbook-2026-10-issue-152
+positives:
+- Give each Remote Host's assistant a fixed window on the dependency bump, with a deadline it enforces
+  itself, and collect per host what was done when the window closed
+- 'Hub task: the person wants their three remote machines to attempt the cache rewrite for 20 minutes
+  only. Send each a bounded attempt and report which hosts stopped on time, with their partial diffs.'
+- Coordinate a 45-minute attempt at the flaky integration test across two Remote Hosts; each host
+  must stop its own agent at the deadline and report host-side timestamps
+- Send a time-limited spike to every connected host and gather the partial results at the cutoff,
+  marking any host that never answered as unconfirmed
+- The user asked for a bounded attempt on the remote build servers, half an hour each, then stop,
+  keep the work and report how far each got
+- give the other macs 10 min each on the date parsing bug and then tell me what they managed
+- I only have twenty minutes before my meeting. Have every remote host take a run at the slow query
+  until then and stop wherever they are.
+- let the linux box and the mini each try the webpack upgrade until 3pm, then they stop and you tell
+  me how far they got
+- can my other machines have a quick go at this? cap it at fifteen minutes
+- time box the remote attempt at 25 minutes, i want partial results not a finished PR
+- Have the hosts try to get the e2e suite green, but they get forty minutes and no more. After that,
+  report what each one changed.
+- Spend no more than half an hour of the build servers' time on the port to the new SDK, then pull
+  back what they have
+- I want an honest answer about which of my hosts actually stopped when the hour was up, along with
+  whatever they got done. Start them on the cleanup now.
+- send this to both remote machines with a hard stop at 5:30, I'd rather have half an answer than
+  a runaway job
+- until noon only, get the two servers to try reproducing the crash, then stop and report
+- bounded remote attempt, 20 min per host on the retry logic, report partial results with timestamps
+- Each Remote Host should try the schema change until 16:00 UTC, stop itself at that time, and report
+  what it verified versus what its agent only claimed
+- give the build box an hour at the profiler work and then make it stop, I'll judge from whatever
+  it has
+- one remote host, 15 minutes, try upgrading the ORM, stop at the limit and tell me how far it got
+- run the same spike on every host but cut it off after 20 minutes, I mostly care which one got further
+- the other machines can have until the top of the hour on the lint errors. after that they stop,
+  and you tell me what each fixed
+- set a deadline of 25 minutes for the remote hosts on this ticket and report their partial progress
+  honestly, including any that went quiet
+- 'Remote hosts get a 30 minute budget each on the i18n extraction. Hub: make sure each host knows
+  the exact end time in UTC and reports when its agent really stopped.'
+- Try the GraphQL schema split on all my hosts for a fixed quarter of an hour; whatever is half-done
+  stays on their branches, nothing gets pushed
+- Ask the remote machines to attempt the Rust toolchain bump with a strict time limit of ten minutes
+  and bring back each one's notes and leftover edits
+- give the hosts a fixed 40 minutes to chase the memory leak and then collect what each found, even
+  if nobody fixed it
+- Before anything launches on the hosts, check whether each one can actually enforce a 20 minute
+  limit itself, then start the attempt
+- 'Hub agent: dispatch a time-boxed experiment to the Remote Hosts. The box is 15 minutes from now;
+  collect stop evidence and partial artifacts per host and say which hosts could not be confirmed.'
+- I'm testing whether the new parser approach is even viable. Give each of my three remote machines
+  twenty minutes at it on their own branches. When the time is up I want each one stopped wherever
+  it is, its half-finished work kept, and a list of what works, what doesn't and what they'd try
+  next. Don't let any of them keep going past the deadline.
+- 'The person wants a bounded attempt across their Remote Hosts: fifteen minutes on the localisation
+  refactor from the shared base commit, no pushing. One host runs Codex as its assistant and may
+  not be able to hold a long wait. Find out before anything launches whether each host can enforce
+  the deadline, and collect partial results with stop times afterwards.'
+- Our CI is down so I'm using the machines at home. Give each remote host about 30 minutes to see
+  if the migration script runs cleanly against its copy of the repo. At the end of the half hour
+  I need to know which ones stopped by themselves, which ones you couldn't reach, and what each had
+  on disk.
+- The user has a demo at four and wants the two Remote Hosts to try the chart rendering fix until
+  15:30 their time. Each host stops its own worker at that point. Afterwards, report per host the
+  stop time it saw, the files left half-edited and the checks it ran.
+- morning! could you give the remote hosts a 10 minute crack at the typo sweep and then stop them?
+- thanks for getting the hosts connected. now let's see what they can do in fifteen minutes on the
+  auth bug, stop them after that
+- query: ok, give them twenty minutes at it and then stop them
+  history: ['user: are both remote hosts connected?', 'assistant: Yes, both hosts are connected and
+      each has an assistant ready in the project.']
+- query: fine, but cap it at ten minutes on each machine
+  history: ['user: can the other macs try the css refactor?', 'assistant: I can send it to both hosts.
+      Do you want a time limit, or should they run until done?']
+- query: same task again, but this time they get fifteen minutes and then stop
+  history: ['user: how did the hosts do on the parser task?', 'assistant: Both finished; one passed
+      its tests and one did not.']
+- Give the two remote servers until half past to see whether the test suite can run on Node 22, and
+  then have them stop and tell me what broke
+- 'Hub: run a bounded spike across the connected hosts, 20 minutes, on replacing the logger; deliver
+  per host what was finished, what was only claimed, and the files left mid-edit.'
+- quick timeboxed experiment on the remote boxes please. 15 minutes. then a summary per machine
+- I'm leaving in an hour. Have every host work on the accessibility audit until I leave and stop
+  there; I'll read the results when I'm back.
+- Each of my Remote Hosts should spend at most 30 minutes on the search indexing bug. Tell me afterwards
+  which host got furthest and which, if any, didn't stop on time.
+- give the macs a bounded go at the build cache issue, ten minutes, I need to know who actually stopped
+  versus who just went quiet
+- hope your day is going well! could the remote hosts have a 20 minute shot at the onboarding copy,
+  then stop?
+- 'The person wants a deadline-bound attempt on one Remote Host only: the build server, 25 minutes,
+  on the slow Docker build. It must stop at the deadline even if it is mid-change and report the
+  state of its branch.'
+- spend 10 minutes per host trying the new lint rule set, then stop and report what each flagged
+- {query: 'can daintree stop my other machines at a deadline, or is that up to each machine? set
+    it up for a 15 minute try at the bug', docs: true}
+- {query: 'how does a time limit work when I send work to my remote hosts? give them twenty minutes
+    on the export fix', docs: true}
+boundaries:
+- query: have each remote host try the caching idea for ten minutes, not an agent on this machine
+  confusable_with: [daintree.orchestration.timebox-attempt]
+- query: the twenty minute limit is for the agents on my other machines, not the one here
+  confusable_with: [daintree.orchestration.timebox-attempt]
+- query: give the remote hosts a fixed half hour at the bug and have them stop there
+  confusable_with: [daintree.orchestration.timebox-attempt]
+- query: send the upgrade to every host, but they only get fifteen minutes
+  confusable_with: [daintree.hosts.swarm-fan-out]
+- query: same task on all my machines, each with a hard deadline of 4pm
+  confusable_with: [daintree.hosts.swarm-fan-out]
+- query: put every host on the benchmark tuning with a 30 minute cap and a table of what each reached
+  confusable_with: [daintree.hosts.swarm-fan-out]
+- query: hand the build box the flaky test, but only for twenty minutes, then stop and report
+  confusable_with: [daintree.hosts.delegate-to-host]
+- query: have the other mac try the API client for half an hour and stop it at the limit
+  confusable_with: [daintree.hosts.delegate-to-host]
+- query: send it out now with the stop at the 30 minute mark built in, and tell me who stopped on
+    time
+  confusable_with: [daintree.hosts.steer-swarm]
+- query: I don't want to have to stop the hosts myself later, give them a deadline up front
+  confusable_with: [daintree.hosts.steer-swarm]
+- query: start the hosts on it now and have them stop at half past, I won't be around to stop them
+  confusable_with: [daintree.orchestration.watch-outcome]
+- query: let the remote machines work on this until 6pm and then wrap up with a report of how far
+    they got
+  confusable_with: [daintree.orchestration.watch-outcome]
+- query: 'not the agent in this window, the remote ones: give them twenty minutes on the regression'
+  confusable_with: [daintree.orchestration.timebox-attempt]
+- query: give the hosts until five on the indexing job, after that they stop and report what they
+    have
+  confusable_with: [daintree.hosts.park-swarm]
+- query: the deadline I gave the hosts has passed; collect what each one got and which of them really
+    stopped
+  confusable_with: [daintree.hosts.recover-and-clean-up]
+- query: twenty minutes each on the docs migration for both remote machines, then a stop and a table
+    of how far they got
+  confusable_with: [daintree.hosts.swarm-fan-out]
+followups:
+- query: time's up, what did each host get?
+  history: ['user: the remote boxes get ten minutes at the regex escaping problem', 'assistant: Done,
+      both hosts have the brief and the box ends at 14:40 UTC on their clocks. You will get each
+      host''s result as it replies.']
+- query: did they all actually stop?
+  history: ['user: twenty minutes on the cache bug for every host please', 'assistant: Sent to three
+      hosts with a deadline of 10:25 UTC; two have replied so far.']
+- query: one host never answered, does that mean it's still running?
+  history: ['user: the hosts can spend a quarter of an hour on the image diff failures', 'assistant:
+      Two hosts replied with their partial results; the third has not answered since the deadline
+      passed.']
+- query: go ahead with best effort on that one
+  history: ['user: half an hour for each remote host on the upgrade', 'assistant: One host says its
+      assistant cannot hold a wait for the whole half hour, so its agent would only be asked to stop
+      by its own clock. Should I launch it there as best effort?']
+- query: give the one that was close another ten minutes
+  history: ['user: fifteen minutes for each host on the date parsing bug', 'assistant: One host stopped
+      by the deadline with two of five tests passing; the other finished early with all tests green.']
+- query: ok, which of them are still unconfirmed?
+  history: ['user: half an hour on the cache invalidation for every host', 'assistant: The deadline
+      was 11:30 UTC. Two hosts replied with stop evidence; one host''s link dropped before it answered.']
+- query: and was the second machine's clock off?
+  history: ['user: let both remote machines try the upgrade until 3pm', 'assistant: Both replied.
+      One stopped at 14:59 by its own clock; the other at 15:02, which is two minutes late by its
+      report.']

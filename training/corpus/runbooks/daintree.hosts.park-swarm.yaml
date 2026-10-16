@@ -163,3 +163,6 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
   - query: hold the multi-stage plan on the remote hosts where it is until I'm back, start no new stage, and keep a resume record
     confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: 'the hosts have had their time on the indexing job; park it so we can pick it up tomorrow with a resume record'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152

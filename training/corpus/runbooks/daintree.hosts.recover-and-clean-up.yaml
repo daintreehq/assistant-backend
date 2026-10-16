@@ -217,3 +217,9 @@ boundaries:
   - query: "the hosts restarted overnight; tell me which of the tasks I sent them are still open, and I'll decide about reverting anything later"
     confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
+  - query: 'the hosts'' twenty minutes are up and I have read their results; now get rid of what that attempt left on each machine'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'I sent work to the hosts this morning with no deadline; what became of it?'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152

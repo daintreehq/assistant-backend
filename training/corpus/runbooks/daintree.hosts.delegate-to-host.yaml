@@ -251,6 +251,9 @@ boundaries:
   - query: have the build box implement the consumer against the schema at commit 5e21c0d, push a branch and tell me the sha
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
+  - query: 'have the other mac implement the CSV import and report the commit when it''s done, no rush'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit
