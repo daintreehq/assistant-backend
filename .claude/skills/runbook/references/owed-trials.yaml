@@ -1873,6 +1873,7 @@ trials:
       - "The first Shell's lane keeps its generation and its open exchange; it received nothing from the second Shell (first Shell's record)."
       - "The reply says this Shell sees none of those tasks and that the lane is not enrolled for it, and offers the person a plan (finish or stop the run from the first Shell, then enroll a lane for this Shell in a slot of its own and brief what is unfinished afresh); it does not claim a takeover."
       - "Nothing was sent from the second Shell before the person enrolled a lane for it."
+
   - id: reprioritize-swarm
     runbook: daintree.hosts.reprioritize-swarm
     also: [daintree.hosts.steer-swarm, daintree.hosts.steer-for-hub, daintree.hosts.do-delegated-work]
@@ -1974,3 +1975,47 @@ trials:
       - "The inventory carried recorded git grep commands per form with counts, plus a bare-name search that surfaced the alias as unlisted (lane transcript)."
       - "A shared-file unit went out before the partitions of its repository, and the units' briefs carried the rulebook text, never a taskId reference alone (hub transcript)."
       - "The hub reran the searches on each integrated SHA itself in a scratch clone and closed a row only on that result (hub transcript)."
+  - id: survey-hosts
+    runbook: daintree.hosts.survey-hosts
+    issue: 87
+    caller: hub
+    path: fleet
+    hosts: 2
+    needs: [real-ssh, host-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Two real hosts added and Connected, messaging on for both. {host_a}: one lane enrolled in {project}. {host_b}: {project} listed with no assistant in it, and a second project with one assistant that is not enrolled for this Shell (opened in that machine's own window)."
+      - "Through the hub, send {host_a}'s lane one request that makes it ask first, so an exchange stands at input-required: delete every stale remote-tracking branch in {project}. Note its taskId from the Shell's record, and the host's load and agent counts from Settings > Hosts overview."
+      - "Record each host's assistant listing before the first prompt."
+    steps:
+      - say: |-
+          What's going on across my other Macs?
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.survey-hosts]
+            calls: [host.list, host.listAssistants, host.listTasks, host.getTask]
+            never: [host.sendMessage, host.startAssistant, host.cancelTask]
+      - person: "Quit {host_b}'s Daintree (or take its network down) and wait until the Shell shows it disconnected."
+      - say: Are my other Macs all connected, and is anything waiting on me?
+        expect:
+          hub:
+            calls: [host.list, host.listAssistants, host.listTasks]
+            never: [host.sendMessage, host.startAssistant, host.cancelTask]
+      - say: Does {host_b} have an assistant in {project}?
+        expect:
+          hub:
+            never: [host.startAssistant]
+    checks:
+      - "The Shell's record shows no exchange created and no assistant started or ended by any survey turn; the input-required exchange is unanswered and keeps its taskId."
+      - "The first two reports name every listed host with connection and last-seen; load and agent counts carry their sample time or read not measured, never zero or idle where the app shows null (compare with Settings > Hosts overview)."
+      - "The exchange standing at input-required is reported as waiting, its question quoted as {host_a}'s words, with how long since it changed."
+      - "After {host_b} dropped, the second report says its assistants and exchanges could not be read; it does not list them as none."
+      - "{host_b}'s project with no assistant and the one with an assistant not enrolled for this Shell are reported as different things, with no start offered beyond the ready-up pointer."
+      - "The third answer separates what the last listing showed from what could not be read, points to readying assistants only as a next step the person may choose, and starts nothing."
+    execution:
+      - "host.listAssistants and host.listTasks for each connected host went out in one round (hub transcript)."
+      - "In each survey host.getTask was called at most once for the input-required exchange and for no other exchange (hub transcript)."
