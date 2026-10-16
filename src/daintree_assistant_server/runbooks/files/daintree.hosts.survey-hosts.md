@@ -10,6 +10,7 @@ requiredTools:
   - host.listTasks
 optionalTools:
   - host.getTask
+hostEligibility: configured
 ---
 Reads only: nothing is sent, started, cancelled or answered. Date every figure by when it was observed.
 

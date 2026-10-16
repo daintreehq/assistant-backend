@@ -11,6 +11,7 @@ optionalTools:
   - host.getTask
   - host.listTasks
   - mcp.surface
+hostEligibility: configured
 ---
 Reads only: never send, start, cancel or resend. Quote `outcome` and `detail`; fixed `detail` beats a guess.
 

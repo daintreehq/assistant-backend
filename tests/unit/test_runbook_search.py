@@ -58,7 +58,13 @@ class _Catalog:
         self.selectable_ids = frozenset(selectable)
 
 
-def _search(clf: _Classifier, selectable: set[str], query: str, limit: int) -> Any:
+def _search(
+    clf: _Classifier,
+    selectable: set[str],
+    query: str,
+    limit: int,
+    exclude: frozenset[str] = frozenset(),
+) -> Any:
     async def go() -> Any:
         pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=5.0)
         try:
@@ -67,7 +73,7 @@ def _search(clf: _Classifier, selectable: set[str], query: str, limit: int) -> A
                 pool,
                 _Catalog(selectable),  # type: ignore[arg-type]
             )
-            return await selector.search(query, limit=limit)
+            return await selector.search(query, limit=limit, exclude=exclude)
         finally:
             pool.close()
 
@@ -99,6 +105,23 @@ def test_search_drops_runbooks_that_are_not_selectable() -> None:
     clf = _Classifier([("hidden", 0.99), ("a", 0.5)], admitted=[])
     hits = _search(clf, {"a"}, "q", 5)
     assert [h.runbook_id for h in hits] == ["a"]
+
+
+def test_search_hands_the_exclusion_to_the_classifier_and_never_returns_it() -> None:
+    """The classifier leaves excluded runbooks off the ballot (before the shortlist);
+    the read-off drops them as well, so no seam can offer one."""
+    clf = _Classifier([("host", 0.9), ("a", 0.5), ("b", 0.4)], admitted=["host", "a"])
+    hits = _search(clf, {"host", "a", "b"}, "q", 5, exclude=frozenset({"host"}))
+    assert [(h.runbook_id, h.selected) for h in hits] == [("a", True), ("b", False)]
+    (call,) = clf.calls
+    assert call["exclude"] == frozenset({"host"})
+
+
+def test_an_unfiltered_search_excludes_nothing() -> None:
+    clf = _Classifier([("a", 0.9)], admitted=[])
+    _search(clf, {"a"}, "q", 5)
+    (call,) = clf.calls
+    assert call["exclude"] == frozenset()
 
 
 def test_a_failed_search_is_none_not_empty() -> None:
@@ -142,6 +165,47 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
     assert hits[0].selected
     scores = [h.score for h in hits]
     assert scores == sorted(scores, reverse=True)
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None:
+    """Issue #153's pairs: the same fan-out request with and without hosts, and a
+    lane with no hosts of its own still answered from its inbox wake line."""
+    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+    from daintree_assistant_server.runbooks.host_state import HostState
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
+
+    catalog = load_catalog(default_runbooks_dir())
+    clf = SetwiseClassifier(_ARTIFACT)
+    clf.sync(catalog)
+    fan_out = "Work these six issues in parallel, an agent on each"
+    wake = (
+        "Daintree: assistant inbox has a new message (exchange "
+        "6a2d9f14-0b7e-4c53-8e21-c4f07b9a3d58). Read it with assistant.getInbox."
+    )
+
+    async def go(query: str, state: HostState | None) -> Any:
+        pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=30.0)
+        try:
+            selector = LocalSelector(clf, pool, catalog)
+            return await selector.search(
+                query, limit=10, exclude=catalog.excluded_for(state)
+            )
+        finally:
+            pool.close()
+
+    unreported = asyncio.run(go(fan_out, None))
+    assert any(h.runbook_id.startswith("daintree.hosts.") for h in unreported)
+
+    no_hosts = asyncio.run(go(fan_out, HostState("none")))
+    assert len(no_hosts) == 10
+    assert no_hosts[0].runbook_id == "daintree.orchestration.fan-out-work"
+    assert no_hosts[0].selected
+    assert not {h.runbook_id for h in no_hosts} & catalog.excluded_for(HostState("none"))
+
+    lane = asyncio.run(go(wake, HostState("none", lane_reachable=True)))
+    assert lane[0].runbook_id == "daintree.hosts.handle-hub-message"
+    assert lane[0].selected
 
 
 def test_a_query_the_tokenizer_rejects_is_a_failed_search_not_a_crash() -> None:

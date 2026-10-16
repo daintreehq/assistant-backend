@@ -15,6 +15,7 @@ requiredTools:
 optionalTools:
   - terminal.sendCommand
   - terminal.getStatus
+hostEligibility: lane
 ---
 Message and reply: daintree.hosts.handle-hub-message.
 

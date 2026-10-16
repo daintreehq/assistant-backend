@@ -8,6 +8,10 @@ request carrying one gets that session's record of what it was already sent
 (``mcp_sessions.py``). The id changes what a reply repeats, never whether a
 request is served: an unknown id is adopted, and a missing one is no session.
 
+Daintree reports the caller's coarse host state in two headers on every POST
+(``runbooks/host_state.py``), and a search leaves out the host runbooks that state
+does not fit. It is read per request, never stored: no request depends on another.
+
 Open by design: anyone can add this server to their agent. A search is the local
 classifier over public runbooks, so there is no credential to hold and nothing a
 caller can spend.
@@ -33,6 +37,7 @@ from ..runbook_mcp import (
     error_reply,
     handle_message,
 )
+from ..runbooks.host_state import HOSTS_HEADER, LANE_HEADER, parse_host_state
 from ..runbooks.local.selector import RunbookSelector
 
 router = APIRouter()
@@ -77,6 +82,8 @@ async def mcp_post(request: Request) -> Response:
     container = request.app.state.container
     selector: RunbookSelector = container.selector
     sessions: SessionMemory = container.sessions
+    host_state = parse_host_state(_header(request, HOSTS_HEADER), _header(request, LANE_HEADER))
+    exclude = container.catalog.excluded_for(host_state)
 
     reply = await handle_message(
         message,
@@ -86,7 +93,7 @@ async def mcp_post(request: Request) -> Response:
             name=_header(request, "mcp-name"),
         ),
         catalog=container.catalog,
-        search=lambda query, limit: selector.search(query, limit=limit),
+        search=lambda query, limit: selector.search(query, limit=limit, exclude=exclude),
         delivered=(record := sessions.delivered(_header(request, "mcp-session-id"))),
     )
     session_id: str | None = None
@@ -100,6 +107,8 @@ async def mcp_post(request: Request) -> Response:
         rpc_method=reply.method,
         status=reply.status,
         results=reply.results,
+        hosts=host_state.hosts if host_state is not None else None,
+        lane_reachable=host_state.lane_reachable if host_state is not None else None,
         duration_ms=round((time.perf_counter() - started) * 1000, 1),
     )
     # Rendered first: only a reply that serialized marks its runbooks as sent.

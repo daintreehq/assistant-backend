@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 Read-only here and on every host: nothing is closed, removed, stopped or pushed.
 

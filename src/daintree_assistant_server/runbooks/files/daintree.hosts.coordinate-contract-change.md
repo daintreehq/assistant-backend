@@ -13,6 +13,7 @@ optionalTools:
   - host.listTasks
   - host.cancelTask
   - assistant.getInbox
+hostEligibility: connected
 ---
 1. Per side: host, project, lane (`host.listAssistants`), remote, that repository's base SHA (`git ls-remote`) and its contract copy's path; a SHA never crosses repositories. Contract: one home repository and paths (schema, examples, error cases, a compatibility test).
 2. Brief the home lane as daintree.hosts.delegate-to-host does (`get_runbook` if absent): its agent writes only those paths on `contract/<run>` and pushes (no push authority: ask first). Check its scope on the remote, show the person, freeze on their yes (the interface is theirs unless left to you): v1, full SHA. Versions are `contract/<run>`'s history.

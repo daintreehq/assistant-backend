@@ -12,6 +12,7 @@ requiredTools:
 optionalTools:
   - host.listTasks
   - host.startAssistant
+hostEligibility: connected
 ---
 Read-only. A host's project `name`, `path` and `projectId` are its own hints: equal ones prove nothing across machines, clones and forks inherit an id, and a repeated id lists once, hiding a clone.
 

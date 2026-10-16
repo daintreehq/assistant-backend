@@ -12,6 +12,7 @@ optionalTools:
   - host.listAssistants
   - assistant.getInbox
   - assistant.reply
+hostEligibility: configured
 ---
 Beside the ids the foundation keeps, give each unit a row: state, when it last moved, result, and each follow-up's `taskId` and purpose.
 

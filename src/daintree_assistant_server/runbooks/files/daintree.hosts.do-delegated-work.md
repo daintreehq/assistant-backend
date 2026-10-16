@@ -17,6 +17,7 @@ requiredTools:
 optionalTools:
   - slashCommands.list
   - terminal.sendCommand
+hostEligibility: lane
 ---
 After daintree.hosts.handle-hub-message has read and fitted it: one hub unit, by a visible agent here; never a batch.
 

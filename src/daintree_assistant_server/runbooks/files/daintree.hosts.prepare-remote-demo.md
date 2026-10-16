@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 The host's lane builds the demo (daintree.hosts.demo-for-hub); you brief it, check its reply and give the person the route. No tool here makes, lists or sees a port forward: the Shell makes it, the person opens it.
 

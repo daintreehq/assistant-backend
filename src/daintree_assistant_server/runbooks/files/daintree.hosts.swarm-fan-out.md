@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 One brief to every chosen host at once, each on its own branch; one table back. Different pieces per host, a split suite or an environment matrix is not this: say so.
 

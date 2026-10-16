@@ -10,6 +10,7 @@ requiredTools:
   - project.openOnHost
 optionalTools:
   - host.listAssistants
+hostEligibility: connected
 ---
 Needs Tool set = Full. Opened by an agent, the dialog pushes, clones and opens nothing until the person clicks it. You brief and open it; you run no git and touch no host file.
 

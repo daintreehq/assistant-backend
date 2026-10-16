@@ -10,6 +10,7 @@ requiredTools:
   - host.sendMessage
   - host.getTask
   - host.listTasks
+hostEligibility: connected
 ---
 The plan lives in this conversation and wakes nobody; task records hold no text and last a day. Each unit is a daintree.hosts.delegate-to-host unit, its brief and checks (`get_runbook` if absent).
 

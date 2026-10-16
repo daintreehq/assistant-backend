@@ -13,6 +13,7 @@ requiredTools:
 optionalTools:
   - host.cancelTask
   - host.startAssistant
+hostEligibility: connected
 ---
 1. The original: your brief (lost: ask the person), its `taskId` (else `host.listTasks`), `host.getTask` (`disconnected`: stale or null, no replies), `host.list` `connection`, `lastSeenAt`. On the remote, `git ls-remote` and `gh pr list --head` its branch: that SHA, not its claims, is the checkpoint.
 2. Stop it:

@@ -12,6 +12,7 @@ requiredTools:
   - worktree.deleteOwned
   - worktree.delete
   - assistant.reply
+hostEligibility: lane
 ---
 Follow daintree.hosts.handle-hub-message first (read, fit, reply); then remove only what this lane made for the run the hub names.
 

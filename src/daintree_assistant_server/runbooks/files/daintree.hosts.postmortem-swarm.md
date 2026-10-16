@@ -11,6 +11,7 @@ optionalTools:
   - host.list
   - host.listAssistants
   - host.sendMessage
+hostEligibility: configured
 ---
 Evidence only: nothing is resent, restarted, cancelled, cleaned up, fixed or filed from here. An elapsed time is not a cause.
 

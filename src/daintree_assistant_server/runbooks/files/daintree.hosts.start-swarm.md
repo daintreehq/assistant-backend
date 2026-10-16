@@ -8,6 +8,7 @@ requiredTools:
   - host.list
   - host.listAssistants
   - host.startAssistant
+hostEligibility: connected
 ---
 Readies one lane per host and sends no work. Start only what the person asked to have ready; a "who can take work?" question gets the table and an offer.
 

@@ -12,6 +12,7 @@ requiredTools:
 optionalTools:
   - host.list
   - assistant.reply
+hostEligibility: configured
 ---
 One hub per Shell: the session the person turned "Accept messages from other machines" on in; no tool moves it. Records belong to the Shell: a successor sees every task, but no update line for an earlier hub's sends and none of its inbox.
 

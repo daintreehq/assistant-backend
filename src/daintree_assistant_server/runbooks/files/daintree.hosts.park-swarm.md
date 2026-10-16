@@ -12,6 +12,7 @@ requiredTools:
   - host.sendMessage
 optionalTools:
   - host.cancelTask
+hostEligibility: configured
 ---
 Parking schedules nothing: a host's restart ends its panes and empties `replies`, never its worktrees. Exchanges expire in 24 hours and their records in about 8 days: the record is what lasts.
 
