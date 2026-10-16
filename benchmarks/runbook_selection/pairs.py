@@ -108,7 +108,7 @@ def brief_problems(brief: str) -> list[str]:
     problems = [
         f"no '{label}:' line"
         for label in BRIEF_LABELS
-        if not re.search(rf"^\s*{label}:\s*\S", brief, re.M)
+        if not re.search(rf"^[ \t]*{label}:[ \t]*\S", brief, re.M)
     ]
     if len(brief) > BRIEF_MAX_CHARS:
         problems.append(f"{len(brief)} chars, over {BRIEF_MAX_CHARS}: a brief is by reference")
@@ -120,7 +120,7 @@ def brief_problems(brief: str) -> list[str]:
 
 
 def objective_line(brief: str) -> str:
-    match = re.search(r"^\s*Objective:\s*(.+)$", brief, re.M)
+    match = re.search(r"^[ \t]*Objective:[ \t]*(.+)$", brief, re.M)
     return match.group(1) if match else ""
 
 

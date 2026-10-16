@@ -14,6 +14,24 @@
 #
 # Where a case misses on the shipped selector the note says where and why; none of these cases
 # bends a runbook's text, and the misses are owed to the user's one retrain.
+#
+# The cohort scenario pairs the hub's placement of several pieces with the lane that receives
+# several at once. Placement sends one message per piece, so no hub runbook yet produces the
+# several-pieces message the lane's runbook is written for: that end is retrieval only, and the
+# missing sender is pinned in tests/unit/test_paired_roles.py (HUB_NAMES_NO_RECEIVER).
+
+# Every procedure a lane follows for a hub's work. A lane case whose right answer is the
+# envelope alone (a wake line, a plain question, a role the lane does not hold) forbids all of
+# them: none can be chosen before the message has been read, or when it asks for no work.
+x-lane-work-procedures: &lane_work
+  - daintree.hosts.do-delegated-work
+  - daintree.hosts.verify-for-hub
+  - daintree.hosts.review-for-hub
+  - daintree.hosts.run-local-cohort
+  - daintree.hosts.steer-for-hub
+  - daintree.hosts.integrate-for-hub
+  - daintree.hosts.demo-for-hub
+  - daintree.hosts.clean-up-for-hub
 
 cases:
   # ------------------------------------------------------------------ implement
@@ -41,9 +59,9 @@ cases:
       implement, fix or build something as one unit of work" and "a new worktree on the brief's
       branch from its base commit".
     brief: |-
-      Objective: Fix the flaky login test so it passes ten runs in a row. Deliverable: one commit on the unit branch.
-      Scope: This project only. Unit branch cut from the base SHA given. Run the unit tests only. No push, no PR.
-      Report: Branch, full SHA, each check's command and result, the pane id.
+      Objective: Fix the flaky login test so it passes ten runs in a row. Deliverable: a commit on the unit branch, pushed, with a pull request open.
+      Scope: This project only. Unit branch cut from the base SHA given. Run the unit tests only. Push the branch and open the pull request once they pass.
+      Report: Branch, full SHA, pull request URL, each check's command and result, the pane id.
       Stop: Ask back if the remote or base SHA differs, or the fix needs a schema change.
     messages:
       - role: user
@@ -66,7 +84,7 @@ cases:
     expect:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.do-delegated-work]
+      forbid: [daintree.hosts.do-delegated-work, daintree.hosts.handle-hub-message]
 
   - id: pair-implement-hub-local-trap
     scenario: implement
@@ -132,7 +150,7 @@ cases:
     expect:
       required: [daintree.review.review-change]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.review-for-hub]
+      forbid: [daintree.hosts.review-for-hub, daintree.hosts.handle-hub-message]
 
   - id: pair-review-hub-local-trap
     scenario: review
@@ -196,7 +214,7 @@ cases:
     expect:
       required: [daintree.ci.run-local-checks]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.verify-for-hub]
+      forbid: [daintree.hosts.verify-for-hub, daintree.hosts.handle-hub-message]
 
   - id: pair-verify-hub-local-trap
     scenario: verify
@@ -275,7 +293,7 @@ cases:
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.run-local-cohort]
+      forbid: [daintree.hosts.run-local-cohort, daintree.hosts.handle-hub-message]
 
   - id: pair-cohort-hub-local-trap
     scenario: cohort
@@ -339,7 +357,7 @@ cases:
     expect:
       required: [daintree.agents.steer-running-agent]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.steer-for-hub]
+      forbid: [daintree.hosts.steer-for-hub, daintree.hosts.handle-hub-message]
 
   - id: pair-steer-hub-local-trap
     scenario: steer
@@ -379,7 +397,7 @@ cases:
       The integrating lane. Decided by "several finished commits from other hosts' or units'
       branches, each pinned by SHA, to merge in order into one new integration branch".
     brief: |-
-      Objective: Merge the three pinned commits below, in order, into one new integration branch. Deliverable: that branch with checks after each merge.
+      Objective: Merge the two pinned commits below, in order, into one new integration branch. Deliverable: that branch with checks after each merge.
       Scope: Own worktree. Merge each exact SHA, never a branch's newer tip. Rewrite no source branch. No push.
       Report: Each merge and its checks, the final branch and SHA, any conflict not settled by this brief.
       Stop: Ask back on a missing commit, a conflict this brief does not settle, or an acceptance clash.
@@ -403,7 +421,7 @@ cases:
     expect:
       required: [daintree.git.integrate-agent-branches]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.integrate-for-hub]
+      forbid: [daintree.hosts.integrate-for-hub, daintree.hosts.handle-hub-message]
 
   - id: pair-integrate-hub-local-trap
     scenario: integrate
@@ -467,7 +485,7 @@ cases:
     expect:
       required: [daintree.workflow.prepare-feature-demo]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.demo-for-hub]
+      forbid: [daintree.hosts.demo-for-hub, daintree.hosts.handle-hub-message]
 
   - id: pair-demo-hub-local-trap
     scenario: demo
@@ -532,7 +550,7 @@ cases:
     expect:
       required: [daintree.orchestration.workspace-cleanup]
       optional: [daintree.foundation]
-      forbid: [daintree.hosts.clean-up-for-hub]
+      forbid: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
 
   - id: pair-cleanup-hub-local-trap
     scenario: clean-up
@@ -600,11 +618,7 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]
-      forbid:
-        - daintree.hosts.do-delegated-work
-        - daintree.hosts.verify-for-hub
-        - daintree.hosts.review-for-hub
-        - daintree.hosts.run-local-cohort
+      forbid: *lane_work
 
   - id: pair-question-lane-fact-trap
     scenario: question
@@ -620,7 +634,7 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]
-      forbid: [daintree.hosts.do-delegated-work, daintree.hosts.verify-for-hub]
+      forbid: *lane_work
 
   - id: pair-question-hub-work-trap
     scenario: question
@@ -686,6 +700,7 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]
+      forbid: *lane_work
 
   - id: pair-role-hub-reads-host-message
     scenario: designated-role

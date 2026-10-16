@@ -226,6 +226,13 @@ def test_a_brief_carries_its_boundaries_and_stays_a_reference() -> None:
     assert any("procedure text" in p for p in brief_problems(pasted))
 
 
+def test_a_boundary_label_needs_its_own_content_not_the_next_lines() -> None:
+    for blank in ("Scope:", "Scope:   ", "Report:\t"):
+        label = blank.split(":")[0]
+        hollow = re.sub(rf"^{label}:.*$", blank, GOOD_BRIEF, flags=re.M)
+        assert any(f"no '{label}:' line" in p for p in brief_problems(hollow)), blank
+
+
 def test_the_shipped_briefs_are_small_and_each_carries_all_four_boundaries() -> None:
     briefs = [c.brief for c in _cases() if c.brief]
     assert len(briefs) >= len(REQUIRED_SCENARIOS)
@@ -274,6 +281,80 @@ def test_a_case_cannot_expect_what_it_forbids() -> None:
         assert not set(case.forbid) & (set(case.required) | set(case.optional)), case.id
         derived = set(wrong_role_ids(str(case.role), catalog))
         assert derived <= set(case.forbid), case.id
+
+
+ENVELOPE_ONLY_TRAPS = (
+    "pair-question-lane-wake-line",
+    "pair-question-lane-fact-trap",
+    "pair-role-lane-asked-to-relay",
+)
+
+
+def test_envelope_only_traps_forbid_every_lane_procedure_and_local_traps_the_envelope() -> None:
+    """A trap whose right answer is the envelope alone must fail when any procedure for a hub's
+    work loads beside it: the role-derived forbid only covers the OTHER end, so the lane's own
+    procedures are named. The set is read from the catalog, so a new lane procedure that lands
+    without being added to the traps turns this red."""
+    catalog = _catalog()
+    envelope = "daintree.hosts.handle-hub-message"
+    lane_work = {r.id for r in catalog.runbooks if baseline_role(r) == "lane"} - {envelope}
+    by_id = {c.id: c for c in _cases()}
+    for case_id in ENVELOPE_ONLY_TRAPS:
+        assert set(by_id[case_id].forbid) >= lane_work, case_id
+        assert by_id[case_id].required == [envelope], case_id
+    # The person at the host's own machine has no hub message to handle, so the envelope is
+    # as wrong there as the receiving procedure.
+    local = [c for c in _cases() if c.role == "lane" and c.id.endswith("local-trap")]
+    assert len(local) >= 7
+    for case in local:
+        assert envelope in case.forbid, case.id
+
+
+def test_an_injected_load_beside_the_right_runbook_fails_these_traps() -> None:
+    from pathlib import Path
+
+    from benchmarks.runbook_selection.local_runner import build_local_doc
+
+    catalog = _catalog()
+    whole = list(_all_cases())
+    by_id = {c.id: c for c in whole}
+    for case_id, extra in (
+        ("pair-question-lane-wake-line", "daintree.hosts.clean-up-for-hub"),
+        ("pair-question-lane-fact-trap", "daintree.hosts.do-delegated-work"),
+        ("pair-role-lane-asked-to-relay", "daintree.hosts.do-delegated-work"),
+        ("pair-implement-lane-local-trap", "daintree.hosts.handle-hub-message"),
+    ):
+        case = by_id[case_id]
+        outcomes = []
+        for picked in ([*case.required], [*case.required, extra]):
+            results = [
+                score_trial(
+                    case,
+                    0,
+                    picked,
+                    degraded=False,
+                    latency_s=0.0,
+                    confidence=None,
+                    task_type=None,
+                    reason=None,
+                    prompt_tokens=None,
+                    completion_tokens=None,
+                )
+            ]
+            doc = build_local_doc(
+                cases=[case],
+                whole_corpus=whole,
+                results=results,
+                losses=[],
+                spans={},
+                picked=[picked],
+                reserved_cases=0,
+                artifact=Path("."),
+                catalog=catalog,
+                candidates=32,
+            )
+            outcomes.append(doc["recall_pass"][0])
+        assert outcomes == [True, False], case_id
 
 
 def test_loading_refuses_a_half_declared_pair_and_a_self_contradicting_expectation(
