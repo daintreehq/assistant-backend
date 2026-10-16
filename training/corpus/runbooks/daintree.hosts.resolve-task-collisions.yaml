@@ -125,6 +125,9 @@ boundaries:
     confusable_with: [daintree.hosts.supervise-swarm]
   - query: two machines got overlapping pieces from the split, they touch the same files; one of them takes the shared part
     confusable_with: [daintree.hosts.place-work]
+  - query: 'my two build machines are both working on the same fix and pushing to one branch right now; stop one of them and choose who keeps it'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 
 followups:
   - query: go with the tower then, and leave the mini's work alone

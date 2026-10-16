@@ -113,6 +113,8 @@ boundaries:
   confusable_with: [daintree.hosts.recover-and-clean-up]
 - query: no more waiting on the hosts. a retrospective of the failed run, per host, with what each claimed and what the remote shows
   confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
+- query: two hosts ended up doing the same issue last week and nothing is running now; I don't want it settled, I want to know how that happened
+  confusable_with: [daintree.hosts.resolve-task-collisions]
 followups:
 - query: and which of those delays was down to how we briefed them?
   history:
