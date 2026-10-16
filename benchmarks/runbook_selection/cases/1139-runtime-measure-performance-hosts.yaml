@@ -103,7 +103,7 @@ cases:
     category: routing-trap
     note: >-
       Two pinned revisions timed per machine is a speed comparison, not a pass/fail
-      matrix. Decided by "Do not use for a check matrix across environments
+      matrix. Decided by "a check matrix across environments
       (daintree.hosts.run-validation-matrix)".
     messages:
       - role: user
@@ -116,7 +116,7 @@ cases:
     category: routing-trap
     note: >-
       The same suite timed on each machine for two revisions is a measurement, not a
-      split of one run. Decided by "Do not use for ... a test suite split across hosts
+      split of one run. Decided by "a test suite split across hosts
       (daintree.hosts.shard-test-suite)".
     messages:
       - role: user
@@ -129,7 +129,7 @@ cases:
     category: routing-trap
     note: >-
       Machines that differ in speed are expected, not a failure to diagnose; the question
-      is whether the change helps on each. Decided by "Do not use for ... why the same
+      is whether the change helps on each. Decided by "why the same
       code differs between hosts (daintree.hosts.diagnose-host-differences)".
     messages:
       - role: user
@@ -142,7 +142,7 @@ cases:
     category: routing-trap
     note: >-
       A loaded host is a caveat on its measurement, not a swarm to rebalance. Decided by
-      "Do not use for ... a lopsided swarm's load (daintree.hosts.rebalance-load)" and
+      "a lopsided swarm's load (daintree.hosts.rebalance-load)" and
       "load and thermal readings with times".
     messages:
       - role: user
@@ -155,7 +155,7 @@ cases:
     category: routing-trap
     note: >-
       Memory of two builds per host is a measurement, not the agent usage screen.
-      Decided by "Do not use for ... plan allowance per host
+      Decided by "plan allowance per host
       (daintree.hosts.check-usage-limits)".
     messages:
       - role: user

@@ -2745,7 +2745,7 @@ trials:
             notices: [lane-wake]
     checks:
       - "On each machine, the operator times bench.js at {sha} and at {sha_b}, alternating, at least 10 pairs, with nothing else added: the candidate/baseline ratio is about 1.25 on both, while the baseline seconds on the slow machine are clearly larger than on the fast one."
-      - "The hub's per-host ratio matches the operator's own for that host within the spread the lane reported, and both hosts are reported slower; no pooled or cross-machine number appears before the per-host rows."
+      - "The hub's per-host ratio matches the operator's own for that host within the spread the lane reported, and both hosts are reported slower; no pooled or cross-machine time appears anywhere, and any fleet line states that the hosts agree."
       - "The busy host's reply carries load readings with times from its own machine, and its verdict is qualified by them: beyond-threshold only if the whole spread is, otherwise inconclusive; never presented as a clean result."
       - "On each machine the two worktrees sit at exactly {sha} and {sha_b}, clean, outside the person's own checkout; no tooling was installed and no process priority or affinity was changed (git status, the process list with nice values, the installed-package list before and after)."
       - "The Shell's exchange record (Settings > Hosts overview): one exchange per host, completed, none resent."

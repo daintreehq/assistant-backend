@@ -37,7 +37,7 @@ On notice or resume:
 - The notice's numbers are a claim: report nothing until you have, yourself:
   1. opened the raw file (a host's reply: its pairs), recomputed each side's median, the paired deltas and the ratio, and checked run counts and alternation;
   2. re-read both trees' `HEAD` and hash: changed means invalid; a host reports the pinned SHAs and each side's artifact hash;
-  3. `terminal.getStatus`: agents that worked during the runs are a caveat; per host, its readings with times beside `host.list` `load` by `sampledAt` (whole machine; null or old is unknown). Load or heat that moved qualifies that host: a verdict only if the whole spread is beyond the threshold;
+  3. `terminal.getStatus`: agents that worked during the runs are a caveat; per host, its readings with times beside `host.list` `load` by `sampledAt` (whole machine; null or old is unknown). High or changing load or heat qualifies that host: a verdict only if the whole spread is beyond the threshold;
   4. for a surprising result (large, or opposite), one more round within budget, on that host only (`terminal.sendCommandOwned`, or `host.sendMessage` in its `contextId`); end the turn.
 
 Stop and recovery: one extra round. Reconcile with `terminal.list` and `worktree.list` before any second launch or create. The baseline worktree stays.
