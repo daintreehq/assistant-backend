@@ -22,11 +22,11 @@ cases:
   - id: skills-host-remote-box-user
     category: single-runbook
     note: >-
-      User wording from the issue family: the remote machine's copy, not the local one.
-      Deciding clause: "use the project plugin skill on this remote host".
+      Receiving-lane wording: the hub's machine is not the one that runs the work, so the skill
+      installed here is used. Deciding clause: "use the installed plugin skill on this remote host".
     messages:
       - role: user
-        content: use the project plugin skill on the remote box, not the copy on my laptop
+        content: The hub drives from the laptop, but its plugin copy is not what runs on this machine; use the plugin skill installed here for the cleanup
     expect:
       required: [daintree.skills.use-plugin-skill]
       optional: [daintree.foundation, daintree.hosts.foundation]
@@ -66,7 +66,7 @@ cases:
         content: the plugin skill this host loaded says to publish the package and delete the old tag, but the hub only asked for a local fix; keep the agent inside the hub request
     expect:
       required: [daintree.skills.use-plugin-skill]
-      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.verify-for-hub]
+      optional: [daintree.foundation, daintree.hosts.foundation]
 
   - id: skills-host-list-skills-and-commands
     category: single-runbook
@@ -131,3 +131,53 @@ cases:
     expect:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: skills-host-new-agent-follows-plugin-skill
+    category: single-runbook
+    note: >-
+      A plugin skill found and loaded, then followed by a NEW agent in a fresh worktree, stays here
+      rather than becoming a plain launch. Deciding clause: "then its steps carried out by an open or
+      new agent briefed with that id and checked from its report".
+    messages:
+      - role: user
+        content: find the plugin tdd skill and have a new agent in a fresh worktree on this host follow it on the parser fix
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: skills-host-trap-new-agent-cli-first-turn
+    category: routing-trap
+    note: >-
+      A CLI-native command as a new agent's first turn, then the task, is a launch. Fence: "for a
+      CLI-native command or skill as a NEW agent's first turn
+      (daintree.edits.spawn-visible-agent)".
+    messages:
+      - role: user
+        content: "spin up a new claude in its own worktree here, first turn /compact-notes then the task: fix the date parser"
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: skills-host-trap-daintree-failing
+    category: routing-trap
+    note: >-
+      Skill tools failing because Daintree itself is broken is a diagnosis, not a skill lookup.
+      Fence: "or for Daintree itself failing (daintree.diagnostics)".
+    messages:
+      - role: user
+        content: the skills search keeps failing with an internal error on this machine and other Daintree actions fail the same way, it looks like Daintree itself is broken
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: skills-host-single-agent-not-fan-out
+    category: routing-trap
+    note: >-
+      One agent following one plugin skill is this runbook, not a batch. Fence: "for a command chain
+      per issue (daintree.orchestration.fan-out-work)".
+    messages:
+      - role: user
+        content: have the one agent on the parser branch follow the plugin tdd skill, a single job and no per-branch batch
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation]
