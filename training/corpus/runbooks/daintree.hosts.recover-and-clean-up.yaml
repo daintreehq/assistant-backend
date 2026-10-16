@@ -275,6 +275,7 @@ boundaries:
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
   - query: 'daintree restarted while the other machines were mid-task; list which exchanges finished, which are still open and which nobody will answer'
+  - query: 'our app was closed overnight while two remote hosts had jobs going; which of those jobs came back, which are still pending, which will never answer'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
   - query: 'which tasks I sent to the other machines are still open, and is it safe to send any of them again'

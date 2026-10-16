@@ -23,7 +23,7 @@ positives:
 - my remote machines made a mess of that run, figure out why
 - which of the hosts told me something that turned out not to be true
 - the swarm fell over halfway, build me the evidence trail of what happened and when
-- one box sat on its task for three hours before touching it. why
+- the run on my remote hosts is finished, and the task I sent to one of them sat for three hours before its assistant touched it. why was that
 - I need a proper write-up of why the multi-machine run stalled, with times
 - 'Hub task: the run across the three remote hosts is finished and two units are missing. Reconstruct from each host''s
   exchange records when every unit was accepted, woken, read and answered, which stamps are absent, and which claims
@@ -85,7 +85,7 @@ boundaries:
   confusable_with: [daintree.agents.postmortem-run]
 - query: the hosts finished already, so no need to follow them. I want to know why the run went the way it did
   confusable_with: [daintree.hosts.supervise-swarm]
-- query: it's over and I don't want to keep watching it; explain the stall and the duplicate work with the evidence
+- query: the run on my remote hosts is over and I don't want to keep watching it; explain the stall and the duplicate work with the evidence
   confusable_with: [daintree.hosts.supervise-swarm]
 - query: not where things stand, I already know that. I want to know why each exchange with the remote machines took as long as it did
   confusable_with: [daintree.hosts.recover-and-clean-up]
@@ -105,7 +105,7 @@ boundaries:
   confusable_with: [daintree.debug.investigate-outage]
 - query: don't revert or clean anything, only explain why the remote hosts' run went wrong and what is salvageable
   confusable_with: [daintree.hosts.undo-swarm-changes, daintree.hosts.recover-and-clean-up]
-- query: nothing to stop or redirect, the run already ended. I want the reasons it failed written down
+- query: nothing to stop or redirect on the remote hosts, the run already ended. I want the reasons it failed written down
   confusable_with: [daintree.hosts.steer-swarm]
 - query: list what we should change after the failed run on the remote machines, and give me a way to reproduce each problem, not a memory note
   confusable_with: [daintree.memory.manage-project-memory]

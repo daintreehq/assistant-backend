@@ -40,7 +40,7 @@ cases:
         content: Why did the cross-host workflow stall or do the same work twice?
     expect:
       required: [daintree.hosts.postmortem-swarm]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.orchestration.status-and-resume]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-issue-preserve-partial
     category: single-runbook
@@ -104,8 +104,8 @@ cases:
   - id: postmortem-swarm-user-approval-hunch
     category: single-runbook
     note: >-
-      A hunch-first phrasing with no word for the run being over: a person suspects slow approvals
-      and asks the records to settle it. Decided by "whether the delay was a person approving each
+      A hunch-first phrasing: a person suspects slow approvals and asks the records of the
+      finished run to settle it. Decided by "whether the delay was a person approving each
       host by hand or the machines". The shipped selector sends it to daintree.hosts.steer-swarm,
       the untrained neighbourhood; the corpus rows carry the lesson (retrain owed).
     messages:
@@ -267,3 +267,14 @@ cases:
         content: The checkout service is returning 500s since the last release. Get investigators on the logs and the diff.
     expect:
       required: [daintree.debug.investigate-outage]
+
+  - id: postmortem-swarm-reverse-memory
+    category: routing-trap
+    note: >-
+      Saving a standing rule stays with daintree.memory.manage-project-memory, which opens "Use when
+      the user wants something remembered from now on"; no finished run is to be explained.
+    messages:
+      - role: user
+        content: Add a standing note to the project that any brief we send the other machines has to carry the exact commit.
+    expect:
+      required: [daintree.memory.manage-project-memory]
