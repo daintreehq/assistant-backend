@@ -1872,3 +1872,53 @@ trials:
       - "The first Shell's lane keeps its generation and its open exchange; it received nothing from the second Shell (first Shell's record)."
       - "The reply says this Shell sees none of those tasks and that the lane is not enrolled for it, and offers the person a plan (finish or stop the run from the first Shell, then enroll a lane for this Shell in a slot of its own and brief what is unfinished afresh); it does not claim a takeover."
       - "Nothing was sent from the second Shell before the person enrolled a lane for it."
+  - id: reprioritize-swarm
+    runbook: daintree.hosts.reprioritize-swarm
+    also: [daintree.hosts.steer-swarm, daintree.hosts.steer-for-hub, daintree.hosts.do-delegated-work]
+    issue: 150
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}, cloned on the Shell and on both hosts; start consent off on both. This hub sent {host_a}'s lane a run/{run} docs task (add a README section, own branch, no pushing) and {host_b}'s lane an unrelated run/{run}-keep task (add a CSV export, own branch, no pushing), each with an agent on model haiku."
+      - "Before the first prompt: {host_a}'s docs agent is mid-turn and its worktree holds an untracked NOTES-CHECK.txt; {host_b}'s agent is mid-turn. Note {remote}'s refs."
+    steps:
+      - say: |-
+          An urgent bug just landed in {project}: the subtotal is wrong for zero quantities. Pause the run/{run} docs task on {host_a} and put a worker on the fix there, in its own worktree on a new branch under run/{run}-urgent, without pushing. Leave the CSV export on {host_b} running. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.reprioritize-swarm]
+            calls: [host.list, host.listAssistants, host.listTasks, host.getTask, host.sendMessage]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub, daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, terminal.getStatus, terminal.interruptOwned, agent.launch, assistant.reply]
+            never: [terminal.kill, terminal.close, worktree.delete]
+            notices: [lane-wake]
+      - person: "After the hub's pause reply, snapshot {host_a}'s run/{run} docs worktree (HEAD, git status --porcelain, a hash of NOTES-CHECK.txt)."
+      - say: The urgent fix is merged and verified. Thanks.
+        expect:
+          hub:
+            calls: [host.getTask]
+            never: [host.sendMessage]
+      - say: Now resume only the docs task on {host_a}.
+        expect:
+          hub:
+            calls: [host.getTask, host.sendMessage]
+          lane:
+            calls: [assistant.getInbox, terminal.getStatus, assistant.reply]
+    checks:
+      - "{host_a}'s docs worktree matched its snapshot before the resume (same HEAD, same untracked file and hash): nothing committed, pushed, stashed, reset or removed; its docs agent was stopped at an empty input line and its pane never closed."
+      - "{host_b}'s agent worked through the whole run; the Shell's record shows no exchange to {host_b} after the first prompt."
+      - "The urgent worker ran in a new worktree on a run/{run}-urgent branch from {sha}, never in the docs worktree; one writer; no ref on {remote} moved that the person did not ask for."
+      - "After the thank-you prompt the Shell's record gained no exchange; the one resume exchange names the docs task and its pause in referenceTaskIds, and the docs agent continued in its own worktree."
+    execution:
+      - "The urgent worker went out only after {host_a}'s lane replied that its docs agent was stopped, not on the cancel, a queued pause or silence (hub transcript order)."
+      - "The report listed the docs task paused (with its note), the CSV export kept and the urgent worker with its branch and SHA checked on the remote (hub transcript)."
+      - "The resume text carried the docs task's original objective and its note (Shell's record of the exchange)."
