@@ -8,7 +8,8 @@
 # enforce it" requests, explanation questions with docs: true; boundaries against a local time
 # box (daintree.orchestration.timebox-attempt), unbounded sends (daintree.hosts.swarm-fan-out,
 # daintree.hosts.delegate-to-host), stopping a run already sent (daintree.hosts.steer-swarm),
-# deferred starts (daintree.orchestration.watch-outcome), parking (daintree.hosts.park-swarm)
+# deferred starts (daintree.orchestration.watch-outcome), following an unbounded run
+# (daintree.hosts.supervise-swarm), parking (daintree.hosts.park-swarm)
 # and catching up (daintree.hosts.recover-and-clean-up), each with reverse rows in that
 # neighbour's file; followups at the bound.
 runbook: daintree.hosts.timebox-swarm
@@ -149,6 +150,12 @@ boundaries:
 - query: twenty minutes each on the docs migration for both remote machines, then a stop and a table
     of how far they got
   confusable_with: [daintree.hosts.swarm-fan-out]
+- query: keep tabs on the hosts while they try the schema change, but they only get thirty minutes
+    and then must stop
+  confusable_with: [daintree.hosts.supervise-swarm]
+- query: send the perf work out and follow it, except each machine has until 2pm and not a minute
+    more
+  confusable_with: [daintree.hosts.supervise-swarm]
 followups:
 - query: time's up, what did each host get?
   history: ['user: the remote boxes get ten minutes at the regex escaping problem', 'assistant: Done,

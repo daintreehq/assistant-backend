@@ -258,3 +258,30 @@ cases:
     expect:
       required: [daintree.orchestration.watch-outcome]
       optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: timebox-swarm-not-supervise-swarm
+    category: routing-trap
+    note: >-
+      The bound is set as the work goes out, and the hosts keep to it themselves: "a FIXED AMOUNT
+      OF TIME starting now" and "each host enforces its own deadline". Fence: "following one with
+      no time bound to its end (daintree.hosts.supervise-swarm)".
+    messages:
+      - role: user
+        content: the cache work goes out to every host now but only for twenty five minutes; I want to see who kept to it
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-reverse-supervise-unbounded
+    category: routing-trap
+    note: >-
+      Work already out with no deadline, followed to its end: daintree.hosts.supervise-swarm "Use
+      once this Shell's work is OUT on the Remote Hosts and the person wants the run followed to
+      its end". This runbook's fence: "following one with no time bound to its end
+      (daintree.hosts.supervise-swarm)".
+    messages:
+      - role: user
+        content: the hosts are midway through the docs work I sent this morning with no deadline; follow it through and tell me when each one is verified
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]

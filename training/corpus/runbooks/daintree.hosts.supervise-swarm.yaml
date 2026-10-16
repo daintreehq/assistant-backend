@@ -109,6 +109,12 @@ boundaries:
     confusable_with: [daintree.hosts.start-swarm]
   - query: the hosts already have the work, keep it moving rather than asking them anything new
     confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: 'no time limit on the remote run; see it through to the end and check each host''s branch as it finishes'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
+  - query: 'the hosts got the migration an hour ago with no deadline, one is still going; stay on it until they are all back'
+    confusable_with: [daintree.hosts.timebox-swarm]
+    run: runbook-2026-10-issue-152
 
 followups:
   - query: ok, now keep an eye on all of them and answer what you can
