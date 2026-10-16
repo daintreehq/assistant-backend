@@ -1,0 +1,223 @@
+# daintree.worktree.manage-resource against the Remote Host runbooks. A worktree's cloud
+# devbox (the project's own provision, pause, resume and status commands) is not a machine
+# added to Daintree as a Remote Host, work placed or delegated to one, or an assistant readied
+# on one. Recall cases in agent and user words (the request's own examples among them), then
+# traps both ways: the devbox runbook wins where the request is about the cloud resource, and
+# must not ride along where the host runbooks win (daintree.hosts.connect-host,
+# daintree.hosts.place-work, daintree.hosts.delegate-to-host, daintree.hosts.start-swarm).
+# The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: manage-resource-configured-devbox
+    category: single-runbook
+    note: >-
+      The request's first example. Decided by "a worktree's cloud devbox or remote resource
+      status" and "wants to provision, pause or resume it".
+    messages:
+      - role: user
+        content: Manage this worktree's configured cloud devbox.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: manage-resource-not-a-remote-host
+    category: single-runbook
+    note: >-
+      The request's third example in a user's words: the person says which thing they mean.
+      Decided by "a worktree's cloud devbox or remote resource status"; the hosts runbooks
+      are about a machine added as a Remote Host.
+    messages:
+      - role: user
+        content: I mean the cloud resource attached to this worktree, not a Remote Host. Is it up?
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: manage-resource-agent-status-only
+    category: single-runbook
+    note: >-
+      Agent-phrased, read-only: "asks about a worktree's cloud devbox or remote resource
+      status".
+    messages:
+      - role: user
+        content: Check the status of the project-configured cloud environment for this worktree and report whether it is healthy, without changing anything.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: manage-resource-user-awake
+    category: single-runbook
+    note: >-
+      Casual status question with no resource noun: "asks about a worktree's cloud devbox or
+      remote resource status".
+    messages:
+      - role: user
+        content: is the cloud machine behind this branch's worktree awake right now
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: manage-resource-lane-told-to-bring-up
+    category: single-runbook
+    note: >-
+      A hub's message reaching a lane that plainly asks for a worktree's devbox: "wants to
+      provision, pause or resume it" applies, with a status read first and the repository
+      command approval still in force. The message handler and the hosts foundation may ride
+      along.
+    messages:
+      - role: user
+        content: The hub asked me to bring the worktree's cloud devbox back up. Check its status before doing anything.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation, daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  # ----------------------------------------------- the devbox wins, hosts must not ride
+  - id: manage-resource-reverse-place-work
+    category: routing-trap
+    note: >-
+      Reverse trap. Bringing one worktree's devbox up before the day starts is "wants to
+      provision, pause or resume it", not choosing a Remote Host for work. daintree.hosts.place-work
+      (which "weighs each host's load") must not be picked.
+    messages:
+      - role: user
+        content: the devbox for this worktree is paused, bring it up before the workday starts and tell me when it is healthy
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: manage-resource-reverse-hosts-named-aside
+    category: routing-trap
+    note: >-
+      Reverse trap. The person names the Remote Hosts only to exclude them: "asks to save
+      resource cost" for the worktree's box. Neither daintree.hosts.start-swarm nor the hosts
+      foundation may be picked.
+    messages:
+      - role: user
+        content: Pause the remote box attached to this worktree, not the work on my remote hosts.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  # ------------------------------------------------ the hosts win, devbox must not ride
+  - id: manage-resource-trap-place-work
+    category: routing-trap
+    note: >-
+      Which Remote Host takes which task is daintree.hosts.place-work ("wants each put on
+      whichever Remote Host this Shell reaches can best take it"). "Remote servers" and "room"
+      are not a cloud devbox, so daintree.worktree.manage-resource must not be picked.
+    messages:
+      - role: user
+        content: split these six bugs across my remote servers so each lands on the one with room
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: manage-resource-trap-connect-host
+    category: routing-trap
+    note: >-
+      A newly built server added to Daintree is daintree.hosts.connect-host ("ANOTHER MAC OR
+      LINUX MACHINE added to Daintree as a Remote Host"). Its connect step is not a worktree
+      resource's connect control, so daintree.worktree.manage-resource must not be picked.
+    messages:
+      - role: user
+        content: set up the server I just built as a Daintree Remote Host
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: manage-resource-trap-start-swarm
+    category: routing-trap
+    note: >-
+      An assistant readied on each server is daintree.hosts.start-swarm ("Claude Code or Codex
+      ready on every Remote Host"). The ready table is not resource status, so
+      daintree.worktree.manage-resource must not be picked.
+    messages:
+      - role: user
+        content: get an assistant ready on every remote server for this repo and tell me which ones are ready
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: manage-resource-trap-delegate-named-host
+    category: routing-trap
+    note: >-
+      Work handed to a named Remote Host is daintree.hosts.delegate-to-host ("WORK done by the
+      Daintree assistant on another machine"). The word "remote" is not a cloud resource, so
+      daintree.worktree.manage-resource, which attracted this request before its title named
+      the devbox, must not be picked.
+    messages:
+      - role: user
+        content: delegate this task to the remote host named build-box
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: manage-resource-trap-delegate-lint-fixes
+    category: routing-trap
+    note: >-
+      The same boundary in a user's words: handing fixes to a named remote server is "WORK done
+      by the Daintree assistant on another machine" (daintree.hosts.delegate-to-host), not a
+      worktree's cloud resource.
+    messages:
+      - role: user
+        content: hand the lint fixes to my remote server build-box
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------ the worktree and server neighbours win, devbox must not ride
+  - id: manage-resource-trap-create-plain-worktree
+    category: routing-trap
+    note: >-
+      Making a worktree is not managing its cloud resource: the fence reads "Do not use for
+      creating or deleting an ordinary git worktree (use daintree.worktree.create-plain-worktree
+      or daintree.orchestration.workspace-cleanup)". daintree.worktree.manage-resource must not
+      be picked.
+    messages:
+      - role: user
+        content: make me a fresh worktree off main called spike-cache, nothing else
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+
+  - id: manage-resource-trap-workspace-cleanup
+    category: routing-trap
+    note: >-
+      Deleting a finished worktree and its branch is the other half of the same fence,
+      "deleting an ordinary git worktree (use ... daintree.orchestration.workspace-cleanup)".
+      daintree.worktree.manage-resource must not be picked.
+    messages:
+      - role: user
+        content: delete the old spike worktree and its branch now that it has merged
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+
+  - id: manage-resource-trap-local-dev-server
+    category: routing-trap
+    note: >-
+      A server on this machine is a visible terminal command, not a cloud resource: the fence
+      reads "Do not use for ... starting a local dev server". daintree.worktree.manage-resource
+      must not be picked.
+    messages:
+      - role: user
+        content: bring the local dev server up on the main checkout and tell me the port
+    expect:
+      required: [daintree.terminals.run-visible-command]
+
+  # ------------------------------------ a host exchange earlier in the conversation
+  - id: manage-resource-after-host-delegation
+    category: continuation
+    note: >-
+      A turn after work was handed to a Remote Host asks about the worktree's devbox:
+      "asks about a worktree's cloud devbox or remote resource status". The earlier delegation
+      does not carry it, so daintree.hosts.delegate-to-host must not be picked again.
+    messages:
+      - role: user
+        content: have the studio machine look into the flaky checkout test
+      - role: assistant
+        content: Sent to the studio machine's assistant; the exchange is working.
+      - role: user
+        content: meanwhile is the devbox on the billing worktree still running?
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
