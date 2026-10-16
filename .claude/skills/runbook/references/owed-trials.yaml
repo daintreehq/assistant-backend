@@ -1249,6 +1249,7 @@ trials:
     execution:
       - "No waitMs and no polling loop between updates (hub transcript); a Claude Code hub sets at most one native wakeup if its tools list one; a Codex hub tells the person what it waits on and ends its turn."
 
+
   - id: diagnose-host-differences
     runbook: daintree.hosts.diagnose-host-differences
     also: [daintree.hosts.verify-for-hub, daintree.hosts.handle-hub-message]
@@ -1293,3 +1294,51 @@ trials:
       - "The hub named {host_a}'s checkout at {sha_b}, not {sha}, as a revision mismatch before attributing {host_b}'s failure to anything (hub transcript)."
       - "The hub ranked the timezone difference with the failing assertion as its evidence, kept it a hypothesis until the TZ=UTC run, and proposed a correction without applying it (hub transcript)."
       - "Both lanes' replies carried the same fingerprint fields and no environment dump, token or credential (lane transcripts)."
+  - id: shard-test-suite
+    runbook: daintree.hosts.shard-test-suite
+    also: [daintree.hosts.verify-for-hub]
+    issue: 118
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [host-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}. Add three more test files under test/ in {project} (four in all, a few tests each; node --test runs them) and push: {sha} is that commit on {remote}, cloned on the Shell and on both hosts."
+    steps:
+      - say: |-
+          Split {project}'s npm test suite at {sha} between my two hosts so it finishes sooner, and prove every test ran exactly once. Change nothing. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.shard-test-suite]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.verify-for-hub]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+      - say: Also give {host_a}'s part to {host_b}, so we have it twice.
+        expect:
+          hub:
+            calls: [host.getTask]
+      - person: "Once the shard briefs are out, quit {host_b}'s instance before its reply arrives."
+      - say: Is the split run complete?
+        expect:
+          hub:
+            calls: [host.getTask]
+            never: [host.cancelTask]
+      - say: Run {host_b}'s part again on {host_a}.
+        expect:
+          hub:
+            calls: [host.sendMessage, host.getTask]
+            notices: [hub-update]
+    checks:
+      - "While {host_b} is gone the report says incomplete and names its missing part; the run is called passed only after the retry, and then the merged test names equal node --test discovery at {sha} in a fresh clone, each exactly once."
+      - "The Shell's record holds one listing task and one shard task per host, the retry as a new task, and at most one extra copy of {host_a}'s part; nothing was resent after a lost reply."
+      - "Every verify checkout is at {sha} with a clean tree; {remote} is unchanged (git --git-dir {remote} for-each-ref before and after)."
+    execution:
+      - "The hub asked each lane what node --test collects and supports before assigning parts (hub transcript)."
+      - "The retry names the original task in referenceTaskIds and, in its text, the run, part, attempt and original taskId; the report counts the duplicate copy once and names it (hub transcript)."
