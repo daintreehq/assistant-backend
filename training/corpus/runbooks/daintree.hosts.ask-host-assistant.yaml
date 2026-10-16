@@ -178,3 +178,12 @@ boundaries:
   - query: "check with the mini's assistant whether the schema change is merged over there, I just want its word on it"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: ask the build host's assistant how its nightly run went and tell me what it says
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: what does the assistant on the laptop host say about the failing import job
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: ask the mini's assistant which branch its checkout is on and relay its answer
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124

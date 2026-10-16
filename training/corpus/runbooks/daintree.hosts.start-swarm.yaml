@@ -154,6 +154,12 @@ boundaries:
   - query: 'which of my machines could take more work right now? just get an assistant ready on each, send nothing yet'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: get an assistant running in our project on every remote machine so they are ready to take tasks
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: which of my other machines have a ready assistant in this project, start the missing ones if I allow it
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
   - query: "get the hosts ready: an assistant in this repo on every remote machine, reuse what's there"
     confusable_with: [daintree.hosts.survey-hosts]

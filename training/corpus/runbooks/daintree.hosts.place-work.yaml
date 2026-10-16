@@ -174,6 +174,15 @@ boundaries:
   - query: there is a free slot on two of my remote machines, split these four tickets between them
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
+  - query: split these seven bugs across the machines that have our repository and room to work
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: I have six tickets and four remote machines, put each ticket on the host that can take it best
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: spread these tickets over the machines, only the ones whose project has the same origin as ours, and show the table before sending
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
   - query: 'five unrelated tickets in different repos, nothing shared between them; put each one on whichever machine has room'
     confusable_with: [daintree.hosts.migrate-across-repositories]

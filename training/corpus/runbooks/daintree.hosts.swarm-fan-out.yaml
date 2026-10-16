@@ -204,6 +204,9 @@ boundaries:
   - query: 'have all the hosts try the new build script at once, each on its own branch'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: have all my machines each try the parser rewrite and bring back one table of results
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
   - query: 'have every machine attempt the same logger swap in its own copy of the web repo so I can compare what each one did'
     confusable_with: [daintree.hosts.migrate-across-repositories]

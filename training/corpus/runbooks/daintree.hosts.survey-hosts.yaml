@@ -122,6 +122,12 @@ boundaries:
     confusable_with: [daintree.hosts.rebalance-load]
   - query: "what's the thermal and memory state of each host right now, no changes please"
     confusable_with: [daintree.hosts.rebalance-load]
+  - query: give me each host's project list, what it left out, and anything waiting on me
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: what projects are open on each of my remote machines and which ones have an assistant that takes messages
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
 followups:
   - query: "and what about the exchanges?"

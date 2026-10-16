@@ -286,3 +286,9 @@ boundaries:
   - query: 'have each remote host''s assistant close the panes and worktrees this job opened there'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: the fix I sent to the build box's project last night never reported back, find out where it stands and what it left behind there
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: some of the tasks I handed the mini's projects are still open, account for each and tidy what is left
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124

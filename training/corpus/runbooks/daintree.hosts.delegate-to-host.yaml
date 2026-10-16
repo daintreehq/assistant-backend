@@ -260,6 +260,15 @@ boundaries:
   - query: 'have the linux server implement the retry option, then when that lands have the mini build the client against it'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: hand the pagination fix to the project on the server and have it open a pull request
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: have the laptop host's assistant build the CSV export in our app and report back the commit
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: give the build box the flaky checkout test to fix in our repo, and if its remote differs from ours stop and tell me
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
   - query: 'get the tower to swap the date library in the admin repo and tell me the commit'
     confusable_with: [daintree.hosts.migrate-across-repositories]

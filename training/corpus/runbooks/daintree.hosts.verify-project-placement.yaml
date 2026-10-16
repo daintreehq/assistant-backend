@@ -1,0 +1,146 @@
+# daintree.hosts.verify-project-placement: before work goes to a Remote Host, the hub checks that
+# the project chosen there is the intended repository at the intended revision, by asking that
+# project's own assistant for its remotes, full SHA, clean state and setup, never by trusting a
+# name, path or id. Rows are invented situations in agents' search wording and people's own
+# words; hosts are invented nicknames or what the machine is. Boundaries name neighbours whose
+# routing text does not already exclude an identity check; the reverse rows live with them.
+runbook: daintree.hosts.verify-project-placement
+run: runbook-2026-10-issue-124
+
+positives:
+  # --- agents' search wording
+  - Confirm that the project selected on each remote host is the same repository as the local one, by remote URL and full commit SHA, before any task is sent
+  - Establish which of the projects on a Remote Host is the intended repository when two of them have the same display name
+  - Have the assistant in each candidate host project report its remotes, branch, HEAD SHA and whether the working tree is dirty, then compare with this checkout
+  - Decide whether the project on the other machine is a fork of our repository or the repository itself, without relying on its folder name
+  - A host project was moved to a different folder; verify it still tracks the same remote before dispatching work to it
+  - The host's project list was truncated and the repository we need is not visible; work out whether it is simply unlisted or absent, and what to ask the person
+  - Check the host's project for repository identity and for whether the dependencies the task needs are installed there, changing nothing
+  - Before delegating, compare the origin and head commit of the matching project on each machine against the commit I pinned, and report mismatches as unresolved choices
+  - Two Remote Hosts each expose a project with an identical project id; find out if they are really one repository
+  - Read-only identity check of the project that would receive this task on the second machine, including whether its remote is a fork
+  - Verify the intended repository and revision on the build machine's project, redacting any credentials embedded in remote URLs before reporting
+  - The host project's path looks right but I suspect it is a stale second clone; confirm remote and commit through its own assistant
+  - Verify that each host lane we plan to use sits in a checkout of the same repository and is clean enough to take the task
+  - Report per host whether its project is the same repository, a fork, a different repository or unverified, plus what the person has to choose
+  # --- people's own words
+  - I have a project called web on the mini and another one called web on the build box, are they both our repo?
+  - make sure the folder on the other mac with our app name in it is actually our repository and not an old fork
+  - did I clone the right thing onto the linux server? check its remote against mine
+  - the build host shows two projects with almost the same name and I don't want the job going to the wrong one
+  - is the project on my laptop host on the same commit as the one I'm working in, and is it clean
+  - can you tell me if the checkout over there is a fork or the real thing
+  - before you send it, check that the other machine's copy of the repo is the one I mean
+  - someone renamed the folder on the server, is it still the same project?
+  - what remote is the project on the second computer pointing at, and does it match ours
+  - my other machine has two copies of the repo, which one is right for this task
+  - the project I wanted isn't in the host's list, could it be hiding or is it the wrong machine
+  - confirm the server's checkout is ours and up to date before we hand it anything
+  - are the copies of our repo on all my machines really the same repo, same commit, nothing uncommitted
+  - one of the hosts has a folder named like ours but I think it's somebody else's fork, can you verify
+  # --- longer, with observations, constraints and the outcome wanted
+  - query: >-
+      I'm about to hand a migration to the machines in the other room. Two of them show a project
+      named after our product, and one of those was cloned from a contractor's fork last spring.
+      Tell me which project on each machine is really our repository and at which commit, ask
+      only the assistants in those projects, and don't fetch or fix anything.
+  - query: >-
+      The build box lists three projects, and none of the names match the folder I use here.
+      Working out which one is our repository by its remote and head commit is the outcome I
+      need, and if it can't be settled from what the assistants report, tell me what to pick.
+  - query: >-
+      Before the release branch goes to the Linux host, check that the project there points at
+      the same origin as ours, that its HEAD matches the commit I pushed this morning, that the
+      tree is clean and that the toolchain it needs is installed. Report each of those apart and
+      change nothing on that machine.
+  - query: >-
+      Our host project ids look identical on two machines because both were cloned from the same
+      commit. Agents shouldn't trust that, so verify each project's remote URL and SHA through the
+      assistant that works in it, and give me a verdict per machine.
+  - query: >-
+      The studio laptop's assistant is only enrolled in one of its two projects. Check the
+      repository identity of the enrolled one, and tell me what would be needed to inspect the
+      other rather than asking the enrolled assistant to look in the wrong folder.
+  - query: >-
+      One host reports a project whose path matches ours exactly and another reports a different
+      path with the same repository name. Paths are per machine, so compare remotes and commits
+      for both and say which of them should receive the work, or that I have to choose.
+  - Look at the project on the second Mac and tell me whether it is our repository or the upstream project we forked from, and which commit it is on
+  - Establish whether the repository in the host project is the one this task is for, using its remote and head commit, before anything is delegated to it
+  - hey, quick one - before the work goes out can you check the other machine's project really is our repo?
+  - thanks for setting that up. now verify that the checkout over on the server is the same repository as mine and clean
+  - query: which of the two projects on the server is the real checkout of our repo
+    history:
+      - "user: the server shows two projects called app"
+      - "assistant: Yes, both are listed with an assistant in each."
+
+boundaries:
+  - query: before I split these tasks across my machines, verify that each machine's project is our repository at the commit I pushed
+    confusable_with: [daintree.hosts.place-work]
+  - query: before handing the pagination fix to the server, confirm the project there is our repository and not a lookalike
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: have each host's assistant report its remotes and head commit, then tell me which of the projects is ours
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: find out which remote machines hold the right repository at the right commit, with nothing started and nothing sent
+    confusable_with: [daintree.hosts.start-swarm]
+  - query: the server hasn't been used for this yet; ahead of the first job, confirm its project tracks our upstream and sits on my commit
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+  - query: the host is connected and listing projects fine, but I can't tell whether the one in the list is ours or a fork
+    confusable_with: [daintree.hosts.connect-host]
+  - query: before the same cleanup goes to every remote machine, verify each machine's project is our repository and clean
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: two machines each list a project with the same name, are those one repository or two different ones
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+  - query: the task needs a seeded database and installed dependencies, so check that the host project has them and that it is our repo
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: the host project's folder was renamed and a second clone appeared, work out which one tracks our upstream before anything is sent
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.place-work]
+
+  - query: which of the build host's projects is ours, going by remote and commit rather than by name
+    confusable_with: [daintree.explore.repository, daintree.hosts.survey-hosts]
+  - query: the build host has three projects with an assistant in each, and I need to know which one is genuinely our repository at the commit I pushed
+    confusable_with: [daintree.hosts.survey-hosts]
+
+followups:
+  - query: and check the other host's project the same way
+    history:
+      - "user: verify the build box's project is our repo before I send the refactor"
+      - "assistant: The build box's project has the same origin and is at your pushed commit, with a clean tree."
+  - query: it says origin is a fork, so is it still safe to send the work there
+    history:
+      - "user: is the project on the server the real repo"
+      - "assistant: The server's project has origin on a personal fork and an upstream remote that matches ours."
+  - query: yes, use the one with the matching remote, check it is clean first
+    history:
+      - "user: two projects on the mini share a name, which is ours"
+      - "assistant: Only one has a remote that matches ours, the other points at an unrelated repository."
+  - query: now do the laptop host as well
+    history:
+      - "user: confirm the mini's project is the same repository as mine"
+      - "assistant: It matches by remote and full SHA, and the working tree is clean."
+  - query: ask again now that I've enrolled its assistant
+    history:
+      - "user: check which of the host projects is our repo"
+      - "assistant: One project has no assistant enrolled, so it stays unverified until you turn that on."
+  - query: what would it take to check the one that isn't listed
+    history:
+      - "user: verify our repo on the build host"
+      - "assistant: The host's list omitted some projects, so our repository may be one of the unseen ones."
+
+topic_shifts:
+  - query: before we go on, verify the project on the second machine is actually our repository
+    history:
+      - "user: open the pull request for the docs fix"
+      - "assistant: Opened it with the summary you asked for."
+  - query: separately, are the copies of the repo on the two servers the same repository
+    history:
+      - "user: what's running in my terminals"
+      - "assistant: Two agents are working and one is idle."
+  - query: new question, I need to know whether the host's project is a fork of ours
+    history:
+      - "user: rename this agent to reviewer"
+      - "assistant: Renamed it to reviewer."
+  - query: before the next task goes out, double check the machine's checkout is the same repo
+    history:
+      - "user: how many tasks are still open on the hosts"
+      - "assistant: Two exchanges are still working and one has finished."

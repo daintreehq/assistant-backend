@@ -128,6 +128,12 @@ boundaries:
   - query: 'my two build machines are both working on the same fix and pushing to one branch right now; stop one of them and choose who keeps it'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: two machines are both working on the login bug, work out which one keeps it
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: a second host started the same ticket and pushed to the same branch, settle who owns it
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
 followups:
   - query: go with the tower then, and leave the mini's work alone

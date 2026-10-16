@@ -118,6 +118,12 @@ boundaries:
   - query: 'the test hangs on only one of my remote hosts; compare their environments and rank the differences'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: the same commit passes tests on one machine and hangs on the other, work out what differs
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: the build only breaks on the Linux host with identical code, find the environment difference
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

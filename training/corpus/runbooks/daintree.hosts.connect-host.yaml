@@ -199,3 +199,9 @@ boundaries:
   - query: "I added a second Mac under Hosts but it never connects, get it working"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: I added the server as a host an hour ago but none of its projects show up here, get them listed
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: the new server's host check keeps failing before any of its projects can be listed, sort the connection out
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
