@@ -436,7 +436,7 @@ topic_shifts:
     active: [daintree.forge.land-pull-request]
   - query: which of these worktrees have devboxes attached and what state are they in
     history:
-      - 'user: rename the tabs so i can tell the agents apart'
+      - 'user: put a short label on each running agent''s tab, one word of what it is doing'
       - 'assistant: Retitled all four by what they''re working on.'
     active: [daintree.terminals.rename, daintree.foundation]
   - query: cheapest thing i can do right now to stop the spend on these remote envs?

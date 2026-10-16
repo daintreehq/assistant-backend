@@ -126,3 +126,36 @@ cases:
     - daintree.hosts.handle-hub-message
     optional:
     - daintree.foundation
+- id: migrate-db-trap-ci-green-then-apply
+  category: routing-trap
+  note: 'The CI check is not the ask here: only applying the migration is, so "to fix a migration test that fails in CI (use daintree.ci.diagnose-and-fix)" does not apply.'
+  messages:
+  - role: user
+    content: CI is green for the schema change, so now apply its new migration to the database of my billing worktree and tell me the schema version.
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: migrate-db-trap-run-written-migrations
+  category: routing-trap
+  note: 'Running migrations that already exist is not code work: "to write a new migration as code work (use daintree.edits.spawn-visible-agent)" does not apply.'
+  messages:
+  - role: user
+    content: Have codex run the migrations that are already written in the inventory worktree against its database; it should not touch any code.
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: migrate-db-trap-one-step-of-a-plan
+  category: routing-trap
+  note: 'One immediate operation inside a larger plan is still this runbook: "for a multi-phase data migration plan tracked across sessions (use daintree.orchestration.execute-durable-workflow)" is for the tracked plan itself.'
+  messages:
+  - role: user
+    content: "Part of a multi-step data migration plan, but right now I only need one thing: roll back the last migration on the worktree's local database."
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
