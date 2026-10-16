@@ -220,3 +220,9 @@ boundaries:
   - query: I need another Mac added to Daintree as a host before I do anything else with it
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: my new Linux workstation needs Daintree installed and set up as a host. What do I do first?
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: the host check says Daintree on the server is a different build and it won't connect. Fix that.
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130

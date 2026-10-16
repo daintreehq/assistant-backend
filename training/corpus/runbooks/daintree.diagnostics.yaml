@@ -379,6 +379,9 @@ boundaries:
   - query: "the Daintree tools disappeared from my sidebar assistant on this Mac and the app feels broken, work out what is wrong"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: Daintree on this laptop crashes on startup since I updated it, find out why
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
 followups:
   - query: and the key thing too?
     history:

@@ -165,6 +165,12 @@ boundaries:
   - query: "one host has been quiet far longer than the others; check on it once and keep the run moving"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: keep an eye on the hosts and tell me when they're done, I'm closing the laptop for lunch
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: I'll restart this laptop soon but the hosts keep running, so keep answering what they ask
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
 followups:
   - query: ok, now keep an eye on all of them and answer what you can
     history:

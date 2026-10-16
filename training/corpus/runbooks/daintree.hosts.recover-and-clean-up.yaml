@@ -304,3 +304,15 @@ boundaries:
   - query: after the restart, tell me where each exchange with the hosts stands, and clean up what that run left through their assistants
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: the host app restarted by itself overnight and I never prepared for it. Which of the tasks I sent are still open?
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: tell me what became of my tasks on the build server after its Daintree crashed and came back
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: the mac mini lost power at lunch. What happened to the delegated work on it?
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: work out which exchanges with the host will never be answered after the restart nobody planned
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130

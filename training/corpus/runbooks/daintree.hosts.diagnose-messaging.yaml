@@ -219,6 +219,9 @@ boundaries:
   - query: "the tower is listed but its assistant has no generation and nothing reaches it; find out which gate is blocking"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: after the update the hub's send to the host comes back lane_unavailable and its assistant shows no generation, why is that
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
 followups:
   - query: check the other hosts the same way
     history:

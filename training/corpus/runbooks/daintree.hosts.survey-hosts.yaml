@@ -146,6 +146,12 @@ boundaries:
   - query: are any of my remote machines waiting on me, without changing anything
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: "give me the status of every host: connection, load, who's enrolled and anything waiting on me"
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: is the lab server connected, and which projects there have an assistant taking messages?
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
 
 followups:
   - query: "and what about the exchanges?"

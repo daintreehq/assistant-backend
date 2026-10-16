@@ -187,3 +187,9 @@ boundaries:
   - query: the hub has to restart tonight, so pause the cross-host work now with a resume file that survives it
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
+  - query: put the whole remote run on hold until Monday and write me a record I can resume from
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: stop everything on every host for the weekend but keep every worktree, I'm travelling
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130

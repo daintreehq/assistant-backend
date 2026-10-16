@@ -213,3 +213,9 @@ boundaries:
   - query: 'one of the hosts is heading the wrong way right now; stop it and point it at the other approach'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: stop the task I gave the lab server and let me know if it confirmed
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
+  - query: tell every host the acceptance criteria changed and that the rest of the brief stands
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: runbook-2026-10-issue-130
