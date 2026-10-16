@@ -120,6 +120,15 @@ boundaries:
   - query: "the mini is pegged with agents and the tower has nothing running, move the unstarted pieces over"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: The staging machine is swapping while the others sit idle, spread the swarm's work around
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: One host ran out of Claude allowance halfway through the run; take the pressure off it without losing work
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+
 followups:
   - query: ok, take some load off the second one then
     history:

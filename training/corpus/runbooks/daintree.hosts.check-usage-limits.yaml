@@ -149,6 +149,15 @@ boundaries:
   - query: which of my other machines has the most Codex usage headroom right now
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: What's the Codex weekly limit situation on the other machines before I send them work?
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: How much Claude usage does each remote machine have left?
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+
 followups:
   - query: and claude on those same machines?
     history:

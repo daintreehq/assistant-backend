@@ -118,6 +118,10 @@ boundaries:
   - query: "have two hosts each build the export feature and let a third one rank them without knowing who wrote which"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
+  - query: Have three of my machines each write a faster version of the sort routine, then rank them blind
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
 
 followups:
   - query: now have a different host review it before I merge

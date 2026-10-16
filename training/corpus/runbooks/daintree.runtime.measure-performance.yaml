@@ -31,6 +31,57 @@ positives:
   - Don't run the test suite, just benchmark the render loop on this worktree versus main.
   - The build isn't failing, it's just slower - measure build time on this branch against main.
   - Before anyone starts optimising, measure how much slower feature/rich-text loads the editor than main does.
+  - query: 'Benchmark the lexer rewrite at 9d41e07 against the 2.8.0 release on each connected host: same build flags, interleaved runs on every machine, a ratio per host, and flag any host that was busy while it ran.'
+    run: runbook-2026-10-issue-139
+  - query: Measure peak memory of the image pipeline before and after the pooling change on every Remote Host, each host comparing its own baseline build with its own candidate build.
+    run: runbook-2026-10-issue-139
+  - query: Run a controlled performance comparison across the three hosts at two pinned commits; each machine runs both sides itself and the result is per-host medians and spread, never pooled seconds.
+    run: runbook-2026-10-issue-139
+  - query: Have each host's assistant time the old and new startup path in ABBA order, record its CPU model, OS and load average with timestamps, and send back the raw pairs.
+    run: runbook-2026-10-issue-139
+  - query: For each host, the ratio of candidate build time to baseline build time, with the thermal state sampled before and after; give a combined statement only if every host agrees in direction.
+    run: runbook-2026-10-issue-139
+  - query: Verify the claimed 2x speedup of the SIMD path on every host separately, since the hosts have different CPUs and absolute numbers will not line up.
+    run: runbook-2026-10-issue-139
+  - query: 'The hub wants two commits of this project timed on this machine, baseline and candidate: send back the raw run pairs with the load and temperature readings taken while they ran.'
+    run: runbook-2026-10-issue-139
+  - query: 'Measure the candidate branch against the baseline commit here for the hub: build both the same way, interleave warmed runs, and return the ratio and what else was running on this machine.'
+    run: runbook-2026-10-issue-139
+  - query: Benchmark both revisions locally and reply with the paired timings; the hub will set them beside the other machines' ratios, not their raw seconds.
+    run: runbook-2026-10-issue-139
+  - query: Pair the old and new binary on each machine's own hardware and report whether the speedup holds on the slow server as well as on the laptop.
+    run: runbook-2026-10-issue-139
+  - query: my laptop says the new serializer is 20% faster, check it on the build server too but don't compare the two machines' raw numbers
+    run: runbook-2026-10-issue-139
+  - query: is it actually faster on the Linux host as well? the Mac is way quicker so the absolute times mean nothing
+    run: runbook-2026-10-issue-139
+  - query: run the benchmark old vs new on every machine I've connected and tell me per machine
+    run: runbook-2026-10-issue-139
+  - query: did the allocator swap help on all my hosts or just the fast one
+    run: runbook-2026-10-issue-139
+  - query: benchmark this PR on the two servers, one is mid-build so say so
+    run: runbook-2026-10-issue-139
+  - query: perf test across my hosts, same two commits everywhere, per-host results first
+    run: runbook-2026-10-issue-139
+  - query: check bundle size and startup time for the new loader on each host separately
+    run: runbook-2026-10-issue-139
+  - query: before I trust the new cache, compare it to the old one on each of my computers, individually
+    run: runbook-2026-10-issue-139
+  - query: Thanks for the earlier update. Now could you find out whether the refactor made the importer slower on any of my machines? Compare before and after on each one.
+    run: runbook-2026-10-issue-139
+  - query: I've got three remote hosts of different ages. After the dependency bump the end-to-end test took 41s on my Mac, but I want to know whether the bump itself slowed things. Please run the pre-bump and post-bump commits on each host, interleaved, and tell me per host whether the difference is beyond noise. One of the hosts is also running a nightly job.
+    run: runbook-2026-10-issue-139
+  - query: 'We think the new query planner is a win, but the CI box and my laptop disagree wildly on absolute timings. Measure planner-off versus planner-on at the same two commits on every machine I''ve connected: warm up first, repeat a lot, and give me a table with one row per machine and a verdict per machine.'
+    run: runbook-2026-10-issue-139
+  - query: Speed check of two release candidates across all hosts; mark a host unreliable if its CPU was busy or hot during the runs.
+    run: runbook-2026-10-issue-139
+  - query: 'Hey, quick one: our parser benchmark improved 35% on the dev laptop after the rewrite. Can you confirm it on the other hosts too, each against its own old build? A faster machine shouldn''t count as a win.'
+    run: runbook-2026-10-issue-139
+  - query: 'Per-host regression check for the connection-pool change: old commit and new commit, same workload, on every machine, ratios side by side.'
+    run: runbook-2026-10-issue-139
+  - query: On every host, compare the previous commit and HEAD for cold-start time using identical setup, and tell me which hosts show a change beyond their own noise.
+    run: runbook-2026-10-issue-139
+
 boundaries:
   - query: The build isn't broken, only slower. Compare its build time on this branch against main.
     confusable_with: [daintree.ci.diagnose-and-fix]
@@ -63,6 +114,55 @@ boundaries:
   - query: "benchmark whether this branch leaves more memory headroom than main does"
     confusable_with: [daintree.hosts.check-usage-limits]
     run: runbook-2026-10-issue-91
+  - query: Same two commits, timed on every machine as a before-and-after pair per machine; tell me which commit is faster on each one
+    confusable_with:
+    - daintree.hosts.run-validation-matrix
+    run: runbook-2026-10-issue-139
+  - query: Measure startup time of the release candidate against the last release on each connected host; what I care about is the change in speed, not whether the tests pass
+    confusable_with:
+    - daintree.hosts.run-validation-matrix
+    run: runbook-2026-10-issue-139
+  - query: How long does the full test suite take on the old commit versus the new one on each machine? Same whole suite both times, no splitting it up.
+    confusable_with:
+    - daintree.hosts.shard-test-suite
+    run: runbook-2026-10-issue-139
+  - query: 'Check whether the new test runner made our suite quicker on every host: run it before and after on each, the whole suite every time'
+    confusable_with:
+    - daintree.hosts.shard-test-suite
+    run: runbook-2026-10-issue-139
+  - query: The new build looks slower on the Linux box, but that box is older. Time old and new there and on the laptop and compare each machine's own ratio.
+    confusable_with:
+    - daintree.hosts.diagnose-host-differences
+    run: runbook-2026-10-issue-139
+  - query: Is the regression real or is host B just a weaker machine? Run the old commit and the new commit on both and compare within each host.
+    confusable_with:
+    - daintree.hosts.diagnose-host-differences
+    run: runbook-2026-10-issue-139
+  - query: Benchmark both commits on all my hosts; the build server is busy with other jobs, so mark how reliable its numbers are rather than moving anything
+    confusable_with:
+    - daintree.hosts.rebalance-load
+    run: runbook-2026-10-issue-139
+  - query: one host is hot and loaded while I measure the speedup, don't touch the load, just qualify that host's result
+    confusable_with:
+    - daintree.hosts.rebalance-load
+    run: runbook-2026-10-issue-139
+  - query: Peak memory of the old and new importer on each host separately, the machines have different amounts of RAM
+    confusable_with:
+    - daintree.hosts.check-usage-limits
+    run: runbook-2026-10-issue-139
+  - query: Compare the memory footprint of the previous and current build on every connected host and report it per host
+    confusable_with:
+    - daintree.hosts.check-usage-limits
+    run: runbook-2026-10-issue-139
+  - query: Time the baseline against the candidate on both remote machines and tell me per machine whether it got faster
+    confusable_with:
+    - daintree.hosts.race-and-review
+    run: runbook-2026-10-issue-139
+  - query: Give every host the same two commits to benchmark against each other and bring back each host's own ratio, no pooled seconds
+    confusable_with:
+    - daintree.hosts.swarm-fan-out
+    run: runbook-2026-10-issue-139
+
 topic_shifts:
   - query: is migrate/date-fns faster than main? the bundle feels bigger — measure it
     history:
@@ -114,3 +214,47 @@ topic_shifts:
       - 'assistant: Done: S1-S8 and S10-S11 verified by me, S9 deferred; checks pass on feat/drizzle; the spike is untouched.'
     active: [daintree.orchestration.productionize-prototype]
     run: 2026-09-28-round6-stateful
+  - query: now check whether that branch is faster than main on each of my hosts, per host
+    history:
+    - 'user: have the build box add the --json flag and push it'
+    - 'assistant: The build box pushed feature/json (9ac3e1f); checks pass there and the commit is on the remote.'
+    active:
+    - daintree.hosts.delegate-to-host
+    run: runbook-2026-10-issue-139
+  - query: 'different thing: is the new scheduler actually faster on every host? measure old against new per machine'
+    history:
+    - 'user: rebalance the swarm, the Linux host is swapping'
+    - 'assistant: Moved two unstarted units to the Mac; the Linux host''s load fell from 91% to 40% on a second reading.'
+    active:
+    - daintree.hosts.rebalance-load
+    run: runbook-2026-10-issue-139
+
+followups:
+  - query: does that hold on my other machines too?
+    history:
+    - 'user: is perf/cache faster than main? measure it'
+    - 'assistant: On this Mac the candidate is 14% faster, spread 3%, beyond the 5% threshold; 20 interleaved pairs, release builds.'
+    active:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: the Linux host came out smaller, is that the change or just the hardware?
+    history:
+    - 'user: benchmark the new tokenizer against main on both of my hosts'
+    - 'assistant: Mac: 14% faster (spread 3%). Linux host: 4% faster (spread 5%), inconclusive against the 5% threshold. Each ratio is from that host''s own pairs.'
+    active:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: rerun the loaded one when it's quiet
+    history:
+    - 'user: measure old vs new on all three hosts'
+    - 'assistant: Host B''s run overlapped a build: load reached 92% mid-run, so its verdict is inconclusive. Hosts A and C are clean: 11% and 9% faster.'
+    active:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: now the same pair on the third machine
+    history:
+    - 'user: compare the baseline and candidate on host A and host B'
+    - 'assistant: A: 7% faster, B: 8% faster, each beyond its own spread; hosts compared by ratio only.'
+    active:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139

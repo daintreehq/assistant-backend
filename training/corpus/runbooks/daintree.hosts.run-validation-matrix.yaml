@@ -124,6 +124,14 @@ boundaries:
   - query: 'before I publish, confirm the CLI''s tests pass on both glibc and musl hosts at the release SHA, separately'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: Run the same checks at this tag under Node 18 and Node 20 across my machines and give me one row each
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: Test the release candidate on the Linux host and on the Mac host and give me one result per platform
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
 
 followups:
   - query: actually do it on the mac host too, and add node 22 on both, as one matrix

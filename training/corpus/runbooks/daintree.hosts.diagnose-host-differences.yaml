@@ -136,6 +136,14 @@ boundaries:
   - query: a deploy script hangs only on the Linux host, compare its environment with the Mac's
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: The build passes on the Mac but times out on the Linux host. Find out why.
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: Same commit, different results on two of my machines; what is different between them?
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

@@ -152,3 +152,11 @@ boundaries:
     confusable_with: [daintree.hosts.run-validation-matrix]
   - query: 'both hosts run the same OS, so just give each a share of the tests at this commit and merge the results'
     confusable_with: [daintree.hosts.run-validation-matrix]
+  - query: Split the end-to-end tests over three of my machines so the wait is shorter
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+  - query: Divide the integration tests into shards across my hosts and confirm nothing got skipped when you merge the results
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139

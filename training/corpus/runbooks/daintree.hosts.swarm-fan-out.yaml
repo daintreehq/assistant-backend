@@ -217,6 +217,11 @@ boundaries:
   - query: "get every host to try its own approach to the flaky cache test, one branch each, using that host's own scratch database, and compare the results"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
+  - query: Send every host the same small fix to implement on its own branch and bring back a table of what each machine produced
+    confusable_with:
+    - daintree.runtime.measure-performance
+    run: runbook-2026-10-issue-139
+
 followups:
   - query: actually, have every other host do the same one too, each on its own branch
     history:
