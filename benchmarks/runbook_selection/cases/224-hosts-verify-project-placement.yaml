@@ -1,0 +1,281 @@
+# daintree.hosts.verify-project-placement: before work goes to a Remote Host, the hub checks
+# that the project chosen there is the intended repository at the intended revision, by
+# asking that project's own assistant (canonical remote, full SHA, clean state, setup), never
+# by trusting a name, path or id. Recall cases: the issue's three requests (scrubbed), agent-
+# and user-phrased outcomes, and the four situations it must resolve (same name, a fork, a
+# renamed folder, a project the host does not list). Routing traps: this runbook wins against
+# each declared neighbour. Reverse traps: the neighbour wins and this runbook must not ride
+# along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: verify-project-placement-copies-same-repo
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "is really the intended repository at the
+      intended revision, not a different project that shares its name, path or id" and its
+      own example "are my copies on the other machines the same repo and ready for this".
+    messages:
+      - role: user
+        content: Check my project copies on the hosts are the same repository and ready for this task.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-same-name-which-receives
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "two host projects with one name and the
+      question of which should take the work".
+    messages:
+      - role: user
+        content: Two host projects have the same name; which one should receive this work?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-repository-revision-identity
+    category: single-runbook
+    note: >-
+      The issue's third request, in an agent's words. Decided by "the intended repository at
+      the intended revision" and the deliverable "canonical remote compared with ours, full
+      SHA against the revision wanted".
+    messages:
+      - role: user
+        content: Verify repository and revision identity for selected host/project lanes.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-agent-compare-each-host
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "a read-only verdict per host and project from that
+      project's own assistant: canonical remote compared with ours, full SHA against the
+      revision wanted, clean or dirty, setup in place".
+    messages:
+      - role: user
+        content: "Before sending anything out, compare each host's project with the local repository: canonical remote, full commit SHA, clean or dirty tree and whether setup is in place. Report which are the right repository. Read-only."
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-user-two-projects-called-api
+    category: single-runbook
+    note: >-
+      Same name on two machines. Decided by "not a different project that shares its name,
+      path or id".
+    messages:
+      - role: user
+        content: The mini and the Linux box both have a project called api. Which one is actually our repo?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-fork-not-upstream
+    category: single-runbook
+    note: >-
+      A fork where the upstream was meant. Decided by "a fork where the upstream was meant"
+      and "forks, omitted projects and choices left to the person named as unresolved".
+    messages:
+      - role: user
+        content: The project on the second machine might be a fork rather than ours. Which remote does it point at and what commit is it on?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-renamed-folder
+    category: single-runbook
+    note: >-
+      A renamed folder. Decided by "a folder renamed or cloned there".
+    messages:
+      - role: user
+        content: I renamed the billing folder on the build host. Make sure it is still the same repository before the task goes there.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-project-not-listed
+    category: single-runbook
+    note: >-
+      A project the host list does not show. Decided by "a project the host does not list"
+      and "omitted projects" named as unresolved.
+    messages:
+      - role: user
+        content: The build host's project list is cut off and I can't see our repo. Before I send this out, is the right project there?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-cloned-twice
+    category: single-runbook
+    note: >-
+      Two clones on one host. Decided by "a folder renamed or cloned there" and "several
+      candidates" resolved by the remote, not the name.
+    messages:
+      - role: user
+        content: I cloned the repo again on the laptop host under another folder name. Which of its two projects is the one to use, and are they the same repo?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-fork-compare-remotes
+    category: single-runbook
+    note: >-
+      Terse, no punctuation, agent-style. Decided by "a fork where the upstream was meant"
+      and "canonical remote compared with ours".
+    messages:
+      - role: user
+        content: whether the project on the other host is a fork, compare its remotes with ours
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  # -------------------------------------------------------------- routing traps
+  - id: verify-project-placement-not-place-work
+    category: routing-trap
+    note: >-
+      The deliverable is the identity verdict, not a placement by capacity. This runbook's
+      fence: "Do not use for splitting pieces across hosts by capacity
+      (daintree.hosts.place-work)".
+    messages:
+      - role: user
+        content: have each host's assistant tell me its remote URL and head SHA so we know which project is the real copy of our repo
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      Checking a project before it receives work, with nothing handed over. This runbook's
+      fence: "sending the work itself (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: Before handing the checkout fix to the build box, make sure its project is our repo and not a same-named one.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-not-ask-host-assistant
+    category: routing-trap
+    note: >-
+      Repository identity across projects and hosts, a verdict rather than one assistant's
+      answer. This runbook's fence: "one open question for a host's assistant
+      (daintree.hosts.ask-host-assistant)".
+    messages:
+      - role: user
+        content: Read-only check of the projects my work would land in on each remote machine - confirm the origin URL, that HEAD is at abc123 and the tree is clean. Do not fetch anything.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-not-start-swarm
+    category: routing-trap
+    note: >-
+      Which hosts hold the right repository, with no assistant being readied. This runbook's
+      fence: "readying assistants (daintree.hosts.start-swarm)".
+    messages:
+      - role: user
+        content: Check which hosts have the right repository at the right commit.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-not-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      Nothing has behaved differently yet; the question is identity before dispatch. This
+      runbook's fence: "why one commit behaves differently on two hosts
+      (daintree.hosts.diagnose-host-differences)".
+    messages:
+      - role: user
+        content: I haven't run anything on the Linux box yet. Before the job goes there, check its project really is our repository at that commit.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-not-connect-host
+    category: routing-trap
+    note: >-
+      A connected host whose project list does not show our repo. This runbook's fence:
+      "adding a machine (daintree.hosts.connect-host)".
+    messages:
+      - role: user
+        content: The host is connected but I can't find our repo in its project list. Is a different project standing in for it, or is it just cut off?
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ reverse traps
+  - id: verify-project-placement-reverse-place-work
+    category: routing-trap
+    note: >-
+      Capacity placement of several pieces; the repository match is one of its own filters.
+      place-work: "wants each put on whichever Remote Host this Shell reaches can best take
+      it". verify-project-placement must not ride along.
+    messages:
+      - role: user
+        content: Put each of these four bugs on whichever remote host has room.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-delegate-to-host
+    category: routing-trap
+    note: >-
+      One piece of work for a named machine. delegate-to-host: "ONE piece of WORK done by the
+      Daintree assistant on another machine".
+    messages:
+      - role: user
+        content: Hand the retry bug in the shop project to the assistant on my other Mac and tell me the SHA when it is done.
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-ask-host-assistant
+    category: routing-trap
+    note: >-
+      One question, its answer relayed. ask-host-assistant: "ONE QUESTION answered by the
+      Daintree assistant on ANOTHER MACHINE".
+    messages:
+      - role: user
+        content: Which remote does the project on the laptop host point at? Ask its assistant.
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-start-swarm
+    category: routing-trap
+    note: >-
+      Readying assistants. start-swarm: "Claude Code or Codex ready on every Remote Host".
+    messages:
+      - role: user
+        content: Get an assistant ready in our project on every remote host.
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      A difference already seen. diagnose-host-differences: "the SAME CODE BEHAVES
+      DIFFERENTLY ON TWO OR MORE Remote Hosts".
+    messages:
+      - role: user
+        content: Tests are green on the mini and red on the Linux box on the same branch, find out why.
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-connect-host
+    category: routing-trap
+    note: >-
+      A machine to add. connect-host: "ANOTHER MAC OR LINUX MACHINE added to Daintree as a
+      Remote Host".
+    messages:
+      - role: user
+        content: Add my new server as a remote host.
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
