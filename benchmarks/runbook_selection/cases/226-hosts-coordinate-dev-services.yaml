@@ -57,9 +57,9 @@ cases:
     messages:
       - role: user
         content: >-
-          Two services on two Remote Hosts must call each other during development. Record each
-          service's listener and owner, start the dependency first, and verify one end-to-end
-          request carrying a revision marker.
+          Two services on two Remote Hosts, with one calling the other during development. Record
+          each service's listener and owner, start the dependency first, and verify one
+          end-to-end request carrying a revision marker.
     expect:
       required: [daintree.hosts.coordinate-dev-services]
       optional: [daintree.hosts.foundation]
@@ -158,8 +158,8 @@ cases:
     note: >-
       A localhost address that belongs to the wrong machine is an addressing question, not a
       port held by a process. Decided by "a port another process holds
-      (daintree.runtime.free-busy-port)" being fenced and "its localhost" being host-scoped in
-      the deliverable.
+      (daintree.runtime.free-busy-port)" being fenced and "an address checked to route from
+      where that process runs" in the deliverable.
     messages:
       - role: user
         content: >-
@@ -260,12 +260,14 @@ cases:
   - id: coordinate-dev-services-reverse-debug-web-app
     category: routing-trap
     note: >-
-      An already-open preview failing at runtime: the neighbour wins. Decided by its "debug a web
-      app that is already open in Daintree Dev Preview".
+      An already-open preview failing at runtime, with no address between services in question:
+      the neighbour wins. Decided by its "debug a web app that is already open in Daintree Dev
+      Preview".
     messages:
       - role: user
         content: >-
-          The frontend dev preview on the second host shows network errors when it calls the API
-          running on the first host. Work out which address the page should be using.
+          The dev preview that is open on the second host renders a blank page and the console
+          shows a TypeError thrown in the cart component. Find the cause and reload once it is
+          fixed.
     expect:
       required: [daintree.runtime.debug-web-app]
