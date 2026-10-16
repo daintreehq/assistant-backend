@@ -106,6 +106,15 @@ boundaries:
     confusable_with: [daintree.ci.run-e2e-suite]
   - query: run the same commit on each remote host under the runtimes I listed, without installing anything new over there
     confusable_with: [daintree.worktree.provision-local-environment]
+  - query: "test the exact commit under node 18 and node 20 on my hosts, I just want a result per environment"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
+  - query: "one result per platform for 6b2e1d4 from my machines; no digging into failures, just the rows"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
+  - query: "two machines, one tag: run the tests for 5.0.0-beta on the server host and the laptop host and give me each one's pass, fail and skip counts"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
 
 followups:
   - query: actually do it on the mac host too, and add node 22 on both, as one matrix

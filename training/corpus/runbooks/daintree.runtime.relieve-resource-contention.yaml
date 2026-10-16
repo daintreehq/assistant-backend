@@ -133,6 +133,9 @@ boundaries:
   - query: "my laptop's load is through the roof since the test workers started, which processes are to blame?"
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
+  - query: "this machine slows to a crawl whenever the agents run the test suite here, find what's hogging it and ease off"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
 followups:
   - query: do it, cap them all at 2 workers
     history:

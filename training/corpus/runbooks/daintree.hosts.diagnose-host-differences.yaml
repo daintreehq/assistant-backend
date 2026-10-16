@@ -1,0 +1,131 @@
+# daintree.hosts.diagnose-host-differences: from this Shell's hub, why one commit passes on one
+# Remote Host and fails on another. Each host's assistant checks its checkout against the pinned
+# commit, reproduces without changes and reports a non-secret fingerprint; the hub compares and
+# ranks the differences by evidence, fixing nothing.
+#
+# Positives are invented situations in agent and user words, short and long, some with a social
+# lead-in or an earlier turn. Boundaries are requests this runbook wins against a neighbour whose
+# vocabulary they share: a matrix of results (run-validation-matrix), a fix here
+# (ci.diagnose-and-fix), one question to one host (ask-host-assistant), a lane testing a commit
+# (verify-for-hub), messaging gates (diagnose-messaging), machine load
+# (relieve-resource-contention), and the hosts runbooks the starting sweep picked (swarm-fan-out,
+# delegate-to-host). Followups are the diagnosis as a second turn. Machine names are generic.
+runbook: daintree.hosts.diagnose-host-differences
+run: runbook-2026-10-issue-119
+
+positives:
+  - compare two remote hosts' environments to explain why the same commit fails on only one of them
+  - 'cross-host discrepancy: the suite passes on one host and fails on the other at the same SHA; collect evidence from each host and identify the environmental cause'
+  - investigate an environment-dependent test failure across the remote hosts without modifying either machine
+  - determine whether a host's failure comes from a stale checkout or from its runtime, compared with a host where the commit passes
+  - gather OS, architecture, runtime versions and checkout state from each host's assistant and rank the differences that could explain a host-specific failure
+  - root-cause why a build succeeds on one remote machine and not another, read-only, attributing each host's evidence
+  - explain a pass/fail split between two hosts for one pinned revision
+  - host-specific failure triage across my machines, evidence from each host, no fixes
+  - my snapshot tests pass on the mac host and fail on the linux one, same branch. what's going on?
+  - why does cargo test blow up on the arm box but not the intel box? same commit
+  - works on the studio machine, broken on the laptop host. figure out why, don't change anything
+  - the date tests only fail on the server host, everything else is the same. is it the timezone or something else?
+  - same code, two machines, two results. find the difference
+  - the build is green on one of my hosts and red on the other and I've been staring at it for an hour
+  - pytest segfaults on one host only. both are on main. what differs between them?
+  - before I start fixing anything, tell me why the linux host fails the e2e run when the mac host passes it
+  - I think the ubuntu host has an older node and that's why its tests fail. can you confirm what's actually different?
+  - could the build box just be behind on its checkout? it fails the tests the other host passes
+  - the go tests hang on one host and finish in 40s on the other. same sha. what's different about that host?
+  - find out why npm run build fails on the mini but works on the other host. no reinstalling anything
+  - one host says 3 failures, the other says all green, same commit. which is right and why do they disagree?
+  - lint passes on my laptop host but fails on the build host with the same config, why
+  - the image tests produce slightly different output on the linux host than on the mac host at the same revision. what's causing it?
+  - the migration test fails on just one of my machines, maybe a database version thing? check what differs before touching it
+  - look at why my two hosts disagree about the test results for this commit
+  - is it the OS or the checkout? the tests fail on the linux host and pass on the mac host, same branch
+  - compare the toolchains on my two hosts, the rust crate builds on one and not the other
+  - the python tests import fine on one host and throw ImportError on the other at the same sha, what differs
+  - the ruby specs pass on the intel host and fail on the arm host. work out what's different without reinstalling gems
+  - locale problem? a sorting test fails on the server host only. compare the two hosts' setups
+  - why does the same commit produce a different bundle on each of my two hosts
+  - only one host fails the checks for this PR's head commit; the other passes. what's the reason?
+  - the java tests take twice as long on one host and hit the timeout, same commit as the fast host. why?
+  - same lockfile, same commit, different results on two hosts. what's different?
+  - the arm host and the x86 host give different results for the hashing tests, explain it
+  - identify the environmental cause of a failure seen on one remote host only, checking each host's revision first
+  - morning! weird one, the parser tests pass on the mac host but fail on the linux host, same commit. any idea what's different?
+  - ok this is driving me nuts. same sha, green on host one, red on host two. can you dig into what's different?
+  - hey, quick favour, find out why the build only breaks on the older host
+  - >-
+    We pushed 3e9f0c1 last night. The nightly on the linux host went red with two failing tests in
+    the currency formatter, but the same run on the mac host this morning was green. Nobody fixes
+    anything yet; I want to know what's different between the two machines, starting with whether
+    they really ran the same code.
+  - >-
+    The checkout service's integration suite times out after 120 seconds on the arm host but
+    passes in about 40 seconds on the x64 host. Both claim to be on main. Get what you need from
+    each host's assistant, versions, checkout state, whatever, and tell me which difference is
+    most likely, with the evidence.
+  - >-
+    A project's end-to-end tests pass on one remote host and fail on another at the same SHA. Have
+    each host report its checkout state, reproduce the failure without changes and report its
+    platform, runtime versions, locale and timezone, then compare them and rank what differs.
+  - >-
+    Same branch on both hosts, but the linux one fails four snapshot tests the mac one passes. I
+    suspect a font or locale difference but I don't actually know. Find out what really differs
+    and don't reinstall or reconfigure anything while you look.
+
+boundaries:
+  - query: the matrix came back with the linux row red, figure out what's different about that host
+    confusable_with: [daintree.hosts.run-validation-matrix]
+  - query: don't run another matrix, explain why node 22 on the build host fails when node 22 on the mac host passes
+    confusable_with: [daintree.hosts.run-validation-matrix]
+  - query: we already know the commit fails on one host and passes on another, I need the cause, not more results
+    confusable_with: [daintree.hosts.run-validation-matrix]
+  - query: the tests fail on the build host but pass on the mac host at the same commit; find what's different and leave the code alone
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: this check only fails on one of my machines, so before fixing anything I want to know why it differs
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: pytest is red on the linux host and green on my other host with the same SHA. what's the environmental difference?
+    confusable_with: [daintree.ci.diagnose-and-fix]
+  - query: ask both of my hosts what versions and checkout they have and work out why only one fails the suite
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: check with each host's assistant why the same commit behaves differently on them
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: both hosts already tested that sha for me and one failed. compare the two hosts and find the cause
+    confusable_with: [daintree.hosts.verify-for-hub]
+  - query: both hosts answer messages fine, the problem is the build fails on one of them and not the other
+    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: the suite is far slower on the old host than on the new one with identical code, find out what's different between those machines
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+  - query: get both machines' assistants digging into why the integration suite only breaks on the arm one
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: put the assistants on both servers onto working out why the release build is fine on one and broken on the other
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: have the build host's assistant help work out why its tests fail when the laptop host's pass at the same commit
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: it's not flaky, it fails every time on the linux host and never on the mac host. find out why
+    confusable_with: [daintree.ci.hunt-flaky-test]
+  - query: the db tests fail on one host, probably something in its setup, but the other host passes at the same sha. compare them
+    confusable_with: [daintree.worktree.provision-local-environment]
+
+followups:
+  - query: now tell me why the linux row failed when the mac row passed
+    history:
+      - "user: run this commit on the linux and mac hosts and give me a result per platform"
+      - "assistant: Done. mac arm64 passed; linux x64 failed 2 tests in the date module."
+  - query: so why does the same commit fail there and not on the mac host? find out
+    history:
+      - "user: ask the linux host whether the suite passes at a41f2c9"
+      - "assistant: The linux host's assistant says 3 tests fail at a41f2c9. The mac host reported all green at that commit yesterday."
+  - query: don't fix it yet, I want to know why it only breaks on that host
+    history:
+      - "user: the tests fail on the build host but pass on the laptop host"
+      - "assistant: Should I have the build host's assistant fix them?"
+  - query: dig into why, it's the same code on both
+    history:
+      - "user: did the nightly pass on both hosts?"
+      - "assistant: The mac host passed. The linux host failed 2 tests at the same commit."
+
+topic_shifts:
+  - query: different thing. the e2e suite passes on one host and fails on the other at the same sha, find out what's different
+    history:
+      - "user: which hosts are connected right now?"
+      - "assistant: Two are connected: the build host and the laptop host."

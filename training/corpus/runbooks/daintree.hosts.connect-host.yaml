@@ -190,3 +190,6 @@ boundaries:
     confusable_with: [daintree.hosts.reassign-host-work]
     docs: true
     run: runbook-2026-10-issue-113
+  - query: "the mac mini host keeps failing its connection test since I moved it to another network, get it connected again"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119

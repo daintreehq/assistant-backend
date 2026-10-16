@@ -499,6 +499,12 @@ boundaries:
   - query: "the deploy job in CI fails at the ssh step with host key verification failed"
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
+  - query: "the tests fail on this machine at the current commit, find the cause and fix it"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
+  - query: "the build broke here after the merge and it fails the same way everywhere I tried, get it green"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
 followups:
   - query: how's it going?
     history:

@@ -166,3 +166,9 @@ boundaries:
   - query: "ask the build host's assistant whether last night's soak test passed and bring me its answer"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: "ask the linux host which node version it has installed"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
+  - query: "what does the mac host's assistant make of the failing date tests over there"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119

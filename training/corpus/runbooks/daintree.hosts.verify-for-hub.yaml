@@ -163,3 +163,9 @@ boundaries:
   - query: Lane task from the hub, one environment row of a cross-host matrix, verify the given full SHA with the listed commands on this machine and reply with counts
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: "hub message: run the failing suite at a1b2c3d on this host and report HEAD, platform, runtime and the counts, change nothing"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
+  - query: "the hub wants this host's results for its sha so it can compare them with another machine; run the tests here and reply"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
