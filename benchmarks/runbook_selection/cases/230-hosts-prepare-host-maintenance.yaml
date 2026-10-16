@@ -264,3 +264,53 @@ cases:
     expect:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-not-supervise-swarm
+    category: routing-trap
+    note: >-
+      One host is about to be restarted while the run goes on elsewhere; saving that host's work
+      and checking it afterwards is the deliverable, not following the run. Decided by "to find
+      out what that will stop there" under "Use BEFORE the person updates, restarts or reboots
+      Daintree on a Remote Host".
+    messages:
+      - role: user
+        content: Daintree on the lab server updates at ten tonight. The run keeps going on the other hosts, but save what the lab server is doing first and check it once it is back.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-hand-off-swarm
+    category: routing-trap
+    note: >-
+      The hub session is being replaced; no host is restarting: hand-off-swarm's "the session
+      coordinating a run ALREADY OUT on the Remote Hosts is being REPLACED BY ANOTHER SESSION NOW".
+    messages:
+      - role: user
+        content: My hub session is nearly out of room. A fresh assistant session has to take over the swarm on the other machines, so write the hand-over first.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-audit-host-workspaces
+    category: routing-trap
+    note: >-
+      A read-only look at what a finished swarm left, with no restart ahead: audit-host-workspaces's
+      "INSPECTED, read-only, to see which are in use, hold unsaved work or could be let go".
+    messages:
+      - role: user
+        content: What did the swarm that just finished leave running or unpushed on my remote hosts? Look only, change nothing.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-diagnose-messaging
+    category: routing-trap
+    note: >-
+      A send refused as paused with the assistant unavailable, no restart planned:
+      diagnose-messaging's "a send or start that came back opted_out, paused, lane_unavailable".
+    messages:
+      - role: user
+        content: The hub's send to the mini comes back paused and its assistant shows unavailable. Which switch is it?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation, daintree.foundation]

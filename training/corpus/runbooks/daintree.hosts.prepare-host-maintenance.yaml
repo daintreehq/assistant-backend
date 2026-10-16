@@ -19,9 +19,9 @@ run: runbook-2026-10-issue-130
 positives:
   - i'm taking the mac mini down for an os update tonight, what will that cut off for the work i gave it
   - Daintree on the render box has to be updated before the demo. What is going to stop over there, and has everything been saved?
-  - 'Task: produce a pre-restart impact report for the Remote Host the user is about to update: projects, enrolled assistants, open delegated exchanges, and the parts the hub cannot observe.'
-  - 'Task: before the user restarts Daintree on a Remote Host, have each enrolled assistant there stop at a safe point and report branch, HEAD, pushed state, uncommitted files and any push or pull request in flight.'
-  - 'Task: after a planned restart of a Remote Host, compare its projects and assistants with the snapshot taken before it, find which assistants lost enrollment, and send nothing more until that is settled.'
+  - 'Task: the build server has one assistant with an unfinished push and a second project the hub only sees as a listing with no assistant. The person restarts its Daintree after lunch. Tell them what stops, what stays unseen and what is safe.'
+  - 'Task: the person is updating the lab host before its demo and one of the two assistants there is partway through opening a pull request. Let that write finish, then ask both to stop where they are and say which branches are pushed.'
+  - 'Task: the mac mini came back from its update with one of three projects missing from its listing and one assistant showing no generation. Work out what survived of the delegated work before sending it anything.'
   - is it safe to update daintree on the linux workstation right now or are there agents mid-task over there
   - the person wants to update the host this evening. tell them honestly what you can see of what runs on it and what you can't
   - Can you check what's running on the cloud box before I restart Daintree on it? I don't want to kill anything that matters.
@@ -39,14 +39,20 @@ positives:
   - thanks, that sorted the test failures. next thing, the lab host needs its Daintree restarted tonight, get its work checkpointed
   - i have to reboot the lab server for a kernel patch and daintree runs on it. what happens to the jobs i handed it
   - the machine hosting my projects gets a power cycle at six, make sure the assistants on it have saved what they were doing
-  - 'Hub task: list what a restart of the host would interrupt, per project, and mark what cannot be seen from here.'
+  - 'Hub task: the user power-cycles the linux host at nine. Two exchanges with it are open and one of its projects has no assistant. Say what that restart ends and which part cannot be known from here.'
   - query: how do i update the remote host without losing the work the assistants are doing for me? do it for the mac mini
     docs: true
   - Before the host's Daintree update goes in, find out whether any assistant over there has a push or pull request under way, and keep new work off it.
   - the update on the host is done. verify its projects are still listed, its assistants are enrolled again, and that nothing I sent before was resent
-  - back from the host restart. which of my open tasks over there are dead now and which assistants need me to switch something on
+  - query: back from the host restart. which of my open tasks over there are dead now and which assistants need me to switch something on
+    history:
+      - "user: i'm restarting the remote host for an update, get it ready"
+      - "assistant: Its one enrolled assistant stopped at a safe point and pushed. Two other projects there I can't see into. Restart when you like."
   - after the daintree upgrade on the server, check the host looks right, same projects, assistants back, and tell me what's still outstanding before we continue
-  - we restarted the box. don't send it anything yet, tell me which assistants came back and what became of the earlier tasks
+  - query: we restarted the box. don't send it anything yet, tell me which assistants came back and what became of the earlier tasks
+    history:
+      - "user: the server gets a daintree update tonight, save what the assistants there are doing"
+      - "assistant: Both assistants reported their branches and uncommitted files. Tell me once it is back."
   - the person says the host is updated and back online. reconcile it before more work goes out
   - the host's Daintree just restarted for the update I asked you to prepare it for. where does everything I had you save stand?
   - plan the maintenance window for the remote host. what to save first, what stops, how we confirm it all came back
