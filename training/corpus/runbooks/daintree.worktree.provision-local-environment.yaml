@@ -265,6 +265,9 @@ boundaries:
   - query: each worktree needs node 22 and its own database before its tests can run; add a setup script that provisions that
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: "new worktrees on this machine come up without the .env, so the db tests fail in every one of them; make the setup script provision it"
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-119
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:
