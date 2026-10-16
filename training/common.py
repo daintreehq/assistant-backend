@@ -89,10 +89,12 @@ def corpus_rows(path: Path) -> list[dict]:
 
 
 def device() -> str:
-    """MPS when the Mac has it, else CPU. Training only — serving is ONNX."""
+    """CUDA on a GPU box, MPS on a Mac, else CPU. Training only — serving is ONNX."""
     try:
         import torch
 
+        if torch.cuda.is_available():
+            return "cuda"
         if torch.backends.mps.is_available():
             return "mps"
     except Exception:  # noqa: BLE001
