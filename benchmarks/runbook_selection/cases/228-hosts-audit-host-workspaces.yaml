@@ -196,6 +196,22 @@ cases:
       required: [daintree.hosts.audit-host-workspaces]
       optional: [daintree.hosts.foundation]
 
+  - id: audit-host-workspaces-not-handle-hub-message
+    category: routing-trap
+    note: >-
+      The hub collecting every host assistant's inventory into one report. Decided by "Use on the
+      hub when" against "its answering the hub's audit request
+      (daintree.hosts.handle-hub-message)": the hub asks, the hosts' assistants answer.
+    messages:
+      - role: user
+        content: >-
+          Have the assistant on each remote host inventory the worktrees, panes and dev servers the
+          swarm left in its project, then give me one combined report of what is safe to remove.
+          Nobody removes anything.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
   # ------------------------------------------------------------------ reverse traps: the neighbour wins
   - id: audit-host-workspaces-reverse-recover-and-clean-up
     category: routing-trap
