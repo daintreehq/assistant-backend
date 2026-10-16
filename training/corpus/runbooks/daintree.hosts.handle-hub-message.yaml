@@ -259,3 +259,9 @@ boundaries:
   - query: "answer the hub: the migration is done at version 42 and the backup is kept on this host"
     confusable_with: [daintree.runtime.migrate-worktree-database]
     run: runbook-2026-10-issue-133
+  - query: "the hub asked this machine's assistant which branch the password-reset work is on. read its message and reply"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
+  - query: "the hub wrote to this machine about the access-token rotation work; fetch its message, check it fits this project, and answer it"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140

@@ -219,3 +219,9 @@ boundaries:
   - query: tell every host the acceptance criteria changed and that the rest of the brief stands
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
+  - query: "halt the run on my remote hosts; its instructions say each should load its own API key from the local environment, and nothing was exposed"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
+  - query: "call off what I sent to the hosts, the task was to rotate a key on a schedule, and keep everything they have done"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140

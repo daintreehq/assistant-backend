@@ -138,6 +138,9 @@ boundaries:
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
 
+  - query: "the secrets-vault ticket landed on two of my hosts and each started its own branch of edits. choose which attempt carries on"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
 followups:
   - query: go with the tower then, and leave the mini's work alone
     history:

@@ -316,3 +316,9 @@ boundaries:
   - query: work out which exchanges with the host will never be answered after the restart nobody planned
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
+  - query: "Daintree was relaunched and I cannot tell how the oauth-refresh work I handed to the remote hosts is doing"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
+  - query: "what did the remote machines finish with the api-key rotation work I handed over while I was away"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
