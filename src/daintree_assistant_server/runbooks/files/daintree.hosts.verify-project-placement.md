@@ -17,7 +17,7 @@ Read-only. A host's project `name`, `path` and `projectId` are its own hints: eq
 
 1. Pin here the intended `origin` (`git remote -v`, credentials removed) and the full base SHA (`git ls-remote`), or the person's.
 2. Per host, `host.listAssistants`. Every project that could be it is a candidate, whatever its name: several are asked, never chosen by name. `projectsOmitted` above 0: that many unseen, with no page to ask for; an unlisted project is unverified, not missing. A candidate with no `available` lane: unverified; the foundation's step 2, or the person. Never ask a lane in another project to look.
-3. One `host.sendMessage` per candidate project, to one available lane, no `waitMs`; end the turn:
+3. One `host.sendMessage` per candidate project, to one available lane at its listed `slot`, no `waitMs`; end the turn:
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","text":"Question only: change nothing, fetch nothing, start no other work. For this project report its root folder, every remote with its URL (credentials removed), current branch, full HEAD SHA, whether <base SHA> is an ancestor of HEAD, tracked and untracked changes as counts, and whether <setup the task needs> is in place. Say what you cannot tell."}
