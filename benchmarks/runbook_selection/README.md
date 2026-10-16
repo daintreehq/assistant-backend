@@ -198,9 +198,37 @@ specific match), `adversarial` (instruction injection + keyword bait),
 ## Results
 
 Runs are saved to `results/<timestamp>.json` (gitignored). The document
-carries the catalog revision, the selector artifact's revision, per-case picks
-and stage attribution, and the summary block. Latency is end-to-end per
-selection (embed + shortlist + head + admission), i.e. what a search pays.
+carries the catalog revision, the selector artifact's path (not its content:
+`git rev-parse HEAD:src/daintree_assistant_server/runbooks/local/artifacts` names
+that), per-case picks and stage attribution, and the summary block. Latency is
+end-to-end per selection (embed + shortlist + head + admission), i.e. what a search pays.
+
+## Measuring a catalog wave
+
+Before and after each coherent wave of runbooks (#144), from the repo root with the
+wave's base checked out in a detached worktree so the active tree is never moved:
+
+```bash
+R=$PWD/benchmarks/runbook_selection/results               # gitignored
+git worktree add --detach ../wave-base <base-commit>
+(cd ../wave-base && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
+  -m benchmarks.runbook_selection.bench local --out "$R/wave-before.json")
+python -m benchmarks.runbook_selection.bench coverage
+python -m benchmarks.runbook_selection.bench local --out "$R/wave-after.json"
+python -m benchmarks.runbook_selection.bench compare "$R/wave-before.json" "$R/wave-after.json"
+python -m benchmarks.runbook_selection.bench scale        # ~2 min; today's size, 200, 500, 1000
+python -m benchmarks.runbook_selection.bench pairs        # the hub/lane pairs, end by end
+git worktree remove ../wave-base
+```
+
+`compare` prints both suites' categories side by side (a wave brings its own cases,
+so those rows are snapshots), then the case-aligned delta: every shared case whose
+loaded set moved, with what EACH side lost. A case that fails on both sides counts as
+neither fixed nor broken, so only the two loss lists show it losing something new.
+Before explaining a move, check whether the case or the runbooks around it changed
+(`git diff <base> -- benchmarks/runbook_selection/cases src/daintree_assistant_server/runbooks/files`)
+and whether the artifact did (the `git rev-parse` above at both commits): with the
+artifact unchanged, every move is the catalog's doing.
 
 ## Historical findings — 2026-07-07, **13-runbook catalog**, superseded
 

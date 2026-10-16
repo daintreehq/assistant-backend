@@ -4,7 +4,7 @@ Run from the repo root:
 
     python -m benchmarks.runbook_selection.bench local       # the SHIPPED selector
     python -m benchmarks.runbook_selection.bench search "…"  # one query, as the MCP ranks it
-    python -m benchmarks.runbook_selection.bench scale       # recall at 200/500/1000
+    python -m benchmarks.runbook_selection.bench scale       # recall today and at 200/500/1000
     python -m benchmarks.runbook_selection.bench lint        # most-confusable runbook pairs
     python -m benchmarks.runbook_selection.bench list
     python -m benchmarks.runbook_selection.bench coverage
@@ -209,11 +209,13 @@ def main(argv: list[str] | None = None) -> int:
 
     scale = sub.add_parser(
         "scale",
-        help="oracle recall at 100/200/500/1000 runbooks (synthetic distractors, free). "
-        "Answers what k the shortlist needs before the catalog needs it",
+        help="oracle recall at today's size and 200/500/1000 runbooks (synthetic "
+        "distractors, free). Answers what k the shortlist needs before the catalog needs it",
     )
     scale.add_argument(
-        "--sizes", help="comma-separated catalog sizes (default 39,100,200,500,1000)"
+        "--sizes",
+        help="comma-separated catalog sizes (default 0,100,200,500,1000); 0 and any size "
+        "below the real catalog measure the real catalog",
     )
     scale.add_argument("--ks", help="comma-separated shortlist widths (default 16,32,48,64,96)")
     scale.add_argument("--out", help="explicit output JSON path")

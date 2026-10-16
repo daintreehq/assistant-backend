@@ -1,0 +1,514 @@
+# Ownership traps across the hosts wave (#144): which machine, and which side of an exchange,
+# owns the request. Six boundaries, both directions: a Remote Host against the same ask on this
+# machine (usage, placement, cleanup, steering, verifying, undo), a Remote Host against a
+# worktree's cloud devbox, a dev stack spread over hosts against one dev server here and a port
+# clash, and the hub's side of an exchange against the lane's side.
+#
+# Written blind for the measurement: every string was drafted before any was ranked, and each
+# is kept whether or not the shipped selector passes it (one optional added after ranking, on
+# review, to own-linux-box-port-busy-preview; it passed strict either way). The owner comes from the routing text
+# (each note quotes the deciding clause), never from what the selector picked. Paraphrases, not
+# training strings: screened against every case suite and the corpus (queries and history).
+# Two probes from the same set are not here because their owner is genuinely split in the
+# routing text: "is messaging even turned on there" (daintree.hosts.foundation's "why one is
+# not reachable" and daintree.hosts.diagnose-messaging's "which gate is in the way") and "ready
+# to take work" (the foundation's "whether it is set up" and daintree.hosts.start-swarm).
+
+cases:
+  # --- a Remote Host against the same ask on this machine ---
+
+  - id: own-usage-each-other-mac
+    category: routing-trap
+    note: >-
+      daintree.hosts.check-usage-limits: "agent usage checked on OTHER MACHINES". It fences the
+      local twin: "Do not use for the usage of agents on this machine
+      (daintree.agents.check-usage-limits)".
+    messages:
+      - role: user
+        content: what's the codex quota situation across my other macs, machine by machine
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-usage-remote-box-most-allowance
+    category: routing-trap
+    note: >-
+      daintree.hosts.check-usage-limits: "or which machine has the most usage headroom", against
+      the local daintree.agents.check-usage-limits.
+    messages:
+      - role: user
+        content: which of my remote boxes has the most claude allowance remaining today
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-usage-remote-hosts-before-sending
+    category: routing-trap
+    note: >-
+      daintree.hosts.check-usage-limits: "how much Claude Code or Codex allowance each Remote Host
+      this Shell reaches has left", against the local daintree.agents.check-usage-limits.
+    messages:
+      - role: user
+        content: check claude usage on the remote hosts before I send more work
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-usage-this-laptop-is-local
+    category: routing-trap
+    note: >-
+      Reverse: daintree.hosts.check-usage-limits says "Do not use for the usage of agents on this
+      machine (daintree.agents.check-usage-limits)".
+    messages:
+      - role: user
+        content: what's left of my claude code limit on this laptop
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: own-place-bugs-by-room
+    category: routing-trap
+    note: >-
+      daintree.hosts.place-work: "DIFFERENT, independent pieces of work ... put on whichever Remote
+      Host this Shell reaches can best take it", not the same work on every host
+      (daintree.hosts.swarm-fan-out).
+    messages:
+      - role: user
+        content: I've got six unrelated bugs, spread them over the linux box and the studio mac by whoever has room
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-place-tickets-remote-machines
+    category: routing-trap
+    note: >-
+      daintree.hosts.place-work: "here are eight issues, split them across my machines", from the
+      hub, not a lane's own cohort (daintree.hosts.run-local-cohort).
+    messages:
+      - role: user
+        content: deal these four tickets out to my remote machines however makes sense
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-split-tickets-here-is-local
+    category: routing-trap
+    note: >-
+      Reverse: daintree.hosts.place-work says "Do not use for ... independent pieces for agents on
+      this machine (daintree.orchestration.fan-out-work)".
+    messages:
+      - role: user
+        content: split these four tickets between a few agents here in separate worktrees
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  # --- a worktree's cloud devbox against a Remote Host ---
+
+  - id: own-devbox-pause-overnight
+    category: routing-trap
+    note: >-
+      daintree.worktree.manage-resource: "provision, pause or resume it, asks to save resource
+      cost". It fences "the assistant on another machine (daintree.hosts.foundation)".
+    messages:
+      - role: user
+        content: pause the cloud devbox behind this worktree overnight so it stops billing
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: own-remote-environment-provisioned
+    category: routing-trap
+    note: >-
+      daintree.worktree.manage-resource: "a worktree's cloud devbox or remote resource status".
+      "Remote" here is the worktree's resource, not a Remote Host (daintree.hosts.foundation
+      fences "a worktree's cloud devbox or remote resource").
+    messages:
+      - role: user
+        content: does the feature worktree still have its cloud environment, or was it torn down
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: own-devbox-resume-branch
+    category: routing-trap
+    note: >-
+      daintree.worktree.manage-resource: "provision, pause or resume it", not adding a machine
+      (daintree.hosts.connect-host).
+    messages:
+      - role: user
+        content: wake the paused devbox that belongs to this branch
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: own-cloud-machine-stop-paying
+    category: routing-trap
+    note: >-
+      daintree.worktree.manage-resource: "asks to save resource cost". The machine is the
+      worktree's, not a Remote Host running a swarm (daintree.hosts.steer-swarm).
+    messages:
+      - role: user
+        content: the old worktree's cloud machine is still costing money, shut it off
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: own-ask-host-repo-on-main
+    category: routing-trap
+    note: >-
+      daintree.hosts.ask-host-assistant: "ONE QUESTION answered by the Daintree assistant on
+      ANOTHER MACHINE", not a local agent (daintree.agents.ask-and-relay) and not a cloud
+      resource. daintree.hosts.verify-project-placement's "a checkout that may be stale" is close
+      enough to ride along.
+    messages:
+      - role: user
+        content: ask the studio mac whether its copy of the repo is on the latest main
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.verify-project-placement, daintree.foundation, daintree.hosts.foundation]
+
+  # --- a dev stack across hosts against one dev server and a port clash ---
+
+  - id: own-dev-stack-cross-host-addresses
+    category: routing-trap
+    note: >-
+      daintree.hosts.coordinate-dev-services: "the client on one host cannot reach the backend on
+      localhost, find out why and what address is right". Not a messaging gate
+      (daintree.hosts.diagnose-messaging) and not Daintree misbehaving (daintree.diagnostics).
+    messages:
+      - role: user
+        content: the frontend on the mac mini can't reach the api running on the linux tower, sort out the addresses
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-dev-stack-two-machines-prove
+    category: routing-trap
+    note: >-
+      daintree.hosts.coordinate-dev-services: "a web client on one machine and the API it calls on
+      another ... prove it reaches the right one". A specific fits, so the hosts foundation alone
+      is not the answer.
+    messages:
+      - role: user
+        content: bring up the backend on one machine and the web client on another and prove they talk
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-dev-stack-api-tower-app-mini
+    category: routing-trap
+    note: >-
+      daintree.hosts.coordinate-dev-services: "run these two projects on different machines and
+      verify the client reaches the right API", not a validation matrix
+      (daintree.hosts.run-validation-matrix) or an end-to-end suite (daintree.ci.run-e2e-suite).
+    messages:
+      - role: user
+        content: run the api on the linux tower and the react app on the mac mini, and make sure the app hits that api
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-dev-stack-storefront-localhost
+    category: routing-trap
+    note: >-
+      daintree.hosts.coordinate-dev-services: "an address that does not route reported as the
+      blocked edge". It fences "per-worktree databases, ports or setup scripts on this machine"
+      to daintree.worktree.provision-local-environment.
+    messages:
+      - role: user
+        content: the storefront on one host keeps calling localhost for the orders service that lives on another host, fix the wiring
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-dev-stack-database-host-first
+    category: routing-trap
+    note: >-
+      daintree.hosts.coordinate-dev-services: "providers started before consumers", not a staged
+      plan of dependent code units (daintree.hosts.execute-distributed-workflow).
+    messages:
+      - role: user
+        content: start the services on their own machines, database host first, then check the web tier connects to the right one
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-dev-server-this-worktree-is-local
+    category: routing-trap
+    note: >-
+      daintree.terminals.run-visible-command: "spin up the dev server for the api worktree".
+      daintree.worktree.manage-resource fences "starting a local dev server", and one server here
+      is not a stack across hosts (daintree.hosts.coordinate-dev-services).
+    messages:
+      - role: user
+        content: boot this worktree's dev server where I can watch it, any open port is fine
+    expect:
+      required: [daintree.terminals.run-visible-command]
+      optional: [daintree.foundation]
+
+  - id: own-remote-vite-port-taken
+    category: routing-trap
+    note: >-
+      daintree.runtime.free-busy-port: a port clash "on this machine or a Remote Host", not work a
+      host cannot finish (daintree.hosts.reassign-host-work).
+    messages:
+      - role: user
+        content: vite on the remote worktree won't start, says 5173 is already taken
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-remote-dev-server-address-in-use
+    category: routing-trap
+    note: >-
+      daintree.runtime.free-busy-port: "a remote worktree's server that cannot bind", not placing
+      a project (daintree.hosts.verify-project-placement).
+    messages:
+      - role: user
+        content: the dev server on my remote host says address in use on 3000, who has it
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-linux-box-port-busy-preview
+    category: routing-trap
+    note: >-
+      daintree.runtime.free-busy-port: a port clash "on this machine or a Remote Host", something
+      else holding 8080. Its fence "for a Dev Preview panel's own server" sends a preview's own
+      failure to daintree.runtime.debug-web-app, and "the preview" here may be one, so that
+      runbook may ride along.
+    messages:
+      - role: user
+        content: port 8080 is busy on the linux box so the preview won't bind there
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.runtime.debug-web-app, daintree.foundation, daintree.hosts.foundation]
+
+  # --- the lane's side of an exchange ---
+
+  - id: own-lane-test-sha-no-fixes
+    category: routing-trap
+    note: >-
+      daintree.hosts.verify-for-hub: "the hub asks this lane to TEST or VERIFY a commit ... with no
+      fixes", not a findings-only review (daintree.hosts.review-for-hub).
+    messages:
+      - role: user
+        content: "hub just pinged: run the whole suite on c41d07e here, report results, don't touch the code"
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-lint-unit-test-sha
+    category: routing-trap
+    note: >-
+      daintree.hosts.verify-for-hub: "hub message: verify this SHA with lint and the unit tests",
+      not the person's own checks here (daintree.ci.run-local-checks).
+    messages:
+      - role: user
+        content: the main machine wants me to lint and unit test that sha here and send the counts
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-review-request-payments
+    category: routing-trap
+    note: >-
+      daintree.hosts.review-for-hub: daintree.hosts.handle-hub-message says "Do not use for ... the
+      review the hub asked of this machine itself (daintree.hosts.review-for-hub)".
+    messages:
+      - role: user
+        content: the hub sent over a review request for the payments branch, look at it on this box
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-show-billing-settings
+    category: routing-trap
+    note: >-
+      daintree.hosts.demo-for-hub: daintree.hosts.handle-hub-message says "Do not use for ... a demo
+      it asks this host to prepare (daintree.hosts.demo-for-hub)". Nothing here adds a machine
+      (daintree.hosts.connect-host).
+    messages:
+      - role: user
+        content: my main shell messaged this host asking to show the new billing settings page running here
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-serve-checkout-redesign
+    category: routing-trap
+    note: >-
+      daintree.hosts.demo-for-hub, the host's own side; daintree.hosts.prepare-remote-demo fences
+      "the host's own side of a demo the hub asked for (daintree.hosts.demo-for-hub)".
+    messages:
+      - role: user
+        content: the hub wants this box to serve the checkout redesign so the person can click through it
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-hub-message-search-url
+    category: routing-trap
+    note: >-
+      daintree.hosts.demo-for-hub: the message is the envelope, the demo is the work
+      (daintree.hosts.handle-hub-message: "Do not use for ... a demo it asks this host to prepare").
+    messages:
+      - role: user
+        content: "hub message: get the search feature running on this machine and tell me the url"
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-halt-hub-agents
+    category: routing-trap
+    note: >-
+      daintree.hosts.steer-for-hub: "stop, pause or correct only the agents this lane launched for
+      the run the hub names", not parking a run from the hub (daintree.hosts.park-swarm).
+    messages:
+      - role: user
+        content: the hub wants the agents it started here halted until further notice
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: own-lane-delete-hub-worktrees
+    category: routing-trap
+    note: >-
+      daintree.hosts.clean-up-for-hub: "remove exactly the panes and worktrees this lane made for
+      the run the hub names", not the hub's own recovery (daintree.hosts.recover-and-clean-up).
+    messages:
+      - role: user
+        content: hub asked us to delete the worktrees it created on this machine for the old run
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # --- the hub's side of the same work ---
+
+  - id: own-hub-one-host-verify-commit
+    category: routing-trap
+    note: >-
+      daintree.hosts.delegate-to-host: "ONE piece of WORK done by the Daintree assistant on another
+      machine". daintree.hosts.verify-for-hub fences "the hub's own side
+      (daintree.hosts.delegate-to-host ...)".
+    messages:
+      - role: user
+        content: have the linux box verify my commit and send back its test counts
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-hub-windows-demo
+    category: routing-trap
+    note: >-
+      daintree.hosts.prepare-remote-demo: "SEE a feature running on another machine ... and look at
+      it from here", not the host's own side (daintree.hosts.demo-for-hub).
+    messages:
+      - role: user
+        content: get the windows host to show the onboarding demo so I can look at it remotely
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-hub-stop-remote-run
+    category: routing-trap
+    note: >-
+      daintree.hosts.steer-swarm: "stop or correct a named run already sent to one or several
+      Remote Hosts", from this Shell, not a lane stopping the hub's agents
+      (daintree.hosts.steer-for-hub).
+    messages:
+      - role: user
+        content: stop everything the run I sent to the remote hosts is doing, the spec changed
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-hub-clean-up-swarm-leftovers
+    category: routing-trap
+    note: >-
+      daintree.hosts.recover-and-clean-up: "what a run left on the Remote Hosts ... cleaned up
+      through each host's own assistant". It fences "tearing down local panes and worktrees
+      (daintree.orchestration.workspace-cleanup)".
+    messages:
+      - role: user
+        content: clean up whatever the swarm left behind on every host now that it is merged
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-hub-remote-run-tidy
+    category: routing-trap
+    note: >-
+      daintree.hosts.recover-and-clean-up: "its panes ..., worktrees and branches, cleaned up
+      through each host's own assistant", not sending the run out (daintree.hosts.swarm-fan-out).
+    messages:
+      - role: user
+        content: the remote run is finished, have each machine tidy away its worktrees and agents
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: own-hub-tear-down-distributed-run
+    category: routing-trap
+    note: >-
+      daintree.hosts.recover-and-clean-up: "what a run left on the Remote Hosts", against the local
+      daintree.orchestration.workspace-cleanup.
+    messages:
+      - role: user
+        content: tear down the leftovers from yesterday's distributed run across all the hosts
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  # --- this machine's owners, which a hosts runbook must not take ---
+
+  - id: own-local-verify-agent-claim
+    category: routing-trap
+    note: >-
+      Reverse: daintree.hosts.verify-for-hub says "Do not use for ... a local agent's result
+      (daintree.orchestration.verify-agent-work)".
+    messages:
+      - role: user
+        content: check whether the agent here really finished what it claimed before I merge
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: own-local-stop-codex-pane
+    category: routing-trap
+    note: >-
+      daintree.agents.steer-running-agent: "an agent that is ALREADY WORKING on a task ... must
+      change course or stop", in a pane on this machine; neither daintree.hosts.steer-swarm (a run
+      sent to Remote Hosts) nor daintree.hosts.steer-for-hub (a lane's agents).
+    messages:
+      - role: user
+        content: stop the codex agent in pane three, it's going the wrong way
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+
+  - id: own-local-remove-finished-worktrees
+    category: routing-trap
+    note: >-
+      Reverse: daintree.hosts.recover-and-clean-up says "Do not use for agents, terminals or
+      worktrees on this machine: ... tearing down local panes and worktrees
+      (daintree.orchestration.workspace-cleanup)".
+    messages:
+      - role: user
+        content: remove the worktrees the agents finished with on this machine
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: own-local-revert-agent-commits
+    category: routing-trap
+    note: >-
+      daintree.git.undo-agent-changes: "roll back the last agent's commits on this branch", one
+      agent on this machine, not a run's commits across hosts (daintree.hosts.undo-swarm-changes).
+    messages:
+      - role: user
+        content: revert the commits that agent pushed to my branch this afternoon
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.foundation]

@@ -97,9 +97,12 @@ buy the first without paying for the second.
 measurably NOT needed before then.
 
 `bench scale` sweeps candidate recall across synthetic catalog sizes
-(`training/EXPERIMENTS.md`, "Catalog scale"). Counted over the 154 cases that
-have a required runbook, `k=32` misses 0 at 200, **2 at 500** and 4 at 1,000;
-`k=48` is clean at 500 and misses 3 at 1,000; `k=96` is clean throughout.
+(`training/EXPERIMENTS.md`, "Catalog scale"). Re-measured 2026-10-16 on the real
+154-file catalog with the hosts family in it ("Catalog 106 → 153"), over the 1,885
+cases that have a required runbook: `k=32` misses 0 today, **3 at 200**, 6 at 500
+and 9 at 1,000, all hosts-adjacent at 200 (ranks 33–37); `k=48` is clean at 200
+and misses 3 at 500; `k=64` misses 1 at 500. The 2026-08-21 sweep (154 cases) had
+`k=32` clean at 200, so the margin has thinned, but the trigger has not been reached.
 
 So this is a real change with a real trigger rather than a standing worry. It is
 not free: `k` is baked into the exported head's graph (MultiheadAttention bakes
@@ -117,7 +120,11 @@ a measurement taken at the time.
 
 **Trigger: the same ~200-runbook mark, or sooner if `foundation-only` regresses.**
 
-The scale sweep's per-category breakdown shows `foundation-only` losing a case at
+Not fired as of 2026-10-16: `foundation-only` went 5/7 → 6/9 in `bench local` only by
+gaining two `hosts.foundation`-alone cases, with the same two shared misses on both
+sides, and it reaches the shortlist 9/9 at every scale size.
+
+The 2026-08-21 scale sweep's per-category breakdown showed `foundation-only` losing a case at
 500 runbooks (5/6) and holding there, and `daintree.foundation` is the deepest
 required runbook at every size — rank 26 of 200 under int8, rank 31 under fp32,
 against a 32-slot shortlist. The cause is structural rather than a bug: there is one broad `daintree.foundation`, its
