@@ -1,0 +1,242 @@
+# daintree.hosts.prepare-remote-demo: the hub's side of a demo on a Remote Host. The person,
+# at the Shell, wants a feature running on another machine at an exact commit and wants to
+# look at it from here; the hub briefs the host's assistant, checks its reply and tells the
+# person how this Shell reaches the page.
+#
+# Recall: the issue's own three requests, an agent-phrased task, a casual line and two
+# requests about the forwarded address. Traps: against the local demo
+# (daintree.workflow.prepare-feature-demo), a preview that is already open
+# (daintree.runtime.debug-web-app), a busy port (daintree.runtime.free-busy-port), a question
+# for the host's assistant (daintree.hosts.ask-host-assistant), plain work on a host
+# (daintree.hosts.delegate-to-host) and the lane's own receiver (daintree.hosts.demo-for-hub),
+# each with a reverse case where the neighbour wins.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: prepare-remote-demo-issue-forwarded-port
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "Use on the hub, the person's own Shell, when the
+      person wants to SEE a feature running on another machine, a Remote Host this Shell reaches".
+    messages:
+      - role: user
+        content: Show me the dev server the remote assistant started, through the correct forwarded port
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.demo-for-hub, daintree.terminals.run-visible-command]
+
+  - id: prepare-remote-demo-issue-open-from-here
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "the person told how to open it through this Shell's
+      own forward".
+    messages:
+      - role: user
+        content: Prepare a demo on the remote host and tell me how to open it from here
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.demo-for-hub, daintree.workflow.prepare-feature-demo]
+
+  - id: prepare-remote-demo-issue-shell-side-access
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "its assistant's reply naming the SHA served, and the
+      person told how to open it".
+    messages:
+      - role: user
+        content: Coordinate a host-side demo with verified Shell-side access
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-agent-phrased
+    category: single-runbook
+    note: >-
+      How the hub writes its search: the host, the branch and commit, sample data and the route the
+      person takes. Decided by "a demo served on that host at the commit named".
+    messages:
+      - role: user
+        content: >-
+          Task: have the Remote Host's assistant serve branch feat/search-v2 at its pushed commit
+          with sample data, check its reply names the commit it serves, and give the person the
+          steps to view it from the Shell, noting that the local forwarded port can differ
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-user-casual
+    category: single-runbook
+    note: >-
+      The person's own words. Decided by "wants to SEE a feature running on another machine".
+    messages:
+      - role: user
+        content: get the other machine to run the new onboarding screens at the commit i pushed, then tell me how to look at them from here
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.workflow.prepare-feature-demo]
+
+  - id: prepare-remote-demo-local-port-busy
+    category: single-runbook
+    note: >-
+      The same port number is already used on the person's machine: the demo is still this
+      runbook's, and the busy local port is why the forward may land elsewhere. Decided by
+      "localhost on the host is not localhost here".
+    messages:
+      - role: user
+        content: Remote host demo of the admin console with invented accounts only, then tell me which address to open here, the host's port 3000 is already used on my laptop
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps
+  - id: prepare-remote-demo-trap-not-local-demo
+    category: routing-trap
+    note: >-
+      A demo on another machine, opened from here, is this runbook; the local demo
+      (daintree.workflow.prepare-feature-demo) is for a checkout on this machine. Decided by
+      "a demo on THIS machine (daintree.workflow.prepare-feature-demo)".
+    messages:
+      - role: user
+        content: Prepare a demo of the profile editor on the remote host. The change is at commit 9d41c2e on feat/profile-editor, pushed. I will open it myself from this Shell
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-trap-not-open-preview
+    category: routing-trap
+    note: >-
+      A page that will not load from the Shell at the host's port number is a route question, not
+      a preview to debug. Decided by "localhost on the host is not localhost here", with "debugging a
+      preview that is already open (daintree.runtime.debug-web-app)".
+    messages:
+      - role: user
+        content: the demo your remote assistant started isn't loading at localhost:4000 on my Mac, what do I open instead
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-trap-not-port-clash
+    category: routing-trap
+    note: >-
+      A demo whose port is also used locally is still a demo to prepare; freeing the local port is
+      not asked. Decided by the deliverable ("the person told how to open it through this
+      Shell's own forward") against "a port another process holds
+      (daintree.runtime.free-busy-port)".
+    messages:
+      - role: user
+        content: The remote machine should serve the reports branch as a demo. Port 5173 is taken here on my Mac, so how do I still get to it from this window once it is up
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-trap-not-a-question
+    category: routing-trap
+    note: >-
+      Preparing a demo changes the host; a question for its assistant does not. Decided by "a question for that host's assistant whose
+      deliverable is its answer (daintree.hosts.ask-host-assistant)".
+    messages:
+      - role: user
+        content: Ask the assistant on my other Mac to prepare a demo of the export dialog from branch feat/export and say how I look at it
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-trap-not-plain-work
+    category: routing-trap
+    note: >-
+      Work that ends in a running demo to look at is this runbook's, not the plain relay
+      (daintree.hosts.delegate-to-host). Decided by "work on that host that leaves
+      no demo (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: Tell the remote assistant to leave a demo of the search rewrite running at the tip of feat/search and then tell me how to see it from my laptop, without exposing it to anyone else
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-trap-not-the-lane
+    category: routing-trap
+    note: >-
+      The hub's own side is this runbook; demo-for-hub is for the host's lane that was asked.
+      Decided by "Use on the hub, the person's own Shell" and "the host's own side
+      of a demo the hub asked for (daintree.hosts.demo-for-hub)".
+    messages:
+      - role: user
+        content: Set up the pricing page demo on the build server instead of here, and tell me how I would open it on this Mac
+    expect:
+      required: [daintree.hosts.prepare-remote-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.demo-for-hub]
+
+  # ------------------------------------------------------------------ reverse
+  - id: prepare-remote-demo-reverse-local-demo
+    category: routing-trap
+    note: >-
+      A demo of a checkout on this machine is daintree.workflow.prepare-feature-demo ("Use when the
+      user wants to SEE or SHOW a feature the agents built"); no host is named, so this runbook
+      must not ride along.
+    messages:
+      - role: user
+        content: Set up a demo of the settings page on this machine from the feature branch and give me a walkthrough
+    expect:
+      required: [daintree.workflow.prepare-feature-demo]
+      optional: [daintree.foundation]
+
+  - id: prepare-remote-demo-reverse-debug-preview
+    category: routing-trap
+    note: >-
+      A preview panel in the person's window with a rendering error is daintree.runtime.debug-web-app
+      ("debug a web app that is already open in Daintree Dev Preview"); no demo is prepared.
+    messages:
+      - role: user
+        content: the dev preview in my window for this project shows a rendering error, check the console and fix
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: prepare-remote-demo-reverse-busy-port
+    category: routing-trap
+    note: >-
+      Who holds a local port is daintree.runtime.free-busy-port ("a ONE-OFF port clash right
+      now"); no demo is asked for.
+    messages:
+      - role: user
+        content: something is holding port 5173 on my machine, what is it
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation]
+
+  - id: prepare-remote-demo-reverse-question
+    category: routing-trap
+    note: >-
+      A question about a past demo setup is daintree.hosts.ask-host-assistant ("ONE QUESTION
+      answered by the Daintree assistant on ANOTHER MACHINE"); nothing is prepared.
+    messages:
+      - role: user
+        content: Ask the assistant on the Linux box how the demo setup went last night
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-reverse-plain-work
+    category: routing-trap
+    note: >-
+      Implementation on another machine with no demo is daintree.hosts.delegate-to-host ("ONE piece
+      of WORK done by the Daintree assistant on another machine").
+    messages:
+      - role: user
+        content: Get the assistant on my other machine to implement the export feature on a new branch and report the SHA
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-remote-demo-reverse-lane
+    category: routing-trap
+    note: >-
+      A request from the hub arriving on this host is daintree.hosts.demo-for-hub ("Use on a Remote
+      Host's lane when the hub asks THIS machine to prepare a DEMO"); this runbook is the hub's.
+    messages:
+      - role: user
+        content: "Hub message: bring up the dashboard branch here as a demo with sample data and reply with the port and the SHA served"
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

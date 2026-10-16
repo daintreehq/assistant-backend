@@ -238,16 +238,14 @@ cases:
     category: routing-trap
     note: >-
       The same boundary in the person's own words: their own remote host, seen from the Shell.
-      daintree.hosts.delegate-to-host owns it today ("ONE piece of WORK done by the Daintree
-      assistant on another machine"); this runbook's fence "the hub's own side of handing a host
-      work" does not hold yet: the shipped selector gives it to this runbook at 1.00 with
-      daintree.workflow.prepare-feature-demo next, and two text attempts on the boundary did not
-      move it. Retrain owed.
+      daintree.hosts.prepare-remote-demo owns it ("Use on the hub, the person's own Shell, when the
+      person wants to SEE a feature running on another machine"); this runbook ("Use on a Remote
+      Host's lane") must not ride along.
     messages:
       - role: user
         content: Get the feature running on my remote host so I can demo it from here
     expect:
-      required: [daintree.hosts.delegate-to-host]
+      required: [daintree.hosts.prepare-remote-demo]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-reverse-delegated-code
