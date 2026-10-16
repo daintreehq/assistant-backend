@@ -150,3 +150,6 @@ boundaries:
   - query: read-only inventory of the remote worktrees and dev servers, grouped by run and owner
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
+  - query: "go through the worktrees the run left on my other machines and tell me which ones could be removed, report only, change nothing"
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
