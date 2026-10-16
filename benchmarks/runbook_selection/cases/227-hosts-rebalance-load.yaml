@@ -82,7 +82,7 @@ cases:
       unstarted work placed on hosts with room".
     messages:
       - role: user
-        content: one of the swarm hosts went offline with several queued units it never started, spread those across the remaining hosts
+        content: one of the swarm hosts went offline; several units the hub had queued for it were never sent, spread those across the remaining hosts
     expect:
       required: [daintree.hosts.rebalance-load]
       optional: [daintree.hosts.foundation]
@@ -209,7 +209,7 @@ cases:
         content: Call off the run I sent to all my machines and keep whatever they've done.
     expect:
       required: [daintree.hosts.steer-swarm]
-      optional: [daintree.hosts.foundation, daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation]
 
   - id: relieve-resource-contention-not-rebalance-load
     category: routing-trap
