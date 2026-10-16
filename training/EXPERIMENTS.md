@@ -1698,3 +1698,299 @@ smoke-tests every candidate before it takes traffic.
 - "A checking runbook reports failures, it doesn't repair them" belongs in the foundation, where every
   delivered runbook would carry it. The foundation has no byte budget left, so adding the rule needs trims
   elsewhere first.
+
+# Catalog 106 → 153: the hosts wave, measured zero-shot (2026-10-16)
+
+Issue #144: measure recall, ownership confusion and bundle cost as the hosts family lands, before
+anything about the model, `k` or the budgets changes. Nothing about them did: no floor, no `k`, no
+artifact, no budget, no routing text. What changed is measurement (an ownership audit of 39 new
+cases, and `bench compare` / `bench scale` fixes) and this record.
+
+**Before** is `133bab34`, the last commit before `daintree.hosts.foundation` (`378f17cf`): 107
+runbook files, 106 selectable, 850 cases, catalog `sha256:39f7e189…`. **After** is `af7b68d3` on
+develop: 154 files, 153 selectable (`daintree.docs.answer-usage-question` stays hidden), 1,876 cases,
+catalog `sha256:79bff154…`; then the same tree plus the audit, 1,915 cases. In between, 47 runbooks
+were added, every one of them `daintree.hosts.*`. 24 established runbooks had their routing text
+rewritten, with reverse fences against the family or a Remote Host clause, and 8 had bodies edited.
+
+**The selector did not change.** The artifact tree is `a5c2edf4` at both commits: the round-6
+seed-41 weights, trained at 105 runbooks. Every hosts runbook is routed zero-shot, embedded at
+startup and never trained on. So this is the "reachable, not competitive" case CLAUDE.md describes,
+measured across a whole family rather than one runbook.
+
+**No benchmark case changed.** All 850 pre-wave cases are byte-identical at HEAD (id, messages,
+expectations, category), so every move below is the catalog's doing.
+
+## Totals
+
+| | before | after | after + audit |
+|---|---|---|---|
+| runbook files / selectable | 107 / 106 | 154 / 153 | 154 / 153 |
+| cases | 850 | 1,876 | 1,915 |
+| recall-pass | 821 | 1,790 | 1,818 |
+| strict | 755 | 1,537 | 1,558 |
+| miss trials | 25 | 82 | 93 |
+| extra trials | 89 | 321 | 336 |
+| candidate_miss | 0 | 0 | 0 |
+| docs correct | 28/30 | 29/31 | 29/31 |
+| quality gate | pass | pass | pass |
+
+Against the floors at after + audit: recall-pass 0.949 (floor 0.90), strict 0.814 (0.78), miss 0.049
+(≤ 0.09), extra 0.175 (≤ 0.20), weakest category 4/6 and 6/9 (0.55). Extra is the nearest.
+
+Split by where the case came from:
+- **The 850 shared cases:** recall-pass 821 → 821 and strict 755 → 753. The wave fixed none and
+  broke none.
+- **The wave's own 1,026 cases:** recall-pass 969 and strict 784, which is 0.764. Taken alone that
+  is under the 0.78 strict floor; the suite clears it only because the older cases carry it.
+
+| category | recall-pass before → after + audit | strict before → after + audit |
+|---|---|---|
+| adversarial | 4/5 → 5/6 | 3/5 → 4/6 |
+| background-wake | 4/5 → 4/6 | 4/5 → 4/6 |
+| continuation | 9/9 → 22/25 | 8/9 → 14/25 |
+| docs-classification | 22/24 → 22/24 | 20/24 → 20/24 |
+| foundation-only | 5/7 → 6/9 | 5/7 → 5/9 |
+| host-query | 41/42 → 43/44 | 37/42 → 39/44 |
+| multi-runbook | 5/5 → 5/5 | 4/5 → 4/5 |
+| no-task | 6/8 → 6/8 | 6/8 → 6/8 |
+| routing-trap | 490/502 → 1,140/1,174 | 453/502 → 999/1,174 |
+| single-runbook | 226/232 → 556/603 | 206/232 → 454/603 |
+| topic-shift | 9/11 → 9/11 | 9/11 → 9/11 |
+
+**`foundation-only` did not regress.** Its 5/7 → 6/9 is the same two shared misses on both sides
+(`novel-read-terminal-output`, `cap_full`; `capability-home-config-commands`, `rank_miss`) plus two
+new `daintree.hosts.foundation`-alone cases. `hosts-foundation-switch-on-messaging` passes;
+`hosts-foundation-how-to-talk` gets nothing at all. The TODO trigger "sooner if `foundation-only`
+regresses" has not fired.
+
+## Every moved case
+
+`bench compare` lists 25 shared cases whose loaded set moved. None changed recall-pass. Strict
+fell on 7 and rose on 5. The three that list a lost runbook on the after side
+(`explore-readonly-agent`, `keyword-bait-rename`, `tx-continue-agents-cut-off-by-sleep`) failed
+identically before. The compare now prints both sides' losses, which is what shows that.
+
+**A new hosts runbook rides in as an extra (12).** Untrained, it scores near 1.0 on shapes that
+share its vocabulary:
+- `hosts.supervise-swarm` (7 cases). It is the strongest attractor of the wave: "keep work already
+  out … moving across turns" shares `orchestration.watch-outcome`'s wake-me vocabulary.
+  - `open-dialogue-not-multi-agent`, `wake-me-on-merge-is-not-a-status-read` and
+    `y-deploy-verify-trap-watch` lose strict.
+  - `host-notice-then-verify` swaps `agents.steer-running-agent` (re-fenced) for it.
+  - `sweep-now-plus-wake-later` swaps `orchestration.workspace-cleanup` for it.
+  - `watch-grant-for-unattended-rollback` takes it with `hosts.park-swarm`, in place of
+    `park-work` and `rollback-deployment`.
+  - `tx-continue-agents-cut-off-by-sleep` takes it with `hosts.steer-swarm`. That case's
+    `agents.recover-agent` miss moves from `rank_miss` to `cap_full`.
+- `hosts.do-delegated-work` displaces `edits.spawn-visible-agent` in `host-issue-agent-worktree`.
+- `hosts.clean-up-for-hub` joins `novel-resolve-one-queue-item` (loses strict).
+- `hosts.shard-test-suite` displaces `context.feed-running-agent` in
+  `tx-drive-release-checklist-in-browser-yourself`, a no-task case failing on both sides.
+- `hosts.report-swarm-results` displaces `review.review-pr-queue` in `x-gap-land-two-in-order-agent`.
+- `hosts.verify-for-hub` displaces `release.test-distributable` in `y-deploy-verify-agent`.
+
+**A re-fenced runbook moves (6).** Its routing text was rewritten against the hosts family, so it
+was re-embedded:
+- `keyword-bait-rename` drops `diagnostics`. It still misses `foundation` on both sides.
+- `memory-not-explore` swaps `status-and-resume` for `execute-durable-workflow`. Both were
+  re-fenced, and the case is non-strict on both sides.
+- `y-release-ready-trap-deploy` drops `release.assess-readiness` and gains strict.
+- Three cases whose required runbook was re-fenced pick up a new extra and lose strict:
+  - `x-bug-bash-trap-e2e`: `ci.run-e2e-suite`'s routing text grew from 1,005 to 1,604 characters
+    for server provenance on a host, and the case picks up `ci.run-local-checks`.
+  - `x-migration-sweep-user`: `orchestration.migration-sweep` was re-fenced; the case picks up
+    `worktree.relocate-agents`.
+  - `x-port-user-whats-on`: `runtime.free-busy-port` gained its Remote Host clause; the case picks
+    up `workflow.follow-up-on-issue`.
+
+**Admission-floor flicker (7).** No runbook text involved changed. In each case the runner-up sits
+within 0.05 of the 0.55 `BONUS_FLOOR`. The set-wise head scores every candidate against the whole
+shortlist, and the shortlist now holds hosts runbooks, so a score that close moves across the
+floor. Measured with `bench search` at after:
+
+| case | runner-up | score | effect |
+|---|---|---|---|
+| `x-gap-spike-keep-winner-casual` | `resolve-task-collisions` | 0.52 | dropped, strict gained |
+| `x-trap-rebase-merge-pr-is-land` | `git.sync-with-base` | 0.50 | dropped, strict gained |
+| `x-prune-user-delete-merged` | `workspace-cleanup` | 0.50 | dropped, strict gained |
+| `y-deploy-verify-trap-rollback` | `investigate-outage` | 0.54 | dropped, strict gained |
+| `x-decompose-prd-into-issues-agent` | `fan-out-work` | (not re-ranked) | dropped |
+| `tx-ask-codex-second-order-risks` | `agents.ask-running-agent` | 0.55 | admitted |
+| `explore-readonly-agent` | `agents.ask-and-relay` | 0.59 | admitted; still misses `spawn-visible-agent` on both sides |
+
+## Ownership audit (`cases/253-ownership-traps.yaml`)
+
+The issue cites a 2026-10-15 32-query audit. It is not in the repository, so it was replaced with
+one that is:
+- **How the 39 cases were written.** Each was drafted blind, before any was ranked, and is kept
+  whether it passes or not.
+- **How the owners were set.** Every owner comes from the routing text, with the deciding clause
+  quoted in the case note.
+- **Screening.**
+  - Every string was screened with `SequenceMatcher` against 54,381 case and corpus strings
+    (queries and history), and the maximum is now 0.71.
+  - Seven drafts at 0.75 or above were reworded before they were ranked. One of them had reused
+    an existing case's example SHA.
+- **What was dropped.** Two probes whose owner the routing text genuinely splits were left out
+  (findings 7 below).
+
+| boundary | cases | recall-pass | strict | the misses |
+|---|---|---|---|---|
+| Remote Host vs this machine: usage, placement | 7 | 7 | 2 | none; the local usage twin rides along both ways, `place-work` pulls `swarm-fan-out`, `run-local-cohort`, `steer-swarm` |
+| worktree cloud devbox vs Remote Host | 5 | 5 | 5 | — |
+| dev stack across hosts | 5 | 2 | 1 | `coordinate-dev-services` lost to `hosts.foundation` alone; to `run-validation-matrix` + `ci.run-e2e-suite`; to the local `worktree.provision-local-environment` |
+| one dev server here, a port clash | 4 | 3 | 3 | a remote vite port went to `hosts.reassign-host-work` + `recover-and-clean-up` (`free-busy-port`, `cap_full`) |
+| the lane's side of an exchange | 8 | 4 | 3 | `verify-for-hub` lost to `shard-test-suite` + `report-swarm-results`; `review-for-hub` and one `demo-for-hub` lost to the envelope (`handle-hub-message` alone); one `demo-for-hub` lost to `connect-host` |
+| the hub's side of the same work | 6 | 3 | 3 | the hub's one-host verify went to the LANE's `verify-for-hub`, not `delegate-to-host`; `recover-and-clean-up` lost to the local `workspace-cleanup` and to `swarm-fan-out` |
+| this machine's own owners | 4 | 4 | 4 | — |
+| **total** | **39** | **28** | **21** | 10 `rank_miss`, 1 `cap_full`, 0 `candidate_miss` |
+
+Every miss had the right runbook on the shortlist, and every one of those runbooks is untrained.
+No local owner lost to a hosts runbook here. Against the cited audit's two claims:
+- "Receiver requests routed to unrelated procedures" reproduces: `connect-host` for a lane demo,
+  and `shard-test-suite` for a lane verify.
+- "Host requests routed to local owners" reproduces: `workspace-cleanup` and
+  `provision-local-environment`.
+- "Host requests routed to cloud-resource owners" does not: 5/5 strict in both directions.
+
+Across the whole suite after the audit, 97 cases fail:
+- 59 lose a hosts-owned runbook:
+  - 21 to a local owner;
+  - 23 to another hosts runbook;
+  - 15 by picking nothing wrong, i.e. under-selection.
+- 34 lose a local-owned runbook. 8 of those pull a hosts runbook in: both
+  `fbp-hosts-*-same-number` / `-free-over-there-*`, both `undo-swarm-changes-lane-*`,
+  `clean-up-for-hub-reverse-lane-read-only`, `migrate-db-hub-tunnel-check-before-reset`,
+  `tx-continue-agents-cut-off-by-sleep` and `own-remote-vite-port-taken`.
+- 4 are no-task or docs cases.
+
+Stage losses: `rank_miss` 80, `cap_full` 10, `cardinality_short` 2, `background_reuse` 1,
+`floor_reject` 0, `candidate_miss` 0.
+
+## Shortlist scale (`bench scale`)
+
+`k=32` misses, by catalog size, counted over the cases with a required runbook:
+
+| | real | 200 | 500 | 1,000 |
+|---|---|---|---|---|
+| before (107 files, 820 cases) | 0 | 0 | 0 | 3 |
+| after + audit (154 files, 1,885 cases) | 0 | 3 | 6 | 9 |
+
+Wider shortlists after: `k=48` misses 0 / 3 / 6 at 200 / 500 / 1,000, `k=64` misses 0 / 1 / 5, and
+`k=96` misses 0 / 0 / 4. The hosts family is 47 similar documents, and it crowds the cosine
+shortlist for hosts-adjacent queries. This is the "own confusion structure" the TODO said a real
+catalog would have.
+- **At 200, all three misses are hosts-adjacent and sit just past the shortlist.**
+  `supervise-swarm-host-message-to-hub` needs `hosts.supervise-swarm`, rank 33.
+  `tx-continue-agents-cut-off-by-sleep` needs `agents.recover-agent`, rank 34.
+  `clean-up-for-hub-reverse-lane-read-only` needs `worktree.audit-worktrees`, rank 37.
+- `daintree.foundation` is no longer the deepest required runbook.
+- `foundation-only` reaches the shortlist 9/9 at every size.
+- **The dormant `scale.smoke()` would now fail.** Its budget is 1 miss at 200 runbooks. Nothing
+  calls it.
+
+`k` stays 32: 0 candidate misses at 153 selectable, and every loss above is downstream of the
+shortlist. The ~200 trigger stands, with a thinner margin than the 2026-08-21 sweep showed (0
+misses at 200 then, 3 now). `k=48` would clear 200.
+
+`bench scale` with no `--sizes` had refused to run since the catalog passed 100. A size below the
+real catalog is now measured at the real catalog's size, and the run says so.
+
+## Bundle cost
+
+The ceilings are unchanged and every runbook is under them. They bind with almost no room:
+- **Foundations.** `daintree.foundation` is 5,384 B against its 5,400 B ceiling.
+  `daintree.hosts.foundation` is 2,417 B.
+- **Bundles** (a runbook plus everything `supporting_for` sends with it, against 10,240 B):
+  - median 10,205 B;
+  - largest 10,237 B (`runtime.measure-performance`, 3 B of headroom);
+  - 98 of 153 at 10,000 B or more, and 117 at 9,500 B or more.
+- **Every hosts leaf ships three bodies:** itself and both foundations, 7,801 B before its own
+  text. A hosts procedure therefore has 2,439 B of room against 5,120 B elsewhere. The 46 hosts
+  leaves have 7–211 B of headroom (median 15).
+
+So a rule added to `daintree.hosts.foundation` costs every hosts leaf byte for byte, and
+`daintree.foundation` can take 16 B. Shared hosts judgment has to be paid for by trimming leaves
+first.
+
+## Findings
+
+1. **A retrain is owed, and the evidence is now measured.**
+   - Every audit miss had an untrained hosts runbook on the shortlist, and lost on rank.
+   - Of the 59 suite failures that lose a hosts-owned runbook, every runbook is on the
+     shortlist and untrained.
+   - The corpus already carries the rows: every hosts runbook has 61–132 compiled rows
+     (`coordinate-dev-services` 66, `demo-for-hub` 74, `recover-and-clean-up` 132). The retrain
+     trains on what is there; it is not an authoring job.
+   - Follow the pipeline: `training/retrain.sh` over three or more seeds, a fresh sealed holdout
+     round for the hosts family, then `calibrate_floors.py`.
+   - Decide `k` at that retrain only if the catalog is headed past ~200. `k=48` is the measured
+     minimum there.
+2. **The extra rate is the floor nearest to binding.** It rose from 89 trials (0.105) to 336
+   (0.175) for 47 runbooks, against a 0.20 ceiling. Another untrained wave of this size would
+   reach it.
+3. **`hosts.supervise-swarm` is the wave's attractor:** an extra on 7 of the 25 moved shared cases,
+   all watch-outcome or conversation shapes. Write reverse rows where
+   `orchestration.watch-outcome` wins against it. Do not fence its untrained `whenToUse` without a
+   per-fence `training.try_runbook_text` measurement: a fence on an untrained runbook has raised
+   it on the queries it fenced before.
+4. **The lane's envelope takes the lane's work.** `handle-hub-message` alone took 2 of 8 lane
+   requests, and `connect-host` a third. Rows are owed where the specific receiver
+   (`review-for-hub`, `demo-for-hub`, `verify-for-hub`) wins with the envelope as
+   `confusable_with`.
+5. **The hub takes the lane's verifier.** "Have the linux box verify my commit" picked
+   `verify-for-hub` over `delegate-to-host`. Rows are owed on the hub's phrasing.
+6. **Cross-host dev stacks lose `coordinate-dev-services`** on 3 of 5 phrasings: to the hosts
+   foundation alone, to the validation matrix with e2e, and to the local
+   `provision-local-environment`.
+7. **Two owners are split in the routing text, with no fence either way.** `bench lint` ranks the
+   first pair the closest in the catalog with no id edge. The six most confusable pairs in the
+   whole catalog are all inside `daintree.hosts`. Settle ownership in the text, measure it, then
+   case it.
+   - "is messaging even turned on there" fits both `hosts.diagnose-messaging` ("which gate is in
+     the way") and `hosts.foundation` ("why one is not reachable"). Cosine 0.69.
+   - "ready to take work" fits both `hosts.foundation` ("whether it is set up") and
+     `hosts.start-swarm`.
+8. **The usage twins ride together.** `agents.check-usage-limits` comes along on 2 of 3 remote
+   usage asks, and `hosts.check-usage-limits` comes along on the local one. Both texts already
+   fence each other, so this is training, not text.
+9. **No hosts procedure can grow.** See Bundle cost.
+
+## Proof layers reached
+
+- **Layer 1 (selection):** `bench coverage`, `bench local`, `bench compare`, `bench scale` and
+  `bench search`.
+- **Layer 2 (contract):** the budget and hygiene tests in `tests/unit`, unchanged and passing.
+- **Layers 3–5:** none. No trial ran, and the hub and lane surfaces are not stageable
+  (`.claude/skills/runbook/references/trials.md`). Nothing here says a request is handled well;
+  only which runbook search returns for it.
+
+## Commands
+
+```bash
+# before, in a detached worktree (the artifact is LFS: git lfs pull there first)
+git worktree add --detach ../wave-base 133bab34
+(cd ../wave-base && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
+  -m benchmarks.runbook_selection.bench local --out "$OLDPWD/before.json")
+(cd ../wave-base && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
+  -m benchmarks.runbook_selection.bench scale --sizes 107,200,500,1000)
+# after
+python -m benchmarks.runbook_selection.bench coverage
+python -m benchmarks.runbook_selection.bench local --out after.json
+python -m benchmarks.runbook_selection.bench compare before.json after.json
+python -m benchmarks.runbook_selection.bench scale          # 0,100 → 154; then 200, 500, 1000
+python -m benchmarks.runbook_selection.bench lint --top 12
+python -m benchmarks.runbook_selection.bench search --max-results 6 "<a moved case's text>"
+pytest tests/unit                                           # budgets and hygiene (layer 2)
+git rev-parse 133bab34:src/daintree_assistant_server/runbooks/local/artifacts HEAD:src/daintree_assistant_server/runbooks/local/artifacts
+```
+
+The bundle numbers use the budget test's own sum: each selectable runbook's body bytes plus
+`catalog.supporting_for([id])`.
+
+## Still open
+- **The retrain** in finding 1, with rows for findings 3–6 first.
+- **Owners for finding 7**, decided in the routing text.
+- **The audit file** is the yardstick for the retrain. Rerun the wave recipe in
+  `benchmarks/runbook_selection/README.md` after it, and after each further wave.
