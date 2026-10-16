@@ -172,9 +172,10 @@ cases:
   - id: rtc-not-recover-neither-knows
     category: routing-trap
     note: >-
-      Settling who keeps a task two hosts both got is not "an account of where exchanges stand
-      or cleaning up after a run (daintree.hosts.recover-and-clean-up)". recover-and-clean-up
-      riding along is an extra.
+      Settling who keeps a task two hosts both got is this runbook's "COLLIDES BY ACCIDENT
+      across its Remote Hosts: two machines given the same issue" and "one owner chosen on
+      evidence or by the person", not recover-and-clean-up's "where things stand with the work
+      handed to another machine". recover-and-clean-up riding along is an extra.
     messages:
       - role: user
         content: the studio and the mini both got the search task and neither knows about the other, sort out which one keeps it
@@ -270,9 +271,10 @@ cases:
   - id: rtc-reverse-recover-open-exchanges
     category: routing-trap
     note: >-
-      Which exchanges are still open, and cleaning up what they left, is "an account of where
-      exchanges stand or cleaning up after a run (daintree.hosts.recover-and-clean-up)"; the
-      collisions runbook must not ride along.
+      Which exchanges are still open, and cleaning up what they left, is recover-and-clean-up's
+      "which delegated exchanges finished, which are still open" and "what a run left on the
+      Remote Hosts ... cleaned up through each host's own assistant"; the collisions runbook
+      must not ride along.
     messages:
       - role: user
         content: which of the exchanges I sent to my other machines are still open, and clean up what they left behind
