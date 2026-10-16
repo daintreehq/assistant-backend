@@ -466,6 +466,15 @@ boundaries:
   - query: tear down the workspaces that fan-out left here, the clean ones, and close their panes
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: "Abort the remaining waves, nothing more gets launched. Close the wave 3 agents and delete their worktrees."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Wave run complete, every wave merged. User asked to remove what it left behind: close the remaining agent terminals and delete their worktrees."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "ok that was the final round and everything's in. can you get rid of all the panels and worktrees it left lying around now"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: actually delete the last one, i don't need that task
     history:

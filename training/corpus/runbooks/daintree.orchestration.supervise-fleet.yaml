@@ -477,6 +477,18 @@ boundaries:
   - query: "is any agent in my open terminals waiting for an answer?"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: "Check every agent terminal: still mid-task, idle with nothing left, or needs me."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Fleet triage now — which agents have work remaining vs sitting finished at their prompt; report blockers."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Sweep the running agents: how many are still working, how many are done, flag any waiting on input."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "how many of the agents still have stuff left to do rn? anyone stuck"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: ok show me the failed one
     history:

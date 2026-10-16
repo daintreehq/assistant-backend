@@ -642,6 +642,18 @@ boundaries:
   - query: 'divide the test-writing for the new API between three agents on this machine'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: "work the ready issues eight at a time, starting another whenever one opens its PR; I'll merge them myself later"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Issues 501-515: keep at most 3 agents running; as each one opens its PR, launch the next issue in a fresh worktree. PRs stay open for human review, no merging."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "I've got about 20 tickets lined up. don't run more than five agents at once, and when one of them gets its PR up just start it on the next ticket. I'll do all the merging myself at the end of the week so don't worry about that part"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Work 12 issues in batches of four. Launch the next batch as soon as every agent in the current batch has opened a PR. Do not merge anything."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: yeah all of them except the docs one
     history:

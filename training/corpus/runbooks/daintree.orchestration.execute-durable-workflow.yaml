@@ -248,6 +248,15 @@ boundaries:
   - query: write a durable checkpoint of this multi-step plan so a later session can resume it
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
+  - query: "Plan and run the session-store migration in dependent phases: add the new schema, backfill, switch reads, drop the old table. Each phase waits on the last being verified; must survive restarts."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Phase 1: an agent adds the v2 API behind a flag. Phase 2, once phase 1 is verified: an agent migrates the callers. Phase 3: remove the flag. One goal; record dependencies and evidence per phase."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "I need the build moved from webpack to vite. step one swap the config, step two fix the broken imports, step three get CI happy, and each step only starts once the one before actually works. keep a plan I can come back to tomorrow"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
 
 followups:
   - query: run the next one

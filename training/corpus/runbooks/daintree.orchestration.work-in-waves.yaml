@@ -19,6 +19,58 @@ positives:
   - 'waves: three issues, merge, three issues, merge, until the list is empty'
   - sequence these in rounds so the later ones build on the merged earlier ones, one codex agent per issue
   - the first wave's PRs are all merged, go ahead with the second
+  - query: "drain the ready issues for me: my planner picks a batch, each pick gets its own worktree and /work agent, my merge skill lands them once they're all done, then delete the worktrees and pick again until nothing's left"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "keep going batch after batch until the backlog is empty, landing every batch's pull requests before you choose the next one"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "each round, have the picker agent choose up to six unblocked issues, put an agent on each in its own worktree, merge the round, then pick the next round"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "empty the issue queue in rounds; later issues build on earlier ones, so a round's PRs must be merged before the next round is chosen"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "these depend on each other so do it in rounds pls. 4 and 5 first, then 7 (needs 4), then 9 and 10 (need 7). merge after each round"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Process issues 12-19 as four pairs, each pair merged into staging before the next pair starts; one worktree and Claude agent per issue"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "my /next-up command picks whatever's ready. run it, do every issue it gives you in parallel, then when all those PRs are in run /merge-train from the main folder. rinse and repeat"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Loop the user's picker slash command: one Claude agent per selected issue in its own worktree, gate on green CI for every PR in the set, merge agent runs /merge-all on main, tear down, continue until no ready issues remain"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "rather than throwing every ready issue at agents at once, do them a handful at a time and merge each handful before grabbing more. there's a /grab-ready command that picks them"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Orchestrate issue rounds against release/3.x: branch every round from origin/release/3.x and land its PRs with the user's /land command before starting the next round"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Drain mode with the user's custom commands: keep picking and landing batches of issues until the picker reports nothing ready; report each round's issues, PRs and merge result"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Work the ready label down to empty in batches of five with a merge between batches; base branch is trunk"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "ok so i've got /pick-batch, /ship and /land-all set up. can you just keep cycling them — pick a batch, ship each issue in its own worktree, land everything when they're all done, clean up, go again — until there's nothing left"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Run the user's three-command loop (/scout picks, /build-issue implements, /merge-everything lands) in rounds; verify each round's PRs MERGED on the forge before scouting again"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Resume an interrupted backlog drain: user reports round 3's PRs merged; fetch, confirm the merges are in origin/main, then pick round 4 with /triage-next"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "here's the order: cycle A = 14, 15, 16; cycle B = 18, 19; cycle C = 22. take each cycle all the way to merged before the next one, the merge cmd is /consolidate"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Codex agent per issue, batches of two, user's /prompts:land-batch runs in the primary worktree between batches; continue until the milestone has no open issues"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "I want to burn down the backlog tonight but carefully: like 3 issues at a time, each one gets its own agent, and nothing new starts until the previous three are actualy merged. use codex for all of them"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Between issue batches: confirm every PR from the batch shows MERGED, close its agents, delete their worktrees, re-fetch origin/main, then call the user's /pick-batch for the next set"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Sequence dependent issues into merge-gated groups: 31 and 32 first, then 35 and 36 which build on them, then 40; one agent per issue, merge each group before branching the next"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Execute the user's issue cycles: /choose-work selects each cycle, the Implement recipe runs per issue, /land-prs merges the cycle; delete landed worktrees before the next cycle"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "keep draining issues with my commands the way we did last week — batch, merge, wipe the worktrees, next batch"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Pick 4 issues, launch a Codex agent per issue in separate worktrees, wait for every PR to pass checks, run the user's /merge-ready in the root checkout, remove the round's worktrees, then pick again"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Can you work through the v2 milestone in rounds? Our base is develop, not main. Each round: the picker skill grabs up to five issues, the Feature recipe runs per issue, and once the PRs are green I want my /land-batch command run in the repo root. Delete those worktrees after each round lands, then pick the next round. Stop when the milestone's empty or something fails to merge."
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Run issues in merge-gated rounds of three on develop; branch each round from origin/develop only after the previous round's PRs have landed"
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Drain ready issues using the user's /next-up picker, /ship per issue in its own worktree, and /land-all once the batch settles; repeat until the picker comes back empty"
+    run: transcript-2026-10-16-batch-workflows
 boundaries:
   - query: start wave 1 of the approved breakdown, and once it's merged go on to wave 2
     confusable_with: [daintree.orchestration.decompose-work]
@@ -30,6 +82,63 @@ boundaries:
     confusable_with: [daintree.git.integrate-agent-branches]
   - query: run phase 2 only after every phase 1 PR has merged; they're all issues, one agent each
     confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: "eight at a time from the ready list, but nothing new starts until the previous eight are merged"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Multi-day run: wave 1 = issues 12, 13; wave 2 = 15, 16, 18 once wave 1's PRs merge; wave 3 = 20. Resume on agent notices."
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "the way I want this run is: batch of issues, merge them all, then delete that batch's worktrees so I'm not drowning in them, then on to the next batch. there are three batches listed in the milestone description"
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "each batch has to end with everything the agents did merged back into main, and the next batch starts from that merged main, otherwise they conflict like crazy. three batches, I'll paste the issue numbers"
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Ship in two rounds: 401 and 402 first, agent per issue; once both PRs are squash-merged, launch 405 and 409 from the updated main."
+    confusable_with: [daintree.forge.land-pull-request]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Use /pick-issues to choose each wave, launch the Build recipe on every issue it returns, merge with /merge-all once all the PRs pass, then call /pick-issues again. Stop when it returns none."
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "can you get agents on all the settings-page tickets, but not all at once — like four, get those merged, then the next four off a fresh main. last time we ran them all together they kept stepping on each other's changes"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Drain the ready-labelled backlog: each round take up to 4 open, unassigned ready issues, agent and worktree per issue, merge the round's PRs, repeat until no ready issues remain."
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "this'll take a couple of days. three rounds of tickets and each round has to be merged before the next because they build on each other. keep track of where we're at and pick it back up whenever the agents finish"
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Dependency-ordered issue batches: 50, 51 -> 54, 55, 56 -> 60. Each batch's PRs must merge before the next batch's agents launch."
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Round 1: 33, 35. Round 2: 38. When both round 1 PRs pass CI, run the user's /merge-prs in the main checkout; launch round 2 only after both show MERGED."
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Gate each wave on required checks green for every PR, merge the wave's PRs, then start agents on the next wave's issues. Waves: 61, 62 / 65, 66, 67 / 70."
+    confusable_with: [daintree.forge.land-pull-request]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Run issues 140, 143 and 147 now, one worktree and agent each. Hold 150 and 152 until all three PRs from the first group have merged into main, then cut those two from the updated main."
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Round 2: #331 and #334 merged, #336 was reverted. Remove the two landed issues' worktrees, keep 336's, then launch round 3."
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Rounds: [12, 14] then [17, 19, 20]. After a round's PRs merge, close that round's agent panels and delete its worktrees, then fetch and branch the next round from origin/main."
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "issues labelled perf (18 open): groups of 6, worktree + agent per issue. barrier: every PR in the group merged to develop before the next group launches."
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Between waves: land the finished wave's PRs, fetch, confirm the merges are in origin/develop, then branch the next wave's issues from it."
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "can you handle the PR merging between rounds too? a round of issues goes out, wait for the checks, squash-merge them all, then the next round of issues starts. there's 3 rounds"
+    confusable_with: [daintree.forge.land-pull-request]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "just keep chewing through the backlog for me. grab a few that are unassigned and ready, get agents on them, get them merged, then grab the next few off the updated main. stop when there's nothing left to grab"
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: yep retry those deletes and then kick off the merge
     history:
@@ -41,3 +150,51 @@ followups:
       - 'user: take these four waves through to the end'
       - 'assistant: Wave 3 is merged: all four PRs show MERGED and develop''s CI passed. Wave 4 has two issues and is ready to start.'
     active: [daintree.orchestration.work-in-waves]
+  - query: "looks like it finished merging on my end, keep going"
+    history:
+      - "user: cycle through the auth milestone two issues at a time, merging each pair with /merge-pair in the root checkout"
+      - "assistant: Both PRs in pair 2 are green. The merge agent is running /merge-pair in the main checkout; I'll pick up when it stops."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "fine, leave 29 out and keep draining"
+    history:
+      - "user: drain everything /next-up gives you, one claude per issue, /ship-it merges"
+      - "assistant: /next-up picked 26, 27 and 29 for this round. 29 is assigned to someone else on the forge, so I've held it and launched 26 and 27."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "let this batch land and then stop, don't pick another one"
+    history:
+      - "user: batches of three from the ready column until it's empty, merge in between"
+      - "assistant: Batch 4 is running: three agents working, one PR open with checks pending."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "makes sense, put 74 in the next round once 71 has merged"
+    history:
+      - "user: drain the ready issues in merge-gated rounds using /pick-batch"
+      - "assistant: /pick-batch chose 70, 71 and 74. 74 lists 71 as a prerequisite that isn't merged yet, so I've dropped 74 from this round and launched the other two."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "how many rounds do you reckon are left?"
+    history:
+      - "user: drain the ready issues with /pick-batch, /ship and /land-all until the picker finds nothing"
+      - "assistant: Round 2 is merged: issues 17, 18 and 21 show MERGED and main's CI passed. Their worktrees are deleted."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "don't wait on that delete, start round 2"
+    history:
+      - "user: rounds of issues off release/2.x, Bugfix recipe per issue, merge each round with /land before branching the next"
+      - "assistant: Round 1 landed. The delete for issue 52's worktree timed out on Daintree's confirmation; the other two worktrees are gone."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "yep, branch round 4 off the fresh main and kick it off"
+    history:
+      - "user: work the payments issues in rounds, codex per issue, my /land-all after each round"
+      - "assistant: Round 3's four PRs all show MERGED and origin/main contains them. Round 4 would be issues 61 and 63."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "so how many PRs still have to merge before the whole thing is done?"
+    history:
+      - "user: 1st group 5,6 ; 2nd group 8 ; 3rd group 10,12,13. merge each group before the next"
+      - "assistant: Group 2 is merged and its worktree removed. Group 3 is next: 10, 12 and 13."
+    active: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows

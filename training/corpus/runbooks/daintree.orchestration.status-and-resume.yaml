@@ -483,6 +483,21 @@ boundaries:
   - query: what was in flight in my earlier sessions before the app restarted?
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: "back after the weekend. whats left over from fridays agents, anything still going?"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "what did we leave hanging last night? whats still open from that batch"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Catch up across sessions: list the work remaining in flight from last week's migration batch, with evidence for each."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Reconstruct what's still left open from yesterday's run: checkpoints vs live worktrees, terminals and PRs."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Resume check — which units from the previous session remain unfinished, and is anything from it still running?"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: close the stale ones
     history:

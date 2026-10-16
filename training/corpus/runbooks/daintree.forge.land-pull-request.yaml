@@ -369,6 +369,15 @@ boundaries:
   - query: Squash-merge the changeset PR once its required checks are green so the release can go out.
     confusable_with: [daintree.release.publish-package]
     run: 2026-09-28-round6
+  - query: "Squash-merge #210, #212 and #215 in that order, each only after its required checks pass; re-read mergeability after every merge."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Wave run is over except two open PRs, #77 and #79. Merge them once required checks are green. No more issue work to launch."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "the agents opened four PRs yesterday. can you land them oldest first, waiting for each to go green before doing the next? nothing new needs starting after"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: squash
     history:
