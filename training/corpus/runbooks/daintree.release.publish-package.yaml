@@ -31,6 +31,57 @@ positives:
   - bump and publish a patch for the eslint config pkg pls
   - Put 1.0.0 of the parser on PyPI as our first stable release and confirm `pip install parser==1.0.0` in a new venv imports it.
   - Publish the next canary of the CLI to npm under the canary tag, leaving latest pointing at 3.8.2.
+  - query: Designate the release host as the only publisher for the SDK 2.1.0; every other host builds the package and returns its tarball hash, none of them gets registry access. Brief the publisher with the full SHA and the dist-tag.
+    run: runbook-2026-10-issue-138
+  - query: only the mac mini should push to npm, the other machines just run the tests and tell me if it looks good
+    run: runbook-2026-10-issue-138
+  - query: 'Hub message: publish parser 0.9.3 to PyPI from this host, the other hosts only verify. Before uploading confirm the account this machine publishes as is the project''s, then report the version and hash the registry shows.'
+    run: runbook-2026-10-issue-138
+  - query: the hub asked this machine to be the one that publishes the crate. check which registry and token this machine uses before you start
+    run: runbook-2026-10-issue-138
+  - query: The publish went out from the release host but its reply was lost. Read the registry for that exact version and hash before anything else, and do not have another host publish it.
+    run: runbook-2026-10-issue-138
+  - query: didn't hear back from the machine that ran npm publish. is 4.0.1 on the registry or not, and don't let a second machine try
+    run: runbook-2026-10-issue-138
+  - query: Host accounts are different on each of my machines; before the designated host uploads the wheel, make sure it is logged in as the maintainer account for the right index, without sending credentials around.
+    run: runbook-2026-10-issue-138
+  - query: tell the build box to publish 2.0.0-beta.1 under the next tag, nobody else publishes
+    run: runbook-2026-10-issue-138
+  - query: I've got three machines building the client library right now. When they all agree on the tarball contents I want exactly one of them, the Linux one with the registry login, to publish 1.8.0 under latest. The others must never get publish rights, and afterwards I want proof from the registry itself that the right version is there.
+    run: runbook-2026-10-issue-138
+  - query: 'One publisher per package and channel: pin the full commit SHA, brief the designated host to build from it and publish once, then confirm the registry''s version, dist-tag and checksum yourself instead of trusting its reply.'
+    run: runbook-2026-10-issue-138
+  - query: The host restarted during the cross-host release and may already have uploaded 3.2.0. Check the registry for that version before anything is retried or reassigned.
+    run: runbook-2026-10-issue-138
+  - query: hey, tests passed everywhere. now only the release machine publishes the sdk, 5.0.0 to latest, and tell me what npm shows
+    run: runbook-2026-10-issue-138
+  - query: This lane was told by the hub to publish a pinned commit as the package's next release. Confirm the registry and account here match what the hub named before uploading, and ask back if they differ.
+    run: runbook-2026-10-issue-138
+  - query: prevent a second host from publishing the same package version while we recover from the dropped connection
+    run: runbook-2026-10-issue-138
+  - query: Cut the 2.4.0 release of the library from the designated publisher host only; the other machines inspect the packed files for secrets and report.
+    run: runbook-2026-10-issue-138
+  - query: right, and only the linux host does the upload to the registry
+    history:
+    - 'user: have my hosts all build and inspect the 6.1.0 tarball'
+    - 'assistant: Sent to the three hosts; each will return its file listing and hash.'
+    run: runbook-2026-10-issue-138
+  - query: how do I make sure only one machine ever publishes the package when several are building it? make the release host the only publisher for 1.2.0
+    docs: true
+    run: runbook-2026-10-issue-138
+  - query: explain what happens when the publish reply gets lost, then publish 1.2.0 from the release host
+    docs: true
+    run: runbook-2026-10-issue-138
+  - query: the publish timed out. did npm get it?
+    history:
+    - 'user: let the release machine do the npm upload for 4.0.1, the others only verify'
+    - 'assistant: The release machine has the publish; the others are inspecting the packed files.'
+    run: runbook-2026-10-issue-138
+  - query: it says published. is that the same hash the registry shows?
+    history:
+    - 'user: have the build box publish 2.2.0 to PyPI, nobody else'
+    - 'assistant: The build box has the brief and will report the upload.'
+    run: runbook-2026-10-issue-138
 boundaries:
   - query: We own the logger package. Release 2.0.0 of it to npm so the other teams can upgrade to it.
     confusable_with: [daintree.deps.upgrade-dependency]
@@ -54,6 +105,35 @@ boundaries:
     confusable_with: [daintree.release.assess-readiness]
   - query: The tarball is packed and checked; publish it to npm as 2.4.0.
     confusable_with: [daintree.release.test-distributable]
+  - query: The tests pass on Linux and Windows for the 1.3.0 tag. Publish 1.3.0 to npm from the Linux host only and prove the registry has it.
+    confusable_with:
+    - daintree.hosts.run-validation-matrix
+    run: runbook-2026-10-issue-138
+  - query: the machine that was publishing the SDK dropped offline right after the upload. don't have another one publish it, check the registry for that version.
+    confusable_with:
+    - daintree.hosts.reassign-host-work
+    run: runbook-2026-10-issue-138
+  - query: Don't reassign the publish. Look at the registry for the version the unreachable host was uploading and report what is there.
+    confusable_with:
+    - daintree.hosts.reassign-host-work
+    run: runbook-2026-10-issue-138
+  - query: two of my machines are both about to publish the same package version; make sure only the release host publishes it and that the registry ends up with one
+    confusable_with:
+    - daintree.hosts.resolve-task-collisions
+    run: runbook-2026-10-issue-138
+  - query: Ask the build box's assistant to publish 0.7.2 to PyPI and tell me what the index shows.
+    confusable_with:
+    - daintree.hosts.delegate-to-host
+    run: runbook-2026-10-issue-138
+  - query: 'hub message: you are the publisher for the sdk this round. build 2.1.0 from the SHA in the message, upload it, reply with the registry''s checksum'
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    - daintree.hosts.do-delegated-work
+    run: runbook-2026-10-issue-138
+  - query: Every host agrees the 3.0 package is ready; publish it to npm from the release host.
+    confusable_with:
+    - daintree.release.assess-readiness
+    run: runbook-2026-10-issue-138
 followups:
   - query: ok, looks clean. publish it
     history:

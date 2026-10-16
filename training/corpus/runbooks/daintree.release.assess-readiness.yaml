@@ -71,6 +71,14 @@ boundaries:
   - query: taking the host matrix results into account, should we cut 1.8 today?
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: every host reported green on the release candidate, is it a go to ship 2.8?
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
+  - query: all my machines built 3.0.0 and agree on the tarball; give me a verdict on whether to publish it
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
 followups:
   - query: 'the milestone is ''v2.5'' — and count the two SSO issues (#788, #790) as must-haves'
     history:

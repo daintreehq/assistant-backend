@@ -115,6 +115,11 @@ boundaries:
   confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
 - query: two hosts ended up doing the same issue last week and nothing is running now; I don't want it settled, I want to know how that happened
   confusable_with: [daintree.hosts.resolve-task-collisions]
+- query: 'Go over last night''s cross-host release: which host did what, where the swarm slowed down and what I should change next time'
+  confusable_with:
+  - daintree.release.deploy-and-verify
+  - daintree.release.publish-package
+  run: runbook-2026-10-issue-138
 followups:
 - query: and which of those delays was down to how we briefed them?
   history:

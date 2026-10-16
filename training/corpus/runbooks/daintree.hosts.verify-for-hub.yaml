@@ -187,3 +187,8 @@ boundaries:
   - query: "the hub asked this host to verify a commit with the unit tests, nothing changed, and to report the counts"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
+  - query: the hub asked this host to build and test tag v2.0.1 and report; it must not deploy or publish anything
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138

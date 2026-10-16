@@ -141,6 +141,26 @@ boundaries:
   - query: "which of my hosts pass the Playwright run on exactly this sha? one answer per machine, nothing fixed"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
+  - query: Run the tests for v2.8.0 under Node 20 and Node 22 on my hosts and give me a matrix; this is only validation before the release, nothing gets deployed
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
+  - query: one row per OS for this release candidate commit, I'll decide about publishing the package separately
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
+  - query: Verify the tagged build on the Windows and Linux hosts and give me a pass or fail per platform; no deploying
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
+  - query: Run the checks for this build on every host; later only the release host will publish it, but nothing is published now
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
+  - query: Have all my machines test the release candidate. Only the Linux host will deploy it after the go decision, but do not deploy anything yet.
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
 
 followups:
   - query: actually do it on the mac host too, and add node 22 on both, as one matrix

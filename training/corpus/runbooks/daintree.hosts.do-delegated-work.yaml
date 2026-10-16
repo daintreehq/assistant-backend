@@ -175,3 +175,11 @@ boundaries:
   - query: "from the hub: new worktree on its branch, codex implements the sorting fix, follow the plugin's tdd skill, report the commit"
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
+  - query: 'hub message: bump the version to 3.1.0 in a new worktree and commit it on the run branch; do not publish'
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
+  - query: 'hub message: fix the failing smoke script for the staging deploy on its branch and reply with the SHA; no deploying'
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138

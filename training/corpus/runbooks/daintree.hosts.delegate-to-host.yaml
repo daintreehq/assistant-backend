@@ -309,6 +309,14 @@ boundaries:
   - query: "have the other Mac's assistant write its own setup and teardown scripts so each worktree there gets a private database and port"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
+  - query: Ask the build box's assistant to bump the package version to 2.4.0 on a branch and open a PR; nothing gets published
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
+  - query: ask the assistant on the Linux host to repair the broken staging smoke test and open a pull request
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:

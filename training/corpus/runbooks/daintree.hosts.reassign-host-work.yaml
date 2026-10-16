@@ -165,6 +165,18 @@ boundaries:
   - query: 'The Mac mini went offline halfway through the parser fix; move that task to the Linux tower'
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
+  - query: The build host stalled compiling the release candidate before pushing anything. Move the compile to another machine and keep the first one stopped.
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
+  - query: the host building the SDK dropped offline at 40%, hand the unfinished build to a different host
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
+  - query: the mini ran out of claude usage halfway through writing the deploy script for staging; give the unfinished script to the tower
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
 
 followups:
   - query: fine, move that one to the tower then
