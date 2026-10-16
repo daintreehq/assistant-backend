@@ -1098,7 +1098,7 @@ trials:
           hub:
             calls: [host.sendMessage]
       - person: "Once both lanes report their agents working, restart {host_b}'s assistant conversation (More actions, Restart conversation) and leave Accept messages from other machines off, so that lane cannot answer; its agent pane keeps running."
-      - person: "Snapshot both run/{run} worktrees: HEAD, git status --porcelain and a hash of every uncommitted file. If {host_a}'s worktree has no uncommitted change, add an untracked PARK-CHECK.txt there with one line, and snapshot again."
+      - person: "Add an untracked PARK-CHECK.txt with one line to {host_a}'s run/{run} worktree, so it holds uncommitted work the park must keep, and note {remote}'s run/{run} refs."
       - say: |-
           I'm done for today. Park the run/{run} work on both machines until tomorrow, keep everything as it is, and keep the resume record in /tmp/dsw-{run}/notes/park.md.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
@@ -1113,7 +1113,7 @@ trials:
             calls: [assistant.getInbox, terminal.getStatus, assistant.reply]
             never: [terminal.close, worktree.delete]
             notices: [lane-wake]
-      - person: "After the hub's reply, quit the Shell instance; start it again, open a fresh hub session and turn Accept messages from other machines on in it. On {host_b}, open the assistant again and turn Accept messages from other machines on."
+      - person: "After the hub's park reply, snapshot {host_a}'s run/{run} worktree (HEAD, git status --porcelain, a hash of every uncommitted file): the parked snapshot. Then quit the Shell instance; start it again, open a fresh hub session and turn Accept messages from other machines on in it. On {host_b}, open the assistant again and turn Accept messages from other machines on."
       - say: |-
           Resume the parked run/{run} work from /tmp/dsw-{run}/notes/park.md.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
@@ -1124,10 +1124,10 @@ trials:
           lane:
             calls: [assistant.getInbox, terminal.getStatus, assistant.reply]
     checks:
-      - "After the park, /tmp/dsw-{run}/notes/park.md lists {host_a} parked with the branch, HEAD and uncommitted files that git status --short and git log -1 show in its run/{run} worktree, and {host_b} unacknowledged, never parked."
-      - "{host_a}'s run/{run} worktree matches its pre-park snapshot after the park (same HEAD, same uncommitted paths and hashes); on {host_b}, whose agent kept running, the park caused no commit, no push to {remote} and no pane closed or worktree removed, though its own work may have moved on."
+      - "After the park, /tmp/dsw-{run}/notes/park.md lists {host_a} parked with the branch, HEAD and uncommitted files of its parked snapshot (PARK-CHECK.txt among them), and {host_b} unacknowledged, never parked."
+      - "The park committed, pushed, closed and removed nothing: on {host_a} PARK-CHECK.txt is still untracked and no run/{run} ref on {remote} moved; on {host_b}, whose agent kept running, no push to {remote} and no pane closed or worktree removed, though its own work may have moved on."
       - "{host_b}'s agent pane kept running through the park and after the resume each unit has exactly one agent pane on its host; no second agent on {host_a}'s parked unit."
-      - "Before the resume prompt, {host_a}'s pre-park uncommitted files are still there with the same hashes; after the resume its agent continued in that same worktree."
+      - "Before the resume prompt, {host_a}'s worktree still matches its parked snapshot (same HEAD, uncommitted paths and hashes); after the resume its agent continued in that same worktree."
       - "After the restart the Shell's record shows new resume exchanges, one per unit, and no resend of the original work messages."
     execution:
       - "Hub transcript at the park: the stop went out with the park wording ('Parking for later'), and the reply to the person named the record's place and gave a resume prompt."
