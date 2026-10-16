@@ -348,3 +348,54 @@ def test_tied_scores_are_broken_by_table_position() -> None:
     picked = _picked(assemble_candidates(sims, ids, set(), 32), ids)
 
     assert picked == ids[:32]
+
+
+# --------------------------------------------------------------------------
+# exclusion (the caller's host state, issue #153)
+# --------------------------------------------------------------------------
+
+
+def test_excluded_rows_free_their_slots_for_the_next_eligible_ones() -> None:
+    """Excluding the whole of retrieval's top k must still fill k slots, from the rows
+    a plain top-k would have cut. Filtering a ranking afterwards would leave none."""
+    ids, sims = _ids(), _sims()
+    exclude = frozenset(ids[i] for i in _oracle(sims, 16))
+    chosen = assemble_candidates(sims, ids, set(), 16, exclude=exclude)
+
+    eligible = [i for i in _oracle(sims, len(ids)) if ids[i] not in exclude]
+    assert len(chosen) == 16
+    # Indices are rows of the WHOLE table, in the eligible rows' cosine order.
+    assert [int(i) for i in chosen.indices] == eligible[:16]
+    assert np.allclose(chosen.cosine, sims[eligible[:16]])
+    assert not set(_picked(chosen, ids)) & exclude
+
+
+def test_exclusion_keeps_table_order_for_ties() -> None:
+    ids = _ids(6)
+    sims = np.array([0.5, 0.5, 0.9, 0.5, 0.5, 0.1], dtype=np.float32)
+    chosen = assemble_candidates(sims, ids, set(), 3, exclude=frozenset({ids[1]}))
+    assert _picked(chosen, ids) == [ids[2], ids[0], ids[3]]
+
+
+def test_an_excluded_active_is_never_reserved_back_onto_the_ballot() -> None:
+    ids, sims = _ids(), _sims()
+    weakest = _oracle(sims, len(ids))[-1]
+    chosen = assemble_candidates(sims, ids, {ids[weakest]}, 8, exclude=frozenset({ids[weakest]}))
+    assert ids[weakest] not in _picked(chosen, ids)
+    assert not chosen.reserved.any()
+
+
+def test_fewer_eligible_rows_than_slots_is_a_short_ballot() -> None:
+    ids, sims = _ids(10), _sims(10)
+    chosen = assemble_candidates(sims, ids, set(), 32, exclude=frozenset(ids[:7]))
+    assert sorted(_picked(chosen, ids)) == ids[7:]
+    every = assemble_candidates(sims, ids, set(), 32, exclude=frozenset(ids))
+    assert len(every) == 0 and every.indices.dtype == np.int64
+
+
+def test_an_empty_exclusion_is_the_unfiltered_ballot() -> None:
+    ids, sims = _ids(), _sims()
+    plain = assemble_candidates(sims, ids, {ids[3]}, 16)
+    same = assemble_candidates(sims, ids, {ids[3]}, 16, exclude=frozenset())
+    assert np.array_equal(plain.indices, same.indices)
+    assert np.array_equal(plain.reserved, same.reserved)

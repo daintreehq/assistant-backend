@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 1. Tell the person first: nothing here keeps time; each host's assistant holds its own box; its reply is the only stop evidence; a host cut off may neither stop nor answer; you report as hosts answer. Asked for a stop guaranteed on every host: it cannot be had; send once they accept.
 2. Hosts named, else `host.list`; one `host.listAssistants` round: each host's project and lane, else "not reached". In your shell: remote, base SHA (`git ls-remote`), run id, per host a new branch `<run>/<unit>`; then `date -u` and the UTC deadline with its date.

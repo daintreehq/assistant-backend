@@ -188,6 +188,18 @@ boundaries:
   - query: get an assistant ready on every other machine for this repo so I can send work to them
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: "make sure every one of my remote servers has an assistant running for this repo before I send anything out"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "Which remote hosts already have an enrolled assistant in this project? Start one on any that don't, if I allow it."
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "bring my other machines up to ready for this project, one assistant each, and list who is ready"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "get the build box and the mac mini both ready with a Codex assistant for the repo"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
 followups:
   - query: 'now get them ready'
     history:

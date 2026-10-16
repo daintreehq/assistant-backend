@@ -11,6 +11,7 @@ requiredTools:
 optionalTools:
   - host.list
   - host.listAssistants
+hostEligibility: configured
 ---
 A report only: no new work, push, publication or cleanup comes from it; a lane is asked to read, never to change.
 

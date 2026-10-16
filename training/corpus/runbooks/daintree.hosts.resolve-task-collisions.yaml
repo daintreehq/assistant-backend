@@ -137,6 +137,10 @@ boundaries:
   - query: 'Two of my hosts are both editing the same branch of this project; sort out which one owns it'
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
+  - query: Two hosts both pushed a version-bump commit for the same release by accident; keep one owner for the bump and hold the other host's branch
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138
 
   - query: "the secrets-vault ticket landed on two of my hosts and each started its own branch of edits. choose which attempt carries on"
     confusable_with: [daintree.security.respond-to-secret-exposure]

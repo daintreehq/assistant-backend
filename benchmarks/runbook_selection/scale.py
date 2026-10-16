@@ -54,8 +54,9 @@ from .cases import BenchCase, load_cases
 from .local_runner import ARTIFACT
 from .shadow_catalog import SEED, Distractor, generate_distractors, shadow_catalog
 
-#: Catalog sizes to sweep. The first entry is replaced by the live catalog's own
-#: size at run time, so "today" is always the baseline row.
+#: Catalog sizes to sweep. ``0``, and any size the live catalog has already outgrown,
+#: become the live catalog's own size at run time, so "today" is always the
+#: baseline row and the default keeps running as the catalog grows past 100.
 DEFAULT_SIZES = (0, 100, 200, 500, 1000)
 
 #: Shortlist widths. 32 is what ships; the rest bracket it. Chosen to answer
@@ -139,6 +140,20 @@ def _is_background_wake(case: BenchCase, selectable: frozenset[str]) -> bool:
     return bool(active) and bool(eligible) and eligible[-1].role != "user"
 
 
+def effective_sizes(sizes: tuple[int, ...], floor: int) -> tuple[tuple[int, ...], list[int]]:
+    """The sizes a sweep measures, and the requested ones it had to raise.
+
+    A synthetic catalog cannot be smaller than the real one it pads, so a size
+    below ``floor`` measures the real catalog instead. Raising it rather than
+    refusing it is what keeps the DEFAULT sweep runnable: it was written at 38
+    runbooks, and the 100 in it was refused outright once the catalog passed 100.
+    The raised sizes are returned so the run can say so; an explicit ``--sizes 100``
+    that silently came back as a 154-runbook row would be a mislabelled number.
+    """
+    raised = sorted({s for s in sizes if 0 < s < floor})
+    return tuple(sorted({max(s, floor) for s in sizes})), raised
+
+
 def sweep(
     *,
     sizes: tuple[int, ...] = DEFAULT_SIZES,
@@ -155,14 +170,9 @@ def sweep(
 
     real = load_catalog(default_runbooks_dir())
     floor = len(real.runbooks)
-    sizes = tuple(sorted({floor if s <= 0 else s for s in sizes}))
-    # Checked BEFORE the artifact is loaded and a thousand documents embedded: a
-    # ValueError two minutes in is an argument bug reported as a slow failure.
-    too_small = [s for s in sizes if s < floor]
-    if too_small:
-        raise ValueError(
-            f"catalog sizes {too_small} are smaller than the real catalog ({floor})"
-        )
+    sizes, raised = effective_sizes(sizes, floor)
+    if raised:
+        log(f"  sizes {raised} are below the real catalog: measured at {floor} runbooks")
 
     largest = max(sizes)
     pool: list[Distractor] = generate_distractors(largest - floor, real, seed=seed)
@@ -196,11 +206,15 @@ def sweep(
             by_cat: dict[str, list[int]] = {}
             for case, (vec, visible, required) in zip(scored, encoded, strict=True):
                 sims = table.retrieval @ vec
-                ballot = assemble_candidates(sims, table.ids, set(visible), k)
+                ballot = assemble_candidates(
+                    sims, table.ids, set(visible), k, exclude=case.exclude
+                )
                 ids = {table.ids[int(i)] for i in ballot.indices}
                 dense = {
                     table.ids[int(i)]
-                    for i in assemble_candidates(sims, table.ids, (), k).indices
+                    for i in assemble_candidates(
+                        sims, table.ids, (), k, exclude=case.exclude
+                    ).indices
                 }
                 if required:
                     need += 1
@@ -376,23 +390,26 @@ def smoke(*, artifact: Path | None = None) -> dict[str, Any]:
         log=lambda *_: None,
     )
     row = doc["rows"][0]
+    # The size actually measured: SMOKE_SIZE until the real catalog outgrows it,
+    # then the real catalog's own (``effective_sizes``).
+    size = row["size"]
     misses = row["all_required_n"] - row["all_required_hits"]
     failures = []
     if misses > SMOKE_MISS_BUDGET:
         failures.append(
-            f"{misses} required runbooks did not reach the head at {SMOKE_SIZE} "
+            f"{misses} required runbooks did not reach the head at {size} "
             f"runbooks (budget {SMOKE_MISS_BUDGET} of {row['all_required_n']} "
             f"cases) — a candidate miss is the one failure no downstream floor "
             f"can repair"
         )
     if row["active_coverage"] < SMOKE_ACTIVE_FLOOR:
         failures.append(
-            f"active_coverage={row['active_coverage']} at {SMOKE_SIZE} runbooks, "
+            f"active_coverage={row['active_coverage']} at {size} runbooks, "
             f"expected {SMOKE_ACTIVE_FLOOR} — candidate reservation is meant to "
             f"make this exact by construction, so this is an assembler bug"
         )
     doc["summary"] = {
-        "size": SMOKE_SIZE,
+        "size": size,
         "k": row["k"],
         "all_required": row["all_required"],
         "candidate_misses": misses,

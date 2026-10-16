@@ -11,6 +11,7 @@ requiredTools:
 optionalTools:
   - host.list
   - host.listTasks
+hostEligibility: connected
 ---
 Lanes run their own services (daintree.hosts.demo-for-hub each, no walkthrough). No tool here makes or sees a forward or a host's network.
 

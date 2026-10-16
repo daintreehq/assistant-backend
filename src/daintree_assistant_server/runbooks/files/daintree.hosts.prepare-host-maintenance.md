@@ -12,6 +12,7 @@ requiredTools:
   - host.sendMessage
 optionalTools:
   - host.cancelTask
+hostEligibility: configured
 ---
 The person updates or restarts the host in Settings, Hosts or at the machine (no SSH or restart API). Daintree restarting there ends every terminal and agent mid-task, every lane enrollment and the pause, and wipes message and reply text; exchanges expire after 24 hours. A reboot is that restart; Daintree returns only with start at login. A Shell restart leaves the host working; only the hub's enrollment and pause end.
 

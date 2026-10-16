@@ -53,6 +53,7 @@ import random
 from dataclasses import dataclass
 
 from daintree_assistant_server.runbooks.catalog import Catalog
+from daintree_assistant_server.runbooks.host_state import HOSTS_NAMESPACE
 from daintree_assistant_server.runbooks.local.documents import runbook_document, split_when_to_use
 from daintree_assistant_server.runbooks.models import Runbook, RunbookMeta
 
@@ -214,9 +215,17 @@ def _refer_to(real: Runbook, n: int) -> str:
 
 
 def _meta(runbook_id: str, title: str, summary: str, when: str) -> RunbookMeta:
-    return RunbookMeta.model_validate(
-        {"id": runbook_id, "title": title, "summary": summary, "whenToUse": when}
-    )
+    fields: dict[str, str] = {
+        "id": runbook_id,
+        "title": title,
+        "summary": summary,
+        "whenToUse": when,
+    }
+    # A distractor in the hosts namespace must declare an eligibility like any
+    # other there; `any` keeps it in every host state, so it competes everywhere.
+    if runbook_id.startswith(HOSTS_NAMESPACE):
+        fields["hostEligibility"] = "any"
+    return RunbookMeta.model_validate(fields)
 
 
 def _paraphrase(real: Runbook, n: int, seq: int) -> tuple[str, str, str, str]:

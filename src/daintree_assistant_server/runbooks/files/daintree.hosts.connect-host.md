@@ -6,6 +6,7 @@ whenToUse: 'Use when the person wants ANOTHER MAC OR LINUX MACHINE added to Dain
 risk: system
 optionalTools:
   - host.list
+hostEligibility: any
 ---
 The person does every step in Daintree's UI (no action can) and reads you what it shows. Never touch their SSH config, `known_hosts` or keys, copy a host's MCP key, or ssh there to do its work.
 

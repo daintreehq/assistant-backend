@@ -518,6 +518,7 @@ class SetwiseClassifier:
         text: str,
         active: set[str],
         spans: dict[str, float] | None = None,
+        exclude: frozenset[str] = frozenset(),
     ) -> tuple[CandidateSet, dict[str, np.ndarray]]:
         """Build one complete, self-consistent set of head inputs for ``text``.
 
@@ -539,6 +540,11 @@ class SetwiseClassifier:
         anyway, because the head cannot keep a runbook it never sees and a
         successful selection is authoritative enough to evict one. Read that
         module for why, and for what it deliberately does not promise.
+
+        ``exclude`` takes runbooks off this pass's ballot before the shortlist
+        (``assemble_candidates``), so the head scores it as if they were not in the
+        catalog. The shared table is never narrowed: that is ``sync``'s one slot,
+        shared by concurrent requests.
         """
         spans = {} if spans is None else spans
         # normalize=True is redundant — the retriever graph L2-normalises
@@ -551,7 +557,7 @@ class SetwiseClassifier:
 
         started = time.perf_counter()
         sims = table.retrieval @ q_ret
-        chosen = assemble_candidates(sims, table.ids, active, self._k)
+        chosen = assemble_candidates(sims, table.ids, active, self._k, exclude=exclude)
         spans["search_ms"] = _since(started)
         n = len(chosen)
 
@@ -587,7 +593,14 @@ class SetwiseClassifier:
         max_active: int = 3,
         docs_query: str | None = None,
         docs_threshold: float = DOCS_THRESHOLD,
+        exclude: frozenset[str] = frozenset(),
     ) -> Selection:
+        """Rank ``query`` against the table, and admit what it needs.
+
+        ``exclude`` names runbooks this caller may not be offered (its host state,
+        ``Catalog.excluded_for``): they never reach the shortlist, either pass's
+        ballot, the active set or the answer. Empty is the whole table.
+        """
         spans: dict[str, float] = {}
         total_started = time.perf_counter()
         started = time.perf_counter()
@@ -598,7 +611,7 @@ class SetwiseClassifier:
         # everything (see the memo note in ``sync``). 5.3s hiding inside an
         # 11ms budget looked like "the selector got slow".
         spans["sync_ms"] = _since(started)
-        if table is None or not table.ids:
+        if table is None or not table.ids or exclude.issuperset(table.ids):
             spans["total_ms"] = _since(total_started)
             return Selection(
                 runbook_ids=[], docs_wanted=False, cardinality=0, scores={}, timings=spans
@@ -611,6 +624,7 @@ class SetwiseClassifier:
         # candidate is the one already open" per slot.
         from .documents import ACTIVE_PREFIX
 
+        active_ids = [sid for sid in active_ids if sid not in exclude]
         text = ACTIVE_PREFIX.format(", ".join(active_ids)) + query if active_ids else query
 
         # normalize=True is redundant — the retriever graph L2-normalises
@@ -618,7 +632,7 @@ class SetwiseClassifier:
         # contract local: `sims` below is a plain dot product only if BOTH sides
         # are unit vectors, and that should not depend on reading the exporter.
         active = set(active_ids)
-        chosen, feed = self._encode_pass(table, text, active, spans)
+        chosen, feed = self._encode_pass(table, text, active, spans, exclude)
         n = len(chosen)
         started = time.perf_counter()
         runbook_logits, docs_logit, card_logits = self._head.run(None, feed)
@@ -709,7 +723,7 @@ class SetwiseClassifier:
             # cost the selector can pay on a turn, and folding it into the
             # totals would make the docs workaround invisible in exactly the
             # profile that would justify retiring it.
-            _, docs_feed = self._encode_pass(table, docs_query, set(), {})
+            _, docs_feed = self._encode_pass(table, docs_query, set(), {}, exclude)
             _, docs_logit, _ = self._head.run(None, docs_feed)
             spans["docs_ms"] = _since(started)
         docs_p = float(1.0 / (1.0 + np.exp(-float(docs_logit[0]))))

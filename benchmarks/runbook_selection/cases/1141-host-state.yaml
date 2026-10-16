@@ -1,0 +1,102 @@
+# The caller's reported host state (`host_state`, sent by Daintree as the Daintree-Hosts
+# and Daintree-Lane headers). A search leaves out the daintree.hosts.* runbooks the state
+# does not fit, before the shortlist, so the rest of the catalog ranks as if they were not
+# there. Every message here is an existing case's, verbatim, so the unreported twin of
+# each pair is already in the suite and the corpus contamination gate is unchanged.
+#
+# Pairs: the same fan-out request with no hosts and with a connected host; a lane's inbox
+# wake line on a machine with no hosts of its own; and one case per eligibility class that
+# must stay reachable in the state it was declared for (connected, configured, any).
+
+cases:
+  - id: host-state-fanout-no-hosts
+    category: host-state
+    note: >-
+      fanout-six-issues-not-single for a caller with no Remote Host. Unreported, the
+      ranking under daintree.orchestration.fan-out-work carried daintree.hosts.run-local-cohort
+      and daintree.hosts.swarm-fan-out as neighbours; with hosts none every hub and lane
+      runbook is off the ballot and local ones take their slots.
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: Six bugs have been sitting in the tracker all week with nobody on them. Let's clear the lot in one go — put someone on each of them instead of grinding through them one after another.
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: host-state-fanout-hosts-connected
+    category: host-state
+    note: >-
+      ELIGIBILITY ONLY, not the issue's connected-host preference. The same request for a
+      caller with a connected host: filtering admits the hub runbooks but cannot promote
+      one, because the query carries no host signal, so the trained
+      daintree.orchestration.fan-out-work still wins it (measured 0.998, with
+      daintree.hosts.place-work at 0.001; it also wins "across my machines", a routing gap
+      in its own text). This guards that a connected host does not cost the local fan-out
+      its answer. Six different bugs spread over hosts would be daintree.hosts.place-work,
+      allowed here; daintree.hosts.swarm-fan-out repeats the same work on every host, so
+      it is not. When host routing lands, re-point `required` at place-work.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Six bugs have been sitting in the tracker all week with nobody on them. Let's clear the lot in one go — put someone on each of them instead of grinding through them one after another.
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional:
+        - daintree.foundation
+        - daintree.hosts.place-work
+        - daintree.hosts.foundation
+
+  - id: host-state-lane-wake-no-hosts
+    category: host-state
+    note: >-
+      handle-hub-message-wake-line on a lane: reachable by a hub's assistant, with no hosts
+      of its own. Lane runbooks follow whether the caller can be messaged, so every hub
+      runbook is left out and the lane's own stays.
+    host_state: {hosts: none, lane: reachable}
+    messages:
+      - role: user
+        content: "Daintree: assistant inbox has a new message (exchange 6a2d9f14-0b7e-4c53-8e21-c4f07b9a3d58). Read it with assistant.getInbox."
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: host-state-delegate-hosts-connected
+    category: host-state
+    note: >-
+      ask-host-reverse-delegate for a hub with a connected host and no lane: the lane's
+      daintree.hosts.do-delegated-work, a neighbour when unreported, is left out.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: get the linux host's assistant to write the migration and push a branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: host-state-recover-hosts-down
+    category: host-state
+    note: >-
+      report-swarm-results-reverse-recover-and-clean-up with hosts configured but none
+      connected: recovery is wanted right after hosts drop, so configured runbooks stay
+      offered while every connected-only one is left out.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: The hub restarted while my other machines were working. Rebuild from each host's task records where every exchange I sent stands.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: host-state-connect-first-host
+    category: host-state
+    note: >-
+      survey-hosts-reverse-add-machine for a caller with no hosts yet: adding the first one
+      is daintree.hosts.connect-host, eligible in every state.
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: Add my build server to Daintree as a Remote Host so I can open its projects here
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]

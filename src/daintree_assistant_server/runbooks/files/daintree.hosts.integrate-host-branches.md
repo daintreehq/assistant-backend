@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 Git: a scratch clone of the remote (`git clone --filter=blob:none --no-checkout <remote>`), `git fetch --prune` before each check.
 

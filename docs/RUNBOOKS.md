@@ -163,6 +163,7 @@ It gets no empty notice or checkpoint sections.
 | `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `hub-full` or `lane-full` for `daintree.hosts.*`) |
 | `optionalTools` | no | app action ids a conditional branch, caller variant or enhancement calls |
 | `requires` | no | other runbook ids whose instructions must be read first |
+| `hostEligibility` | `daintree.hosts.*` only, and required there | the caller host state it fits: `connected`, `configured`, `lane` or `any` ([MCP.md](MCP.md#host-state)); search leaves it out for a caller whose reported state does not fit |
 
 Unknown keys are rejected (`runbooks/models.py`). A tool may not be both required and
 optional. The nearest domain foundation is delivered automatically and needs no

@@ -12,6 +12,7 @@ requiredTools:
   - host.sendMessage
 optionalTools:
   - host.cancelTask
+hostEligibility: connected
 ---
 1. The ask: the urgent task, how many workers, what gives way. Resolve the run as daintree.hosts.steer-swarm's step 1 does (`get_runbook` it if absent; page `host.listTasks`), plus `host.list` for load (`sampledAt`, `agentsObserved`).
 2. Per unit: keep (not named; nothing sent, state from `host.getTask`), pause, or redirect (paused, its lane then taking an urgent worker). Pause the fewest that make room; ask when picks differ. A `disconnected` host may still be working: its units stand, its room is never free.

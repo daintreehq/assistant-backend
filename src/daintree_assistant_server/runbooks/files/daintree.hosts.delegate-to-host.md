@@ -13,6 +13,7 @@ optionalTools:
   - host.listTasks
   - host.startAssistant
   - host.cancelTask
+hostEligibility: connected
 ---
 1. Resolve the named host (`host.list`), then in `host.listAssistants` the project holding the work's repository and its lane. Two fit or none: ask. No lane: start one only if the request covers it.
 2. In your own shell pin the remote URL (yours or the person's), the base branch's SHA (`git ls-remote`), a run id and, for a change, a run/unit branch not yet on the remote.

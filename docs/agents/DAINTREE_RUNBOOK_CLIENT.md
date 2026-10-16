@@ -42,6 +42,12 @@ claude mcp add --transport http daintree-runbooks https://assistant.daintree.org
 codex mcp add daintree-runbooks --url https://assistant.daintree.org/v1/daintree/mcp
 ```
 
+When Daintree itself configures the connection for an assistant it launches, it also
+sends the caller's coarse host state as two headers on every request,
+`Daintree-Hosts` and `Daintree-Lane` ([MCP.md](../MCP.md#host-state)): Claude Code's
+`headers` on the `type: "http"` entry, Codex's `http_headers`. A connection without
+them is offered the whole catalog.
+
 Check the installed client's `--help` and configuration scope before changing
 someone's existing setup. Never put a Daintree bearer in a committed config or an
 example. The pane connection's bearer belongs to Daintree.

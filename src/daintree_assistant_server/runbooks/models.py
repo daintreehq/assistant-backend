@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .host_state import HOST_ELIGIBILITY, HOSTS_NAMESPACE, HostEligibility
+
 # Allowed values for the ``risk`` enum. Descriptive only: nothing grants or
 # refuses an action because of it.
 RISK_VALUES: frozenset[str] = frozenset(
@@ -66,6 +68,11 @@ class RunbookMeta(BaseModel):
     # with the nearest domain foundation, which needs no declaration. Instruction
     # dependencies, not workflow steps: nothing executes them.
     requires: list[str] = Field(default_factory=list)
+    # POLICY, unlike the fields above: the caller host state a `daintree.hosts.*`
+    # runbook fits (`host_state.fits`). Search leaves out a runbook the reported
+    # state does not fit, and offers every one when no state is reported.
+    # Required in that namespace and refused outside it.
+    host_eligibility: HostEligibility | None = Field(default=None, alias="hostEligibility")
 
     @field_validator("id")
     @classmethod
@@ -118,6 +125,16 @@ class RunbookMeta(BaseModel):
             raise ValueError(f"tools listed as both required and optional: {overlap}")
         if self.id in self.requires:
             raise ValueError(f"runbook {self.id!r} requires itself")
+        in_hosts = self.id.startswith(HOSTS_NAMESPACE)
+        if in_hosts and self.host_eligibility is None:
+            raise ValueError(
+                f"runbook {self.id!r} must declare hostEligibility "
+                f"(one of {sorted(HOST_ELIGIBILITY)})"
+            )
+        if not in_hosts and self.host_eligibility is not None:
+            raise ValueError(
+                f"runbook {self.id!r} declares hostEligibility outside {HOSTS_NAMESPACE}*"
+            )
         # Whether the other ids exist, are public and form no cycle is a catalog
         # question — see `Catalog._validate_dependencies`.
         return self

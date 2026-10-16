@@ -150,6 +150,7 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 | `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the caller's surface: `pane-core`, or for `daintree.hosts.*` one of `hub-full`/`lane-full` (`CALLER_POLICY`) (→ `required_tools`) |
 | `optionalTools` | no | action ids a conditional branch or caller variant calls (→ `optional_tools`); never also required |
 | `requires` | no | other runbook ids whose instructions must be read first; validated for existence, visibility and cycles (the implicit foundation edge included), and delivered as `supporting_runbooks` |
+| `hostEligibility` | `daintree.hosts.*` only, required there | `connected` `configured` `lane` `any`: the caller host state (`Daintree-Hosts`/`Daintree-Lane` headers, `runbooks/host_state.py`) the runbook fits; search excludes it before the shortlist when the reported state does not fit, and an unreported caller is offered everything |
 
 The routing document the ranker embeds is title + summary + `whenToUse`, **not the body**.
 Editing routing text re-embeds that runbook and must be measured with `bench local`.

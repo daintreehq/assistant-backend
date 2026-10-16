@@ -16,6 +16,7 @@ requiredTools:
 optionalTools:
   - agent.listAvailable
   - terminal.sendKeys
+hostEligibility: lane
 ---
 After daintree.hosts.handle-hub-message has fitted it. Findings only; nobody changes the reviewed code.
 

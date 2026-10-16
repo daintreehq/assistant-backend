@@ -12,6 +12,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.startAssistant
+hostEligibility: connected
 ---
 Initial placement only; a piece needing another's result is a gap: say so. Keep each task's role: survey, or which piece.
 

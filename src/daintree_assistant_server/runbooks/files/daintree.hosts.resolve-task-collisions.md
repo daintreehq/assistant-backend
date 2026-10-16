@@ -12,6 +12,7 @@ requiredTools:
 optionalTools:
   - host.list
   - host.cancelTask
+hostEligibility: connected
 ---
 1. Match: the tasks from your record, else `host.listTasks` per host (no text: unsure, ask); `host.getTask` each. Same unit: one repository and an overlapping issue, PR or acceptance, or contradicting edits; never by branch name, project id or pane title.
 2. Hold every side still writing. `submitted`: `host.cancelTask`; only `canceled` needs no hold. Else one `host.sendMessage` per lane, the original in `referenceTaskIds`, no `waitMs`: "Follow daintree.hosts.steer-for-hub: stop the agents on <hostTaskId>, never start it if unstarted; commit, push, revert nothing. Reply per agent as it says, plus the unit as briefed, remote, branch, full HEAD, pushed or not." End the turn.

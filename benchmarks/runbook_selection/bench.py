@@ -4,10 +4,11 @@ Run from the repo root:
 
     python -m benchmarks.runbook_selection.bench local       # the SHIPPED selector
     python -m benchmarks.runbook_selection.bench search "…"  # one query, as the MCP ranks it
-    python -m benchmarks.runbook_selection.bench scale       # recall at 200/500/1000
+    python -m benchmarks.runbook_selection.bench scale       # recall today and at 200/500/1000
     python -m benchmarks.runbook_selection.bench lint        # most-confusable runbook pairs
     python -m benchmarks.runbook_selection.bench list
     python -m benchmarks.runbook_selection.bench coverage
+    python -m benchmarks.runbook_selection.bench pairs
     python -m benchmarks.runbook_selection.bench report results/<run>.json
     python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
 
@@ -62,6 +63,8 @@ def _cmd_local(args: argparse.Namespace) -> int:
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
+    from daintree_assistant_server.runbooks.host_state import HostState
+
     from .search import print_search, read_queries, request_errors, search
 
     queries = list(args.queries) + (read_queries(Path(args.file)) if args.file else [])
@@ -70,7 +73,13 @@ def _cmd_search(args: argparse.Namespace) -> int:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
         return 2
-    catalog, results, shrunk = search(queries, limit=args.max_results)
+    if args.lane and args.hosts is None:
+        print("error: --lane is part of a reported host state; give --hosts too", file=sys.stderr)
+        return 2
+    host_state = (
+        HostState(hosts=args.hosts, lane_reachable=args.lane) if args.hosts is not None else None
+    )
+    catalog, results, shrunk = search(queries, limit=args.max_results, host_state=host_state)
     print_search(catalog, queries, results, shrunk)
     return 0 if all(hits is not None for hits in results) else 1
 
@@ -114,6 +123,28 @@ def _cmd_coverage(args: argparse.Namespace) -> int:
     # `rows and` matters: an empty catalog makes `all(...)` vacuously true, which
     # would turn the gate into a silent pass in exactly the situation it exists for.
     return 0 if rows and all(r.gate_ok for r in rows) else 1
+
+
+def _cmd_pairs(args: argparse.Namespace) -> int:
+    """The paired hub/lane scenarios, run on the shipped selector and reported by end.
+
+    A report, not a gate: ``bench local`` scores these cases with all the others and
+    is the verdict. This says, per scenario, which end missed, where it lost the
+    runbook, and what each caller would actually have been handed. Exit 1 when a pair
+    case fails, so a retrain-owed miss is loud rather than lost in the full run.
+    """
+    from daintree_assistant_server.runbooks.catalog import load_catalog
+
+    from .local_runner import run_local
+    from .pairs import pair_cases, print_pairs
+
+    catalog = load_catalog()
+    cases = pair_cases(load_cases(catalog))
+    if not cases:
+        print("no paired role cases", file=sys.stderr)
+        return 2
+    doc = run_local(catalog=catalog, cases=cases, quantized=not args.fp32)
+    return 1 if print_pairs(doc, cases) else 0
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
@@ -182,15 +213,28 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument(
         "--max-results", type=int, default=5, help="hits per query (default 5, as the tool)"
     )
+    search.add_argument(
+        "--hosts",
+        choices=("none", "configured", "connected"),
+        help="rank for a caller reporting this host state, as Daintree-Hosts does "
+        "(default: unreported, the whole catalog)",
+    )
+    search.add_argument(
+        "--lane",
+        action="store_true",
+        help="with --hosts: the caller is reachable by another machine's assistant",
+    )
     search.set_defaults(func=_cmd_search)
 
     scale = sub.add_parser(
         "scale",
-        help="oracle recall at 100/200/500/1000 runbooks (synthetic distractors, free). "
-        "Answers what k the shortlist needs before the catalog needs it",
+        help="oracle recall at today's size and 200/500/1000 runbooks (synthetic "
+        "distractors, free). Answers what k the shortlist needs before the catalog needs it",
     )
     scale.add_argument(
-        "--sizes", help="comma-separated catalog sizes (default 39,100,200,500,1000)"
+        "--sizes",
+        help="comma-separated catalog sizes (default 0,100,200,500,1000); 0 and any size "
+        "below the real catalog measure the real catalog",
     )
     scale.add_argument("--ks", help="comma-separated shortlist widths (default 16,32,48,64,96)")
     scale.add_argument("--out", help="explicit output JSON path")
@@ -215,6 +259,14 @@ def main(argv: list[str] | None = None) -> int:
         "declares confusable neighbours with no routing trap (no API calls)",
     )
     cov.set_defaults(func=_cmd_coverage)
+
+    pairs = sub.add_parser(
+        "pairs",
+        help="the paired hub/lane scenarios on the shipped selector, per end: what was "
+        "loaded, where a miss was lost, and any wrong-role load; exit 1 on a failure (free)",
+    )
+    pairs.add_argument("--fp32", action="store_true", help="score the fp32 graphs")
+    pairs.set_defaults(func=_cmd_pairs)
 
     report = sub.add_parser("report", help="re-print a saved results file")
     report.add_argument("path")

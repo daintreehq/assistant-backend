@@ -91,6 +91,30 @@ lone user message with nothing loaded. Results come back best first:
   (`2025-06-18`) keeps one per process, while Claude Code 2.1.283 negotiates
   `2026-07-28`, which has no sessions, so it is sent everything every time.
 
+### Host state
+
+Daintree tells the search what Remote Host setup the caller has, so a caller is
+offered only the `daintree.hosts.*` runbooks that fit it. Two request headers, sent on
+**every** POST, from a snapshot taken when the assistant launches:
+
+| header | values |
+|---|---|
+| `Daintree-Hosts` | `none` (no Remote Host configured), `configured` (at least one, none connected with messaging on), `connected` (at least one connected with messaging on) |
+| `Daintree-Lane` | `reachable` when another machine's assistant can message this caller (it is a lane); omit it otherwise |
+
+Each hosts runbook declares the state it fits as `hostEligibility`: `connected`,
+`configured` (configured or connected, so recovery stays offered while every host is
+down), `lane` (follows `Daintree-Lane`, not the caller's own hosts) or `any`. A search
+leaves out the runbooks the reported state does not fit **before the shortlist**, so
+the rest of the catalog ranks as if they were not there.
+
+Only the coarse state leaves the machine: no host names, counts or ids. It is read
+from each request and never kept between requests (the request log records the coarse
+value as metadata). Missing `Daintree-Hosts`, an unknown value, or a
+`Daintree-Lane` other than `reachable` is an unreported caller, which is offered the
+whole catalog, never an error. `get_runbook` and `supporting_runbooks` ignore the
+state: it narrows what a search offers, not what can be read by id.
+
 ## `get_runbook`
 
 | argument | type | |

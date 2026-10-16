@@ -11,6 +11,7 @@ requiredTools:
   - host.listAssistants
   - host.sendMessage
   - host.cancelTask
+hostEligibility: configured
 ---
 1. Resolve the run the person names: its tasks, `hostTaskId`s and lanes from what you kept, else `host.listTasks` per host (records hold no text: unsure which are this run's, ask). Only the hosts and units named. `host.getTask` each; `host.listAssistants` for lane addresses.
 2. One row per task:

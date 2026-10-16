@@ -57,7 +57,9 @@ def score(clf: SetwiseClassifier, catalog, cases) -> tuple[int, int, float]:  # 
             query = query_document(case.messages, turn_context=case.turn_context)
             visible = [sid for sid in case.active if sid in selectable]
             picked = [
-                sid for sid in clf.select(query, visible).runbook_ids if sid in selectable
+                sid
+                for sid in clf.select(query, visible, exclude=case.exclude).runbook_ids
+                if sid in selectable
             ]
         got = set(picked)
         miss = set(case.required) - got

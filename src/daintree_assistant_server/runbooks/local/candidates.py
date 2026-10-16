@@ -148,8 +148,8 @@ Two details carry that parity:
 
 from __future__ import annotations
 
-from collections.abc import Container, Sequence
-from dataclasses import dataclass
+from collections.abc import Container, Sequence, Set
+from dataclasses import dataclass, replace
 
 import numpy as np
 import numpy.typing as npt
@@ -208,6 +208,8 @@ def assemble_candidates(
     ids: Sequence[str],
     active: Container[str],
     k: int,
+    *,
+    exclude: Set[str] = frozenset(),
 ) -> CandidateSet:
     """Build the candidate ballot for one query.
 
@@ -220,6 +222,14 @@ def assemble_candidates(
     with every active runbook it missed swapped in over the weakest candidate that
     is not itself active. ``ids`` is assumed unique — ``Catalog`` guarantees it,
     and a repeated id would give one runbook two votes in the set-wise pass.
+
+    ``exclude`` takes runbooks off the table for this ballot only (the caller's host
+    state, ``Catalog.excluded_for``), BEFORE the top ``k``, so the slots they would
+    have held go to the next-nearest eligible rows; filtering a ranking afterwards
+    would let them crowd eligible runbooks out of the shortlist. Excluded rows are
+    compacted away rather than masked, so the rest keep their table order (ties
+    break as they would have) and an excluded active cannot be reserved back on.
+    Returned indices are still rows of the WHOLE table.
 
     Raises ``ValueError`` on a malformed similarity row. That is deliberate and
     it is the SAFE direction: the caller is ``InferencePool.run``, which turns an
@@ -235,6 +245,10 @@ def assemble_candidates(
         )
     if sims.size and not np.isfinite(sims).all():
         raise ValueError("similarity row is not finite; refusing to rank on it")
+    if exclude:
+        keep = np.array([i for i, sid in enumerate(ids) if sid not in exclude], dtype=np.int64)
+        chosen = assemble_candidates(sims[keep], [ids[int(i)] for i in keep], active, k)
+        return replace(chosen, indices=keep[chosen.indices])
 
     total = len(ids)
     n = min(k, total)

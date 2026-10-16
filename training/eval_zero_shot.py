@@ -44,7 +44,8 @@ def pick(clf: SetwiseClassifier, case, selectable) -> list[str]:  # type: ignore
         return list(case.active)
     query = query_document(case.messages, turn_context=case.turn_context)
     visible = [sid for sid in case.active if sid in selectable]
-    return [sid for sid in clf.select(query, visible).runbook_ids if sid in selectable]
+    selection = clf.select(query, visible, exclude=case.exclude)
+    return [sid for sid in selection.runbook_ids if sid in selectable]
 
 
 def main() -> int:

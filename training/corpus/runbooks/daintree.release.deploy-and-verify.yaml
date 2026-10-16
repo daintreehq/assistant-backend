@@ -32,6 +32,57 @@ positives:
   - Deploy the container image built from tag v9.2 to the staging k8s namespace and check the rollout finished on that image.
   - checks are green on release/2.2, deploy it to preprod and verify the served sha matches
   - Deploy main to staging now, don't wait for tonight's scheduled run, and prove the new revision carries the traffic.
+  - query: 'Plan for the release: the three Remote Hosts each build and test tag v3.4.0 in parallel, then the Linux host alone deploys it to the staging cluster. Hold the deploy until all three report green, send it to that host only, and confirm from the platform which revision is serving.'
+    run: runbook-2026-10-issue-138
+  - query: let every machine run the tests for release/2.8, then have only the build box ship it to staging. the others stay out of the deploy
+    run: runbook-2026-10-issue-138
+  - query: 'Hub request: deploy tag v1.9.2 to the production service from this host, which is the designated deployer. Before writing anything confirm this machine''s active cloud project is the production one, run the deploy once, and reply with the revision taking traffic.'
+    run: runbook-2026-10-issue-138
+  - query: the hub wants me to push main to staging from here, i'm the only host that's allowed to deploy it. check which account this box is logged into before you start
+    run: runbook-2026-10-issue-138
+  - query: A delegated deploy to the production service was submitted from the release host but its reply never arrived and the task shows no outcome. Read the platform's operations and traffic for the pinned SHA before anything else, and do not give the deploy to another host.
+    run: runbook-2026-10-issue-138
+  - query: no answer back from the deploy on the linux box. before anyone tries again, look at what staging is actually running
+    run: runbook-2026-10-issue-138
+  - query: Before the designated host deploys to the eu environment, have it confirm the project and cluster context it is logged into are really the eu ones, since environment names differ between my machines.
+    run: runbook-2026-10-issue-138
+  - query: only the build host is allowed to deploy, tell it to ship 4f2a9c1 to staging
+    run: runbook-2026-10-issue-138
+  - query: We have five machines running the integration suites against 9d41e7b right now. Once they are all green I want the deploy to the preprod environment to happen exactly once, from the Linux machine that has the cloud credentials. Nobody else should touch the deploy, and I want to know which revision is really serving afterwards, not just that the command finished.
+    run: runbook-2026-10-issue-138
+  - query: We run a release across four machines tonight. Production has to be deployed once, by the Linux box that holds the login; I will pin the commit and the other three only report their test results. Tell the Linux box what to do and check production yourself afterwards.
+    run: runbook-2026-10-issue-138
+  - query: A host restarted halfway through the cross-host run; the deploy to staging may already have been submitted by the designated host. Find out from the platform whether it went out before anything is retried.
+    run: runbook-2026-10-issue-138
+  - query: 'morning! quick one: the other machines are done testing, now just the release host should deploy v2.2.1 to staging and tell me what''s live'
+    run: runbook-2026-10-issue-138
+  - query: The inbox exchange asks this lane to deploy a pinned SHA to the staging environment and report what is serving. The lane's cloud login may belong to another project than the one the hub named; check before deploying, and ask back if it differs.
+    run: runbook-2026-10-issue-138
+  - query: make sure only one host ever runs the production deploy for this release, the rest just build and verify
+    run: runbook-2026-10-issue-138
+  - query: Production deploy of 8c2d1ab from the designated host please. It has to be the one machine with the production login; the other two just finished verifying and must not deploy.
+    run: runbook-2026-10-issue-138
+  - query: ok, and the deploy itself comes from the linux host only, nobody else touches it
+    history:
+    - 'user: have all my hosts build and test v5.0.0 in parallel'
+    - 'assistant: Sent to the three hosts; builds are running and I will collect the results when they report.'
+    run: runbook-2026-10-issue-138
+  - query: explain how I keep deploys to one machine while the others only build, then make the build box the only deployer for staging
+    docs: true
+    run: runbook-2026-10-issue-138
+  - query: explain how the deploy gets confirmed when the host's reply was lost, then check the staging one for me
+    docs: true
+    run: runbook-2026-10-issue-138
+  - query: the host's reply never came back. is it live or not?
+    history:
+    - 'user: have only the build box deploy 4f2a9c1 to staging'
+    - 'assistant: Sent the deploy to the build box; I will check what staging serves when it replies.'
+    run: runbook-2026-10-issue-138
+  - query: it replied that it finished. is that really what production is running?
+    history:
+    - 'user: only the release host deploys v3.0.4 to production, the others verify'
+    - 'assistant: The release host has the deploy; the others are building and checking the same commit.'
+    run: runbook-2026-10-issue-138
 boundaries:
   - query: The incident is understood and the fix is merged. Ship the fix to prod now (authorized) and verify the errors stop.
     confusable_with: [daintree.debug.investigate-outage]
@@ -61,6 +112,47 @@ boundaries:
     confusable_with: [daintree.terminals.run-visible-command]
   - query: Deploy the onboarding branch's current SHA to the demo staging environment and confirm it's what's serving.
     confusable_with: [daintree.workflow.prepare-feature-demo]
+  - query: Linux and Mac hosts both passed the checks on tag v2.5; now deploy v2.5 to staging from the Linux host only and confirm what serves.
+    confusable_with:
+    - daintree.hosts.run-validation-matrix
+    run: runbook-2026-10-issue-138
+  - query: Each machine has run its checks on the tag. I want the production deploy done once from the release host and the serving revision confirmed.
+    confusable_with:
+    - daintree.hosts.run-validation-matrix
+    run: runbook-2026-10-issue-138
+  - query: The release host went quiet right after it started the production deploy; don't give the deploy to another machine, check what is serving first.
+    confusable_with:
+    - daintree.hosts.reassign-host-work
+    run: runbook-2026-10-issue-138
+  - query: the host that was deploying lost its connection mid-deploy. leave the deploy with it and tell me what the platform says is live
+    confusable_with:
+    - daintree.hosts.reassign-host-work
+    run: runbook-2026-10-issue-138
+  - query: Ask the release host to deploy 4f2a9c1 to staging and tell me which revision is serving.
+    confusable_with:
+    - daintree.hosts.delegate-to-host
+    run: runbook-2026-10-issue-138
+  - query: All hosts reported green for 2.8. Deploy 2.8 to production from the designated host and confirm it is live.
+    confusable_with:
+    - daintree.release.assess-readiness
+    run: runbook-2026-10-issue-138
+  - query: 'hub message: deploy 7d3b9e0 to the staging environment from this machine and reply with what is serving'
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    - daintree.hosts.do-delegated-work
+    run: runbook-2026-10-issue-138
+  - query: The hub told this host to be the deployer for production. Verify the target here is the right one, deploy once and answer with what the platform shows.
+    confusable_with:
+    - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-138
+  - query: the hub says tag v2.0.1 was built and tested on another machine; this host should now deploy that tag to staging and say what is serving
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-138
+  - query: last night's release run left the staging deploy unconfirmed. skip the write-up, just check what staging is serving now
+    confusable_with:
+    - daintree.hosts.postmortem-swarm
+    run: runbook-2026-10-issue-138
 followups:
   - query: how's it going — is 3fa9c21 actually the thing serving yet?
     history:

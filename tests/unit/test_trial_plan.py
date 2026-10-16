@@ -159,6 +159,52 @@ def test_each_rule_rejects_the_plan_that_breaks_it(
     assert any(expected in p for p in problems), problems
 
 
+def test_an_entry_discovery_run_gives_no_search_instruction(tp: ModuleType) -> None:
+    """Every other entry ends its first prompt with the search line. An entry-discovery run is
+    the app's own role-entry path (an ordinary request, an inbox wake), so it must not: handing
+    the assistant the instruction proves it can follow one, not that its prompt leads it to."""
+    entry = copy.deepcopy(_entry(tp))
+    entry["discovery"] = "entry"
+    entry["steps"][0]["say"] = "Ask {host_a} how {branch} is going."
+    assert _problems(tp, entry) == []
+    sheet = tp.runsheet(entry)
+    assert "Entry discovery" in sheet and "search_runbooks" not in sheet
+
+    for step, said in (
+        (0, f"Ask {{host_a}} how {{branch}} is going.\n{tp.SEARCH_LINE}"),
+        (2, "Ask again, and use search_runbooks first."),
+    ):
+        broken = copy.deepcopy(entry)
+        broken["steps"][step]["say"] = said
+        assert any("gives no search instruction" in p for p in _problems(tp, broken)), step
+
+    for bad in ("always", [], {"entry": 1}):
+        broken = copy.deepcopy(entry)
+        broken["discovery"] = bad
+        assert any("discovery must be one of" in p for p in _problems(tp, broken)), bad
+    # Without the key, the first prompt still has to end with the search line.
+    plain = copy.deepcopy(entry)
+    del plain["discovery"]
+    assert any("must end with the search line" in p for p in _problems(tp, plain))
+
+
+def test_the_register_carries_a_real_role_entry_run_for_the_hub_and_the_lane(
+    tp: ModuleType,
+) -> None:
+    entries = [e for e in tp.load_register()["trials"] if e.get("discovery") == "entry"]
+    assert [e["id"] for e in entries] == ["paired-role-entry"]
+    (entry,) = entries
+    assert entry["caller"] == "hub" and entry["status"] == "owed"
+    expected: dict[str, set[str]] = {"hub": set(), "lane": set()}
+    for step in entry["steps"]:
+        for role, obs in (step.get("expect") or {}).items():
+            expected[role] |= set(obs.get("selected") or [])
+    assert "daintree.hosts.delegate-to-host" in expected["hub"]
+    assert {"daintree.hosts.do-delegated-work", "daintree.hosts.handle-hub-message"} <= expected["lane"]
+    # The lane's own initiative is what is recorded, and a missing search is never a pass.
+    assert any("never a pass" in line for line in entry["execution"])
+
+
 def test_selection_by_the_wrong_role_does_not_count(tp: ModuleType) -> None:
     entry = _entry(tp)
     entry["steps"][0]["expect"]["lane"]["selected"] = ["daintree.hosts.ask"]

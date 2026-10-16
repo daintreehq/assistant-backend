@@ -232,3 +232,15 @@ boundaries:
   - query: 'I want my team''s plugins available on a second machine, so first get that machine added to Daintree as a host and connected.'
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-137
+  - query: "add my new linux server to Daintree so I can run agents on it"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "the remote host I added yesterday keeps failing the ssh check, walk me through fixing it"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "I just built a second mac, how do I hook it up as a remote host over ssh"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: "host mode needs to be on at the other end, help me get my server connected"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134

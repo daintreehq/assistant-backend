@@ -14,6 +14,7 @@ optionalTools:
   - terminal.list
   - terminal.getStatus
   - agent.listAvailable
+hostEligibility: lane
 ---
 The message, its fit and the one reply are daintree.hosts.handle-hub-message's; the run goes to a visible verifier.
 

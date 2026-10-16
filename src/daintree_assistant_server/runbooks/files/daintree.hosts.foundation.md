@@ -16,6 +16,7 @@ optionalTools:
   - assistant.reply
 requires:
   - daintree.foundation
+hostEligibility: any
 ---
 Sidebar assistants only, never panes: this Shell's hub messages the assistant enrolled in a host's project (a lane); hosts never reach each other, so the hub relays. Steps are the hub's; a lane follows Daintree's messaging instructions, plus step 3 and the stops.
 

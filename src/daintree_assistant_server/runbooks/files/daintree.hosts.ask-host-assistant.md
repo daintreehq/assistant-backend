@@ -12,6 +12,7 @@ requiredTools:
 optionalTools:
   - host.listTasks
   - host.startAssistant
+hostEligibility: connected
 ---
 One question to one host's assistant; the deliverable is its answer, attributed.
 

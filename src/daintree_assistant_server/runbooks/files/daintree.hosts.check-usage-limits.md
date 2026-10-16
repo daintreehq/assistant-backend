@@ -12,6 +12,7 @@ requiredTools:
 optionalTools:
   - host.listTasks
   - host.startAssistant
+hostEligibility: connected
 ---
 1. Hosts: those the user named, else every host `host.list` gives. Per host, `host.listAssistants`: one `available` lane with a `generation` is enough. None: foundation step 2. This machine only when the user includes it: daintree.agents.check-usage-limits, here.
 2. CLI per host: the one the user named. Unnamed or unknown: every agent CLI signed in there; the hub cannot see which, so never guess.

@@ -42,6 +42,17 @@ cases:
 - Multi-turn cases add earlier `messages` (user/assistant). Most new-runbook cases
   are a single user message, because the served query is a bare query.
 
+### Paired hub and lane cases
+
+A hosts runbook that is one end of a hub/lane pair gets its pair's case in
+`benchmarks/runbook_selection/cases/1142-hosts-paired-roles.yaml`, or a file of its own
+following the same shape (`scenario`, `role`, a lane `brief`, `forbid`;
+`benchmarks/runbook_selection/README.md`, Paired hub/lane cases). Word the hub query as
+a person would say it on the hub and the lane query as the assistant would search after
+reading the brief, each one sentence of 8 to 15 words, never a runbook id. A pair miss is
+retrain-owed and reported with its stage (`bench pairs`), not fixed by bending routing
+text. Keep pair strings out of corpus rows: screen both ways (difflib above 0.8).
+
 ### Categories
 
 Use an existing one. Every category is floored on its own, so a new one-case category

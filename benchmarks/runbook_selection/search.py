@@ -18,6 +18,7 @@ from pathlib import Path
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.runbook_mcp import MAX_QUERY_CHARS, MAX_RESULTS_CAP
 from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
+from daintree_assistant_server.runbooks.host_state import HostState
 from daintree_assistant_server.runbooks.local.documents import fit_query, query_document
 from daintree_assistant_server.runbooks.local.paths_local import selector_artifact_dir
 from daintree_assistant_server.runbooks.local.runtime import InferencePool
@@ -50,9 +51,12 @@ def read_queries(path: Path) -> list[str]:
 
 
 def search(
-    queries: Sequence[str], *, limit: int
+    queries: Sequence[str], *, limit: int, host_state: HostState | None = None
 ) -> tuple[Catalog, list[SearchResult], list[bool]]:
     """Rankings, plus whether each query had to be shrunk to fit the encoder.
+
+    ``host_state`` ranks for a caller reporting it, as the transport does from
+    its headers; ``None`` is an unreported caller, offered the whole catalog.
 
     A shrunk query is where serving and ``bench local`` part ways: search renders
     it with ``fit_query``, the benchmark with ``query_document``, and they agree
@@ -70,9 +74,13 @@ def search(
 
     async def run_all() -> list[SearchResult]:
         selector = LocalSelector(classifier, pool, catalog)
+        exclude = catalog.excluded_for(host_state)
         # Stripped as the tool strips it (`runbook_mcp.py`), so a padded query
         # pasted from a transcript ranks exactly as it did for the caller.
-        return [await selector.search(query.strip(), limit=limit) for query in queries]
+        return [
+            await selector.search(query.strip(), limit=limit, exclude=exclude)
+            for query in queries
+        ]
 
     try:
         return catalog, asyncio.run(run_all()), shrunk
