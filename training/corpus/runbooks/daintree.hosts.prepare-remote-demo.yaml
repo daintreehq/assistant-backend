@@ -130,6 +130,9 @@ boundaries:
   - query: "get my other Mac to stand up the export feature with sample data and send me back its port"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: have the remote host serve the checkout branch as a demo and tell me how to open it from this laptop
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 
 followups:
   - query: right, bring it up on the other machine instead; I'll look at it from this one

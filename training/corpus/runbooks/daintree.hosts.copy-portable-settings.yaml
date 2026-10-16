@@ -120,10 +120,19 @@ boundaries:
 - query: my project is on the server already; what I want there now is my own Daintree notification and agent settings, not the repository
   confusable_with:
   - daintree.hosts.open-project-on-host
+- query: before the remote demo, make sure the host has my Daintree notification and agent settings, and copy them if not
+  confusable_with:
+  - daintree.hosts.prepare-remote-demo
+- query: the hosts keep drifting from my laptop's Daintree preferences; show me which setting categories differ and copy the ones I pick
+  confusable_with:
+  - daintree.hosts.audit-host-workspaces
+- query: the dev services run fine across my hosts now; what I still need is my own Daintree preferences on the second one
+  confusable_with:
+  - daintree.hosts.coordinate-dev-services
 followups:
 - query: ok now bring my settings across too
   history:
-  - 'user: add the new server as a Remote Host'
+  - 'user: the spare Linux tower should show up in Daintree as one of my hosts'
   - 'assistant: It''s connected and its projects are listed under Other hosts; messaging is still off.'
   active:
   - daintree.hosts.connect-host

@@ -103,6 +103,9 @@ boundaries:
     confusable_with: [daintree.hosts.swarm-fan-out]
   - query: bring up the full stack, web client on one remote machine and API on another, each through the assistant that owns that project, and make sure they connect
     confusable_with: [daintree.hosts.start-swarm]
+  - query: the web client on one of my hosts cannot reach the API dev server on another, find the right address
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 
 followups:
   - query: now start the frontend against it

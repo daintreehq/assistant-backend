@@ -141,3 +141,6 @@ boundaries:
     confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
   - query: audit the remote hosts for what the swarm left behind in their workspaces
     confusable_with: [daintree.hosts.check-usage-limits]
+  - query: which worktrees and dev servers did last night's run leave on my other machines, and does any hold unpushed work
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
