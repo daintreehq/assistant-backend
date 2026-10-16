@@ -146,3 +146,9 @@ boundaries:
     confusable_with: [daintree.hosts.reassign-host-work]
   - query: 'the linux box went quiet during its part of the sharded suite; run that part elsewhere once it is confirmed stopped, then merge'
     confusable_with: [daintree.hosts.reassign-host-work]
+  - query: 'use the arm mac and the linux box as two halves of one test run at the release commit, then merge their junit files into one report'
+    confusable_with: [daintree.hosts.run-validation-matrix]
+  - query: 'carve the e2e tests up between the connected hosts at main so they finish before the release call, then give me a single verdict'
+    confusable_with: [daintree.hosts.run-validation-matrix]
+  - query: 'both hosts run the same OS, so just give each a share of the tests at this commit and merge the results'
+    confusable_with: [daintree.hosts.run-validation-matrix]

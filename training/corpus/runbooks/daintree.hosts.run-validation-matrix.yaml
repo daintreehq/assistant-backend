@@ -115,6 +115,15 @@ boundaries:
   - query: "two machines, one tag: run the tests for 5.0.0-beta on the server host and the laptop host and give me each one's pass, fail and skip counts"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: 'does the release tag still pass its checks on arm64 and x86_64? one answer per architecture from the hosts'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'do the tests pass on node 18 as well as node 22? use whichever hosts have each and give me both results'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
+  - query: 'before I publish, confirm the CLI''s tests pass on both glibc and musl hosts at the release SHA, separately'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
 
 followups:
   - query: actually do it on the mac host too, and add node 22 on both, as one matrix
