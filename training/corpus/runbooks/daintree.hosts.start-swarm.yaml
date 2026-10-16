@@ -164,6 +164,15 @@ boundaries:
   - query: "which machines can I give work to right now? start assistants where they are missing and allowed"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: is the other machine's assistant enrolled for this shell yet
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-coordinator
+  - query: is the remote machine's assistant ready to take work from this shell
+    confusable_with: [daintree.hosts.foundation, daintree.worktree.manage-resource]
+    run: runbook-2026-10-coordinator
+  - query: get the remote box's assistant set up so this shell can send it tasks
+    confusable_with: [daintree.hosts.foundation, daintree.worktree.manage-resource]
+    run: runbook-2026-10-coordinator
 followups:
   - query: 'now get them ready'
     history:

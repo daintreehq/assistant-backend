@@ -80,7 +80,6 @@ foundation:
   - query: can my two remote hosts talk to each other directly or does it all go through this machine
     docs: true
   - the remote mac's assistant never gets my messages, where do I even start
-  - is the other machine's assistant enrolled for this shell yet
   - query: when I message the other machine's assistant how does its answer get back to me
     docs: true
   - query: what happens if I message the other machine while it's offline
@@ -131,11 +130,7 @@ boundaries:
     confusable_with: [daintree.diagnostics]
   - query: why can't my assistant see any assistant it can message on my second mac
     confusable_with: [daintree.diagnostics]
-  - query: is the remote machine's assistant ready to take work from this shell
-    confusable_with: [daintree.worktree.manage-resource]
   - query: connect the assistant on my remote mac to the one here
-    confusable_with: [daintree.worktree.manage-resource]
-  - query: get the remote box's assistant set up so this shell can send it tasks
     confusable_with: [daintree.worktree.manage-resource]
   - query: "before I hand work to my other mac's assistant, what has to be switched on for this shell to reach it"
     docs: true
