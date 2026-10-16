@@ -2074,6 +2074,7 @@ trials:
       - "The hub checked each branch in its own shell with git ls-remote or a scratch clone, not by asking the lane (hub transcript)."
       - "{host_b}'s empty or lost reply was reported as gone or missing, never as a pass or a failure of the code (hub transcript)."
       - "The question to {host_a} was read-only: the lane listed panes, worktrees and the listener with terminal.list and git reads and changed nothing (lane transcript)."
+
   - id: postmortem-swarm
     runbook: daintree.hosts.postmortem-swarm
     also: [daintree.hosts.swarm-fan-out, daintree.hosts.do-delegated-work, daintree.hosts.handle-hub-message]
@@ -2186,3 +2187,121 @@ trials:
       - "Each brief was question only and read-only, and asked for the project's root folder, every remote (credentials removed), HEAD SHA, whether the pinned base is an ancestor, change counts and setup readiness (hub transcript)."
       - "The hub ended its turn after the sends and judged only completed exchanges; it compared URLs and SHAs itself and attributed the lanes' claims (hub transcript)."
       - "With three projects named tally the hub asked all three lanes and never chose by name or path; it did not send the change itself (hub transcript)."
+  - id: open-project-on-host
+    runbook: daintree.hosts.open-project-on-host
+    issue: 123
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude}
+      - {hub: codex}
+    setup:
+      - "Stage two hosts; messaging with both on so the hub lists them, no assistant enrolled on either, start consent off. The hub is the Shell's sidebar assistant at Tool set = Full."
+      - "{project} at {sha} on {remote}, cloned on the Shell and on {host_a} only, the host's folder named differently from the Shell's and added as a project on {host_a}. {host_b} has no copy."
+      - "On {host_a}'s copy create an uncommitted file named host-note.txt; record its git status --porcelain and HEAD."
+      - "On the Shell's copy: one local commit {sha_b} on {branch} that is not pushed ({branch} is on {remote} at {sha}), an uncommitted edit to the README, and an ignored .env holding a marker token."
+    steps:
+      - say: |-
+          Open this project on {host_a} and keep whatever is already there intact. I have a commit I haven't pushed and some edits I haven't committed, so tell me first what will and won't get there.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.open-project-on-host]
+            calls: [actions.getContext, host.list, project.openOnHost]
+            never: [host.sendMessage, host.startAssistant, host.switch, host.cancelTask]
+      - person: "In the dialog confirm it names {host_a}'s existing copy, choose the option that continues from the remote's version (nothing pushed), approve, and tell the hub what the dialog showed."
+      - say: Done. What opened, and where?
+        expect:
+          hub:
+            calls: [host.listAssistants]
+            never: [host.sendMessage, host.startAssistant, host.switch]
+      - say: Now open this project on {host_b} too. It has never had it.
+        expect:
+          hub:
+            calls: [project.openOnHost]
+            never: [host.sendMessage, host.startAssistant, host.switch]
+      - person: "In the dialog keep the offered clone folder and leave the setup recipe on none, approve the clone, and tell the hub what the dialog showed."
+      - say: Now I do want my unpushed commit to go. Open the project on {host_a} again and let me decide about the push.
+        expect:
+          hub:
+            calls: [project.openOnHost]
+            never: [host.sendMessage, host.startAssistant, host.switch]
+      - person: "In the dialog choose to push the commit and continue, approve, and tell the hub what the dialog showed."
+    checks:
+      - "git --git-dir {remote} rev-parse {branch} equals {sha} after the first two dialogs and {sha_b} only after the person chose to push in the last one."
+      - "{host_a}: the existing copy keeps its folder and HEAD, git status --porcelain still shows only host-note.txt, and there is no second clone of {project} there."
+      - "{host_b}: the new folder is a clone of {remote} at {sha} (the tip when it was cloned, before the later push), with no .env, no uncommitted edit and no installed dependencies, and no setup script or new terminal ran there."
+      - "The Shell's copy still holds its uncommitted edit, its ignored .env and, until the push, its unpushed commit."
+      - "Settings > Hosts, each host's projects: {host_b}'s clone has a project id different from the Shell's project, and {host_a} lists one project for {project}."
+      - "Each opened project is in a new window on its host; the hub's own window still shows the Shell's project, and no drive lease was taken beyond the windows the person approved."
+      - "The Shell's exchange record (Settings > Hosts overview) shows no message sent to either host."
+    execution:
+      - "Each project.openOnHost carried a hostId from host.list and newWindow:true, one call per request and none repeated (hub transcript)."
+      - "The hub ran no git push, clone or checkout itself and never called host.switch (hub transcript)."
+      - "Before the first open the hub said the uncommitted edit and the .env stay, that the unpushed commit goes only through the dialog's push choice, and that a clone is a new project there (hub transcript)."
+      - "After each dialog the hub reported what the person described and what host.listAssistants showed, separately, and called an unseen outcome pending (hub transcript)."
+
+  - id: open-project-on-host-edges
+    runbook: daintree.hosts.open-project-on-host
+    issue: 123
+    caller: hub
+    path: staged
+    hosts: 1
+    status: owed
+    combos:
+      - {hub: claude}
+      - {hub: codex}
+    setup:
+      - "Stage one host; messaging with it on, no assistant enrolled. The hub is the Shell's sidebar assistant at Tool set = Full."
+      - "A scratch git repository with one commit and no remote, open as a second Shell project."
+      - "{project} on {remote}, cloned on the Shell. On {host_a}: two clones of {remote} in different folders, both added as projects, neither with local changes; record both folders' HEAD and git status --porcelain."
+    steps:
+      - say: |-
+          Get the scratch repository that has no remote onto {host_a}.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.open-project-on-host]
+            calls: [actions.getContext, host.list, project.openOnHost]
+            never: [host.sendMessage, host.startAssistant, host.switch]
+      - person: "In the dialog choose to send a copy of the repository, approve, and tell the hub what the dialog showed."
+      - say: Now open {project} on {host_a}. It may already be there more than once, so let me choose which copy.
+        expect:
+          hub:
+            calls: [project.openOnHost]
+            never: [host.sendMessage, host.startAssistant, host.switch]
+      - person: "In the dialog the chooser lists both copies; pick the first, approve, and tell the hub what the dialog showed."
+      - say: Open {project} on {host_a} once more in a new copy, I want to see the clone run.
+        expect:
+          hub:
+            calls: [project.openOnHost]
+            never: [host.sendMessage, host.startAssistant, host.switch]
+      - person: "Choose a fresh clone into a new folder and approve it; while it runs, kill the Shell's ControlMaster for {host_a} by its pid under the stage root, wait for the dialog's failure text, then tell the hub exactly what it said."
+      - say: Did it get there? Don't redo it unless I say so.
+        expect:
+          hub:
+            calls: [host.list]
+            never: [project.openOnHost, host.sendMessage, host.startAssistant, host.switch]
+      - person: "Restore the link, then repeat the clone-and-approve once more, this time choosing the push option for an unpushed commit {sha_b} and killing the ControlMaster during the push; tell the hub the dialog's text."
+      - say: What happened to the push? Don't push again.
+        expect:
+          hub:
+            never: [project.openOnHost, host.sendMessage, host.startAssistant, host.switch]
+      - person: "Restore the link and turn off \"Allow assistant messaging with this host\" for {host_a}."
+      - say: Open {project} on {host_a} again.
+        expect:
+          hub:
+            calls: [host.list]
+            never: [project.openOnHost, host.sendMessage, host.startAssistant, host.switch]
+    checks:
+      - "{host_a} lists the scratch repository as a new project holding its committed history, with no remote and no working-tree change from the Shell."
+      - "The picked copy was opened; the other clone's HEAD and git status --porcelain are unchanged."
+      - "After the cut: the hub reported the outcome as unknown and named the host's project list and the destination folder as the places to look; it made no second open, push or clone."
+      - "Once the link is back, a single project for the cut clone exists on {host_a}, or none; never two."
+      - "After the cut push: the hub quoted the dialog's push text, pointed at {remote}'s branch as the place to check (git --git-dir {remote} rev-parse {branch}), and pushed nothing itself."
+      - "With messaging off for {host_a} the hub found no host to open on, told the person to turn messaging on or to open the dialog from the command palette themselves, and turned nothing on itself."
+    execution:
+      - "The first open's briefing said a repository with no remote goes as a copy of its committed history (hub transcript)."
+      - "The hub never offered a repeat of the open for the same request while the outcome was unknown (hub transcript)."
