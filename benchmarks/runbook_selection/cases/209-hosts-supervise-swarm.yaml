@@ -391,3 +391,16 @@ cases:
     expect:
       required: [daintree.hosts.execute-distributed-workflow]
       optional: [daintree.hosts.foundation]
+
+  - id: supervise-swarm-reverse-place-work
+    category: routing-trap
+    note: >-
+      Reverse trap. Unsent pieces that still need a host each are daintree.hosts.place-work ("a
+      placement table (piece, host, project, CLI, reason), shown before anything is sent"); nothing
+      is out yet, so this runbook must not ride along.
+    messages:
+      - role: user
+        content: these three bugs haven't gone anywhere yet, decide which of my machines takes which and let me see that first
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
