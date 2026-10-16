@@ -1,0 +1,345 @@
+# daintree.hosts.report-swarm-results: the hub's final, verified account of a run on its Remote
+# Hosts once the run is over. Every assigned unit gets a row; what the hub checked is kept apart
+# from what each host claimed; false and missing reports are named; what each host left behind
+# (dev servers, panes, worktrees, unpushed work) is listed with who decides.
+#
+# Recall: the issue's three requests (the first, about collecting from every machine, shares
+# its vocabulary with sending the same work to every host and is judged with the run it follows),
+# an agent-phrased task description, a casual line, a leftovers line and a cut-off reply.
+# Traps: this runbook wins against following a run (daintree.hosts.supervise-swarm), the
+# after-restart account and cleanup (daintree.hosts.recover-and-clean-up), stopping a run
+# (daintree.hosts.steer-swarm), one unit's hand-off (daintree.hosts.delegate-to-host), the
+# local worker check (daintree.orchestration.verify-agent-work), the dated repository summary
+# (daintree.git.summarize-activity) and the local post-mortem (daintree.agents.postmortem-run).
+# Reverse traps: each of those wins its own request and this runbook must not ride along, plus
+# combining the hosts' branches (daintree.hosts.integrate-host-branches), usage on the hosts
+# (daintree.hosts.check-usage-limits) and why one commit differs between hosts
+# (daintree.hosts.diagnose-host-differences).
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: report-swarm-results-issue-collect
+    category: single-runbook
+    note: >-
+      The issue's first request, after a run on the hosts. Decided by "when a run SENT to the
+      Remote Hosts is over, finished or stopped, and the person wants the FINAL ACCOUNT of it,
+      trusted". On its own the sentence reads as sending work to every host
+      (daintree.hosts.swarm-fan-out); the history is what makes it a report.
+    messages:
+      - role: user
+        content: have every one of my other machines run the integration tests on its own branch
+      - role: assistant
+        content: All four hosts have replied and the run is over.
+      - role: user
+        content: Collect verified artifacts and test reports from every machine into one result.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-issue-summarise
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "one report with a row for every assigned unit ...
+      each false or missing report named, and the dev servers, panes, worktrees and unpushed work
+      left behind with who decides". At base it selected daintree.git.summarize-activity and
+      daintree.hosts.reassign-host-work.
+    messages:
+      - role: user
+        content: Summarise the completed swarm with commit references and unresolved work.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-issue-audit
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "audit the swarm's completion claims against the
+      evidence" and "hub-verified versus host-claimed". At base it selected
+      daintree.hosts.supervise-swarm and daintree.hosts.steer-swarm.
+    messages:
+      - role: user
+        content: Audit a swarm's reported completion against task and artifact evidence.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-agent-phrased
+    category: single-runbook
+    note: >-
+      How an agent writes the search for this task. Decided by "one report with a row for every
+      assigned unit ... host, project, branch, exact SHA and checks, hub-verified versus
+      host-claimed".
+    messages:
+      - role: user
+        content: >-
+          Produce a verified final account of the cross-host run for the user: per unit its host,
+          branch, exact SHA and checks, what the hub confirmed versus what the host claimed, any
+          missing or false completion claims, and anything left running or unpushed.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-user-phrased
+    category: single-runbook
+    note: >-
+      A casual line from the person after the hosts finished. Decided by "which machines really
+      finished, which only said so, and what did they leave running".
+    messages:
+      - role: user
+        content: ok the hosts are all done, write it up and tell me which ones actually delivered and which only said they did
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-left-running
+    category: single-runbook
+    note: >-
+      The leftovers half of the deliverable. Decided by "the dev servers, panes, worktrees and
+      unpushed work left behind with who decides".
+    messages:
+      - role: user
+        content: >-
+          The swarm is finished and a dev server is probably still up on one of the Macs. Give
+          me the final report with everything the hosts left behind and who decides what happens
+          to it.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-cut-off-reply
+    category: single-runbook
+    note: >-
+      A reply that did not come through whole. Decided by "each false or missing report named"
+      and "It starts, pushes, publishes and cleans up nothing".
+    messages:
+      - role: user
+        content: >-
+          One host's reply got cut off partway through its failing tests. Finish the run report
+          and get me the missing failures without posting them anywhere public.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps: this runbook wins
+  - id: report-swarm-results-not-supervise-swarm
+    category: routing-trap
+    note: >-
+      The hosts are all in and the person wants the final account. Decided by "Do not use for
+      keeping a run moving while it works (daintree.hosts.supervise-swarm)" and "over, finished
+      or stopped". The neighbour is wrong here: nothing is left to follow.
+    messages:
+      - role: user
+        content: All four hosts have reported on the run. Write the final report, which units are verified on the remote and which only say they finished.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-recover-and-clean-up
+    category: routing-trap
+    note: >-
+      The run ended and the person wants the account with leftovers listed, nothing removed.
+      Decided by "Do not use for what became of work after a restart
+      (daintree.hosts.recover-and-clean-up)" and "It starts, pushes, publishes and cleans up
+      nothing".
+    messages:
+      - role: user
+        content: The cross-machine run ended last night. Give me the final report of what each host produced, and list whatever is still running over there.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-steer-swarm
+    category: routing-trap
+    note: >-
+      A run already stopped, now the account of it. Decided by "Do not use for ... stopping or
+      changing it (daintree.hosts.steer-swarm)" and "over, finished or stopped".
+    messages:
+      - role: user
+        content: I stopped the remote run this morning. Write the final report of what each host had finished by then, with every commit checked.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      Several units done, one report wanted. Decided by "Do not use for one host's result before
+      the next step (daintree.hosts.delegate-to-host)" and "a row for every assigned unit".
+    messages:
+      - role: user
+        content: Both hosts finished their parts. Put it all in one final report with every commit checked on the remote and any checks that were skipped.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-verify-agent-work
+    category: routing-trap
+    note: >-
+      Hosts' claims, not one local agent's. Decided by "Do not use for ... one agent on this
+      machine (daintree.orchestration.verify-agent-work)" and "hub-verified versus host-claimed".
+    messages:
+      - role: user
+        content: One of the hosts claimed it was finished but I can't see its branch. Write up the run's results and call out any report that does not hold up.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-summarize-activity
+    category: routing-trap
+    note: >-
+      A run's account, not a dated standup. Decided by "Do not use for ... dated repository
+      activity (daintree.git.summarize-activity)" and "a row for every assigned unit".
+    messages:
+      - role: user
+        content: Which of my machines really delivered? Show me the commits and the test results side by side, claimed versus checked.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-not-postmortem-run
+    category: routing-trap
+    note: >-
+      What happened, not why it went wrong. Decided by "Do not use for ... why a local run
+      failed (daintree.agents.postmortem-run)" and "failed, expired, unreachable and silent ones
+      too".
+    messages:
+      - role: user
+        content: The build box never answered and the two minis said done. Final report please, with a row for the silent one too.
+    expect:
+      required: [daintree.hosts.report-swarm-results]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps: the neighbour wins
+  - id: report-swarm-results-reverse-supervise-swarm
+    category: routing-trap
+    note: >-
+      The run is still going and the person wants it followed. daintree.hosts.supervise-swarm
+      wins by "the run followed to its end"; no account yet.
+    messages:
+      - role: user
+        content: Keep following the run on the other machines until every host is in, and answer what they ask on the way.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-recover-and-clean-up
+    category: routing-trap
+    note: >-
+      After a restart the person wants where each exchange stands from the records.
+      daintree.hosts.recover-and-clean-up wins by "rebuild where every exchange with the Remote
+      Hosts stands after a restart".
+    messages:
+      - role: user
+        content: The hub restarted while my other machines were working. Rebuild from each host's task records where every exchange I sent stands.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-cleanup
+    category: routing-trap
+    note: >-
+      Removing what the run left on the hosts is cleanup, not a report.
+      daintree.hosts.recover-and-clean-up wins by "cleaned up through each host's own assistant".
+    messages:
+      - role: user
+        content: Have each of my remote hosts clean up the panes and worktrees that the run created there.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-steer-swarm
+    category: routing-trap
+    note: >-
+      Stopping a run that is under way. daintree.hosts.steer-swarm wins by "STOPPED, CALLED OFF
+      or CHANGED while it is under way".
+    messages:
+      - role: user
+        content: Call off what I sent to every machine but keep what they have done, and tell me which hosts acknowledged.
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.steer-for-hub]
+
+  - id: report-swarm-results-reverse-integrate-host-branches
+    category: routing-trap
+    note: >-
+      Combining the hosts' finished work into one branch.
+      daintree.hosts.integrate-host-branches wins by "one machine is to do the combining".
+    messages:
+      - role: user
+        content: The two other Macs pushed their halves. Have the build host assemble them on one branch and see if the suite is green.
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-check-usage-limits
+    category: routing-trap
+    note: >-
+      Allowance left on the hosts, host by host. daintree.hosts.check-usage-limits wins by
+      "how much Claude Code or Codex allowance each Remote Host this Shell reaches has left".
+    messages:
+      - role: user
+        content: Which of my remote hosts still has Claude or Codex quota, and how much?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.agents.check-usage-limits]
+
+  - id: report-swarm-results-reverse-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      One test behaving differently on two hosts is a diagnosis.
+      daintree.hosts.diagnose-host-differences wins by "SAME CODE BEHAVES DIFFERENTLY ON TWO OR
+      MORE Remote Hosts".
+    messages:
+      - role: user
+        content: The same test fails on the Linux box and passes on the Mac host. Work out why.
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-verify-agent-work
+    category: routing-trap
+    note: >-
+      One local agent's claim is the local check. daintree.orchestration.verify-agent-work wins
+      by "a finished agent's work checked before it is trusted".
+    messages:
+      - role: user
+        content: Check what the agent in my worktree claimed about its fix, and confirm whether it is really done.
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      optional: [daintree.foundation]
+
+  - id: report-swarm-results-reverse-summarize-activity
+    category: routing-trap
+    note: >-
+      A standup over a stated window is dated repository activity. daintree.git.summarize-activity
+      wins by "a written REPORT of work over a period of time".
+    messages:
+      - role: user
+        content: "Draft this week's standup: what I shipped, tied to commits."
+    expect:
+      required: [daintree.git.summarize-activity]
+      optional: [daintree.foundation]
+
+  - id: report-swarm-results-reverse-postmortem-run
+    category: routing-trap
+    note: >-
+      Why a local agent run went wrong. daintree.agents.postmortem-run wins by "WHY it went wrong
+      and how to stop it happening again".
+    messages:
+      - role: user
+        content: Find the point where last night's Codex run drifted from what I asked for, and what caused it.
+    expect:
+      required: [daintree.agents.postmortem-run]
+      optional: [daintree.foundation]
+
+  - id: report-swarm-results-reverse-swarm-fan-out
+    category: routing-trap
+    note: >-
+      Sending the same work to every host is the fan-out. daintree.hosts.swarm-fan-out wins by
+      "the SAME WORK done on EVERY Remote Host".
+    messages:
+      - role: user
+        content: Try the new lint config on all my hosts at the same time, a separate branch on each.
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.orchestration.fan-out-work]
