@@ -6,6 +6,39 @@ about today's behaviour against the source before acting on it.
 
 ---
 
+## Stop storing every model version in Git LFS
+
+**Trigger: now. Every retrain adds ~225 MB of LFS history, and there will be many retrains.**
+
+The selector artifact is committed through Git LFS: the int8 ranker (~115 MB), the fp32
+retriever (~99 MB) and the head (~10 MB). An LFS pointer keeps every old version alive
+forever, so storage and clone cost grow by ~225 MB per retrain, and the catalog is headed for
+hundreds of runbooks (maybe 1,000), so the model will change often and get bigger. The old
+versions are of no use: nothing ever needs an old model that a retrain replaced.
+
+Recommended: **take the artifact out of Git, keep only a small lock file.**
+
+- Store each artifact in a GCS bucket in `daintree-research`, under a path named by its content
+  hash. Commit `selector.lock` (the hash, per-file hashes and sizes) in place of the binaries.
+- `training/retrain.sh` uploads the new artifact and rewrites the lock; a prune step deletes
+  every object the lock does not name (the current one, plus the previous one for rollback).
+- Cloud Build copies the artifact by hash before the image build (it runs in GCP, so no LFS
+  fetch); the readiness check already fails closed on a missing artifact. Developers and CI use
+  a `training/fetch_selector.sh` in place of `git lfs pull`.
+- Git history: the existing LFS objects stay referenced by old commits. Dropping them means
+  rewriting history (`git filter-repo` on `src/.../artifacts/selector`) and a force-push, or
+  asking GitHub to purge the unreferenced LFS objects. Both need an explicit decision: do not
+  do either unattended.
+
+Alternatives considered: a GitHub Release asset per release (easy to delete, but the build then
+needs a token); shrinking the model (an int8 retriever was measured at a cost of 1-6 cases);
+leaving it and paying for LFS storage (cheapest today, worst at 1,000 runbooks).
+
+This touches the production build path (`cloudbuild.yaml`, `Dockerfile`, the smoke test and the
+readiness check), so do it as its own change, not inside a release.
+
+---
+
 ## Bound anonymous traffic on the public endpoint
 
 **Trigger: before the MCP endpoint is announced, or the first time request volume

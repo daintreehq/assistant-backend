@@ -19,11 +19,75 @@ allowed-tools:
 1. Add or edit runbooks, cases and training rows (step 1-2 below for generating rows).
 2. `training/retrain.sh` — compiles the corpus, trains both stages (one seed), exports,
    installs the artifact and runs `bench local`; on a failed gate it puts the previous
-   artifact back and exits non-zero. About an hour on Apple silicon.
+   artifact back and exits non-zero. **Run it on a rented Lambda Labs GPU, not here and not on
+   the Studios** (next section): at ~150 runbooks it is hours on a Mac, and the retriever's
+   peak memory no longer fits a 32-36 GB one.
 3. Commit (the artifact is Git LFS) and `/release`. The release does not wait for CI.
 
 Everything below — seed sweeps, holdout rounds, decision rules — is for investigating a
 routing problem, not a requirement of every retrain.
+
+## Where to run it: a small Lambda Labs GPU
+
+The retrain got harder as the catalog grew: stage 1 re-embeds every runbook document with
+gradients each step, so memory and time scale with the catalog (at 153 runbooks: >42 GiB peak
+and ~26 min per stage-1 epoch on an M1 Max, ~6 h for the whole retrain). **Rent a Lambda Labs
+GPU, run `retrain.sh` there with `EXPORT_ONLY=1`, copy the artifact back, gate it here, and
+terminate the instance.**
+
+- **Always `gpu_1x_a10` (24 GB, $1.29/h) when it has capacity; only if it has none,
+  `gpu_1x_a100_sxm4` (40 GB, $1.99/h).** A bigger GPU is not needed and training on a small one
+  is quick. Check capacity first; always terminate afterwards, it bills until you do.
+- **Never run the retrain on the user's machine, and never leave a local "fallback" run going.**
+  That is the whole reason for using Lambda: the user is working on this Mac, and one trainer
+  process holds 55 GB of unified memory and makes it grind to a halt (it happened, 2026-10-16).
+  Only light local work is fine: `rsync`, the unit suite, `bench local`. The Studios are no
+  alternative (an M1 Max needs ~6 h). If the instance fails, fix that or ask.
+- Commit once at the end, not per edit: skill and docs changes ride in one commit.
+
+The key is in the environment as `LAMBDA_LABS_API_KEY` (HTTP basic auth, key as the username;
+never print it). The registered SSH key "Greg Mac Studio ed25519" is this machine's
+`~/.ssh/id_ed25519`.
+
+```bash
+L=https://cloud.lambdalabs.com/api/v1; A=(-s -u "$LAMBDA_LABS_API_KEY:")
+curl "${A[@]}" $L/instance-types      # prices; "regions_with_capacity_available" says what is free
+curl "${A[@]}" -X POST $L/instance-operations/launch -H 'Content-Type: application/json' \
+  -d '{"region_name":"us-east-1","instance_type_name":"gpu_1x_a10",
+       "ssh_key_names":["Greg Mac Studio ed25519"],"quantity":1,"name":"daintree-retrain-tmp"}'
+curl "${A[@]}" $L/instances/<id>      # poll until status "active" (about 4 min), then "ip"
+curl "${A[@]}" -X POST $L/instance-operations/terminate -H 'Content-Type: application/json' \
+  -d '{"instance_ids":["<id>"]}'      # ALWAYS, once the artifact is back
+```
+
+On the instance (`ssh ubuntu@<ip>`; Ubuntu with Python 3.10, no `uv`, 1.4 TB disk):
+
+```bash
+rsync -a --exclude .venv --exclude .venv-train --exclude .tmp --exclude .git \
+  --exclude __pycache__ --exclude .claude/worktrees ./ ubuntu@<ip>:daintree/   # ~1.1 GB; no git needed
+ssh ubuntu@<ip> 'cd ~/daintree; curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH=$HOME/.local/bin:$PATH
+  uv venv --python 3.12 .venv-train
+  uv pip install --python .venv-train/bin/python -r training/requirements-train.lock
+  uv pip install --python .venv-train/bin/python --no-deps -e .
+  # TRAP: the lock gives torch 2.13.0+cu130, but the A10 image has a CUDA 12.8 driver:
+  # "The NVIDIA driver on your system is too old". Use the cu129 build (same version):
+  uv pip install --python .venv-train/bin/python --reinstall-package torch "torch==2.13.0+cu129" \
+    --index-url https://download.pytorch.org/whl/cu129 --extra-index-url https://pypi.org/simple \
+    --index-strategy unsafe-best-match
+  .venv-train/bin/python -c "import torch; x=torch.randn(2048,2048,device=\"cuda\"); print((x@x).sum())"
+  mkdir -p .tmp; RETRIEVER_ARGS=--grad-checkpoint EXPORT_ONLY=1 nohup training/retrain.sh > .tmp/retrain.out 2>&1 &'
+```
+
+`training/common.py:device()` picks CUDA automatically and the log says `training device: cuda`
+(if it says `cpu`, the torch wheel is wrong). `--grad-checkpoint` keeps stage 1 inside the
+A10's 24 GB; drop it on a bigger card. Poll `.tmp/retrain.out` and
+`.tmp/retrain/retriever.log`/`setwise.log` (epoch lines) over ssh. When it prints
+`exported to .tmp/retrain/artifact`, copy that directory back over
+`src/daintree_assistant_server/runbooks/local/artifacts/selector/` with `rsync -a --delete`,
+terminate the instance, then gate here with
+`.venv/bin/python -m benchmarks.runbook_selection.bench local` (and the unit suite).
+`git checkout` the artifact directory if the gate fails. CLAUDE.md ("Training on a remote
+machine") has the same recipe for a plain SSH box.
 
 ## Read this first: a retrain is a QUALITY step, not an unblocking step
 
@@ -234,17 +298,14 @@ $PY -m training.export_two_stage
 ```
 
 Exports both encoders (the retriever fp32 only, the ranking encoder fp32 + int8)
-and the head, rebuilds `vectors.npz` through the **shipped** `sync()` path, and
-gates on decision parity across the whole benchmark. Serving runs the retriever
-in fp32 and the ranking encoder in int8 (measured 2026-09-28: an int8 retriever
-never gained a case and cost 1-6 on five of eight artifacts, for 67MB saved).
-
-**int8 is a property of the weights, not a draw**: re-exporting the same
-checkpoint reproduces the same int8 decisions (checked 2026-09-28), so a gate
-failure is not fixed by exporting again. What varies is each RETRAIN's weights —
-one seed's int8 lost 5 dev cases against its fp32, another's gained 1. If the
-gate fails, the staged artifact is left in `<out>.staging`; score it, and judge
-the recipe over seeds rather than chasing one checkpoint's quantisation.
+and the head, and rebuilds `vectors.npz` through the **shipped** `sync()` path. Serving runs
+the retriever in fp32 and the ranking encoder in int8 (measured 2026-09-28: an int8 retriever
+never gained a case and cost 1-6 on five of eight artifacts, for 67MB saved). It prints how
+many decisions int8 flips against fp32 and the recall-pass of each; that is information, not a
+gate (the old "core decision diff <= 10" assertion blocked a model that scored BETTER under
+int8, at 153 runbooks, and was removed). The export fails only if int8 loses recall-pass
+cases against fp32. The gate that matters is `bench local` on the installed artifact. If the
+export does fail, the artifact is left in `<out>.staging`; score it.
 
 ### 5. Score the SHIPPED artifact
 
