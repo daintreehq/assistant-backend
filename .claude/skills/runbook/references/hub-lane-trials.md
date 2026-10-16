@@ -232,3 +232,57 @@ trial a hosts runbook adds or updates its entry there as well as in its workspac
 "$T/dtrb.sh" plan show <id>   # one entry as a runsheet
 "$T/dtrb.sh" plan revision    # the catalog revision every search must carry
 ```
+
+## Failure and recovery scenarios
+
+`failure-scenarios.yaml` holds reusable fault runs: a lost send or start reply, a
+duplicate wake, a restart, a dropped link, a second Shell, a full slot set, a
+confirmation that times out, and the rest of the plan's nine families. An issue names
+the scenarios its acceptance needs by id (`dtrb.sh plan scenarios --issue N`) instead
+of copying the matrix. Each scenario carries its family and observations, the
+invariants its outcome checks must show (no duplicate write, no displaced lane, no
+false stop/pass/completion claim, no unrelated resource touched), the issues it
+serves, the fault and when it is injected, what the app returns under it, citations
+of the app at `app_sha`, and a run: a register entry that already stages the fault,
+or its own in the register's shape, with outcome checks kept apart from transcript
+checks.
+
+Three kinds of evidence, never mixed:
+
+| kind | how | what it shows |
+|---|---|---|
+| contract | `plan check`, offline, every run | the runbooks exist; each role is offered what a step expects of it; each injected condition is a value the captured output schema declares (or a cited app error code). Nothing about behaviour. `plan grounding` also reads every citation at `app_sha` (needs the app checkout). |
+| staged | the staged path above | a real hub and lanes meet the fault on one Mac (layers 4 and 5 for that scenario). `staged: owed` until a record says `passed: <date> <verdict>`. |
+| real host | the fleet path | what one Mac cannot stand in for: a network hop, sleep, two loopbacks, a second Shell. `real_host: owed` the same way; `n/a: <why>` where the staged run settles it. |
+
+`app_tests` cites the app's own tests of the behaviour, chiefly the in-process
+harness that runs the real link (`electron/remote/__tests__/assistantExchanges.harness.test.ts`).
+They are evidence of what the app does, never that an agent follows a runbook. The app
+has no test of a lost start reply, of a hub or lane action meeting
+`CONFIRMATION_TIMEOUT` (`host.*` and `assistant.*` never raise a confirmation; a lane's
+pane and worktree actions do), or of message text lost when a host restarts, and no e2e
+spec drives messaging between instances: those scenarios rest on their own runs.
+
+**Injecting.** Only through the stage's own processes and the person's own switches:
+a ControlMaster is found by pid under the stage root, never by name. The app types at
+most one wake per exchange (`AssistantExchangeStore.ts:368-387`), so a duplicate wake
+is the operator typing the lane's wake line again. An injection that misses its window
+(the send settled before the cut) is HARNESS: record it and repeat that trial once.
+
+**Cost.** Run `minimum_staged` first: six scenarios, two trials each, both CLIs as hub
+and as lane in mixed pairs, covering the faults the program names first. After that a
+runbook change re-runs only the scenarios that exercise it (`plan scenarios --runbook
+<id>`), an issue only those it names, and evidence is shared between issues only when
+the run exercised and independently checked each issue's procedure. The usage-limit
+stop above applies.
+
+```bash
+"$T/dtrb.sh" plan scenarios --minimum       # the bounded subset to run first
+"$T/dtrb.sh" plan scenarios --issue 110     # an issue's scenarios and what each still owes
+"$T/dtrb.sh" plan show lost-send-reply      # one scenario as a runsheet
+"$T/dtrb.sh" plan grounding                 # every citation read at app_sha
+```
+
+`plan coverage` also lists any observation or family owner issue no scenario covers.
+A passed scenario run sets `staged:` or `real_host:` to `passed: <date> <verdict>`; a
+new fault gets a scenario here, not a paragraph in an issue.

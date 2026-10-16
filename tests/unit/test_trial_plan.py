@@ -21,6 +21,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+import yaml
 
 _KIT = Path(__file__).resolve().parents[2] / ".claude/skills/runbook/scripts/trial"
 _SCRIPT = _KIT / "trial_plan.py"
@@ -308,3 +309,395 @@ def test_the_driver_routes_plan_and_parses() -> None:
     driver = _KIT / "dtrb.sh"
     assert re.search(r"^\s*plan\) shift; cmd_plan \"\$@\" ;;$", driver.read_text(), re.M)
     assert subprocess.run(["bash", "-n", str(driver)], check=False).returncode == 0
+
+
+# --------------------------------------------------------------------------- scenarios
+#
+# The failure and recovery scenarios (`references/failure-scenarios.yaml`, issue #143).
+# What `check` proves for them is the contract layer only: the runbooks exist, each
+# role is offered what a step expects of it, and each injected condition is a value
+# the app's captured contract declares. None of it is live evidence.
+
+OUTPUTS: dict[str, dict[str, Any]] = {
+    "hub-full": {
+        "host.sendMessage": {
+            "type": "object",
+            "properties": {
+                "outcome": {"type": "string", "enum": ["ok", "ambiguous", "rate_limited"]},
+                "task": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {"state": {"enum": ["working", "completed"]}},
+                        },
+                        {"type": "null"},
+                    ]
+                },
+            },
+        },
+        "host.list": {
+            "properties": {
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "properties": {"connection": {"enum": ["connected", "disconnected"]}}
+                    },
+                }
+            }
+        },
+    },
+    "lane-full": {"assistant.reply": {"properties": {"state": {"enum": ["completed"]}}}},
+    "pane-full": {},
+}
+OBSERVATIONS = {"lost-reply": "delivery", "reuse": "startup"}
+INVARIANTS = ("no-duplicate-write", "no-false-claim")
+
+#: The faults issue #143 names, as observation tags: each needs a scenario.
+ISSUE_143_FAULTS = (
+    "lost-send-reply",
+    "lost-start-reply",
+    "duplicate-wake",
+    "delayed-reply",
+    "input-required",
+    "rate-limit",
+    "oversized-reply",
+    "stale-generation",
+    "consent-withdrawn",
+    "slots-full",
+    "wrong-cli",
+    "confirmation-timeout",
+    "hub-replacement",
+    "link-loss",
+    "host-restart",
+    "lane-loss",
+    "multiple-projects",
+    "second-shell",
+)
+#: The evidence each scenario's outcome checks must show held (issue #143).
+ISSUE_143_INVARIANTS = {
+    "no-duplicate-write",
+    "no-displaced-lane",
+    "no-false-claim",
+    "no-unrelated-resource",
+}
+
+
+def _scenario(tp: ModuleType) -> dict[str, Any]:
+    run = {k: v for k, v in _entry(tp).items() if k not in ("id", "issue", "status")}
+    return {
+        "id": "lost-reply",
+        "family": "delivery",
+        "observes": ["lost-reply"],
+        "invariants": ["no-duplicate-write"],
+        "issues": [1],
+        "inject": "Cut the link while the send is in flight.",
+        "conditions": [{"role": "hub", "action": "host.sendMessage", "outcome": "ambiguous"}],
+        "grounding": ["src/send.ts:10 a send cut off mid-call is ambiguous"],
+        "staged": "owed",
+        "real_host": "owed",
+        **run,
+    }
+
+
+def _scenario_file(tp: ModuleType) -> tuple[dict[str, Any], dict[str, Any]]:
+    data = {
+        "app_sha": "abc",
+        "families": {
+            "delivery": {"title": "Delivery", "observations": ["lost-reply"], "issues": [1]},
+            "startup": {"title": "Startup", "observations": ["reuse"], "issues": [2]},
+        },
+        "invariants": dict.fromkeys(INVARIANTS, "shown by an outcome check"),
+        "minimum_staged": ["lost-reply"],
+        "scenarios": [_scenario(tp)],
+    }
+    return data, {"app_sha": "abc", "trials": [_entry(tp)]}
+
+
+def _scenario_problems(tp: ModuleType, sc: dict[str, Any]) -> list[str]:
+    entries = {"ask": _entry(tp)}
+    result: list[str] = tp.scenario_problems(
+        sc, KNOWN, SURFACES, OUTPUTS, entries, OBSERVATIONS, INVARIANTS
+    )
+    return result
+
+
+def test_a_well_formed_scenario_has_no_problems(tp: ModuleType) -> None:
+    assert _scenario_problems(tp, _scenario(tp)) == []
+    data, register = _scenario_file(tp)
+    assert tp.scenarios_problems(data, register, KNOWN, SURFACES, OUTPUTS) == []
+
+
+def test_a_scenario_may_run_a_register_entry_instead_of_its_own(tp: ModuleType) -> None:
+    sc = {k: v for k, v in _scenario(tp).items() if k in tp.SCENARIO_KEYS}
+    sc["run"] = "ask"
+    assert _scenario_problems(tp, sc) == []
+    sc["run"] = "gone"
+    assert any("not a register entry" in p for p in _scenario_problems(tp, sc))
+    sc["run"] = "ask"
+    sc["steps"] = []
+    assert any("and its own ['steps']" in p for p in _scenario_problems(tp, sc))
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (_set("inject", _DELETE), "missing ['inject']"),
+        (_set("steps", _DELETE), "no run of its own: missing ['steps']"),
+        (_set("colour", "red"), "unknown keys ['colour']"),
+        (_set("id", "Lost Reply"), "lowercase slug"),
+        (_set("family", "weather"), "family must be one of"),
+        (_set("observes", []), "observes nothing"),
+        (_set("observes", ["sunshine"]), "observes unknown"),
+        (_set("observes", ["reuse"]), "nothing of its own family"),
+        (_set("invariants", []), "names no invariant"),
+        (_set("invariants", ["no-rain"]), "unknown invariants"),
+        (_set("issues", ["#1"]), "issue numbers"),
+        (_set("inject", " "), "inject must say"),
+        (_set("grounding", []), "at least one citation"),
+        (_set("grounding", ["somewhere in the app"]), "not 'path:line what'"),
+        (_set("app_tests", ["a test somewhere"]), "not 'path:line what'"),
+        (_set("staged", "pending"), "staged must be"),
+        (_set("real_host", "n/a"), "real_host must be"),
+        (_set("staged", "n/a: one Mac"), "never n/a"),
+        (_set("path", "fleet"), "a fleet run cannot be staged"),
+        (_set("conditions", "ambiguous"), "conditions must list"),
+        # The run itself is held to the register's rules.
+        (_set("combos", [{"hub": "claude", "lane": "codex"}]), "must run both"),
+        (_set("steps.0.expect.lane.calls", ["host.sendMessage"]), "not offered on lane-full"),
+    ],
+)
+def test_each_scenario_rule_rejects_the_scenario_that_breaks_it(
+    tp: ModuleType, mutate: Any, expected: str
+) -> None:
+    sc = copy.deepcopy(_scenario(tp))
+    mutate(sc)
+    problems = _scenario_problems(tp, sc)
+    assert any(expected in p for p in problems), problems
+
+
+def test_a_scenario_nothing_would_ever_run_is_refused(tp: ModuleType) -> None:
+    sc = _scenario(tp)
+    sc.update(path="fleet", staged="n/a: one Mac", real_host="n/a: settled offline")
+    assert any("both n/a" in p for p in _scenario_problems(tp, sc))
+
+
+@pytest.mark.parametrize(
+    ("cond", "expected"),
+    [
+        (
+            {"role": "hub", "action": "host.sendMessage", "outcome": "lost"},
+            "not among the captured",
+        ),
+        ({"role": "hub", "action": "host.sendMessage", "state": "exploded"}, "not among"),
+        ({"role": "hub", "action": "host.teleport", "outcome": "ok"}, "not offered on hub-full"),
+        ({"role": "pane", "action": "terminal.list", "state": "idle"}, "this run has only"),
+        ({"role": "hub", "action": "host.sendMessage"}, "exactly one result field"),
+        (
+            {"role": "hub", "action": "host.sendMessage", "outcome": "ok", "state": "working"},
+            "exactly one result field",
+        ),
+        ({"role": "hub", "action": "host.sendMessage", "detail": "x"}, "no enumerated 'detail'"),
+        ({"error": "SOMETHING_ODD"}, "not an app error code"),
+        ({"error": ["TOO_LARGE"]}, "plain strings"),
+        ({"role": "hub", "action": "host.sendMessage", "outcome": {"x": 1}}, "plain strings"),
+        ("ambiguous", "must be a mapping"),
+    ],
+)
+def test_a_condition_must_be_one_the_captured_contract_declares(
+    tp: ModuleType, cond: Any, expected: str
+) -> None:
+    problems = tp.condition_problems(cond, {"hub", "lane"}, OUTPUTS)
+    assert any(expected in p for p in problems), problems
+
+
+def test_conditions_reach_nested_enums_and_cited_error_codes(tp: ModuleType) -> None:
+    for cond in (
+        {"role": "hub", "action": "host.sendMessage", "state": "working"},
+        {"role": "hub", "action": "host.list", "connection": "disconnected"},
+        {"role": "lane", "action": "assistant.reply", "state": "completed"},
+        {"error": "CONFIRMATION_TIMEOUT"},
+        {"error": "TOO_LARGE"},
+    ):
+        assert tp.condition_problems(cond, {"hub", "lane"}, OUTPUTS) == [], cond
+    # A fault in the world (a listener, a branch) declares no app value.
+    sc = _scenario(tp)
+    sc["conditions"] = []
+    assert _scenario_problems(tp, sc) == []
+
+
+def test_the_captured_contract_declares_the_faults_the_scenarios_inject(tp: ModuleType) -> None:
+    outputs = tp.load_outputs()
+    send = outputs["hub-full"]["host.sendMessage"]
+    assert {"ambiguous", "rate_limited", "too_large", "lane_unavailable"} <= tp.output_values(
+        send, "outcome"
+    )
+    assert "input-required" in tp.output_values(outputs["hub-full"]["host.getTask"], "state")
+    assert "disconnected" in tp.output_values(outputs["hub-full"]["host.list"], "connection")
+    assert tp.output_values(outputs["lane-full"]["assistant.reply"], "state") == {
+        "input-required",
+        "completed",
+    }
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (lambda d: d.update(app_sha="def"), "app_sha differs"),
+        (lambda d: d.update(families={}), "families must map"),
+        (
+            lambda d: d["families"]["startup"].update(observations=["lost-reply"]),
+            "in both delivery and startup",
+        ),
+        (lambda d: d["families"]["startup"].pop("issues"), "needs exactly title"),
+        (lambda d: d["families"]["startup"].update(issues=143), "list of issue numbers"),
+        (lambda d: d["families"]["startup"].update(issues=[]), "list of issue numbers"),
+        (lambda d: d["families"]["startup"].update(observations=[]), "list of slugs"),
+        (lambda d: d["families"]["startup"].update(observations="reuse"), "list of slugs"),
+        (lambda d: d["scenarios"][0].update(family=["delivery"]), "family must be one of"),
+        (lambda d: d.update(invariants={}), "invariants must map"),
+        (lambda d: d["scenarios"].append(copy.deepcopy(d["scenarios"][0])), "id used twice"),
+        (lambda d: d["scenarios"][0].update(id="ask"), "also a register entry's"),
+        (lambda d: d.update(minimum_staged=[]), "minimum_staged must list"),
+        (lambda d: d.update(minimum_staged=["nope"]), "no scenario nope"),
+        (lambda d: d.update(minimum_staged=["lost-reply"] * 7), "at most 6"),
+        (
+            lambda d: d["scenarios"][0].update(
+                path="fleet", staged="n/a: one Mac", needs=["real-ssh"]
+            ),
+            "is not a staged run",
+        ),
+        (
+            lambda d: d["scenarios"][0].update(
+                combos=[{"hub": "claude", "lane": "claude"}, {"hub": "codex", "lane": "codex"}]
+            ),
+            "a mixed-CLI pair",
+        ),
+        (
+            lambda d: d["scenarios"][0].update(
+                combos=[{"hub": "claude", "lane": "codex"}, {"hub": "codex", "lane": "codex"}]
+            ),
+            "both CLIs as hub and both as lane",
+        ),
+    ],
+)
+def test_the_scenario_file_rules(tp: ModuleType, mutate: Any, expected: str) -> None:
+    data, register = _scenario_file(tp)
+    mutate(data)
+    problems = tp.scenarios_problems(data, register, KNOWN, SURFACES, OUTPUTS)
+    assert any(expected in p for p in problems), problems
+
+
+def test_gaps_name_unobserved_observations_and_unmapped_issues(tp: ModuleType) -> None:
+    data, _register = _scenario_file(tp)
+    assert tp.scenario_gaps(data) == [
+        "no scenario observes startup: reuse",
+        "no scenario maps issue #2 (startup)",
+    ]
+    # Malformed families are a gap, never a vacuous pass or a crash.
+    for bad in ({"issues": 143}, {"issues": []}, {"observations": []}, {"observations": [["x"]]}):
+        broken = copy.deepcopy(data)
+        broken["families"]["startup"].update(bad)
+        assert "family startup is malformed (plan check)" in tp.scenario_gaps(broken), bad
+    data["scenarios"][0]["observes"] = [["lost-reply"]]
+    assert "no scenario observes delivery: lost-reply" in tp.scenario_gaps(data)
+    data["families"] = None
+    assert tp.scenario_gaps(data) == ["no families to cover"]
+
+
+def test_scenarios_are_selected_by_issue_runbook_family_and_minimum(tp: ModuleType) -> None:
+    data, register = _scenario_file(tp)
+    by_ref = {k: v for k, v in _scenario(tp).items() if k in tp.SCENARIO_KEYS}
+    by_ref.update(id="reuse-lane", family="startup", observes=["reuse"], issues=[2], run="ask")
+    data["scenarios"].append(by_ref)
+
+    def ids(**kw: Any) -> list[str]:
+        return [s["id"] for s in tp.select_scenarios(data, register, **kw)]
+
+    assert ids(issue=2) == ["reuse-lane"]
+    assert ids(runbook="daintree.hosts.ask") == ["lost-reply", "reuse-lane"]
+    assert ids(runbook="daintree.hosts.work") == []
+    assert ids(family="delivery") == ["lost-reply"]
+    assert ids(minimum=True) == ["lost-reply"]
+    table = tp.scenario_table(tp.select_scenarios(data, register), register)
+    assert "2 scenarios; staged owed 2 (4 trials), real host owed 2" in table
+    assert "staged: owed | real host: owed | app tests: none" in table
+
+
+def test_a_scenario_sheet_keeps_contract_staged_and_real_host_evidence_apart(
+    tp: ModuleType,
+) -> None:
+    _data, register = _scenario_file(tp)
+    sc = _scenario(tp)
+    sc["app_tests"] = ["src/send.test.ts:4 reports a lost answer as ambiguous"]
+    sheet = tp.scenario_sheet(sc, register, "sha256:abc")
+    assert "Evidence: contract checked by plan check; staged owed; real host owed" in sheet
+    assert "- role hub, action host.sendMessage, outcome ambiguous" in sheet
+    assert "App harness (the app's own behaviour, never runbook following):" in sheet
+    assert "## Outcome checks (layer 5" in sheet
+    assert "# lost-reply: daintree.hosts.ask (a scenario's own run)" in sheet
+    sc["conditions"] = []
+    assert "none: the fault is in the world" in tp.scenario_sheet(sc, register)
+
+
+def test_grounding_reads_every_citation_at_the_pinned_revision(tp: ModuleType) -> None:
+    data, _register = _scenario_file(tp)
+    sc = data["scenarios"][0]
+    sc["app_tests"] = ["src/send.test.ts:2 reports a lost answer as ambiguous"]
+    files = {
+        "src/send.ts": "\n".join(f"line {n}" for n in range(1, 21)),
+        "src/send.test.ts": 'import x\nit("reports a lost answer as ambiguous", () => {})\n',
+    }
+    assert tp.grounding_problems(data, files.get) == []
+    sc["grounding"] = ["src/send.ts:19-25 past the end", "src/gone.ts:1 not there"]
+    sc["app_tests"] = ["src/send.test.ts:1 reports a lost answer as ambiguous"]
+    problems = tp.grounding_problems(data, files.get)
+    assert any("has 20 lines, not 19-25" in p for p in problems), problems
+    assert any("src/gone.ts is not in the app" in p for p in problems), problems
+    assert any("is not the test" in p for p in problems), problems
+
+
+def test_the_committed_scenarios_hold_to_their_rules(tp: ModuleType) -> None:
+    known, _revision = tp.load_catalog_ids()
+    data, register = tp.load_scenarios(), tp.load_register()
+    problems = tp.scenarios_problems(data, register, known, tp.load_surfaces(), tp.load_outputs())
+    assert problems == []
+    assert tp.scenario_gaps(data) == []
+
+
+def test_the_committed_scenarios_cover_what_issue_143_names(tp: ModuleType) -> None:
+    data, register = tp.load_scenarios(), tp.load_register()
+    observed = {o for sc in data["scenarios"] for o in sc["observes"]}
+    assert sorted(set(ISSUE_143_FAULTS) - observed) == []
+    # The issue references its scenarios by id: listing it finds every named fault.
+    own = tp.select_scenarios(data, register, issue=143)
+    assert sorted(set(ISSUE_143_FAULTS) - {o for sc in own for o in sc["observes"]}) == []
+    assert set(data["invariants"]) == ISSUE_143_INVARIANTS
+    # Every staged scenario owes a staged run and every fleet one a real-host run, and
+    # the minimum subset stays within twelve trials.
+    for sc in data["scenarios"]:
+        run = tp.scenario_run(sc, register)
+        tier = "staged" if run["path"] == "staged" else "real_host"
+        assert sc[tier] == "owed", (sc["id"], tier)
+    minimum = tp.select_scenarios(data, register, minimum=True)
+    assert sum(len(tp.scenario_run(s, register)["combos"]) for s in minimum) <= 12
+
+
+def test_the_cli_lists_scenarios_and_fails_a_broken_file(tp: ModuleType, tmp_path: Path) -> None:
+    assert tp.main(["scenarios", "--issue", "143"]) == 0
+    assert tp.main(["show", "lost-send-reply"]) == 0
+    broken = tmp_path / "scenarios.yaml"
+    broken.write_text("app_sha: x\nfamilies: {}\nscenarios:\n  - id: y\n")
+    assert tp.main(["check", "--scenarios", str(broken)]) == 1
+
+
+def test_a_scenario_naming_a_missing_run_fails_cleanly(tp: ModuleType, tmp_path: Path) -> None:
+    data, register = _scenario_file(tp)
+    sc = {k: v for k, v in _scenario(tp).items() if k in tp.SCENARIO_KEYS}
+    sc["run"] = "gone"
+    with pytest.raises(ValueError, match="'gone' is not a register entry"):
+        tp.scenario_run(sc, register)
+    broken = tmp_path / "scenarios.yaml"
+    data["scenarios"] = [sc]
+    broken.write_text(yaml.safe_dump(data))
+    assert tp.main(["scenarios", "--scenarios", str(broken)]) == 1
+    assert tp.main(["show", sc["id"], "--scenarios", str(broken)]) == 1

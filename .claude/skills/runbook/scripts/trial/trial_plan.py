@@ -9,6 +9,11 @@
                                                a staged run's paths, ports and transcript
                                                locations, checked for isolation
     trial_plan.py revision                     the catalog revision a trial must see served
+    trial_plan.py scenarios [--issue N] [--runbook ID] [--family F] [--minimum]
+                                               failure and recovery scenarios an issue,
+                                               runbook or family names, with what each owes
+    trial_plan.py grounding [--app-repo DIR]   every scenario citation read at app_sha
+                                               (reads the app checkout; writes nothing)
 
 The register (`references/owed-trials.yaml`) holds every hub, lane and host-pane
 trial a runbook still owes: who runs it, which CLI pairs, the exact prompts, what each
@@ -19,13 +24,22 @@ both CLIs covered within the two-trial cap, and the staged path asked only for w
 one Mac can stage. Passing `check` proves a plan is well formed, nothing about how an
 agent behaves.
 
+The scenarios (`references/failure-scenarios.yaml`) are reusable failure and recovery
+runs an issue names by id. `check` also holds them to their rules: each injected
+condition is a result value the captured output schema of an action that role is
+offered declares (or a cited app error code), each scenario cites the app, and the
+minimum staged subset is bounded and runs both CLIs in both roles. `coverage` also
+lists observations and owner issues no scenario covers.
+
 Run it through `dtrb.sh plan ...`, which supplies the backend's interpreter.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
 import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -120,6 +134,54 @@ _PATH_LEAK = re.compile(r"test|trial|runbook|e2e|harness", re.I)
 #: A stage root's own name, and a project folder's: one plain path component.
 _SAFE_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 _PROJECT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+_SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+# Failure and recovery scenarios (`references/failure-scenarios.yaml`): reusable fault
+# definitions an issue names by id instead of repeating the matrix.
+SCENARIOS = SKILL / "references" / "failure-scenarios.yaml"
+#: What a run needs, whether a register entry or a scenario carries it.
+RUN_KEYS = ENTRY_KEYS - {"id", "issue", "status"}
+RUN_OPTIONAL = OPTIONAL_KEYS - {"evidence"}
+SCENARIO_KEYS = {
+    "id",
+    "family",
+    "observes",
+    "invariants",
+    "issues",
+    "inject",
+    "conditions",
+    "grounding",
+    "staged",
+    "real_host",
+}
+SCENARIO_OPTIONAL = {"run", "app_tests"}
+#: Staged and real-host evidence: owed, passed with its record, or n/a with the reason.
+_EVIDENCE = re.compile(r"owed|passed: \S.*|n/a: \S.*")
+#: A citation of the app at the pinned revision: path:line, then what is there.
+_CITATION = re.compile(r"[\w./@-]+\.[A-Za-z]+:\d+(-\d+)? \S.*")
+#: The minimum staged subset is bounded: two trials per scenario.
+MINIMUM_MAX = 6
+#: Codes the app raises as tool errors rather than result values, so the captured
+#: output schemas cannot show them. At the register's app_sha: a lane's messaging
+#: refusals (`AssistantMessagingRefusalCode`, shared/types/assistantMessaging.ts:217-227),
+#: an unanswered confirmation (electron/services/mcp-server/shared.ts:323) and a
+#: renderer that never came back (shared.ts:326).
+APP_ERROR_CODES = frozenset(
+    {
+        "NOT_ELIGIBLE",
+        "INVALID_ARGS",
+        "UNKNOWN_TASK",
+        "EXCHANGE_CLOSED",
+        "TOO_MANY_RESPONSES",
+        "PAUSED",
+        "HOP_LIMIT",
+        "TOO_LARGE",
+        "OUTBOX_FULL",
+        "UNAVAILABLE",
+        "CONFIRMATION_TIMEOUT",
+        "SESSION_BINDING_GONE",
+    }
+)
 
 
 # --------------------------------------------------------------------------- register
@@ -219,10 +281,25 @@ def entry_problems(
     if problems:
         return problems
 
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(entry["id"])):
+    if not _SLUG.fullmatch(str(entry["id"])):
         problems.append("id must be a lowercase slug")
     if not isinstance(entry["issue"], int):
         problems.append("issue must be the issue number")
+    if entry["status"] not in STATUSES:
+        problems.append(f"status must be one of {list(STATUSES)}")
+    elif entry["status"] != "owed" and not entry.get("evidence"):
+        problems.append(f"status {entry['status']} needs evidence")
+    return problems + run_problems(entry, known_ids, surfaces)
+
+
+def run_problems(
+    entry: dict[str, Any],
+    known_ids: frozenset[str],
+    surfaces: Mapping[str, frozenset[str]],
+) -> list[str]:
+    """Everything wrong with what a trial runs (caller, combos, hosts, setup, steps,
+    checks): shared by a register entry and a scenario that carries its own run."""
+    problems: list[str] = []
     runbooks = [entry["runbook"], *(_strings(entry.get("also")))]
     if unknown := sorted(set(runbooks) - known_ids):
         problems.append(f"unknown runbooks {unknown}")
@@ -290,11 +367,6 @@ def entry_problems(
             problems.append(f"needs {fleet} cannot be staged on one Mac: path must be fleet")
         if hosts > STAGED_MAX_HOSTS:
             problems.append(f"{hosts} hosts: the staged path holds {STAGED_MAX_HOSTS}")
-
-    if entry["status"] not in STATUSES:
-        problems.append(f"status must be one of {list(STATUSES)}")
-    elif entry["status"] != "owed" and not entry.get("evidence"):
-        problems.append(f"status {entry['status']} needs evidence")
 
     try:
         _strings(entry["setup"])
@@ -369,13 +441,430 @@ def register_problems(
 
 
 def uncovered(data: dict[str, Any], known_ids: Iterable[str]) -> list[str]:
-    """Landed hosts runbooks no entry exercises (as its runbook or in `also`)."""
+    """Landed hosts runbooks no entry exercises (as its runbook or in `also`). A
+    scenario does not count: each runbook's own issue owes its own run."""
     covered: set[str] = set()
     for entry in data["trials"]:
         if isinstance(entry, dict):
             covered.add(str(entry.get("runbook")))
             covered.update(_strings(entry.get("also")))
     return sorted(i for i in known_ids if i.startswith("daintree.hosts.") and i not in covered)
+
+
+# --------------------------------------------------------------------------- scenarios
+
+
+def load_scenarios(path: Path = SCENARIOS) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not isinstance(data.get("scenarios"), list):
+        raise ValueError(f"{path}: expected a mapping with a 'scenarios' list")
+    return data
+
+
+def output_values(schema: Any, field: str) -> set[str]:
+    """Every enumerated value a captured output schema allows for a property named
+    `field`, at any depth (an `outcome`, a task's `state`, a host's `connection`)."""
+    found: set[str] = set()
+
+    def enums(node: Any) -> None:
+        if isinstance(node, dict):
+            found.update(str(v) for v in node.get("enum") or [])
+            for key in ("anyOf", "oneOf", "items"):
+                if key in node:
+                    enums(node[key])
+        elif isinstance(node, list):
+            for item in node:
+                enums(item)
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            props = node.get("properties")
+            if isinstance(props, dict) and field in props:
+                enums(props[field])
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(schema)
+    return found
+
+
+def condition_problems(
+    cond: Any,
+    roles: set[str],
+    outputs: Mapping[str, Mapping[str, Any]],
+) -> list[str]:
+    """A scenario's injected condition must be one the app's contract declares: a
+    result value in the captured output schema of an action the role is offered, or
+    an error code the app raises (cited in APP_ERROR_CODES)."""
+    if not isinstance(cond, dict):
+        return ["a condition must be a mapping"]
+    if bad := sorted(str(k) for k, v in cond.items() if not isinstance(v, str)):
+        return [f"condition values must be plain strings, not {bad}"]
+    if set(cond) == {"error"}:
+        if cond["error"] not in APP_ERROR_CODES:
+            return [f"error {cond['error']!r} is not an app error code in APP_ERROR_CODES"]
+        return []
+    role, action = cond.get("role"), cond.get("action")
+    if role not in roles:
+        return [f"condition role {role!r}: this run has only {sorted(roles)}"]
+    surface = ROLE_SURFACE[str(role)]
+    schema = outputs.get(surface, {}).get(str(action))
+    if schema is None:
+        return [f"condition {action!r} is not offered on {surface}"]
+    fields = sorted(set(cond) - {"role", "action"})
+    if len(fields) != 1:
+        return [f"condition on {action} must name exactly one result field, not {fields}"]
+    field = fields[0]
+    allowed = output_values(schema, field)
+    if not allowed:
+        return [f"{action} declares no enumerated {field!r} on {surface}"]
+    if cond[field] not in allowed:
+        return [f"{action} {field} {cond[field]!r} is not among the captured {sorted(allowed)}"]
+    return []
+
+
+def _is_slug(value: Any) -> bool:
+    return isinstance(value, str) and _SLUG.fullmatch(value) is not None
+
+
+def _list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _family_ok(tags: Any, issues: Any) -> bool:
+    """A family names at least one observation (slugs) and at least one owner issue."""
+    return (
+        isinstance(tags, list)
+        and bool(tags)
+        and all(_is_slug(t) for t in tags)
+        and isinstance(issues, list)
+        and bool(issues)
+        and all(isinstance(i, int) and not isinstance(i, bool) for i in issues)
+    )
+
+
+def _citations(value: Any, label: str) -> list[str]:
+    try:
+        cites = _strings(value)
+    except TypeError as exc:
+        return [f"{label}: {exc}"]
+    return [f"{label}: {c!r} is not 'path:line what'" for c in cites if not _CITATION.fullmatch(c)]
+
+
+def scenario_problems(
+    sc: Any,
+    known_ids: frozenset[str],
+    surfaces: Mapping[str, frozenset[str]],
+    outputs: Mapping[str, Mapping[str, Any]],
+    entries: Mapping[str, dict[str, Any]],
+    observations: Mapping[str, str],
+    invariants: Iterable[str],
+) -> list[str]:
+    """Everything wrong with one scenario. `entries` are the register's entries by id
+    (a scenario may run one of them); `observations` maps each observation to its
+    family."""
+    if not isinstance(sc, dict):
+        return ["not a mapping"]
+    problems: list[str] = []
+    if missing := sorted(SCENARIO_KEYS - set(sc)):
+        problems.append(f"missing {missing}")
+    inline = set(sc) & (RUN_KEYS | RUN_OPTIONAL)
+    if "run" in sc and inline:
+        problems.append(f"runs register entry {sc['run']!r} and its own {sorted(inline)}")
+    elif "run" not in sc and (lacking := sorted(RUN_KEYS - inline)):
+        problems.append(f"no register 'run' and no run of its own: missing {lacking}")
+    known_keys = SCENARIO_KEYS | SCENARIO_OPTIONAL | RUN_KEYS | RUN_OPTIONAL
+    if extra := sorted(set(sc) - known_keys):
+        problems.append(f"unknown keys {extra}")
+    if problems:
+        return problems
+
+    if not _SLUG.fullmatch(str(sc["id"])):
+        problems.append("id must be a lowercase slug")
+    families = set(observations.values())
+    if not isinstance(sc["family"], str) or sc["family"] not in families:
+        problems.append(f"family must be one of {sorted(families)}")
+    try:
+        observes = _strings(sc["observes"])
+        named = _strings(sc["invariants"])
+        _strings(sc["inject"])
+    except TypeError as exc:
+        return [*problems, f"observes/invariants/inject: {exc}"]
+    if not observes:
+        problems.append("observes nothing")
+    elif unknown := sorted(set(observes) - set(observations)):
+        problems.append(f"observes unknown {unknown}")
+    elif str(sc["family"]) not in {observations[o] for o in observes}:
+        problems.append(f"observes nothing of its own family {sc['family']}")
+    if not named:
+        problems.append("names no invariant")
+    elif unknown := sorted(set(named) - set(invariants)):
+        problems.append(f"unknown invariants {unknown}")
+    issues = sc["issues"]
+    if not isinstance(issues, list) or not issues or not all(isinstance(i, int) for i in issues):
+        problems.append("issues must be a non-empty list of issue numbers")
+    if not str(sc["inject"]).strip():
+        problems.append("inject must say what is injected and when")
+    problems += _citations(sc["grounding"], "grounding")
+    if not sc["grounding"]:
+        problems.append("grounding: at least one citation of the app")
+    problems += _citations(sc.get("app_tests"), "app_tests")
+
+    if "run" in sc:
+        run = entries.get(str(sc["run"]))
+        if run is None:
+            return [*problems, f"run {sc['run']!r} is not a register entry"]
+    else:
+        run = sc
+        problems += run_problems(sc, known_ids, surfaces)
+    caller = run.get("caller")
+    roles = set(CALLER_ROLES.get(str(caller), set()))
+
+    # Empty only when the fault lives in the world (a listener, a branch, a file).
+    conds = sc["conditions"]
+    if not isinstance(conds, list):
+        problems.append("conditions must list what the app returns under the fault")
+    else:
+        for cond in conds:
+            problems += condition_problems(cond, roles, outputs)
+
+    for tier in ("staged", "real_host"):
+        if not isinstance(sc[tier], str) or not _EVIDENCE.fullmatch(sc[tier]):
+            problems.append(f"{tier} must be 'owed', 'passed: <record>' or 'n/a: <why>'")
+    if run.get("path") == "fleet" and not str(sc["staged"]).startswith("n/a:"):
+        problems.append("a fleet run cannot be staged: staged must be 'n/a: <why>'")
+    if run.get("path") == "staged" and str(sc["staged"]).startswith("n/a:"):
+        problems.append("a staged run's staged evidence is owed or passed, never n/a")
+    if str(sc["staged"]).startswith("n/a:") and str(sc["real_host"]).startswith("n/a:"):
+        problems.append("staged and real_host both n/a: nothing would ever run it")
+    return problems
+
+
+def scenarios_problems(
+    data: dict[str, Any],
+    register: dict[str, Any],
+    known_ids: frozenset[str],
+    surfaces: Mapping[str, frozenset[str]],
+    outputs: Mapping[str, Mapping[str, Any]],
+) -> list[str]:
+    """The scenario file: its families, invariants, every scenario, and the bounded
+    minimum staged subset."""
+    problems: list[str] = []
+    if data.get("app_sha") != register.get("app_sha"):
+        problems.append("app_sha differs from the register's: ground both at one revision")
+    observations: dict[str, str] = {}
+    families = data.get("families")
+    if not isinstance(families, dict) or not families:
+        return [*problems, "families must map each family to its observations and issues"]
+    for family, spec in families.items():
+        if not isinstance(spec, dict) or set(spec) != {"title", "observations", "issues"}:
+            problems.append(f"family {family}: needs exactly title, observations, issues")
+            continue
+        tags, issues = spec["observations"], spec["issues"]
+        if not isinstance(tags, list) or not tags or not all(_is_slug(t) for t in tags):
+            problems.append(f"family {family}: observations must be a list of slugs")
+            continue
+        if not _family_ok(tags, issues):
+            problems.append(f"family {family}: issues must be a list of issue numbers")
+        for tag in tags:
+            if tag in observations:
+                problems.append(f"observation {tag} in both {observations[tag]} and {family}")
+            observations[tag] = str(family)
+    invariants = data.get("invariants")
+    if not isinstance(invariants, dict) or not invariants:
+        problems.append("invariants must map each invariant to what an outcome check shows")
+        invariants = {}
+
+    entries = {str(e["id"]): e for e in register["trials"] if isinstance(e, dict) and "id" in e}
+    ids: set[str] = set()
+    by_id: dict[str, dict[str, Any]] = {}
+    for i, sc in enumerate(data["scenarios"]):
+        name = str(sc.get("id", f"#{i}")) if isinstance(sc, dict) else f"#{i}"
+        if name in ids:
+            problems.append(f"{name}: id used twice")
+        elif name in entries:
+            problems.append(f"{name}: id is also a register entry's")
+        ids.add(name)
+        found = scenario_problems(
+            sc, known_ids, surfaces, outputs, entries, observations, invariants
+        )
+        problems += [f"{name}: {p}" for p in found]
+        if isinstance(sc, dict):
+            by_id[name] = sc
+
+    minimum = data.get("minimum_staged")
+    if not isinstance(minimum, list) or not minimum:
+        return [*problems, "minimum_staged must list the staged subset run first"]
+    if len(minimum) > MINIMUM_MAX:
+        problems.append(f"minimum_staged: {len(minimum)} scenarios, at most {MINIMUM_MAX}")
+    pairs: set[tuple[str, str]] = set()
+    for sid in minimum:
+        sc = by_id.get(str(sid))
+        if sc is None:
+            problems.append(f"minimum_staged: no scenario {sid}")
+            continue
+        run = entries.get(str(sc.get("run")), {}) if "run" in sc else sc
+        if run.get("path") != "staged":
+            problems.append(f"minimum_staged: {sid} is not a staged run")
+        for combo in run.get("combos") or []:
+            if isinstance(combo, dict) and "hub" in combo and "lane" in combo:
+                pairs.add((str(combo["hub"]), str(combo["lane"])))
+    hubs, lanes = {h for h, _ in pairs}, {lane for _, lane in pairs}
+    if hubs != set(CLIS) or lanes != set(CLIS):
+        problems.append("minimum_staged must run both CLIs as hub and both as lane")
+    if not any(h != lane for h, lane in pairs):
+        problems.append("minimum_staged must include a mixed-CLI pair")
+    return problems
+
+
+_CITED = re.compile(r"([\w./@-]+\.[A-Za-z]+):(\d+)(?:-(\d+))? (.*)")
+
+
+def grounding_problems(data: dict[str, Any], read: Any) -> list[str]:
+    """Every scenario citation against the app at app_sha: the file exists and holds
+    the cited lines, and an app test's title is on its cited line. `read(path)` returns
+    the file's text at that revision, or None."""
+    problems: list[str] = []
+    files: dict[str, list[str] | None] = {}
+    for sc in data["scenarios"]:
+        if not isinstance(sc, dict):
+            continue
+        cites = [(c, False) for c in _strings(sc.get("grounding"))]
+        cites += [(c, True) for c in _strings(sc.get("app_tests"))]
+        for cite, is_test in cites:
+            m = _CITED.fullmatch(cite)
+            if m is None:
+                continue  # the shape is check's to report
+            path, first, last, what = m.group(1), int(m.group(2)), m.group(3), m.group(4)
+            if path not in files:
+                text = read(path)
+                files[path] = None if text is None else text.splitlines()
+            lines = files[path]
+            end = int(last) if last else first
+            if lines is None:
+                problems.append(f"{sc.get('id')}: {path} is not in the app at app_sha")
+            elif not 1 <= first <= end <= len(lines):
+                problems.append(f"{sc.get('id')}: {path} has {len(lines)} lines, not {first}-{end}")
+            elif is_test and what[:24] not in lines[first - 1]:
+                problems.append(f"{sc.get('id')}: {path}:{first} is not the test {what[:40]!r}")
+    return problems
+
+
+def scenario_gaps(data: dict[str, Any]) -> list[str]:
+    """Observations no scenario observes, and family owner issues no scenario maps.
+    Malformed parts are `check`'s to report; here they are a gap, never a pass."""
+    families = data.get("families")
+    if not isinstance(families, dict) or not families:
+        return ["no families to cover"]
+    scenarios = [s for s in data["scenarios"] if isinstance(s, dict)]
+    observed = {o for s in scenarios for o in _list(s.get("observes")) if isinstance(o, str)}
+    mapped = {i for s in scenarios for i in _list(s.get("issues")) if isinstance(i, int)}
+    gaps: list[str] = []
+    for family, spec in families.items():
+        tags = _list(spec.get("observations")) if isinstance(spec, dict) else []
+        issues = _list(spec.get("issues")) if isinstance(spec, dict) else []
+        if not _family_ok(tags, issues):
+            gaps.append(f"family {family} is malformed (plan check)")
+            continue
+        gaps += [f"no scenario observes {family}: {t}" for t in tags if t not in observed]
+        gaps += [f"no scenario maps issue #{i} ({family})" for i in issues if i not in mapped]
+    return gaps
+
+
+def scenario_run(sc: dict[str, Any], register: dict[str, Any]) -> dict[str, Any]:
+    """The run a scenario names: a register entry, or its own."""
+    if "run" not in sc:
+        return sc
+    for entry in register["trials"]:
+        if isinstance(entry, dict) and entry.get("id") == sc["run"]:
+            return entry
+    raise ValueError(f"scenario {sc.get('id')}: run {sc['run']!r} is not a register entry")
+
+
+def select_scenarios(
+    data: dict[str, Any],
+    register: dict[str, Any],
+    *,
+    issue: int | None = None,
+    runbook: str | None = None,
+    family: str | None = None,
+    minimum: bool = False,
+) -> list[dict[str, Any]]:
+    """The scenarios an issue, a runbook or a family names, or the minimum subset."""
+    chosen = []
+    keep = {str(s) for s in data.get("minimum_staged") or []}
+    for sc in data["scenarios"]:
+        if issue is not None and issue not in sc["issues"]:
+            continue
+        if family is not None and sc["family"] != family:
+            continue
+        if minimum and sc["id"] not in keep:
+            continue
+        if runbook is not None:
+            run = scenario_run(sc, register)
+            if runbook not in {run["runbook"], *_strings(run.get("also"))}:
+                continue
+        chosen.append(sc)
+    return chosen
+
+
+def scenario_table(chosen: list[dict[str, Any]], register: dict[str, Any]) -> str:
+    """One line per scenario, then what the selection still owes, by tier."""
+    out = []
+    for sc in chosen:
+        run = scenario_run(sc, register)
+        runbooks = ", ".join([run["runbook"], *_strings(run.get("also"))])
+        app = len(_strings(sc.get("app_tests")))
+        out += [
+            f"{sc['id']} [{sc['family']}] observes {', '.join(_strings(sc['observes']))}",
+            f"    runbooks: {runbooks}",
+            f"    contract: plan check | staged: {sc['staged']} | real host: {sc['real_host']}"
+            f" | app tests: {app or 'none'}",
+        ]
+    staged = [s for s in chosen if s["staged"] == "owed"]
+    real = [s for s in chosen if s["real_host"] == "owed"]
+    trials = sum(len(scenario_run(s, register)["combos"]) for s in staged)
+    out.append(
+        f"{len(chosen)} scenarios; staged owed {len(staged)} ({trials} trials), "
+        f"real host owed {len(real)}"
+    )
+    return "\n".join(out) + "\n"
+
+
+def scenario_sheet(
+    sc: dict[str, Any], register: dict[str, Any], revision: str | None = None
+) -> str:
+    """One scenario as the operator runs it: the fault and its evidence tiers, then
+    the run's own runsheet."""
+    run = scenario_run(sc, register)
+    out = [
+        f"# scenario {sc['id']} ({sc['family']}): issues "
+        + ", ".join(f"#{i}" for i in sc["issues"]),
+        "",
+        f"Observes: {', '.join(_strings(sc['observes']))}",
+        f"Invariants: {', '.join(_strings(sc['invariants']))}",
+        f"Injected: {str(sc['inject']).strip()}",
+        "Conditions (checked offline against the captured contract, never live proof):",
+    ]
+    for cond in sc["conditions"]:
+        out.append("- " + ", ".join(f"{k} {v}" for k, v in cond.items()))
+    if not sc["conditions"]:
+        out.append("- none: the fault is in the world, not a value the app returns")
+    out += [
+        f"Evidence: contract checked by plan check; staged {sc['staged']}; "
+        f"real host {sc['real_host']}",
+        "Grounding (app source at app_sha):",
+        *(f"- {c}" for c in _strings(sc["grounding"])),
+        "App harness (the app's own behaviour, never runbook following):",
+        *(f"- {c}" for c in _strings(sc.get("app_tests")) or ["none"]),
+    ]
+    if "run" in sc:
+        out.append(f"Run: register entry {sc['run']}")
+    out.append("")
+    return "\n".join(out) + "\n" + runsheet(run, revision)
 
 
 # --------------------------------------------------------------------------- runsheet
@@ -395,8 +884,11 @@ def runsheet(entry: dict[str, Any], revision: str | None = None) -> str:
     combos = "; ".join(
         " + ".join(f"{role} {cli}" for role, cli in combo.items()) for combo in entry["combos"]
     )
+    owner = "a scenario's own run"
+    if "issue" in entry:
+        owner = f"{entry['status']}, issue #{entry['issue']}"
     out = [
-        f"# {entry['id']}: {entry['runbook']} ({entry['status']}, issue #{entry['issue']})",
+        f"# {entry['id']}: {entry['runbook']} ({owner})",
         "",
         f"Caller: {caller}",
         f"Path: {path}; hosts: {entry['hosts']}",
@@ -584,14 +1076,50 @@ def load_surfaces() -> dict[str, frozenset[str]]:
     return {name: frozenset(surfaces.action_ids(name)) for name in set(ROLE_SURFACE.values())}
 
 
+def load_outputs() -> dict[str, dict[str, Any]]:
+    """Each caller's captured output schemas, by action id."""
+    sys.path.insert(0, str(REPO / "tests"))
+    import daintree_mcp_surfaces as surfaces
+
+    return {
+        name: {
+            str(tool["action_id"]): tool.get("outputSchema") or {}
+            for tool in surfaces.capture(name)["tools"]
+        }
+        for name in set(ROLE_SURFACE.values())
+    }
+
+
+def _default_app_repo() -> Path:
+    """The app checkout: $DAINTREE_APP_REPO, else a `daintree` beside the main checkout."""
+    if env := os.environ.get("DAINTREE_APP_REPO"):
+        return Path(env)
+    common = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    main_checkout = Path(common).parent if common else REPO
+    return main_checkout.parent / "daintree"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="trial_plan.py", description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("check", "coverage", "show"):
+    for name in ("check", "coverage", "show", "scenarios", "grounding"):
         p = sub.add_parser(name)
         if name == "show":
             p.add_argument("id")
+        if name == "scenarios":
+            p.add_argument("--issue", type=int)
+            p.add_argument("--runbook")
+            p.add_argument("--family")
+            p.add_argument("--minimum", action="store_true")
+        if name == "grounding":
+            p.add_argument("--app-repo", type=Path, default=_default_app_repo())
         p.add_argument("--register", type=Path, default=REGISTER)
+        p.add_argument("--scenarios", type=Path, default=SCENARIOS)
     lay = sub.add_parser("layout")
     lay.add_argument("run")
     lay.add_argument("--hosts", type=int, default=1)
@@ -612,8 +1140,8 @@ def main(argv: list[str] | None = None) -> int:
             runbooks_port=args.runbooks_port,
         )
         print(yaml.safe_dump(plan, sort_keys=False, width=120), end="")
-        for p in problems:
-            print(f"problem: {p}", file=sys.stderr)
+        for problem in problems:
+            print(f"problem: {problem}", file=sys.stderr)
         return 1 if problems else 0
 
     known, revision = load_catalog_ids()
@@ -621,25 +1149,73 @@ def main(argv: list[str] | None = None) -> int:
         print(revision)
         return 0
     data = load_register(args.register)
+    scenarios = load_scenarios(args.scenarios)
     if args.cmd == "coverage":
         missing = uncovered(data, known)
         for rid in missing:
             print(f"no owed or passed trial recorded: {rid}")
         hosts = sum(1 for rid in known if rid.startswith("daintree.hosts."))
         print(f"coverage: {hosts - len(missing)} of {hosts} hosts runbooks have an entry")
-        return 1 if missing else 0
+        gaps = scenario_gaps(scenarios)
+        for gap in gaps:
+            print(gap)
+        print(f"scenarios: {len(scenarios['scenarios'])}, {len(gaps)} gaps")
+        return 1 if missing or gaps else 0
     if args.cmd == "show":
         entry = next((e for e in data["trials"] if e.get("id") == args.id), None)
-        if entry is None:
-            print(f"no entry {args.id}", file=sys.stderr)
+        if entry is not None:
+            print(runsheet(entry, revision), end="")
+            return 0
+        sc = next((s for s in scenarios["scenarios"] if s.get("id") == args.id), None)
+        if sc is None:
+            print(f"no entry or scenario {args.id}", file=sys.stderr)
             return 2
-        print(runsheet(entry, revision), end="")
+        try:
+            print(scenario_sheet(sc, data, revision), end="")
+        except (ValueError, KeyError, TypeError) as exc:
+            print(f"problem: {exc} (run plan check)", file=sys.stderr)
+            return 1
         return 0
-    problems = register_problems(data, known, load_surfaces())
-    for p in problems:
-        print(f"problem: {p}")
+    if args.cmd == "grounding":
+        sha = str(scenarios["app_sha"])
+
+        def read(path: str) -> str | None:
+            done = subprocess.run(
+                ["git", "-C", str(args.app_repo), "show", f"{sha}:{path}"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return done.stdout if done.returncode == 0 else None
+
+        problems = grounding_problems(scenarios, read)
+        for problem in problems:
+            print(f"problem: {problem}")
+        print(f"grounding: citations read at {sha[:10]}, {len(problems)} problems")
+        return 1 if problems else 0
+    if args.cmd == "scenarios":
+        try:
+            chosen = select_scenarios(
+                scenarios,
+                data,
+                issue=args.issue,
+                runbook=args.runbook,
+                family=args.family,
+                minimum=args.minimum,
+            )
+            print(scenario_table(chosen, data), end="")
+        except (ValueError, KeyError, TypeError) as exc:
+            print(f"problem: {exc} (run plan check)", file=sys.stderr)
+            return 1
+        return 0
+    surfaces = load_surfaces()
+    problems = register_problems(data, known, surfaces)
+    problems += scenarios_problems(scenarios, data, known, surfaces, load_outputs())
+    for problem in problems:
+        print(f"problem: {problem}")
     owed = sum(1 for e in data["trials"] if isinstance(e, dict) and e.get("status") == "owed")
     print(f"register: {len(data['trials'])} entries, {owed} owed, {len(problems)} problems")
+    print(f"scenarios: {len(scenarios['scenarios'])}, checked against the captured contract")
     return 1 if problems else 0
 
 

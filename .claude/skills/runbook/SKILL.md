@@ -494,8 +494,10 @@ corpus rows stay, the retrain is owed, the prose stops.
   pane. A third trial only to confirm a body fix.
 - **Not trialable** (a sidebar-only caller, Remote Hosts, other machines, accounts):
   record the owed run in `$W/trials/owed.md`: who can run it, where, the exact
-  prompts, and what to check. If the issue's "Done when" requires it, the PR says
-  `Part of #N`.
+  prompts, and what to check. A hosts runbook's run is also an entry in
+  `references/owed-trials.yaml`, and its failure cases are scenario ids from
+  `references/failure-scenarios.yaml` (`dtrb.sh plan scenarios --runbook <id>`), not a
+  copied matrix. If the issue's "Done when" requires it, the PR says `Part of #N`.
 
 Run, judge and classify each trial (RUNBOOK / MODEL / ROUTING / APP / HARNESS). Fix
 **bodies** for RUNBOOK findings, restart the runbook server, reset and reseed, and
@@ -693,6 +695,7 @@ than two runners at once.
 | `references/cases-and-corpus.md` | case shape, categories, what a runbook owes, corpus rows, blind verification, compiling |
 | `references/proof.md` | the five evidence layers, and the rule that a claim may not exceed its strongest one |
 | `references/trials.md` | the live-trial kit in `scripts/trial/`: isolation, cost, procedure, scenarios, prompts, judging, classifying |
+| `references/hub-lane-trials.md` | hub and lane trials (staged and fleet), the owed-trial register and the failure and recovery scenarios |
 | `references/issue-format.md` | the shape of a runbook issue, and how this skill reads one |
 | `references/templates.md` | design note, PR body, final reports |
 | `docs/RUNBOOKS.md`, `CLAUDE.md` | the repository's own authoring guide and rules; they win over anything here |
