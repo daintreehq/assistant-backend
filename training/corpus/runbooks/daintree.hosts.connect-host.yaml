@@ -211,3 +211,12 @@ boundaries:
   - query: 'The host I added last month says it is unreachable; get it connected again so I can open projects there'
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
+  - query: Set up my second Linux server as a Remote Host so Daintree can open its repositories; I'll deal with the settings afterwards
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: The host I added last night shows Unreachable in Settings, get it connecting again
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: I need another Mac added to Daintree as a host before I do anything else with it
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129

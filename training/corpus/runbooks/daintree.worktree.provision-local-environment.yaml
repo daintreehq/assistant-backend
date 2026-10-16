@@ -274,6 +274,9 @@ boundaries:
   - query: two worktrees on this machine run the same frontend and API on the same ports and clash; give each its own
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: runbook-2026-10-issue-126
+  - query: each worktree should get its own database and port when it is created on the build server
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:

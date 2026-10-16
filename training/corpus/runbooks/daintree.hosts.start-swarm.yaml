@@ -185,6 +185,9 @@ boundaries:
   - query: get the remote box's assistant set up so this shell can send it tasks
     confusable_with: [daintree.hosts.foundation, daintree.worktree.manage-resource]
     run: runbook-2026-10-coordinator
+  - query: get an assistant ready on every other machine for this repo so I can send work to them
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 followups:
   - query: 'now get them ready'
     history:

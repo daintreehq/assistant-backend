@@ -25,8 +25,8 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-issue-copy-after-showing
   category: single-runbook
-  note: A copy requested with the changes shown first. Decided by "only the categories the person chose
-    copied after a preview, the applied and skipped counts checked on the host".
+  note: A copy requested with the changes shown first. Decided by "a preview first, then only the categories
+    the person chose copied" and "the applied and skipped counts checked on the host".
   messages:
   - role: user
     content: Copy my portable Daintree settings to this host after showing the changes.
@@ -213,7 +213,7 @@ cases:
   note: The same code passing on one machine and failing on another is daintree.hosts.diagnose-host-differences.
   messages:
   - role: user
-    content: The tests pass on my laptop and fail on the Linux host, find out why.
+    content: The same build is green on my Mac and red on the Linux host, find what differs between them.
   expect:
     required:
     - daintree.hosts.diagnose-host-differences

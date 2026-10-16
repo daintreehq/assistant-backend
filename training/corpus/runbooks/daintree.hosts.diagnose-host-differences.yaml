@@ -130,6 +130,12 @@ boundaries:
   - query: the tests only time out on one of my remote hosts, work out why before changing anything
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: the nightly job succeeds on one of my machines and hangs on the other, so what is different about their environments
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: a deploy script hangs only on the Linux host, compare its environment with the Mac's
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

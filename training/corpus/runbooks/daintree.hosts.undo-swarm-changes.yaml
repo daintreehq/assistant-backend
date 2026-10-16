@@ -105,6 +105,12 @@ boundaries:
   - query: 'revert the commits the run put on the remote hosts'' branches; I have the list of what went in'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: the remote agents' commits broke the build on both hosts; revert just those commits and keep my own work
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: reverse the changes last night's remote job committed, repo by repo, on every machine
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 
 followups:
   - query: ok that's wrong, revert all of it on both hosts

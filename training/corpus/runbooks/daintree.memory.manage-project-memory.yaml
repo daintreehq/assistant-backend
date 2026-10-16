@@ -257,6 +257,12 @@ boundaries:
   - query: 'remember that our briefs to the other machines must always name the exact commit'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: remember that the host assistant should check the lockfile before installing anything
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: add a rule to AGENTS.md so every agent on every machine keeps the same formatting
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 followups:
   - query: also the node version, 22
     history:

@@ -140,6 +140,12 @@ boundaries:
   - query: 'give me a read-only overview of the hosts: connection, enrolled assistants and anything waiting on me'
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: 'give me a read-only summary of every host: connected or not, how busy, and what is open with each'
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: are any of my remote machines waiting on me, without changing anything
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 
 followups:
   - query: "and what about the exchanges?"

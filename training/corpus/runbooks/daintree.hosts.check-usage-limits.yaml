@@ -143,6 +143,12 @@ boundaries:
   - query: how much Claude allowance does each remote host have left?
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: how much Claude allowance is left on each of my hosts
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: which of my other machines has the most Codex usage headroom right now
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 followups:
   - query: and claude on those same machines?
     history:

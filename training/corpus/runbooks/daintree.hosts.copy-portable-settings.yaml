@@ -1,0 +1,162 @@
+# daintree.hosts.copy-portable-settings: the person compares this machine's Daintree settings
+# with a connected Remote Host and copies chosen categories there once through Settings → Hosts
+# → the host → Copy settings, checks the applied and skipped counts, or undoes the last copy.
+#
+# Boundaries are the words this shares with adding a host (connect-host), durable instructions
+# (project memory), plugin work, why one machine behaves differently from another (diagnose
+# host differences), taking back a run's code (undo-swarm-changes), the host status report
+# (survey-hosts), and the "agent" and "build server" vocabulary of usage limits and per-worktree
+# environments. Reverse rows live in those runbooks' files.
+runbook: daintree.hosts.copy-portable-settings
+run: runbook-2026-10-issue-129
+positives:
+- The person just connected a new Linux build server and wants it to behave like their laptop; preview which Daintree setting categories a copy would change there and copy the default ones once they approve the preview
+- Compare this Mac's notification and idle-terminal settings with the host they just added and tell the person which categories a copy would change, without writing anything
+- The person wants their custom agents and agent presets on the remote host but not the environment variables; walk them through ticking only the right categories before the preview
+- After a settings copy to the host, the result lists some settings as skipped; read the preview and the result with the person and explain which ones did not land and why
+- The last copy to the server switched session restore off and the person has since changed two other settings there; take back only the copy and leave their later edits alone
+- The person asks to include permission bypass in the copy; explain what it does on the host, get their explicit yes, and leave it out otherwise
+- The preview shows a line saying a value stays on this computer because it looks like a secret; explain what that means and confirm nothing sensitive is on its way to the host
+- The copy ended with a message that the host's settings changed since the preview; guide the person through previewing and reviewing again before anything is written a second time
+- Help the user find out whether the host's Daintree already matches theirs after yesterday's copy, using the Compared with section and its Refresh button
+- Undo last copy is missing beside the last copy on the host's page and the row says it can't be undone; explain why and what the person can still do
+- Check that only the theme and keyboard shortcut categories were copied to the Linux host the person sits at, and that this machine's own windows keep their look
+- The user wants the global recipes they built here available on the remote host too; copy just that category and confirm the host received them without anything being run
+- 'Verify a finished settings copy: the per-category counts, the source name the host shows, and that no credential or consent came across with it'
+- The host was freshly installed and starts from defaults; offer the person a one-time copy of their portable settings and say nothing will sync afterwards
+- Before the person copies anything to the second host, list what the Copy settings screen would leave out whatever they tick and why
+- The person edited an agent preset on the host after the copy and now wants the copy reversed; explain what comes back and what stays as they left it
+- A copy to the server reported a failure partway through; read what the Hosts page says and tell the person whether the host's settings changed
+- Walk the user through checking which setting categories on the Mac host differ from this laptop, then stop and ask before copying any of them
+- The person wants the same worktree path pattern and hibernation timing on the host as on this machine; preview that copy and apply it once they say so
+- The connection dropped while the person was copying settings to the host; work out where it stands and avoid a blind second copy
+- push my agent settings to the linux box
+- can you copy my daintree settings over to the mac mini
+- what would copy settings change on the server
+- undo that settings copy but keep what i've changed since
+- the build server has none of my notification setup, put it on there
+- does the host have my recipes yet
+- copy my shortcuts and theme to the studio, not the rest
+- i hit copy and it said some were skipped, why
+- make the host's worktree path pattern match mine
+- my settings on the server are a mess compared to my laptop, line them up
+- that settings push I did earlier was a mistake, reverse it
+- do i need to do anything on the server after copying settings
+- hey thanks! next I want my prefs on the remote box, preview first please
+- show me what's different in the host's settings before you copy a single thing
+- I'd rather not carry my env vars over to the server, copy everything else
+- the copy button is greyed out on the host page, what's going on
+- how many settings did the last copy to the server apply
+- which computer did the host think the last copy came from
+- redo my settings copy to the studio, the last one went wrong
+- 'quick one: put my theme on the headless box too, only that'
+- I tweaked the server's settings by hand last week and then copied from my laptop, can I get my hand edits back
+- 'I''ve just reinstalled Daintree on the Linux server that I use as a host and everything on it is back to defaults: my agent flags, my notification sounds, the lot. I''d like to push my laptop''s settings across, but I want to see what would change first and I don''t want any of my logins or approvals to go with it. Can you take me through it?'
+- The settings copy to the build machine finished and the Hosts page says some settings were skipped and one failed. I don't know which ones, and I'm nervous that the machine is now half configured. Tell me what the page is saying, whether the host's settings are consistent, and whether I should try again or undo.
+- Earlier today I copied my settings to the Mac host, then changed the notification quiet hours directly on that host. Now the agent flags from the copy are wrong and I want that copy taken back, but I don't want to lose the quiet hours I just set. Is that something Daintree can do and can you do it with me?
+- The person is about to copy Daintree settings to a shared host that other people also use. They have not decided about permission bypass, environment variables or their theme. Help them choose categories, explain each opt-in, and make sure they approve the preview before the host changes.
+- query: what does Copy settings carry to a host and what stays behind
+  docs: true
+- query: will copying settings overwrite what I've set on the server?
+  docs: true
+- query: is there a way to see what Copy settings would change before it writes anything
+  docs: true
+- query: how does undoing a settings copy work if I changed things afterwards
+  docs: true
+- query: do the host's settings stay in sync with mine after a copy
+  docs: true
+- query: which settings categories are switched on by default when I copy to a host
+  docs: true
+boundaries:
+- query: The host finished connecting a minute ago and shows Connected; now offer to bring my settings across to it
+  confusable_with:
+  - daintree.hosts.connect-host
+- query: Daintree offered to copy settings when I first connected the server and I skipped it; I want to do that now
+  confusable_with:
+  - daintree.hosts.connect-host
+- query: copy my agent flags and presets to the host, I only mean Daintree's own preferences and not any instruction files
+  confusable_with:
+  - daintree.memory.manage-project-memory
+- query: carry my notification and recipe preferences over to the server, then leave project memory and AGENTS.md as they are
+  confusable_with:
+  - daintree.memory.manage-project-memory
+- query: bring my settings to the host now; the plugins I'll sort out one at a time on its Plugins page
+  confusable_with:
+  - daintree.plugins.develop-project-plugin
+- query: the notification sounds on the server aren't the ones I set here, which of my settings differ from the host's
+  confusable_with:
+  - daintree.hosts.diagnose-host-differences
+- query: the default agent on the host isn't the one I use on this machine; what would a copy change over there
+  confusable_with:
+  - daintree.hosts.diagnose-host-differences
+- query: reverse the settings copy I made to the studio an hour ago, leaving whatever was changed there since it
+  confusable_with:
+  - daintree.hosts.undo-swarm-changes
+- query: take back what that copy changed in the host's settings, not any commits
+  confusable_with:
+  - daintree.hosts.undo-swarm-changes
+- query: which of my settings categories are out of step with the server
+  confusable_with:
+  - daintree.hosts.survey-hosts
+- query: tell me what the host's settings page says about the last copy it received
+  confusable_with:
+  - daintree.hosts.survey-hosts
+- query: make the server's default agent and its idle terminal alerts the same as on my laptop
+  confusable_with:
+  - daintree.hosts.check-usage-limits
+- query: the new build server starts from defaults; bring my worktree path pattern and recipes across
+  confusable_with:
+  - daintree.worktree.provision-local-environment
+- query: bring over my global environment variables and the bypass option for the Linux host, but show me everything first
+  confusable_with:
+  - daintree.hosts.migrate-across-repositories
+- query: copy my Daintree settings across to the remote machine, and make sure no API key or login goes with them
+  confusable_with:
+  - daintree.worktree.manage-resource
+followups:
+- query: ok now bring my settings across too
+  history:
+  - 'user: add the new server as a Remote Host'
+  - 'assistant: It''s connected and its projects are listed under Other hosts; messaging is still off.'
+  active:
+  - daintree.hosts.connect-host
+- query: go ahead
+  history:
+  - 'user: copy my settings to the host, show me first'
+  - 'assistant: The preview lists 11 changes across 5 categories and one value that stays on this computer. Say go to copy them.'
+  active: &id001
+  - daintree.hosts.copy-portable-settings
+- query: it says some were skipped
+  history:
+  - 'user: copy my notification settings to the server'
+  - 'assistant: Copied. Read me the count line under each category.'
+  active: *id001
+- query: undo it
+  history:
+  - 'user: copy my agent presets to the build box'
+  - 'assistant: Done: 8 applied, 1 skipped. The Last copied row now shows Undo last copy.'
+  active: *id001
+- query: and the theme as well, but only that one
+  history:
+  - 'user: push my notification settings to the studio'
+  - 'assistant: The preview shows 4 changes under Notifications. Say go when you''re happy.'
+  active: *id001
+- query: it still says 3 categories would change after the copy
+  history:
+  - 'user: copy my settings across to the mac host'
+  - 'assistant: Applied. Press Refresh under Compared with and read me what it says.'
+  active: *id001
+- query: yes I changed them on the host since, that's expected
+  history:
+  - 'user: undo the last settings copy to the server'
+  - 'assistant: The dialog lists 6 settings; any you changed on the host since will stay. Say when to press Undo copy.'
+  active: *id001
+topic_shifts:
+- query: before we carry on, my settings should be on the server too, preview a copy first
+  history:
+  - 'user: have the build host''s assistant run the integration tests'
+  - 'assistant: Sent to the assistant on the build host; I''ll report when its update line arrives.'
+- query: 'different thing: my notification setup should be on the server too, show me the changes before copying'
+  history:
+  - 'user: what''s the state of the refactor branch'
+  - 'assistant: It is rebased on develop with two commits ahead.'

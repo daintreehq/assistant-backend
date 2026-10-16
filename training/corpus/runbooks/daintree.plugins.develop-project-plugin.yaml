@@ -122,6 +122,12 @@ boundaries:
   - query: "Find out what the metrics panel our project plugin contributes looks like after yesterday's commit."
     confusable_with: [daintree.explore.repository]
     run: runbook-2026-10-issue-96
+  - query: my project plugin builds but its panel never appears on the host, debug it
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: the plugin I wrote fails validation on the remote machine, fix it
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 followups:
   - query: why is it staged, what do I have to do?
     history:
