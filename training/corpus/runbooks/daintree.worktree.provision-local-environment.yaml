@@ -185,6 +185,8 @@ positives:
     run: runbook-2026-10-issue-132
   - query: "Make the setup refuse to continue if the database it resolves is reachable from any other worktree or machine, and say what it found instead of dropping anything."
     run: runbook-2026-10-issue-132
+  - query: "setup for the worktree on the second machine is stuck at needs-approval; tell me what to do so it provisions and keeps its own database"
+    run: runbook-2026-10-issue-132
 boundaries:
   - query: get an agent to write the provisioning scripts for me
     confusable_with: [daintree.edits.spawn-visible-agent]
@@ -349,9 +351,6 @@ boundaries:
     run: runbook-2026-10-issue-132
   - query: "give each worktree its own database on every host before we send work out"
     confusable_with: [daintree.hosts.swarm-fan-out]
-    run: runbook-2026-10-issue-132
-  - query: "setup for the worktree on the second machine is stuck at needs-approval; tell me what to do so it provisions and keeps its own database"
-    confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-132
   - query: "make sure the teardown on every host removes only the database its own setup created, never a shared one"
     confusable_with: [daintree.hosts.recover-and-clean-up, daintree.orchestration.workspace-cleanup]

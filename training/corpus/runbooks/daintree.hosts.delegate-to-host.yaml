@@ -304,6 +304,7 @@ boundaries:
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
   - query: "have the other host's assistant bump the database driver in its worktree and open a PR"
+  - query: "have the other host's assistant move its worktree to the new database driver, check it against that worktree's own database and open a PR"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
   - query: "have the other Mac's assistant write its own setup and teardown scripts so each worktree there gets a private database and port"

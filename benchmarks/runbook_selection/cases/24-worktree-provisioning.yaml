@@ -98,13 +98,13 @@ cases:
       The issue's third request, planning wording with no symptom. Decided by "The tell is a
       per-worktree RESOURCE (database, port, hostname, docroot, container) or the setup/teardown
       configuration that creates it." At base it was selected third (0.76) behind two
-      swarm-placement runbooks: recall holds, precision is a retrain matter.
+      swarm-placement procedures: recall holds, precision is a retrain matter.
     messages:
       - role: user
         content: Plan per-host worktree environment isolation with explicit resource ownership.
     expect:
       required: [daintree.worktree.provision-local-environment]
-      optional: [daintree.foundation, daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
 
   - id: provision-hosts-scratch-teardown-agent-phrased
     category: single-runbook
