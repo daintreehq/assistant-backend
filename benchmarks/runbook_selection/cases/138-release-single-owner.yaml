@@ -11,9 +11,10 @@ cases:
     category: single-runbook
     note: >-
       Agent-phrased hub request. The deploy clause "Also when a swarm of hosts shares the
-      work and exactly one host is the deployer: the hub's brief to it, its check of its
-      own target, and its lost reply reconciled against the platform." names it; the
-      matrix may ride along because the builds and checks are its deliverable.
+      work and exactly one host is the deployer of a deploy authorised now: the hub's brief
+      to it, its check of its own target, and its lost reply reconciled against the
+      platform." names it; the matrix may ride along because the builds and checks are its
+      deliverable.
     messages:
       - role: user
         content: >-
@@ -27,8 +28,10 @@ cases:
   - id: release-owner-deploy-user-one-host-only
     category: single-runbook
     note: >-
-      Casual user wording, one host deploys and the others must not. The deploy clause
-      "exactly one host is the deployer" is the signal.
+      Casual user wording, one host deploys and the others must not. The deploy clause "Also
+      when a swarm of hosts shares the work and exactly one host is the deployer of a deploy
+      authorised now: the hub's brief to it, its check of its own target, and its lost reply
+      reconciled against the platform." is the signal.
     messages:
       - role: user
         content: deploy the api to production from the linux host only and make sure the other hosts do not run the deploy
@@ -39,9 +42,11 @@ cases:
   - id: release-owner-deploy-issue-build-everywhere
     category: single-runbook
     note: >-
-      The issue's own phrasing for the whole swarm job. "exactly one host is the
-      deployer" decides it; the plan runbooks (start-swarm, execute-distributed-workflow)
-      carry the build side and may ride along.
+      The issue's own phrasing for the whole swarm job. The deploy clause "Also when a swarm
+      of hosts shares the work and exactly one host is the deployer of a deploy authorised
+      now: the hub's brief to it, its check of its own target, and its lost reply reconciled
+      against the platform." decides it; the plan runbooks (start-swarm, execute-
+      distributed-workflow) carry the build side and may ride along.
     messages:
       - role: user
         content: Build across the swarm but deploy once from the designated host.
@@ -57,8 +62,11 @@ cases:
   - id: release-owner-deploy-lane-preflight
     category: single-runbook
     note: >-
-      The receiving lane's wording: "its check of its own target" before it writes, then
-      what serves. The lane-side envelope runbooks may ride along.
+      The receiving lane's wording: its check of its own target before it writes, then what
+      serves. The deploy clause "Also when a swarm of hosts shares the work and exactly one
+      host is the deployer of a deploy authorised now: the hub's brief to it, its check of
+      its own target, and its lost reply reconciled against the platform." decides it; the
+      lane-side envelope runbooks may ride along.
     messages:
       - role: user
         content: >-
@@ -72,9 +80,11 @@ cases:
   - id: release-owner-deploy-trap-lost-reply-not-reassign
     category: routing-trap
     note: >-
-      "its lost reply reconciled against the platform" is the deploy clause; moving the
-      work to another machine is reassign-host-work's job, which this deploy must never
-      get (a submitted deploy is read, not handed over).
+      The deploy clause "Also when a swarm of hosts shares the work and exactly one host is
+      the deployer of a deploy authorised now: the hub's brief to it, its check of its own
+      target, and its lost reply reconciled against the platform." covers the lost reply;
+      moving the work to another machine is reassign-host-work's job, which a submitted
+      deploy must never get: it is read, not handed over.
     messages:
       - role: user
         content: >-
@@ -87,9 +97,10 @@ cases:
   - id: release-owner-deploy-trap-after-matrix
     category: routing-trap
     note: >-
-      The matrix has already passed; what is asked now is the deploy from one host.
-      Deploy clause: "The deliverable is the project's own deploy mechanism ... run once
-      for a pinned SHA to the named environment". The matrix runbook tests under several
+      The matrix has already passed; what is asked now is the deploy from one host. Deploy
+      clause: "The deliverable is the project's own deploy mechanism (its scripts, Makefile,
+      CI workflow or platform CLI, never an invented one) run once for a pinned SHA to the
+      named environment where the user can watch it". The matrix runbook tests under several
       environments and deploys nothing.
     messages:
       - role: user
@@ -104,8 +115,8 @@ cases:
     category: routing-trap
     note: >-
       Matrix clause: "ONE EXACT COMMIT, tag or release candidate TESTED UNDER SEVERAL
-      ENVIRONMENTS ... with nothing fixed". Release candidate wording without any deploy
-      or publish stays with the matrix.
+      ENVIRONMENTS on the Remote Hosts this Shell reaches, with nothing fixed". A release
+      candidate checked on every host with no deploy or publish stays with the matrix.
     messages:
       - role: user
         content: >-
@@ -120,8 +131,9 @@ cases:
     category: single-runbook
     note: >-
       Agent-phrased. The publish clause "Also when a swarm of hosts shares the work and
-      exactly one host is the publisher: the hub's brief to it, its check of its own
-      registry account and channel, and its lost reply reconciled against the registry."
+      exactly one host is the publisher of a publish authorised now: the hub's brief to it,
+      its check of its own registry account and channel, and its lost reply reconciled
+      against the registry." names it.
     messages:
       - role: user
         content: >-
@@ -134,7 +146,10 @@ cases:
   - id: release-owner-publish-user-only-machine
     category: single-runbook
     note: >-
-      Casual user wording: "exactly one host is the publisher" while the others verify.
+      Casual user wording: one machine publishes while the others verify. The publish clause
+      "Also when a swarm of hosts shares the work and exactly one host is the publisher of a
+      publish authorised now: the hub's brief to it, its check of its own registry account
+      and channel, and its lost reply reconciled against the registry." is the signal.
     messages:
       - role: user
         content: only the release machine may push 3.0.1 to npm, the other machines just verify the tarball
@@ -145,8 +160,11 @@ cases:
   - id: release-owner-publish-lane-timeout
     category: single-runbook
     note: >-
-      The lane's view of a lost reply: "its lost reply reconciled against the registry".
-      The lane-side envelope runbook may ride along.
+      The lane's view of a lost reply. The publish clause "Also when a swarm of hosts shares
+      the work and exactly one host is the publisher of a publish authorised now: the hub's
+      brief to it, its check of its own registry account and channel, and its lost reply
+      reconciled against the registry." covers it; the lane-side envelope runbook may ride
+      along.
     messages:
       - role: user
         content: >-
@@ -160,8 +178,10 @@ cases:
     category: routing-trap
     note: >-
       A publish whose reply was lost is read from the registry, never handed to another
-      host: "its lost reply reconciled against the registry". Moving a unit to another
-      machine is reassign-host-work, which this is not.
+      host: the publish clause "Also when a swarm of hosts shares the work and exactly one
+      host is the publisher of a publish authorised now: the hub's brief to it, its check of
+      its own registry account and channel, and its lost reply reconciled against the
+      registry.". Moving a unit to another machine is reassign-host-work, which this is not.
     messages:
       - role: user
         content: the publish from the release machine got no answer, have a different machine run npm publish now
@@ -172,8 +192,10 @@ cases:
   - id: release-owner-publish-after-builds
     category: single-runbook
     note: >-
-      The other hosts are done; the one publisher goes: "exactly one host is the
-      publisher".
+      The other hosts are done and one publisher goes. The publish clause "Also when a swarm
+      of hosts shares the work and exactly one host is the publisher of a publish authorised
+      now: the hub's brief to it, its check of its own registry account and channel, and its
+      lost reply reconciled against the registry." names it.
     messages:
       - role: user
         content: >-
