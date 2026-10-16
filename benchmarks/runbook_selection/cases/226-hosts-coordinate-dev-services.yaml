@@ -173,14 +173,46 @@ cases:
     category: routing-trap
     note: >-
       A service on one host needs the address of the service it calls on another; nothing is a per-worktree
-      resource on this machine. Decided by "services on this machine
-      (daintree.worktree.provision-local-environment)" being fenced.
+      resource on this machine. Decided by "per-worktree databases, ports or setup scripts on
+      this machine (daintree.worktree.provision-local-environment)" being fenced.
     messages:
       - role: user
         content: >-
           The billing service on one host calls the user service on another, so billing needs
           that service's address. Work it out and verify it with a request, nothing exposed to
           the internet.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-not-demo-for-hub
+    category: routing-trap
+    note: >-
+      The hub starts a sample-data API on one host and the client on another and proves the
+      request crosses; no host is being asked to serve a demo of its own. Decided by "a host's
+      own side of a demo (daintree.hosts.demo-for-hub)" being fenced.
+    messages:
+      - role: user
+        content: >-
+          The web client on one remote host needs the sample-data API running on another. Start
+          the API there with invented rows, point the client at it, and prove a request goes
+          across.
+    expect:
+      required: [daintree.hosts.coordinate-dev-services]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-dev-services-not-debug-web-app
+    category: routing-trap
+    note: >-
+      The preview fails because the API on another host is not reachable; the work is starting it
+      and finding an address that routes, not reading the preview's console. Decided by "one Dev
+      Preview's own runtime failure (daintree.runtime.debug-web-app)" being fenced.
+    messages:
+      - role: user
+        content: >-
+          The preview on the first remote host cannot load its data because the API on the second
+          remote host is not reachable. Start the API there, sort out which address the page
+          should call, and prove a request goes through.
     expect:
       required: [daintree.hosts.coordinate-dev-services]
       optional: [daintree.hosts.foundation]
@@ -271,3 +303,17 @@ cases:
           fixed.
     expect:
       required: [daintree.runtime.debug-web-app]
+
+  - id: coordinate-dev-services-reverse-provision-local-environment
+    category: routing-trap
+    note: >-
+      Per-worktree databases and ports on one machine, released with the worktree: the neighbour
+      wins. Decided by its "a shared runtime resource that several worktrees collide over".
+    messages:
+      - role: user
+        content: >-
+          Every worktree of this project on my Mac should get its own database and port for its
+          frontend and API dev servers, created on setup and released when the worktree is
+          deleted.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
