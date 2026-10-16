@@ -1,0 +1,252 @@
+# daintree.hosts.undo-swarm-changes: the hub backing out exactly the code one named run changed
+# across its Remote Hosts' repositories. Writers are stopped first, dependents are reverted
+# before what they build on, each host's own assistant follows the local undo procedure
+# (daintree.git.undo-agent-changes) through a fresh agent, and every revert is checked against
+# the lane's evidence.
+#
+# Recall: the issue's three requests, an agent-phrased task description with the run's
+# dependency observed, a casual line, and a lost reply after a host restart. Traps: this
+# runbook wins against the local undo procedure, stopping a run without undoing it
+# (daintree.hosts.steer-swarm), cleaning up a run's resources
+# (daintree.hosts.recover-and-clean-up) and a deployed-service rollback
+# (daintree.release.rollback-deployment). Reverse traps: each of those wins its own request and
+# this runbook must not ride along, plus a dependent plan run forward
+# (daintree.hosts.execute-distributed-workflow).
+#
+# Lane receivers: on the receiving host, the hub's undo is read through
+# daintree.hosts.handle-hub-message and carried out with daintree.git.undo-agent-changes, which
+# the hub's brief names. These cases pin that search agrees; at authoring they routed to this
+# hub runbook instead (untrained, shared vocabulary), and two text attempts did not move them:
+# the boundary is carried by corpus rows and owed to the next retrain.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: undo-swarm-changes-issue-undo-only
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "the CODE one run or swarm changed on their Remote
+      Hosts TAKEN BACK across hosts, in every repository it touched, while everyone else's work
+      stays". At base it selected daintree.git.undo-agent-changes and
+      daintree.hosts.steer-swarm.
+    messages:
+      - role: user
+        content: Undo only what this swarm changed across the affected repositories.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-issue-client-server
+    category: single-runbook
+    note: >-
+      The issue's second request: two repositories of one run, unrelated edits kept. Decided by
+      "in every repository it touched, while everyone else's work stays" and "per repository the
+      original and revert SHAs". At base daintree.git.undo-agent-changes.
+    messages:
+      - role: user
+        content: Back out the client and server commits from this run, preserving the unrelated edits.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-issue-cross-host
+    category: single-runbook
+    note: >-
+      The issue's third, abstract request. Decided by the summary's "back out exactly the commits
+      one named run made in each repository on the Remote Hosts" and "nothing reset,
+      force-pushed or rewritten in shared history". At base it went to
+      daintree.orchestration.execute-durable-workflow, daintree.hosts.execute-distributed-workflow
+      and daintree.explore.repository, and at authoring those three still fill the cap
+      (cap_full, retrain owed): summary wording that won it pushed a pre-existing case under its
+      admission floor and was backed out.
+    messages:
+      - role: user
+        content: Coordinate attributable cross-host reversions without rewriting shared history.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-agent-phrased
+    category: single-runbook
+    note: >-
+      How a hub agent describes the task to search_runbooks, with the dependency observed:
+      "TAKEN BACK across hosts, in every repository it touched", "dependents before what they
+      build on" and "everyone else's work stays".
+    messages:
+      - role: user
+        content: The person wants yesterday's cross-host run reverted. It changed a schema package on one host and the web client on another, and the client commit depends on the schema one. Back out exactly the run's commits in both repositories and keep any uncommitted work on those machines.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-user-casual
+    category: single-runbook
+    note: >-
+      Casual and short: "the CODE one run or swarm changed on their Remote Hosts TAKEN BACK ...
+      while everyone else's work stays". daintree.hosts.steer-swarm scores below its floor.
+    messages:
+      - role: user
+        content: ugh the remote swarm made a mess, revert whatever it committed on the hosts and leave my stuff alone
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-lost-reply
+    category: single-runbook
+    note: >-
+      A reversion already under way when a host restarted and its reply was lost: still this
+      runbook's deliverable ("that run's attributable commits reverted on each host"). Reading
+      where the exchanges stand after a restart is daintree.hosts.recover-and-clean-up's ("rebuild
+      where every exchange with the Remote Hosts stands after a restart"), so it may ride along.
+    messages:
+      - role: user
+        content: Halfway through reverting the remote run one host restarted and its reply never came back. Find out which reverts actually happened there and finish only the rest.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.recover-and-clean-up, daintree.hosts.foundation, daintree.foundation]
+
+  # -------------------------------------------------------- traps: this wins
+  - id: undo-swarm-changes-trap-not-local-undo
+    category: routing-trap
+    note: >-
+      Agents' commits reverted with hand edits kept is the local procedure's vocabulary, but the
+      work sits on two remote machines: "the CODE one run or swarm changed on their Remote Hosts
+      TAKEN BACK across hosts", and the fence "Do not use for one agent's changes on this
+      machine".
+    messages:
+      - role: user
+        content: Revert what the agents committed for the run on my two remote machines, in both repositories, but keep the edits I made by hand over there.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-trap-not-steer
+    category: routing-trap
+    note: >-
+      The run is already stopped and the person wants its code taken back. Fence: "stopping or
+      changing a run without undoing it (daintree.hosts.steer-swarm)".
+    messages:
+      - role: user
+        content: The remote run is already stopped. Now take back what it committed in each repository on those machines.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-trap-not-cleanup
+    category: routing-trap
+    note: >-
+      Panes and worktrees explicitly kept, commits reverted. Fence: "removing a run's panes,
+      worktrees or branches (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: Leave the run's panes and worktrees on the hosts as they are, but revert the commits it made there.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-trap-not-rollback
+    category: routing-trap
+    note: >-
+      Source reverted, no deployment touched. Fence: "or a deployed service
+      (daintree.release.rollback-deployment)".
+    messages:
+      - role: user
+        content: Staging is fine, I don't want a deploy rolled back, just the run's commits reverted in the code on each host.
+    expect:
+      required: [daintree.hosts.undo-swarm-changes]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ----------------------------------------------- reverse traps: neighbour wins
+  - id: undo-swarm-changes-reverse-local-undo
+    category: routing-trap
+    note: >-
+      One agent in this worktree, on this machine: daintree.git.undo-agent-changes, "Use when an
+      agent changed things the user wants taken back while everything else stays". This
+      runbook's "on their Remote Hosts" does not apply.
+    messages:
+      - role: user
+        content: undo what the claude agent in this worktree committed in the last hour but keep my staged changes
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.foundation]
+
+  - id: undo-swarm-changes-reverse-steer
+    category: routing-trap
+    note: >-
+      A stop with nothing reverted: daintree.hosts.steer-swarm, "work they ALREADY SENT to their
+      other machines ... STOPPED, CALLED OFF or CHANGED while it is under way" with "their work
+      left in place".
+    messages:
+      - role: user
+        content: Stop the run on my other machines right now and keep whatever they have done so far, nothing gets reverted.
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-reverse-cleanup
+    category: routing-trap
+    note: >-
+      Resources removed, commits untouched: daintree.hosts.recover-and-clean-up, "what a run
+      left on the Remote Hosts, its panes ..., worktrees and branches, cleaned up through each
+      host's own assistant".
+    messages:
+      - role: user
+        content: Get my hosts to remove the panes and worktrees from yesterday's remote run, but don't touch any commits.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-reverse-rollback
+    category: routing-trap
+    note: >-
+      A deployed environment restored: daintree.release.rollback-deployment, "a DEPLOYED
+      environment must go back to an earlier release now" and "shift traffic back to the last
+      good revision", even though a swarm made the change.
+    messages:
+      - role: user
+        content: The swarm's deploy broke production, shift traffic back to the previous revision.
+    expect:
+      required: [daintree.release.rollback-deployment]
+      optional: [daintree.foundation]
+
+  - id: undo-swarm-changes-reverse-forward-plan
+    category: routing-trap
+    note: >-
+      The dependent plan run forward, nothing undone: daintree.hosts.execute-distributed-workflow,
+      "a multi-stage PLAN across their Remote Hosts: a dependency graph of three or more units in
+      which several wait on others".
+    messages:
+      - role: user
+        content: Run the schema unit first, then the server and the client against it, each on the host that owns that project.
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # --------------------------------- lane receivers (retrain owed at authoring)
+  - id: undo-swarm-changes-lane-revert-run-commits
+    category: routing-trap
+    note: >-
+      On the receiving host: the local procedure does the reverting, the envelope rides along.
+      Decided by this runbook's fence "as a Remote Host's own assistant reverting in its project
+      (daintree.git.undo-agent-changes)" and the local runbook's "Use when an agent changed
+      things the user wants taken back while everything else stays". At base it selected
+      daintree.hosts.clean-up-for-hub; at authoring this hub runbook (retrain owed).
+    messages:
+      - role: user
+        content: The hub asked me to revert the commits its run made on this project's branch and keep everything else.
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: undo-swarm-changes-lane-exact-commits
+    category: routing-trap
+    note: >-
+      A lane given the exact commits by the hub: "as a Remote Host's own assistant reverting in
+      its project (daintree.git.undo-agent-changes)". At base this selected
+      daintree.git.undo-agent-changes 0.996; with this hub runbook present it moved here
+      (retrain owed).
+    messages:
+      - role: user
+        content: 'Hub request on this lane: revert exactly these three commits from the run on branch run/checkout/api, newest first, keep unrelated staged and untracked work, no push'
+    expect:
+      required: [daintree.git.undo-agent-changes]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
