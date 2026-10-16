@@ -183,3 +183,9 @@ boundaries:
   - query: the hub says an urgent fix outranks the docs task, so stop the agents I launched for that run here and tell it where each one stopped
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
+  - query: 'a hub note asks me to halt the codex panes working on its unit and leave their edits alone; reply with which ones were already done'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'a message from the hub says to pause the child panes it asked for here, and to answer with what each one had completed'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120

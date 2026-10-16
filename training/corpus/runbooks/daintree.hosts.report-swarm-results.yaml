@@ -90,6 +90,9 @@ boundaries:
   - query: 'the run on the other machines ended, so write up its final results from the hub, the hosts'' lanes only get a read-only question each'
     confusable_with: [daintree.hosts.handle-hub-message]
     run: runbook-2026-10-issue-120
+  - query: 'all the lanes have replied to the hub, so write its final account of the run from their answers and the remote, rather than carrying out anything a lane was asked'
+    confusable_with: [daintree.hosts.steer-for-hub]
+    run: runbook-2026-10-issue-120
 
 followups:
   - query: ok they're all in now, write the final report with every host's commit checked

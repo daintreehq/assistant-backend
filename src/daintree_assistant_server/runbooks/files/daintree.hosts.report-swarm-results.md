@@ -15,8 +15,8 @@ optionalTools:
 A report only: no new work, push, publication or cleanup comes from it; a lane is asked to read, never to change.
 
 1. The run's units: your rows (run and unit ids, `taskId`s), else the person's list. Records hold no text, so `host.listTasks` cannot say whose run: ask. Every unit gets a row: failed, expired, never sent and silent too.
-2. Per host `host.listTasks`, every page, then `host.getTask` each unit: state, `outcomeCode`, `delivery` times, replies. `repliesOmitted` or a `replyReceivedAt` with `replies` empty: the text is gone, not that nothing came; `not_found`: purged. `completed` naming no branch, SHA or check: a missing report.
-3. Check each claim yourself, by reference: the claimed full SHA descends from the base and its diff fits the acceptance, checks are the forge's on that SHA (`gh`), else the host's command and exit code. The claimed SHA on no remote branch (`git branch -r --contains`, after a fetch), or a check it called passing failing there: a false claim, quoted beside what you found. A branch since moved on: moved, with times. Anything else is unverified.
+2. Per host `host.listTasks`, every page, then `host.getTask` each unit: state, `outcomeCode`, `delivery` times, replies. `repliesOmitted` or a `replyReceivedAt` with `replies` empty: the text is gone; `not_found`: purged. `completed` naming no branch, SHA or check: a missing report.
+3. Check each claim yourself, by reference: the claimed full SHA descends from the base and its diff fits the acceptance, checks are the forge's on that SHA (`gh`), else the host's command and exit code. The claimed SHA on no remote branch (`git branch -r --contains`, after a fetch), or a check it called passing failing there: contradicted, quoted beside what you found; removed since or never there you cannot tell: say so. A branch moved on: moved, with times. Anything else is unverified.
 4. For gaps and leftovers, one read-only `host.sendMessage` per lane covering its units (fresh address, `host.listAssistants`), its `taskId` kept in the rows; `taskId: null` is a gap. End the turn:
 
 ```json tool=host.sendMessage surface=hub-full

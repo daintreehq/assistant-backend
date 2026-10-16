@@ -387,8 +387,9 @@ cases:
     category: routing-trap
     note: >-
       On the receiving host the hub's read-only question is a message to answer, not a report to
-      write. daintree.hosts.handle-hub-message wins by the message the hub sent its lane; the
-      hub's own report procedure must not load. At authoring this routed to the report
+      write. daintree.hosts.handle-hub-message wins by "Use on a Remote Host's Daintree assistant
+      enrolled as a lane when the hub, the assistant on the person's main machine, has messaged it";
+      the hub's own report procedure must not load. At authoring this routed to the report
       (untrained, shared vocabulary): the boundary is carried by corpus rows and owed to the next
       retrain.
     messages:
@@ -397,3 +398,16 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: report-swarm-results-reverse-steer-for-hub
+    category: routing-trap
+    note: >-
+      The receiving lane told to stop its agents. daintree.hosts.steer-for-hub wins by "to STOP,
+      PAUSE or CHANGE the work of the AGENTS it launched for one of the hub's runs"; the hub's
+      report procedure must not load.
+    messages:
+      - role: user
+        content: The hub's message in my inbox says to stop the agents I started for its run here and keep their work. Handle it and say which had already finished.
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
