@@ -94,6 +94,12 @@ boundaries:
   - query: why did codex's importer attempt blow up? i want the cause, not a fix
     confusable_with: [daintree.orchestration.salvage-failed-attempt]
     run: 2026-09-28-round6
+  - query: 'why did last night''s agent run go wrong? find where it first drifted from the brief'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'post-mortem that failed attempt and tell me how to stop it happening again'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
 followups:
   - query: it's the codex one from last night, the panel is closed now
     history:

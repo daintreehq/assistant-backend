@@ -134,6 +134,12 @@ boundaries:
   - query: "which of my machines will run out of Codex first at this rate"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: 'how much agent usage does each of my other machines have left? one table, host by host'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'which remote host has the most Claude headroom right now?'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
 followups:
   - query: and claude on those same machines?
     history:

@@ -369,6 +369,12 @@ boundaries:
   - query: 'the reviewer agent here says the branch''s tests all pass at 2a7f9c4; confirm that claim yourself before the hub hears it'
     confusable_with: [daintree.hosts.review-for-hub]
     run: runbook-2026-10-issue-99
+  - query: 'the agent in this worktree says it''s done and the tests pass. check that it''s true before I merge'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'I don''t trust that the local agent actually fixed the bug, verify its claim'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
 followups:
   - query: how's that going?
     history:

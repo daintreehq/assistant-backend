@@ -106,6 +106,12 @@ boundaries:
     confusable_with: [daintree.ci.diagnose-and-fix]
   - query: the db tests fail on one host, probably something in its setup, but the other host passes at the same sha. compare them
     confusable_with: [daintree.worktree.provision-local-environment]
+  - query: 'the same commit passes its tests on the mac host and fails on the linux server. find out why'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'this build only hangs on one of my remote machines. work out what differs between it and the others'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

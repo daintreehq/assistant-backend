@@ -254,6 +254,12 @@ boundaries:
   - query: 'have the other mac implement the CSV import and report the commit when it''s done, no rush'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: 'ask the build box''s assistant to fix the flaky upload test and tell me the commit once it''s pushed'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'have the linux server implement the retry option, then when that lands have the mini build the client against it'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
 
   - query: 'get the tower to swap the date library in the admin repo and tell me the commit'
     confusable_with: [daintree.hosts.migrate-across-repositories]

@@ -198,6 +198,12 @@ boundaries:
   - query: 'run the dependency upgrade on all my machines and show me what each got, no time limit'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: 'put the logging change on all my other hosts, a branch each, and show me a row for every one'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'have all the hosts try the new build script at once, each on its own branch'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
 
   - query: 'have every machine attempt the same logger swap in its own copy of the web repo so I can compare what each one did'
     confusable_with: [daintree.hosts.migrate-across-repositories]

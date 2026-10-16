@@ -174,3 +174,9 @@ boundaries:
   - query: 'every partition of the api repo''s logger change is pushed from the hosts; get the build box to combine them in order and report the merged head'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: 'the minis finished their halves. one machine should assemble them on a new branch, then tell me whether everything passes'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'put the work the three hosts finished onto one integration branch on a single machine and tell me if it holds'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120

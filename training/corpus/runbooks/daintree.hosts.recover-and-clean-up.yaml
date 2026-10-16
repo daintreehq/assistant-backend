@@ -256,3 +256,12 @@ boundaries:
   - query: "clean up what that run left on the remote hosts: panes, worktrees and branches, through each host's assistant"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: 'the hub restarted and I lost track of what I sent to the other machines. which exchanges ever finished, which are still open?'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'Daintree was restarted last night while my other machines were mid-task. what became of each task I sent them?'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'have each remote host''s assistant remove the worktrees and panes it made for last night''s run'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
