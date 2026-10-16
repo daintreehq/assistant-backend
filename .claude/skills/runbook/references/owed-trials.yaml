@@ -2127,6 +2127,7 @@ trials:
     execution:
       - "Hub transcript: every duration cites the stamps it came from, null stamps are marked unobserved, no stamp from one host is compared with another's or with the Shell's clock, and the report keeps verified apart from claimed."
       - "The report credits {host_a}'s wait to what the lane or the person said, not to the gap, and calls {host_b}'s claim contradicted only after a check against {remote}; a claim with no such check is left unverified."
+
   - id: verify-project-placement
     runbook: daintree.hosts.verify-project-placement
     also: [daintree.hosts.handle-hub-message]
@@ -2305,3 +2306,52 @@ trials:
     execution:
       - "The first open's briefing said a repository with no remote goes as a copy of its committed history (hub transcript)."
       - "The hub never offered a repeat of the open for the same request while the outcome was unknown (hub transcript)."
+  - id: coordinate-dev-services
+    runbook: daintree.hosts.coordinate-dev-services
+    also: [daintree.hosts.demo-for-hub]
+    issue: 126
+    caller: hub
+    path: fleet
+    hosts: 2
+    needs: [separate-loopback, real-ssh]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Two real machines with enrolled lanes in {project}, and in a second scratch repository tally-web, each pushed to its own bare remote and cloned on both hosts; {project} at {sha} on {remote}. {project} gains a tiny API (npm run serve on {port}, GET /total over an invented seed, logging each request's X-Dev-Marker header and the caller's address) and tally-web a dev server that reads its API address from an untracked .env.local and proxies /api to it; both fall back to a local mock when the address fails."
+      - "The two machines have no route the person has named: {host_b}'s API binds loopback by default and no private address is given at the start. Neither host has a firewall rule or tunnel for this."
+    steps:
+      - say: |-
+          Get the tally API running on {host_b} and tally-web on {host_a} so the client reaches the API, and prove a request goes all the way through. Invented data only, nothing public, no keys copied between the machines. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.coordinate-dev-services]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.cancelTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.demo-for-hub]
+            calls: [worktree.list, terminal.list, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - person: "When the hub reports the blocked edge, name {host_b}'s address on the private network the two machines share, and say the API may bind to that one address."
+      - say: Use that address and finish the check.
+        expect:
+          hub:
+            calls: [host.sendMessage, host.getTask]
+            never: [host.cancelTask]
+      - say: Stop both services, the client first.
+        expect:
+          hub:
+            calls: [host.sendMessage, host.getTask]
+            never: [host.cancelTask]
+    checks:
+      - "Before the person named an address, the hub reported the client-to-API edge as blocked with both hosts, the address tried and the probe's result, offered co-location or a named private address, and exposed nothing: no 0.0.0.0 listener, no tunnel, no forward or firewall change on either machine, no copy of credentials between them."
+      - "The client was started only after that edge was verified; its .env.local is untracked, git status and {remote} are otherwise unchanged, and the start order on the hosts (process start times) is the API first."
+      - "After the address was named, the API listens on {host_b} on that one private address, started after {sha}; the API's own request log shows the marker request carrying {run} and the commit, from {host_a}'s address, answered 2xx, and the client's answer carries the API's SHA. A client that fell back to its mock would leave no such log line or SHA: it did not."
+      - "The report keeps readiness and the end-to-end result apart, names the SHA each service served against its pin, and names who stops each."
+      - "After the stop messages, no listener from either service remains on either host (lsof), the client was stopped first, and host.cancelTask was never used."
+    execution:
+      - "The probe from {host_a} to the API address and each start went out as separate rounds, the turn ending after each (hub transcript)."
+      - "The hub never called the Shell's forward or localhost a route between the hosts (hub transcript)."
