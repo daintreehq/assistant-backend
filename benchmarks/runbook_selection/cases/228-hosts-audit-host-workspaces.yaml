@@ -22,8 +22,8 @@ cases:
   - id: audit-host-workspaces-issue-audit-left-across-hosts
     category: single-runbook
     note: >-
-      The issue's first request. Decided by "wants to SEE what a run or swarm left on their Remote
-      Hosts before anything is cleaned up, and which of it could go". At base it selected
+      The issue's first request. Decided by "INSPECTED, read-only, to see which are in use, hold
+      unsaved work or could be let go". At base it selected
       daintree.hosts.check-usage-limits and daintree.worktree.audit-worktrees.
     messages:
       - role: user
@@ -59,8 +59,7 @@ cases:
   - id: audit-host-workspaces-agent-phrased-inventory
     category: single-runbook
     note: >-
-      How a hub agent writes the search. Decided by "each item the run made (worktree, pane,
-      branch, running server, retained resource) classed safe, unsafe or unknown" and "hosts or
+      How a hub agent writes the search. Decided by "each item the run made classed safe, unsafe or unknown" and "hosts or
       projects not observed as explicit gaps".
     messages:
       - role: user
@@ -75,8 +74,8 @@ cases:
   - id: audit-host-workspaces-user-casual-leftovers
     category: single-runbook
     note: >-
-      A person's own words, nothing deleted. Decided by "wants to SEE what a run or swarm left on
-      their Remote Hosts before anything is cleaned up".
+      A person's own words, nothing deleted. Decided by "to see which are in use, hold unsaved work or could be let
+      go".
     messages:
       - role: user
         content: >-
@@ -185,8 +184,8 @@ cases:
   - id: audit-host-workspaces-not-diagnose-host-differences
     category: routing-trap
     note: >-
-      Per-host leftovers, not a behaviour difference. Decided by "Do not use for ... why one host
-      differs from another (daintree.hosts.diagnose-host-differences)"; the ask is what each host
+      Per-host leftovers, not a behaviour difference. Decided by "or for why one host differs from
+      another (daintree.hosts.diagnose-host-differences)"; the ask is what each host
       holds.
     messages:
       - role: user

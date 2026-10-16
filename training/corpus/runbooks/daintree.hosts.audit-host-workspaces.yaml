@@ -22,7 +22,7 @@ positives:
   - query: Which of the worktrees my remote hosts created for the migration job still have uncommitted changes?
   - query: list every dev server the job left listening on the remote machines and say whose it is
   - query: The overnight job is over. Before I clean anything up, which worktrees on the remote hosts are safe to delete, which are not, and which can't you tell?
-  - query: 'Task: build a read-only inventory, per host and project, of the resources run bf-19 created (worktrees, branches, panes, ports). Mark each safe, unsafe or unknown to remove, with the evidence. Name every host or project you could not inspect. Remove nothing.'
+  - query: The three Remote Hosts I gave the invoice-export job to are done and I am about to free up disk on them. One host's assistant mentioned a branch it never pushed. Before I give the word, report what is sitting there for that job and whether any of it is still doing something.
   - query: do any of my remote worktrees from the sync job have commits that never got pushed?
   - query: can you check what's left from the refactor swarm on the laptop host and the build host, nothing gets deleted, I only want to know what's at risk
   - query: 'hey, quick one: before I wipe the leftovers on my other computers, is anything still running or unsaved over there?'
@@ -35,7 +35,7 @@ positives:
   - query: I need a safe, unsafe and unknown list of what the swarm left on my remote machines, with the reason for each
   - query: a service the run started might still be up on a remote host after its worktree was removed. Look for any, and report them separately from the worktrees
   - query: what is each of my remote hosts still holding for the swarm, before I ask anyone to remove it
-  - query: Report which of the run's worktrees on each remote host have a running listener whose working directory is inside them, and which have none.
+  - query: The checkout rewrite's panes closed days ago, but a dev server still answers on the second Remote Host. Report which swarm worktree it runs from, if any, or that it belongs to someone else; the hosts' assistants can look, nobody stops it.
   - query: one host has two worktrees with near-identical names, one from this run and one from somebody else's. Make sure the audit doesn't mix them up.
   - query: morning! the swarm is done. could you go through what it left on the other machines and tell me what's risky to remove? don't touch anything yet
   - query: 'check my remote hosts for work that exists only there: dirty files or commits that aren''t on the shared remote'
@@ -50,7 +50,7 @@ positives:
   - query: I think a server the run started is still up on the second machine. Find out, and tell me which worktree it belongs to, without stopping it.
   - query: can you tell me, per machine, what the parallel job created that is still there and whether any of it has unsaved work? I'm deciding tomorrow what to remove
   - query: The hosts' assistants did a lot of work for the run and I lost track. What did they leave in their projects, and what can't be judged without asking someone?
-  - query: 'Hub agent task: collect from every enrolled host assistant a report-only account of the worktrees, panes and listeners tied to run lint-sweep-3, then class them and list the gaps.'
+  - query: 'Orchestrator note: the person wants the leftovers of run lint-sweep-3 on the Remote Hosts reviewed before anyone cleans anything. Have each enrolled host assistant report what it sees for the run, class the items by how risky removal is, and state the hosts that did not answer.'
   - query: Sort what the swarm left on my remote machines into things in use, things holding unpushed work, things that look finished and things you can't verify.
   - query: 'thanks! last thing on the swarm: an overview of the workspaces it left across the hosts, nothing removed, with who owns what'
   - query: now list what it left on them, read-only

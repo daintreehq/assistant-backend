@@ -12,10 +12,10 @@ requiredTools:
 optionalTools:
   - host.listTasks
 ---
-Read-only here and on every host: nothing is closed, removed, stopped, pruned or pushed.
+Read-only here and on every host: nothing is closed, removed, stopped or pushed.
 
 1. The run's items per host and project, from the replies and plan you kept: the worktree, branch, pane and port it named. Match only by those; anything that merely resembles one is not the run's: counted, unjudged. No record (a restart drops reply text): ask that lane which it made; unproven is unknown.
-2. `host.list`; `host.listAssistants` per host. A lane with a `generation` and `available` is audited; a `disconnected` host, a project with no lane, `projectsOmitted` above 0, no generation, paused or not `ok` is a coverage gap, never "nothing there".
+2. `host.list`; `host.listAssistants` per host. A lane with a `generation` and `available` is audited; a `disconnected` host, a project with no lane, `projectsOmitted` above 0, no generation, not `available` or not `ok` is a coverage gap, never "nothing there".
 3. One `host.sendMessage` per audited lane, no `waitMs`, for its own project only; end the turn.
 
 ```json tool=host.sendMessage surface=hub-full
@@ -25,9 +25,9 @@ Read-only here and on every host: nothing is closed, removed, stopped, pruned or
    Brief: "Report only; change nothing. Run <run>. Follow daintree.worktree.audit-worktrees, but no `fetch` (what it would settle is unknown), for these items in this project: <ids, branches, panes, ports>. Per item add: a listener on a named port or with its cwd in it (`lsof -nP -iTCP -sTCP:LISTEN`, then `lsof -a -p <pid> -d cwd`); a configured remote resource, noted and never probed; HEAD on the remote (`ls-remote`). List others, unjudged. Never close, kill, remove or push. Reply each item's facts and any failed read."
 
 On notice or resume (the hosts foundation's reconcile):
-- `completed`: check what is cheap: a pushed claim by `git ls-remote` on the shared remote; else one narrow question in the same `contextId`. Unchecked stays a claim.
-- Per item, apart: in use (working agent, open pane, listener), dirty or untracked, unpushed, merged (a PR head holding HEAD; git alone misses squashes), listener owner, retained service or cloud resource. Safe: clean, HEAD pushed or in a merged PR, idle, every read ok. Unsafe: a flag, named. Unknown: failed read, unobserved lane, owner unproved. A closed task is not an abandoned worktree.
+- `completed`: check what is cheap: a pushed claim by `git ls-remote` on the shared remote; else one narrow question, same `contextId`. Unchecked stays a claim.
+- Per item, apart: in use (working agent, open pane, listener), dirty or untracked, unpushed, merged (a PR head holding HEAD; git alone misses squashes), listener owner, retained service or cloud resource. Safe: clean, idle, HEAD in a merged PR, every read ok. Unsafe: a flag, named. Unknown: pushed but unmerged, failed read, unobserved lane, owner unproved, any retained resource. A closed task is not an abandoned worktree.
 
-Stop and recovery: one audit per lane; an unsent, lost or empty one is a gap. Safe now is not safe later: re-check before any cleanup the person authorises (daintree.hosts.recover-and-clean-up);
+Stop and recovery: one audit per lane; an unsent, lost or empty one is a gap. Re-check before any cleanup the person authorises (daintree.hosts.recover-and-clean-up);
 
 Report back: per host and project, each item with class, reasons and the decision it needs; coverage gaps; other owners counted; what you checked against what lanes said.
