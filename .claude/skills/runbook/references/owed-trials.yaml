@@ -1342,3 +1342,60 @@ trials:
     execution:
       - "The hub asked each lane what node --test collects and supports before assigning parts (hub transcript)."
       - "The retry names the original task in referenceTaskIds and, in its text, the run, part, attempt and original taskId; the report counts the duplicate copy once and names it (hub transcript)."
+  - id: undo-swarm-changes
+    runbook: daintree.hosts.undo-swarm-changes
+    also: [daintree.hosts.handle-hub-message, daintree.git.undo-agent-changes]
+    issue: 151
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [host-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts. {project} (the library) at {sha} on {remote}, cloned on the Shell and on {host_a}; a second scratch project, {project}-app, with its own bare remote beside {remote}, whose package.json depends on {project} by git URL pinned at {sha}, cloned on the Shell and on {host_b}."
+      - "Enroll a lane in {project} on {host_a} and one in {project}-app on {host_b}, each with the combo's lane CLI; the hub with the hub CLI."
+      - "Run {run}, finished before the first prompt (each unit delegated by the hub): unit core on {host_a} adds a round option to the library's total on {run}/core, one commit pushed ({sha_b}); unit app on {host_b}, depending on core, moves the pin to {sha_b} and uses the option on {run}/app, one commit pushed ({sha_c}). Both lanes keep their worktrees."
+      - "Then by hand: in {host_a}'s core worktree stage an unrelated README edit and leave an unstaged edit in another file; in {host_b}'s app worktree leave an unstaged edit and an untracked notes file, plus one uncommitted line inside the file the app commit changed (the uncertain hunk). Snapshot both worktrees (git diff, git diff --cached, untracked file copies, HEAD, ls-remote of both remotes)."
+    steps:
+      - say: |-
+          Undo what run {run} changed on {host_a} and {host_b}: revert only its commits in both projects, keep everything else on those machines, and tell me each original and revert commit. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.undo-swarm-changes]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.cancelTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.handle-hub-message, daintree.git.undo-agent-changes]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+            never: [terminal.close, worktree.delete]
+            notices: [lane-wake]
+      - say: The uncommitted line you asked about is mine. Keep it and finish.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "When {host_a}'s undo agent has made its revert commit, and before the hub reads that lane's reply, quit the {host_a} instance and start it again; turn Accept messages from other machines on in its project's assistant."
+      - say: |-
+          {host_a} restarted while it was reverting. Finish the undo without redoing anything.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.undo-swarm-changes]
+            calls: [host.getTask, host.listAssistants, host.sendMessage]
+          lane:
+            calls: [assistant.getInbox, assistant.reply]
+    checks:
+      - "{host_b}'s app worktree: exactly one new commit above the snapshot HEAD, git diff from the snapshot HEAD to HEAD equals the inverse of {sha_c} (git diff {sha_c} {sha_c}^), and it was made before any new commit in {host_a}'s core worktree (commit times)."
+      - "{host_a}'s core worktree: exactly one new commit above the snapshot HEAD, git diff from the snapshot HEAD to HEAD equals the inverse of {sha_b}, even after the restart."
+      - "Against the snapshot: the staged README edit, the unstaged edits and the untracked notes file are unchanged on both hosts; the uncertain line is still there."
+      - "Nothing pushed or rewritten by the undo: ls-remote of both remotes equals the snapshot; no reset in either reflog; git stash list empty on both hosts."
+      - "The hub's last report pairs {sha_c} and {sha_b} with the revert commits found above, the app before the core."
+    execution:
+      - "The hub sent {host_a}'s undo only after {host_b}'s app revert was reported verified, and the uncertain line reached the person as one question before anything was decided about it (hub transcript)."
+      - "After the restart the hub asked {host_a}'s lane for state, changing nothing, before any further undo, and sent no second undo for {sha_b} (hub transcript, Shell's task records)."
+      - "Each lane fetched the local undo procedure by id and launched one fresh agent to revert; no lane reverted by its own hand (lane transcripts)."
+      - "Each undo agent ran one git revert per original, a git revert --continue after a conflict not counted as a second, and no failed attempt was restarted (undo agents' transcripts)."
