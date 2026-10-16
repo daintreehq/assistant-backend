@@ -177,7 +177,6 @@ boundaries:
   - query: "give each of my four remote machines the same retry-wrapper task on its own branch and keep at it until every host's sha is in the table"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
-  - query: 'have every host write the json flattener on its own branch and give me each one''s sha, no judging needed'
   - query: 'I just want to see what each remote machine does with the json flattener: their branches and commits in a table, nobody wins'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
