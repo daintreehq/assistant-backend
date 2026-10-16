@@ -67,7 +67,7 @@ git lfs pull                             # the selector artifact is Git LFS
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" -c requirements.lock
 
-# Test / lint / types (CI runs all of these on push + PR to main and develop)
+# Test / lint / types (the full check: run it locally; there is no hosted CI)
 pytest                                   # whole suite
 pytest tests/unit/test_catalog.py -k <name>
 ruff check .
@@ -205,10 +205,11 @@ MCP spec rather than frozen.
 
 ## CI
 
-`.github/workflows/ci.yml` reports on every push; it is **not** a release gate (Cloud Build's
-candidate smoke test guards production). It runs: install from lock, ruff, `mypy --strict src`, pytest with
-coverage (`fail_under = 90`), `bench coverage`, `bench local`. CI checks out the LFS
-artifact. `bench local` is the routing verdict: it attributes every
+There is no hosted CI: GitHub runs nothing on a push or a PR. The full check runs locally
+before work lands: install from lock, ruff, `mypy --strict src`, pytest with coverage
+(`pytest -q --cov --cov-report=term:skip-covered`, `fail_under = 90`), `bench coverage`,
+`bench local`. It needs the LFS artifact pulled. It is not a release gate either (Cloud Build's
+candidate smoke test guards production). `bench local` is the routing verdict: it attributes every
 miss to the stage that lost it, and `candidate_miss` (a required runbook that never
 reached the head) is gated at zero — it is the first number to move as the catalog
 grows, and `bench scale` measures when.

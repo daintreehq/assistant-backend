@@ -164,7 +164,7 @@ rewrite what a generator returned.
 
 ```bash
 python -m training.compile_corpus          # rebuild selection.jsonl + corpus-lock.json
-python -m training.compile_corpus --check  # what CI runs
+python -m training.compile_corpus --check  # what the test suite checks
 ```
 
 Commit the YAML edit, the recompiled `selection.jsonl` and the updated

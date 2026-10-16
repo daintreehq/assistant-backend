@@ -4,7 +4,7 @@
 (`runbooks/local/artifacts/selector/`) through the classifier's decision procedure
 — the visible-active projection, the structural background-wake rule, the
 earn-your-place admission floors, the bare-question docs pass — offline,
-deterministically, and for free. CI runs it on every push.
+deterministically, and for free. It is part of the full local check.
 
 The corpus is conversational because the classifier was trained on conversations.
 The MCP search sends a bare query with nothing loaded, which the single-runbook,

@@ -215,7 +215,7 @@ clauses, reverse boundaries and followups.
 
    ```bash
    "$PY" -m training.compile_corpus          # read dropped_contaminated / dropped_conflicting_label
-   "$PY" -m training.compile_corpus --check  # what CI runs
+   "$PY" -m training.compile_corpus --check  # what the test suite checks
    ```
 
    Commit the YAML with the recompiled `training/data/selection.jsonl` and

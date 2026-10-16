@@ -2,8 +2,8 @@
 
 One suite, `runbook_selection/`: routing quality of the shipped runbook selector —
 the search behind the MCP server. Offline, deterministic and free. It is outside the
-package, pytest's `testpaths` and the type gate, but CI runs `coverage` and `local`
-on every push.
+package, pytest's `testpaths` and the type gate, but `coverage` and `local` are part of
+the full local check (CLAUDE.md, "CI").
 
 ```bash
 python -m benchmarks.runbook_selection.bench coverage   # every runbook has a case that requires it
