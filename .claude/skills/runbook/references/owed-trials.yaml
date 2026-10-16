@@ -930,3 +930,148 @@ trials:
       - "{branch} on {remote} holds the HEAD the {host_a} lane reported, pushed after the stop; {host_a}'s agent pane is stopped, still open, and its worktree kept."
       - "{host_b} works on a new branch whose history contains that commit, sent only after the push showed on {remote}; one work exchange to {host_b} (Shell's record)."
       - "Nothing force-pushed; {branch} gets no commit after the stop."
+
+  - id: steer-swarm
+    runbook: daintree.hosts.steer-swarm
+    also: [daintree.hosts.steer-for-hub]
+    issue: 110
+    caller: hub
+    path: fleet
+    hosts: 3
+    needs: [real-ssh]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Three hosts with enrolled lanes in {project}, {project} at {sha} on {remote}. This hub sent each lane a run/{run} brief to add a --json option to the tally CLI on its own branch, no pushing, agents on model haiku."
+      - "Before the first prompt: on {host_a} the worker is mid-turn with uncommitted files; on {host_b} the person keeps the lane busy answering them in its own window, so the brief's wake is still held (undelivered); the third host is taken off the network."
+    steps:
+      - say: |-
+          Stop the run/{run} work on all my machines, but keep whatever they've done so far.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.steer-swarm]
+            calls: [host.getTask, host.cancelTask, host.sendMessage]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [terminal.getStatus, terminal.interruptOwned, assistant.reply]
+            never: [terminal.kill, worktree.delete]
+    checks:
+      - "The Shell's record: {host_b}'s brief is canceled, and no worker was launched there afterwards."
+      - "{host_a}'s worker is stopped at an empty input line with its uncommitted files intact (git status --porcelain before and after); nothing committed, pushed or reset."
+      - "The third host is reported unresolved and disconnected; no exchange was queued to it (Shell's record)."
+    execution:
+      - "Each host's state in the report comes from its lane's answer, never from the exchange state alone (hub transcript)."
+
+  - id: integrate-host-branches
+    runbook: daintree.hosts.integrate-host-branches
+    also: [daintree.hosts.integrate-for-hub]
+    issue: 116
+    caller: hub
+    path: fleet
+    hosts: 3
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Three hosts with enrolled lanes in {project}. On {remote}: main at {sha}; run/{run}/qty at {sha_b}, pushed from {host_a}; run/{run}/currency at {sha_c}, pushed from {host_b}; both from {sha}, touching different files. The third host integrates."
+    steps:
+      - say: |-
+          Have my third machine combine run/{run}/qty from {host_a} and then run/{run}/currency from {host_b} on top of main at {sha}, as run/{run}/integration, with npm test after each merge, and push the integration branch. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.integrate-host-branches]
+            calls: [host.list, host.listAssistants, host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.integrate-for-hub]
+            calls: [actions.getContext, worktree.createWithRecipe, agent.launch, assistant.reply]
+      - person: "Right after the hub's send, push one more commit to run/{run}/qty on {remote}."
+      - say: Is the integration done?
+        expect:
+          hub:
+            calls: [host.getTask]
+    checks:
+      - "run/{run}/integration on {remote} descends from {sha} and merges {sha_b} then {sha_c} (git log --first-parent), not the commit pushed after the send."
+      - "The moved run/{run}/qty is reported as a finding for the person, never merged; npm test passes on the integration head in a fresh clone."
+      - "Neither source branch was changed by the run (git --git-dir {remote} rev-parse each, before and after, apart from the person's push)."
+    execution:
+      - "The hub checked each input on the shared remote before the send and verified the merges from the base after the reply (hub transcript)."
+
+  - id: execute-distributed-workflow
+    runbook: daintree.hosts.execute-distributed-workflow
+    also: [daintree.hosts.do-delegated-work]
+    issue: 115
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [shell-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project} and in a second scratch repository, tally-web (a small client with npm test), each pushed to its own bare remote in the stage and cloned on both hosts; {project} at {sha} on {remote}."
+      - "{project}'s package.json requires Node 20 and uses syntax older Node cannot parse; no host has Node 10."
+    steps:
+      - say: |-
+          Run this plan across my machines, each unit on its own branch under run/{run}, pushed to origin: (1) on {host_a}, add a totals endpoint to {project} that returns {"total": cents}, as contract v1; (2) once (1) is on origin, on {host_b}, make tally-web fetch the total from that endpoint; (3) on {host_b}, make {project}'s npm test pass on Node 10; (4) once (3) is on origin, on {host_a}, lower {project}'s engines field to Node 10. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.execute-distributed-workflow]
+            calls: [host.list, host.listAssistants, host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+      - person: "When unit (1)'s reply arrives and before unit (2) goes out, quit the Shell and start it again. First combo: resume the same hub conversation; second combo: open a new one. Turn Accept messages from other machines on again before the next prompt."
+      - say: Carry on with the plan.
+        expect:
+          hub:
+            calls: [host.listTasks, host.getTask, host.sendMessage]
+    checks:
+      - "Each unit has exactly one host task in the Shell's record, across the restart; nothing was sent twice."
+      - "Unit (2) went out once, after (1)'s branch was on {remote}, and its brief names that commit; tally-web's run branch calls the v1 endpoint and its npm test passes in a fresh clone."
+      - "Unit (4) was never sent; the final report shows (3) failed or blocked and (4) blocked, both visible."
+    execution:
+      - "After the restart the hub rebuilt the plan from host.listTasks and host.getTask instead of waiting for a notice (hub transcript)."
+
+  - id: run-validation-matrix
+    runbook: daintree.hosts.run-validation-matrix
+    also: [daintree.hosts.verify-for-hub]
+    issue: 117
+    caller: hub
+    path: fleet
+    hosts: 2
+    needs: [linux-host]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Two hosts with enrolled lanes in {project}: {host_a} Linux x64, {host_b} macOS arm64. {project} at {sha} on {remote} has a test that fails only on Linux, and an npm run test:py check that needs Python 3.9, which neither host has."
+    steps:
+      - say: |-
+          Test {project} at {sha} with npm test on Linux x64 and on macOS arm64, plus npm run test:py under Python 3.9 wherever that exists, and give me one matrix. Change nothing. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.run-validation-matrix]
+            calls: [host.list, host.listAssistants, host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.verify-for-hub]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+    checks:
+      - "The matrix shows Linux x64 failed (the Linux-only test named), macOS arm64 passed, and the Python 3.9 row unavailable."
+      - "Each verify checkout is at {sha} with a clean tree; {remote} is unchanged (git --git-dir {remote} for-each-ref before and after)."
+      - "No verify task was sent for the unavailable row (Shell's record)."
+    execution:
+      - "The hub asked each lane what its machine offers before placing any row, since host.list carries no platform (hub transcript)."
