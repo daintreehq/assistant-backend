@@ -101,10 +101,10 @@ boundaries:
   - query: "open a terminal in .daintree/plugins/acme.board and run its watch build so I can see the output"
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-96
-  - query: "start the api dev server for the build host's worktree in a panel and leave it running for me, no tests"
+  - query: "get the storybook server for the design-system worktree going on the build host and keep it alive, I only want it up, not tested"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
-  - query: "bring up the frontend dev server for the feature worktree in a terminal and just keep it going"
+  - query: "open a terminal and run the docs site watcher for the portal worktree, it should stay up while I read"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
 followups:
