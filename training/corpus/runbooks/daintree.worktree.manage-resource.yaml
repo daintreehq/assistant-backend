@@ -286,6 +286,12 @@ boundaries:
   - query: 'the cloud devbox for the sync worktree, pause it over the weekend and resume it monday morning'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
+  - query: "the devbox for the api worktree has a database on it, is it up or paused?"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
+  - query: "pause the cloud resource that hosts my branch's database until Monday"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
 followups:
   - query: pause it then
     history:

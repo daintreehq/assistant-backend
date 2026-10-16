@@ -253,3 +253,9 @@ boundaries:
   - query: reply to the hub with whatever it asked about the worktrees and servers on this host, it wants a report only
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: "open the inbox: the hub wrote something about reseeding a database here, what does it want from this lane"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
+  - query: "answer the hub: the migration is done at version 42 and the backup is kept on this host"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133

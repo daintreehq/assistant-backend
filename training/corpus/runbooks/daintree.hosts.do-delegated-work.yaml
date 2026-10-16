@@ -163,3 +163,6 @@ boundaries:
   - query: 'a message from the hub: build the subscriber half here on its run branch, the contract is pinned at 2f6a9e4, and send back the commit'
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
+  - query: "the hub wants a new worktree on this host where an agent adds the invoices migration and commits it, reply with the sha"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133

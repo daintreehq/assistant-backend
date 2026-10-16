@@ -157,3 +157,6 @@ boundaries:
   - query: tidy up my part of the hub's experiment on this machine, nothing forced, and report what stayed
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: "the hub asked this machine to close the panes and remove the worktrees from the schema-change run, and to say which it kept"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133

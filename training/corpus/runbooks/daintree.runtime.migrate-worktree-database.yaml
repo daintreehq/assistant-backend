@@ -57,6 +57,46 @@ positives:
     run: 2026-09-28-round6
   - query: pg_restore /Users/sam/db/feature-flags.dump into the feature-flags worktree's own database; prove the target is local before writing anything.
     run: 2026-09-28-round6
+  - query: "Lane task from the hub: run the pending migrations for the worktree on branch run-12/unit-5 here, confirm the database is the worktree's own and not a forward to something shared, and report the schema version and the commit that was tested."
+    run: runbook-2026-10-issue-133
+  - query: "Resolve the database connection of the checkout on this machine and establish whether the localhost port is a tunnel to a different environment before any reseed; if identity cannot be established, report that instead of proceeding."
+    run: runbook-2026-10-issue-133
+  - query: "Work out which server and database a reset in the feature checkout would hit, comparing it with the main checkout and the other worktrees on this host. Read-only: run nothing that writes."
+    run: runbook-2026-10-issue-133
+  - query: "Seed the worktree's disposable postgres with the fixtures, but only after showing that the loopback port in its connection string is served by a local process and not by an ssh or kubectl forward."
+    run: runbook-2026-10-issue-133
+  - query: "The worktree's env file points at 127.0.0.1:3307 and a cloud sql proxy is running on this machine; decide whether that database is this worktree's own before applying the schema change."
+    run: runbook-2026-10-issue-133
+  - query: "Apply the new migration to the worktree's database on this host, back it up first, and send back the tested commit, the schema version before and after, and where on this machine the backup is stored. No connection details."
+    run: runbook-2026-10-issue-133
+  - query: "my worktree db is on localhost:5433 but i think that's a port forward to the team database, can you check before i wipe it"
+    run: runbook-2026-10-issue-133
+  - query: "reset the test database for the payments branch, but make sure it's not the shared one i tunnel to from the vpn"
+    run: runbook-2026-10-issue-133
+  - query: "before you seed anything, tell me whether the db this worktree talks to is really sitting on this machine"
+    run: runbook-2026-10-issue-133
+  - query: "run the migrations on the remote worktree, but I'm worried localhost is going through my ssh tunnel to staging"
+    run: runbook-2026-10-issue-133
+  - query: "is the mysql on 127.0.0.1 in the invoices worktree the same server main uses? if it isn't, reset it"
+    run: runbook-2026-10-issue-133
+  - query: "I set up an ssh tunnel last week so I could look at the staging database from my laptop and I think it is still listening on 5432. The checkout for the audit-log branch has DATABASE_URL pointing at localhost:5432. Before you run any migration or reset there, work out what that port is really connected to and tell me. I only want it touched if it is the branch's own throwaway database."
+    run: runbook-2026-10-issue-133
+  - query: "The person's hub asked this machine to refresh the test data in the checkout for the ledger branch. The env file says localhost, and another checkout here uses the same port number. Find out whether they are the same database; if you can't tell, don't wipe anything, send the question back."
+    run: runbook-2026-10-issue-133
+  - query: "hub wants the orders worktree on this host migrated to head, db is on localhost"
+    run: runbook-2026-10-issue-133
+  - query: "The hub is asking for a fresh seed of the worktree database on this host; check what that database really is first"
+    run: runbook-2026-10-issue-133
+  - query: "hub: roll back the last migration on the checkout for run-9, only if its db is its own"
+    run: runbook-2026-10-issue-133
+  - query: "Run the schema upgrade for the hub's unit worktree on this machine, and say plainly if the database turns out to be shared"
+    run: runbook-2026-10-issue-133
+  - query: "can you check that the sqlite file in the notifications worktree isn't a symlink into main's data directory, then drop and rebuild it"
+    run: runbook-2026-10-issue-133
+  - query: "The connection string says localhost but the container publishing that port belongs to a different compose project. Establish whose database it is before migrating the worktree."
+    run: runbook-2026-10-issue-133
+  - query: "Get an agent in the search-revamp worktree to compare the database server id behind its config with the one main and the other worktrees resolve to, and only then run the migration."
+    run: runbook-2026-10-issue-133
 boundaries:
   - query: The migration is fine in CI; just apply it to my local db in the reports worktree.
     confusable_with: [daintree.ci.diagnose-and-fix]
@@ -106,6 +146,27 @@ boundaries:
   - query: "the hub only wants this worktree's database migrated and seeded with invented customers, no server and no demo"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: "The hub asked this host to reseed the sample database for the worktree on the pricing branch and said nothing about serving it; make sure it is the worktree's own database first."
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-133
+  - query: "hub request: put the seed rows into the worktree's database here and tell it the row counts"
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: runbook-2026-10-issue-133
+  - query: "Apply the migrations the hub asked for in the checkout on this host, and check the database is not the one another checkout here uses."
+    confusable_with: [daintree.hosts.handle-hub-message]
+    run: runbook-2026-10-issue-133
+  - query: "reset the database in the worktree; the db host is a tunnel to a shared box so check that before anything is wiped"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-133
+  - query: "the worktree's postgres container is local and its own; migrate it, no cloud box involved"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-133
+  - query: "the worktree already has its own sqlite file; apply the new migrations to it after confirming nothing else opens that file"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-133
+  - query: "The hub asked this host to apply the pending migrations on the worktree for unit 4"
+    confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
+    run: runbook-2026-10-issue-133
 followups:
   - query: did it prove the database isn't the same one main uses?
     history:
@@ -143,6 +204,18 @@ followups:
       - 'assistant: Applied and checked: php artisan migrate:status in ~/proj-invoices shows all 41 ran; backup at ~/db-backups/invoices-0928.sql.'
     active: [daintree.runtime.migrate-worktree-database]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "what was actually behind the localhost port?"
+    history:
+      - "user: run the migrations in the billing worktree, it uses localhost for the db"
+      - "assistant: Launched claude-3 'DB: billing' in ~/code-billing with notify and handback; it proves the database is the worktree's own before running anything. Ending my turn."
+    active: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
+  - query: "the agent says an ssh process holds that port. so is it safe to reset?"
+    history:
+      - "user: reset the db for the invoices-v2 worktree"
+      - "assistant: Launched claude-5 'DB: invoices-v2'; it resolves the connection and compares it with main before it resets anything."
+    active: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
 topic_shifts:
   - query: run the pending migrations for that worktree
     history:

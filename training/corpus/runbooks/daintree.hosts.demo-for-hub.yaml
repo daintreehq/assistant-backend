@@ -150,6 +150,12 @@ boundaries:
   - query: "Message from the hub asking this host to start the reports preview as a demo for the person at the Shell, with the SHA and host port in the reply"
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
+  - query: "the hub needs the checkout of the search-revamp branch up and running here with demo data loaded, then tell it how the person can reach the app"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
+  - query: "demo for the hub: load the sample data into this worktree's own database and leave the app running on a port"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-133
 
 followups:
   - query: good, start the preview and check it serves that commit
