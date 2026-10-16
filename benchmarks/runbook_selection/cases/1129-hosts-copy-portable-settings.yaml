@@ -136,8 +136,8 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-trap-not-project-memory
   category: routing-trap
-  note: 'Daintree agent presets, not durable instructions. Fence: "Do not use for ... durable instructions
-    and project memory (daintree.memory.manage-project-memory)".'
+  note: 'Daintree agent presets, not durable instructions. Fence: "durable instructions and project memory
+    (daintree.memory.manage-project-memory)".'
   messages:
   - role: user
     content: Mirror my agent presets and notification setup on the host, secrets stay here.
@@ -198,8 +198,9 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-connect-host
   category: routing-trap
-  note: Adding a machine is daintree.hosts.connect-host's deliverable; no settings are mentioned, so Copy
-    settings must not ride along.
+  note: 'Adding a machine is the neighbour''s deliverable, no settings named. Its text: "Use when the
+    person wants ANOTHER MAC OR LINUX MACHINE added to Daintree as a Remote Host". Copy settings must
+    not ride along.'
   messages:
   - role: user
     content: Set up a second Mac as a Remote Host so I can run projects on it over SSH.
@@ -210,7 +211,8 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-diagnose-host-differences
   category: routing-trap
-  note: The same code passing on one machine and failing on another is daintree.hosts.diagnose-host-differences.
+  note: 'The same build green on one machine and red on another. The neighbour''s text: "Use when the
+    SAME CODE BEHAVES DIFFERENTLY ON TWO OR MORE Remote Hosts this Shell reaches".'
   messages:
   - role: user
     content: The same build is green on my Mac and red on the Linux host, find what differs between them.
@@ -221,7 +223,8 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-survey-hosts
   category: routing-trap
-  note: A host-by-host status report is daintree.hosts.survey-hosts.
+  note: 'A host-by-host status report. The neighbour''s text: "The deliverable is ONE read-only report,
+    host by host".'
   messages:
   - role: user
     content: 'Give me a read-only report on each Remote Host: its connection, load and open exchanges.'
@@ -232,7 +235,8 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-project-memory
   category: routing-trap
-  note: A durable rule for the host's assistant is daintree.memory.manage-project-memory.
+  note: 'A durable rule for the host''s assistant. The neighbour''s text: "Use when the user wants something
+    remembered from now on".'
   messages:
   - role: user
     content: Remember that the assistant on the host should always run the linter first.
@@ -241,7 +245,7 @@ cases:
     - daintree.memory.manage-project-memory
 - id: copy-portable-settings-reverse-plugin-development
   category: routing-trap
-  note: A project plugin that fails to load is daintree.plugins.develop-project-plugin.
+  note: 'A project plugin that fails to load. The neighbour''s text: "my plugin isn''t loading".'
   messages:
   - role: user
     content: My project plugin will not load on the host, help me debug it.
@@ -250,7 +254,8 @@ cases:
     - daintree.plugins.develop-project-plugin
 - id: copy-portable-settings-reverse-undo-swarm-changes
   category: routing-trap
-  note: Backing out a run's commits across hosts is daintree.hosts.undo-swarm-changes.
+  note: 'Backing out a run''s commits across hosts. The neighbour''s text: "Use on the hub when the person
+    wants the CODE one run or swarm changed on their Remote Hosts TAKEN BACK across hosts".'
   messages:
   - role: user
     content: Back out what last night's remote run committed in the API repository on each host.
@@ -261,7 +266,8 @@ cases:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-start-swarm
   category: routing-trap
-  note: Readying assistants on hosts is daintree.hosts.start-swarm, nothing about settings.
+  note: 'Readying assistants on hosts. The neighbour''s text: "Use when the user wants a swarm SET UP
+    across their other machines before handing out work".'
   messages:
   - role: user
     content: Bootstrap an assistant for this project on each of my remote hosts and report which are ready.

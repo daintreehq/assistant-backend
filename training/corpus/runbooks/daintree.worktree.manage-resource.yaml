@@ -292,6 +292,9 @@ boundaries:
   - query: "pause the cloud resource that hosts my branch's database until Monday"
     confusable_with: [daintree.runtime.migrate-worktree-database]
     run: runbook-2026-10-issue-133
+  - query: pause my worktree's cloud devbox overnight and tell me what it costs while it is paused
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 followups:
   - query: pause it then
     history:

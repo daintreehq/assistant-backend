@@ -17,8 +17,8 @@ Changed since the preview, or the link dropped: Refresh, preview and review agai
 
 6. Verify: the result's applied, unchanged, skipped and failed counts against the preview; after Refresh "Compared with" no longer listing what was copied, and "Last copied from <name> <time>" with the same applied and skipped. The name is attribution.
 
-Undo: "Undo last copy" on that row, the latest copy only, absent or "Can't be undone" when no record is kept. The dialog lists what goes back; anything edited on the host since stays. A newer copy replaces it. After it, or a dropped link, Refresh: "restored" leaves, "Kept · Changed … since the copy" edits, "Couldn't restore" leaves still as copied. Never repeat an undo blindly.
+Undo: "Undo last copy" on that row, the latest copy only, absent or "Can't be undone" when no record is kept. The dialog lists what goes back; anything edited on the host since stays. A newer copy replaces it. After it, or a dropped link, Refresh: a "restored" count, "Kept · Changed … since the copy" edits, "Couldn't restore" leaves still as copied. Never repeat an undo blindly.
 
 Credentials, consent, trust, project and run state and plugin installs never travel. Plugins: the host's Plugins page, one at a time; trust is per machine.
 
-Report back: host, categories ticked, the preview's changes and skips, the person's approval, the counts, restored, kept and failed leaves.
+Report back: host, categories ticked, the preview's changes and skips, the person's approval, the counts, restored count, kept and failed leaves.

@@ -41,7 +41,8 @@ positives:
 - make the host's worktree path pattern match mine
 - my settings on the server are a mess compared to my laptop, line them up
 - that settings push I did earlier was a mistake, reverse it
-- do i need to do anything on the server after copying settings
+- query: do i need to do anything on the server after copying settings
+  docs: true
 - hey thanks! next I want my prefs on the remote box, preview first please
 - show me what's different in the host's settings before you copy a single thing
 - I'd rather not carry my env vars over to the server, copy everything else
@@ -113,6 +114,9 @@ boundaries:
 - query: copy my Daintree settings across to the remote machine, and make sure no API key or login goes with them
   confusable_with:
   - daintree.worktree.manage-resource
+- query: the assistants on the host are already ready and taking messages; the one thing missing there is my notification and agent preferences, copy them over
+  confusable_with:
+  - daintree.hosts.start-swarm
 followups:
 - query: ok now bring my settings across too
   history:

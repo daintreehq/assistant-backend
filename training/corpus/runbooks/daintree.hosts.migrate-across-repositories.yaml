@@ -159,6 +159,9 @@ boundaries:
 
   - query: 'the deprecated orders field has to be dropped from every consuming repo on my hosts with the same rewrite, nothing to negotiate, pilot first'
     confusable_with: [daintree.hosts.coordinate-contract-change]
+  - query: rename the old fetch helper to the new one in every repository my hosts have checked out, one change per repository
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 topic_shifts:
   - query: now take the same logger swap through the other four repos on my machines, pilot first
     history:
