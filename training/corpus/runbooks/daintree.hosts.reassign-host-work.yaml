@@ -162,6 +162,9 @@ boundaries:
   - query: that remote task ran out of usage on its host, give it to a host with a different agent CLI instead
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
+  - query: 'The Mac mini went offline halfway through the parser fix; move that task to the Linux tower'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 
 followups:
   - query: fine, move that one to the tower then

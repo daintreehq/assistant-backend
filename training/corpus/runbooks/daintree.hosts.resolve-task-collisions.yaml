@@ -134,6 +134,9 @@ boundaries:
   - query: a second host started the same ticket and pushed to the same branch, settle who owns it
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: 'Two of my hosts are both editing the same branch of this project; sort out which one owns it'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 
 followups:
   - query: go with the tower then, and leave the mini's work alone

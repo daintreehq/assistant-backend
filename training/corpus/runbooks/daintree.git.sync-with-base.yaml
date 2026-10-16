@@ -77,6 +77,12 @@ boundaries:
   - query: rebase the auth branch on latest develop pls
     confusable_with: [daintree.git.resolve-semantic-conflict]
     run: 2026-09-28-round6
+  - query: 'My feature branch is eleven commits behind develop, merge the latest in and fix the conflicts'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'Rebase every one of my open branches onto main before the agents carry on'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 followups:
   - query: ok push it — with the lease like you said
     history:

@@ -205,3 +205,9 @@ boundaries:
   - query: the new server's host check keeps failing before any of its projects can be listed, sort the connection out
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: 'Add my spare Mac mini to Daintree as a host so I can start putting projects on it'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'The host I added last month says it is unreachable; get it connected again so I can open projects there'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123

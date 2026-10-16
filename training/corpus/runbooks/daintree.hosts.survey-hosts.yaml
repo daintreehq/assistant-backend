@@ -128,6 +128,12 @@ boundaries:
   - query: what projects are open on each of my remote machines and which ones have an assistant that takes messages
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: 'Give me a read-only rundown of my other machines: what projects each one has open and which have an assistant enrolled'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'Which of the remote hosts hold this repository, and is anything waiting on me there? Look only, change nothing'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 
 followups:
   - query: "and what about the exchanges?"

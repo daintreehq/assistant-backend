@@ -160,6 +160,12 @@ boundaries:
   - query: which of my other machines have a ready assistant in this project, start the missing ones if I allow it
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: 'The project is already open on every remote host; get an assistant enrolled in each one before any work goes out'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'Which remote hosts have an assistant ready in this repository? Start one on the hosts that lack it'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 
   - query: "get the hosts ready: an assistant in this repo on every remote machine, reuse what's there"
     confusable_with: [daintree.hosts.survey-hosts]

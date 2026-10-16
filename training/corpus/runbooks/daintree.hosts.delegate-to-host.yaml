@@ -269,6 +269,12 @@ boundaries:
   - query: give the build box the flaky checkout test to fix in our repo, and if its remote differs from ours stop and tell me
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: 'The repo is already on the build server; have its assistant add pagination to the list endpoint and open a PR'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'Ask the other Mac to run the migration branch''s tests and tell me which commit it checked'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 
   - query: 'get the tower to swap the date library in the admin repo and tell me the commit'
     confusable_with: [daintree.hosts.migrate-across-repositories]

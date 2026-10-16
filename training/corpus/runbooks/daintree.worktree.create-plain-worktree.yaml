@@ -392,6 +392,12 @@ boundaries:
   - query: 'just make a worktree for the branch run-3/unit-2, no agent in it yet'
     confusable_with: [daintree.hosts.do-delegated-work]
     run: runbook-2026-10-issue-98
+  - query: 'Make a new worktree on this machine for the release-candidate branch, no agent needed'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'Give me a plain worktree for the existing hotfix branch next to this project'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 followups:
   - query: nice. do another one off origin/develop, call it spike/cache
     history:

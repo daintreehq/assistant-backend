@@ -180,3 +180,6 @@ boundaries:
   - query: 'put the work the three hosts finished onto one integration branch on a single machine and tell me if it holds'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'The branches from my two remote machines need to be combined into one on the build host'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123

@@ -183,6 +183,12 @@ boundaries:
   - query: spread these tickets over the machines, only the ones whose project has the same origin as ours, and show the table before sending
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: 'I have four bugs to hand out and three machines that all have the repo; pick the host for each and show me the plan first'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'Which of my remote hosts should take this refactor? They all have the project already'
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
 
   - query: 'five unrelated tickets in different repos, nothing shared between them; put each one on whichever machine has room'
     confusable_with: [daintree.hosts.migrate-across-repositories]
