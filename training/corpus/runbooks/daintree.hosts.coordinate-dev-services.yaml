@@ -42,7 +42,7 @@ positives:
   - after the backend host restarted, the frontend on the other host can't reach it any more. bring the backend back and re-verify the connection between them
   - we have three dev services across two remote hosts, a web app, an api and a worker. figure out who calls whom and bring them up dependencies first
   - get the sync server on one remote machine and the companion app's backend on another talking to each other, verified with a tagged request
-  - both servers answer from my laptop but I don't know whether they can reach each other. check, don't assume
+  - both dev servers answer from my laptop, but I don't know whether the two remote hosts they run on can reach each other. check, don't assume
   - Make the web client on one remote host call the API on my other remote host. Don't open any ports to the internet and don't copy any keys between them
   - >-
     Observed: the frontend dev server on host-a returns 502 for /api and the backend dev server
@@ -56,9 +56,9 @@ positives:
   - pair the dev backend on the linux box with the dev frontend on the mini so they talk to each other, using the exact commits we pushed
   - the order, billing and inventory services are split across two hosts for dev. map the call graph, start them bottom-up, and verify each call that crosses hosts
   - the frontend on host 1 opens fine but anything it loads from the API on host 2 fails. check the addresses and what the browser can actually reach
-  - tell me which process makes the call from the web app to the API, the browser or the dev server, and bring the services up accordingly
-  - deliberately give the client a bad API address and show me you report the broken connection rather than fixing it behind my back
-  - spin up the websocket server on one host and the chat client on another and confirm messages flow between them
+  - tell me which process makes the call from the web app on one remote host to the API on the other, the browser or the dev server, and bring the services up accordingly
+  - deliberately give the client on one remote host a bad address for the API on another and show me you report the broken connection rather than fixing it behind my back
+  - spin up the auth service on one remote host and the account page on another, and confirm the page's sign-in request really reaches the service
   - the cache service on host b must be running before the app on host a will start. sequence it and verify the app really uses that cache
   - 'Search task: coordinate two dev servers on separate Remote Hosts so one calls the other'
   - two repos, two remote machines, one running stack. get it up and prove the pieces connect
