@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 20914,
-  "compiled_sha256": "08fad51aa902a87ab431be20fdd55409622ce752d7970184ad0348bd06f2e19c",
+  "rows": 20918,
+  "compiled_sha256": "56837d5b0153c1300e507b6dc3a56dde022caebce34054ac8983608342339bbe",
   "label_space_sha256": "792fae7311d835f56b67ddac4d1b22e1182c16eae885a8388d753e1278ebf46a",
   "label_space_size": 139,
   "by_source": {
-    "boundary": 6588,
+    "boundary": 6592,
     "docs": 841,
     "followup": 985,
     "foundation": 441,
@@ -57,7 +57,7 @@
     "runbook-2026-10-issue-118": 91,
     "runbook-2026-10-issue-119": 82,
     "runbook-2026-10-issue-122": 89,
-    "runbook-2026-10-issue-127": 81,
+    "runbook-2026-10-issue-127": 85,
     "runbook-2026-10-issue-131": 46,
     "runbook-2026-10-issue-148": 80,
     "runbook-2026-10-issue-151": 85,
@@ -453,10 +453,10 @@
       "sha256": "188de3cdbd4ed84d6ba11f4cc7d998b3fcfd62a50e0c3a63e32f279895fc0eb9"
     },
     "runbooks/daintree.hosts.rebalance-load.yaml": {
-      "examples": 66,
-      "rows": 66,
+      "examples": 68,
+      "rows": 68,
       "runbook": "daintree.hosts.rebalance-load",
-      "sha256": "685bfca1d87262c7a713a0a43d960415d74d9e94723abf3cffbbe59c63350e99"
+      "sha256": "fd06ab2b6a31ed909b4cf71c23e2cc65d42140d7803769b6f9dcf3c407616595"
     },
     "runbooks/daintree.hosts.recover-and-clean-up.yaml": {
       "examples": 99,
@@ -507,10 +507,10 @@
       "sha256": "a445cf8bcdac715bd1152d60fa0459342a69387966d63cdcb60c7eb8b9671ffb"
     },
     "runbooks/daintree.hosts.supervise-swarm.yaml": {
-      "examples": 73,
-      "rows": 73,
+      "examples": 75,
+      "rows": 75,
       "runbook": "daintree.hosts.supervise-swarm",
-      "sha256": "c41801f09dbbe348c4c41a0683d9bd74805ab149ca692e01774eb7d34ad2b689"
+      "sha256": "042406fe22b9874fcd2a06c6a7acbfc3f68d692b44608d9a97fd754da04da468"
     },
     "runbooks/daintree.hosts.swarm-fan-out.yaml": {
       "examples": 90,
@@ -642,7 +642,7 @@
       "examples": 57,
       "rows": 57,
       "runbook": "daintree.orchestration.reprioritize-work",
-      "sha256": "3eb0ad25a68c0854125b6ade1d309ae3ab2ef89153fa0ab903d7e1033160f8d2"
+      "sha256": "a6405331697d85615462ca9090fd4735135e06717d1d6eb0fcd98ddcb3b41e70"
     },
     "runbooks/daintree.orchestration.resolve-task-collisions.yaml": {
       "examples": 52,
