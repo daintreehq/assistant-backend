@@ -552,7 +552,7 @@ scenarios:
     family: restart-delivery
     observes: [host-restart, stale-generation]
     invariants: [no-duplicate-write, no-false-claim, no-unrelated-resource]
-    issues: [95, 103, 143]
+    issues: [95, 103, 130, 143]
     inject: "Once {host_a}'s worker is working, the operator quits {host_a}'s instance and starts it again (Host mode back on, {project} open). Its lane's enrollment ends and its message text is gone; the exchange record stays open."
     conditions:
       - {role: hub, action: host.sendMessage, outcome: lane_unavailable}

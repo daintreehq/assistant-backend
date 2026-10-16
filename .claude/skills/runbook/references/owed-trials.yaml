@@ -2595,6 +2595,7 @@ trials:
     execution:
       - "Lane transcript: skills.load was called once with the id skills.search returned on {host_a}; no slash command or similar skill stood in for the missing one; the brief to the agent named the skipped steps (lane transcript)."
       - "The lane ran git rev-parse HEAD and the tests itself in the checkout before replying, rather than repeating the agent's report (lane transcript)."
+
   - id: provision-local-environment-lane
     runbook: daintree.worktree.provision-local-environment
     also: [daintree.hosts.delegate-to-host, daintree.hosts.handle-hub-message]
@@ -2649,3 +2650,66 @@ trials:
     execution:
       - "No secret value (password, token, connection string with credentials) appears in the hub transcript or in any message between machines (hub and lane transcripts)."
       - "The lane inspected only its own host and launched one agent in the checkout holding the config; it never reran setup by hand after the app had run it, and its report separates what it ran from what it only reported (lane transcript)."
+  - id: prepare-host-maintenance
+    runbook: daintree.hosts.prepare-host-maintenance
+    also: [daintree.hosts.steer-for-hub, daintree.hosts.recover-and-clean-up]
+    issue: 130
+    caller: hub
+    path: staged
+    hosts: 1
+    needs: [host-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage one host with two projects open: {project} with a lane enrolled on the combo's lane CLI, and a second scratch project with an assistant opened in that machine's own window, not enrolled for this Shell. Start consent off. Nobody watches the host's windows."
+      - "{project} at {sha} on {remote}, cloned on the Shell and on {host_a}. Note the host's Daintree build from Settings > Hosts."
+    steps:
+      - say: |-
+          Have {host_a} add a CSV export to the tally library on a new branch under run/{run}, with an agent on model haiku; don't push anything.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "Once the lane's agent is working, add an untracked CHECKPOINT-CHECK.txt with one line to its run/{run} worktree and open a plain terminal on {host_a} running sleep 3000 in the second project. Then snapshot {host_a}'s run/{run} worktree (HEAD, git status --porcelain, a hash of CHECKPOINT-CHECK.txt), list the host's panes and worktrees, and note {remote}'s run/{run} refs (none yet): the before snapshot."
+      - say: |-
+          I'm going to restart Daintree on {host_a} for an update. Before I do, tell me what that will stop over there and get its work saved.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.prepare-host-maintenance]
+            calls: [host.list, host.listAssistants, host.listTasks, host.getTask, host.sendMessage]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [assistant.getInbox, terminal.getStatus, assistant.reply]
+            never: [terminal.close, worktree.delete]
+            notices: [lane-wake]
+      - person: "After the hub's report, take the snapshot again and compare it with the before snapshot, and read the update dialog's impact lines in Settings > Hosts if it shows them. Then quit {host_a}'s instance and start it again with Host mode on and both projects open; wait until the Shell shows it Connected."
+      - say: |-
+          {host_a} is back from the update. Check it before anything else goes out.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.prepare-host-maintenance]
+            calls: [host.list, host.listAssistants, host.listTasks, host.getTask]
+            never: [host.sendMessage, host.startAssistant]
+      - person: "Enroll the lane again from the Shell's window on {host_a}: More actions, Accept messages from other machines."
+      - say: Carry on with the CSV export on {host_a}, using what is already there.
+        expect:
+          hub:
+            calls: [host.listAssistants, host.sendMessage]
+            never: [host.startAssistant]
+    checks:
+      - "The second snapshot of {host_a}'s run/{run} worktree matches the before snapshot (same HEAD, CHECKPOINT-CHECK.txt still untracked with the same hash), no run/{run} ref appeared on {remote}, and the host's panes and worktrees are as listed before, the plain terminal included: the checkpoint committed, pushed, closed and removed nothing."
+      - "The Shell's record shows exactly one new exchange to {host_a} for the checkpoint, to the enrolled lane; none to the second project."
+      - "After the restart the host listing shows the lane with a null or changed generation (Settings > Hosts overview), and the Shell's record shows no new exchange to {host_a} until the lane was enrolled again; the pre-restart exchange was not resent."
+      - "After re-enrollment {host_a} has at most one live agent for the unit, in the same worktree (a surviving worker reused, or one replacement started), and no duplicate commit or second branch for it."
+    execution:
+      - "Hub report before the restart (transcript): it named the enrolled lane with its open exchange, the second project as unobserved (no lane for this Shell), and plain terminals and other Shells' work as not visible, and did not offer the hub's task list as the host's process list; the lane's checkpoint reply named the branch, HEAD, CHECKPOINT-CHECK.txt as uncommitted and pushed: no, which the snapshot confirms."
+      - "Hub report after the restart (transcript): it said the lane's enrollment ended and left the host's build for the person to check in Settings > Hosts."
+      - "Hub transcript at the report: host.listAssistants, host.listTasks and host.getTask came before the one host.sendMessage per enrolled lane, and the message told the lane to let any write in flight finish before stopping."
+      - "Hub transcript after the restart: host.listAssistants and host.listTasks (cursor 0 for {host_a}) came before any host.sendMessage; nothing waited for an update line from before the restart."
+      - "The lane, back after the last prompt, inspected its worktree and panes before acting."
