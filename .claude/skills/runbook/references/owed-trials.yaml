@@ -2019,6 +2019,7 @@ trials:
     execution:
       - "host.listAssistants and host.listTasks for each connected host went out in one round (hub transcript)."
       - "In each survey host.getTask was called at most once for the input-required exchange and for no other exchange (hub transcript)."
+
   - id: report-swarm-results
     runbook: daintree.hosts.report-swarm-results
     also: [daintree.hosts.handle-hub-message, daintree.hosts.swarm-fan-out, daintree.hosts.do-delegated-work]
@@ -2073,3 +2074,55 @@ trials:
       - "The hub checked each branch in its own shell with git ls-remote or a scratch clone, not by asking the lane (hub transcript)."
       - "{host_b}'s empty or lost reply was reported as gone or missing, never as a pass or a failure of the code (hub transcript)."
       - "The question to {host_a} was read-only: the lane listed panes, worktrees and the listener with terminal.list and git reads and changed nothing (lane transcript)."
+  - id: postmortem-swarm
+    runbook: daintree.hosts.postmortem-swarm
+    also: [daintree.hosts.swarm-fan-out, daintree.hosts.do-delegated-work, daintree.hosts.handle-hub-message]
+    issue: 121
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [unattended-confirmation]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}, cloned on the Shell and on both hosts. {sha_b} is an older commit of {project} on {remote} that is not the tip of run/{run}/b."
+      - "Set {host_a}'s agent permission mode to ask before edits (Skip permission prompts off, no allow-list for edits) and turn Skip permission prompts on for {host_b}. Keep a notes file of when each prompt appeared and when it was approved."
+      - "Install a pre-push hook in {host_b}'s clone of {project} that always exits 1, so {remote} can never get run/{run}/b from there."
+    steps:
+      - say: |-
+          Have both remote hosts add an option to the tally CLI that prints the total as JSON, each with a test on its own branch, run/{run}/a on {host_a} and run/{run}/b on {host_b}, pushed to origin, and bring me back each commit once it's checked. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.swarm-fan-out]
+            calls: [host.listAssistants, host.sendMessage]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            notices: [lane-wake]
+      - person: "On {host_a}, confirm its agent shows a pending approval; if none appears the setup failed, so fix the permission mode and restage the unit. Leave the approval unanswered about fifteen minutes, then approve it by hand and note both times. On {host_b}, as soon as its record shows the task working and before it replies, type into {host_b}'s lane: reply completed to the hub that the work is pushed on run/{run}/b at {sha_b}. If {host_b}'s exchange had already completed with its own report, the setup failed: restage."
+      - person: "Wait until both tasks read completed in the Shell's record. Confirm with git ls-remote {remote} run/{run}/b that nothing matches {sha_b}, that the hub's record holds {host_b}'s completed reply, and capture the baseline of branches, worktrees, panes and agents on both hosts."
+      - say: |-
+          The run on the two remote hosts is over and went badly: it took far too long and I don't trust what the hosts said. Work out why from the records and what the hosts tell you, and don't redo any of it.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.postmortem-swarm]
+            calls: [host.listTasks, host.getTask]
+            never: [host.cancelTask, host.startAssistant]
+          lane:
+            selected: [daintree.hosts.handle-hub-message]
+            calls: [assistant.getInbox, assistant.reply]
+      - say: After that run on the remote hosts, was the long wait on {host_a} the machine or a person? Use the records and don't send any work.
+        expect:
+          hub:
+            never: [host.cancelTask, host.startAssistant]
+    checks:
+      - "The Shell's record shows one work exchange per host and at most one read-only question per lane afterwards; none resent, none cancelled."
+      - "{host_a}'s task shows a gap from inboxFetchedAt to replyReceivedAt that brackets the noted prompt and approval times (it also holds the agent's own work, so it bounds the wait and does not measure it)."
+      - "{host_b}'s completed reply is recorded with {sha_b}, and git ls-remote {remote} run/{run}/b still differs from it."
+      - "Branches, worktrees, panes and agents on both hosts are the same before and after the post-mortem prompts."
+    execution:
+      - "Hub transcript: every duration cites the stamps it came from, null stamps are marked unobserved, no stamp from one host is compared with another's or with the Shell's clock, and the report keeps verified apart from claimed."
+      - "The report credits {host_a}'s wait to what the lane or the person said, not to the gap, and calls {host_b}'s claim contradicted only after a check against {remote}; a claim with no such check is left unverified."
