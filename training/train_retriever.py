@@ -159,6 +159,14 @@ def main() -> int:
         default="hash",
         help="`hash` keys each row's side of the split on its content (stable_split)",
     )
+    ap.add_argument(
+        "--grad-checkpoint",
+        action="store_true",
+        help="recompute activations in the backward pass. The whole catalog is re-embedded "
+        "with gradients every step, so peak memory grows with the catalog (it passed ~42 GiB "
+        "at 155 runbooks and failed on 32-36 GB machines). Same maths, same recipe; trades "
+        "~30%% more step time for a fraction of the memory.",
+    )
     ap.add_argument("--out", default=str(MODELS / "retriever"))
     args = ap.parse_args()
 
@@ -242,6 +250,8 @@ def main() -> int:
     print(f"training device: {dev}")
     tok = AutoTokenizer.from_pretrained(args.base_model)
     model = AutoModel.from_pretrained(args.base_model).to(dev)
+    if args.grad_checkpoint:
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
 
     def encode(texts: list[str], max_length: int) -> tuple[torch.Tensor, torch.Tensor]:
         enc = tok(
