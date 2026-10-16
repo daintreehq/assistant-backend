@@ -191,6 +191,39 @@ several cases by seed, so judge a recipe over several seeds. `TODO.md` carries t
 retrain-triggered entries (reservation retention, renamed routing text, `k=64` at ~200
 runbooks, domain foundations).
 
+**Training on a remote machine.** Training is heavy (stage 1 re-embeds the whole catalog with
+gradients every step), so prefer an idle Apple-silicon box over this one. Everything lives in a
+throwaway directory there; only the exported artifact comes back. Over SSH (non-interactive
+shells have no Homebrew on `PATH`, so export it):
+
+```bash
+H=studio-01.local                       # any Apple-silicon Mac you can ssh to
+git push origin develop                 # the remote clones from GitHub, so push first
+ssh $H 'export PATH=/opt/homebrew/bin:$PATH
+  brew install python@3.12 git-lfs      # once per machine
+  git lfs install --skip-repo
+  git clone --branch develop git@github.com:daintreehq/assistant-backend.git ~/tmp/daintree-retrain
+  cd ~/tmp/daintree-retrain && git lfs pull
+  python3.12 -m venv .venv-train
+  .venv-train/bin/pip install -r training/requirements-train.lock
+  .venv-train/bin/pip install --no-deps -e .'
+# train and export; detached so the ssh session can drop (hours on an M1 Max)
+ssh $H 'export PATH=/opt/homebrew/bin:$PATH; cd ~/tmp/daintree-retrain; mkdir -p .tmp
+  RETRIEVER_ARGS=--grad-checkpoint EXPORT_ONLY=1 nohup training/retrain.sh > .tmp/retrain.out 2>&1 &'
+# when .tmp/retrain.out says "exported to .tmp/retrain/artifact": copy it back and gate here
+rsync -a --delete $H:tmp/daintree-retrain/.tmp/retrain/artifact/ \
+  src/daintree_assistant_server/runbooks/local/artifacts/selector/
+.venv/bin/python -m benchmarks.runbook_selection.bench local   # the gate; restore the old artifact
+                                                               # with `git checkout` if it fails
+```
+
+`--grad-checkpoint` is required below ~64 GB of unified memory: the retriever's peak passed
+42 GiB at 155 runbooks and fails with `MPS backend out of memory` on a 32-36 GB Mac. It is the
+same recipe at lower peak memory and costs about 30% more step time. `EXPORT_ONLY=1` stops
+after the export because the install-and-gate step needs the dev venv. Seeds and experiments run
+the same way, one per machine, each in its own `.tmp/<tag>` (`--seed`, `--out`); delete the
+checkout when done.
+
 ## Versioning and compatibility
 
 Pre-release. Nothing carries a version: runbooks have no `version` field, and change is
