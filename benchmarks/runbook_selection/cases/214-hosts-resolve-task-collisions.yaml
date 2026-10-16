@@ -1,0 +1,281 @@
+# daintree.hosts.resolve-task-collisions: the hub finds work it sent to its Remote Hosts
+# overlapping by accident (the same issue on two machines, two hosts pushing one branch,
+# units that contradict) and settles one owner without losing either attempt. The cases
+# pin the three requests its issue names, an agent-phrased and a user-phrased request, and
+# the unpushed-edits situation; the traps hold its boundary both ways with
+# daintree.orchestration.resolve-task-collisions (agents on this machine),
+# daintree.hosts.race-and-review (attempts the person asked for),
+# daintree.hosts.reassign-host-work (a unit moved off a host that could not finish it),
+# daintree.hosts.steer-swarm (a stop with no overlap to settle),
+# daintree.hosts.integrate-host-branches (combining finished branches) and
+# daintree.hosts.recover-and-clean-up (an account of exchanges, cleanup).
+
+cases:
+  - id: rtc-issue-find-duplicate-work
+    category: single-runbook
+    note: >-
+      The issue's own first request. Decided by "work it sent out COLLIDES BY ACCIDENT
+      across its Remote Hosts".
+    messages:
+      - role: user
+        content: Find and resolve duplicate work already running on two remote hosts.
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-issue-same-issue-ownership
+    category: single-runbook
+    note: >-
+      The issue's own second request. Decided by "two machines given the same issue" and
+      the deliverable "the other attempt kept, never deleted or merged unasked".
+    messages:
+      - role: user
+        content: Two machines picked the same issue; sort out ownership without losing either branch.
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-agent-lanes-same-unit
+    category: single-runbook
+    note: >-
+      Agent phrasing of the hub's task. Decided by "every host's writer on that work stopped
+      with an acknowledgement, each side's pushed SHA verified and its unpushed work
+      accounted for, one owner chosen".
+    messages:
+      - role: user
+        content: >-
+          Two remote host lanes are implementing the same unit on different branches; stop
+          the duplicate writer, compare their pushed SHAs and unpushed edits, and keep one owner
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-user-sent-to-both
+    category: single-runbook
+    note: >-
+      A person who sent one task to two machines by mistake. Decided by "two machines given
+      the same issue" on "work it sent out COLLIDES BY ACCIDENT".
+    messages:
+      - role: user
+        content: oops I sent the login bug to both the mini and the build box and they're both working on it
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-user-same-branch
+    category: single-runbook
+    note: >-
+      Two hosts writing one branch. Decided by "two hosts pushing one branch".
+    messages:
+      - role: user
+        content: my two other macs are pushing to the same branch figure out who owns it
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-agent-unpushed-edits
+    category: single-runbook
+    note: >-
+      One side has pushed and the other has edits it never committed. Decided by "each
+      side's pushed SHA verified and its unpushed work accounted for".
+    messages:
+      - role: user
+        content: >-
+          Two machines picked up the same ticket and both have pushed branches; one of them also
+          has edits it never committed. Work out which one keeps the ticket and keep the other's
+          work safe.
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-user-different-branch-names
+    category: single-runbook
+    note: >-
+      The acceptance situation: overlapping units under different branch names, one with
+      uncommitted changes. Decided by "two machines given the same issue" and "unpushed work
+      accounted for". Retrain owed if the local neighbour out-ranks it.
+    messages:
+      - role: user
+        content: >-
+          Both hosts are working on #412 under different branch names; one has uncommitted
+          changes. Pick one owner and keep the other's work
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-issue-artifact-evidence
+    category: single-runbook
+    note: >-
+      The issue's own third request. Decided by "each side's pushed SHA verified and its
+      unpushed work accounted for, one owner chosen on evidence". The account runbook
+      riding along is an extra; retrain owed.
+    messages:
+      - role: user
+        content: Resolve cross-host task collisions from artifact evidence.
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-not-race-nobody-asked
+    category: routing-trap
+    note: >-
+      An overlap the person did not ask for is not "attempts the person asked to race or have
+      reviewed (daintree.hosts.race-and-review)"; the positive clause decides it: "work it
+      sent out COLLIDES BY ACCIDENT across its Remote Hosts". race-and-review riding along is
+      an extra.
+    messages:
+      - role: user
+        content: nobody asked for a contest; the studio and the tower both took the invoice bug, give it to one of them
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-not-reassign-both-healthy
+    category: routing-trap
+    note: >-
+      Both hosts are up and both were handed the work, so nothing moved off a host that could
+      not finish: not "a unit moved to another host because its first host could not finish it
+      (daintree.hosts.reassign-host-work)". reassign-host-work riding along is an extra.
+    messages:
+      - role: user
+        content: The two hosts are healthy but were both handed the profile page task; settle which machine owns it
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-not-steer-decide-first
+    category: routing-trap
+    note: >-
+      Choosing which of two hosts keeps a duplicated bug is not "stopping or changing a run
+      with no overlap to settle (daintree.hosts.steer-swarm)". steer-swarm riding along is
+      an extra.
+    messages:
+      - role: user
+        content: halt the duplicate on one of my two hosts, they're both on the same bug, but decide first which keeps it
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-not-integrate-single-owner
+    category: routing-trap
+    note: >-
+      Two different fixes for one ticket, one owner and no combined branch: not "combining
+      finished branches into one (daintree.hosts.integrate-host-branches)".
+      integrate-host-branches riding along is an extra.
+    messages:
+      - role: user
+        content: the mini and the studio each pushed a different fix for one ticket; I want one of them to own it, no combined branch
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-not-recover-neither-knows
+    category: routing-trap
+    note: >-
+      Settling who keeps a task two hosts both got is not "an account of where exchanges stand
+      or cleaning up after a run (daintree.hosts.recover-and-clean-up)". recover-and-clean-up
+      riding along is an extra.
+    messages:
+      - role: user
+        content: the studio and the mini both got the search task and neither knows about the other, sort out which one keeps it
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-not-local-two-hosts
+    category: routing-trap
+    note: >-
+      Work on two Remote Hosts is not "agents colliding on this machine
+      (daintree.orchestration.resolve-task-collisions)"; the positive clause decides it:
+      "work it sent out COLLIDES BY ACCIDENT across its Remote Hosts". The local runbook riding
+      along is an extra.
+    messages:
+      - role: user
+        content: Two of my remote hosts are each fixing the same bug in their own branch; keep one of them and park the other.
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-reverse-local-agents-here
+    category: routing-trap
+    note: >-
+      Agents in one worktree on this machine are "agents colliding on this machine
+      (daintree.orchestration.resolve-task-collisions)"; the hosts runbook must not ride along.
+    messages:
+      - role: user
+        content: claude-1 and codex-2 in this worktree are both on the cache bug, give it one owner
+    expect:
+      required: [daintree.orchestration.resolve-task-collisions]
+
+  - id: rtc-reverse-race-asked
+    category: routing-trap
+    note: >-
+      A race the person asked for is "attempts the person asked to race or have reviewed
+      (daintree.hosts.race-and-review)"; the collisions runbook must not ride along.
+    messages:
+      - role: user
+        content: race the date parser across two of my machines and pick the better one
+    expect:
+      required: [daintree.hosts.race-and-review]
+
+  - id: rtc-reverse-reassign-offline
+    category: routing-trap
+    note: >-
+      A task moved because its host went offline is "a unit moved to another host because its
+      first host could not finish it (daintree.hosts.reassign-host-work)"; the collisions
+      runbook must not ride along.
+    messages:
+      - role: user
+        content: the mini went offline in the middle of the upload fix; move its task to the tower
+    expect:
+      required: [daintree.hosts.reassign-host-work]
+
+  - id: rtc-reverse-reassign-host-returned
+    category: routing-trap
+    note: >-
+      A host that comes back holding its own copy of a unit that was moved is "that host
+      coming back afterwards (daintree.hosts.reassign-host-work)", which reconciles both
+      attempts; the collisions runbook must not ride along.
+    messages:
+      - role: user
+        content: the laptop host is back online after I gave its task to the server, and it kept working offline. which copy wins?
+    expect:
+      required: [daintree.hosts.reassign-host-work]
+
+  - id: rtc-reverse-steer-call-off
+    category: routing-trap
+    note: >-
+      Calling off a run with nothing to settle is "stopping or changing a run with no overlap
+      to settle (daintree.hosts.steer-swarm)"; the collisions runbook must not ride along.
+    messages:
+      - role: user
+        content: call off what I sent to the studio and the server and tell me which machines acknowledged
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-reverse-integrate-parts
+    category: routing-trap
+    note: >-
+      Hosts that finished different parts, to be put together by one machine, are "combining
+      finished branches into one (daintree.hosts.integrate-host-branches)"; the collisions
+      runbook must not ride along.
+    messages:
+      - role: user
+        content: the two other hosts both finished their parts; get the build box to combine the pushed branches and tell me whether the tests pass
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-reverse-recover-open-exchanges
+    category: routing-trap
+    note: >-
+      Which exchanges are still open, and cleaning up what they left, is "an account of where
+      exchanges stand or cleaning up after a run (daintree.hosts.recover-and-clean-up)"; the
+      collisions runbook must not ride along.
+    messages:
+      - role: user
+        content: which of the exchanges I sent to my other machines are still open, and clean up what they left behind
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
