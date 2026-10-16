@@ -115,6 +115,12 @@ boundaries:
   - query: 'the hosts got the migration an hour ago with no deadline, one is still going; stay on it until they are all back'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: 'the load across the hosts looks fine, just keep following their updates until every unit is in'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: 'no machine is struggling, the run only needs watching until it finishes and the odd question answered'
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
 
 followups:
   - query: ok, now keep an eye on all of them and answer what you can

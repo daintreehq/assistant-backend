@@ -110,6 +110,10 @@ boundaries:
   - query: the remote run keeps getting slower on one overloaded host, rebalance its waiting units before it stalls completely
     confusable_with: [daintree.hosts.reassign-host-work]
 
+  - query: the swarm needs more than watching now, the hot host has far too many agents; spread the units it hasn't started to the others
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: while you follow the run, the tower's memory pressure has gone critical; lighten its load onto the quiet hosts
+    confusable_with: [daintree.hosts.supervise-swarm]
 followups:
   - query: ok, take some load off the second one then
     history:
