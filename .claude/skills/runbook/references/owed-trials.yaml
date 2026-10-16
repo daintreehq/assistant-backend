@@ -2355,3 +2355,56 @@ trials:
     execution:
       - "The probe from {host_a} to the API address and each start went out as separate rounds, the turn ending after each (hub transcript)."
       - "The hub never called the Shell's forward or localhost a route between the hosts (hub transcript)."
+  - id: audit-host-workspaces
+    runbook: daintree.hosts.audit-host-workspaces
+    also: [daintree.hosts.handle-hub-message, daintree.worktree.audit-worktrees]
+    issue: 128
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}; nobody watches either host's windows."
+    steps:
+      - say: |-
+          Have {host_a} make a run/{run}-clean branch with a CHANGELOG entry and push it, and a run/{run}-dirty branch with another entry, committed but not pushed. Have {host_b} do the same with run/{run}-b-clean and run/{run}-b-dirty. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "When both hosts reported, stage by hand: leave an uncommitted file in {host_a}'s run/{run}-dirty worktree; start npm run serve on {port} from {host_a}'s run/{run}-clean worktree directory and leave it running; on {host_b} create the person's own worktree in a different parent folder with the same directory name as the run's run/{run}-b-clean one, on another branch. Snapshot, on both hosts, git status --porcelain, git stash list, git branch -a, git worktree list, lsof -nP -iTCP:{port} -sTCP:LISTEN, git --git-dir {remote} for-each-ref and the Shell's terminal list."
+      - say: |-
+          Audit what the run/{run} work left on both machines: worktrees, panes, branches and any server. Report only, remove nothing.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.audit-host-workspaces]
+            calls: [host.list, host.listAssistants, host.sendMessage]
+            never: [host.startAssistant, host.cancelTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.handle-hub-message, daintree.worktree.audit-worktrees]
+            calls: [assistant.getInbox, worktree.list, terminal.list, assistant.reply]
+            never: [terminal.closeMany, worktree.delete, worktree.deleteOwned]
+            notices: [lane-wake]
+      - person: "Restart {host_b}'s lane conversation from the Shell's window on {host_b} (its enrollment ends)."
+      - say: |-
+          Audit the run/{run} leftovers on both machines again, still report only.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.listAssistants]
+            never: [host.startAssistant]
+    checks:
+      - "Nothing changed: the snapshots from before the first audit equal the same commands after both audits (statuses, stashes, branches, worktree lists, the server on {port} still listening, the remote's refs, the Shell's terminal list); no fetch moved a remote-tracking ref on either host (git for-each-ref refs/remotes before and after)."
+      - "The report classes {host_a}'s run/{run}-dirty worktree unsafe for both reasons (the uncommitted file and the unpushed commit; git ls-remote does not show the branch), the run/{run}-clean worktree running the server in use, not safe, and calls safe only a clean worktree with no pane or listener whose HEAD is in a merged PR; a pushed, unmerged one is unknown."
+      - "{host_b}'s same-named worktree appears as not the run's (counted, unjudged) and in no safe list; its owner is not inferred from the name."
+      - "After the lane restart {host_b} is a coverage gap, not empty: no assistant was started or enrolled, no item there was described, and the Shell's record shows no send to it for the second audit."
+      - "The Shell's record (Settings > Hosts overview): one audit exchange per audited lane per audit, none resent, none cancelled."
+    execution:
+      - "The hub's brief named daintree.worktree.audit-worktrees, report-only and no fetch, and listed the run's item ids; it ended its turn on the update line (hub transcript)."
+      - "The lane read its inbox once, followed the local audit with git reads and lsof only, and replied once; none of terminal.closeMany, worktree.delete or worktree.deleteOwned was called, only the prescribed reads (lane transcript)."
+      - "The hub checked a pushed claim against {remote} with git ls-remote or asked one narrow question before calling it verified (hub transcript)."
