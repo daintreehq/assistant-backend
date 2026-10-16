@@ -19,13 +19,13 @@ optionalTools:
 3. Brief each side likewise, `taskId` `<run>-<side>-v1`: copy the paths unchanged from v1 to its copy's path (the home side builds on v1); fixtures from its examples; only its own paths; a contract change needed: stop, reply `input-required`, never edit the copy; report the contract SHA used. End the turn.
 
 On notice or resume:
-- A change, a side's or the person's, decided as in step 2, is vN, never a rewrite. `submitted` sides: `host.cancelTask`; only `canceled` is withdrawn. Others: "Follow daintree.hosts.steer-for-hub, run <run>, unit <side>: pause, keep all work"; acknowledged only when the reply shows each agent stopped or done, else unresolved, as is an unavailable lane. Brief the home lane for vN on the prior version; check ancestry (`git merge-base --is-ancestor`) and scope. Then withdrawn sides get step 3 at vN; acknowledged ones, done or not:
+- A change, a side's or the person's, decided as in step 2, is vN, never a rewrite. `submitted` sides: `host.cancelTask`; only `canceled` is withdrawn. Others: "Follow daintree.hosts.steer-for-hub, run <run>, unit <side>: pause, keep all work"; acknowledged only when the reply shows each agent stopped or done, else unresolved, as is an unavailable lane. Brief the home lane for vN on the prior version; check ancestry (`git merge-base --is-ancestor`), scope. Then withdrawn sides get step 3 at vN; acknowledged ones, done or not:
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","taskId":"<run>-<side>-v<N>","text":"Follow daintree.hosts.steer-for-hub, run <run>, unit <side>: resume on contract v<N> <SHA>: <change>","referenceTaskIds":["<earlier taskIds>"]}
 ```
 
-  Adopted once a reply names its agent on vN's SHA ("change sent" is not yet); its result: the original exchange if open, else `assistant.getInbox`.
+  Adopted once a reply confirms its agent uses contract vN ("change sent" is not yet); result: the original exchange if open, else `assistant.getInbox`.
 - A result at its HEAD: each copy's blob there equals the current version's (`git rev-parse <HEAD>:<path>`), and daintree.hosts.verify-for-hub runs the compatibility test at that HEAD. Built on an older version: stale.
 
 Stop and recovery: one brief per side per version; never merge commits across repositories.
