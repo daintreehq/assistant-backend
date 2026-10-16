@@ -1775,6 +1775,7 @@ trials:
       - "The hub sent a hold to each lane and ended its turn before comparing; the hold named the unit and asked for the remote, branch, HEAD, pushed or not, and the uncommitted files, and said to commit, push and revert nothing (hub transcript)."
       - "The hub checked each pushed SHA itself (git ls-remote) before naming an owner, and the decision messages named the owner as the only one to publish, and the other's branch and worktree as kept (hub transcript)."
       - "A side that did not acknowledge its stop was reported as possibly still writing, not as settled (hub transcript)."
+
   - id: hand-off-swarm-hub-swap
     runbook: daintree.hosts.hand-off-swarm
     also: [daintree.hosts.supervise-swarm, daintree.hosts.delegate-to-host, daintree.hosts.do-delegated-work]
@@ -1922,3 +1923,54 @@ trials:
       - "The urgent worker went out only after {host_a}'s lane replied that its docs agent was stopped, not on the cancel, a queued pause or silence (hub transcript order)."
       - "The report listed the docs task paused (with its note), the CSV export kept and the urgent worker with its branch and SHA checked on the remote (hub transcript)."
       - "The resume text carried the docs task's original objective and its note (Shell's record of the exchange)."
+  - id: migrate-across-repositories
+    runbook: daintree.hosts.migrate-across-repositories
+    also: [daintree.hosts.verify-for-hub, daintree.hosts.do-delegated-work, daintree.hosts.integrate-host-branches]
+    issue: 149
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes. {project} (on {remote}, base {sha}) is cloned on both hosts; a second repository, {project}-b (on {remote}-b, base {sha_b}), is cloned only on {host_a}. Both hold a few calls to a tiny helper oldFetch( in src/ and tests/, one config file naming it, and in {project}-b one call through an alias (const f = oldFetch;) that a plain call search does not list. No host holds {project}-gone, a third repository the prompt names."
+      - "Before the first prompt record, on {remote} and {remote}-b, the refs and base tips (git for-each-ref), and each host's checkout tip and git status --porcelain for the clones."
+    steps:
+      - say: |-
+          Replace every call to the old oldFetch helper with fetchJson in these three repositories, which are on my other machines: {project}, {project}-b and {project}-gone. Pilot it in one first, then the rest the same way, and give me one row per repository with what is left in each. Nothing goes to main and no pull requests. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.migrate-across-repositories]
+            calls: [host.list, host.listAssistants, host.sendMessage]
+            never: [host.cancelTask]
+          lane:
+            selected: [daintree.hosts.verify-for-hub]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - say: Yes, you may push branches named {run}/<unit> to each remote for this, never a base branch. Take the unlisted alias call in {project}-b as fetchJson with the same arguments, add that to the rules, and carry on with the rest.
+        expect:
+          hub:
+            calls: [host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+      - say: Is the migration finished in every repository?
+        expect:
+          hub:
+            calls: [host.getTask, host.listTasks]
+            never: [host.cancelTask]
+    checks:
+      - "Only one of {host_a} and {host_b} received work for {project}; the other clone's tip and git status --porcelain still match the readings before the first prompt (Shell's record and the clones)."
+      - "No exchange names {project}-gone, and the report row for it says no host holds it; the report has three rows, not four."
+      - "On {remote} and {remote}-b only {run}/ branches were added: the base branch tips and every other ref are as before (git for-each-ref); nothing was force-pushed and no pull request was opened."
+      - "In a fresh clone of each integrated {run}/ branch, git grep oldFetch finds nothing outside the files the rules list as exceptions, in {project}-b included once the alias form was added; git diff --stat from that repository's own base ({sha} for {project}, {sha_b} for {project}-b) touches only the files the rules cover."
+      - "One work exchange per unit in the Shell's record, no unit sent twice, and none sent between the lane's report of the alias form and the person's answer."
+    execution:
+      - "The hub asked each lane for its origin URL, default branch and SHA before counting repositories, and counted {project} once (hub transcript)."
+      - "The inventory carried recorded git grep commands per form with counts, plus a bare-name search that surfaced the alias as unlisted (lane transcript)."
+      - "A shared-file unit went out before the partitions of its repository, and the units' briefs carried the rulebook text, never a taskId reference alone (hub transcript)."
+      - "The hub reran the searches on each integrated SHA itself in a scratch clone and closed a row only on that result (hub transcript)."
