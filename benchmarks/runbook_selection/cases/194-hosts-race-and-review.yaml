@@ -317,3 +317,16 @@ cases:
     expect:
       required: [daintree.hosts.run-local-cohort]
       optional: [daintree.hosts.foundation]
+
+  - id: race-and-review-reverse-do-delegated-work
+    category: routing-trap
+    note: >-
+      This machine is one entry in the hub's race and only builds its own unit. The race's
+      fence sends that to the lane: "on a host's lane, building or reviewing what the hub sent
+      (daintree.hosts.do-delegated-work, daintree.hosts.review-for-hub ...)".
+    messages:
+      - role: user
+        content: The hub picked this machine as one entry in its race; build the retry logic here on the branch its brief names and reply with the commit.
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

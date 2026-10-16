@@ -103,11 +103,11 @@ boundaries:
     confusable_with: [daintree.hosts.run-local-cohort]
   - query: 'from the shell: have two hosts each implement the importer, then get the attempts ranked'
     confusable_with: [daintree.hosts.do-delegated-work]
-  - query: the tower pushed; I'd like codex over on the build box to critique that branch, and whatever it flags goes back to the tower to fix
+  - query: the tower pushed; I'd like codex over on the build box to critique that branch, and any blocking issue it flags goes back to the tower to fix
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: get a second opinion from another machine on the branch the mini pushed
     confusable_with: [daintree.agents.ask-and-relay]
-  - query: after the queue worker lands from the laptop host, a second host should look it over and the laptop host address whatever it raises, capped at two passes
+  - query: after the queue worker lands from the laptop host, a second host should look it over and the laptop host fix any blocking issue it raises, capped at two passes
     confusable_with: [daintree.review.cross-review-cohort]
 
 followups:

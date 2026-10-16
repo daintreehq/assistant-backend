@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 20406,
-  "compiled_sha256": "bafe89590afdd25c198a260c3d99e10f060cea9ddb17ae2c76df7d92954fc8de",
+  "compiled_sha256": "0333c27438e7268b1b0e1bbf503c98e4beeb1def6cecb5e43b49970f9e9c63c6",
   "label_space_sha256": "50915c3dc4bf83731f7cb14e40b37a5dab13d8d1f73b195411941279431c3b92",
   "label_space_size": 133,
   "by_source": {
@@ -426,7 +426,7 @@
       "examples": 67,
       "rows": 67,
       "runbook": "daintree.hosts.race-and-review",
-      "sha256": "7e80962aa00ec301ab272f4fab78a799f644ffa84a686c0830d4b7a633a98b21"
+      "sha256": "2f92dcf72f18c75292aa6eb1b56a4e3b3d53267167bce966f7eedd54b0c8687c"
     },
     "runbooks/daintree.hosts.reassign-host-work.yaml": {
       "examples": 70,
