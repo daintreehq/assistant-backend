@@ -1399,3 +1399,93 @@ trials:
       - "After the restart the hub asked {host_a}'s lane for state, changing nothing, before any further undo, and sent no second undo for {sha_b} (hub transcript, Shell's task records)."
       - "Each lane fetched the local undo procedure by id and launched one fresh agent to revert; no lane reverted by its own hand (lane transcripts)."
       - "Each undo agent ran one git revert per original, a git revert --continue after a conflict not counted as a second, and no failed attempt was restarted (undo agents' transcripts)."
+  - id: coordinate-contract-change-amend
+    runbook: daintree.hosts.coordinate-contract-change
+    also: [daintree.hosts.do-delegated-work, daintree.hosts.steer-for-hub, daintree.hosts.verify-for-hub]
+    issue: 148
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts: a lane on {host_a} in {project}, a lane on {host_b} in a second scratch repository, tally-web (a small client with npm test); each repository pushed to its own bare remote in the stage. {project} at {sha} on {remote}; tally-web at {sha_b} on its remote."
+    steps:
+      - say: |-
+          {project} on {host_a} is to serve a totals summary that tally-web on {host_b} will display. Agree the format first: have it written in {project} as a JSON schema with one example, one error case and a small check both sides can run, and show it to me before anything is built. Then have each machine build its side against it on a run/{run} branch and push that branch; the format's branch may be pushed too. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.coordinate-contract-change]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+      - say: That format is fine, go ahead with both sides.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+          lane:
+            calls: [agent.launch, assistant.reply]
+      - person: "Give the next prompt once {host_a}'s side has replied completed while {host_b}'s is still working. If both finish first, give it anyway and note that in the record."
+      - say: Change to the format, the summary needs a currency field. Pause whatever is still building, make it a new version, and get both sides onto it.
+        expect:
+          hub:
+            calls: [host.getTask, host.sendMessage]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [terminal.getStatus, assistant.reply]
+            never: [terminal.close, worktree.delete]
+    checks:
+      - "The format's branch on {remote} holds the first version and then the second, the first an ancestor of the second, the second touching only the format's files; nothing force-pushed."
+      - "Each side's final run/{run} branch carries the format file identical to the second version (git rev-parse <final sha>:<path> on its remote equals git rev-parse <second version>:<path> on {remote}), and the format's check passes at both final commits in fresh clones."
+      - "{host_a}'s first result was not accepted as final: its final commit descends from it and carries the second version. No commit of either repository appears in the other's history."
+      - "Shell's record: a pause exchange to {host_b} answered before its second-version message; each second-version message lists that side's earlier task ids in referenceTaskIds."
+    execution:
+      - "The hub showed the format to the person before any side was briefed, and each brief named the format's remote, path and full SHA in its text (hub transcript)."
+      - "The final report lists both versions, each side's verified SHA and the version it adopted, and the pause acknowledgement (hub transcript)."
+
+  - id: coordinate-contract-change-unavailable
+    runbook: daintree.hosts.coordinate-contract-change
+    also: [daintree.hosts.do-delegated-work, daintree.hosts.steer-for-hub]
+    issue: 148
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: codex, lane: claude}
+      - {hub: claude, lane: codex}
+    setup:
+      - "Stage as coordinate-contract-change-amend: {project} on {host_a} at {sha} on {remote}, tally-web on {host_b} at {sha_b} on its own remote, a lane enrolled in each."
+    steps:
+      - say: |-
+          {project} on {host_a} is to serve a totals summary that tally-web on {host_b} will display. Have the format written in {project} as a JSON schema with an example, an error case and a small check both sides can run; I leave its details to you, no need to show me. Then have each machine build its side against it on a run/{run} branch and push that branch. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.coordinate-contract-change]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+      - person: "Once both sides are building, turn off Accept messages from other machines in tally-web's assistant on {host_b}."
+      - say: The summary also needs a currency field. Make it a new version of the format and get both sides onto it.
+        expect:
+          hub:
+            calls: [host.listAssistants, host.getTask, host.sendMessage]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [terminal.getStatus, assistant.reply]
+    checks:
+      - "{host_a}'s final run/{run} commit carries the second version of the format file unchanged and its check passes there in a fresh clone."
+      - "No second-version message reached {host_b} (Shell's record); its worktree and branch are as they were when messaging went off."
+      - "The format's branch holds the first version and then the second; nothing force-pushed."
+    execution:
+      - "The hub reported {host_b}'s pause acknowledgement and adoption as unresolved, never as adopted or done, and named what brings it back: the person turning messaging on again there (hub transcript)."
