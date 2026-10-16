@@ -165,7 +165,7 @@ cases:
         content: Set up the pricing page demo on the build server instead of here, and tell me how I would open it on this Mac
     expect:
       required: [daintree.hosts.prepare-remote-demo]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   # ------------------------------------------------------------------ reverse
   - id: prepare-remote-demo-reverse-local-demo

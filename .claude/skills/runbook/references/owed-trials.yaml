@@ -847,11 +847,12 @@ trials:
             notices: [lane-wake]
       - person: "Cmd/Ctrl-click {host_a}'s row in the host menu, open {project} in that window, show its Dev Preview and tell the hub the address it shows."
     checks:
-      - "The hub's reply names {sha} as served and the host's port {port} as the host's, and offers no localhost URL for the person's browser."
       - "The address the person read serves the demo page showing {sha}; its local port is not the host's {port}, which the Shell's unrelated listener holds."
-      - "The host listener is on loopback, started after the pin, with its cwd in the demo worktree (lsof on {host_a}); the data is the invented seed."
-      - "The Shell's unrelated listener on {port} is alive; the hub made no forward, ssh tunnel or window switch."
+      - "The host listener is on loopback with its cwd in the demo worktree, and `ps -o lstart=` for its PID is later than the time the pin was recorded before the send; the data is the invented seed."
+      - "The Shell's unrelated listener on {port} is alive; the Ports view lists no forward the hub made, and no ssh tunnel or window switch followed from the hub."
     execution:
+      - "The hub's reply names {sha} as served and the host's port {port} as the host's, and offers no localhost URL for the person's browser (hub transcript)."
+      - "The hub never called host.switch or project.openOnHost (hub transcript)."
       - "The hub sent one message, ended its turn, and compared the reply's SHA with the pin and {remote} before giving the person a route (hub transcript)."
       - "The hub curled exactly the address the person read, not one it built (hub transcript)."
 
