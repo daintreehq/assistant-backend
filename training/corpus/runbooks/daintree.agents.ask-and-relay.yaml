@@ -457,7 +457,7 @@ boundaries:
   - query: start an agent read-only and ask it what the ssh config for the other box does
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
-  - query: 'launch codex here read-only and have it tell me whether our backoff constants look sane'
+  - query: 'ask codex in a pane here for a second opinion on my retry branch and tell me what it says'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
 followups:

@@ -15,7 +15,7 @@ runbook: daintree.hosts.race-and-review
 run: runbook-2026-10-issue-94
 
 positives:
-  - let the tower and the mini both have a crack at the flaky date test and tell me which fix is better
+  - the flaky date test keeps failing; I'd like the tower and the mini each to take a shot and then know which fix to keep
   - have three of my hosts each build the export endpoint and get the best one picked
   - race the cache invalidation fix across the remote machines
   - two machines, same bug, best fix wins
@@ -26,7 +26,7 @@ positives:
   - "morning! let's race the auth timeout fix on the mini and the tower and see whose holds up"
   - "hey, quick one: have two of the remote boxes each take the logging cleanup and tell me which attempt is stronger"
   - same brief to the build box and the tower, push both branches, then have them compared blind
-  - put claude on the mini and codex on the tower on the same retry fix and have the attempts ranked
+  - claude on the mini, codex on the tower, both on the csv quoting bug; I want to know whose fix is stronger
   - which of my machines writes the better migration script? have two of them try and get it judged
   - let all three hosts attempt the importer and have the attempts scored against the acceptance criteria, unlabelled
   - race it across the boxes and give me a ranking with reasons, I'll pick the winner myself
@@ -34,7 +34,7 @@ positives:
   - Run a best-of-three across the user's Remote Hosts for the search indexing change and return a ranking with the judge's reasons
   - Have several remote hosts implement the same rate limiter, verify each pushed SHA on the remote, then get a blind comparison against the user's criteria
   - User asked to race the config loader fix on two hosts; the attempts must be judged by someone independent, without host names, and nothing merged
-  - 'Best-of-N across remote machines: one brief, a branch per attempt, an independent ranking, and the user chooses the winner'
+  - The flaky upload test has already beaten one agent; the user wants two Remote Hosts to attempt it independently and an agent that wrote neither to say which fix holds up
   - >-
     I have the tower on Claude Code and the build box on Codex. Give them both the same task, fixing
     the off-by-one in the paginator, each on its own branch, and push. Then I want someone who didn't
@@ -55,8 +55,8 @@ positives:
   - 'review loop between hosts: the laptop host fixes, the build box reviews, stop after two rounds'
   - get another host's opinion on the branch the tower just pushed, I don't trust it to review its own work
   - The user wants the commit a Remote Host pushed reviewed by a different Remote Host, ideally under another agent CLI, with the findings brought back as claims
-  - Arrange an independent review of a Remote Host's pushed branch on another host at the exact SHA; if there are blocking findings, send them back to the builder for at most two rounds
-  - A host finished and pushed the feature; the user wants a second machine that did not build it to review that SHA and report findings, no edits
+  - The tower's push to the payments branch changes refund rounding; the user wants a host that never touched it to review that commit, with anything blocking sent back to the tower, two rounds at most
+  - The build box pushed the new search filters an hour ago and the user is about to merge; a different machine should read that exact commit first and report what it finds without editing it
   - 'Cross-host review: Codex on one remote machine reviews the work Claude Code pushed from another, findings relayed to the builder for fixes'
   - >-
     The tower just pushed its version of the billing fix. I want a different machine, preferably one
@@ -85,7 +85,7 @@ boundaries:
     confusable_with: [daintree.hosts.integrate-host-branches]
   - query: both machines pushed rival versions of the same fix; don't merge them, rank them
     confusable_with: [daintree.hosts.integrate-host-branches]
-  - query: 'not agents on this mac, my remote machines: each builds the tokenizer and a judge ranks them'
+  - query: skip the local worktrees this time; the contest should run on the other macs, then someone neutral compares what they produced
     confusable_with: [daintree.orchestration.competition]
   - query: run the contest across hosts instead of local worktrees, same task on two remote machines, then a blind verdict
     confusable_with: [daintree.orchestration.competition]
@@ -93,7 +93,7 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: code review of the mini's branch, but done by a different remote host
     confusable_with: [daintree.review.review-change]
-  - query: "from my main machine: arrange for one host to review another host's pushed SHA"
+  - query: the mini wrote the cache layer; send it to whichever of my other hosts had no part in it for a review
     confusable_with: [daintree.hosts.review-for-hub]
   - query: I'm on the shell; have the build box review the commit the tower pushed and tell me what it finds
     confusable_with: [daintree.hosts.review-for-hub]
