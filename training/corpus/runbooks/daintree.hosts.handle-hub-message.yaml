@@ -265,3 +265,11 @@ boundaries:
   - query: "the hub wrote to this machine about the access-token rotation work; fetch its message, check it fits this project, and answer it"
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: runbook-2026-10-issue-140
+  - query: there is something from the hub in my inbox about getting the release out. open it and handle whatever it asks
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
+  - query: the hub sent me a message about the package publish. read it and reply to the hub with whether this machine is the right one for it
+    confusable_with:
+    - daintree.release.publish-package
+    run: runbook-2026-10-issue-138

@@ -50,7 +50,7 @@ positives:
     run: runbook-2026-10-issue-138
   - query: We have five machines running the integration suites against 9d41e7b right now. Once they are all green I want the deploy to the preprod environment to happen exactly once, from the Linux machine that has the cloud credentials. Nobody else should touch the deploy, and I want to know which revision is really serving afterwards, not just that the command finished.
     run: runbook-2026-10-issue-138
-  - query: 'One owner per environment: designate the release host for production, pin the full commit SHA, brief it to deploy once, and verify the revision serving from the platform rather than from its own reply.'
+  - query: We run a release across four machines tonight. Production has to be deployed once, by the Linux box that holds the login; I will pin the commit and the other three only report their test results. Tell the Linux box what to do and check production yourself afterwards.
     run: runbook-2026-10-issue-138
   - query: A host restarted halfway through the cross-host run; the deploy to staging may already have been submitted by the designated host. Find out from the platform whether it went out before anything is retried.
     run: runbook-2026-10-issue-138
@@ -67,7 +67,7 @@ positives:
     - 'user: have all my hosts build and test v5.0.0 in parallel'
     - 'assistant: Sent to the three hosts; builds are running and I will collect the results when they report.'
     run: runbook-2026-10-issue-138
-  - query: how do I make sure only one machine deploys when the others are just building? set it up that way for staging with the build box as the deployer
+  - query: explain how I keep deploys to one machine while the others only build, then make the build box the only deployer for staging
     docs: true
     run: runbook-2026-10-issue-138
   - query: explain how the deploy gets confirmed when the host's reply was lost, then check the staging one for me
@@ -144,6 +144,14 @@ boundaries:
   - query: The hub told this host to be the deployer for production. Verify the target here is the right one, deploy once and answer with what the platform shows.
     confusable_with:
     - daintree.hosts.handle-hub-message
+    run: runbook-2026-10-issue-138
+  - query: the hub says tag v2.0.1 was built and tested on another machine; this host should now deploy that tag to staging and say what is serving
+    confusable_with:
+    - daintree.hosts.verify-for-hub
+    run: runbook-2026-10-issue-138
+  - query: last night's release run left the staging deploy unconfirmed. skip the write-up, just check what staging is serving now
+    confusable_with:
+    - daintree.hosts.postmortem-swarm
     run: runbook-2026-10-issue-138
 followups:
   - query: how's it going — is 3fa9c21 actually the thing serving yet?
