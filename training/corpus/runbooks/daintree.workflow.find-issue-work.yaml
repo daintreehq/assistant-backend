@@ -331,6 +331,36 @@ boundaries:
   - query: 'find me unassigned issues I could hand to the other machines'
     confusable_with: [daintree.hosts.start-swarm]
     run: runbook-2026-10-issue-102
+  - query: "besides the ones being worked right now, which open issues are left for later?"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "what remains in the backlog that nobody has started yet?"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "before we plan any rounds, can you show me what's open that nobody's on yet? I want to sort them into batches myself, so don't kick anything off"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Find 4 open, unassigned issues to add to wave 3 and check none is already in a worktree. Return the shortlist only, launch nothing."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Shortlist the unstarted bugs remaining apart from #212, #215 and #219, which already have agents on them."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Shortlist candidates for the next round: open, no assignee, no linked PR, not in flight in any worktree. List only."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "backlog: open issues left that no worktree or open PR covers yet"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Open tickets still left besides the four in flight — unassigned only, smallest first."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Search the repo's issues for what's still not picked up by anyone; the agents running now cover the auth tickets."
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "whats left on the board that isnt already being worked by one of the agents"
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: any of those small enough for an hour?
     history:

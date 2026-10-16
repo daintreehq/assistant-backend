@@ -15,35 +15,33 @@ requiredTools:
   - worktree.deleteOwned
 optionalTools:
   - terminal.list
+  - slashCommands.list
+  - terminal.readLastMessageOwned
 ---
-A wave is a barrier: nothing in the next wave starts until every pull request in this one is merged. The run moves on Daintree notices, a host continuation you have verified, or the user: say which before ending a turn. Pin the repository on every read (`gh --repo`, `git -C`); a failed read is an unknown gate.
+A wave is a barrier: nothing in the next wave starts until every pull request in this one is merged. Say what will wake the run before ending a turn. Pin the repository on every read (`gh --repo`, `git -C`); a failed read is an unknown gate.
 
 Procedure:
-1. The plan is the user's. Restate it and read each issue in full: it waits until every issue it names as a prerequisite is merged; one closed or in flight (`worktree.list` `issueNumber`, `prNumber`) is skipped; same-file overlaps within a wave are reported, not re-planned. A wave you change or extend needs the user's yes. Checkpoint per the foundation: each issue's branch before its create, the returned ids after.
-2. The base. A new branch starts from the main worktree's local branch unless `baseBranch` says otherwise; a forge merge does not move it and the create does not fetch. Before each wave `git fetch`, confirm the previous wave's merges are in `origin/<base>`, and branch from it, never pulling into the user's checkout.
-3. Launch the wave, one worktree per issue. `recipe.list` gives ids, not prompts: confirm the user's recipe runs this task (its team file, or ask). It starts the agent; send it nothing more, and pass `assignToSelf` as the user asked:
+1. The contract is the user's; restate it: waves they listed, or a drain ("until none are left") picked a wave at a time by their command or as daintree.workflow.find-issue-work does; the cap; overlap policy; each command; who fixes failing CI; teardown scope. Report a drain's picks and any overlap, never re-planning; a changed listed wave needs a yes.
+2. Before each wave re-read each issue on the forge: skip closed or in-flight ones (`worktree.list` `issueNumber`, `prNumber`), saying why; a listed one waits on its prerequisites, a pick needs them merged and no assignee. An empty pick ends a drain; a pick the re-check empties is picked again. Checkpoint each branch before its create.
+3. Commands: find each with `slashCommands.list` for its agent in the main worktree before the first launch. Send it as typed with `notify:true` and no `handback` (it would join the arguments), so re-arm `terminal.notifyWhenIdle` once it works again (a stopped one refuses: recheck paced to the work). Its finish is the end marker it documents, else its screen.
+4. The base. Neither a forge merge nor a create updates the local base: before each wave `git fetch`, confirm the last wave's merges are in `origin/<base>` and branch from it.
+5. Launch the wave, one worktree per issue. A recipe the user named starts the agent (`recipe.list` gives ids, not prompts: confirm it runs this task):
 
 ```json tool=worktree.createWithRecipe
-{"source":{"kind":"newBranch","branchName":"feature/issue-42-retry","baseBranch":"origin/<base>","fromRemote":true,"collisionPolicy":"error","issueNumber":42,"assignToSelf":true},"recipeId":"<id from recipe.list>","focusPolicy":"preserve"}
+{"source":{"kind":"newBranch","branchName":"feature/issue-42","baseBranch":"origin/<base>","fromRemote":true,"collisionPolicy":"error","issueNumber":42,"assignToSelf":true},"recipeId":"<id from recipe.list>","focusPolicy":"preserve"}
 ```
 
-   It is confirm-gated; `CONFIRMATION_TIMEOUT` created nothing (check `worktree.list`), so ask. Read `spawnedTerminalIds`, `failedTerminalCount`, `assignedToSelf` and `assignmentError`: report a failure, never re-create. The agent may start before setup finishes (say so if setup matters) and has no notify: arm `terminal.notifyWhenIdle` on each working one, its issue in the note; `armed:false`, read its state now. No recipe: launch as daintree.orchestration.fan-out-work does.
-4. The gate is yours on the forge, never an agent's done line. Per issue: a PR whose head is the worktree's `HEAD` (`gh pr view <branch> --json headRefOid,mergeStateStatus`), merge state clean, no check failing or pending (`gh pr checks`; note skipped ones), a clean tree. A failing check is its agent's to fix: report it.
-5. Merge where the user said, with their merge command. Resolve what it lands before launching: PRs outside the wave need the user's yes unless already authorized.
-
-```json tool=agent.launch
-{"agentId":"claude","name":"Merge wave 2","worktreeId":"<main worktree id>","prompt":"<the user's merge command>","notify":true,"handback":true,"focusPolicy":"preserve"}
-```
-
-6. Teardown, if the user asked for it, once the merge is launched unless they ordered otherwise, so a pending delete never holds it. Per issue: its agent no longer working, `HEAD` still the gated PR head, tree clean; close the agent (`terminal.closeOwned`, confirmed by `closedIds`), then `worktree.deleteOwned`, which keeps the branch. `CONFIRMATION_TIMEOUT`: pending; say so once, retry when the user is there.
-7. The merge is done when every wave PR is `MERGED` on the forge and the merge agent reports its own finish. Its notice may be an interim stop or a question: read it. `terminal.notifyWhenIdle` arms only on a working terminal, so recheck paced to the work. Then confirm the base's CI, close the merge agent if asked, and go to step 2.
+   It is confirm-gated; `CONFIRMATION_TIMEOUT` created nothing (check `worktree.list`), so ask. Its panels are `spawnedTerminalIds` (setup may still run), without notify: arm `terminal.notifyWhenIdle` on each working agent (`armed:false`: read it now). Report a `failedTerminalCount` or `assignmentError`; never re-create. No recipe: omit `recipeId` and launch on `setupState:"ready"` as daintree.orchestration.fan-out-work does. `assignToSelf` as asked.
+6. The gate is on the forge: per issue a PR whose head is the worktree's `HEAD` (`gh pr view --json headRefOid,mergeStateStatus`), merge state clean, no check failing or pending (`gh pr checks`), a clean tree. A failing check goes to whoever the contract names.
+7. Merge with the user's command where they said, once you know what it lands: PRs beyond the wave need a yes unless authorized. If it moves its checkout, wait until that is clean and on the base, never switching or cleaning it. A long merge stops between background steps; without its finish that is normal: read it for a question, nudge once after long silence. Done is its documented marker or finished screen (never that phrase in progress text) and every wave PR `MERGED` on the forge; reverted is not landed. Then check base CI; close the merge agent if asked.
+8. Teardown when and as the user asked (default: landed issues, after the merge). Per worktree: agent not working, `HEAD` still the gated head, tree clean, no pane you did not open (`terminal.list` by `worktreeId`, background too); else keep it, saying why. Close the agent (`terminal.closeOwned`, confirmed by `closedIds`), then `worktree.deleteOwned`, which keeps the branch. `CONFIRMATION_TIMEOUT` is pending: say so once, retry with the user there; it holds the next wave only if asked. Then step 2.
 
 On notice or resume:
-1. Compare the time with the check that was due. Every check that never ran, and how long work sat finished, is told to the user.
-2. Rebuild from live state: `worktree.list`, `terminal.getStatus` on the issue and merge agents, `gh pr view` per PR. Re-arm `terminal.notifyWhenIdle` on each agent still working.
-3. A new help-session provision (your scratch path changed) owns none of the earlier panels or worktrees, and earlier notices may not reach it. Cleanup you no longer own stays pending: name the worktrees for the user to delete in Daintree; never switch tools to get past an ownership refusal.
-4. A stopped issue agent: read its last screen; answer a question within scope, else ask the user. Advance only on step 4's gate or step 7's proof. Your own scheduled check firing is not the user's answer.
+1. A notice or scheduled check prompts a fresh `terminal.getStatus`. Over hours keep one recurring host check if you can schedule, removed at the end. Tell the user every check that never ran and how long work sat finished.
+2. Rebuild from live state (`worktree.list`, `terminal.getStatus`, the forge) and re-arm per step 3.
+3. A new help session owns no earlier worktree: list those for the user to delete.
+4. A stopped agent: read its last reply (`terminal.readLastMessageOwned`, or its screen). Answer a question in scope, else ask the user. A working one with a stale `lastOutputChangeAt` is reported, not interrupted. Advance only on step 6's gate or step 7's proof.
 
-Stop and recovery: a confirmation timeout or a failed issue holds the advance, not the watch. Stop pacing only after saying what will wake the run. Never relaunch an agent or rerun a recipe to repair tracking. On cancellation launch nothing more; teardown is daintree.orchestration.workspace-cleanup.
+Stop and recovery: a blocked issue holds the wave until the user answers; a failed one holds the next wave unless the contract says go on. A drain halted by an unfinished merge or unlanded PRs is stuck, not drained. Teardown on cancellation is daintree.orchestration.workspace-cleanup.
 
-Report back: per wave its issues, branches, terminal ids, PRs and state; what you verified and how; pending deletes; PRs the merge landed beyond the wave; the next check and what brings it; every check that never ran.
+Report back: per wave its issues, branches, terminals, PRs and state; worktrees kept or pending, and why; PRs landed beyond the wave; issues assigned that never landed.

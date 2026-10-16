@@ -241,6 +241,39 @@ boundaries:
   - query: "skip the remote hosts, how close is this machine's codex to its weekly cap"
     confusable_with: [daintree.hosts.check-usage-limits]
     run: runbook-2026-10-issue-91
+  - query: "how much is remaining on Claude before this batch is done — will it hit the five-hour cap?"
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "what's left of Codex's weekly limit after all these issues?"
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Usage left per CLI against the issues still queued: Claude Code /usage and Codex /status, % left and resets."
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Read Codex's /status: enough five-hour allowance left to get through the rest of this batch?"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Before the remaining 5 issues are launched, check how much weekly quota Claude Code has left and when it resets."
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "agents are still grinding, will the codex weekly cap last till theyre done? check whats remaining but dont mess with the busy ones"
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "how much claude do i have left after all these issues? enough for another round?"
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Mid-batch quota read: remaining premium requests on Copilot, from its own usage view."
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "we still got 12 tickets left, is there enough gemini quota left or will it hit the daily limit first"
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Spin up a spare Codex terminal and read the weekly window remaining; don't type into the agents mid-task."
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Picking up yesterday's run: how much Claude allowance is left before those agents resume?"
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: now do grok
     history:

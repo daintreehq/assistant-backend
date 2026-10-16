@@ -95,6 +95,15 @@ boundaries:
   - query: 'my local agents each made a branch here; combine them in order and run the tests after each merge'
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
+  - query: "the three agents from this morning are all done. before I open anything on github, can you put their branches together on one branch and check the whole thing still builds and passes"
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "First wave of agents finished and there is no second wave. Merge feature/import-csv, feature/export-csv and feature/csv-schema locally into one branch and verify it builds."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
+  - query: "Agents on 88, 90 and 93 are done. Bring their branches together on a fresh integration worktree, tests after each merge, nothing pushed and no PR yet."
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: transcript-2026-10-16-batch-workflows
 followups:
   - query: ok, the codex one is committed now, add feat/search-index as the last merge
     history:

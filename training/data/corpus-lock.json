@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 22603,
-  "compiled_sha256": "4bb3b70a9f5663220a3d910f945d089f8cfb55bed4987d8b5a9049acf0943d1b",
+  "rows": 22702,
+  "compiled_sha256": "edb6b472062c03b085fdec745bb1cfed75d3a1786b65cdd2339b46085b586922",
   "label_space_sha256": "0d96c44aebbede14ec9a156a820b8dd40fa15c89a878e9f5c9fe48a77ea0cd4f",
   "label_space_size": 153,
   "by_source": {
-    "boundary": 7348,
+    "boundary": 7413,
     "docs": 848,
-    "followup": 1085,
+    "followup": 1093,
     "foundation": 440,
     "foundation_boundary": 309,
     "multi_runbook": 488,
@@ -16,7 +16,7 @@
     "no_task": 117,
     "no_task_stateful": 592,
     "off_domain": 212,
-    "positive": 7819,
+    "positive": 7845,
     "topic_shift": 3079,
     "wake": 150
   },
@@ -103,7 +103,8 @@
     "transcript-2026-09-26-reviewer-fixer-relay": 10,
     "transcript-2026-09-27-help-release": 15,
     "transcript-2026-09-29-launch-effort-cut-off-turns": 14,
-    "transcript-2026-10-15-work-in-waves": 20
+    "transcript-2026-10-15-work-in-waves": 20,
+    "transcript-2026-10-16-batch-workflows": 99
   },
   "dropped": {},
   "adjusted": {
@@ -129,10 +130,10 @@
       "sha256": "e7c99ddeab11ef16074c5725d97b8c0ab3b0597d3fef53451d9b0a95008adb62"
     },
     "runbooks/daintree.agents.check-usage-limits.yaml": {
-      "examples": 125,
-      "rows": 125,
+      "examples": 136,
+      "rows": 136,
       "runbook": "daintree.agents.check-usage-limits",
-      "sha256": "961c42df0ee21ef282a27e969e2009ba6417c2dc8a95ede63bc8e38f070247fb"
+      "sha256": "87d0ef1663eed5eaf722ed046435e99c70f2438cd882da0e2ae36b9b8abb5b26"
     },
     "runbooks/daintree.agents.hand-off-task.yaml": {
       "examples": 79,
@@ -273,10 +274,10 @@
       "sha256": "cbfd974dcdf9587c9003a42d1b8ac13df445cda0a8b79e328121956f8d173cf9"
     },
     "runbooks/daintree.forge.land-pull-request.yaml": {
-      "examples": 277,
-      "rows": 277,
+      "examples": 280,
+      "rows": 280,
       "runbook": "daintree.forge.land-pull-request",
-      "sha256": "f03179fd72a1421c568e5df6c3ff181b991c8bf6c5b40acb0c3e9bb857b70341"
+      "sha256": "9786405cb83bc0911b5554b24555bccc38c1a75cff2e149e66aaa71c06fc6233"
     },
     "runbooks/daintree.forge.manage-issue.yaml": {
       "examples": 229,
@@ -309,10 +310,10 @@
       "sha256": "b1a69cfa23317a857b324cd103f891719b6883b18778afedd4c92d02d341761e"
     },
     "runbooks/daintree.git.integrate-agent-branches.yaml": {
-      "examples": 65,
-      "rows": 65,
+      "examples": 68,
+      "rows": 68,
       "runbook": "daintree.git.integrate-agent-branches",
-      "sha256": "6a03f646febd667e1b7a35eb85908db26697c25a93bd9c6f746dee1fcd944167"
+      "sha256": "dffaaab6702e3127c40ac8a6e6a22d6a3beae6d48d4a1fa28fa682ef65b52384"
     },
     "runbooks/daintree.git.prune-stale-branches.yaml": {
       "examples": 49,
@@ -687,16 +688,16 @@
       "sha256": "c46063c4d321eefb798ef11dd3ff4934484ffc72bc3ae814b696b23614a6fdfc"
     },
     "runbooks/daintree.orchestration.execute-durable-workflow.yaml": {
-      "examples": 209,
-      "rows": 209,
+      "examples": 212,
+      "rows": 212,
       "runbook": "daintree.orchestration.execute-durable-workflow",
-      "sha256": "7e284a90e41a422434a8bd781f384abd751aac33e0e092d2ee1c7b7e0d002bed"
+      "sha256": "d8b6d764aee12a060a64cd4cf7c7439794c66b3855fc393897809d827908f32e"
     },
     "runbooks/daintree.orchestration.fan-out-work.yaml": {
-      "examples": 373,
-      "rows": 373,
+      "examples": 377,
+      "rows": 377,
       "runbook": "daintree.orchestration.fan-out-work",
-      "sha256": "96d48f99b3b502f8bac3b8011a3ed29b641b818a9d8245f8a6b1c14f63e055a9"
+      "sha256": "6ad30a6bf90fd4058e33830a3141e6dd7acccda5788308b9264fa3c2155d231a"
     },
     "runbooks/daintree.orchestration.hand-off-orchestration.yaml": {
       "examples": 50,
@@ -783,16 +784,16 @@
       "sha256": "4b12dfda046e0a3cb9c87e432f47397b3ef81949db1c630f7dcfb4ce3c75df3b"
     },
     "runbooks/daintree.orchestration.status-and-resume.yaml": {
-      "examples": 333,
-      "rows": 333,
+      "examples": 338,
+      "rows": 338,
       "runbook": "daintree.orchestration.status-and-resume",
-      "sha256": "6380c96aabdd2d11dfe40fc9f0dbf34a904aa5bbc3b6c1b59aa9c4478ebc8ec5"
+      "sha256": "b376f2c3c97fc339c7251d1762c769a7967b6f1b11573fc557e862c2e00df96c"
     },
     "runbooks/daintree.orchestration.supervise-fleet.yaml": {
-      "examples": 326,
-      "rows": 326,
+      "examples": 330,
+      "rows": 330,
       "runbook": "daintree.orchestration.supervise-fleet",
-      "sha256": "f6e84c24a72b7dbca4af63d65597958c7ac479231d29f9fdb3f81aed00c90a16"
+      "sha256": "a22be2fdd64fd43ae80e69f1fe3cedcd6f2c4bfb8854652668af9ea668113d42"
     },
     "runbooks/daintree.orchestration.test-first-split.yaml": {
       "examples": 43,
@@ -819,16 +820,16 @@
       "sha256": "bc92d11cd36849395a397d7423bd6679d49490915dfe71d743e039f0390c82e6"
     },
     "runbooks/daintree.orchestration.work-in-waves.yaml": {
-      "examples": 20,
-      "rows": 20,
+      "examples": 73,
+      "rows": 73,
       "runbook": "daintree.orchestration.work-in-waves",
-      "sha256": "f50411eb3a01fc6ad84ec3ab3f5958ddf8aa72046e00360a09f148e5e1c11b95"
+      "sha256": "d0af806effa3fd87c7bb087042cd8d2086b4c107fb7f1bb028ca303a9644983a"
     },
     "runbooks/daintree.orchestration.workspace-cleanup.yaml": {
-      "examples": 367,
-      "rows": 367,
+      "examples": 370,
+      "rows": 370,
       "runbook": "daintree.orchestration.workspace-cleanup",
-      "sha256": "33e60e1557a323639e88b74c700a905389f0756377a9a6f557f1ae6652a8fe68"
+      "sha256": "d5bb9dfa333bbe601aaab4db4397ca42f9d78302b47d9ef5e7ffa470f743e28d"
     },
     "runbooks/daintree.plugins.develop-project-plugin.yaml": {
       "examples": 120,
@@ -963,10 +964,10 @@
       "sha256": "02fc3af046fc098432c2355ec777e6f879317521866564e5cee55e2508fb4edf"
     },
     "runbooks/daintree.workflow.find-issue-work.yaml": {
-      "examples": 235,
-      "rows": 235,
+      "examples": 245,
+      "rows": 245,
       "runbook": "daintree.workflow.find-issue-work",
-      "sha256": "7ea30176b5272b8aa2ef22a9ab698a573e28738f458392435c8b6ef880a4963d"
+      "sha256": "42de1f9d0e25bbc432660ee6f363ca01950b815297bbf8e8619e8573cdb38718"
     },
     "runbooks/daintree.workflow.follow-up-on-issue.yaml": {
       "examples": 344,
