@@ -121,6 +121,12 @@ boundaries:
   - query: 'no machine is struggling, the run only needs watching until it finishes and the odd question answered'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: keep the remote run moving and bring me only the questions the hosts cannot answer themselves, nothing has changed priority
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: one of my remote hosts has been quiet much longer than the others, check on it once and tell me where the run stands
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
 
   - query: keep watching the run I just sent to the studios and tell me what each one asks
     confusable_with: [daintree.hosts.hand-off-swarm]

@@ -180,3 +180,6 @@ boundaries:
   - query: the hub says pause the agent here that is building the consumer, the contract it uses is being revised
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
+  - query: the hub says an urgent fix outranks the docs task, so stop the agents I launched for that run here and tell it where each one stopped
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150

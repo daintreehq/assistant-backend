@@ -89,6 +89,9 @@ boundaries:
   - query: prod is returning 500s since someone rotated the database password this morning — get agents on the logs
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
+  - query: production is down right now and nothing else is running anywhere, work out what broke and why
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
 followups:
   - query: the payments service is throwing timeouts too - add that to the logs lens
     history:

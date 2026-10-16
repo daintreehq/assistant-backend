@@ -192,3 +192,15 @@ boundaries:
   - query: "stop everything I've handed to the hosts and report which ones confirmed"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
+  - query: I changed my mind about the run on the remote hosts, call it off and tell me which machines confirmed it stopped
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: the remote agents should also handle empty input, send that to every host without restarting their tasks, nothing else is more important
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: stop the run on the other machines, keep every worktree, I will not be restarting it
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: withdraw what I sent to the remote hosts that was not read yet and stop the rest
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150

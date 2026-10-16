@@ -178,3 +178,12 @@ boundaries:
   - query: Pause the cross-machine run until Monday and write down where each host is, I'll resume it in this same session
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
+  - query: I am travelling for the week, hold the whole run on my remote hosts and leave me a record so we can restart it when I land
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: put the swarm to bed until next monday, record which machines acknowledged and where each stopped
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: the hub has to restart tonight, so pause the cross-host work now with a resume file that survives it
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150

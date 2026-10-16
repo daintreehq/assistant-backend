@@ -165,6 +165,15 @@ boundaries:
   - query: 'pick the host with the most headroom for this new refactor ticket and send it there'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: I have a dozen small bugs and no deadline on any, hand each to whichever remote machine has the most room, leave what is running alone
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: put this one new task on whichever of my remote hosts has spare capacity and the right agent CLI
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
+  - query: there is a free slot on two of my remote machines, split these four tickets between them
+    confusable_with: [daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-150
 
 followups:
   - query: yes, go ahead with that split
