@@ -38,10 +38,16 @@ cases:
   - id: undo-swarm-changes-issue-client-server
     category: single-runbook
     note: >-
-      The issue's second request: two repositories of one run, unrelated edits kept. Decided by
-      "in every repository it touched, while everyone else's work stays" and "per repository the
-      original and revert SHAs". At base daintree.git.undo-agent-changes.
+      The issue's second request, as a continuation of a run built on two Remote Hosts: two
+      repositories of one run, unrelated edits kept. Decided by "in every repository it touched,
+      while everyone else's work stays" and "per repository the original and revert SHAs". On
+      its own the request is one machine's undo (daintree.git.undo-agent-changes); the history
+      is what makes it a swarm.
     messages:
+      - role: user
+        content: have the laptop host build the billing client and the build box build the server, each on its own branch
+      - role: assistant
+        content: Both Remote Hosts finished and pushed their branches.
       - role: user
         content: Back out the client and server commits from this run, preserving the unrelated edits.
     expect:
