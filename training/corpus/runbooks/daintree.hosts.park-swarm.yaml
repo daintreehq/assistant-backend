@@ -161,3 +161,5 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
   - query: put the remote swarm to sleep until thursday, nothing torn down
     confusable_with: [daintree.worktree.manage-resource]
+  - query: hold the multi-stage plan on the remote hosts where it is until I'm back, start no new stage, and keep a resume record
+    confusable_with: [daintree.hosts.execute-distributed-workflow]

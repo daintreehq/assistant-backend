@@ -196,9 +196,6 @@ boundaries:
   - query: clean up the panes and worktrees the staged plan left on the remote hosts
     confusable_with: [daintree.hosts.execute-distributed-workflow]
     run: runbook-2026-10-issue-115
-  - query: 'My Shell was rebooted for updates. Go through every host''s task records and tell me which of my messages there never got an answer.'
-    confusable_with: [daintree.hosts.park-swarm]
-    run: runbook-2026-10-issue-111
   - query: 'what happened on the other machines overnight? nothing was parked, I just want where things stand'
   - query: 'the hub restarted overnight; tell me where each exchange with the hosts stands, I''m not resuming anything yet'
     confusable_with: [daintree.hosts.park-swarm]
