@@ -1249,3 +1249,47 @@ trials:
     execution:
       - "No waitMs and no polling loop between updates (hub transcript); a Claude Code hub sets at most one native wakeup if its tools list one; a Codex hub tells the person what it waits on and ends its turn."
 
+  - id: diagnose-host-differences
+    runbook: daintree.hosts.diagnose-host-differences
+    also: [daintree.hosts.verify-for-hub, daintree.hosts.handle-hub-message]
+    issue: 119
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "{project} on {remote}: {sha} adds a test that formats one fixed UTC instant as a local calendar date and expects the UTC date; {sha_b} is its parent, without that test."
+      - "Stage two hosts with enrolled lanes in {project}; start {host_a}'s instance with TZ=UTC and {host_b}'s with TZ=Pacific/Kiritimati (the deliberate runtime difference), and confirm each with `date` in a terminal of that host."
+      - "{host_b}'s {project} checkout at {sha}; {host_a}'s left at {sha_b} (the stale checkout)."
+    steps:
+      - say: |-
+          npm test in {project} passes on {host_a} and fails on {host_b}, both supposedly at {sha}. Find out why before anything is changed. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.diagnose-host-differences]
+            calls: [host.list, host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.startAssistant, host.cancelTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.verify-for-hub]
+            calls: [worktree.createWithRecipe, agent.launch, assistant.reply]
+            never: [worktree.delete]
+            notices: [lane-wake]
+      - say: Confirm it with one run of that test on {host_b} under TZ=UTC, changing nothing else.
+        expect:
+          hub:
+            calls: [host.sendMessage, host.getTask]
+            never: [host.cancelTask]
+    checks:
+      - "One evidence exchange per host before the confirmation, then one confirmation exchange to {host_b} only (Shell's record)."
+      - "{host_a}'s {project} checkout still at {sha_b} and {host_b}'s at {sha}, both with an empty git status --porcelain; nothing new on {remote}."
+      - "Each host has one verify worktree at {sha} with an empty git status; run by the operator there, the test passes on {host_a}, fails on {host_b}, and passes on {host_b} with TZ=UTC."
+      - "No host's TZ, runtime, installed packages or Daintree settings changed after the run (date and node -v in a terminal of each host)."
+    execution:
+      - "The hub named {host_a}'s checkout at {sha_b}, not {sha}, as a revision mismatch before attributing {host_b}'s failure to anything (hub transcript)."
+      - "The hub ranked the timezone difference with the failing assertion as its evidence, kept it a hypothesis until the TZ=UTC run, and proposed a correction without applying it (hub transcript)."
+      - "Both lanes' replies carried the same fingerprint fields and no environment dump, token or credential (lane transcripts)."
