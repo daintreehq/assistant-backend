@@ -187,6 +187,8 @@ boundaries:
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
   - query: 'give all my machines the same job: each adds snapshot tests for the invoice renderer on a branch of its own, and I will compare them'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: runbook-2026-10-issue-118
   - query: 'every host should move the test runner to its next major version on a branch of its own and report the SHA'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
