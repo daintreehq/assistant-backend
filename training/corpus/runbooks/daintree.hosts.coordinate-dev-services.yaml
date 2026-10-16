@@ -107,6 +107,9 @@ boundaries:
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
 
+  - query: "my frontend on the mini can't call the backend on the linux box, though every worktree on both has a database and port of its own. which address does it need, and prove a call lands"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: now start the frontend against it
     history:
