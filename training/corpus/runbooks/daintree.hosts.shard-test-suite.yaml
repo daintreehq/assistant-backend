@@ -134,7 +134,7 @@ boundaries:
     confusable_with: [daintree.hosts.verify-for-hub]
   - query: the hub should hand out the test shards and check the union, not run one itself
     confusable_with: [daintree.hosts.verify-for-hub]
-  - query: use the remote hosts for the test files, not a batch of local agents
+  - query: split the one test suite's files across the remote hosts to run, not a batch of local agents
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: parallelise the test run over my other machines instead of local agents
     confusable_with: [daintree.orchestration.fan-out-work]
