@@ -1,0 +1,211 @@
+# daintree.hosts.rebalance-load: the hub relieves pressure across a swarm ALREADY RUNNING on
+# the Remote Hosts. One host is overloaded (swapping, hot, pegged, too many agents) or
+# unavailable, or its agent CLI is out of allowance: its own assistant runs fewer agents and
+# holds what it has not started, and only that unstarted work moves to hosts with room, with a
+# reading before and after. Recall cases are the issue's three requests plus agent- and
+# user-phrased outcomes and an unavailable host. Routing traps: this runbook wins against each
+# declared neighbour. Reverse traps: the neighbour wins and this runbook must not ride along.
+# The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: rebalance-load-issue-swapping
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "a swarm ALREADY RUNNING across the person's
+      Remote Hosts is LOPSIDED: one machine is swapping, hot, pegged or running too many
+      agents while others sit idle".
+    messages:
+      - role: user
+        content: One remote host is swapping while the others are idle; rebalance the swarm.
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-issue-allowance
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "or its agent CLI ran out of allowance, and the
+      person wants the pressure spread" and "nothing already running sent twice".
+    messages:
+      - role: user
+        content: The host hit its agent allowance; reduce pressure without losing work.
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-issue-contention
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "relieve the swarm's resource contention with
+      per-host evidence" and the deliverable "per-host load and allowance readings with their
+      times".
+    messages:
+      - role: user
+        content: Relieve active swarm resource contention with per-host evidence.
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-agent-phrased
+    category: single-runbook
+    note: >-
+      An agent's search query. Decided by "one machine is swapping, hot, pegged or running too
+      many agents while others sit idle" and "the pressured host's own assistant lowering how
+      many agents it runs and releasing pieces it has not started".
+    messages:
+      - role: user
+        content: >-
+          Rebalance a running multi-host swarm: one Remote Host shows critical memory pressure
+          with six agents working while two other hosts are nearly idle; move the queued pieces
+          and lower that host's concurrency without duplicating running work
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-user-phrased
+    category: single-runbook
+    note: >-
+      Casual, no punctuation. Decided by "running too many agents while others sit idle" and
+      "the person wants the pressure spread".
+    messages:
+      - role: user
+        content: too many agents on one host swarm is unbalanced fix it
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-unavailable-host
+    category: single-runbook
+    note: >-
+      The unavailable-host scenario. Decided by "a host dropped out mid-run" and "only that
+      unstarted work placed on hosts with room".
+    messages:
+      - role: user
+        content: one of the swarm hosts went offline with several queued units it never started, spread those across the remaining hosts
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------- routing traps
+  - id: rebalance-load-not-place-work
+    category: routing-trap
+    note: >-
+      The units were placed already; the swarm is running and one host is swamped. Fence: "first
+      placement of new pieces (daintree.hosts.place-work)".
+    messages:
+      - role: user
+        content: the swarm's units are already spread over my machines but one host is now swamped; shift the ones it hasn't started to hosts with room
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-not-reassign-host-work
+    category: routing-trap
+    note: >-
+      Several units that never started, not one started unit. Fence: "moving one started unit to
+      another machine (daintree.hosts.reassign-host-work)".
+    messages:
+      - role: user
+        content: a host in the running swarm dropped out; its units that never started should go to the hosts that are still up, without anything running twice
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-not-check-usage-limits
+    category: routing-trap
+    note: >-
+      Usage ran out and the work has to move, not just be reported. Fence: "only reading usage
+      left per host (daintree.hosts.check-usage-limits)".
+    messages:
+      - role: user
+        content: the codex host ran through its usage mid-swarm, move its untouched units to machines with allowance left
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-not-steer-swarm
+    category: routing-trap
+    note: >-
+      The run keeps going; its load is spread. Fence: "stopping or calling off a run, or
+      correcting its brief (daintree.hosts.steer-swarm)".
+    messages:
+      - role: user
+        content: keep the swarm going, but cut the agent count on the overloaded remote host and give its unstarted units to the quiet hosts
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: rebalance-load-not-relieve-resource-contention
+    category: routing-trap
+    note: >-
+      The pressure is on a Remote Host in the swarm. Fence: "load on this machine alone
+      (daintree.runtime.relieve-resource-contention)".
+    messages:
+      - role: user
+        content: the pressure is on one of the remote hosts in the swarm, not this machine; spread the swarm's remaining units across the other hosts
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------ reverse traps
+  - id: place-work-not-rebalance-load
+    category: routing-trap
+    note: >-
+      New pieces, nothing sent: first placement. place-work's "the person has DIFFERENT,
+      independent pieces of work ... and wants each put on whichever Remote Host this Shell
+      reaches can best take it".
+    messages:
+      - role: user
+        content: Here are five new tickets, nothing sent yet; put each on whichever of my machines has the most room.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: reassign-host-work-not-rebalance-load
+    category: routing-trap
+    note: >-
+      One started unit with pushed commits on a host that cannot finish. reassign-host-work's "a
+      piece of work ALREADY SENT to one Remote Host has to MOVE TO A DIFFERENT MACHINE because
+      the first cannot finish it".
+    messages:
+      - role: user
+        content: The studio died halfway through the auth fix it had already pushed two commits for; have another host finish that one unit.
+    expect:
+      required: [daintree.hosts.reassign-host-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: check-usage-limits-not-rebalance-load
+    category: routing-trap
+    note: >-
+      A usage read with nothing moved. check-usage-limits's "how much Claude Code or Codex
+      allowance each Remote Host this Shell reaches has left".
+    messages:
+      - role: user
+        content: For the swarm hosts, read off what each one's Codex usage screen says right now, one row per machine.
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation]
+
+  - id: steer-swarm-not-rebalance-load
+    category: routing-trap
+    note: >-
+      A stop with work kept, nothing moved. steer-swarm's "work they ALREADY SENT to their other
+      machines ... STOPPED, CALLED OFF or CHANGED while it is under way".
+    messages:
+      - role: user
+        content: Call off the run I sent to all my machines and keep whatever they've done.
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.hosts.park-swarm]
+
+  - id: relieve-resource-contention-not-rebalance-load
+    category: routing-trap
+    note: >-
+      This machine is the one struggling. relieve-resource-contention's "Use when the MACHINE is
+      struggling under the agents' load and the user wants it relieved".
+    messages:
+      - role: user
+        content: My own machine is crawling since the agents started their test runs here; what's eating the CPU?
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
