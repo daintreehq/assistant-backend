@@ -6,9 +6,9 @@
 # Recall: the issue's own three requests, an agent-phrased and a long user-phrased
 # description, and the follow-up shape (a shard that came back empty, run again and folded
 # in). Traps: one per declared neighbour where this runbook wins (the same work on every host,
-# different pieces placed per host, checks on this machine, a lane running its one shard),
-# and a reverse case for each where the neighbour wins and this runbook must not ride along,
-# plus one for several agents splitting tests on this machine
+# different pieces placed per host, checks on this machine, the same checks per environment, a
+# lane running its one shard), and a reverse case for each where the neighbour wins and this
+# runbook must not ride along, plus one for several agents splitting tests on this machine
 # (daintree.orchestration.fan-out-work).
 
 cases:
@@ -29,9 +29,8 @@ cases:
   - id: shard-test-suite-issue-bucket
     category: single-runbook
     note: >-
-      The issue's second request. Decided by "each host taking a disjoint part of its tests at
-      the same commit" and "one merged test report". At base daintree.hosts.swarm-fan-out
-      took it (0.97).
+      The issue's second request. Decided by "each host taking a disjoint part of its tests"
+      and "one merged test report". At base daintree.hosts.swarm-fan-out took it (0.97).
     messages:
       - role: user
         content: Shard this allowed test bucket over three machines and combine the reports.
@@ -96,7 +95,7 @@ cases:
     category: routing-trap
     note: >-
       A different slice per host is not the same work on every host. Decided by "each host
-      taking a disjoint part of its tests at the same commit"; daintree.hosts.swarm-fan-out is
+      taking a disjoint part of its tests"; daintree.hosts.swarm-fan-out is
       fenced as "the same work or change on every host" and must not ride along.
     messages:
       - role: user
@@ -139,6 +138,19 @@ cases:
     messages:
       - role: user
         content: split the test run between the remote hosts, each takes its own part at commit 5e2a, then merge their results into one report
+    expect:
+      required: [daintree.hosts.shard-test-suite]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: shard-test-suite-not-matrix-speed
+    category: routing-trap
+    note: >-
+      Speed, not a per-environment comparison. Decided by "ONE test suite run faster by
+      SPLITTING it between their Remote Hosts"; daintree.hosts.run-validation-matrix is fenced
+      as "the same checks repeated under each environment for a matrix".
+    messages:
+      - role: user
+        content: "I don't need each platform's result, just the suite done faster: split it over the hosts at this commit"
     expect:
       required: [daintree.hosts.shard-test-suite]
       optional: [daintree.hosts.foundation, daintree.foundation]
@@ -203,3 +215,15 @@ cases:
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
+
+  - id: shard-test-suite-reverse-matrix-per-platform
+    category: routing-trap
+    note: >-
+      The whole suite once per platform with a result for each: daintree.hosts.run-validation-matrix
+      ("TESTED UNDER SEVERAL ENVIRONMENTS"); nothing is split, so this runbook must not ride along.
+    messages:
+      - role: user
+        content: run the full suite on the linux host and again on the mac host at this tag and show me each platform's result
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation, daintree.foundation]
