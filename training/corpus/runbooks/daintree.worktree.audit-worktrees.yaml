@@ -92,6 +92,15 @@ boundaries:
   - query: 'the hub wants to know which of my worktrees are merged; it isn''t asking me to delete anything'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: go through my local checkouts and tell me which are fully merged and which hold commits that were never pushed
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: does any local worktree have commits that never got pushed?
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: which of these worktrees on this machine can I let go of?
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
 followups:
   - query: what exactly would I lose from feat/search-v2 if I removed it?
     history:

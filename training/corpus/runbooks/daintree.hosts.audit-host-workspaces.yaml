@@ -1,0 +1,139 @@
+# daintree.hosts.audit-host-workspaces: the hub's read-only inventory of what one run left on its
+# Remote Hosts. Each host's own assistant inventories its own project (the local worktree audit plus
+# listeners and any configured remote resource), the hub classes every item safe, unsafe or unknown
+# from the evidence, names the hosts and projects it could not observe, and removes nothing.
+#
+# Rows: audit requests in people's own words and as hub agents describe them, with the situations the
+# procedure handles (dirty and unpushed work, a squash-merged branch, a server still listening, a
+# same-named worktree that belongs to someone else, a closed task, a host that could not be reached,
+# a retained cloud resource); followups after a run finished or after an earlier audit had gaps; and
+# boundaries against performing the cleanup (daintree.hosts.recover-and-clean-up), a lane's own
+# removal (daintree.hosts.clean-up-for-hub), the local audit (daintree.worktree.audit-worktrees),
+# local teardown (daintree.orchestration.workspace-cleanup), a why-do-hosts-differ diagnosis
+# (daintree.hosts.diagnose-host-differences) and catching up on earlier sessions
+# (daintree.orchestration.status-and-resume), each with reverse rows in that neighbour's file.
+# Lane-side rows (a host asked by the hub for the inventory) live in daintree.hosts.handle-hub-message.yaml.
+
+runbook: daintree.hosts.audit-host-workspaces
+run: runbook-2026-10-issue-128
+
+positives:
+  - query: 'audit what the swarm left behind on the other machines: worktrees, panes, branches and any running servers'
+  - query: Which of the worktrees my remote hosts created for the migration job still have uncommitted changes?
+  - query: list every dev server the job left listening on the remote machines and say whose it is
+  - query: The overnight job is over. Before I clean anything up, which worktrees on the remote hosts are safe to delete, which are not, and which can't you tell?
+  - query: 'Task: build a read-only inventory, per host and project, of the resources run bf-19 created (worktrees, branches, panes, ports). Mark each safe, unsafe or unknown to remove, with the evidence. Name every host or project you could not inspect. Remove nothing.'
+  - query: do any of my remote worktrees from the sync job have commits that never got pushed?
+  - query: can you check what's left from the refactor swarm on the laptop host and the build host, nothing gets deleted, I only want to know what's at risk
+  - query: 'hey, quick one: before I wipe the leftovers on my other computers, is anything still running or unsaved over there?'
+  - query: 'I handed units of the checkout rewrite to three machines last week. Two have finished and I think I closed their tasks, but I''m not sure what is still sitting on those machines: worktrees, terminals, maybe a preview server. Give me an inventory with what''s dirty, what has unpushed commits and what''s merged, and flag anything you couldn''t look at. Don''t remove or stop anything.'
+  - query: Which remote worktrees are already merged, squash merges included, and which still hold commits that exist nowhere else?
+  - query: 'inventory of remote leftovers by owner: mine from this run, someone else''s, and unknown'
+  - query: Is anyone still using the worktrees the swarm made on the mini? An agent or a dev server maybe.
+  - query: Audit the remote hosts' workspaces for run nightly-77 and tell me which hosts you couldn't reach.
+  - query: Some of the swarm's tasks are closed. Does that mean their worktrees on the hosts are abandoned? Check before I decide anything.
+  - query: I need a safe, unsafe and unknown list of what the swarm left on my remote machines, with the reason for each
+  - query: a service the run started might still be up on a remote host after its worktree was removed. Look for any, and report them separately from the worktrees
+  - query: what is each of my remote hosts still holding for the swarm, before I ask anyone to remove it
+  - query: Report which of the run's worktrees on each remote host have a running listener whose working directory is inside them, and which have none.
+  - query: one host has two worktrees with near-identical names, one from this run and one from somebody else's. Make sure the audit doesn't mix them up.
+  - query: morning! the swarm is done. could you go through what it left on the other machines and tell me what's risky to remove? don't touch anything yet
+  - query: 'check my remote hosts for work that exists only there: dirty files or commits that aren''t on the shared remote'
+  - query: after the failed run, take stock of panes and worktrees on both remote hosts. read only.
+  - query: 'Run an audit of the Remote Hosts for leftovers: per project, what the run left, what''s in use, what''s unpushed. Report only.'
+  - query: Look at the remote workspaces left by the release-prep swarm and tell me what I'd lose if I deleted each one.
+  - query: what would I lose if I removed the build box's worktrees from that run?
+  - query: which remote projects did you not manage to inspect? the swarm touched four
+  - query: so what's actually left on the hosts from the experiment? worktrees, panes, servers, branches
+  - query: 'Give me the remote leftovers report: for each item, the evidence and what I would need to decide.'
+  - query: Verify which of the swarm's remote branches have really been pushed, and which worktrees only look pushed.
+  - query: I think a server the run started is still up on the second machine. Find out, and tell me which worktree it belongs to, without stopping it.
+  - query: can you tell me, per machine, what the parallel job created that is still there and whether any of it has unsaved work? I'm deciding tomorrow what to remove
+  - query: The hosts' assistants did a lot of work for the run and I lost track. What did they leave in their projects, and what can't be judged without asking someone?
+  - query: 'Hub agent task: collect from every enrolled host assistant a report-only account of the worktrees, panes and listeners tied to run lint-sweep-3, then class them and list the gaps.'
+  - query: Sort what the swarm left on my remote machines into things in use, things holding unpushed work, things that look finished and things you can't verify.
+  - query: 'thanks! last thing on the swarm: an overview of the workspaces it left across the hosts, nothing removed, with who owns what'
+  - query: now list what it left on them, read-only
+    history:
+      - 'user: send the three parser fixes to the build box, the mini and the tower'
+      - 'assistant: Sent. Each host reported done, with a branch on the shared remote.'
+  - query: is anything still running on those machines from it? and what could go?
+    history:
+      - 'user: the cross-machine run finished, thanks'
+      - 'assistant: Glad it landed. The three branches are merged.'
+
+followups:
+  - query: before we clean up, what did it leave on the machines?
+    history:
+      - 'user: run the dependency bumps on all four hosts'
+      - 'assistant: All four finished; each pushed a branch and the checks passed.'
+    active: [daintree.hosts.foundation]
+  - query: and is anything still running on them?
+    history:
+      - 'user: look through the hosts for anything the swarm abandoned'
+      - 'assistant: Two hosts reported. Three worktrees are clean and pushed; one has dirty files. The third host''s assistant was unavailable.'
+    active: [daintree.hosts.foundation]
+  - query: which of those are safe to delete?
+    history:
+      - 'user: what did the run leave on the build box?'
+      - 'assistant: Four worktrees, two terminals and one server listening on a dev port.'
+    active: [daintree.hosts.foundation]
+  - query: check the third host too, you said you couldn't reach it
+    history:
+      - 'user: go over the remote leftovers from the swarm'
+      - 'assistant: Two of three audited; the third host''s assistant was not available, so it is a gap.'
+    active: [daintree.hosts.foundation]
+  - query: the mini's assistant is back. look again at what the run left there, still read only
+    history:
+      - 'user: inventory the leftovers on the hosts'
+      - 'assistant: The mini was unavailable so nothing is known about it.'
+    active: [daintree.hosts.foundation]
+  - query: ok, i'm about to clear them out. re-check them first
+    history:
+      - 'user: which remote worktrees from the swarm can go?'
+      - 'assistant: Two are safe, one has unpushed commits, one is unknown because the read failed.'
+    active: [daintree.hosts.foundation]
+  - query: was that server on the linux host the swarm's or someone else's?
+    history:
+      - 'user: any servers from the swarm still up over there?'
+      - 'assistant: One listener on the linux host runs from a worktree that is not on the run''s list, so I left it unjudged.'
+    active: [daintree.hosts.foundation]
+  - query: same audit for the other project on the hosts
+    history:
+      - 'user: audit what the run left in the api project on each host'
+      - 'assistant: Done: three hosts, eleven items, two unsafe.'
+    active: [daintree.hosts.foundation]
+
+boundaries:
+  - query: don't remove anything yet, just tell me what the run left on each remote host and what's safe
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: 'report only: the panes, worktrees and branches the swarm made on my other machines, and which I could clean up later'
+    confusable_with: [daintree.hosts.recover-and-clean-up, daintree.hosts.clean-up-for-hub]
+  - query: before the hosts tidy up their parts, I want an inventory of what each of them would be removing
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: Give me the leftovers per host with a safe, unsafe or unknown verdict. The cleanup itself waits for my go.
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: which worktrees on the other machines have unpushed or uncommitted work?
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: audit the worktrees on my remote hosts, read only, and say which are merged
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: classify the worktrees the swarm made on the remote hosts as in use, at risk or merged
+    confusable_with: [daintree.worktree.audit-worktrees]
+  - query: 'from my main machine: sort the leftovers on the hosts into the run''s own and other owners'', and just report, I''ll decide about removing'
+    confusable_with: [daintree.hosts.clean-up-for-hub]
+  - query: Ask every host's assistant what the run left in its project and compile one report; no one removes anything
+    confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
+  - query: list what remains from the swarm on the remote machines before I decide whether to tear any of it down
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: tell me which of the swarm's panes and servers on the other computers are still in use, I won't close anything today
+    confusable_with: [daintree.orchestration.workspace-cleanup]
+  - query: 'what does each remote host still have from the run: open panes, dirty worktrees, servers? no diagnosis needed'
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+  - query: what has the parallel run left lying around on the remote machines, and is any of it safe to remove?
+    confusable_with: [daintree.orchestration.status-and-resume]
+  - query: list the leftovers from that cross-machine run, nothing deleted
+    confusable_with: [daintree.orchestration.status-and-resume, daintree.hosts.recover-and-clean-up]
+  - query: the swarm is finished; I want a report on its leftover workspaces across the hosts, not a status of the run
+    confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
+  - query: audit the remote hosts for what the swarm left behind in their workspaces
+    confusable_with: [daintree.hosts.check-usage-limits]

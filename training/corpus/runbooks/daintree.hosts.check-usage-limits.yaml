@@ -140,6 +140,9 @@ boundaries:
   - query: 'before I start the long job, which of my other machines can still take a big Codex run today?'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: how much Claude allowance does each remote host have left?
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
 followups:
   - query: and claude on those same machines?
     history:

@@ -124,6 +124,12 @@ boundaries:
   - query: the build only breaks on the Linux host with identical code, find the environment difference
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: the same branch passes on the mini and fails on the build box with identical checkouts; find out what differs between the two machines
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: the tests only time out on one of my remote hosts, work out why before changing anything
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

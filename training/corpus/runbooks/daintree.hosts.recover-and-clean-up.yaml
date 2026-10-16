@@ -292,3 +292,15 @@ boundaries:
   - query: some of the tasks I handed the mini's projects are still open, account for each and tidy what is left
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
+  - query: Job r-9 is finished. Ask the assistants on the hosts to close the panes they opened for it and delete its clean worktrees, then report what each one kept.
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: clean up the worktrees and branches the swarm left on the other machines, I've already looked at what is there
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: 'I went through the leftovers already: the two clean, pushed worktrees on the build box can go. Have its assistant remove them.'
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: after the restart, tell me where each exchange with the hosts stands, and clean up what that run left through their assistants
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128

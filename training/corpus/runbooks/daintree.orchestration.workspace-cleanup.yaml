@@ -460,6 +460,12 @@ boundaries:
   - query: 'clean up everything the race left on my laptop except the winner''s worktree'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: close all the terminals and delete the merged worktrees from the swarm run on this machine
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: tear down the workspaces that fan-out left here, the clean ones, and close their panes
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
 followups:
   - query: actually delete the last one, i don't need that task
     history:

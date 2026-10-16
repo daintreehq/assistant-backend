@@ -148,3 +148,12 @@ boundaries:
   - query: "hub wants the worktrees from its run removed on this machine, nothing reverted"
     confusable_with: [daintree.git.undo-agent-changes]
     run: runbook-2026-10-issue-151
+  - query: my hub wants the panes and worktrees I created for its lint sweep gone from this machine; remove them and reply with what stayed
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: The hub wants the terminals I opened for its benchmark run closed and the clean, pushed worktrees deleted on this machine. Do that and answer it.
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: tidy up my part of the hub's experiment on this machine, nothing forced, and report what stayed
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128

@@ -244,3 +244,12 @@ boundaries:
   - query: 'the hub''s inbox message asks what is unpushed or still serving from the run it gave this lane, without touching anything. Read it and reply to the hub.'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: the hub asked me for a read-only inventory of what I made for its run; read the message and answer it
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: There is a hub message in my inbox asking which worktrees here are dirty or unpushed. Read it and reply, changing nothing.
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: reply to the hub with whatever it asked about the worktrees and servers on this host, it wants a report only
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128

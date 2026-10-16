@@ -477,6 +477,12 @@ boundaries:
   - query: "catch me up on where I left off yesterday across my sessions"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: where did I leave off with the agents on this machine yesterday?
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: what was in flight in my earlier sessions before the app restarted?
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
 followups:
   - query: close the stale ones
     history:
