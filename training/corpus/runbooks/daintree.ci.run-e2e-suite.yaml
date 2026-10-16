@@ -58,7 +58,7 @@ positives:
     run: runbook-2026-10-issue-135
   - query: "The reviewers' worktree on the build box has a long-lived dev server on 3000 that belongs to the main checkout. Run the browser specs for the review branch without touching it, and show the run used its own."
     run: runbook-2026-10-issue-135
-  - query: "run the integration suite that boots the API on the other host, then tell me what served it and keep the report somewhere I can reach from here"
+  - query: "run the integration suite that boots the API on the other host, then tell me what served it and give me the report location with the host named"
     run: runbook-2026-10-issue-135
   - query: "I'm about to sign off on a remote e2e result. Re-run just the failing checkout spec in that worktree and attach evidence that the server was the branch's build, not a cached bundle."
     run: runbook-2026-10-issue-135
@@ -115,7 +115,7 @@ boundaries:
   - query: "keep readable trace references for the e2e run on the remote worktree and show which server it used"
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-135
-  - query: "check the end-to-end provenance of that remote worktree's server and give me report locations I can read"
+  - query: "check the end-to-end provenance of that remote worktree's server and give me the report locations, written with the host, worktree and commit"
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-135
   - query: "run the cypress spec for this worktree at the commit named and prove the server was this checkout's, then reply with the report location"
@@ -126,6 +126,12 @@ boundaries:
     run: runbook-2026-10-issue-135
   - query: "rerun the integration tests on the remote machine and demonstrate they reach only this worktree's app"
     confusable_with: [daintree.orchestration.verify-agent-work]
+    run: runbook-2026-10-issue-135
+  - query: "the worktree on the build host already has its own port and database configured; just run the browser specs against it once with a temporary server and stop what you start"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-135
+  - query: "I don't need ports or a database set up for that remote worktree, only the end-to-end specs run against a server started for the run"
+    confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-135
 followups:
   - query: rerun just those two with tracing on
