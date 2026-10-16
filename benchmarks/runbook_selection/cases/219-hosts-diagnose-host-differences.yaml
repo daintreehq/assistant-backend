@@ -1,0 +1,262 @@
+# daintree.hosts.diagnose-host-differences: the hub works out why one commit passes on one Remote
+# Host and fails on another. Each host's assistant checks its checkout against the pinned commit,
+# reproduces without changes and reports a non-secret fingerprint; the hub ranks the differences
+# by evidence and fixes nothing.
+# Recall cases are the issue's three requests plus agent- and user-phrased outcomes. Routing traps:
+# this runbook wins against each declared neighbour. Reverse traps: the neighbour wins and this
+# runbook must not ride along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: diagnose-host-differences-tests-pass-one-host
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "tests green on one machine and red on another" and
+      "the person wants to know WHY before anything changes".
+    messages:
+      - role: user
+        content: Why do these tests pass on one host and fail on another?
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-isolate-setup
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "each host's checkout compared with the commit" and
+      "the differences ranked by the evidence that ties each to the failure". An honest measurement
+      of an untrained runbook: daintree.hosts.swarm-fan-out rides along on the comparison wording; retrain owed.
+    messages:
+      - role: user
+        content: Compare the remote machines at the same commit and isolate the setup difference.
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-no-config-change
+    category: single-runbook
+    note: >-
+      The issue's third request, agent-phrased. Decided by "the SAME CODE BEHAVES DIFFERENTLY ON TWO
+      OR MORE Remote Hosts" and "a correction proposed but not applied".
+    messages:
+      - role: user
+        content: Diagnose cross-host environment-dependent failure without changing configuration.
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-agent-outcome
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "each host's checkout compared with the commit", "the
+      failure reproduced there without edits" and "a comparable non-secret environment fingerprint
+      from each host".
+    messages:
+      - role: user
+        content: >-
+          From the hub, find out why one commit passes its tests on one remote host and fails on
+          another: check each host's checkout against the SHA, have it reproduce the failure
+          without changes, and compare runtime versions, locale and installed dependencies
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-user-mac-linux
+    category: single-runbook
+    note: >-
+      Casual user wording. Decided by "tests green on one machine and red on another" and "WHY
+      before anything changes".
+    messages:
+      - role: user
+        content: the api tests pass on the mac host and fail on the linux host, same commit, can you find out what's different before anyone touches anything
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-timeout-one-host
+    category: single-runbook
+    note: >-
+      A timeout on one host only. Decided by "a command that hangs or times out on just one of
+      them".
+    messages:
+      - role: user
+        content: the e2e suite times out only on the older host at the same sha, work out which environment difference does it
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-stale-checkout-suspected
+    category: single-runbook
+    note: >-
+      The person suspects a stale checkout. Decided by "a stale or dirty checkout is a revision
+      mismatch, found first".
+    messages:
+      - role: user
+        content: I suspect the laptop host just has an old checkout, it fails there but passes on the studio host. check before blaming the OS
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-have-hosts-investigate
+    category: single-runbook
+    note: >-
+      The issue's measured baseline query, which selected nothing of this kind before. Decided by
+      "the host assistants asked to look into why" and "tests green on one machine and red on
+      another". An honest measurement of an untrained runbook: daintree.hosts.delegate-to-host and
+      daintree.hosts.swarm-fan-out ride along on the request to have the hosts investigate; retrain owed.
+    messages:
+      - role: user
+        content: Have the host assistants investigate why the same tests pass on one machine and fail on another
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------- routing traps (this runbook wins)
+  - id: diagnose-host-differences-not-matrix
+    category: routing-trap
+    note: >-
+      A matrix already showed the split; the ask is its cause. daintree.hosts.run-validation-matrix
+      must not be picked: this text excludes "before any difference has been seen
+      (daintree.hosts.run-validation-matrix)".
+    messages:
+      - role: user
+        content: yesterday's cross-platform run had the linux row red and the mac row green at the same commit; find which difference between those two hosts explains it, no new matrix
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-not-diagnose-and-fix
+    category: routing-trap
+    note: >-
+      A check red on one host and green on another, nothing to fix yet.
+      daintree.ci.diagnose-and-fix must not be picked: this text excludes "a failing check to fix
+      on this machine (daintree.ci.diagnose-and-fix)".
+    messages:
+      - role: user
+        content: the unit tests fail on the build box but pass on my other host at the same SHA. don't fix it, find out what's different
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-not-ask-host
+    category: routing-trap
+    note: >-
+      Asking both hosts is evidence gathering for a comparison, not one question.
+      daintree.hosts.ask-host-assistant must not be picked: this text excludes "one question to one
+      host (daintree.hosts.ask-host-assistant)".
+    messages:
+      - role: user
+        content: ask both hosts' assistants what differs in their setup that makes the same commit fail on just one of them
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-not-verify-for-hub
+    category: routing-trap
+    note: >-
+      The hub, after its lanes tested one SHA, wants the cause of the split.
+      daintree.hosts.verify-for-hub must not be picked: this text excludes "a host testing a commit
+      it was sent (daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: the hub asked both lanes to test the same sha; one passed and one failed, now find the cause by comparing the two hosts
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-not-diagnose-messaging
+    category: routing-trap
+    note: >-
+      Both hosts reply; the difference is in the code's behaviour. daintree.hosts.diagnose-messaging
+      must not be picked: this text excludes "an assistant that cannot be messaged
+      (daintree.hosts.diagnose-messaging)".
+    messages:
+      - role: user
+        content: both hosts replied fine, one says the suite passes at that sha and the other says it fails. why the difference?
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-not-resource-contention
+    category: routing-trap
+    note: >-
+      Slow on one host only, identical code. daintree.runtime.relieve-resource-contention must not
+      be picked: this text excludes "this machine slowed by load
+      (daintree.runtime.relieve-resource-contention)".
+    messages:
+      - role: user
+        content: it's slow and times out on one host but fine on the other with identical code, figure out what's different about that machine
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------- reverse traps (the neighbour wins)
+  - id: diagnose-host-differences-reverse-matrix
+    category: routing-trap
+    note: >-
+      Results per environment with nothing to explain: daintree.hosts.run-validation-matrix wins on
+      "TESTED UNDER SEVERAL ENVIRONMENTS"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: run the checks for 4f1e2a9 on every platform my hosts cover, no fixes, one result per OS and runtime
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-reverse-diagnose-and-fix
+    category: routing-trap
+    note: >-
+      A failing check here to make green: daintree.ci.diagnose-and-fix wins on "something is
+      FAILING and the user wants it working"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: the integration tests are failing on this branch here, find the cause and fix them
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+
+  - id: diagnose-host-differences-reverse-ask-host
+    category: routing-trap
+    note: >-
+      One question to one host: daintree.hosts.ask-host-assistant wins on "ONE QUESTION answered by
+      the Daintree assistant on ANOTHER MACHINE"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: check with the mac mini's assistant if the release branch builds there
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-reverse-verify-for-hub
+    category: routing-trap
+    note: >-
+      The lane's side, testing the hub's commit: daintree.hosts.verify-for-hub wins on "the hub asks
+      this lane to TEST or VERIFY a commit"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: 'hub message: put commit 7c2d9e1 through lint and the unit tests on this machine and report the counts, no fixes'
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-reverse-diagnose-messaging
+    category: routing-trap
+    note: >-
+      A send that came back paused: daintree.hosts.diagnose-messaging wins on "cannot message or
+      start the Daintree assistant on it"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: the send to the mac host came back paused, why can't I reach its assistant
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-reverse-resource-contention
+    category: routing-trap
+    note: >-
+      This machine under the agents' load: daintree.runtime.relieve-resource-contention wins on
+      "the MACHINE is struggling under the agents' load"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: my laptop is crawling since the agents started running test suites, what's eating the CPU
+    expect:
+      required: [daintree.runtime.relieve-resource-contention]
