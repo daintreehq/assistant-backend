@@ -129,6 +129,14 @@ boundaries:
 - query: the dev services run fine across my hosts now; what I still need is my own Daintree preferences on the second one
   confusable_with:
   - daintree.hosts.coordinate-dev-services
+- query: 'Bring the recipes and notification sounds from this Mac to the build host in a single copy; the plugins on both machines stay exactly as they are.'
+  confusable_with:
+  - daintree.plugins.develop-project-plugin
+  run: runbook-2026-10-issue-137
+- query: 'Show what a settings copy to the second host would change, since the plugin list there is already how I want it.'
+  confusable_with:
+  - daintree.plugins.develop-project-plugin
+  run: runbook-2026-10-issue-137
 followups:
 - query: ok now bring my settings across too
   history:

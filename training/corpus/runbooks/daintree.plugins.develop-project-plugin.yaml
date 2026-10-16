@@ -228,6 +228,15 @@ boundaries:
   - query: 'my plugin is running on the remote host but the shell wants a yes before it shows the panel, where do I give it'
     confusable_with: [daintree.hosts.diagnose-messaging]
     run: runbook-2026-10-issue-137
+  - query: 'I copied my settings to the host and every category applied, yet one of my plugins is still not there; where is it?'
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-137
+  - query: 'My plugin says it is unconfigured on the host because its API key only exists on this Mac; diagnose it and tell me what has to be set up over there, copying nothing.'
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-137
+  - query: 'The settings copy skipped my plugin''s configuration on the host; make the plugin run there anyway.'
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-137
 followups:
   - query: why is it staged, what do I have to do?
     history:
