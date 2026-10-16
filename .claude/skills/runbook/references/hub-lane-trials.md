@@ -208,6 +208,70 @@ anyone launch agents ask for model haiku. Stop at the first usage-limit banner a
 record the rest as owed. Default runs on real accounts or machines are always
 explicit and recorded; nothing sweeps the fleet on its own.
 
+## Paired role evidence
+
+A hosts scenario is one piece of work seen from both ends: the person's request on the
+hub, the hub's brief, the lane's own search for the work the brief names, and the
+runbook that comes back. Evidence is kept per end, never as one "it works".
+
+| layer | hub end | lane end | where |
+|---|---|---|---|
+| selection | the request selects the hub runbook | the lane's search selects the receiving runbook | `cases/1142-hosts-paired-roles.yaml`; `bench pairs` (per end: what loaded, the stage that lost a miss), and `bench local` as the gate |
+| wrong role | no lane runbook loads on the hub | no hub baseline (`host.*`) loads on a lane | `forbid`, derived from the catalog per role plus explicit; a forbidden load fails the case |
+| contract | baseline and bundle offered by `hub-full`, a lane's by `lane-full`, nothing hidden in `optionalTools` | same | `tests/unit/test_paired_roles.py` against the captures |
+| delivery | foundation and hosts foundation in full once per session, named after | the same, in its own session | the same test, over HTTP |
+| grounding | the app's rule that sends the hub to search (below) | the app's pointer for a woken lane (below) | citations at the pinned SHA |
+| execution, outcome | register entry `paired-role-entry` (`discovery: entry`) | same | owed; a live hub and lane |
+
+**Writing a pair.** Both queries are worded as the app tells the assistant to search: one
+sentence of 8 to 15 words in the person's voice, specifics left out. Neither names a
+runbook id, and a lane case carries the hub's emitted brief beside it (`brief`):
+Objective with its deliverable, Scope, Report (the output) and Stop (when to ask back),
+small, by reference, no runbook pasted in; the query must be drawn from the brief's
+objective. `validate_pairs` refuses a scenario without both ends, a successful selection
+at each, an emitted brief and a wrong-role trap, and loading any case file runs it.
+Every scenario carries the same family of traps: the person asking on the machine itself
+(a local runbook owns it and neither end's runbook may load), a question rather than
+work, the lane's bare wake line (only the envelope may load: no deliverable is known
+yet), and a role the caller does not hold (a lane asked to relay on, a hub reading a
+host's message). A miss is recorded, not fixed here: where a pair fails on the shipped
+selector it is retrain-owed, with the stage `bench pairs` printed; routing text is not
+bent to pass it. A hub runbook that does not itself name the lane runbook its brief
+should lead to is pinned in `HUB_NAMES_NO_RECEIVER` (`test_paired_roles.py`) with the
+reason, and the test fails when the pointer lands.
+
+**Entry discovery.** Register entries normally end their first prompt with the search
+line, which proves an assistant follows a procedure it was told to look up. A role-entry
+run (`discovery: entry`) types an ordinary request on the hub and lets the lane be
+woken by the app's own wake line, with no search instruction anywhere; `plan check`
+refuses the line in such an entry. Record each role's first search (query and result) or
+that there was none; a lane that never searched is an APP finding, never a pass.
+
+**What the app does at the pinned SHA (`0436363469`).**
+- Hub: `buildRunbooksAddendum` (`electron/services/helpSessionRunbooks.ts:53`, written into
+  a session's prompt only while "Follow runbooks" is on, `HelpSessionService.ts:3390`)
+  makes `search_runbooks` the first call on any request to do something, with a
+  sentence of 8 to 15 words in the user's voice. An ordinary request on the hub is
+  therefore a discovery entry point as it stands.
+- Lane: `buildMessagingAddendum` (`helpSessionRunbooks.ts:106`, written where a wake can
+  reach the lane, `HelpSessionService.ts:3416`) quotes the wake line
+  (`terminalNotify.ts:635`), says to read it with `assistant.getInbox`, and calls the
+  lane its hub's "submanager" and the enrolled hub the manager. **It does not tell the
+  lane to search for the work after reading the message.** The generic rule does not
+  fill the gap: its first daintree call is the inbox read, before any task is known,
+  and it excludes searching for a notice, which a wake line reads as. The test pinning
+  the addendum says it is "pointing at runbooks for the procedures"
+  (`__tests__/helpSessionRunbooks.test.ts:138`); the text has no such pointer. The
+  addendum measures 1746 of its 1750-byte cap.
+- **The app-owned change, kept owed (not made here, and no procedure moves into the
+  prompt):** one sentence in the Swarm paragraph of `buildMessagingAddendum`, after the
+  hub's message is read: search runbooks for the work it asks, once, as the rule
+  above describes, before acting ("Once you have read a hub's message, search runbooks
+  for the work it asks before acting." is 87 bytes plus a separating space), with the cap
+  raised to fit or the paragraph trimmed by as much. Until it lands and a live pair shows the lane
+  searching on its own, the lane end of discovery is unproven; the offline evidence
+  above shows only that a lane which does search is routed correctly.
+
 ## Recording and the register
 
 Record each trial as `trials.md` says (`$W/trials/<id>-<hub>-<lane>.md`), per role:

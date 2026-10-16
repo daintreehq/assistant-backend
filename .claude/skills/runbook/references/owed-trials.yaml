@@ -20,6 +20,9 @@
 #   checks    outcome checks (layer 5): the world and the app's own records, made by
 #             the operator, never read off a reply
 #   execution optional checks read from transcripts (layer 4: what an agent did)
+#   discovery optional; `entry` marks a run of the app's own role-entry path: ordinary
+#             requests on the hub and the lane's inbox wake, no search instruction in any
+#             prompt (every other entry ends its first prompt with the search line)
 #
 # Placeholders, filled from the stage or the fleet: {host_a} {host_b} (host names as
 # the Shell lists them), {project}, {remote}, {branch}, {sha} {sha_b} {sha_c} (full
@@ -71,6 +74,62 @@ trials:
     execution:
       - "The hub's send carried no waitMs, and it ended its turn until the update line (hub transcript)."
       - "The lane fetched the receiver procedure the brief named and answered the worker's trust dialog by label (lane transcript)."
+
+  - id: paired-role-entry
+    runbook: daintree.hosts.delegate-to-host
+    also:
+      - daintree.hosts.do-delegated-work
+      - daintree.hosts.ask-host-assistant
+      - daintree.hosts.handle-hub-message
+      - daintree.edits.spawn-visible-agent
+    issue: 142
+    caller: hub
+    path: staged
+    hosts: 1
+    discovery: entry
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage one host (hub-lane-trials.md, Staged path); start consent off."
+      - "Settings > Daintree Assistant > Behavior: Follow runbooks on in BOTH instances (the app writes its search rule into a session only while it is on), then start a fresh assistant conversation in each, after the host shows Connected."
+      - "Enroll a lane in {project} on {host_a} with the combo's lane CLI; the hub with the hub CLI."
+      - "{project} at {sha} on {remote}, cloned on the Shell and on {host_a}."
+    steps:
+      - say: Get the assistant on {host_a} to add a --json option to the tally CLI that prints the total as JSON, with a test, on a new branch {branch}, and push that branch to origin. Launch any agents with model haiku.
+        expect:
+          hub:
+            selected: [daintree.hosts.delegate-to-host]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, worktree.createWithRecipe, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - say: Ask the assistant on {host_a} which branch {project} is checked out on there.
+        expect:
+          hub:
+            selected: [daintree.hosts.ask-host-assistant]
+            calls: [host.listAssistants, host.sendMessage]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.handle-hub-message]
+            calls: [assistant.getInbox, assistant.reply]
+            never: [worktree.createWithRecipe, agent.launch]
+            notices: [lane-wake]
+      - person: "In the lane's own window on {host_a}, type: Have an agent fix the typo in the tally README in a new worktree on this machine, with model haiku. Nothing is sent from the Shell for this step."
+    checks:
+      - "git --git-dir {remote} rev-parse {branch} equals the commit in the hub's final reply to the first prompt, and only the CLI and a test changed."
+      - "The second reply names the branch git -C <host project> branch --show-current prints, and made no worktree or pane."
+      - "The Shell's exchange record (Settings > Hosts overview) shows exactly two exchanges, both completed; the person's own request in the lane's window made none."
+      - "The README fix is in a worktree on {host_a} made for the person's request, with no run or unit id of a hub exchange on its branch."
+    execution:
+      - "Hub transcript: the first Daintree call after the first prompt is search_runbooks, one sentence of 8 to 15 words without the branch, file or project names (record the query). No search means the app's role-entry rule did not reach the hub: record it as APP, with the session's prompt."
+      - "Lane transcript, first prompt: the first line is the wake line and it carries no task. Record whether the lane searched after reading assistant.getInbox (query and result), fetched the brief's named procedure by id instead, or did neither. Only a search on the lane's own initiative counts as discovery; the rest is an APP finding for the addendum, never a pass."
+      - "Lane transcript, second prompt: it loaded no procedure that creates a worktree or launches an agent, and answered with assistant.reply once."
+      - "Lane transcript, the person's own request: it searched for the work as a local request and was not handed any procedure for a hub's request (no assistant.reply, no exchange)."
 
   - id: hosts-foundation
     runbook: daintree.hosts.foundation

@@ -122,7 +122,13 @@ ENTRY_KEYS = {
     "steps",
     "checks",
 }
-OPTIONAL_KEYS = {"needs", "also", "evidence", "execution", "lanes"}
+OPTIONAL_KEYS = {"needs", "also", "evidence", "execution", "lanes", "discovery"}
+#: `discovery: entry` marks a run of the app's own role-entry path: an ordinary request on
+#: the hub and an inbox wake on the lane, with no instruction to search. Every other entry
+#: hands the assistant the search line, which proves it can follow a procedure it was told
+#: to look up, not that its own prompt leads it to look one up (`hub-lane-trials.md`,
+#: Paired role evidence).
+DISCOVERY_MODES = frozenset({"entry"})
 _LANE_HOST = re.compile(r"host_([a-z])")
 EXPECT_KEYS = {"selected", "calls", "never", "notices"}
 #: The person's own Daintree listens here by default; a staged instance never does.
@@ -377,6 +383,9 @@ def run_problems(
     if not checks:
         problems.append("no independent checks: an agent's report is not an outcome")
 
+    discovery = entry.get("discovery")
+    if discovery is not None and discovery not in DISCOVERY_MODES:
+        problems.append(f"discovery must be one of {sorted(DISCOVERY_MODES)}")
     steps = entry["steps"]
     if not isinstance(steps, list) or not steps:
         return [*problems, "steps must be a non-empty list"]
@@ -399,7 +408,10 @@ def run_problems(
             problems.append(f"step {n}: empty prompt")
             continue
         prompts.append(text)
-        if n == 1 and not text.rstrip().endswith(SEARCH_LINE):
+        if discovery == "entry":
+            if SEARCH_LINE in text or "search_runbooks" in text:
+                problems.append(f"step {n}: an entry-discovery run gives no search instruction")
+        elif n == 1 and not text.rstrip().endswith(SEARCH_LINE):
             problems.append("step 1: the first prompt must end with the search line")
         problems.extend(f"step {n}: {p}" for p in _prompt_problems(text, hosts))
         found, calls, selected = _expect_problems(step.get("expect"), caller, known_ids, surfaces)
@@ -901,6 +913,11 @@ def runsheet(entry: dict[str, Any], revision: str | None = None) -> str:
         out.append(f"Needs: {', '.join(_strings(entry['needs']))}")
     if entry.get("also"):
         out.append(f"Also exercises: {', '.join(_strings(entry['also']))}")
+    if entry.get("discovery") == "entry":
+        out.append(
+            "Entry discovery: type the prompts as written and nothing more; the assistants' own "
+            "prompts must lead each to search (record the query, or that none was made)"
+        )
     if revision:
         out.append(f"Every search result must carry catalog_revision {revision}")
     out += ["", "## Setup", *(f"{n}. {s}" for n, s in enumerate(_strings(entry["setup"]), 1))]
