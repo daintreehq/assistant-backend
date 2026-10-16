@@ -2559,7 +2559,7 @@ trials:
       - "Before the first prompt, record on {host_a}: the plugin directory listing, git status --porcelain in {project}, and git --git-dir {remote} for-each-ref."
     steps:
       - say: |-
-          Ask the assistant on {host_a} to run {project}'s tests at {sha} using the tally-check plugin skill installed on that machine, changing nothing outside the repository and pushing nothing, and to tell me which steps of the skill it did and which it skipped. Launch any agents with model haiku.
+          Ask the assistant on {host_a} to run {project}'s tests at {sha} using the tally-check plugin skill installed on that machine, making no change to the repository beyond running the tests and pushing nothing, and to tell me which steps of the skill it did and which it skipped. Launch any agents with model haiku.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
         expect:
           hub:
