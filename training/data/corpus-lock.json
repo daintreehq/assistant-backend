@@ -3,8 +3,8 @@
   "generated_by": "python -m training.compile_corpus",
   "rows": 21008,
   "compiled_sha256": "908452091b98fe44d6620113220bd6b5a3ab4d5362f0ffe71c411101e4e4479a",
-  "label_space_sha256": "24cc043b656131ef5313dfe2810f396492351c77b1a99ec97ded745114946430",
-  "label_space_size": 140,
+  "label_space_sha256": "27b05f6f2821f0b39a1211630698eb36378b5023be9dec1211fdd3a9712c6d09",
+  "label_space_size": 141,
   "by_source": {
     "boundary": 6631,
     "docs": 841,

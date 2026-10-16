@@ -1720,6 +1720,7 @@ trials:
       - "{host_b} has exactly one worktree and agent each for run/{run}/round and run/{run}/money."
     execution:
       - "Hub transcript before the yes: {host_a} named disconnected, its load sample called old and its agent count not measured; qty kept as started (moving it only by reassignment, on the person's word); round and money proposed for {host_b}."
+
   - id: resolve-task-collisions-overlap
     runbook: daintree.hosts.resolve-task-collisions
     also: [daintree.hosts.steer-for-hub, daintree.hosts.do-delegated-work]
@@ -1774,3 +1775,100 @@ trials:
       - "The hub sent a hold to each lane and ended its turn before comparing; the hold named the unit and asked for the remote, branch, HEAD, pushed or not, and the uncommitted files, and said to commit, push and revert nothing (hub transcript)."
       - "The hub checked each pushed SHA itself (git ls-remote) before naming an owner, and the decision messages named the owner as the only one to publish, and the other's branch and worktree as kept (hub transcript)."
       - "A side that did not acknowledge its stop was reported as possibly still writing, not as settled (hub transcript)."
+  - id: hand-off-swarm-hub-swap
+    runbook: daintree.hosts.hand-off-swarm
+    also: [daintree.hosts.supervise-swarm, daintree.hosts.delegate-to-host, daintree.hosts.do-delegated-work]
+    issue: 112
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts (hub-lane-trials.md, Staged path) with a lane enrolled in {project} on each, in the combo's lane CLI; the hub in the combo's hub CLI, with Accept messages from other machines on in its sidebar session."
+      - "{project} at {sha} on {remote}, cloned on the Shell and on both hosts. The person has a notes folder outside {project} that the assistant may write to."
+    steps:
+      - say: |-
+          Have {host_a} work on this in {project} at {sha}: add a --json option to the tally CLI that prints the total as JSON, with a test, on a new branch {branch}, and push it to {remote}. Have {host_b} add a test for an empty list on a new branch {branch}-b, but ask me which test name to use before it writes anything. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.listAssistants, host.sendMessage]
+            notices: [hub-update]
+      - person: "Wait until {host_b}'s task shows it needs input (host.getTask state input-required) and {host_a}'s agent is still working. Do not answer the question."
+      - say: |-
+          I'm changing the hub assistant to the other CLI right now while both hosts keep working. Hand the run over so nothing is lost or sent twice, and save the hand-over in my notes folder as swarm-handover-{run}.md.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.hand-off-swarm]
+            calls: [host.listTasks, host.getTask, assistant.getInbox]
+            never: [host.sendMessage, host.cancelTask, host.startAssistant]
+      - person: "Switch the sidebar assistant in {project} to the other CLI (its agent selector) and turn Accept messages from other machines on in the new session; let {host_a}'s unit finish before the next step."
+      - say: |-
+          Take over the run from swarm-handover-{run}.md in my notes folder and tell me where every task stands.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.hand-off-swarm]
+            calls: [host.listTasks, host.getTask, assistant.getInbox, host.listAssistants]
+            never: [host.cancelTask, host.startAssistant]
+      - say: 'For {host_b}''s question, use the test name emptyList.'
+        expect:
+          hub:
+            calls: [host.sendMessage]
+            never: [host.startAssistant]
+      - say: |-
+          Hand the run over again, saving the hand-over in my notes folder as swarm-handover-{run}-b.md; I'll switch the assistant back after that.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.hand-off-swarm]
+            calls: [host.listTasks, host.getTask, assistant.getInbox]
+            never: [host.sendMessage, host.cancelTask, host.startAssistant]
+      - person: "Switch the sidebar assistant back to the first CLI and turn Accept messages from other machines on again."
+      - say: |-
+          Take over the run from swarm-handover-{run}-b.md in my notes folder and tell me where every task stands.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.hand-off-swarm]
+            calls: [host.listTasks, host.getTask, host.listAssistants]
+            never: [host.sendMessage]
+    checks:
+      - "The Shell's exchange record holds one exchange per message ever sent: the two original sends and the one answer; nothing was resent by either successor."
+      - "{branch} on {remote} ends at one commit that adds the option and a test, and npm test passes in a fresh clone; {branch}-b holds the empty-list test with the name emptyList; neither host runs a second agent for either unit (each host's pane list)."
+      - "The hand-over file is where the person said, outside {project} and outside the assistant's scratch folder, and names both hosts, each task id, each lane's generation, the open question and what was never to be redone."
+      - "Each successor's account matches the app's own records: the finished unit reported finished, the answered question reported answered; no unit reported done that the branch does not show."
+    execution:
+      - "The outgoing hub sent nothing after the freeze and drained its inbox before telling the person to switch (hub transcript)."
+      - "The successor read host.listTasks from the cursor in the hand-over to the last page and host.listAssistants before its send, and said it would see no update line for the earlier sends (hub transcript)."
+
+  - id: hand-off-swarm-second-shell
+    runbook: daintree.hosts.hand-off-swarm
+    also: [daintree.hosts.foundation]
+    issue: 112
+    caller: hub
+    path: fleet
+    hosts: 1
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Two Shells reach {host_a}. On the first, a lane in {project} on {host_a} is enrolled and an exchange sent from its hub is still open. The prompts below go to the second Shell's hub, whose messaging is on."
+    steps:
+      - say: |-
+          The hub on my other Mac sent {host_a} some work that is still going. Take that run over from here without restarting it.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.hand-off-swarm]
+            calls: [host.listAssistants, host.listTasks]
+            never: [host.sendMessage, host.startAssistant, host.cancelTask]
+    checks:
+      - "The first Shell's lane keeps its generation and its open exchange; it received nothing from the second Shell (first Shell's record)."
+      - "The reply says this Shell sees none of those tasks and that the lane is not enrolled for it, and offers the person a plan (finish or stop the run from the first Shell, then enroll a lane for this Shell in a slot of its own and brief what is unfinished afresh); it does not claim a takeover."
+      - "Nothing was sent from the second Shell before the person enrolled a lane for it."
