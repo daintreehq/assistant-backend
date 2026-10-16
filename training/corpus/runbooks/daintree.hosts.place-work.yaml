@@ -199,6 +199,9 @@ boundaries:
   - query: "here are eight tickets; spread them over my remote hosts according to how busy each is and who has allowance left"
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
+  - query: "here are six issues, put each on the machine best placed to take it, each in its own worktree"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: yes, go ahead with that split
     history:

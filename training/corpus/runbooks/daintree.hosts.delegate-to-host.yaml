@@ -303,6 +303,12 @@ boundaries:
   - query: "send the second Mac the job of tidying the config loader, with its plugin lint skill applied; I need the branch name back"
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
+  - query: "have the other host's assistant bump the database driver in its worktree and open a PR"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
+  - query: "have the other Mac's assistant write its own setup and teardown scripts so each worktree there gets a private database and port"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:

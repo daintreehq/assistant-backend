@@ -170,6 +170,12 @@ boundaries:
   - query: "the migration for unit 3 is committed in its worktree on this host; run it against that worktree's database and report the version, but only if the database is the worktree's own"
     confusable_with: [daintree.hosts.do-delegated-work]
     run: runbook-2026-10-issue-133
+  - query: "roll back the last migration in the linux host's worktree and run it again; its database is separate from everyone else's"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
+  - query: "reseed the sample data in the build host's worktree database, it is already separate from the others"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: did it prove the database isn't the same one main uses?
     history:

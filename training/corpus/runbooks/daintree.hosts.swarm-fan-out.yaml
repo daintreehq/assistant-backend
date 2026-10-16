@@ -214,6 +214,9 @@ boundaries:
   - query: 'send the identical config change to all three hosts, each on its own branch, and show me a row per machine'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: "get every host to try its own approach to the flaky cache test, one branch each, and compare the results"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: actually, have every other host do the same one too, each on its own branch
     history:

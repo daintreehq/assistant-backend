@@ -196,3 +196,9 @@ boundaries:
   - query: "check with the Linux host's assistant which commit its demo is on and what it exercised, read only"
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
+  - query: "can you find out from the laptop host what url its dev servers connect to? just curious, nothing to modify"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
+  - query: "check with the build box which port its worktree dev servers bind and tell me what it says, don't change anything"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132

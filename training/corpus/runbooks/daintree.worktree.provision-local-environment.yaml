@@ -133,6 +133,58 @@ positives:
     run: 2026-09-28-catalog-expansion-late
   - query: add a worktree setup script that copies .env and runs pnpm install for every new worktree
     run: 2026-09-28-catalog-expansion-refine
+  - query: "Remote worktrees on two hosts run the same Rails app against one shared development PostgreSQL; give each worktree on each host its own database name and port derived from where it lives, and make teardown remove only what that worktree's setup created."
+    run: runbook-2026-10-issue-132
+  - query: "Audit whether worktrees on separate machines share any backing service (database, Redis, object storage bucket) and configure the setup scripts so each gets private ones, never altering a shared one."
+    run: runbook-2026-10-issue-132
+  - query: "Write per-worktree setup and teardown for a Django project whose worktrees live on different hosts: a scratch database per worktree, local port allocation, and a refusal to run when DATABASE_URL points at a server other machines also use."
+    run: runbook-2026-10-issue-132
+  - query: "Configure a setup command that records what a worktree created in a marker file, and a teardown that releases exactly that, for worktrees spread across several machines."
+    run: runbook-2026-10-issue-132
+  - query: "Decide which resources are per worktree and which are shared across hosts for a monorepo with a docker compose stack, then wire the lifecycle commands accordingly."
+    run: runbook-2026-10-issue-132
+  - query: "A worktree on a second host never ran its setup because the repository's lifecycle commands were not approved on that machine; work out what has to happen there and what will be provisioned once they are."
+    run: runbook-2026-10-issue-132
+  - query: "i made worktrees on the mini and on the linux box and they both seed the same mysql schema when they start. fix it so each one gets its own"
+    run: runbook-2026-10-issue-132
+  - query: "my laptop worktree and the one on the build machine both say redis://localhost:6379 and I have a feeling that's one redis through a tunnel, can you check before I trust the tests"
+    run: runbook-2026-10-issue-132
+  - query: "when i delete a worktree on one machine the teardown wipes the dev bucket the other machine is using"
+    run: runbook-2026-10-issue-132
+  - query: "all my worktrees on the other host open on port 8000, same as here, is the setup reusing one env file for everything?"
+    run: runbook-2026-10-issue-132
+  - query: "the .env isn't in git so the worktrees I make on the remote machine come up with no database url at all. get each of them a working one of its own"
+    run: runbook-2026-10-issue-132
+  - query: "can every machine get its own scratch database name so two copies of the same branch don't land in the same schema"
+    run: runbook-2026-10-issue-132
+  - query: "new worktrees on the remote host have no node_modules and no .env, set up the lifecycle so they come up ready"
+    run: runbook-2026-10-issue-132
+  - query: "before I let anyone run the setup script on the second machine, make sure it can't point at the shared staging db"
+    run: runbook-2026-10-issue-132
+  - query: "two copies of feature-login exist, one per host, and their sqlite is fine but they both write to the same S3 prefix. give each its own"
+    run: runbook-2026-10-issue-132
+  - query: "i'd like each remote worktree to get a port from a range and a database named after it, written somewhere so cleanup knows what's whose"
+    run: runbook-2026-10-issue-132
+  - query: "We run the same project on three machines and each has a worktree for the payments branch. The dev database lives on a server that all three can reach, and last night one machine's migration dropped a column the other two still needed. I want every worktree on every machine to get its own database, and teardown must never touch the other databases on that server."
+    run: runbook-2026-10-issue-132
+  - query: "Context: two hosts, one project, and the repository's setup creates a database named after the branch. Both hosts check out the same branch name, so the names collide on the shared server. Work out a naming and ownership scheme that cannot collide across machines and write the setup and teardown for it."
+    run: runbook-2026-10-issue-132
+  - query: "The worktrees on the remote host were created with the repository's setup commands, but nobody approved them there, so nothing ran and the databases never got created. Then the person deleted one and no teardown ran either. Sort out provisioning on that host and list what was left behind."
+    run: runbook-2026-10-issue-132
+  - query: "hey, quick one before lunch: could you make it so each of the worktrees on my second machine gets its own database and port?"
+    run: runbook-2026-10-issue-132
+  - query: "thanks for the survey. next, the worktrees on those hosts all share a dev database, let's give them separate ones"
+    run: runbook-2026-10-issue-132
+  - query: "the review apps on my two servers both talk to the same elasticsearch index, so one branch's fixtures show up in the other's search. separate them per worktree"
+    run: runbook-2026-10-issue-132
+  - query: "worktree names are unique on each machine so I figured the databases were too, but the same names exist on both and the setup uses the name alone"
+    run: runbook-2026-10-issue-132
+  - query: "Rework the teardown on the laptop host so it leaves the build host's containers and volumes alone."
+    run: runbook-2026-10-issue-132
+  - query: "Draw up which database, queue and port settings must stay private to a worktree and which may be shared across my hosts, and write the setup that follows it."
+    run: runbook-2026-10-issue-132
+  - query: "Make the setup refuse to continue if the database it resolves is reachable from any other worktree or machine, and say what it found instead of dropping anything."
+    run: runbook-2026-10-issue-132
 boundaries:
   - query: get an agent to write the provisioning scripts for me
     confusable_with: [daintree.edits.spawn-visible-agent]
@@ -277,6 +329,44 @@ boundaries:
   - query: each worktree should get its own database and port when it is created on the build server
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: "list which database each worktree on the build host points at, then give any that share one a database of its own"
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-132
+  - query: "the worktrees on both machines migrate fine but all of them hit one database; give each its own and make the teardown drop only its own"
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: runbook-2026-10-issue-132
+  - query: "worktrees on two hosts both bind 3000 from the same config, make the setup choose a port per worktree instead"
+    confusable_with: [daintree.runtime.free-busy-port]
+    run: runbook-2026-10-issue-132
+  - query: "the cloud devbox is fine; what I need is a private database and port for each worktree on the remote host"
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-132
+  - query: "per-host plan for worktree resources: which database and port belongs to which worktree on each machine, and what the setup should create"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.reprioritize-swarm]
+    run: runbook-2026-10-issue-132
+  - query: "set the project's lifecycle commands so a worktree created on any host gets its own env; the agents come later"
+    confusable_with: [daintree.hosts.swarm-fan-out, daintree.hosts.start-swarm]
+    run: runbook-2026-10-issue-132
+  - query: "give each worktree its own database on every host before we send work out"
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-132
+  - query: "setup for the worktree on the second machine is stuck at needs-approval; tell me what to do so it provisions and keeps its own database"
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-132
+  - query: "make sure the teardown on every host removes only the database its own setup created, never a shared one"
+    confusable_with: [daintree.hosts.recover-and-clean-up, daintree.orchestration.workspace-cleanup]
+    run: runbook-2026-10-issue-132
+followups:
+  - query: "yes, and make sure it can't fall back to the shared dev server"
+    history:
+      - "user: give the worktrees on the build host their own databases"
+      - "assistant: The project has no lifecycle config. I'd create a scratch database and a port per worktree, recorded in a marker file the teardown reads. Want that?"
+    run: runbook-2026-10-issue-132
+  - query: "fix that so each gets its own"
+    history:
+      - "user: which database is each worktree on the second machine using?"
+      - "assistant: Both worktrees there resolve to the same Postgres server and database name, one directly and one through a forward."
+    run: runbook-2026-10-issue-132
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:
@@ -332,3 +422,9 @@ topic_shifts:
       - 'assistant: claude-4 stopped: feat/invoices and main both resolve to localhost:5432/app_dev, so running it would change main''s schema too.'
     active: [daintree.runtime.migrate-worktree-database]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "meanwhile each worktree over there keeps hitting the shared redis, give them one each"
+    history:
+      - "user: send the same refactor to every host"
+      - "assistant: Started one agent per host, each on its own branch; three have pushed so far."
+    active: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-132
