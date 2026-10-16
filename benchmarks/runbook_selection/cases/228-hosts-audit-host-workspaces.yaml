@@ -284,3 +284,16 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.worktree.audit-worktrees, daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-survey-hosts
+    category: routing-trap
+    note: >-
+      Which hosts are up and what is open with them, not what a run left. Decided by
+      survey-hosts' "whether the Remote Hosts are connected, how busy each is, which projects have
+      an assistant enrolled and taking messages, which exchanges with them are still open".
+    messages:
+      - role: user
+        content: "Show me the state of the other hosts: who is connected, who is loaded, which exchanges are open"
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]

@@ -133,6 +133,10 @@ boundaries:
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: list the leftovers from that cross-machine run, nothing deleted
     confusable_with: [daintree.orchestration.status-and-resume, daintree.hosts.recover-and-clean-up]
+  - query: I know the hosts are connected. What I need to see is what the swarm left in their worktrees, panes and servers, read only
+    confusable_with: [daintree.hosts.survey-hosts]
+  - query: 'per host: which leftover worktrees hold unpushed work and which servers are still listening, not how loaded the hosts are'
+    confusable_with: [daintree.hosts.survey-hosts]
   - query: the swarm is finished; I want a report on its leftover workspaces across the hosts, not a status of the run
     confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
   - query: audit the remote hosts for what the swarm left behind in their workspaces

@@ -134,6 +134,12 @@ boundaries:
   - query: 'Which of the remote hosts hold this repository, and is anything waiting on me there? Look only, change nothing'
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
+  - query: which of my remote hosts are connected, how loaded is each, and which exchanges with them are still open?
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
+  - query: 'give me a read-only overview of the hosts: connection, enrolled assistants and anything waiting on me'
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: runbook-2026-10-issue-128
 
 followups:
   - query: "and what about the exchanges?"
