@@ -204,3 +204,19 @@ cases:
     expect:
       required: [daintree.release.publish-package]
       optional: [daintree.hosts.foundation]
+
+  - id: release-owner-reassign-reverse-unfinished-build
+    category: routing-trap
+    note: >-
+      A release build already sent to one host that cannot finish it moves to another
+      machine. Reassign clause: "a piece of work ALREADY SENT to one Remote Host has to MOVE
+      TO A DIFFERENT MACHINE because the first cannot finish it". The release runbooks cover
+      the one designated writer, not moving unfinished build work.
+    messages:
+      - role: user
+        content: >-
+          the build host went silent partway through compiling the sdk for release, hand
+          its unfinished build to a different machine
+    expect:
+      required: [daintree.hosts.reassign-host-work]
+      optional: [daintree.hosts.foundation]
