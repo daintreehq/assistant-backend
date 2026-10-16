@@ -63,6 +63,64 @@ positives:
     run: runbook-2026-10-issue-96
   - query: "Inspect a Daintree project plugin's panel visually without attaching to the running app; report what each state looks like."
     run: runbook-2026-10-issue-96
+  - query: 'The deploy-board plugin loads fine in my copy of the project here, but on the Linux build box its panel and tools simply aren''t there. Work out whether it is missing, incompatible or not trusted over there, and change nothing.'
+    run: runbook-2026-10-issue-137
+  - query: 'my plugin is fine on my mac but the remote machine has nothing for it, no panel, no tools'
+    run: runbook-2026-10-issue-137
+  - query: 'On the remote host the plugin shows as loaded, yet when I switch to that host in the Shell the panel is replaced by a notice that it is blocked on this computer. What is going on and what should I click?'
+    run: runbook-2026-10-issue-137
+  - query: 'Check whether the team plugin installed on this Mac also exists on the host I''m working against, and tell me what has to be put there and who has to do it.'
+    run: runbook-2026-10-issue-137
+  - query: 'The host''s plugin list and mine disagree about the version of acme.metrics. Which copy actually runs in the host''s windows?'
+    run: runbook-2026-10-issue-137
+  - query: 'Why does this Shell keep asking me to approve the code of a plugin the host already trusts?'
+    run: runbook-2026-10-issue-137
+  - query: 'Watching the shared project from my window, the plugin panel says it shows in the window driving this project. Check the plugin''s state on the host and tell me what the notice means.'
+    run: runbook-2026-10-issue-137
+  - query: 'Establish which gate is holding a project plugin back on a remote host: not installed there, a platform it cannot run on, an unset secret, host trust, or the Shell''s consent to its view bundle. Report only; change nothing.'
+    run: runbook-2026-10-issue-137
+  - query: 'Person on the Shell says the plugin panel never appears. From this host, report the plugin''s state here (loaded, staged, blocked or unknown) and what they must do on their side.'
+    run: runbook-2026-10-issue-137
+  - query: 'Our plugin needs an API token. It works on my laptop; on the remote host it reports that it cannot run. Is the secret missing over there, and can you just copy my settings across?'
+    run: runbook-2026-10-issue-137
+  - query: 'The host has the plugin enabled, but the Shell says the panel''s code changed since I allowed it. Is it safe to allow it again, and is the plugin broken?'
+    run: runbook-2026-10-issue-137
+  - query: 'I pushed the rebuilt dist/ and the panel works locally, but the remote machine''s checkout never shows the plugin. Where does it stop?'
+    run: runbook-2026-10-issue-137
+  - query: 'A call from my plugin''s panel on the remote host fails with PLUGIN_NOT_ON_HOST. What does that mean and what do I do about it?'
+    run: runbook-2026-10-issue-137
+  - query: 'The Linux host reports PLUGIN_INCOMPATIBLE with reason platform for a plugin that runs fine on my Mac. Work out what is wrong and how to get it running there.'
+    run: runbook-2026-10-issue-137
+  - query: 'hey, quick one: my plugin works on this machine but the Shell says it isn''t installed on the remote host. can you sort that out?'
+    run: runbook-2026-10-issue-137
+  - query: 'Next to the host''s name, Settings shows the plugin under only on this machine. What gets it onto the host without copying my settings or secrets?'
+    run: runbook-2026-10-issue-137
+  - query: 'Check the plugin view consent for this host and tell me whether the bundle the Shell allowed is the one the host serves now, without widening any trust.'
+    docs: true
+    run: runbook-2026-10-issue-137
+  - query: 'how do I get my project plugin installed on the remote host and its panel allowed on this computer?'
+    docs: true
+    run: runbook-2026-10-issue-137
+  - query: 'Verify plugin parity between this Mac and the build host, the host''s configuration for it and whether the Shell has consented to its remote view.'
+    run: runbook-2026-10-issue-137
+  - query: 'the remote host says the plugin is staged but my teammate on the Shell only sees a placeholder for the panel; which of the two is the real problem?'
+    run: runbook-2026-10-issue-137
+  - query: 'now check why that plugin''s panel shows nothing on the remote host''s side of the project'
+    history:
+      - 'user: connect the Linux box as a host'
+      - 'assistant: It''s connected and its projects are listed.'
+    run: runbook-2026-10-issue-137
+  - query: 'the plugin I just built is missing there though, not on this machine'
+    history:
+      - 'user: reload the project plugins'
+      - 'assistant: The deploy-board plugin is active and its panel renders in the preview.'
+    run: runbook-2026-10-issue-137
+  - query: 'Our status-board plugin is enabled on the host and nothing renders on my laptop''s Shell: a notice says the view is blocked on this computer. Find out whether it needs my allowing or whether the host side is at fault.'
+    run: runbook-2026-10-issue-137
+  - query: 'My plugin panel on the shared project only shows a notice that a colleague''s window is driving it. Is the plugin itself fine on the host, or is something wrong with it?'
+    run: runbook-2026-10-issue-137
+  - query: 'Tell me which plugins differ between this Mac and the remote host and whether any of them cannot run on the host''s operating system.'
+    run: runbook-2026-10-issue-137
 boundaries:
   - query: Daintree's plugin manager shows our project's plugin with a red error; what's wrong with it?
     confusable_with: [daintree.diagnostics]
@@ -134,6 +192,39 @@ boundaries:
   - query: "validate and reload the project plugin on this machine, the manager says it's staged"
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
+  - query: 'Connection to the Linux host is healthy and its projects list fine; the one thing wrong is that the Shell will not render my plugin until its code is approved here.'
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-137
+  - query: 'My remote host connects fine, but a plugin I use is missing there. Is it the host connection or the plugin install?'
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-137
+  - query: 'The panel for my plugin on the remote host is blank; the host itself is fine and other panels render. Find the plugin-side cause.'
+    confusable_with: [daintree.hosts.connect-host, daintree.diagnostics]
+    run: runbook-2026-10-issue-137
+  - query: 'Which plugins are installed here but not on the host, and which of them can''t run there?'
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-137
+  - query: 'The host''s copy of my project may be behind, so the plugin never loads there; see what its plugin state says and what must reach the host''s project root.'
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-137
+  - query: 'The same plugin works on one host and not on another that has the same commit; check each host''s plugin install and trust before anything else.'
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-137
+  - query: 'Daintree''s plugin manager on the remote host shows our project plugin as blocked; tell me why and what the person has to approve.'
+    confusable_with: [daintree.diagnostics]
+    run: runbook-2026-10-issue-137
+  - query: 'Is the plugin''s skill listed on the host? Only the plugin''s install and consent matter here, not what the skill says.'
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-137
+  - query: 'The Shell refuses my plugin''s panel while the host says it loaded; which approval is the Shell waiting for?'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-137
+  - query: 'Which consent is missing for the plugin view on this computer? The host has the plugin running.'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-137
+  - query: 'my plugin is running on the remote host but the shell wants a yes before it shows the panel, where do I give it'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: runbook-2026-10-issue-137
 followups:
   - query: why is it staged, what do I have to do?
     history:
@@ -171,6 +262,16 @@ followups:
       - "assistant: The plugin has no test:preview script; plugin.diagnostics shows acme.board active with no errors."
     active: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-96
+  - query: 'and is that panel allowed on the Shell too, or only trusted on the host?'
+    history:
+      - 'user: why is the plugin panel not coming up on the build server'
+      - 'assistant: It''s loaded on the host; the Shell has not allowed its view bundle yet.'
+    run: runbook-2026-10-issue-137
+  - query: 'ok it''s installed on the host now, why is the panel still a placeholder here'
+    history:
+      - 'user: install the plugin on the remote host'
+      - 'assistant: Done through the host''s plugin list; it reports the plugin as installed.'
+    run: runbook-2026-10-issue-137
 topic_shifts:
   - query: ok so it's not Daintree — it's my plugin in .daintree/plugins/acme.board that won't load
     history:

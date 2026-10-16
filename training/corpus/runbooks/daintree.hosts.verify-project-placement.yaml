@@ -100,6 +100,9 @@ boundaries:
     confusable_with: [daintree.explore.repository, daintree.hosts.survey-hosts]
   - query: the build host has three projects with an assistant in each, and I need to know which one is genuinely our repository at the commit I pushed
     confusable_with: [daintree.hosts.survey-hosts]
+  - query: 'Before I send the plugin rework to the server, check that the project there is our repository at the commit I pushed.'
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-137
 
 followups:
   - query: and check the other host's project the same way

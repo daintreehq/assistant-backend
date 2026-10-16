@@ -226,3 +226,9 @@ boundaries:
   - query: the host check says Daintree on the server is a different build and it won't connect. Fix that.
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
+  - query: 'Add the new Linux build box to Daintree as a Remote Host over SSH; once it connects I''ll deal with the plugins.'
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-137
+  - query: 'I want my team''s plugins available on a second machine, so first get that machine added to Daintree as a host and connected.'
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-137

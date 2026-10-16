@@ -144,6 +144,9 @@ boundaries:
     confusable_with:
     - daintree.runtime.measure-performance
     run: runbook-2026-10-issue-139
+  - query: 'The plugin''s unit tests pass on the Linux host and fail on the Mac host at the same commit; find out why and fix nothing yet.'
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-137
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

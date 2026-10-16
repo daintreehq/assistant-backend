@@ -222,6 +222,12 @@ boundaries:
   - query: after the update the hub's send to the host comes back lane_unavailable and its assistant shows no generation, why is that
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
+  - query: 'My message to the host''s assistant is refused until someone on that machine gives consent; which approval is missing there?'
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-137
+  - query: 'Which consent does the person on the build host still owe before its assistant accepts anything from this Shell?'
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-137
 followups:
   - query: check the other hosts the same way
     history:
