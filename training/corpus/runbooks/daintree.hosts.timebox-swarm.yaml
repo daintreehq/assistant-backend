@@ -129,8 +129,7 @@ boundaries:
   confusable_with: [daintree.hosts.delegate-to-host]
 - query: have the other mac try the API client for half an hour and stop it at the limit
   confusable_with: [daintree.hosts.delegate-to-host]
-- query: send it out now with the stop at the 30 minute mark built in, and tell me who stopped on
-    time
+- query: send the parser rework to the build box and the laptop host now, with the stop at the 30 minute mark built into each brief, and tell me which machine stopped on time
   confusable_with: [daintree.hosts.steer-swarm]
 - query: I don't want to have to stop the hosts myself later, give them a deadline up front
   confusable_with: [daintree.hosts.steer-swarm]
