@@ -197,7 +197,7 @@ cases:
       diagnose-host-differences's "tests green on one machine and red on another".
     messages:
       - role: user
-        content: Why does the same commit pass its tests on the Mac and fail on the Linux host?
+        content: The suite is green on my laptop and red on the CI server box, same checkout. Work out what is different between the two.
     expect:
       required: [daintree.hosts.diagnose-host-differences]
       optional: [daintree.hosts.foundation, daintree.foundation]
