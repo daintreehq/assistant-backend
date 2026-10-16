@@ -81,8 +81,8 @@ cases:
   - id: undo-swarm-changes-user-casual
     category: single-runbook
     note: >-
-      Casual and short: "the CODE one run or swarm changed on their Remote Hosts TAKEN BACK ...
-      while everyone else's work stays". daintree.hosts.steer-swarm scores below its floor.
+      Casual and short: "the CODE one run or swarm changed on their Remote Hosts TAKEN BACK" and
+      "while everyone else's work stays". daintree.hosts.steer-swarm scores below its floor.
     messages:
       - role: user
         content: ugh the remote swarm made a mess, revert whatever it committed on the hosts and leave my stuff alone
@@ -173,7 +173,7 @@ cases:
     category: routing-trap
     note: >-
       A stop with nothing reverted: daintree.hosts.steer-swarm, "work they ALREADY SENT to their
-      other machines ... STOPPED, CALLED OFF or CHANGED while it is under way" with "their work
+      other machines" and "STOPPED, CALLED OFF or CHANGED while it is under way" with "their work
       left in place".
     messages:
       - role: user
@@ -186,8 +186,8 @@ cases:
     category: routing-trap
     note: >-
       Resources removed, commits untouched: daintree.hosts.recover-and-clean-up, "what a run
-      left on the Remote Hosts, its panes ..., worktrees and branches, cleaned up through each
-      host's own assistant".
+      left on the Remote Hosts" and "worktrees and branches, cleaned up through each host's own
+      assistant".
     messages:
       - role: user
         content: Get my hosts to remove the panes and worktrees from yesterday's remote run, but don't touch any commits.

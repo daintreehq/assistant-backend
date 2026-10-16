@@ -15,7 +15,7 @@ Code only: a deployed service, credentials, data and the run's panes and worktre
 
 1. Resolve the named run, per unit: host, project, lane (`host.listAssistants`), repository, branch, base SHA, its reported commits, `dependsOn`, checks; from the plan and replies kept; none: ask the person (records hold no text). Titles, authors and times only find candidates.
 2. Unless every unit is closed, stop the run first (daintree.hosts.steer-swarm); release nothing more of it. Each lane's confirmed stop (branch, HEAD, dirty files) is its repository's checkpoint; none: it waits.
-3. Order: dependents before what they build on, across projects; a commit in two units goes once. A dependent kept, or a consumer outside the run (merged, deployed): ask; keep both, or stage it.
+3. Order: dependents before what they build on, across projects; each SHA once per checkout. A dependent kept, or a consumer outside the run (merged, deployed): ask; keep both, or stage it.
 4. Per lane, this stage's units: one `host.sendMessage`, `taskId` `<run>-undo-<unit>`: "Follow daintree.git.undo-agent-changes in <repository> (check `origin`) on <branch>, start <base>: undo newest first the run's commits <SHAs> and pane <ids>' uncommitted edits, as you attribute them; keep all other staged, unstaged and untracked work; no reset, clean, stash, push or history drop; anything unattributed or mixed: one input-required list, unchanged. Checks: <commands>. Reply each original and revert SHA, kept work, checks." End the turn.
 
 ```json tool=host.sendMessage surface=hub-full
