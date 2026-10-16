@@ -1263,7 +1263,7 @@ trials:
     setup:
       - "{project} on {remote}: {sha} adds a test that formats 2026-01-01T12:00:00Z as a local calendar date and expects 2026-01-01 (2026-01-02 under Pacific/Kiritimati); {sha_b} is its parent, without that test."
       - "Stage two hosts with enrolled lanes in {project}; start {host_a}'s instance with TZ=UTC and {host_b}'s with TZ=Pacific/Kiritimati (the deliberate runtime difference), and confirm each with `date` in a terminal of that host."
-      - "{host_b}'s {project} checkout at {sha}; {host_a}'s left at {sha_b} (the stale checkout). Before the first prompt, record date, node -v and npm ls -g --depth=0 on each host, and confirm npm test passes in {host_a}'s checkout and fails in {host_b}'s."
+      - "{host_b}'s {project} checkout at {sha}; {host_a}'s left at {sha_b} (the stale checkout). Before the first prompt, record date '+%Z %z', node -v and npm ls -g --depth=0 on each host, and confirm npm test passes in {host_a}'s checkout and fails in {host_b}'s."
     steps:
       - say: |-
           npm test in {project} passes on {host_a} and fails on {host_b}, both supposedly at {sha}. Find out why before anything is changed. Launch any agents with model haiku.
@@ -1288,7 +1288,7 @@ trials:
       - "One evidence exchange per host before the confirmation, then one confirmation exchange to {host_b} only (Shell's record)."
       - "{host_a}'s {project} checkout still at {sha_b} and {host_b}'s at {sha}, both with an empty git status --porcelain; nothing new on {remote}."
       - "Each host has one verify worktree at {sha} with an empty git status; run by the operator there, the test passes on {host_a}, fails on {host_b}, and passes on {host_b} with TZ=UTC."
-      - "date, node -v and npm ls -g --depth=0 on each host match the readings taken before the first prompt."
+      - "date '+%Z %z', node -v and npm ls -g --depth=0 on each host match the readings taken before the first prompt."
     execution:
       - "The hub named {host_a}'s checkout at {sha_b}, not {sha}, as a revision mismatch before attributing {host_b}'s failure to anything (hub transcript)."
       - "The hub ranked the timezone difference with the failing assertion as its evidence, kept it a hypothesis until the TZ=UTC run, and proposed a correction without applying it (hub transcript)."
