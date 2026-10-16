@@ -78,7 +78,7 @@ positives:
     - 'user: have only the build box deploy 4f2a9c1 to staging'
     - 'assistant: Sent the deploy to the build box; I will check what staging serves when it replies.'
     run: runbook-2026-10-issue-138
-  - query: it replied that it finished. is that really what staging is running?
+  - query: it replied that it finished. is that really what production is running?
     history:
     - 'user: only the release host deploys v3.0.4 to production, the others verify'
     - 'assistant: The release host has the deploy; the others are building and checking the same commit.'

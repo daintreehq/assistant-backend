@@ -142,6 +142,10 @@ boundaries:
     confusable_with:
     - daintree.hosts.postmortem-swarm
     run: runbook-2026-10-issue-138
+  - query: release the new sdk version 3.1.0 to npm under latest from the release host; it is a library, nothing gets deployed to any environment
+    confusable_with:
+    - daintree.release.deploy-and-verify
+    run: runbook-2026-10-issue-138
 followups:
   - query: ok, looks clean. publish it
     history:
