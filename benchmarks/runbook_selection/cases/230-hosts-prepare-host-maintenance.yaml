@@ -17,8 +17,8 @@ cases:
   - id: prepare-host-maintenance-issue-what-will-stop
     category: single-runbook
     note: >-
-      The issue's first request. Decided by "what the restart will stop on that host, its
-      projects, agents and swarm jobs, and what the hub cannot see". At base it selected
+      The issue's first request. Decided by "what that will stop there (its projects, agents
+      and delegated swarm jobs, and what the hub cannot see)". At base it selected
       daintree.worktree.manage-resource.
     messages:
       - role: user
@@ -30,9 +30,9 @@ cases:
   - id: prepare-host-maintenance-issue-update-without-losing
     category: single-runbook
     note: >-
-      The issue's second request. Decided by "the work there checkpointed" under "BEFORE a Remote
-      Host is updated, restarted or rebooted". At base it selected daintree.hosts.supervise-swarm
-      and daintree.workflow.prep-branch-for-review.
+      The issue's second request. Decided by "have the work on it checkpointed" under "Use BEFORE
+      the person updates, restarts or reboots Daintree on a Remote Host". At base it selected
+      daintree.hosts.supervise-swarm and daintree.workflow.prep-branch-for-review.
     messages:
       - role: user
         content: Prepare this host for an update without losing delegated work.
@@ -43,7 +43,7 @@ cases:
   - id: prepare-host-maintenance-issue-checkpoint-reconcile
     category: single-runbook
     note: >-
-      The issue's third request. Decided by "the host reconciled afterwards" and the deliverable
+      The issue's third request. Decided by "once the host is back, reconcile it" and the deliverable
       "a reconciliation of projects, lanes and exchanges before anything more is sent". At base it
       selected daintree.orchestration.execute-durable-workflow and daintree.hosts.park-swarm.
     messages:
@@ -68,7 +68,7 @@ cases:
   - id: prepare-host-maintenance-user-upgrade-saved
     category: single-runbook
     note: >-
-      A casual line. Decided by "what the restart will stop on that host" and "the work there
+      A casual line. Decided by "what that will stop there" and "have the work on it
       checkpointed". The build server is the host.
     messages:
       - role: user
@@ -80,8 +80,8 @@ cases:
   - id: prepare-host-maintenance-user-about-to-update
     category: single-runbook
     note: >-
-      The person is mid-sentence away from the restart. Decided by "BEFORE a Remote Host is
-      updated, restarted or rebooted (Daintree or the machine itself)".
+      The person is minutes from the update. Decided by "Use BEFORE the person updates, restarts
+      or reboots Daintree on a Remote Host, or the machine it runs on".
     messages:
       - role: user
         content: I'm about to update Daintree on the build machine. What's going to get interrupted over there, and can you get everything saved first?
@@ -92,8 +92,8 @@ cases:
   - id: prepare-host-maintenance-user-return-after-update
     category: continuation
     note: >-
-      The return turn: the host is back and the earlier turn prepared it. Decided by "again once
-      it is back" and "a reconciliation of projects, lanes and exchanges before anything more is
+      The return turn: the host is back and the earlier turn prepared it. Decided by "once the
+      host is back, reconcile it" and "a reconciliation of projects, lanes and exchanges before anything more is
       sent".
     messages:
       - role: user
@@ -244,7 +244,8 @@ cases:
   - id: prepare-host-maintenance-reverse-diagnostics
     category: routing-trap
     note: >-
-      Daintree misbehaving on this machine: diagnostics, with no host and no restart planned.
+      Daintree misbehaving on this machine: diagnostics' "Use when the question is about DAINTREE'S OWN HEALTH
+      — something is misbehaving", with no host and no restart planned.
     messages:
       - role: user
         content: my own Daintree keeps freezing when I open the settings, can you find out why
