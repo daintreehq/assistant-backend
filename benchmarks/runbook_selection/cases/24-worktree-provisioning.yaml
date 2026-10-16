@@ -78,7 +78,7 @@ cases:
         content: Give remote worktrees isolated ports and databases on each host.
     expect:
       required: [daintree.worktree.provision-local-environment]
-      optional: [daintree.foundation, daintree.hosts.swarm-fan-out]
+      optional: [daintree.foundation]
 
   - id: provision-hosts-shared-database-lifecycle
     category: single-runbook
@@ -240,3 +240,52 @@ cases:
     expect:
       required: [daintree.hosts.coordinate-dev-services]
       optional: [daintree.hosts.foundation]
+
+  - id: provision-hosts-trap-not-plain-worktree
+    category: routing-trap
+    note: >-
+      The ask is a database every new worktree gets when it is created, not a checkout.
+      provision-local-environment's "provision new worktrees automatically" decides it; its fence
+      "to create a worktree (use daintree.worktree.create-plain-worktree)" is for a checkout with
+      nothing set up, so create-plain-worktree must not ride along.
+    messages:
+      - role: user
+        content: >-
+          New worktrees on each host should get their own scratch database when they are
+          created. Configure that.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-trap-not-run-checks
+    category: routing-trap
+    note: >-
+      Checks that fail because worktrees on two machines share a test database: the fix is per-worktree
+      resources. provision-local-environment's "The tell is a per-worktree RESOURCE (database, port,
+      hostname, docroot, container)" decides it; running the checks is fenced ("to RUN a test suite,
+      check or command in a worktree that already works (use daintree.ci.run-local-checks"), so
+      run-local-checks must not ride along.
+    messages:
+      - role: user
+        content: >-
+          My checks fail on the second host because both machines' worktrees use one test database
+          and the checks wipe it. Make each worktree's checks run against a database of its own.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-trap-reverse-run-checks
+    category: routing-trap
+    note: >-
+      Reverse trap. The worktree already has a database and port of its own and the ask is to run the
+      checks: the deliverable is the result, per provision-local-environment's own fence "to RUN a test
+      suite, check or command in a worktree that already works (use daintree.ci.run-local-checks", so
+      provision must not ride along.
+    messages:
+      - role: user
+        content: >-
+          Run the unit checks in the worktree on the build host, it already has its own database
+          and port, and tell me what fails.
+    expect:
+      required: [daintree.ci.run-local-checks]
+      optional: [daintree.foundation]
