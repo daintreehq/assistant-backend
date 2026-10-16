@@ -18,9 +18,9 @@ positives:
   - compare the two remote hosts' environments to explain why the webhook tests fail on only one of them
   - 'cross-host discrepancy in the billing service: 12 tests fail on one host and none on the other at the same SHA; find the environmental cause'
   - investigate why the checkout service's tests fail on the arm remote host only, without modifying either machine
-  - determine whether a host's failure comes from a stale checkout or from its runtime, compared with a host where the commit passes
+  - the laptop host fails the auth tests the desktop host passes, and nobody remembers pulling on the laptop this week; figure out which it is
   - the payments service passes its suite on one remote host and fails on another; gather what each host can tell us and pin down which difference matters
-  - root-cause why a build succeeds on one remote machine and not another, read-only, attributing each host's evidence
+  - the docs site builds on the mini host and errors out on the linux host with a sass complaint, same commit; root-cause it read-only
   - explain why rev 4c1d0e7 passes lint on the studio host and fails it on the build host
   - triage a failure that only shows up on the second build machine, evidence from both, no fixes
   - my snapshot tests keep coming out different on the linux host than anywhere else, same branch. what's going on?
