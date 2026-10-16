@@ -1133,3 +1133,63 @@ trials:
       - "Hub transcript at the park: the stop went out with the park wording ('Parking for later'), and the reply to the person named the record's place and gave a resume prompt."
       - "Hub transcript after the restart: host.listTasks and host.getTask before any host.sendMessage; nothing waits for an update line from before the restart."
       - "{host_b}'s lane, back after the resume message, checked its agent's state before acting and asked back or reported rather than launching another."
+
+  - id: supervise-swarm
+    runbook: daintree.hosts.supervise-swarm
+    also: [daintree.hosts.swarm-fan-out, daintree.hosts.do-delegated-work, daintree.hosts.handle-hub-message]
+    issue: 109
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [shell-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}, cloned on the Shell and on both hosts."
+    steps:
+      - say: |-
+          Have both remote hosts add an option to the tally CLI that prints the total as JSON, each with a test on its own branch pushed to origin, and bring me back each commit once it's checked. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.swarm-fan-out]
+            calls: [host.listAssistants, host.sendMessage]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            notices: [lane-wake]
+      - say: |-
+          Keep the swarm going and answer what you can. Only bring me decisions.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.supervise-swarm]
+            calls: [host.getTask]
+            never: [host.cancelTask, host.startAssistant]
+            notices: [hub-update]
+      - person: "In {host_a}'s lane, have its assistant reply input-required to the hub: should the option be --json or --format json? (The person's request covers either.) In {host_b}, pause its agent for about twenty minutes as soon as it starts."
+      - person: "Once {host_a} has replied completed, have {host_b}'s lane message the hub: the push to {remote} was rejected; push elsewhere or stop?"
+      - say: Answer what came in.
+        expect:
+          hub:
+            calls: [assistant.getInbox]
+            never: [host.cancelTask]
+      - person: "After the hub brings the push question to you, quit the Shell instance, start it again, and turn Accept messages from other machines on in a new hub session."
+      - say: |-
+          Where were we? Carry on with the swarm; on the push question, stop and keep what it has.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.supervise-swarm]
+            calls: [host.listTasks, host.getTask, assistant.reply]
+            never: [host.startAssistant]
+    checks:
+      - "One brief per host and nothing resent after the restart (each host's task records in the Shell's record)."
+      - "The question closed by reference: one follow-up to {host_a} naming the asking task, and that task reads completed afterwards."
+      - "The push question reached the person before any assistant.reply on its inbox task; exactly one reply after their answer."
+      - "{host_b} got at most one narrow follow-up, sent only after {host_a} was in; the report states what was seen (state, minutes), with no guessed cause."
+      - "Each reported SHA equals git ls-remote {remote} for that host's branch; anything unverified is marked so."
+    execution:
+      - "No waitMs and no polling loop between updates (hub transcript); a Claude Code hub sets at most one native wakeup if its tools list one; a Codex hub tells the person what it waits on and ends its turn."
+
