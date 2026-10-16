@@ -210,7 +210,7 @@ cases:
       FAILING and the user wants it working"; this runbook must not ride along.
     messages:
       - role: user
-        content: the integration tests are failing on this branch here, find the cause and fix them
+        content: the build broke after I merged main into my branch, track down what's wrong and make it compile again
     expect:
       required: [daintree.ci.diagnose-and-fix]
 
@@ -221,7 +221,7 @@ cases:
       the Daintree assistant on ANOTHER MACHINE"; this runbook must not ride along.
     messages:
       - role: user
-        content: check with the mac mini's assistant if the release branch builds there
+        content: have the assistant on the mac mini tell me if its copy of the api still has the old auth module
     expect:
       required: [daintree.hosts.ask-host-assistant]
       optional: [daintree.hosts.foundation]
@@ -233,7 +233,7 @@ cases:
       this lane to TEST or VERIFY a commit"; this runbook must not ride along.
     messages:
       - role: user
-        content: 'hub message: put commit 7c2d9e1 through lint and the unit tests on this machine and report the counts, no fixes'
+        content: the hub wants 7c2d9e1 tested on this machine with the unit and lint commands it listed; report results, don't fix anything
     expect:
       required: [daintree.hosts.verify-for-hub]
       optional: [daintree.hosts.foundation]
@@ -257,6 +257,6 @@ cases:
       "the MACHINE is struggling under the agents' load"; this runbook must not ride along.
     messages:
       - role: user
-        content: my laptop is crawling since the agents started running test suites, what's eating the CPU
+        content: the agents' docker builds have filled the disk and this machine is barely responsive, relieve it
     expect:
       required: [daintree.runtime.relieve-resource-contention]
