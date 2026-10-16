@@ -13,7 +13,7 @@ two request headers sent on every POST (``docs/MCP.md``):
 Only that coarse state leaves the machine: no host names, counts or ids. A
 snapshot that is missing or malformed is UNREPORTED, and unreported filters
 nothing, so an older Daintree or any other caller searches the whole catalog as
-before. The server stores none of it; every request carries its own.
+before. Nothing is kept between requests; every request carries its own.
 
 Each ``daintree.hosts.*`` runbook declares the state it fits as
 ``hostEligibility`` (``models.RunbookMeta``), one of ``HOST_ELIGIBILITY``.

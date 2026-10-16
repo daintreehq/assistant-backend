@@ -109,7 +109,8 @@ leaves out the runbooks the reported state does not fit **before the shortlist**
 the rest of the catalog ranks as if they were not there.
 
 Only the coarse state leaves the machine: no host names, counts or ids. It is read
-from each request and stored nowhere. Missing `Daintree-Hosts`, an unknown value, or a
+from each request and never kept between requests (the request log records the coarse
+value as metadata). Missing `Daintree-Hosts`, an unknown value, or a
 `Daintree-Lane` other than `reachable` is an unreported caller, which is offered the
 whole catalog, never an error. `get_runbook` and `supporting_runbooks` ignore the
 state: it narrows what a search offers, not what can be read by id.

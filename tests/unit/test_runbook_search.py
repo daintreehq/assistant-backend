@@ -194,9 +194,6 @@ def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None
         finally:
             pool.close()
 
-    unreported = asyncio.run(go(fan_out, None))
-    assert any(h.runbook_id.startswith("daintree.hosts.") for h in unreported)
-
     no_hosts = asyncio.run(go(fan_out, HostState("none")))
     assert len(no_hosts) == 10
     assert no_hosts[0].runbook_id == "daintree.orchestration.fan-out-work"

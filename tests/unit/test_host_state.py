@@ -151,8 +151,16 @@ def test_every_packaged_hosts_runbook_is_classified(catalog: Catalog) -> None:
         "daintree.hosts.connect-host",
         "daintree.hosts.foundation",
     }
-    # What is wanted right after hosts drop stays offered while they are down.
-    for leaf in ("recover-and-clean-up", "park-swarm", "undo-swarm-changes", "diagnose-messaging"):
+    # What is wanted right after hosts drop stays offered while they are down, and the
+    # UI-only procedures need a host, not its messaging (messaging off is `configured`).
+    for leaf in (
+        "recover-and-clean-up",
+        "park-swarm",
+        "undo-swarm-changes",
+        "diagnose-messaging",
+        "copy-portable-settings",
+        "open-project-on-host",
+    ):
         assert hosts[f"daintree.hosts.{leaf}"] == "configured", leaf
 
 
@@ -288,3 +296,30 @@ def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> No
     clf.sync(catalog)
     sel = clf.select("rename my terminals", [], catalog=catalog, exclude=catalog.selectable_ids)
     assert sel.runbook_ids == [] and sel.ranked == ()
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_the_docs_pass_builds_its_own_ballot_under_the_same_exclusion(
+    catalog: Catalog,
+) -> None:
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
+
+    clf = SetwiseClassifier(_ARTIFACT)
+    clf.sync(catalog)
+    exclude = catalog.excluded_for(HostState("none"))
+    seen: list[frozenset[str]] = []
+    real = clf._encode_pass
+
+    def spy(table, text, active, spans=None, exclude=frozenset()):  # type: ignore[no-untyped-def]
+        seen.append(exclude)
+        return real(table, text, active, spans, exclude)
+
+    clf._encode_pass = spy  # type: ignore[method-assign]
+    clf.select(
+        "[recent: the last turn]\nwhat is a remote host?",
+        [],
+        catalog=catalog,
+        docs_query="what is a remote host?",
+        exclude=exclude,
+    )
+    assert seen == [exclude, exclude]

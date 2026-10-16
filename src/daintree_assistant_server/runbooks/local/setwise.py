@@ -85,7 +85,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -541,12 +541,10 @@ class SetwiseClassifier:
         successful selection is authoritative enough to evict one. Read that
         module for why, and for what it deliberately does not promise.
 
-        ``exclude`` takes runbooks off the table for this pass only, BEFORE the
-        shortlist, so the rows they would have held go to the next-nearest eligible
-        runbooks and the head scores a ballot built as if they were not in the
-        catalog. Filtering the ranking afterwards would let them crowd eligible
-        runbooks out of the shortlist and into nothing. The shared table is never
-        narrowed (that is ``sync``'s one slot, shared by concurrent requests).
+        ``exclude`` takes runbooks off this pass's ballot before the shortlist
+        (``assemble_candidates``), so the head scores it as if they were not in the
+        catalog. The shared table is never narrowed: that is ``sync``'s one slot,
+        shared by concurrent requests.
         """
         spans = {} if spans is None else spans
         # normalize=True is redundant — the retriever graph L2-normalises
@@ -559,19 +557,7 @@ class SetwiseClassifier:
 
         started = time.perf_counter()
         sims = table.retrieval @ q_ret
-        if exclude:
-            # Compacted rather than masked: the remaining rows keep their table
-            # order, so ties break as they would have, and an excluded active
-            # cannot be reserved back onto the ballot. Indices map back to the table.
-            keep = np.array(
-                [i for i, sid in enumerate(table.ids) if sid not in exclude], dtype=np.int64
-            )
-            chosen = assemble_candidates(
-                sims[keep], [table.ids[int(i)] for i in keep], active, self._k
-            )
-            chosen = replace(chosen, indices=keep[chosen.indices])
-        else:
-            chosen = assemble_candidates(sims, table.ids, active, self._k)
+        chosen = assemble_candidates(sims, table.ids, active, self._k, exclude=exclude)
         spans["search_ms"] = _since(started)
         n = len(chosen)
 

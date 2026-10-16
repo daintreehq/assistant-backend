@@ -104,8 +104,9 @@ def picks(clf: SetwiseClassifier, cases: Any, catalog: Any) -> list[list[str]]:
         query = query_document(case.messages, turn_context=case.turn_context)
         visible = [sid for sid in case.active if sid in selectable]
         out.append(
-            [s for s in clf.select(query, visible, catalog=catalog).runbook_ids
-             if s in selectable]
+            [s for s in clf.select(
+                query, visible, catalog=catalog, exclude=case.exclude
+            ).runbook_ids if s in selectable]
         )
     return out
 

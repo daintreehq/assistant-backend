@@ -10,7 +10,8 @@ request is served: an unknown id is adopted, and a missing one is no session.
 
 Daintree reports the caller's coarse host state in two headers on every POST
 (``runbooks/host_state.py``), and a search leaves out the host runbooks that state
-does not fit. It is read per request, never stored: no request depends on another.
+does not fit. It is read per request and never kept between them: no request depends
+on another.
 
 Open by design: anyone can add this server to their agent. A search is the local
 classifier over public runbooks, so there is no credential to hold and nothing a

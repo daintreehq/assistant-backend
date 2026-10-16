@@ -27,12 +27,15 @@ cases:
   - id: host-state-fanout-hosts-connected
     category: host-state
     note: >-
-      The same request for a caller with a connected host. The filter admits the hub
-      runbooks but cannot promote one: the query carries no host signal, and the trained
-      daintree.orchestration.fan-out-work still wins it (and still wins "across my
-      machines", which is a routing gap in its own text). Host fan-out is allowed here, not
-      demanded, until that routing is fixed; this case guards that a connected host does
-      not cost the local fan-out its answer.
+      ELIGIBILITY ONLY, not the issue's connected-host preference. The same request for a
+      caller with a connected host: filtering admits the hub runbooks but cannot promote
+      one, because the query carries no host signal, so the trained
+      daintree.orchestration.fan-out-work still wins it (measured 0.998, with
+      daintree.hosts.place-work at 0.001; it also wins "across my machines", a routing gap
+      in its own text). This guards that a connected host does not cost the local fan-out
+      its answer. Six different bugs spread over hosts would be daintree.hosts.place-work,
+      allowed here; daintree.hosts.swarm-fan-out repeats the same work on every host, so
+      it is not. When host routing lands, re-point `required` at place-work.
     host_state: {hosts: connected}
     messages:
       - role: user
@@ -42,7 +45,6 @@ cases:
       optional:
         - daintree.foundation
         - daintree.hosts.place-work
-        - daintree.hosts.swarm-fan-out
         - daintree.hosts.foundation
 
   - id: host-state-lane-wake-no-hosts
