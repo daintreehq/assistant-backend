@@ -253,3 +253,31 @@ cases:
           and head commit so we know it is the right repository.
     expect:
       required: [daintree.hosts.verify-project-placement]
+
+  - id: develop-project-plugin-host-after-settings-copy
+    category: routing-trap
+    note: >-
+      A settings copy that applied cleanly does not install plugins; why one is still missing
+      on the host is the plugin runbook's "which gate holds on a Remote Host: plugin absent,
+      incompatible or untrusted there". The fence reads "for copying this machine's settings to
+      a host (use daintree.hosts.copy-portable-settings)"; copy-portable-settings must not ride
+      along.
+    messages:
+      - role: user
+        content: Settings I copied to the host last week are applied; now why is the one plugin I use still missing there?
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-reverse-settings-copy
+    category: routing-trap
+    note: >-
+      Reverse trap: putting this machine's preferences on a connected host is
+      daintree.hosts.copy-portable-settings ("put this machine's Daintree settings (agent flags
+      and presets, notification preferences, recipes, theme) on a Remote Host that is already
+      connected"); the plugin runbook must not ride along.
+    messages:
+      - role: user
+        content: Put my notification preferences and the default agent flags on the connected host, only those two categories.
+    expect:
+      required: [daintree.hosts.copy-portable-settings]
