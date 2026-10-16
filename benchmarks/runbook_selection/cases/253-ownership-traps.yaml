@@ -5,7 +5,8 @@
 # clash, and the hub's side of an exchange against the lane's side.
 #
 # Written blind for the measurement: every string was drafted before any was ranked, and each
-# is kept whether or not the shipped selector passes it. The owner comes from the routing text
+# is kept whether or not the shipped selector passes it (one optional added after ranking, on
+# review, to own-linux-box-port-busy-preview; it passed strict either way). The owner comes from the routing text
 # (each note quotes the deciding clause), never from what the selector picked. Paraphrases, not
 # training strings: screened against every case suite and the corpus (queries and history).
 # Two probes from the same set are not here because their owner is genuinely split in the
@@ -19,8 +20,8 @@ cases:
   - id: own-usage-each-other-mac
     category: routing-trap
     note: >-
-      daintree.hosts.check-usage-limits: "agent usage checked on OTHER MACHINES". The local twin
-      fences it: "Do not use for the usage of agents on this machine
+      daintree.hosts.check-usage-limits: "agent usage checked on OTHER MACHINES". It fences the
+      local twin: "Do not use for the usage of agents on this machine
       (daintree.agents.check-usage-limits)".
     messages:
       - role: user
@@ -273,14 +274,16 @@ cases:
   - id: own-linux-box-port-busy-preview
     category: routing-trap
     note: >-
-      daintree.runtime.free-busy-port: the port clash itself, not the preview's own failure
-      (daintree.runtime.debug-web-app).
+      daintree.runtime.free-busy-port: a port clash "on this machine or a Remote Host", something
+      else holding 8080. Its fence "for a Dev Preview panel's own server" sends a preview's own
+      failure to daintree.runtime.debug-web-app, and "the preview" here may be one, so that
+      runbook may ride along.
     messages:
       - role: user
         content: port 8080 is busy on the linux box so the preview won't bind there
     expect:
       required: [daintree.runtime.free-busy-port]
-      optional: [daintree.foundation, daintree.hosts.foundation]
+      optional: [daintree.runtime.debug-web-app, daintree.foundation, daintree.hosts.foundation]
 
   # --- the lane's side of an exchange ---
 
@@ -475,8 +478,9 @@ cases:
   - id: own-local-stop-codex-pane
     category: routing-trap
     note: >-
-      daintree.agents.steer-running-agent, an agent in a pane on this machine; neither
-      daintree.hosts.steer-swarm nor daintree.hosts.steer-for-hub.
+      daintree.agents.steer-running-agent: "an agent that is ALREADY WORKING on a task ... must
+      change course or stop", in a pane on this machine; neither daintree.hosts.steer-swarm (a run
+      sent to Remote Hosts) nor daintree.hosts.steer-for-hub (a lane's agents).
     messages:
       - role: user
         content: stop the codex agent in pane three, it's going the wrong way
@@ -500,8 +504,8 @@ cases:
   - id: own-local-revert-agent-commits
     category: routing-trap
     note: >-
-      daintree.git.undo-agent-changes, one agent's commits on this machine's branch, not a run's
-      commits across hosts (daintree.hosts.undo-swarm-changes).
+      daintree.git.undo-agent-changes: "roll back the last agent's commits on this branch", one
+      agent on this machine, not a run's commits across hosts (daintree.hosts.undo-swarm-changes).
     messages:
       - role: user
         content: revert the commits that agent pushed to my branch this afternoon

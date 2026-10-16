@@ -1739,8 +1739,8 @@ Against the floors at after + audit: recall-pass 0.949 (floor 0.90), strict 0.81
 (≤ 0.09), extra 0.175 (≤ 0.20), weakest category 4/6 and 6/9 (0.55). Extra is the nearest.
 
 Split by where the case came from:
-- **The 850 shared cases:** recall-pass 821 → 821 and strict 755 → 753. The wave fixed none and
-  broke none.
+- **The 850 shared cases:** recall-pass 821 → 821 and strict 755 → 753. No shared case gained or
+  lost recall-pass; strict fell on 7 and rose on 5.
 - **The wave's own 1,026 cases:** recall-pass 969 and strict 784, which is 0.764. Taken alone that
   is under the 0.78 strict floor; the suite clears it only because the older cases carry it.
 
@@ -1761,8 +1761,9 @@ Split by where the case came from:
 **`foundation-only` did not regress.** Its 5/7 → 6/9 is the same two shared misses on both sides
 (`novel-read-terminal-output`, `cap_full`; `capability-home-config-commands`, `rank_miss`) plus two
 new `daintree.hosts.foundation`-alone cases. `hosts-foundation-switch-on-messaging` passes;
-`hosts-foundation-how-to-talk` gets nothing at all. The TODO trigger "sooner if `foundation-only`
-regresses" has not fired.
+`hosts-foundation-how-to-talk` gets nothing at all. On strict, the shared cases fall 5/7 → 4/7,
+because `hosts.clean-up-for-hub` rides along on `novel-resolve-one-queue-item`: an extra, with the
+foundation still picked. The TODO trigger is about the foundation being buried, so it has not fired.
 
 ## Every moved case
 
@@ -1771,8 +1772,8 @@ fell on 7 and rose on 5. The three that list a lost runbook on the after side
 (`explore-readonly-agent`, `keyword-bait-rename`, `tx-continue-agents-cut-off-by-sleep`) failed
 identically before. The compare now prints both sides' losses, which is what shows that.
 
-**A new hosts runbook rides in as an extra (12).** Untrained, it scores near 1.0 on shapes that
-share its vocabulary:
+**A new hosts runbook rides in as an extra (12).** Untrained, it is admitted on shapes that share
+its vocabulary:
 - `hosts.supervise-swarm` (7 cases). It is the strongest attractor of the wave: "keep work already
   out … moving across turns" shares `orchestration.watch-outcome`'s wake-me vocabulary.
   - `open-dialogue-not-multi-agent`, `wake-me-on-merge-is-not-a-status-read` and
@@ -1804,20 +1805,21 @@ was re-embedded:
   - `x-port-user-whats-on`: `runtime.free-busy-port` gained its Remote Host clause; the case picks
     up `workflow.follow-up-on-issue`.
 
-**Admission-floor flicker (7).** No runbook text involved changed. In each case the runner-up sits
-within 0.05 of the 0.55 `BONUS_FLOOR`. The set-wise head scores every candidate against the whole
-shortlist, and the shortlist now holds hosts runbooks, so a score that close moves across the
-floor. Measured with `bench search` at after:
+**The runner-up crosses the admission floor (7).** No runbook text involved changed. The set-wise
+head scores every candidate against the whole shortlist, and the shortlist now holds hosts
+runbooks, so the runner-up's probability moves and crosses the 0.55 `BONUS_FLOOR`. Most moves
+are small; one is not. Scored with the same artifact against the baseline catalog (its files
+exported from `133bab34`) and today's:
 
-| case | runner-up | score | effect |
+| case | runner-up | before → after | effect |
 |---|---|---|---|
-| `x-gap-spike-keep-winner-casual` | `resolve-task-collisions` | 0.52 | dropped, strict gained |
-| `x-trap-rebase-merge-pr-is-land` | `git.sync-with-base` | 0.50 | dropped, strict gained |
-| `x-prune-user-delete-merged` | `workspace-cleanup` | 0.50 | dropped, strict gained |
-| `y-deploy-verify-trap-rollback` | `investigate-outage` | 0.54 | dropped, strict gained |
-| `x-decompose-prd-into-issues-agent` | `fan-out-work` | (not re-ranked) | dropped |
-| `tx-ask-codex-second-order-risks` | `agents.ask-running-agent` | 0.55 | admitted |
-| `explore-readonly-agent` | `agents.ask-and-relay` | 0.59 | admitted; still misses `spawn-visible-agent` on both sides |
+| `x-gap-spike-keep-winner-casual` | `resolve-task-collisions` | 0.582 → 0.522 | dropped, strict gained |
+| `x-trap-rebase-merge-pr-is-land` | `git.sync-with-base` | 0.553 → 0.503 | dropped, strict gained |
+| `x-prune-user-delete-merged` | `workspace-cleanup` | 0.624 → 0.498 | dropped, strict gained |
+| `y-deploy-verify-trap-rollback` | `investigate-outage` | 0.594 → 0.544 | dropped, strict gained |
+| `x-decompose-prd-into-issues-agent` | `fan-out-work` | 0.561 → 0.317 | dropped |
+| `tx-ask-codex-second-order-risks` | `agents.ask-running-agent` | 0.546 → 0.554 | admitted |
+| `explore-readonly-agent` | `agents.ask-and-relay` | 0.516 → 0.589 | admitted; still misses `spawn-visible-agent` on both sides |
 
 ## Ownership audit (`cases/253-ownership-traps.yaml`)
 
@@ -1846,8 +1848,14 @@ one that is:
 | this machine's own owners | 4 | 4 | 4 | — |
 | **total** | **39** | **28** | **21** | 10 `rank_miss`, 1 `cap_full`, 0 `candidate_miss` |
 
-Every miss had the right runbook on the shortlist, and every one of those runbooks is untrained.
-No local owner lost to a hosts runbook here. Against the cited audit's two claims:
+Every miss had the right runbook on the shortlist:
+- **Ten are hosts runbooks.** All are untrained and all were lost on rank.
+- **The eleventh is the established `daintree.runtime.free-busy-port`**
+  (`own-remote-vite-port-taken`), crowded out at `cap_full` by `hosts.reassign-host-work` and
+  `hosts.recover-and-clean-up`. Its Remote Host clause was written during the wave, so the head
+  has never trained on it.
+
+Apart from that one, no local owner lost to a hosts runbook. Against the cited audit's claims:
 - "Receiver requests routed to unrelated procedures" reproduces: `connect-host` for a lane demo,
   and `shard-test-suite` for a lane verify.
 - "Host requests routed to local owners" reproduces: `workspace-cleanup` and
@@ -1902,22 +1910,31 @@ real catalog is now measured at the real catalog's size, and the run says so.
 The ceilings are unchanged and every runbook is under them. They bind with almost no room:
 - **Foundations.** `daintree.foundation` is 5,384 B against its 5,400 B ceiling.
   `daintree.hosts.foundation` is 2,417 B.
-- **Bundles** (a runbook plus everything `supporting_for` sends with it, against 10,240 B):
-  - median 10,205 B;
-  - largest 10,237 B (`runtime.measure-performance`, 3 B of headroom);
-  - 98 of 153 at 10,000 B or more, and 117 at 9,500 B or more.
+- **Bundles** (each selectable runbook plus everything `supporting_for` sends with it, against
+  10,240 B), before → after:
+
+  | | before (106) | after (153) |
+  |---|---|---|
+  | median | 9,971.5 B | 10,205 B |
+  | largest | 10,234 B | 10,237 B (`runtime.measure-performance`, 3 B of headroom) |
+  | at 10,000 B or more | 51 | 98 |
+  | at 9,500 B or more | 69 | 117 |
+
+  All 46 hosts leaves sit at 10,000 B or more; they are 46 of the 47 bundles added at that size.
 - **Every hosts leaf ships three bodies:** itself and both foundations, 7,801 B before its own
-  text. A hosts procedure therefore has 2,439 B of room against 5,120 B elsewhere. The 46 hosts
-  leaves have 7–211 B of headroom (median 15).
+  text. A hosts procedure therefore has 2,439 B of room, against 4,856 B for a runbook that
+  carries only `daintree.foundation`. The 46 hosts leaves have 7–211 B of headroom (median 15).
 
 So a rule added to `daintree.hosts.foundation` costs every hosts leaf byte for byte, and
-`daintree.foundation` can take 16 B. Shared hosts judgment has to be paid for by trimming leaves
+`daintree.foundation` can take 16 B before its own ceiling and 3 B before the tightest bundle's. Shared hosts judgment has to be paid for by trimming leaves
 first.
 
 ## Findings
 
 1. **A retrain is owed, and the evidence is now measured.**
-   - Every audit miss had an untrained hosts runbook on the shortlist, and lost on rank.
+   - Ten of the 11 audit misses are untrained hosts runbooks lost on rank with the answer on the
+     shortlist. The eleventh is `free-busy-port`, whose new Remote Host clause was crowded out
+     at `cap_full`.
    - Of the 59 suite failures that lose a hosts-owned runbook, every runbook is on the
      shortlist and untrained.
    - The corpus already carries the rows: every hosts runbook has 61–132 compiled rows
@@ -1928,8 +1945,9 @@ first.
    - Decide `k` at that retrain only if the catalog is headed past ~200. `k=48` is the measured
      minimum there.
 2. **The extra rate is the floor nearest to binding.** It rose from 89 trials (0.105) to 336
-   (0.175) for 47 runbooks, against a 0.20 ceiling. Another untrained wave of this size would
-   reach it.
+   (0.175) for 47 runbooks, against a 0.20 ceiling. That is a risk, not a measurement: whether
+   another untrained wave crosses it depends on that wave's cases. The headroom is 47 trials at
+   today's suite size.
 3. **`hosts.supervise-swarm` is the wave's attractor:** an extra on 7 of the 25 moved shared cases,
    all watch-outcome or conversation shapes. Write reverse rows where
    `orchestration.watch-outcome` wins against it. Do not fence its untrained `whenToUse` without a
@@ -1954,31 +1972,36 @@ first.
      `hosts.start-swarm`.
 8. **The usage twins ride together.** `agents.check-usage-limits` comes along on 2 of 3 remote
    usage asks, and `hosts.check-usage-limits` comes along on the local one. Both texts already
-   fence each other, so this is training, not text.
-9. **No hosts procedure can grow.** See Bundle cost.
+   fence each other by id, so a text edit has no fence left to add. The retrain is the next thing
+   to try, untested here.
+9. **Hosts procedures can barely grow:** 7–211 B each (median 15). See Bundle cost.
 
 ## Proof layers reached
 
 - **Layer 1 (selection):** `bench coverage`, `bench local`, `bench compare`, `bench scale` and
   `bench search`.
 - **Layer 2 (contract):** the budget and hygiene tests in `tests/unit`, unchanged and passing.
-- **Layers 3–5:** none. No trial ran, and the hub and lane surfaces are not stageable
-  (`.claude/skills/runbook/references/trials.md`). Nothing here says a request is handled well;
-  only which runbook search returns for it.
+- **Layers 3–5:** none. No trial ran. The staged hub-and-lane protocol
+  (`.claude/skills/runbook/references/hub-lane-trials.md`) has not had its messaging leg exercised
+  yet. Nothing here says a request is handled well; only which runbook search returns for it.
 
 ## Commands
 
 ```bash
-# before, in a detached worktree (the artifact is LFS: git lfs pull there first)
-git worktree add --detach ../wave-base 133bab34
-(cd ../wave-base && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
-  -m benchmarks.runbook_selection.bench local --out "$OLDPWD/before.json")
-(cd ../wave-base && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
+R=$PWD/benchmarks/runbook_selection/results                 # gitignored
+# before, and the after column without the audit, each in a detached worktree
+# (the artifact is LFS: run git lfs pull in each first)
+for rev in 133bab34 af7b68d3; do
+  git worktree add --detach "../snap-$rev" "$rev"
+  (cd "../snap-$rev" && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
+    -m benchmarks.runbook_selection.bench local --out "$R/local-$rev.json")
+done
+(cd ../snap-133bab34 && PYTHONPATH=src:. "$OLDPWD/.venv/bin/python" \
   -m benchmarks.runbook_selection.bench scale --sizes 107,200,500,1000)
-# after
+# after + audit, on this branch
 python -m benchmarks.runbook_selection.bench coverage
-python -m benchmarks.runbook_selection.bench local --out after.json
-python -m benchmarks.runbook_selection.bench compare before.json after.json
+python -m benchmarks.runbook_selection.bench local --out "$R/local-audit.json"
+python -m benchmarks.runbook_selection.bench compare "$R/local-133bab34.json" "$R/local-audit.json"
 python -m benchmarks.runbook_selection.bench scale          # 0,100 → 154; then 200, 500, 1000
 python -m benchmarks.runbook_selection.bench lint --top 12
 python -m benchmarks.runbook_selection.bench search --max-results 6 "<a moved case's text>"
@@ -1987,7 +2010,9 @@ git rev-parse 133bab34:src/daintree_assistant_server/runbooks/local/artifacts HE
 ```
 
 The bundle numbers use the budget test's own sum: each selectable runbook's body bytes plus
-`catalog.supporting_for([id])`.
+`catalog.supporting_for([id])`, over `load_catalog(<dir>)` for each commit's runbook files.
+For the before→after runner-up scores, `bench search` was pointed at the `133bab34` runbook files
+by swapping the `load_catalog` that `benchmarks/runbook_selection/search.py` calls.
 
 ## Still open
 - **The retrain** in finding 1, with rows for findings 3–6 first.

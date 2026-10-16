@@ -386,23 +386,26 @@ def smoke(*, artifact: Path | None = None) -> dict[str, Any]:
         log=lambda *_: None,
     )
     row = doc["rows"][0]
+    # The size actually measured: SMOKE_SIZE until the real catalog outgrows it,
+    # then the real catalog's own (``effective_sizes``).
+    size = row["size"]
     misses = row["all_required_n"] - row["all_required_hits"]
     failures = []
     if misses > SMOKE_MISS_BUDGET:
         failures.append(
-            f"{misses} required runbooks did not reach the head at {SMOKE_SIZE} "
+            f"{misses} required runbooks did not reach the head at {size} "
             f"runbooks (budget {SMOKE_MISS_BUDGET} of {row['all_required_n']} "
             f"cases) — a candidate miss is the one failure no downstream floor "
             f"can repair"
         )
     if row["active_coverage"] < SMOKE_ACTIVE_FLOOR:
         failures.append(
-            f"active_coverage={row['active_coverage']} at {SMOKE_SIZE} runbooks, "
+            f"active_coverage={row['active_coverage']} at {size} runbooks, "
             f"expected {SMOKE_ACTIVE_FLOOR} — candidate reservation is meant to "
             f"make this exact by construction, so this is an assembler bug"
         )
     doc["summary"] = {
-        "size": SMOKE_SIZE,
+        "size": size,
         "k": row["k"],
         "all_required": row["all_required"],
         "candidate_misses": misses,
