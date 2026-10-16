@@ -3133,3 +3133,101 @@ trials:
       - "The lane checked the registry and account it publishes as before uploading (lane transcript)."
       - "The publish ran once in a visible pane; after the lost response the lane read the registry for the exact version and hash and did not re-send (lane transcript)."
       - "The hub answered the third prompt by reading the registry and the exchange, not by sending a second publish (hub transcript)."
+  - id: manage-resource-pane
+    runbook: daintree.worktree.manage-resource
+    issue: 134
+    caller: pane
+    path: staged
+    hosts: 0
+    status: owed
+    combos:
+      - {pane: claude}
+      - {pane: codex}
+    setup:
+      - "A scratch project whose .daintree/config.json has a resource block: status prints {\"status\":\"paused\"} or {\"status\":\"ready\"} from a file .devbox-state in the worktree, pause and resume write that file, provision writes ready; none touches a network. Approve the project's commands on the worktree card. A second worktree {branch} with the same config but a pause command that increments a counter file .pause-count, writes paused to .devbox-state and then exits non-zero. An agent pane in the project, its Daintree MCP tool set Core, so every resource call asks first."
+    steps:
+      - say: |-
+          What state is the cloud devbox for the {branch} worktree in? Just report it, don't change anything.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          pane:
+            selected: [daintree.worktree.manage-resource]
+            calls: [worktree.list, worktree.resource.status]
+            never: [worktree.resource.provision, worktree.resource.pause, worktree.resource.resume, worktree.resource.teardown]
+      - say: |-
+          Pause the devbox for the {branch} worktree to save cost.
+        expect:
+          pane:
+            calls: [worktree.resource.status, worktree.resource.pause]
+      - person: "Decline the pane's approval prompt for the pause call."
+      - say: |-
+          Ok, then resume it instead. Tell me when it's back.
+        expect:
+          pane:
+            calls: [worktree.resource.status]
+      - person: "Approve the resume call. The fixture's pause command (not run) would have exited non-zero; leave it alone."
+    checks:
+      - "cat .devbox-state in the {branch} worktree after the declined pause: unchanged from before the pause request."
+      - "The pane did not retry the pause after the decline or build a command from the connect or status metadata; its resume call carried the exact worktreeId of {branch} and is followed by a fresh status read."
+      - "The final reply names the status read after the resume and matches .devbox-state."
+    execution:
+      - "Pane transcript: worktree.resource.status ran before every lifecycle call and again after it; no lifecycle call carried a different worktree id than worktree.list returned for {branch}."
+
+  - id: manage-resource-pane-ambiguous
+    runbook: daintree.worktree.manage-resource
+    issue: 134
+    caller: pane
+    path: staged
+    hosts: 0
+    status: owed
+    combos:
+      - {pane: claude}
+      - {pane: codex}
+    setup:
+      - "The scratch project of manage-resource-pane, tool set Full this time (no per-call prompt). {branch}'s pause command increments a counter file .pause-count (start it at 0), writes paused to .devbox-state and then exits non-zero, so the call errors although the state changed."
+    steps:
+      - say: |-
+          Pause the devbox for the {branch} worktree, it's idle. Check it really is paused afterwards.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          pane:
+            selected: [daintree.worktree.manage-resource]
+            calls: [worktree.list, worktree.resource.status, worktree.resource.pause]
+    checks:
+      - ".devbox-state in {branch} reads paused, and the pause command ran once (.pause-count holds 1)."
+      - "The reply says the pause call errored and reports the status read afterwards, not a bare success or a retry."
+    execution:
+      - "Pane transcript: after the errored pause the pane read worktree.resource.status before any further lifecycle call and made no second identical pause call."
+
+  - id: manage-resource-lane-brief
+    runbook: daintree.worktree.manage-resource
+    also: [daintree.hosts.do-delegated-work, daintree.hosts.handle-hub-message]
+    issue: 134
+    caller: lane
+    path: staged
+    hosts: 1
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage one host (hub-lane-trials.md, Staged path); consents off. Enroll a lane in {project} on {host_a}; the hub with the hub CLI. {project} on {host_a} has the resource block and approved commands of manage-resource-pane, with its worktree {branch} paused (.devbox-state reads paused); the lane's tool set is Full."
+    steps:
+      - say: |-
+          Have {host_a} run the project's checks against the cloud devbox of the {branch} worktree and bring back the result. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.delegate-to-host]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.worktree.manage-resource]
+            calls: [assistant.getInbox, worktree.list, worktree.resource.status, assistant.reply]
+            never: [worktree.resource.provision, worktree.resource.resume, worktree.resource.teardown]
+            notices: [lane-wake]
+    checks:
+      - ".devbox-state in {branch} on {host_a} still reads paused: the lane did not resume or provision it."
+      - "The hub's final reply says the lane asked before bringing the devbox up (the exchange ended input-required), not that the checks passed."
+      - "The Shell's exchange record: one exchange, input-required; nothing sent twice."
