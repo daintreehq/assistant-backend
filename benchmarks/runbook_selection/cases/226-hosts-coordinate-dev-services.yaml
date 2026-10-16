@@ -172,15 +172,15 @@ cases:
   - id: coordinate-dev-services-not-provision-local-environment
     category: routing-trap
     note: >-
-      Two services on different hosts each need the other's address; nothing is a per-worktree
+      A service on one host needs the address of the service it calls on another; nothing is a per-worktree
       resource on this machine. Decided by "services on this machine
       (daintree.worktree.provision-local-environment)" being fenced.
     messages:
       - role: user
         content: >-
-          The user service on one host and the billing service on another each need to be told
-          what the other one's address is. Work it out and verify it with a request, nothing
-          exposed to the internet.
+          The billing service on one host calls the user service on another, so billing needs
+          that service's address. Work it out and verify it with a request, nothing exposed to
+          the internet.
     expect:
       required: [daintree.hosts.coordinate-dev-services]
       optional: [daintree.hosts.foundation]

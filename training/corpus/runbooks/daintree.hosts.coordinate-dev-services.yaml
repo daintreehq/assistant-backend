@@ -85,9 +85,9 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: get the second host's assistant to run the backend and the first host's to run the frontend against it, and verify the connection yourself
     confusable_with: [daintree.hosts.delegate-to-host]
-  - query: the frontend host and the API host each need the other's address for the dev stack. work out which address works from where, and verify with a request
+  - query: the frontend host needs the API host's address for the dev stack. work out which address works from where, and verify with a request
     confusable_with: [daintree.hosts.demo-for-hub]
-  - query: two services that live on different remote machines need each other's addresses during development, and nothing here is about worktrees on this machine
+  - query: the order service on one remote machine calls the stock service on another and needs its address during development, and nothing here is about worktrees on this machine
     confusable_with: [daintree.worktree.provision-local-environment]
   - query: my frontend and my API run on separate remote hosts, not different worktrees on this Mac. Wire them up and check they talk
     confusable_with: [daintree.worktree.provision-local-environment]
