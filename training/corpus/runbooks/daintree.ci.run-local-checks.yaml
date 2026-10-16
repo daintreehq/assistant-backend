@@ -110,6 +110,9 @@ boundaries:
   - query: 'run the jest suite locally with --shard 1/2 and then 2/2 and tell me if both halves pass'
     confusable_with: [daintree.hosts.shard-test-suite]
     run: runbook-2026-10-issue-118
+  - query: "lint and unit-test the feature worktree, its own scratch database and port are already in place, and list anything red"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: and the unit tests?
     history:

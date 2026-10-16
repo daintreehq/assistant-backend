@@ -355,6 +355,12 @@ boundaries:
   - query: "make sure the teardown on every host removes only the database its own setup created, never a shared one"
     confusable_with: [daintree.hosts.recover-and-clean-up, daintree.orchestration.workspace-cleanup]
     run: runbook-2026-10-issue-132
+  - query: "the checks on the build host keep failing because every worktree there shares one test schema and the runs wipe each other; give each worktree its own schema through its setup"
+    confusable_with: [daintree.ci.run-local-checks]
+    run: runbook-2026-10-issue-132
+  - query: "our check command passes alone, but two worktrees on different machines running it at once corrupt the same database. set up isolation for each of them"
+    confusable_with: [daintree.ci.run-local-checks, daintree.ci.run-e2e-suite]
+    run: runbook-2026-10-issue-132
 followups:
   - query: "yes, and make sure it can't fall back to the shared dev server"
     history:

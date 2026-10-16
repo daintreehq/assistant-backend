@@ -58,6 +58,9 @@ boundaries:
   - query: end-to-end tests in the browser against this branch's running app on node 22, failures with their traces
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: "run the end-to-end suite in the second host's worktree; its database and port are its own already, just give me the pass and fail list"
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-132
 followups:
   - query: rerun just those two with tracing on
     history:
