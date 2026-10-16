@@ -1,0 +1,265 @@
+# daintree.hosts.prepare-host-maintenance: the hub readying a Remote Host for a planned update,
+# restart or reboot. Before: an impact report per host (projects, lanes, open exchanges, and what
+# the hub cannot see), each enrolled lane's acknowledged checkpoint (branch, SHA, pushed or not,
+# uncommitted files, writes in flight). After the person has restarted it: projects, lanes and
+# exchanges reconciled before anything more is sent. The person does the update.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, a "stop
+# sending and checkpoint" line, and the return turn. Traps: this runbook wins against catching up
+# after a restart already behind us (daintree.hosts.recover-and-clean-up), putting a run on hold
+# (daintree.hosts.park-swarm), stopping or changing a run (daintree.hosts.steer-swarm), a read of
+# the hosts (daintree.hosts.survey-hosts), adding a host (daintree.hosts.connect-host) and Daintree
+# misbehaving here (daintree.diagnostics); reverse traps, where each neighbour keeps its own
+# request and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: prepare-host-maintenance-issue-what-will-stop
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "what the restart will stop on that host, its
+      projects, agents and swarm jobs, and what the hub cannot see". At base it selected
+      daintree.worktree.manage-resource.
+    messages:
+      - role: user
+        content: Before restarting the remote Daintree server, show what projects and swarm jobs will stop.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-issue-update-without-losing
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "the work there checkpointed" under "BEFORE a Remote
+      Host is updated, restarted or rebooted". At base it selected daintree.hosts.supervise-swarm
+      and daintree.workflow.prep-branch-for-review.
+    messages:
+      - role: user
+        content: Prepare this host for an update without losing delegated work.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-issue-checkpoint-reconcile
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "the host reconciled afterwards" and the deliverable
+      "a reconciliation of projects, lanes and exchanges before anything more is sent". At base it
+      selected daintree.orchestration.execute-durable-workflow and daintree.hosts.park-swarm.
+    messages:
+      - role: user
+        content: Plan a host maintenance checkpoint and reconcile after the person restarts it.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-agent-phrased
+    category: single-runbook
+    note: >-
+      An agent's task description. Decided by "an impact report per host with its limits stated,
+      each enrolled lane's acknowledged checkpoint".
+    messages:
+      - role: user
+        content: The user will restart Daintree on a Remote Host tonight for an update. Report which projects, enrolled assistants and open exchanges it will interrupt, what the hub cannot observe, and have each lane checkpoint its work first.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-user-upgrade-saved
+    category: single-runbook
+    note: >-
+      A casual line. Decided by "what the restart will stop on that host" and "the work there
+      checkpointed". The build server is the host.
+    messages:
+      - role: user
+        content: Which projects and swarm jobs on the build server will end when I restart Daintree there for the upgrade, and have they all saved their branches?
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-user-about-to-update
+    category: single-runbook
+    note: >-
+      The person is mid-sentence away from the restart. Decided by "BEFORE a Remote Host is
+      updated, restarted or rebooted (Daintree or the machine itself)".
+    messages:
+      - role: user
+        content: I'm about to update Daintree on the build machine. What's going to get interrupted over there, and can you get everything saved first?
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-user-return-after-update
+    category: continuation
+    note: >-
+      The return turn: the host is back and the earlier turn prepared it. Decided by "again once
+      it is back" and "a reconciliation of projects, lanes and exchanges before anything more is
+      sent".
+    messages:
+      - role: user
+        content: Get the mac mini ready for a Daintree update.
+      - role: assistant
+        content: Both lanes on the mini stopped at a safe point and pushed their branches. Tell me once the update is done and the mini is back.
+      - role: user
+        content: It's back, the update finished.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps (this runbook wins)
+  - id: prepare-host-maintenance-not-recover-planned
+    category: routing-trap
+    note: >-
+      The restart is ahead, not behind us. Fence: "an unplanned restart or dropped link already
+      behind us (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: Sort out what happens to the delegated work on the lab server when I update Daintree on it Saturday
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-not-park-swarm
+    category: routing-trap
+    note: >-
+      The reason is the host's own restart and the stop is a checkpoint before it, not a run on
+      hold for later. Fence: "putting a whole run on hold for later (daintree.hosts.park-swarm)".
+    messages:
+      - role: user
+        content: Before the remote host's Daintree is restarted for its update, have every assistant there stop at a safe point and tell me what is pushed
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-not-steer-swarm
+    category: routing-trap
+    note: >-
+      Work is stopped because a restart is coming and saved, not because the run is called off.
+      Fence: "stopping or changing a run (daintree.hosts.steer-swarm)".
+    messages:
+      - role: user
+        content: the person is about to restart the remote Daintree, so stop sending it new tasks and get the existing ones checkpointed
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-not-survey-hosts
+    category: routing-trap
+    note: >-
+      A restart is ahead, so the impact report and checkpoint are the deliverable. Fence: "a read
+      of the hosts with no restart ahead (daintree.hosts.survey-hosts)".
+    messages:
+      - role: user
+        content: Before I restart the remote host's Daintree, what would that end over there?
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-not-connect-host
+    category: routing-trap
+    note: >-
+      The host is already added; it is its update that needs preparing. Fence: "adding a machine
+      as a host (daintree.hosts.connect-host)".
+    messages:
+      - role: user
+        content: The host row says it is on an older Daintree build and I will update it from Settings tonight. What will that cut off, and has the work there been saved?
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-not-diagnostics
+    category: routing-trap
+    note: >-
+      Daintree on another machine is being restarted on purpose; nothing here is misbehaving.
+      Fence: "Daintree itself misbehaving on this machine (daintree.diagnostics)".
+    messages:
+      - role: user
+        content: We're restarting Daintree on the remote server for an upgrade tonight; list the projects and swarm jobs that will stop.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps (neighbour wins)
+  - id: prepare-host-maintenance-reverse-recover
+    category: routing-trap
+    note: >-
+      The restart already happened and an exchange never came back: recover-and-clean-up's "why a
+      task sent to a Remote Host never came back, usually after Daintree restarted". Nothing is
+      being prepared.
+    messages:
+      - role: user
+        content: the hub task from the last session is still open on the studio machine, did it survive the restart? I never got a reply
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-park-swarm
+    category: routing-trap
+    note: >-
+      A whole run on hold for the night, no host maintenance: park-swarm's "PUT ON HOLD TO COME
+      BACK TO".
+    messages:
+      - role: user
+        content: park the whole remote run until tomorrow, I'm off for the night
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-steer-swarm
+    category: routing-trap
+    note: >-
+      Calling a run off, with acknowledgements per machine: steer-swarm's "STOPPED, CALLED OFF or
+      CHANGED while it is under way".
+    messages:
+      - role: user
+        content: I want to stop the run on every machine now, and tell me which ones acknowledged
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-survey-hosts
+    category: routing-trap
+    note: >-
+      A plain read of the hosts, no restart ahead: survey-hosts's "whether the Remote Hosts are
+      connected, how busy each is".
+    messages:
+      - role: user
+        content: which of my remote hosts are connected right now and how busy is each
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-connect-host
+    category: routing-trap
+    note: >-
+      Adding a machine that does not run Daintree yet: connect-host's "ANOTHER MAC OR LINUX
+      MACHINE added to Daintree as a Remote Host".
+    messages:
+      - role: user
+        content: add my new server as a remote host, Daintree is not installed on it yet
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-diagnostics
+    category: routing-trap
+    note: >-
+      Daintree misbehaving on this machine: diagnostics, with no host and no restart planned.
+    messages:
+      - role: user
+        content: my own Daintree keeps freezing when I open the settings, can you find out why
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-supervise-swarm
+    category: routing-trap
+    note: >-
+      The Shell's own restart leaves the host working; the run just needs following:
+      supervise-swarm's "the run followed to its end".
+    messages:
+      - role: user
+        content: keep the swarm going and answer what the hosts ask while I restart this laptop
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
