@@ -1,0 +1,312 @@
+# daintree.hosts.open-project-on-host: the person wants THIS project or branch on a Remote Host
+# that is already added, through Daintree's project dialog (the host's existing copy of the
+# repository or a fresh clone), with the dialog's push, clone folder and setup left to the
+# person. Recall cases in agent and user words (the issue's three requests among them, an
+# existing copy, a fresh clone, uncommitted and unpushed work, a repository with no remote, a
+# fork, and a clone that was cut off), a routing trap per declared neighbour where this
+# runbook wins, and reverse traps where the neighbour wins and this one must not ride along:
+# daintree.hosts.connect-host, daintree.hosts.start-swarm, daintree.hosts.delegate-to-host,
+# daintree.hosts.place-work, daintree.worktree.create-plain-worktree and
+# daintree.git.sync-with-base. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: open-project-on-host-issue-existing-work
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "put on a Remote Host they already added" and
+      "the host's project opened".
+    messages:
+      - role: user
+        content: Open this project on another Daintree host and keep the existing work intact
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-issue-branch-dialog
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "Daintree's project dialog opened for the person to
+      approve" and "put on a Remote Host they already added".
+    messages:
+      - role: user
+        content: Take this branch to the other server through Daintree's project dialog
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-issue-placement
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "put on a Remote Host they already added" and the
+      deliverable "the host's project opened".
+    messages:
+      - role: user
+        content: Guide git-backed project placement on a Remote Host
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-existing-copy
+    category: single-runbook
+    note: >-
+      An existing copy on the host, user-phrased. Decided by "does that machine already have a
+      copy of this repo, or clone it there".
+    messages:
+      - role: user
+        content: the other Mac already has a checkout of this repo, open that one instead of cloning a second copy
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-fresh-clone
+    category: single-runbook
+    note: >-
+      A fresh clone. Decided by "does that machine already have a copy of this repo, or clone
+      it there" and "get my repo onto my other Mac".
+    messages:
+      - role: user
+        content: this repo is not on the Linux server at all, so clone it there for me
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-dirty-unpushed
+    category: single-runbook
+    note: >-
+      Uncommitted and unpushed work on this machine. Decided by "what reaches the host if I open
+      this project there" and "what stayed behind".
+    messages:
+      - role: user
+        content: I have uncommitted changes and two unpushed commits, what actually reaches the server if I open this project on it
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-no-remote
+    category: single-runbook
+    note: >-
+      A repository with no remote. Decided by "put on a Remote Host they already added" and
+      "what stayed behind"; the dialog sends a copy of its committed history.
+    messages:
+      - role: user
+        content: my project has no git remote, get it onto the connected server as a copy of its history
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-env-file
+    category: single-runbook
+    note: >-
+      Whether uncommitted and ignored files travel when the project is opened on the host.
+      Decided by "what reaches the host if I open this project there" in the routing text and,
+      in the body, "Committed history is all that travels".
+    messages:
+      - role: user
+        content: when I open this project on the remote host, do my .env and uncommitted changes get there too
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+  - id: open-project-on-host-agent-phrased
+    category: single-runbook
+    note: >-
+      Agent-phrased search_runbooks query. Decided by "Daintree's project dialog opened for the
+      person to approve (matching copy, clone folder, push, setup)".
+    messages:
+      - role: user
+        content: Open the current project on the connected Remote Host through Daintree's project dialog, so the person approves the matching copy, the clone folder and any push
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-build-box
+    category: single-runbook
+    note: >-
+      "build box" pulls toward a worktree's cloud devbox; the example "open this project on the
+      build box or server" on this runbook carries it.
+    messages:
+      - role: user
+        content: get my repo open on the build box over there
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-fork-candidates
+    category: single-runbook
+    note: >-
+      Two candidate copies, one a fork. Decided by "matching copy" in the dialog the person
+      approves.
+    messages:
+      - role: user
+        content: the repo has two clones on the server, one of them a fork of mine; I want the dialog to open the right one
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-clone-cut-off
+    category: single-runbook
+    note: >-
+      A clone cut off by a dropped link. Decided by "the host's project opened, and the answer
+      to where it opened". Untrained recovery wording; may be a retrain-owed miss.
+    messages:
+      - role: user
+        content: the project dialog's clone to the other Mac was cut off; has the repository reached it or should I run it again
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  # ---------------------------------------- traps: this runbook wins, neighbour out
+  - id: open-project-on-host-trap-host-already-connected
+    category: routing-trap
+    note: >-
+      The host is already added and connected, so the machine is not the task: "adding the machine itself or a
+      host that will not connect (daintree.hosts.connect-host)" is fenced out.
+    messages:
+      - role: user
+        content: the second Mac is already connected under Settings, Hosts; now open this project on it
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-trap-no-assistants-yet
+    category: routing-trap
+    note: >-
+      Cloning the project, no assistants asked for: "assistants readied on a host that already has the
+      project (daintree.hosts.start-swarm)" is fenced out.
+    messages:
+      - role: user
+        content: the build server has never seen this repo, clone it there and open it
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-trap-no-work-yet
+    category: routing-trap
+    note: >-
+      The project only, no task for the host: "work sent to a host (daintree.hosts.delegate-to-host)" is
+      fenced out.
+    messages:
+      - role: user
+        content: get this project onto my other Mac so it is ready to be worked on there later
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-trap-no-host-chosen
+    category: routing-trap
+    note: >-
+      Putting the project on a host, not choosing hosts for work: "choosing which host should take
+      pieces of work (daintree.hosts.place-work)" is fenced out.
+    messages:
+      - role: user
+        content: none of my hosts has this repo yet; put the project on the one with the most room
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-trap-not-a-local-worktree
+    category: routing-trap
+    note: >-
+      Carrying the branch to the host, not a local checkout: "a local worktree
+      (daintree.worktree.create-plain-worktree)" is fenced out.
+    messages:
+      - role: user
+        content: open this project on the server and carry my current branch over to it
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-trap-not-a-base-update
+    category: routing-trap
+    note: >-
+      The host's copy is stale; the task is opening it there on this branch: "catching a branch up with
+      its base (daintree.git.sync-with-base)" is fenced out.
+    messages:
+      - role: user
+        content: the remote host's copy of the project is stale, open it there on my branch
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------- reverse traps: neighbour wins, this one stays out
+  - id: open-project-on-host-reverse-connect-host
+    category: routing-trap
+    note: >-
+      The machine is not a host yet. daintree.hosts.connect-host decides it: "ANOTHER MAC OR LINUX MACHINE
+      added to Daintree as a Remote Host".
+    messages:
+      - role: user
+        content: I haven't added my second Mac to Daintree yet, set it up as a host so I can open this project on it
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-reverse-start-swarm
+    category: routing-trap
+    note: >-
+      Assistants readied per host. daintree.hosts.start-swarm decides it: "Claude Code or Codex ready on
+      every Remote Host".
+    messages:
+      - role: user
+        content: get one assistant lane enrolled per host here before any work is sent
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-reverse-delegate-to-host
+    category: routing-trap
+    note: >-
+      Work for a host's assistant. daintree.hosts.delegate-to-host decides it: "ONE piece of WORK done by the
+      Daintree assistant on another machine".
+    messages:
+      - role: user
+        content: have the build box assistant fix the failing checkout test
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-reverse-place-work
+    category: routing-trap
+    note: >-
+      Several pieces spread by capacity. daintree.hosts.place-work decides it: "DIFFERENT, independent pieces
+      of work".
+    messages:
+      - role: user
+        content: split these eight tickets between my laptops depending on who has capacity and which CLI is signed in
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-reverse-local-worktree
+    category: routing-trap
+    note: >-
+      A worktree on this machine. daintree.worktree.create-plain-worktree decides it: "create, add, or set
+      up a plain worktree for a new branch or an existing branch".
+    messages:
+      - role: user
+        content: I need a standalone worktree for the release branch here on this laptop
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+
+  - id: open-project-on-host-reverse-sync-with-base
+    category: routing-trap
+    note: >-
+      Bringing a branch up to date. daintree.git.sync-with-base decides it: "has fallen behind its base or
+      conflicts with it and should be caught up".
+    messages:
+      - role: user
+        content: update my feature branch with the latest main
+    expect:
+      required: [daintree.git.sync-with-base]
+
+  - id: open-project-on-host-reverse-survey-hosts
+    category: routing-trap
+    note: >-
+      A read-only look at what the hosts hold. daintree.hosts.survey-hosts decides it: "ONE read-only
+      report, host by host".
+    messages:
+      - role: user
+        content: show me every Remote Host with the projects it has and who is enrolled there, change nothing
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
