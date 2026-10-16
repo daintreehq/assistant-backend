@@ -232,3 +232,15 @@ boundaries:
   - query: "clean up the worktrees and panes the last run left on the remote hosts"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
+  - query: Daintree restarted while I was away. What happened to the tasks I sent to my remote hosts, and which never came back?
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: The assistant is the same as before. Give me an account of every exchange with the hosts after the link dropped, and say which I should send again
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: after the update Daintree restarted; check each host's task records and tell me which are finished and which are still open
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: clean up the panes and worktrees the run left on the remote machines now it's done
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112

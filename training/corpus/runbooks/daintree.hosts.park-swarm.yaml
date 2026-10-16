@@ -169,3 +169,12 @@ boundaries:
   - query: 'the hosts are all overloaded, so park the whole remote run until tomorrow with a resume record'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: I'm off on holiday for ten days. Put the remote run on hold and leave a resume record, this same assistant will pick it up when I'm back
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: park the swarm tonight, the hub stays as it is and we resume tomorrow morning
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: Pause the cross-machine run until Monday and write down where each host is, I'll resume it in this same session
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112

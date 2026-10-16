@@ -1,0 +1,163 @@
+# daintree.hosts.hand-off-swarm: coordination of a run already out on the Remote Hosts passing from
+# one hub session to another on the same Shell (Claude Code to Codex and back).
+# The outgoing hub freezes, answers its inbox and writes a hand-over where the person chooses; the
+# person switches the hub (nothing moves it for them); the successor rebuilds every exchange from the
+# Shell's task records, resends nothing and supervises on. Another Shell's hub cannot take the run
+# over: it gets a person-led plan.
+#
+# Rows: swaps and take-overs in people's own words and as hub agents describe them, with the
+# situations the procedure handles (a usage limit or a full context forcing the change, a host
+# waiting on a question, a hand-over file the successor is pointed at, a different Mac asking to
+# take over); followups from either session; and boundaries against holding a run to resume later
+# (daintree.hosts.park-swarm), an account of a run after a restart (daintree.hosts.recover-and-clean-up),
+# following a run its own hub sent (daintree.hosts.supervise-swarm), a coordinator pane's agents on
+# this machine (daintree.orchestration.hand-off-orchestration), one agent's task moving to another
+# CLI (daintree.agents.hand-off-task), a local durable plan
+# (daintree.orchestration.execute-durable-workflow) and sending a new run (daintree.hosts.start-swarm),
+# each with reverse rows in that neighbour's file.
+runbook: daintree.hosts.hand-off-swarm
+run: runbook-2026-10-issue-112
+
+positives:
+  - swap the hub to codex, the other machines are still mid-task, keep track of all of it
+  - my claude session is nearly out of context. let a fresh one take over the run on the other machines
+  - 'Hub task: freeze new dispatch, record every outstanding task on the Remote Hosts with its lane, task id and open question, and write the hand-over a replacement hub session can read.'
+  - I'm switching the sidebar assistant from codex back to claude. The remote work is halfway done; how do we change over without redoing anything?
+  - new hub here. The last session left notes about what's running on the two studios in ~/swarm-notes.md, pick the run up from there
+  - The usage limit on this Claude session is nearly gone but three remote hosts are still building. Move the coordination to Codex without resending a thing.
+  - can you write up everything the next sidebar session needs to carry on managing the work on my other machines
+  - hand the cross-machine run to the other assistant, I'll flip the CLI myself
+  - 'Successor hub: the previous session coordinated two Remote Hosts and has been replaced. Read its hand-over, rebuild each task from the Shell''s task records and carry on without resending anything.'
+  - I just restarted the sidebar assistant with a different agent. Work out where the tasks it sent to my other Macs stand and keep the run going.
+  - >-
+    We started a four-host migration this morning with Claude as the hub. I want Codex to take
+    over this afternoon because Claude's weekly limit is nearly used up. Two hosts have finished,
+    one is still working and one is waiting on a reply from me. Prepare everything Codex needs and
+    tell me what to click.
+  - 'Codex has just taken over as hub. Pick up the swarm from the hand-over in my notes, check each task against what the hosts report, and tell me what is still open.'
+  - "pass the baton: I'm moving the swarm from Claude Code to Codex right now"
+  - before I quit this session, leave the next hub everything it needs to keep running the work on my remote machines, including the questions the hosts have asked
+  - Please prepare the switch of hub assistant from Claude to Codex. Nothing may be sent twice to the hosts and the question one host asked me must not get lost.
+  - my codex hub keeps hitting its limit. can claude take over the swarm mid-run? what do I have to do?
+  - Hey, quick one. I'm going to change which assistant runs the sidebar, so please hand the remote swarm over cleanly.
+  - thanks, that's all for this session. Hand the swarm to whoever I open next and tell me how to switch.
+  - 'Search task: how to move coordination of an in-flight cross-host run to a replacement hub assistant on the same Shell when the agent CLI changes, without losing task state.'
+  - >-
+    The hub (Claude Code) has about five percent of its context left. Three Remote Hosts have open
+    tasks and one of them is waiting on a decision from the person. Hand the run to a fresh hub
+    session: capture task ids, lane generations and cursors, write the hand-over where the person
+    chooses, and tell the person how to switch.
+  - My work laptop's hub started this run but I'd like my desktop to finish it. Can the desktop's hub take it over? The remote hosts are mid-task.
+  - If I open the sidebar on a second Mac, can it continue the tasks the first Mac's hub sent to the remote hosts?
+  - "i'm the new sidebar session. the last one's note says the remote tasks are listed in ~/handover.txt. read it, reconcile it with what the hosts report, and continue"
+  - swap hubs without killing the agents on the other machines
+  - 'The hub assistant needs replacing because its CLI crashed twice. The hosts are still working. Rebuild what it knew for a new hub session from the task records and the notes, and do not resend anything.'
+  - Moving coordination of the cross-machine job from Codex to Claude. Which tasks are still running and what is the new session going to need?
+  - I've turned on messages from other machines in a new sidebar session. Hand the live run over to it.
+  - make the next assistant my swarm manager and give it the full picture of what's out on the hosts
+  - Good evening. We need a handover of the swarm to Codex before I close this session; the studios keep running overnight.
+  - this session is the replacement hub. The person says the old one wrote its state to a file. Find the open tasks on the hosts and pick up where it stopped.
+  - "give the replacement hub the full picture of the work on my Remote Hosts: tasks, owners, open questions, and what must not be sent again"
+  - I want to hand the cross-machine coordination to another assistant. Show me the steps for me and for it.
+  - freeze new dispatch to the other machines, we're changing the hub assistant
+  - the claude sidebar session is about to be closed and three machines are still busy, hand over
+  - Codex's turn to run the swarm. Claude should write down where the hosts stand and what's waiting on me, then I'll switch.
+  - mid-run swap of manager session; make sure the host that asked a question gets its answer from the new one
+  - the swarm manager changes from codex to claude tonight. what has to be written down so the hosts' tasks aren't lost?
+  - >-
+    I'm about to close this laptop's session and let Codex run the rest of tomorrow's cross-host
+    test sweep. Four hosts have shards in flight. Capture which task is on which host, which have
+    reported and which haven't, plus any message waiting for an answer, so the Codex session can
+    take it from there.
+  - query: take over the swarm
+    history:
+      - "user: I switched the sidebar to Claude. The run was started by Codex."
+      - "assistant: I am a fresh session with no memory of the previous one."
+  - query: yes, hand it over
+    history:
+      - "user: is the hub able to change while the studios are working?"
+      - "assistant: Yes. The hosts keep their tasks; the new session reads them from the Shell's records."
+  - query: you have the hand-over, the other session is Codex now
+    history:
+      - "user: swap the hub, I'm out of Claude usage"
+      - "assistant: I can hand the run over. Where should I save the hand-over?"
+  - query: if I switch the hub from Claude to Codex while the hosts are still working, will the new session see the tasks the old one sent? set up the switch
+    docs: true
+  - query: can the hub assistant be changed in the middle of a run, and what happens to the questions the hosts already asked? do it for my current run
+    docs: true
+  - query: what happens to the tasks on my remote hosts if I change which CLI the sidebar assistant uses? hand them over properly
+    docs: true
+
+followups:
+  - query: ok, now hand it to codex
+    history:
+      - "user: where does the swarm stand?"
+      - "assistant: Two hosts have finished, one is working and one is waiting on you."
+  - query: it's at ~/notes/swarm-handover.md, the new session is open
+    history:
+      - "user: hand the swarm over to a new hub"
+      - "assistant: Where should I save the hand-over, and is the replacement session already open?"
+  - query: I've switched the CLI. now what?
+    history:
+      - "user: hand the swarm over"
+      - "assistant: Hand-over saved to ~/notes/swarm-handover.md. Switch the assistant, then tell the new session to take over the run from that file."
+  - query: include the second host's open question in it too
+    history:
+      - "user: write the hand-over for the next hub"
+      - "assistant: Written for host one: task, lane, state and the question it asked."
+  - query: go ahead, take over
+    history:
+      - "user: I changed the sidebar to Codex. Claude started the run."
+      - "assistant: I'm the new session. I can pick the run up from the hosts' records if you want."
+  - query: and tell me what the new one will not see
+    history:
+      - "user: swap the hub to claude and keep the run going"
+      - "assistant: Understood. I'll freeze new sends and write the hand-over."
+
+topic_shifts:
+  - query: forget the failing lint job, swap the hub to codex and hand over the remote run
+    history:
+      - "user: why is the lint job failing on the second host?"
+      - "assistant: The config was missing a rule."
+  - query: actually first hand the swarm to the codex session, my context is nearly full
+    history:
+      - "user: draft the changelog entry for the parser fix"
+      - "assistant: Here is a draft."
+
+boundaries:
+  - query: the other machines should keep working while a new hub takes over, don't park anything
+    confusable_with: [daintree.hosts.park-swarm]
+  - query: I'm switching the hub assistant, no pause, the hosts carry on and the new session picks up the run
+    confusable_with: [daintree.hosts.park-swarm]
+  - query: don't stop the hosts, just change who is coordinating them from Claude to Codex
+    confusable_with: [daintree.hosts.park-swarm, daintree.hosts.steer-swarm]
+  - query: my next session is a different CLI and the remote run continues meanwhile, give it a record to continue from
+    confusable_with: [daintree.hosts.park-swarm]
+  - query: I'm replacing the hub on purpose; write the hand-over for the next session, I don't need an account of the exchanges
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the old hub is being swapped for Codex now, leave Codex what it needs to keep the remote run going
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: new hub, with the previous one's hand-over file to read. Continue the run
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: the hub is changing from Claude to Codex while the hosts work, carry the open questions across so none is answered twice
+    confusable_with: [daintree.hosts.recover-and-clean-up, daintree.hosts.supervise-swarm]
+  - query: the hub that sent the run is being replaced; get the new session following the hosts' updates
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: a new session has to take over watching the remote run from the one that sent it
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: switch the coordinator of the hosts' work to the other CLI and have it carry on answering what they ask
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: hand the swarm on my remote hosts to a fresh Codex hub, not the agents in my local panes
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+  - query: swap the coordinator to codex, it's the cross-machine run that moves and nothing in this window
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+  - query: pass the run on the Remote Hosts to a new assistant; the panes here stay as they are
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+  - query: move the whole swarm manager role from claude to codex, not one agent's task
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: switch the assistant that coordinates my remote machines to the other CLI, along with the tasks the hosts hold
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: write the hub-to-hub handover for the cross-host run, not a checkpoint of a local plan
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+  - query: the run is already out on the hosts and only the hub assistant changes, so nothing new gets started
+    confusable_with: [daintree.hosts.start-swarm]

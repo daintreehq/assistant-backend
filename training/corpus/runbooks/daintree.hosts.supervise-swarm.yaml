@@ -122,6 +122,16 @@ boundaries:
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
 
+  - query: keep watching the run I just sent to the studios and tell me what each one asks
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: a host wants to know if it may rebase its branch; answer within what I asked and keep the run going
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: one of my remote hosts is taking far longer than the others; check on it once and tell me what it says
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+
 followups:
   - query: ok, now keep an eye on all of them and answer what you can
     history:

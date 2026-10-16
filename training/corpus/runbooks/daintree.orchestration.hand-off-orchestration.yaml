@@ -59,6 +59,16 @@ boundaries:
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: The next session should take over the run checkpoint as its only writer; write the coordinator handover and start that session now.
     confusable_with: [daintree.orchestration.status-and-resume]
+  - query: I'm switching to codex as the coordinator for the agents in my panes, write the handoff for it
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: "my context is full: pass the migration run in these four terminals to a new session"
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+  - query: write the handover so another session can take over the agents I launched in this window
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: runbook-2026-10-issue-112
+
 followups:
   - query: use codex as the successor, not claude
     history:
