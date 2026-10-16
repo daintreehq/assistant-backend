@@ -166,3 +166,6 @@ boundaries:
     confusable_with: [daintree.hosts.verify-for-hub]
   - query: 'hub review job on the parser rewrite at e17c3a5: findings on design and correctness, the suite already passed on another host'
     confusable_with: [daintree.hosts.verify-for-hub]
+  - query: 'the hub sent me another machine''s race branch at a commit to review, findings only, no edits'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94

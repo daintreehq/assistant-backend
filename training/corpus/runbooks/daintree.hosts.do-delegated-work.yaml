@@ -157,3 +157,6 @@ boundaries:
   - query: 'one ticket from the hub for this host, the search debounce, codex in a fresh worktree'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: 'the hub asked this machine to build its attempt at the csv parser in a new worktree and push the branch'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94

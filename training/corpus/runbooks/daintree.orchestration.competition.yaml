@@ -432,6 +432,12 @@ boundaries:
   - query: 'three agents compete on the caching change here and I''ll be the judge'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: 'claude and codex in two worktrees here, same task, then a blind vote on the better one'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94
+  - query: 'run a contest between the agents on this machine for the cleanest regex'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94
 followups:
   - query: how's it going?
     history:

@@ -239,6 +239,12 @@ boundaries:
   - query: "hand the export-flag change to the build box's assistant on a fresh branch and follow it until it reports the sha"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: 'I opened a PR for the docs fix; get the tower''s assistant to review it and tell me what it thinks'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94
+  - query: 'the mini should take the webhook retry ticket by itself and push a branch when done'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94
 
 followups:
   - query: when it's pushed, have the mini start the client against that commit

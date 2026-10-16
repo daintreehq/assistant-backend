@@ -53,6 +53,9 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: The three agents have finished their PRs - have each one review another agent's PR, then fix what its reviewer found.
     confusable_with: [daintree.review.review-pr-queue]
+  - query: 'now that the four worktree agents are done, swap their work around for review and let each answer what its reviewer found'
+    confusable_with: [daintree.hosts.race-and-review]
+    run: runbook-2026-10-issue-94
 followups:
   - query: don't tell them whose branch it is
     history:

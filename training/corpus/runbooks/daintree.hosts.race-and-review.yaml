@@ -1,0 +1,147 @@
+# daintree.hosts.race-and-review: on the hub, work done on Remote Hosts judged by a machine or
+# agent that did not build it. A race: the same task built on several hosts, each pushing its own
+# branch, ranked blind by an agent that built none. A cross-review: one host's pushed commit
+# reviewed on another host, findings sent back to the builder for a capped number of rounds.
+#
+# Positives are invented situations in agent and user words, short and long, some with a social
+# lead-in, two how-to questions marked docs. Boundaries are requests this runbook wins against a
+# neighbour whose vocabulary they share: the same work tabled with no judging (swarm-fan-out), one
+# unit or a hand-over (delegate-to-host), combining branches (integrate-host-branches), contests
+# and reviews among agents on this machine (competition, review-change, relay-review-feedback,
+# ask-and-relay, cross-review-cohort), and the lane's side (review-for-hub, run-local-cohort,
+# do-delegated-work). Followups and topic shifts are a race or review as the next turn after a
+# host pushed, or after a fleet read. Machine names are generic.
+runbook: daintree.hosts.race-and-review
+run: runbook-2026-10-issue-94
+
+positives:
+  - let the tower and the mini both have a crack at the flaky date test and tell me which fix is better
+  - have three of my hosts each build the export endpoint and get the best one picked
+  - race the cache invalidation fix across the remote machines
+  - two machines, same bug, best fix wins
+  - can both of my other macs try the csv parser and have someone neutral say which is better?
+  - get the linux box and the laptop host to each write the throttle helper, then have an agent that wrote neither rank them
+  - I want two of my hosts to each do the slugify rewrite, and keep whichever comes out best
+  - i want my hosts to compete on the pagination bug, judged by something that wrote none of the attempts
+  - "morning! let's race the auth timeout fix on the mini and the tower and see whose holds up"
+  - "hey, quick one: have two of the remote boxes each take the logging cleanup and tell me which attempt is stronger"
+  - same brief to the build box and the tower, push both branches, then have them compared blind
+  - put claude on the mini and codex on the tower on the same retry fix and have the attempts ranked
+  - which of my machines writes the better migration script? have two of them try and get it judged
+  - let all three hosts attempt the importer and have the attempts scored against the acceptance criteria, unlabelled
+  - race it across the boxes and give me a ranking with reasons, I'll pick the winner myself
+  - The user wants the same dependency upgrade done on two Remote Hosts, each on its own pushed branch, and the attempts compared by an agent that built neither
+  - Run a best-of-three across the user's Remote Hosts for the search indexing change and return a ranking with the judge's reasons
+  - Have several remote hosts implement the same rate limiter, verify each pushed SHA on the remote, then get a blind comparison against the user's criteria
+  - User asked to race the config loader fix on two hosts; the attempts must be judged by someone independent, without host names, and nothing merged
+  - 'Best-of-N across remote machines: one brief, a branch per attempt, an independent ranking, and the user chooses the winner'
+  - >-
+    I have the tower on Claude Code and the build box on Codex. Give them both the same task, fixing
+    the off-by-one in the paginator, each on its own branch, and push. Then I want someone who didn't
+    write either version to tell me which one is better and why. Don't merge anything, I'll decide.
+  - >-
+    The user wants a race: the same schema migration built on three Remote Hosts with whatever agent
+    CLI each one has, every branch pushed so it can be compared, then an independent ranking against
+    the migration's checks. They said explicitly that the losing branches stay on the remote.
+  - the mini pushed the session refactor, get the tower to review it
+  - have codex on another host go over what the build box just pushed
+  - get a second machine to look at the laptop host's branch before I merge it
+  - can another host give me an independent read on the tower's commit?
+  - the linux box finished the cache layer; have a different machine check it at that exact commit
+  - ask a host that didn't write the importer to review the branch the mini pushed, findings only
+  - cross-check the build box's work on another box with a different agent
+  - "hey, before I merge: have one of the other machines review what the tower pushed"
+  - have the tower review the mini's branch and then send the problems back to the mini to fix, max two rounds
+  - 'review loop between hosts: the laptop host fixes, the build box reviews, stop after two rounds'
+  - get another host's opinion on the branch the tower just pushed, I don't trust it to review its own work
+  - The user wants the commit a Remote Host pushed reviewed by a different Remote Host, ideally under another agent CLI, with the findings brought back as claims
+  - Arrange an independent review of a Remote Host's pushed branch on another host at the exact SHA; if there are blocking findings, send them back to the builder for at most two rounds
+  - A host finished and pushed the feature; the user wants a second machine that did not build it to review that SHA and report findings, no edits
+  - 'Cross-host review: Codex on one remote machine reviews the work Claude Code pushed from another, findings relayed to the builder for fixes'
+  - >-
+    The tower just pushed its version of the billing fix. I want a different machine, preferably one
+    running Codex since the tower uses Claude, to review that exact commit. If it finds anything
+    blocking, send it back to the tower to fix and have it reviewed again, but no more than two
+    rounds, and don't merge.
+  - >-
+    Both minis pushed attempts at the websocket reconnect logic last night. Get them compared by an
+    agent that wrote neither, without telling it which machine did which, and give me the ranking
+    with its reasons. I'll pick one and clean up the branches myself.
+  - query: how do I get two of my machines to race the same task and have someone neutral pick the best one?
+    docs: true
+  - query: how does a review by another host work when one of my machines built the branch?
+    docs: true
+
+boundaries:
+  - query: every host does the same task, but this time I want a winner picked by someone who wrote none of them
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: 'not a side-by-side table, a ranking: have the hosts each build it and get the attempts judged'
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: the mini already pushed its branch; have a different host review that commit, not the mini itself
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: one host builds the oauth fix and a second host reviews it, findings go back to the first
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the hosts' attempts shouldn't be combined; pick the best one with an independent judge
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: both machines pushed rival versions of the same fix; don't merge them, rank them
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: 'not agents on this mac, my remote machines: each builds the tokenizer and a judge ranks them'
+    confusable_with: [daintree.orchestration.competition]
+  - query: run the contest across hosts instead of local worktrees, same task on two remote machines, then a blind verdict
+    confusable_with: [daintree.orchestration.competition]
+  - query: I don't want reviewers on this machine; have another of my hosts review the tower's pushed commit
+    confusable_with: [daintree.review.review-change]
+  - query: code review of the mini's branch, but done by a different remote host
+    confusable_with: [daintree.review.review-change]
+  - query: "from my main machine: arrange for one host to review another host's pushed SHA"
+    confusable_with: [daintree.hosts.review-for-hub]
+  - query: I'm on the shell; have the build box review the commit the tower pushed and tell me what it finds
+    confusable_with: [daintree.hosts.review-for-hub]
+  - query: spread the attempts over my machines, one attempt per host, and get the best one picked
+    confusable_with: [daintree.hosts.run-local-cohort]
+  - query: from my shell, have two hosts race the same fix rather than one machine running both attempts
+    confusable_with: [daintree.hosts.run-local-cohort]
+  - query: 'from the shell: have two hosts each implement the importer, then get the attempts ranked'
+    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: the tower pushed; I'd like codex over on the build box to critique that branch, and whatever it flags goes back to the tower to fix
+    confusable_with: [daintree.agents.relay-review-feedback]
+  - query: get a second opinion from another machine on the branch the mini pushed
+    confusable_with: [daintree.agents.ask-and-relay]
+  - query: after the queue worker lands from the laptop host, a second host should look it over and the laptop host address whatever it raises, capped at two passes
+    confusable_with: [daintree.review.cross-review-cohort]
+
+followups:
+  - query: now have a different host review it before I merge
+    history:
+      - 'user: ask the mini for a retry wrapper around the http client, pushed when done'
+      - 'assistant: Done: ran the http client change on the mini, its tests pass, and the new head shows up on origin.'
+  - query: actually have the tower try it too, and then get the two versions judged
+    history:
+      - 'user: have the build box implement the debounce helper on a new branch'
+      - 'assistant: Sent to the build box; I will check its branch when it replies.'
+  - query: send those findings back to the laptop host and have it fix them, one more round at most
+    history:
+      - 'user: have the mini review the branch the laptop host pushed'
+      - 'assistant: The reviewer on the mini found two blocking issues in the commit it read.'
+  - query: both are pushed, get them ranked now
+    history:
+      - 'user: race the csv export on the tower and the build box'
+      - 'assistant: Both hosts are building; I will verify their branches as they reply.'
+  - query: and once it's pushed, get codex on another machine to review it
+    history:
+      - 'user: the tower should add rate limiting middleware, send it over'
+      - 'assistant: Sent to the tower with push authority; waiting on its reply.'
+
+topic_shifts:
+  - query: good, now race the auth timeout fix across those two
+    history:
+      - 'user: which of my hosts are connected?'
+      - 'assistant: The tower and the mini are connected, each with an assistant in this project.'
+  - query: fine, then have a machine that didn't build it review the tower's branch
+    history:
+      - 'user: is the build box close to its codex limit this week?'
+      - 'assistant: The build box reports about two thirds of its weekly codex allowance left.'
+  - query: ok, different job, have the mini and the build box both take the flaky upload test and get the fixes compared
+    history:
+      - 'user: what did the hosts do with the parser task?'
+      - 'assistant: Two hosts replied completed and git ls-remote matches what each said it pushed.'
