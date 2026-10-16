@@ -1,0 +1,158 @@
+# daintree.hosts.resolve-task-collisions: the hub finds that work it sent to its Remote Hosts
+# overlaps by accident (two machines on the same issue, units touching the same files, two
+# hosts pushing one branch), holds every side, verifies what each pushed and hears what each
+# kept unpushed, gives the work one owner that alone publishes, and keeps the other attempt.
+#
+# Positives are invented situations in agent and user words, short and long, some with a
+# social lead-in, a constraint or an earlier turn; two how-to questions carry docs.
+# Boundaries are requests this runbook wins against a neighbour sharing its words: agents
+# colliding on one machine (orchestration.resolve-task-collisions), a race the person asked
+# for (race-and-review), a unit moved off a failing host (reassign-host-work), a plain stop
+# (steer-swarm), combining branches (integrate-host-branches), an account of the hosts
+# (recover-and-clean-up), a new hand-off (delegate-to-host), following a run
+# (supervise-swarm), placing pieces (place-work). Followups and topic shifts are the overlap
+# found after an account, a status table or a hold. Machine names are generic.
+runbook: daintree.hosts.resolve-task-collisions
+run: runbook-2026-10-issue-114
+
+positives:
+  - I think I gave the checkout bug to both the mini and the studio, they're both on it now. sort it out
+  - two of my remote machines are each fixing the same flaky upload test, only one of them should keep going
+  - Two Remote Host lanes were briefed with the same issue under different unit names; pause both, collect their branches and dirty files, and pick a single owner
+  - the tower and the build box keep pushing to the same feature branch and stepping on each other
+  - hey, small mess. the laptop host and the linux box both started the settings page redesign. can you figure out which one keeps it without throwing away the other one's work?
+  - both hosts are implementing the retry policy, one on retry-backoff and one on fix/retries. decide who owns it
+  - Overlapping delegated units on two hosts both modify the billing schema migration; hold the writers, compare what each pushed, and give the migration one owner
+  - oh no, the server and the mini are both rewriting the same parser module from different tickets
+  - the studio has uncommitted edits on the export bug and the workstation already pushed a fix for the same bug. who should carry on?
+  - my other macs are duplicating each other's work on the search ranking change, stop that and keep one
+  - Detected two exchanges to different Remote Hosts that cover the same pull request; settle ownership so only one host pushes and the other attempt is preserved
+  - looks like I double-sent the docs cleanup, both machines are working on it
+  - two remote assistants are editing the same config loader on separate branches, which one should own it
+  - "morning! quick one before standup: the build box and the tower both have agents on the onboarding email ticket. keep one, don't lose anything the other did"
+  - the mini pushed three commits to the same branch the studio is committing on locally, they're going to clash
+  - "Hub sees two hosts claiming the same unit: the laptop's lane says it owns the cache fix, the server's lane says the same. Establish one owner from what each actually pushed"
+  - accidentally assigned the dark mode toggle twice across hosts, I only want one machine doing it
+  - both of the hosts I sent work to are touching api/routes.ts for what were supposed to be separate tasks; one of them needs to back off
+  - the server and the workstation each opened a branch for the same feature request, put one of them in charge
+  - two machines picked up ticket 2381 at the same time, settle it and keep both branches around
+  - Stop the duplicate writer among two Remote Hosts working on one issue, verify each side's pushed SHA, record the other's uncommitted files, and brief the chosen owner to continue
+  - my laptop host and the tower are both trying to land the same refactor, tell me which one is further along and make it the only one working on it
+  - which of my two machines should keep the csv export task? they both started it by mistake
+  - I'm pretty sure the mini and the studio are fighting over the same branch, can you get them sorted
+  - two hosts have overlapping work on the notifications service, freeze both and let me pick
+  - the remote hosts are doing the same job twice, keep whichever fits the brief best and park the other
+  - the studio's lane and the build box's lane both say they're on the login timeout issue. no idea how that happened. one owner please, and don't delete anything
+  - query: >-
+      I split the backlog across my machines earlier but I think I messed up and two of them
+      got overlapping pieces: the tower is doing the payment retries and the mini is doing
+      payment errors, and both have changed the same retry helper. I don't want a merge
+      mess later. Can you get them to stop, see what each has, and give the helper to one?
+  - query: >-
+      Two Remote Hosts are working on the same GitHub issue in the same repository under
+      different branch names. One lane has pushed two commits; the other has uncommitted
+      edits only. Hold both lanes, verify the pushed SHAs on the shared remote, keep the
+      unpushed edits where they are, and leave exactly one host allowed to push or open the PR.
+  - query: >-
+      ok so the build box finished the rate limiter and pushed it, but I just noticed the
+      linux box has been doing the same rate limiter all afternoon and has a bunch of local
+      changes. I don't want two PRs. sort out who owns it and make sure the linux box's
+      changes don't get thrown away.
+  - query: how does daintree settle it when two of my machines got the same ticket by mistake? then do that for the upload bug
+    docs: true
+  - query: what happens to the uncommitted changes on the host that loses when two machines collided on one task? explain, then settle the one on the mini and the studio
+    docs: true
+  - query: they're both on it, pick one
+    history:
+      - "user: did I send the image resize ticket to the tower or the mini?"
+      - "assistant: Both: one exchange to each, an hour apart, and both lanes have agents working on it."
+  - query: then sort that out, one owner
+    history:
+      - "user: how are the remote hosts doing?"
+      - "assistant: The studio and the server are both editing src/auth/session.ts, for the login bug and the session refactor."
+  - query: >-
+      While looking over the exchanges I noticed the same issue number in two host tasks, one on
+      the mini and one on the studio, each with its own branch. Work out which host should
+      continue and what happens to the other branch.
+  - hub, units 3 and 5 turned out to cover the same endpoint on two hosts. pause the writers, collect the SHAs and pick one owner
+  - hey, I think the tower and the mini overlap on the same task. if they do, sort out which one keeps it
+  - ugh, two machines both fixed the typo bug on different branches. I only want one PR
+  - the two lanes disagree about the settings API because their briefs contradicted each other; pick one brief to go with and park the other host's work
+  - thanks for the update. one more thing, the server and the studio are both on the dashboard ticket and the server has a lot of unsaved changes. which should keep going?
+  - I'm travelling and just realised I gave the same refactor to two of my remote machines, they've been at it for an hour. stop one without losing its work
+  - same repo, two hosts, one branch each but really the same fix. make one the owner and tell the other to stay put
+  - "Reconcile two hosts that both claim the same ticket: gather their pushed commits, hear what each kept unpushed, and leave only one allowed to publish"
+  - did the studio and the build box end up with the same assignment? if so make one of them the only one working on it
+
+boundaries:
+  - query: two remote machines are both building the same importer, decide which keeps it and keep the other's branch
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+  - query: the agents on the mini and on the studio got the same issue by accident; one owner, nothing lost
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+  - query: my two hosts are overwriting each other's pushes on one branch, stop it
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+  - query: "a remote host's lane and another host's lane both claim the search unit; settle which machine owns it"
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+  - query: I never asked for two attempts, but two hosts are both doing the export fix. keep one
+    confusable_with: [daintree.hosts.race-and-review]
+  - query: two machines ended up building the same widget by mistake; I don't want them judged, just one owner
+    confusable_with: [daintree.hosts.race-and-review]
+  - query: the tower and the mini both did the parser change without me meaning to, pick the one that fits the brief and stop the other
+    confusable_with: [daintree.hosts.race-and-review]
+  - query: both hosts are online and working on the same ticket, nobody moved anything, I just sent it twice
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: the studio and the server are both on the cache bug and both still running fine; only one should own it
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: two hosts I sent separate tasks to are now editing the same files, give that code one owner
+    confusable_with: [daintree.hosts.reassign-host-work]
+  - query: stop whichever of the two hosts is duplicating the other on the signup form, and keep its work
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: the mini and the tower are on the same job; halt one of them, but first work out which should keep it
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: call off the duplicate, two of my machines are doing the same thing
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: both hosts pushed a version of the same fix, don't merge them, I want one owner and the other branch left alone
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: two machines built the same feature on different branches; choose which branch carries on, no combining
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: two of the remote hosts turned out to be doing the same task, sort out which one keeps it
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: found duplicate work across my machines, resolve it without deleting either attempt
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: I sent the same bug to two hosts by mistake, both have started; fix the mix-up
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: while the run was going two hosts drifted onto the same module; settle ownership before anything else
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: two machines got overlapping pieces from the split, they touch the same files; one of them takes the shared part
+    confusable_with: [daintree.hosts.place-work]
+
+followups:
+  - query: go with the tower then, and leave the mini's work alone
+    history:
+      - "user: the tower and the mini are both on the export bug, sort it out"
+      - "assistant: Both stopped. The tower pushed two commits that pass the brief's tests; the mini has uncommitted edits to the same files and nothing pushed. Which should own it?"
+  - query: the studio isn't answering. go ahead anyway, I accept it might still push
+    history:
+      - "user: two hosts are on the same ticket, pick one"
+      - "assistant: The server's lane stopped its agent; the studio has not acknowledged the hold, so its agent may still be writing."
+  - query: ok, they both stopped. now what
+    history:
+      - "user: the build box and the tower are fighting over one branch"
+      - "assistant: I asked both lanes to stop their agents and report branch, HEAD and uncommitted files."
+  - query: wait, the mini is still committing on that branch
+    history:
+      - "user: settle the overlap on the search unit"
+      - "assistant: The studio owns the search unit now; the mini was told to leave its agents stopped."
+  - query: yes, the server keeps it and the studio stays stopped
+    history:
+      - "user: two of my machines did the dashboard ticket, which one should keep it?"
+      - "assistant: The server's branch is further along and meets the brief's checks; the studio has uncommitted edits and nothing pushed. I'd keep the server."
+topic_shifts:
+  - query: forget the usage table, the linux box and the tower are both doing the same ticket, deal with that first
+    history:
+      - "user: how much codex usage is left on each host?"
+      - "assistant: The tower shows 40% weekly left, the linux box 12%."
+  - query: hang on, before the cleanup, two machines did the same task, settle who keeps it
+    history:
+      - "user: clean up the panes the last run left on the hosts"
+      - "assistant: Two hosts have panes from it; I can ask each host's assistant to remove them."

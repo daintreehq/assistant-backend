@@ -183,3 +183,12 @@ boundaries:
   - query: 'change the remote run''s brief so every host uses at most two test workers from now on, nothing else changes'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: "tell every machine I sent the refactor to to stop now and keep what they have"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "change the acceptance on what the hosts are building so it also covers the cart page"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "stop everything I've handed to the hosts and report which ones confirmed"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114

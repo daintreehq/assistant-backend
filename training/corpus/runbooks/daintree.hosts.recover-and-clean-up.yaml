@@ -223,3 +223,12 @@ boundaries:
   - query: 'I sent work to the hosts this morning with no deadline; what became of it?'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: "I restarted the app, what is the state of everything I sent to my other machines?"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "one exchange to the mini never came back, find out what happened and whether to send it again"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "clean up the worktrees and panes the last run left on the remote hosts"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114

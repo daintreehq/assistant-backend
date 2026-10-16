@@ -159,3 +159,12 @@ boundaries:
   - query: both hosts finished their parts of the same repo, get one machine to merge them into a single branch and run the tests
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
+  - query: "the mini pushed the api half and the studio pushed the ui half, get one machine to combine them and run the tests"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "put the three host branches together on one machine and confirm the result holds all of them"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "combine what my other two macs finished into one branch without changing either of them"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114

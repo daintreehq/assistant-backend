@@ -147,6 +147,15 @@ boundaries:
   - query: 'the overloaded host is stuck on its half done migration unit; move just that unit to another machine from what it pushed'
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
+  - query: "the build box ran out of codex halfway through the ticket, hand what it did to the tower"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "the mini went dark mid-task, get the studio to finish it from what the mini pushed"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "the host I took the export task off has reconnected with its own version of it; which of the two copies do we keep?"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
 
 followups:
   - query: fine, move that one to the tower then

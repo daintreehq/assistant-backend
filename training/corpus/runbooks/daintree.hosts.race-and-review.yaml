@@ -109,6 +109,15 @@ boundaries:
     confusable_with: [daintree.agents.ask-and-relay]
   - query: after the queue worker lands from the laptop host, a second host should look it over and the laptop host fix any blocking issue it raises, capped at two passes
     confusable_with: [daintree.review.cross-review-cohort]
+  - query: "put two of my machines on the same bug on purpose and then compare what they pushed"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "try the date parser on the mini and on the tower and tell me whose version is better"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
+  - query: "have two hosts each build the export feature and let a third one rank them without knowing who wrote which"
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-114
 
 followups:
   - query: now have a different host review it before I merge
