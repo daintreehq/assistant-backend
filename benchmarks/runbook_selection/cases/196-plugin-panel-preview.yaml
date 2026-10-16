@@ -99,3 +99,156 @@ cases:
     expect:
       required: [daintree.plugins.develop-project-plugin]
       optional: [daintree.foundation]
+
+  # Plugins on a Remote Host: the plugin's code and trust are the host's, its panel renders
+  # on the Shell and the Shell consents to the exact bundle. The first four are requests that
+  # should find the plugin runbook; the traps keep a connected host, a missing install and a
+  # different-commit question with their owners, and the reverse cases keep each neighbour's
+  # own work away from the plugin runbook.
+  - id: develop-project-plugin-host-missing-user
+    category: single-runbook
+    note: >-
+      User-phrased. Decided by the example "my plugin works here but is missing on the
+      remote host" and the deliverable "which gate holds on a Remote Host: plugin absent,
+      incompatible or untrusted there".
+    messages:
+      - role: user
+        content: My project plugin works here but is missing on the remote host.
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-shell-refuses
+    category: single-runbook
+    note: >-
+      User-phrased. Decided by the example "the host loaded the plugin but the Shell refuses
+      its panel" and "or the Shell's own consent to its panel".
+    messages:
+      - role: user
+        content: The host plugin is loaded but the Shell refuses its panel.
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-parity-consent-agent
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "including which gate holds on a Remote Host: plugin
+      absent, incompatible or untrusted there, or the Shell's own consent to its panel".
+    messages:
+      - role: user
+        content: Verify plugin parity, host configuration and remote view consent.
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-lane-state-report
+    category: single-runbook
+    note: >-
+      Receiver wording, from the host's own assistant. Decided by "or its exact state and
+      the reason it is not" and the example "my plugin isn't loading".
+    messages:
+      - role: user
+        content: >-
+          Lane report: the hub's person cannot see the plugin's panel on their Shell; check the
+          plugin's state on this host.
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-no-sign-on-server
+    category: single-runbook
+    note: >-
+      User-phrased, with the machine named by role. Decided by "my plugin works here but is
+      missing on the remote host".
+    messages:
+      - role: user
+        content: >-
+          The deploy-board plugin works on my machine, though the build server shows no sign of
+          it; report what is different there.
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-connected-not-connect
+    category: routing-trap
+    note: >-
+      The host is already connected; only a plugin panel waits on the Shell's consent. The
+      fence reads "for adding or connecting a machine as a Remote Host (use
+      daintree.hosts.connect-host)", which this request is not; connect-host must not ride along.
+    messages:
+      - role: user
+        content: >-
+          The host is connected fine, but my plugin's panel won't open on the Shell until I
+          allow the bundle; what is that about?
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-installed-here-only
+    category: routing-trap
+    note: >-
+      A plugin installed on this machine and absent on a host is a plugin-install question, not
+      a connection one. Decided by "which gate holds on a Remote Host: plugin absent,
+      incompatible or untrusted there" against connect-host's "for adding or connecting a
+      machine as a Remote Host".
+    messages:
+      - role: user
+        content: >-
+          Our team plugin is installed on my Mac but the build server has no copy; what is the
+          status there and what should I do?
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-driving-window
+    category: single-runbook
+    note: >-
+      A panel that a watching window cannot load. Decided by the example "the host loaded the
+      plugin but the Shell refuses its panel" and "the Shell's own consent to its panel".
+    messages:
+      - role: user
+        content: my plugin panel says it shows in the window driving this project
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-reverse-connect-host
+    category: routing-trap
+    note: >-
+      Reverse trap: adding a machine is daintree.hosts.connect-host's deliverable even when
+      plugins are the reason. The plugin runbook's fence "for adding or connecting a machine as
+      a Remote Host (use daintree.hosts.connect-host)" keeps it out.
+    messages:
+      - role: user
+        content: Register my home server with Daintree as a machine it can reach over SSH; plugins are a later problem.
+    expect:
+      required: [daintree.hosts.connect-host]
+
+  - id: develop-project-plugin-host-reverse-differences
+    category: routing-trap
+    note: >-
+      Reverse trap: a test that fails on one host and passes on another at the same commit is
+      daintree.hosts.diagnose-host-differences ("SAME CODE BEHAVES DIFFERENTLY ON TWO OR MORE
+      Remote Hosts"); the plugin in the sentence is only the subject of the tests.
+    messages:
+      - role: user
+        content: >-
+          Our build server runs the same commit as my laptop, yet the plugin's tests only fail
+          on the server; work out why, change nothing.
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+
+  - id: develop-project-plugin-host-reverse-placement
+    category: routing-trap
+    note: >-
+      Reverse trap: confirming a host's project is the intended repository is
+      daintree.hosts.verify-project-placement ("whether a project on another machine ... is
+      really the repository meant"), not a plugin question.
+    messages:
+      - role: user
+        content: >-
+          Before the plugin rewrite is sent out, ask the host's assistant for its remote URLs
+          and head commit so we know it is the right repository.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
