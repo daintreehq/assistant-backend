@@ -117,6 +117,9 @@ boundaries:
 - query: the assistants on the host are already ready and taking messages; the one thing missing there is my notification and agent preferences, copy them over
   confusable_with:
   - daintree.hosts.start-swarm
+- query: my project is on the server already; what I want there now is my own Daintree notification and agent settings, not the repository
+  confusable_with:
+  - daintree.hosts.open-project-on-host
 followups:
 - query: ok now bring my settings across too
   history:

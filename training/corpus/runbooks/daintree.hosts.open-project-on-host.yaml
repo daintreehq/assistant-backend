@@ -88,6 +88,12 @@ boundaries:
     confusable_with: [daintree.git.sync-with-base]
   - query: take the latest commits over to the server's copy of this project
     confusable_with: [daintree.git.sync-with-base]
+  - query: Put this repository on the Linux server so I can work in it there, cloning it if it is missing
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: Does the build box have a copy of this project yet, or does it need a clone?
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
 
 followups:
   - query: do the same on the second server
