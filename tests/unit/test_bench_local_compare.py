@@ -57,6 +57,49 @@ def test_trades_that_net_to_zero_are_both_listed(capsys: pytest.CaptureFixture[s
     assert "only in B (1):" in out and "tx-new: []   lost: y (candidate_miss)" in out
 
 
+def test_a_case_failing_on_both_sides_shows_what_each_side_lost(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Neither fixed nor broken, so only the two loss lists show B lost something new."""
+    a = _run({"still-red": ["x"]}, [("still-red", "y", "rank_miss")])
+    b = _run(
+        {"still-red": ["q"]},
+        [("still-red", "y", "rank_miss"), ("still-red", "x", "cap_full")],
+    )
+    print_local_compare(a, b)
+    out = capsys.readouterr().out
+    assert "recall broken in B (0)" in out
+    assert (
+        "still-red: ['x'] -> ['q']   A lost: y (rank_miss)"
+        "   B lost: y (rank_miss), x (cap_full)"
+    ) in out
+
+
+def test_categories_are_compared_as_whole_suite_snapshots(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A catalog wave brings its own cases, so a category can exist on one side only."""
+    a = _run({"c": ["x"]}, [])
+    b = _run({"c": ["x"]}, [])
+    a["summary"] |= {
+        "recall_pass_categories": {"routing-trap": {"passed": 490, "cases": 502}},
+        "categories": {"routing-trap": {"passed": 450, "cases": 502}},
+    }
+    b["summary"] |= {
+        "recall_pass_categories": {
+            "routing-trap": {"passed": 1112, "cases": 1135},
+            "ownership": {"passed": 3, "cases": 4},
+        },
+        "categories": {"routing-trap": {"passed": 978, "cases": 1135}},
+    }
+    print_local_compare(a, b)
+    out = capsys.readouterr().out
+    assert "routing-trap" in out and "490/502 -> 1112/1135" in out
+    assert "450/502 -> 978/1135" in out
+    ownership = next(line for line in out.splitlines() if "ownership" in line)
+    assert "— -> 3/4" in ownership
+
+
 def test_a_run_without_case_ids_is_refused_rather_than_aligned_by_position() -> None:
     old = _run({"a": ["x"]}, [])
     del old["case_ids"]

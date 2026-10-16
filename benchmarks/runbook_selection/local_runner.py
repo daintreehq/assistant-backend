@@ -446,13 +446,40 @@ def _by_case(doc: dict[str, Any]) -> dict[str, tuple[list[str], list[str], bool]
     }
 
 
+def _print_category_compare(sa: dict[str, Any], sb: dict[str, Any]) -> None:
+    """Per-category counts for both runs, whole suite against whole suite.
+
+    Across a catalog wave the two suites differ (the wave brings its own cases), so
+    these rows are two snapshots side by side rather than a per-case delta; the
+    case-aligned lists below are the delta.
+    """
+    blocks = [
+        (s.get("recall_pass_categories") or {}, s.get("categories") or {}) for s in (sa, sb)
+    ]
+    names = sorted({name for recall, strict in blocks for name in (*recall, *strict)})
+    if not names:
+        return
+
+    def cell(block: dict[str, Any]) -> str:
+        return f"{block['passed']}/{block['cases']}" if block else "—"
+
+    print("by category, whole suites (recall-pass A -> B, strict A -> B):")
+    for name in names:
+        (ra, ta), (rb, tb) = ((r.get(name, {}), t.get(name, {})) for r, t in blocks)
+        print(
+            f"  {name:22} {cell(ra):>9} -> {cell(rb):<9}  {cell(ta):>9} -> {cell(tb)}"
+        )
+
+
 def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
     """Two ``bench local`` runs, case by case.
 
     The totals can hide a trade: an edit that fixes one case and breaks another
     nets to zero, and a case that swaps an extra for a wrong pick moves no pass
-    count at all. So every case whose loaded set moved is listed, with what each
-    side lost.
+    count at all. So every case whose loaded set moved is listed, with what EACH
+    side lost: a case that failed on both sides counts as neither fixed nor
+    broken, and only A's losses next to B's show whether B lost a different
+    runbook than A did.
     """
     ca, cb = _by_case(a), _by_case(b)
     sa, sb = a["summary"], b["summary"]
@@ -465,6 +492,7 @@ def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
         f"{'candidate_miss':14} A {sa['candidate_miss_trials']}   "
         f"B {sb['candidate_miss_trials']}"
     )
+    _print_category_compare(sa, sb)
     common = sorted(set(ca) & set(cb))
     fixed = [c for c in common if cb[c][2] and not ca[c][2]]
     broke = [c for c in common if ca[c][2] and not cb[c][2]]
@@ -473,7 +501,11 @@ def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
     moved = [c for c in common if set(ca[c][0]) != set(cb[c][0])]
     print(f"loaded set changed ({len(moved)}):")
     for cid in moved:
-        lost = f"   B lost: {', '.join(cb[cid][1])}" if cb[cid][1] else ""
+        lost = "".join(
+            f"   {label} lost: {', '.join(side[cid][1])}"
+            for label, side in (("A", ca), ("B", cb))
+            if side[cid][1]
+        )
         print(f"  {cid}: {ca[cid][0]} -> {cb[cid][0]}{lost}")
     sides = (("only in A", set(ca) - set(cb), ca), ("only in B", set(cb) - set(ca), cb))
     for label, only, side in sides:

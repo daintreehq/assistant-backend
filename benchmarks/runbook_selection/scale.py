@@ -54,8 +54,9 @@ from .cases import BenchCase, load_cases
 from .local_runner import ARTIFACT
 from .shadow_catalog import SEED, Distractor, generate_distractors, shadow_catalog
 
-#: Catalog sizes to sweep. The first entry is replaced by the live catalog's own
-#: size at run time, so "today" is always the baseline row.
+#: Catalog sizes to sweep. ``0``, and any size the live catalog has already outgrown,
+#: become the live catalog's own size at run time, so "today" is always the
+#: baseline row and the default keeps running as the catalog grows past 100.
 DEFAULT_SIZES = (0, 100, 200, 500, 1000)
 
 #: Shortlist widths. 32 is what ships; the rest bracket it. Chosen to answer
@@ -139,6 +140,20 @@ def _is_background_wake(case: BenchCase, selectable: frozenset[str]) -> bool:
     return bool(active) and bool(eligible) and eligible[-1].role != "user"
 
 
+def effective_sizes(sizes: tuple[int, ...], floor: int) -> tuple[tuple[int, ...], list[int]]:
+    """The sizes a sweep measures, and the requested ones it had to raise.
+
+    A synthetic catalog cannot be smaller than the real one it pads, so a size
+    below ``floor`` measures the real catalog instead. Raising it rather than
+    refusing it is what keeps the DEFAULT sweep runnable: it was written at 38
+    runbooks, and the 100 in it was refused outright once the catalog passed 100.
+    The raised sizes are returned so the run can say so; an explicit ``--sizes 100``
+    that silently came back as a 154-runbook row would be a mislabelled number.
+    """
+    raised = sorted({s for s in sizes if 0 < s < floor})
+    return tuple(sorted({max(s, floor) for s in sizes})), raised
+
+
 def sweep(
     *,
     sizes: tuple[int, ...] = DEFAULT_SIZES,
@@ -155,14 +170,9 @@ def sweep(
 
     real = load_catalog(default_runbooks_dir())
     floor = len(real.runbooks)
-    sizes = tuple(sorted({floor if s <= 0 else s for s in sizes}))
-    # Checked BEFORE the artifact is loaded and a thousand documents embedded: a
-    # ValueError two minutes in is an argument bug reported as a slow failure.
-    too_small = [s for s in sizes if s < floor]
-    if too_small:
-        raise ValueError(
-            f"catalog sizes {too_small} are smaller than the real catalog ({floor})"
-        )
+    sizes, raised = effective_sizes(sizes, floor)
+    if raised:
+        log(f"  sizes {raised} are below the real catalog: measured at {floor} runbooks")
 
     largest = max(sizes)
     pool: list[Distractor] = generate_distractors(largest - floor, real, seed=seed)
