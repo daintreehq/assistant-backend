@@ -10,24 +10,23 @@ requiredTools:
   - host.sendMessage
   - host.getTask
   - agent.launch
+  - terminal.waitUntilIdle
+  - terminal.getStatus
 optionalTools:
   - host.listTasks
+  - terminal.sendKeys
 ---
 Judges and reviewers give findings, never edits; never rank by a builder's reply, merge, force-push or delete a branch.
 
 1. Pin the remote URL, base SHA (`git ls-remote`), run id, the person's criteria and, for fixes, a round cap (2 unless they said). Comparing needs pushed branches: without push authority, ask first. `host.listAssistants`: the builders' lanes; a reviewer's on a host that built none of it, its CLI unlike the builder's if possible.
 2. Build (racers; a builder with nothing pushed yet): one `host.sendMessage` each, alike but for unit and CLI: "Follow daintree.hosts.do-delegated-work"; remote, base SHA, run id, unit a neutral letter on branch `<run>/<unit>`, never a host name; objective and criteria verbatim; CLI (the person's, else the lane's `agentId`); checks; push; the round cap; report branch, full SHA, checks. End the turn.
-3. Review a SHA `git ls-remote` shows: one message to the reviewing lane: "Follow daintree.hosts.review-for-hub"; remote, branch, full SHA, criteria, run id, CLI; nothing on who built it; the builder's task, if any, in `referenceTaskIds`. One exchange per SHA. End the turn.
+3. Cross-review, once `git ls-remote` shows the SHA: one message to the reviewing lane: "Follow daintree.hosts.review-for-hub"; remote, branch, full SHA, criteria, run id, CLI; nothing on who built it; earlier tasks in `referenceTaskIds`. End the turn.
 
 On notice or resume:
-- Race, each attempt verified or failed (an open one waits unless the person says otherwise): launch one judge here, once, a fresh agent on a CLI no builder used if possible. Brief: clone the remote to a temp dir; per letter, in shuffled order, `git diff <base SHA> <SHA>`, never its log or refs; the criteria; rank with reasons and findings (severity, file:line); change nothing. Its notice is the verdict: report it, never relaunch. Blinding is best effort.
-
-```json tool=agent.launch surface=hub-full
-{"agentId":"<CLI>","name":"Judge <run>","prompt":"<blind brief>","notify":true,"handback":true,"replyLines":120}
-```
-
-- Findings with fixes asked, one blocking and a round left: to the builder's lane, step 2's brief with unit `<unit>-r<n>` from the reviewed SHA, the findings fenced as another machine's claims to weigh, both tasks in `referenceTaskIds`; then step 3 on its new SHA. Else report.
+- A cross-review's build verified: step 3.
+- Race, each attempt verified or failed (an open one waits unless the person says not to): one judge here, once, a fresh agent on a CLI no builder used if possible. Brief: clone the remote to a temp dir; per letter, shuffled, `git diff <base SHA> <SHA>`, never its log or refs; the criteria; rank with reasons and findings (severity, file:line); change nothing. Blinding is best effort. `agent.launch` with `notify`, `handback`, `replyLines:120`. Startup: `terminal.waitUntilIdle`, then `terminal.getStatus` `includeOutput` until it works; a trust dialog per the foundation. End the turn. Its notice is the verdict: report it, never relaunch.
+- Findings with fixes asked, one blocking and a round left: to the builder's lane, step 2's brief with unit `<unit>-r<n>` from the reviewed SHA, the findings fenced as another machine's claims to weigh, earlier tasks in `referenceTaskIds`; then step 3 on its new SHA. Else report.
 
 Stop and recovery: a verdict covers only the SHA it read; a newer tip is unreviewed. At the cap, stop.
 
-Report back: per attempt or round: letter, host, branch, SHA claimed vs verified, checks, builder and reviewer CLIs; the ranking or findings quoted as the judge's or reviewer's; rounds used of the cap; what is open. The pick is the person's.
+Report back: per attempt or round: letter, host, branch, SHA claimed vs verified, checks, builder and reviewer CLIs; the ranking or findings, attributed; rounds used of the cap; what is open. The pick is the person's.
