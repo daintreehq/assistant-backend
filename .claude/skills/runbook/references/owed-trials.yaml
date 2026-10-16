@@ -351,6 +351,62 @@ trials:
     execution:
       - "Before the yes the hub sent only survey questions, one per candidate lane, and showed the placement table (hub transcript)."
 
+  - id: race-and-review
+    runbook: daintree.hosts.race-and-review
+    also: [daintree.hosts.do-delegated-work, daintree.hosts.review-for-hub]
+    issue: 94
+    caller: hub
+    path: fleet
+    hosts: 2
+    needs: [distinct-sign-ins]
+    status: owed
+    lanes: {host_a: claude, host_b: codex}
+    combos:
+      - {hub: claude}
+      - {hub: codex}
+    setup:
+      - "Two hosts with enrolled lanes in {project}: {host_a} on Claude Code, {host_b} signed in to Codex only; Claude Code or Codex signed in on the Shell, with {project} open there."
+    steps:
+      - say: |-
+          Have {host_a} and {host_b} both add a --currency flag to the CLI in {project}, with tests, and pick the better one. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.race-and-review]
+            calls: [host.listAssistants]
+            never: [host.sendMessage]
+      - say: Yes, push each attempt's branch to origin.
+        expect:
+          hub:
+            calls: [host.sendMessage, host.getTask, agent.launch]
+            never: [host.cancelTask]
+            notices: [hub-update, pane-notice]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - say: |-
+          Now have {host_b} review {host_a}'s attempt for correctness, and send anything blocking back to {host_a} to fix. One round at most.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.race-and-review]
+            calls: [host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.review-for-hub]
+            calls: [worktree.createWithRecipe, agent.launch, assistant.reply]
+            notices: [lane-wake]
+    checks:
+      - "Before the push yes, no exchange was sent (Shell's record) and neither host has a branch or worktree for the run."
+      - "Each attempt's branch on {remote} is named by the run and a neutral letter, never a host name; each SHA in the report equals git ls-remote {remote} for it."
+      - "One judge pane on the Shell, launched once; {project}'s checkout on the Shell is unchanged (git status --porcelain, git worktree list)."
+      - "{host_b}'s review worktree is at the reviewed SHA; at most one revision branch on {remote}, starting at the reviewed SHA; nothing merged, deleted or force-pushed (for-each-ref before and after)."
+    execution:
+      - "The judge's brief named letters with full SHAs and the base SHA, in an order unlike the build order, and no host, CLI or author (hub transcript)."
+      - "The review brief named the remote, branch, full SHA, criteria, run id and a CLI other than {host_a}'s, and not who built it; the revision brief repeated the build brief with the findings fenced as another machine's claims (hub transcript)."
+      - "The report quoted the ranking as the judge's words, gave rounds used of the cap, and left the pick and branch cleanup to the person (hub transcript)."
+
   - id: recover-and-clean-up
     runbook: daintree.hosts.recover-and-clean-up
     also: [daintree.hosts.clean-up-for-hub]
