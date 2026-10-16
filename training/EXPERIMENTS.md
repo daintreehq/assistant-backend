@@ -2014,6 +2014,18 @@ The bundle numbers use the budget test's own sum: each selectable runbook's body
 For the before→after runner-up scores, `bench search` was pointed at the `133bab34` runbook files
 by swapping the `load_catalog` that `benchmarks/runbook_selection/search.py` calls.
 
+## On develop after the measurement
+
+The tables above are pinned to `af7b68d3`. This work was then rebased onto develop `076ad479`.
+- **What arrived:** four routing texts rewritten (`worktree.manage-resource` whole, and the
+  `whenToUse` of `release.deploy-and-verify`, `release.publish-package` and
+  `plugins.develop-project-plugin`) and 85 cases.
+- **The gate on that tree:** passes at 1,890/2,000 recall-pass, strict 1,622, extra 354 (0.177),
+  `candidate_miss` 0.
+- **The audit:** 29/39 recall-pass, 21 strict. The one move is `own-remote-vite-port-taken`, which
+  now passes recall: `free-busy-port` displaces `hosts.recover-and-clean-up` within the cap,
+  with `hosts.reassign-host-work` still an extra.
+
 ## Still open
 - **The retrain** in finding 1, with rows for findings 3–6 first.
 - **Owners for finding 7**, decided in the routing text.

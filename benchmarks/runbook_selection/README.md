@@ -217,6 +217,7 @@ python -m benchmarks.runbook_selection.bench coverage
 python -m benchmarks.runbook_selection.bench local --out "$R/wave-after.json"
 python -m benchmarks.runbook_selection.bench compare "$R/wave-before.json" "$R/wave-after.json"
 python -m benchmarks.runbook_selection.bench scale        # ~2 min; today's size, 200, 500, 1000
+python -m benchmarks.runbook_selection.bench pairs        # the hub/lane pairs, end by end
 git worktree remove ../wave-base
 ```
 
