@@ -12,19 +12,19 @@ optionalTools:
   - host.list
   - host.listTasks
 ---
-Lanes run their own services (daintree.hosts.demo-for-hub per service, no walkthrough). No tool here makes or sees a forward or a host's network.
+Lanes run their own services (daintree.hosts.demo-for-hub each, no walkthrough). No tool here makes or sees a forward or a host's network.
 
-1. Map, per service: host, project, lane (`host.listAssistants`), remote, branch, full SHA (pushed: `git ls-remote`), start command, port, services it calls. Per edge, the caller: a host's server (its `localhost` is that host's own) or a browser (a Shell window reaches only its own host's forwards).
-2. Address each edge, assuming nothing:
+1. Map, per service: host, lane (`host.listAssistants`), remote, branch, full SHA (`git ls-remote`), start command, port, services it calls. Per edge, the caller: a host's server (its `localhost` is that host's own) or a browser (a Shell window reaches only its own host's forwards).
+2. Address each edge:
    - same host: `localhost` there.
-   - browser: a Shell forward, loopback here, local port may differ, no other host reaches it; the person reads it in Ports, you `curl` it; clicks stay unverified. Never a browser to another host's API (such pages are refused private-network addresses): a server calls it.
-   - server to server across hosts: only an existing route, an address the person names or the callee's lane reports; ask the caller's lane for one request to it from its own machine. A loopback bind, refusal or timeout is the blocked edge: report hosts, address, result; the person picks co-location or names one private address (the only exception to demo-for-hub's loopback). Never `0.0.0.0`, a firewall, a tunnel or a forward.
-3. Start each service once, when what it calls is ready and those edges verified: one `host.sendMessage`, `taskId` `<run>-<service>`, no `waitMs`: remote, branch, SHA; verified addresses in untracked dev config; invented data; no credential from another host; never a shared, staging or production endpoint or database. Reply as demo-for-hub does, plus the bind, a good readiness request and who stops it. Probes and starts are separate rounds; end the turn each time.
+   - browser: a Shell forward, loopback here, local port may differ, no other host reaches it; the person reads it in Ports, you `curl` it; clicks stay unverified. Another host's API is never browser-direct (private-network addresses are refused): a server calls it.
+   - server to server across hosts: once the callee is ready, an address the person names or its lane reports; ask the caller's lane for one request to it from its own machine. A loopback bind, refusal or timeout is the blocked edge: report hosts, address, result; the person picks co-location or names one private address, the only exception to demo-for-hub's loopback: its lane stops, then rebinds there. Never `0.0.0.0`, a firewall, a tunnel or a forward.
+3. Start each service once, when what it calls is ready and those edges verified: one `host.sendMessage`, `taskId` `<run>-<service>`, no `waitMs`: remote, branch, SHA; bind loopback or the one named address; verified addresses in untracked dev config; invented data; no copied credential; never a shared, staging or production endpoint or database. Reply as demo-for-hub does, plus the bind, a good readiness request and who stops it. Each probe and start ends the turn.
 
-On notice or resume: `completed` without that evidence is a blocker, not ready. A changed address or SHA is a new `taskId`, facts in its text.
+On notice or resume: `completed` without that evidence is a blocker, not ready.
 
-4. All ready: the caller's lane sends one request through its service to its callee with header `X-Dev-Marker: <run>-<sha>`, replies status and body; the callee's lane replies whether its log shows the marker. Compatible: expected response, marker seen, SHAs the pins. Unseen: unverified.
+4. All ready: the caller's lane sends one request through its service to its callee with header `X-Dev-Marker: <run>-<sha>`, replies status and body; the callee's lane replies whether its log shows the marker answered 2xx. Compatible: the body carries the callee's SHA, the log agrees, SHAs the pins. Else unverified.
 
-Stop and recovery: one start per service. On request, message each lane to stop its service and reply its listener is gone, callers first.
+Stop and recovery: one start per service; a rebind or new SHA is a new `taskId` after the stop reply. On request, message each lane to stop its service and reply its listener is gone, callers first.
 
-Report back: per service, SHA pinned vs served, owner; per edge, caller, address, how verified; readiness and end-to-end apart; blocked edges; what runs.
+Report back: per service SHA pinned vs served and owner; per edge caller, address, how verified; readiness and end-to-end apart; blocked edges.
