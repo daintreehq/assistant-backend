@@ -1,0 +1,260 @@
+# daintree.hosts.timebox-swarm: the hub giving one or several Remote Hosts a fixed time on a task.
+# Each host's assistant holds its own box on its own machine; the hub sends one bounded brief per
+# host with an absolute deadline, ends its turn, and reports a row per host at the bound (finished
+# early, stopped by the deadline, stopped late, blocked, unconfirmed or not reached) with that
+# host's own times and partial work. Nothing on the sending machine keeps time.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, a
+# pre-launch "can they enforce it" request, and the follow-up at the bound. Traps: this runbook
+# wins against a local time box (daintree.orchestration.timebox-attempt), unbounded sends
+# (daintree.hosts.swarm-fan-out, daintree.hosts.delegate-to-host), a stop of work already sent
+# (daintree.hosts.steer-swarm) and deferred starts (daintree.orchestration.watch-outcome); and the
+# reverse traps, where each neighbour keeps its own request and this runbook must not ride along,
+# including a receiving host's own assistant given a deadline by the hub.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: timebox-swarm-issue-ten-minutes
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "when they give that work a FIXED AMOUNT OF TIME
+      starting now, after which every host stops and reports how far it got". At base it selected
+      daintree.orchestration.timebox-attempt, the local procedure, which cannot reach other
+      machines.
+    messages:
+      - role: user
+        content: Give the remote hosts ten minutes to try this, then stop and report.
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-issue-which-really-stopped
+    category: single-runbook
+    note: >-
+      The issue's second request: stop evidence per worker. Decided by "one row per host at the
+      bound: finished early, stopped by the deadline, stopped late, blocked or unconfirmed". At
+      base it selected daintree.worktree.manage-resource, daintree.hosts.park-swarm and
+      daintree.hosts.steer-swarm.
+    messages:
+      - role: user
+        content: Timebox the swarm and verify which workers really stopped by the deadline.
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-issue-no-invented-timer
+    category: single-runbook
+    note: >-
+      The issue's third request, agent-phrased. Decided by "each host enforces its own deadline,
+      nothing on this machine does" and "a bounded attempt sent to one or several other
+      machines". At base it selected daintree.hosts.execute-distributed-workflow.
+    messages:
+      - role: user
+        content: Coordinate bounded host-local attempts without promising an unavailable timer.
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-agent-phrased
+    category: single-runbook
+    note: >-
+      How a hub agent describes the task to search. Decided by "FIXED AMOUNT OF TIME starting
+      now" and "with that host's own times, how far it got and next steps". At
+      base it selected daintree.orchestration.timebox-attempt.
+    messages:
+      - role: user
+        content: Send a time-boxed attempt to each Remote Host's assistant with an absolute deadline, have each lane stop its agent at the deadline and report partial results with stop evidence
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-user-casual
+    category: single-runbook
+    note: >-
+      Casual, no punctuation. Decided by "a FIXED AMOUNT OF TIME starting now, after which every
+      host stops and reports how far it got". At base it selected
+      daintree.orchestration.watch-outcome, daintree.orchestration.timebox-attempt and
+      daintree.hosts.park-swarm.
+    messages:
+      - role: user
+        content: timebox the remote hosts to 10 minutes on this bug then collect what they have
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-can-they-enforce
+    category: single-runbook
+    note: >-
+      The pre-launch feasibility question the procedure answers before sending: "each host
+      enforces its own deadline, nothing on this machine does".
+    messages:
+      - role: user
+        content: before you send it to the hosts, can each of them actually enforce a 15 minute limit? then go
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-collect-at-the-bound
+    category: continuation
+    note: >-
+      The second turn, after the deadline: the hub collects what each host got and which stopped.
+      Decided by "The deliverable is one row per host at the bound: finished early, stopped by the
+      deadline, stopped late, blocked or unconfirmed".
+    messages:
+      - role: user
+        content: give both remote hosts fifteen minutes on the flaky snapshot test, then stop
+      - role: assistant
+        content: Sent to both hosts with a deadline of 10:40 UTC. Each host stops its own agent and replies; I will report as they answer.
+      - role: user
+        content: it's past the deadline now, which hosts actually stopped and what did each one get?
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps
+  - id: timebox-swarm-not-local-timebox
+    category: routing-trap
+    note: >-
+      The agents are on the hosts, not this machine: "a bounded attempt sent to one or several
+      other machines". Fence: "Do not use for a time box on an agent on this machine", which
+      names daintree.orchestration.timebox-attempt.
+    messages:
+      - role: user
+        content: Run a 30-minute attempt on all my hosts in parallel and stop them at the deadline even if unfinished
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-not-fan-out
+    category: routing-trap
+    note: >-
+      The same work on every host, but with a bound: "FIXED AMOUNT OF TIME starting now, after
+      which every host stops". Fence: "sending work with no time bound
+      (daintree.hosts.swarm-fan-out".
+    messages:
+      - role: user
+        content: every remote host gets twenty minutes with codex on the migration, after which each one stops itself and reports
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-not-delegate
+    category: routing-trap
+    note: >-
+      One host, bounded: "a bounded attempt sent to one or several other machines". Fence:
+      "sending work with no time bound (daintree.hosts.swarm-fan-out; one host,
+      daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: Have the assistant on my other Mac try the date picker bug until 4pm and stop wherever it is, I want its partial work
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-not-steer-swarm
+    category: routing-trap
+    note: >-
+      The stop is set before the work goes out, not asked of a run already under way: "a FIXED
+      AMOUNT OF TIME starting now". Fence: "stopping or changing a run already sent
+      (daintree.hosts.steer-swarm)".
+    messages:
+      - role: user
+        content: put a deadline on the remote run before it goes out, 25 minutes, and report which machines kept to it
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-not-watch-outcome
+    category: routing-trap
+    note: >-
+      The clock bounds work starting now on the hosts; it does not schedule a later start: "FIXED
+      AMOUNT OF TIME starting now". Fence: "a later start or a wake when work finishes
+      (daintree.orchestration.watch-outcome)".
+    messages:
+      - role: user
+        content: let my other machines try the font loading fix until 11:30 and then stop, no later
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps
+  - id: timebox-swarm-reverse-local-pane
+    category: routing-trap
+    note: >-
+      A time box on an agent on this machine stays local: daintree.orchestration.timebox-attempt
+      "Use when an agent gets a fixed amount of TIME on a task and is stopped at the deadline with
+      a report of how far it got". This runbook's fence: "Do not use for a time box on an agent on
+      this machine".
+    messages:
+      - role: user
+        content: let the claude pane here have fifteen minutes on the lint errors, then stop it and tell me how far it got
+    expect:
+      required: [daintree.orchestration.timebox-attempt]
+      optional: [daintree.foundation]
+
+  - id: timebox-swarm-reverse-lane-given-deadline
+    category: routing-trap
+    note: >-
+      On the receiving host, the lane carries out the bounded attempt itself:
+      daintree.orchestration.timebox-attempt "A Remote Host's assistant given its deadline in a
+      hub message follows this too". This runbook's fence: "or on a host whose own assistant was
+      handed such a deadline (daintree.orchestration.timebox-attempt)".
+    messages:
+      - role: user
+        content: "hub message: you have until 15:10 on this host's clock to attempt the upgrade, stop at the deadline and report partial results"
+    expect:
+      required: [daintree.orchestration.timebox-attempt]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.handle-hub-message]
+
+  - id: timebox-swarm-reverse-steer-now
+    category: routing-trap
+    note: >-
+      No bound set up front; a run already out is stopped now: daintree.hosts.steer-swarm "wants
+      work they ALREADY SENT to their other machines ... STOPPED, CALLED OFF or CHANGED while it
+      is under way". This runbook's fence: "stopping or changing a run already sent
+      (daintree.hosts.steer-swarm)".
+    messages:
+      - role: user
+        content: stop the remote run now, the hosts have had long enough
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-reverse-fan-out-unbounded
+    category: routing-trap
+    note: >-
+      Every host, no time bound: daintree.hosts.swarm-fan-out "wants the SAME WORK done on EVERY
+      Remote Host this Shell reaches". This runbook's fence: "sending work with no time bound
+      (daintree.hosts.swarm-fan-out".
+    messages:
+      - role: user
+        content: send the parser fix to every host, no rush
+    expect:
+      required: [daintree.hosts.swarm-fan-out]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-reverse-delegate-unbounded
+    category: routing-trap
+    note: >-
+      One host, no bound: daintree.hosts.delegate-to-host "wants ONE piece of WORK done by the
+      Daintree assistant on another machine". This runbook's fence: "one host,
+      daintree.hosts.delegate-to-host".
+    messages:
+      - role: user
+        content: Have the build server's assistant fix the flaky checkout test on a new branch and report the commit
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-reverse-later-start
+    category: routing-trap
+    note: >-
+      The time says when to start, not how long to work: daintree.orchestration.watch-outcome
+      "Any deferred action belongs here". This runbook's fence: "a later start or a wake when work
+      finishes (daintree.orchestration.watch-outcome)".
+    messages:
+      - role: user
+        content: in twenty minutes send the remote hosts the parser task
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation, daintree.hosts.foundation]
