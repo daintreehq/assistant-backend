@@ -111,7 +111,7 @@ boundaries:
     confusable_with: [daintree.hosts.integrate-host-branches]
   - query: the producer and consumer are separate repos so nothing gets merged, just confirm both sides match contract version three
     confusable_with: [daintree.hosts.integrate-host-branches]
-  - query: brief the consumer host's lane with the frozen contract commit and tell it to stop and ask if the contract needs changing
+  - query: brief both the producer and the consumer hosts with the frozen contract commit, tell each to stop and ask if it needs changing, and track which side has adopted it
     confusable_with: [daintree.hosts.do-delegated-work]
   - query: have each remote side run the contract's compatibility test at its final commit and tell me which contract version it passed against
     confusable_with: [daintree.hosts.verify-for-hub]
