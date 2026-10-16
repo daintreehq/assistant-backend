@@ -460,48 +460,22 @@ boundaries:
   - query: 'ask codex in a pane here for a second opinion on my retry branch and tell me what it says'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
+  - query: get an agent to look through the migration code and tell me what it finds
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
+  - query: nothing's open on this yet. get one fresh Gemini to say whether the new storage layout is sensible, and bring me its answer.
+    confusable_with: [daintree.agents.ask-running-agent, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: hows it going
-    history:
-      - 'user: ask claude what it makes of the retry logic in the provider adapter'
-      - 'assistant: Confirmed — spawning a read-only Claude Code agent in explore mode with that question. Waiting on it now.'
-    active: [daintree.agents.ask-and-relay]
   - query: still waiting?
     history:
       - 'user: spawn something read-only to check whether the state token handles clock skew and report back'
       - 'assistant: Launched agent "skew-check" (terminal t-4b) in explore mode. Awaiting its answer.'
     active: [daintree.agents.ask-and-relay]
-  - query: just tell it yes
-    history:
-      - 'user: get an agent to look at the auth middleware and tell me what it finds'
-      - 'assistant: Agent spawned on terminal t-9. It''s asking whether it should include the test files in scope.'
-    active: [daintree.agents.ask-and-relay]
-  - query: did it say anything about the refill interval specifically
-    history:
-      - 'user: ask codex whether our token bucket is thread safe'
-      - 'assistant: Codex says it is not — the refill path reads and writes `tokens` without holding the lock, so two concurrent takes can both succeed. (agent: codex, terminal t-2)'
-    active: [daintree.agents.ask-and-relay]
-  - query: give me its exact wording, not the summary
-    history:
-      - 'user: ask claude what it thinks of the prompt assembly order'
-      - 'assistant: Relayed: Claude flags the trailing injected-context block as the only volatile row and says the ordering looks deliberate. (terminal t-7)'
-    active: [daintree.agents.ask-and-relay]
-  - query: nice. now same question but for the speculation path
-    history:
-      - 'user: spawn an agent and ask it how the docs mcp lookup is wired'
-      - 'assistant: Done — agent on terminal t-3 answered: the orchestrator calls the MCP directly with one stateless tools/call, no initialize handshake.'
-    active: [daintree.agents.ask-and-relay]
   - query: which agent did you end up using?
     history:
       - 'user: ask an agent whether the coverage floors actually ratchet'
       - 'assistant: Spawned a read-only agent (terminal t-11). It''s still working — I''ll re-await it.'
-    active: [daintree.agents.ask-and-relay]
-  - query: yeah ask it the same thing about the selector cadence
-    history:
-      - 'user: get claude''s take on the provider routing policy'
-      - 'assistant: Claude''s answer, relayed: one policy for every call, throughput-sorted with a latency floor; it thinks the latency_critical flag is the only sensible exception. (terminal t-6)'
-      - 'user: ok good'
-      - 'assistant: Anything else you want asked while that terminal is still open?'
     active: [daintree.agents.ask-and-relay]
 topic_shifts:
   - query: just get claude-2 on its own to look at cache.py and tell me if the locking is safe
@@ -638,35 +612,11 @@ topic_shifts:
       - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
     active: [daintree.orchestration.competition]
     run: 2026-09-24-selector-hardening
-  - query: cool. ask claude what it thinks of the backoff in client.go, just bring back its answer
-    history:
-      - 'user: how much claude code usage do i have left'
-      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-24-selector-hardening
-  - query: same again but gemini
-    history:
-      - 'user: ask claude what it makes of the retry logic in client.go'
-      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
-    active: [daintree.agents.ask-and-relay]
-    run: 2026-09-24-selector-hardening
-  - query: what about codex
-    history:
-      - 'user: ask claude what it makes of the retry logic in client.go'
-      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
-    active: [daintree.agents.ask-and-relay]
-    run: 2026-09-24-selector-hardening
   - query: ok. ask gemini whether the webhook retries in hooks.ts are idempotent
     history:
       - 'user: check usage on gemini'
       - 'assistant: Gemini /stats shows 812 of 1000 daily requests used, resets at midnight PT.'
     active: [daintree.agents.check-usage-limits]
-    run: 2026-09-24-selector-hardening
-  - query: cool. unrelated — ask gemini what it thinks the biggest risk in our webhook retry logic is and tell me
-    history:
-      - 'user: start work on #733'
-      - 'assistant: Created worktree issue-733-retry-uploads and spawned claude in t6 with a supervisor watcher.'
-    active: [daintree.workflow.start-work-on-issue]
     run: 2026-09-24-selector-hardening
   - query: get a fresh codex to read the cache module and tell me whether that key is actually safe
     history:
@@ -674,6 +624,13 @@ topic_shifts:
       - 'assistant: claude-5 says the key includes the tenant id to avoid cross-tenant leaks.'
     active: [daintree.agents.ask-running-agent]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: yep, ask it and bring me the answer.
+    history:
+      - 'user: I want Gemini''s opinion on the snapshot format.'
+      - 'assistant: No Gemini session exists. I can launch one read-only, ask that question and relay its answer.'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-running-agent]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[agent a_3021 completed]'
     history:
@@ -686,9 +643,5 @@ wakes:
       - 'assistant: Read-only agent up in t_4455 with that exact question. I''ll relay its answer once it lands.'
     active: [daintree.agents.ask-and-relay, daintree.foundation]
 docs:
-  - query: yep ask it
-    history:
-      - 'user: hi'
-      - 'assistant: Hi — ready when you are.'
 foundation_boundaries:
   - ask an agent what it makes of the auth module

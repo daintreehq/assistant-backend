@@ -51,3 +51,9 @@ reuse a `--run` and you get an error rather than a silently replaced record.
 Never edit a file in this directory; correct the curated YAML instead, which
 is what it is for. Note that ingest's no-op property is about the CORPUS: if
 you prune a run and then re-ingest its journal, the rows come back.
+
+The `2026-10-16-synthetic-audit--*` journals contain audit action records rather
+than generator bundles: raw proposals, blind labels, adjudications and exclusion
+fingerprints. They document manual curation and must not be replayed through
+`ingest_journal`; replacements and removals are already reflected in the source
+YAML. `training/AUDIT-2026-10-16.md` records the method and results.

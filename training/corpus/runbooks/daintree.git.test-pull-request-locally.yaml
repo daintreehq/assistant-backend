@@ -82,6 +82,12 @@ boundaries:
     confusable_with:
     - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
+  - query: 'Check out PR #1739''s exact head in an isolated worktree and exercise the failing upload scenario locally.'
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.worktree.create-plain-worktree
+      - daintree.review.review-change
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: yeah that's the sharp prebuilt, it's fine — go ahead
     history:
@@ -131,12 +137,6 @@ topic_shifts:
       - 'user: go through the review queue and tell me which PRs are good to merge'
       - 'assistant: Verdicts (checked against source): #412 ready; #415 cannot assess (setup failed in pr-415); #418 needs changes — unguarded null at src/auth/session.ts:142; #420 ready. CI green on #412 and #420 heads. Nothing posted.'
     active: [daintree.review.review-pr-queue]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: 'fine, but does #77 actually work? pull it down and run the tests'
-    history:
-      - 'user: review #77'
-      - 'assistant: Codex found one medium issue (missing timeout at src/net/client.ts:31); otherwise the change matches its description. Nothing posted.'
-    active: [daintree.review.review-change]
     run: 2026-09-28-catalog-expansion-stateful
   - query: 'try #340 on my machine and see if it really fixes it for me'
     history:

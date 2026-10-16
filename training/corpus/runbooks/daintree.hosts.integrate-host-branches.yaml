@@ -183,3 +183,12 @@ boundaries:
   - query: 'The branches from my two remote machines need to be combined into one on the build host'
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
+
+topic_shifts:
+  - query: The hosts have finished and pushed the three exporter units. Verify their exact SHAs and brief one remote integrator to combine those inputs in order on a new branch.
+    history:
+      - 'user: what finished while the hub was offline?'
+      - 'assistant: Three completed units are recorded, each with a pushed branch and SHA.'
+    active: [daintree.hosts.recover-and-clean-up]
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: 2026-10-16-synthetic-audit

@@ -168,9 +168,6 @@ boundaries:
   - query: 'Uncaught TypeError: Cannot read properties of undefined (reading ''map'') at ProductList (ProductList.tsx:42:18) at renderWithHooks (react-dom.development.js:16305:18) at mountIndeterminateComponent (react-dom.development.js:20074:13) The above error occurred in the <ProductList> component [HMR] connected thats what the console in the daintree preview panel shows, page is just white. can you debug it'
     confusable_with: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
-  - query: The dev preview shows a blank page and the console says 'Cannot read properties of undefined (reading map)'
-    confusable_with: [daintree.ci.diagnose-and-fix]
-    run: 2026-09-28-agent-queries
   - query: Tests pass but the app in the preview panel throws a hydration mismatch error in the browser console; fix it
     confusable_with: [daintree.ci.diagnose-and-fix]
     run: 2026-09-28-agent-queries
@@ -441,11 +438,6 @@ topic_shifts:
       - 'user: file an issue about the coupon field'
       - 'assistant: Created #712, labelled bug, assigned to you.'
     active: [daintree.forge.manage-issue]
-  - query: can you actually see the preview or only read its console? and either way tell me what errors are in there
-    history:
-      - 'user: where were we'
-      - 'assistant: The ui refresh branch, agent finished last night, nothing merged.'
-    active: [daintree.orchestration.status-and-resume]
   - query: after that agent's change, reload the preview and tell me if the error is actually gone or just old messages
     history:
       - 'user: send the review findings over to the agent'
@@ -471,11 +463,6 @@ topic_shifts:
       - 'user: did the agent do what it claimed'
       - 'assistant: The diff matches the brief and it ran the unit tests, which passed.'
     active: [daintree.orchestration.verify-agent-work]
-  - query: look at the running preview, i'm getting a 'cannot read properties of undefined' the moment i click save
-    history:
-      - 'user: what''s blocking #660'
-      - 'assistant: Nothing on the forge — CI is green and it''s approved. It''s waiting on you.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
   - query: The React app in Dev Preview is blank; inspect the runtime error and fix it.
     history:
       - 'user: hi'
@@ -484,10 +471,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: where's this coming from — console says Cannot read x of null in CartSummary. preview is open
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: 404 on a js chunk in the preview console
     history:
       - 'user: hows your day going'
@@ -496,10 +479,6 @@ topic_shifts:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
-  - query: grab whatever errors are in the console and tell me whats actually wrong
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: i fixed the import path, reload it
     history:
       - 'user: morning'
@@ -520,10 +499,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: start a dev preview for me
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: reading the source isn't going to tell you this one, it only shows up when the page actually runs. preview's loaded
     history:
       - 'user: good morning'
@@ -536,10 +511,6 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: Tell me what this Assistant can actually prove about the visual preview.
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: cors error in the browser console of the preview, i can't get the api call through
     history:
       - 'user: hey'
@@ -556,10 +527,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: Take a screenshot of the preview and tell me whether the layout is correct.
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: Inspect console warnings and errors in the open preview panel.
     history:
       - 'user: yo'
@@ -617,14 +584,6 @@ topic_shifts:
       - 'user: have agents poke at the app and find bugs'
       - 'assistant: Three charters running against the dev preview on localhost:5173.'
     active: [daintree.orchestration.bug-bash]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: the preview's console is full of hydration errors on /settings — dig into that
-    history:
-      - 'user: check out #340 and see if it works'
-      - 'assistant: Worktree pr-340 is ready at head 5c2e9ab (setupState ready). project.runCheck `test`: passed, 212/212.'
-      - 'user: spin it up so I can click around'
-      - 'assistant: Dev Preview "Preview #340" is running in pr-340.'
-    active: [daintree.git.test-pull-request-locally]
     run: 2026-09-28-catalog-expansion-stateful
   - query: the checkout page open in the preview panel is throwing a console error — debug that
     history:

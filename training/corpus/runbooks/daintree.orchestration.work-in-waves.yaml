@@ -139,6 +139,39 @@ boundaries:
   - query: "just keep chewing through the backlog for me. grab a few that are unassigned and ready, get agents on them, get them merged, then grab the next few off the updated main. stop when there's nothing left to grab"
     confusable_with: [daintree.workflow.find-issue-work]
     run: transcript-2026-10-16-batch-workflows
+  - query: 'Execute the approved release board: issues 361 and 364 first, then 370 and 372 after both initial PRs merge; create each second-group branch from the updated release branch.'
+    confusable_with: [daintree.orchestration.fan-out-work, daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
+  - query: Run the five ticket groups from delivery-plan.md, using the Work recipe per issue; require green checks, one merge pass and checkout removal between groups.
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Advance the next ordered issue batch only after the current batch has landed, even if an agent slot becomes free early.
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Use one merge agent for each finished batch of issues; wait for its verified merges before creating the following batch of worktrees.
+    confusable_with: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Continue the issue waves on develop, with integration CI checked after each batch lands and before the next batch branches.
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
+  - query: Apply the Build-and-PR recipe to each issue in wave A, then merge and retire that wave before applying the recipe to wave B.
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-10-16-synthetic-audit
+  - query: Run the ticket schedule one group at a time with a fresh main baseline after each merged group; do not refill individual slots inside a group.
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: can we do the small fixes first, merge that lot, then branch the two bigger tickets from what landed? agent per ticket like before
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: one ticket per agent, two tickets per round, and nobody starts the next round until both PRs are in develop
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: go through all 18 in the groups in the doc; land each group and clean up before branching the next
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-10-16-synthetic-audit
+  - query: wave one is 903, 905 and 906; wave two is 910. they're already planned. please run them right through, merge between waves
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: yep retry those deletes and then kick off the merge
     history:
@@ -198,3 +231,110 @@ followups:
       - "assistant: Group 2 is merged and its worktree removed. Group 3 is next: 10, 12 and 13."
     active: [daintree.orchestration.work-in-waves]
     run: transcript-2026-10-16-batch-workflows
+  - query: 'Keep wave two blocked: PR 219 is green but PR 221 still has an integration check running. Resume the merge gate when both settle.'
+    history:
+      - 'user: Run these tickets as two merge-gated waves.'
+      - 'assistant: Wave one produced PRs 219 and 221. Neither is merged. One required integration check is pending.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: Reconcile the interrupted merge pass against the actual merged PRs before advancing to the remaining issues in the wave plan.
+    history:
+      - 'user: Work the approved board in successive waves, merging each before continuing.'
+      - 'assistant: The merge agent stopped after reporting PR 418 merged; PRs 420 and 421 are still unconfirmed. Wave two has not started.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.status-and-resume]
+    run: 2026-10-16-synthetic-audit
+  - query: Start issues 598 and 601 from freshly fetched main now that every PR from the previous round is merged and its old checkouts are gone.
+    history:
+      - 'user: Do the six issues in three merge-gated rounds.'
+      - 'assistant: Round one is merged and cleaned up. Round two is 598 and 601.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.fan-out-work, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
+  - query: Complete this wave and its merge gate, then stop before the third wave; leave the remaining issue list available for later.
+    history:
+      - 'user: Run three waves from the approved task list.'
+      - 'assistant: Wave two agents are working on issues 612 and 614; wave three is still untouched.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.park-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Inspect the failed merge-agent attempt for wave one, avoid replaying PR 74 which is already merged, and finish the other merges before wave two launches.
+    history:
+      - 'user: Work the dependency-ordered issue batches through merge and cleanup.'
+      - 'assistant: Merge agent exited with an error. PR 74 shows merged; PR 75 is still open. No second-batch worktrees exist.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.agents.recover-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: Hold the next wave until the last PR is merged; completing implementation alone does not release the next group.
+    history:
+      - 'user: The second wave depends on the first being merged.'
+      - 'assistant: All three agents report done and PRs exist, but none has merged yet.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Read the merger output and verify that all three PRs landed, then remove the completed wave worktrees and launch the two issues in the following round.
+    history:
+      - 'user: Run the board in merge-gated rounds.'
+      - 'assistant: The wave-one merge agent has just stopped; its notice says it completed its pass.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.verify-agent-work, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
+  - query: PR 832 is still red, so please don't start the next set just because the other two are merged
+    history:
+      - 'user: Work these issues in three rounds, all PRs merged between rounds.'
+      - 'assistant: Round one PRs 830 and 831 are merged; 832 has a failing required check.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: ok those are all in. same setup for the next pair please
+    history:
+      - 'user: Take these four pairs through implementation, merge and cleanup one pair at a time.'
+      - 'assistant: Pair two is merged into develop and its checkouts are removed. Pair three is issues 144 and 147.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: we're using release/8.x for every round, not main. still merge a round before you touch the next one
+    history:
+      - 'user: Run the issue plan in successive merged rounds.'
+      - 'assistant: Ready to branch the first issue worktrees from main.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
+  - query: the merge pane is done. if they're really all merged, clear those worktrees and carry on with group C
+    history:
+      - 'user: Work groups A, B and C, merging and cleaning up between groups.'
+      - 'assistant: Group B merge agent has stopped. Group C issues 680 and 682 remain queued.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.workspace-cleanup, daintree.orchestration.verify-agent-work]
+    run: 2026-10-16-synthetic-audit
+  - query: keep doing the waves, but use Claude rather than Codex for the merge step from here
+    history:
+      - 'user: Run all four issue waves with a merge agent between each.'
+      - 'assistant: Wave one finished. No merge agent for wave two has launched yet.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-10-16-synthetic-audit
+
+topic_shifts:
+  - query: Switch from a refill-as-finished queue to merge-gated issue groups of four, so each new group starts with the previous group on main.
+    history:
+      - 'user: Work through the issue list with four agents at most.'
+      - 'assistant: Four issue agents are running and six tickets remain; I planned to refill each free slot.'
+    active: [daintree.orchestration.fan-out-work]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Carry out the approved two-wave breakdown now; the planning gate is complete, and each wave must merge before the next starts.
+    history:
+      - 'user: Break the export epic into waves and show me the split.'
+      - 'assistant: Approved breakdown is wave one 332/333 and wave two 338. No agents have launched yet.'
+    active: [daintree.orchestration.decompose-work]
+    confusable_with: [daintree.orchestration.decompose-work]
+    run: 2026-10-16-synthetic-audit
+  - query: After this one integration pass, proceed through the remaining issue waves from the agreed list, with a separate CI and merge gate each time.
+    history:
+      - 'user: Integrate the three branches for batch one.'
+      - 'assistant: Batch one is merged into main. Two further batches are listed in the approved delivery plan.'
+    active: [daintree.git.integrate-agent-branches]
+    confusable_with: [daintree.git.integrate-agent-branches]
+    run: 2026-10-16-synthetic-audit

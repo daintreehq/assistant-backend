@@ -13,7 +13,7 @@ Three planes, and the distinction between them is the point:
 
 ``training/data/selection.jsonl``
     COMPILED. A build artifact, reproducible from the plane above by
-    ``training.compile_corpus``, and gated in CI as such.
+    ``training.compile_corpus``, and checked by the ordinary test suite.
 
 Before this split there was one file, ``selection.jsonl``, which was BOTH the
 assembler's output AND its own input: a retrain read the committed corpus back
@@ -372,7 +372,7 @@ def source_files(root: Path | None = None) -> Iterator[SourceFile]:
     """Every curated file, in a deterministic order.
 
     Sorted by path, and within a file by section order then list order, so the
-    compiled artifact is a pure function of the tree's bytes. CI compares the
+    compiled artifact is a pure function of the tree's bytes. Tests compare the
     committed ``selection.jsonl`` against a fresh compile; a set iteration or a
     directory listing order anywhere in here would make that gate flap.
     """

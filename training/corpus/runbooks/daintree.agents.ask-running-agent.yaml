@@ -90,9 +90,6 @@ boundaries:
   - query: there's no competition here and nobody is judging anything. ask claude-2 what it makes of the backoff logic and tell me what it says.
     confusable_with: [daintree.agents.ask-and-relay]
     run: pre-split
-  - query: yep ask it
-    confusable_with: [daintree.agents.ask-and-relay]
-    run: pre-split
   - query: just read out what that agent said in terminal 2
     confusable_with: [daintree.agents.ask-and-relay]
     run: pre-split
@@ -206,3 +203,67 @@ topic_shifts:
       - 'assistant: Reproduced on integrate/refunds and waiting on your decision: async wins, sync wins, or async with an idempotency key.'
     active: [daintree.git.resolve-semantic-conflict]
     run: 2026-09-28-round6-stateful
+  - query: winner gets to write its own acceptance speech, send it over
+    history:
+      - 'user: Have the three agents submit release taglines and pick the winner.'
+      - 'assistant: Contest complete. Codex in terminal t-46 won 3 votes to 1; all ballots have been tallied.'
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-10-16-synthetic-audit
+  - query: did it say anything about the refill interval specifically
+    history:
+      - 'user: ask codex whether our token bucket is thread safe'
+      - 'assistant: Codex says it is not — the refill path reads and writes `tokens` without holding the lock, so two concurrent takes can both succeed. (agent: codex, terminal t-2)'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit
+  - query: give me its exact wording, not the summary
+    history:
+      - 'user: ask claude what it thinks of the prompt assembly order'
+      - 'assistant: Relayed: Claude flags the trailing injected-context block as the only volatile row and says the ordering looks deliberate. (terminal t-7)'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit
+  - query: nice. now same question but for the speculation path
+    history:
+      - 'user: spawn an agent and ask it how the docs mcp lookup is wired'
+      - 'assistant: Done — agent on terminal t-3 answered: the orchestrator calls the MCP directly with one stateless tools/call, no initialize handshake.'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit
+  - query: yeah ask it the same thing about the selector cadence
+    history:
+      - 'user: get claude''s take on the provider routing policy'
+      - 'assistant: Claude''s answer, relayed: one policy for every call, throughput-sorted with a latency floor; it thinks the latency_critical flag is the only sensible exception. (terminal t-6)'
+      - 'user: ok good'
+      - 'assistant: Anything else you want asked while that terminal is still open?'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit
+  - query: what did it say about the backoff timer?
+    history:
+      - 'user: launch a read-only agent to dig into the websocket reconnect path, i want to watch it'
+      - 'assistant: Spawned an explore agent on terminal t-9, no watcher — I''m waiting on it in this turn.'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: Read the answer already left by term-cache about eviction ordering and quote the relevant paragraph.
+    history:
+      - 'user: Ask Codex to explain why cache entries are sorted by access time.'
+      - 'assistant: Codex answered in term-cache and remains open; no review findings were requested.'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-and-relay, daintree.agents.relay-review-feedback]
+    run: 2026-10-16-synthetic-audit
+  - query: ask the one already in the queue worktree why it chose that retry ceiling, and tell me what it says.
+    history:
+      - 'user: Put Claude on the queue retry refactor.'
+      - 'assistant: Claude is open in term-q17 and has committed a retry ceiling of seven.'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit
+  - query: yep, ask it.
+    history:
+      - 'user: Why did the indexing agent drop the secondary sort key?'
+      - 'assistant: term-index is still open from that task. Its transcript does not explain the choice; I can ask that same session.'
+    active: [daintree.agents.ask-running-agent]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit

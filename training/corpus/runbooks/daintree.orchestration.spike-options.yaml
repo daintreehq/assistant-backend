@@ -109,6 +109,9 @@ boundaries:
   - query: 'spike two ORMs on this repo before we pick one'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: 'Assign distinct prototypes for the same document editor: a block model and a plain-text model, then compare undo correctness and startup cost without merging either.'
+    confusable_with: [daintree.orchestration.competition, daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: add Kysely as a third option too, same scenario
     history:

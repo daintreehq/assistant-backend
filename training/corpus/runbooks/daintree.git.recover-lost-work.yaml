@@ -61,6 +61,9 @@ boundaries:
     confusable_with: [daintree.worktree.audit-worktrees]
   - query: I removed three worktrees from the at-risk list by mistake; get back their unpushed commits.
     confusable_with: [daintree.worktree.audit-worktrees]
+  - query: Recover the commits erased by the reset on feature/import into a fresh recovery checkout and identify any missing files.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.git.undo-agent-changes]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: yes that's them, restore all three
     history:
@@ -129,3 +132,10 @@ topic_shifts:
       - 'assistant: claude-8 fixed it, but its output shows it also ran git reset --hard origin/main ''to start clean'' before committing.'
     active: [daintree.edits.spawn-visible-agent]
     run: 2026-09-28-round6-stateful
+  - query: I reset too far and my own commits disappeared. please get them back; don't revert anyone's edits.
+    history:
+      - 'user: We may need to undo the agent''s work.'
+      - 'assistant: No undo was performed. You then ran reset locally and HEAD moved back three commits.'
+    active: [daintree.git.undo-agent-changes]
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: 2026-10-16-synthetic-audit

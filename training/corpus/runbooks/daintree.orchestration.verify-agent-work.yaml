@@ -130,8 +130,6 @@ boundaries:
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: it says it's done but i don't trust that, check it actually made the changes
     confusable_with: [daintree.agents.recover-agent]
-  - query: the agent says the tests pass now — confirm that before I merge
-    confusable_with: [daintree.ci.diagnose-and-fix]
   - query: it claims CI is green, I don't trust that, check it actually did what I asked
     confusable_with: [daintree.ci.diagnose-and-fix]
   - query: did that agent actually fix the thing it said it fixed?
@@ -149,8 +147,6 @@ boundaries:
   - query: the agent says it finished the refactor, did it actually do it?
     confusable_with: [daintree.review.review-change]
   - query: it claims all the tests pass, confirm that before i merge
-    confusable_with: [daintree.review.review-change]
-  - query: check that agent 2 actually did what i asked before i trust it
     confusable_with: [daintree.review.review-change]
   - query: it says it fixed the failing tests — confirm that before i merge
     confusable_with: [daintree.orchestration.supervise-fleet]
@@ -187,8 +183,6 @@ boundaries:
   - query: it claims the review comments are all handled. i don't trust that
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: it says it finished the migration and i dont trust it, check it actually did
-    confusable_with: [daintree.agents.recover-agent]
-  - query: the agent claims the tests pass, confirm that before i merge
     confusable_with: [daintree.agents.recover-agent]
   - query: it says it's done and the tests all pass. check that's true before i merge
     confusable_with: [daintree.agents.answer-waiting-agent]
@@ -240,8 +234,6 @@ boundaries:
     confusable_with: [daintree.workflow.prep-branch-for-review]
   - query: it claims the branch is clean and the tests pass, confirm that before i trust it
     confusable_with: [daintree.workflow.prep-branch-for-review]
-  - query: check the agent actually did what i asked before i merge anything
-    confusable_with: [daintree.workflow.prep-branch-for-review]
   - query: did the agent actually make the change it claims? check before i merge 214
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: codex says it addressed every review comment. did it actually?
@@ -255,12 +247,6 @@ boundaries:
     run: 2026-09-24-selector-hardening
   - query: codex swears the endpoint is done but the route file looks untouched to me
     confusable_with: [daintree.agents.recover-agent]
-    run: 2026-09-24-selector-hardening
-  - query: claude says the tests pass now, confirm that before i merge
-    confusable_with: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-24-selector-hardening
-  - query: codex says t4 is done and tests pass, confirm that before i merge
-    confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
   - query: '[claude t2] ✓ Implemented rate limiter, all 42 tests passing did it actually do it tho'
     confusable_with: [daintree.orchestration.supervise-fleet]
@@ -340,9 +326,6 @@ boundaries:
   - query: Check that the finished agent really implemented all four acceptance criteria before I trust it.
     confusable_with: [daintree.review.cross-review-cohort]
     run: 2026-09-28-catalog-expansion
-  - query: Codex says it added the rate-limit tests and they pass — confirm that before I merge.
-    confusable_with: [daintree.review.red-team-change]
-    run: 2026-09-28-catalog-expansion
   - query: claude-2 says it refactored the parser with no behaviour change; check it actually did that.
     confusable_with: [daintree.runtime.measure-performance]
     run: 2026-09-28-catalog-expansion
@@ -381,12 +364,10 @@ boundaries:
   - query: "it claims the browser tests passed on the remote machine, confirm that yourself before I trust it"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
+  - query: Check the finished agent's claim that the old endpoint is gone by reading its diff and running the relevant checks independently; return a verdict without a review/fix cycle.
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: how's that going?
-    history:
-      - 'user: claude in tab 2 says it finished the rate limiter, check it before i merge'
-      - 'assistant: Pulse shows 3 commits on feat/rate-limit and a clean tree. Running the detected check now and asking the terminal for the final result line.'
-    active: [daintree.orchestration.verify-agent-work]
   - query: ugh. do the other two as well
     history:
       - 'user: verify the agent in the auth worktree actually added the tests'
@@ -424,6 +405,12 @@ followups:
       - 'user: verify the work in tab 5'
       - 'assistant: Verified — 2 commits under the module you named, suite tail quotes 118 passed / 0 failed. Want me to open the PR?'
     active: [daintree.orchestration.verify-agent-work]
+  - query: do the same check for the other two
+    history:
+      - 'user: Verify the three agents really implemented their issue acceptance criteria before I merge.'
+      - 'assistant: Verified the upload agent from its diff and independently run checks. The export and timezone agents still need that check.'
+    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: the one in tab 5 says its already applied phase 1 — i dont buy it, check
     history:
@@ -435,13 +422,6 @@ topic_shifts:
       - 'user: get an agent to add retries to the webhook sender'
       - 'assistant: Agent finished — it added exponential backoff in webhooks/sender.py and two tests.'
     active: [daintree.edits.spawn-visible-agent]
-  - query: the one on 13 says its finished — prove it before i trust it
-    history:
-      - 'user: agent per issue on 12 13 and 14'
-      - 'assistant: Three agents up, one per issue.'
-      - 'user: hows it going'
-      - 'assistant: All three still working, none waiting.'
-    active: [daintree.orchestration.fan-out-work, daintree.orchestration.supervise-fleet]
   - query: check the one in tab 5 too, i dont buy that one either
     history:
       - 'user: verify the agent actually did it'
@@ -469,16 +449,6 @@ topic_shifts:
       - 'user: competition between the four of them, best answer wins'
       - 'assistant: Peer voting done, t_3303 wins.'
     active: [daintree.orchestration.competition]
-  - query: before i trust that - check it really did the thing it said it did
-    history:
-      - 'user: the agent is asking something, tell it yes'
-      - 'assistant: Answered yes, it carried on and has now finished.'
-    active: [daintree.agents.answer-waiting-agent]
-  - query: how does daintree tell completed from exited anyway?
-    history:
-      - 'user: it says the tests pass, confirm that'
-      - 'assistant: Git read first: 4 files changed, test file touched. Pulling the tail to check the run happened.'
-    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
   - query: how far back can you read a terminal — is there a scrollback limit?
     history:
       - 'user: did it actually do it?'
@@ -541,13 +511,6 @@ topic_shifts:
       - 'user: reply saying it''s fixed on 2.3 and close it'
       - 'assistant: Drafted the reply. Before I post — do you want the fix confirmed on 2.3 first?'
     active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
-  - query: back. did it actually fix it or did it just say it did
-    history:
-      - 'user: where is the csv writer implemented?'
-      - 'assistant: src/export/csv_writer.go:41, flush at :118.'
-      - 'user: ping me when it finishes, im going to lunch'
-      - 'assistant: Watcher armed on tab 3 - I''ll wake you when it finishes or asks something.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: ok it says done now. check the diff actually does what i asked
     history:
       - 'user: its been quiet for 15 min'
@@ -663,18 +626,10 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: that finished way too fast. 40 seconds for a whole refactor. check what it actually did
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: it says the readme and the changelog are both updated. confirm both
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: do the same check for the other two
-    history:
-      - 'user: hey, you around?'
-      - 'assistant: Around. What''s the task?'
   - query: its summary says tests pass but the last line i can see says 2 failed. which is it
     history:
       - 'user: hi'
@@ -731,16 +686,18 @@ topic_shifts:
       - 'assistant: codex-3 took over in fix/invoices from the handoff brief and now reports ''all tests pass, feature complete''.'
     active: [daintree.agents.hand-off-task]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: don't just take its word for it
+    history:
+      - 'user: the golden tests are red, fix them'
+      - 'assistant: Agent t-7 says it regenerated the snapshots and everything passes now.'
+    active: [daintree.ci.diagnose-and-fix]
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[async verdict returned: unverified — no commits on the branch]'
     history:
       - 'user: the agent says its done, i dont trust it'
       - 'assistant: Checking. Cheap git reads first, and I''ve sent the terminal tail to a verdict task — waiting on that.'
-    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
-  - query: '[agent task a_4402 completed]'
-    history:
-      - 'user: check that agent actually did what i asked before i merge'
-      - 'assistant: Spawned a read-only explore agent in t_4402 to inspect the diff against the acceptance criteria. I''ll report its verdict.'
     active: [daintree.orchestration.verify-agent-work, daintree.foundation]
   - query: '[watcher fired: t_5150 exited 1 — 4 tests failing, contradicts the agent''s claim]'
     history:

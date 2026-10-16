@@ -238,12 +238,6 @@ topic_shifts:
       - 'assistant: claude-6''s setup and teardown scripts are committed; I created a scratch worktree and it got its own app_scratch database.'
     active: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: seed the database for this branch
-    history:
-      - 'user: make me a worktree for feat/reports'
-      - 'assistant: Created feat/reports at ~/proj-reports off main; no recipe or agent launched.'
-    active: [daintree.worktree.create-plain-worktree]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: apply the new migration in that worktree and check it works
     history:
       - 'user: have claude write a migration adding an index on orders.created_at in feat/perf'
@@ -262,3 +256,10 @@ topic_shifts:
       - 'assistant: codex-2 says it split users to keep auth columns out of the profile query path; quoted from its last reply.'
     active: [daintree.agents.ask-running-agent]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Apply the pending migrations to wt-reports' already isolated local database and read back its schema version.
+    history:
+      - 'user: Give the reports checkout an independent dev environment.'
+      - 'assistant: wt-reports now resolves to its own localhost database reports_dev_42; main resolves to app_dev. The setup script is already written.'
+    active: [daintree.worktree.provision-local-environment]
+    confusable_with: [daintree.worktree.provision-local-environment, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

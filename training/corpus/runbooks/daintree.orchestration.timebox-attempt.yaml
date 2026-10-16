@@ -101,6 +101,13 @@ followups:
       - 'assistant: A 45-minute box is longer than one held wait (30 min cap). I can keep holding with waitUntilIdle past the launch wait, if your host allows it.'
     active: [daintree.orchestration.timebox-attempt]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Stop the single investigation attempt at its twelve-minute budget and inspect the partial diff before reporting what remains.
+    history:
+      - 'user: Give Codex twelve minutes from now on shrinking the import bundle, then stop and report.'
+      - 'assistant: Codex started at 10:16 with deadline 10:28. The held wait returned at 10:29 and the agent is still working.'
+    active: [daintree.orchestration.timebox-attempt]
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: 'hmm, it''s taking forever. new attempt: give codex 15 minutes on it, then stop and tell me where it got'
     history:

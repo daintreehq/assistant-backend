@@ -86,6 +86,12 @@ boundaries:
   - query: "I need to show the integrated branch to the team from my laptop in an hour; get it running with safe data in a preview on this machine"
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
+  - query: Stage the completed invitation flow for tomorrow's walkthrough with a reproducible checkout, fake accounts and an exercised click path.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.runtime.debug-web-app
+      - daintree.terminals.run-visible-command
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: use fake customers only — nothing from the staging dump
     history:

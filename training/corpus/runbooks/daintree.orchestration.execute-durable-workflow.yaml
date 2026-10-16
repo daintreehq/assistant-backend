@@ -257,6 +257,12 @@ boundaries:
   - query: "I need the build moved from webpack to vite. step one swap the config, step two fix the broken imports, step three get CI happy, and each step only starts once the one before actually works. keep a plan I can come back to tomorrow"
     confusable_with: [daintree.orchestration.work-in-waves]
     run: transcript-2026-10-16-batch-workflows
+  - query: 'Track the database move as dependent phases: provision replica, restore snapshot, validate counts, switch traffic and retire the source; checkpoint evidence between sessions.'
+    confusable_with: [daintree.orchestration.work-in-waves, daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
+  - query: it's a phased service migration, not tickets. record the restore, validation and cutover steps so we can pick it up tomorrow
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: run the next one
@@ -306,20 +312,10 @@ followups:
       - 'user: sequence the us-east rollout'
       - 'assistant: Planned. Flag, deploy, 5%, soak, 50%, 100% — each gated on the previous.'
     active: [daintree.orchestration.execute-durable-workflow]
-  - query: give me the full view, compact isn't enough
-    history:
-      - 'user: what''s the state of it'
-      - 'assistant: 4 of 11 done, one blocked, next action is to spawn on the client-update node.'
-    active: [daintree.orchestration.execute-durable-workflow]
   - query: it failed. retry that step rather than replanning the lot.
     history:
       - 'user: run whatever''s ready'
       - 'assistant: Ran the shared-lib publish node. It came back non-zero — reconciled with reason failure, that node is marked failed and the three consumers are still waiting.'
-    active: [daintree.orchestration.execute-durable-workflow]
-  - query: right, park it there. back after lunch.
-    history:
-      - 'user: keep moving through the plan'
-      - 'assistant: Two more nodes complete. The deploy node is waiting on the release build, everything after it is blocked on that.'
     active: [daintree.orchestration.execute-durable-workflow]
   - query: Advance the ready node and attach whatever it creates.
     history:
@@ -351,6 +347,13 @@ followups:
       - 'user: Cancel this workflow.'
       - 'assistant: Graph cancellation will not stop its external resources.'
     active: [daintree.orchestration.execute-durable-workflow]
+  - query: Resume the dependency graph at the backfill verification node and keep the traffic cutover blocked until validation passes; there are no per-issue batches.
+    history:
+      - 'user: Track the warehouse move durably across sessions.'
+      - 'assistant: Snapshot copy is complete. Backfill verification is ready; the cutover node depends on it.'
+    active: [daintree.orchestration.execute-durable-workflow]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: Okay, stop tracking that plan.
     history:
@@ -366,11 +369,6 @@ topic_shifts:
       - 'user: review the schema branch'
       - 'assistant: The change is fine in isolation, but it assumes the backfill has already run. That ordering isn''t captured anywhere.'
     active: [daintree.review.review-change]
-  - query: track this as a durable plan — each phase has to finish before the next one starts and i'll be closing the laptop
-    history:
-      - 'user: start work on #77'
-      - 'assistant: Agent up in wt_4d on issue-77, background watcher attached.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: 'give me a workflow graph for it: extract the client, swap the callers, delete the old package, in that order'
     history:
       - 'user: get an agent to pull the http client out into its own package'
@@ -391,11 +389,6 @@ topic_shifts:
       - 'user: did the agent really finish the parser work'
       - 'assistant: Verified against the diff and the test run. It did.'
     active: [daintree.orchestration.verify-agent-work]
-  - query: reconcile the plan with what actually happened, two of those nodes are done now
-    history:
-      - 'user: how''s everyone doing'
-      - 'assistant: One agent finished, one waiting on a question, one still running.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: there are six ordered steps here and half of them wait on external stuff. i want progress tracked across restarts
     history:
       - 'user: clean up the terminals from yesterday'
@@ -431,10 +424,6 @@ topic_shifts:
       - 'user: why did that check fail'
       - 'assistant: The query planner regressed after the index change — the test asserts a plan shape that no longer holds.'
     active: [daintree.ci.diagnose-and-fix, daintree.foundation]
-  - query: can you actually do dependency tracking on something this size or is that not a thing here
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: big one this. we need billing pulled out of the monolith into its own package, every import updated, CI green, then a release cut. each bit gates the next and i'll be in and out all day so it has to survive me closing this thing.
     history:
       - 'user: hey, you around?'
@@ -451,10 +440,6 @@ topic_shifts:
     history:
       - 'user: How are you?'
       - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
-  - query: we're rotating the signing keys. new key generated, both accepted for a week, clients migrated, old key revoked. i really don't want to lose track of where we are in that.
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: catch me up on the graph and then run whatever's next in it
     history:
       - 'user: yo'
@@ -491,10 +476,6 @@ topic_shifts:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: the three agents are done. mark those steps complete and tell me what that unblocks.
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: resume the migration from wherever it stopped. and i mean actually push it forward, not just tell me where it is
     history:
       - 'user: hi'
@@ -517,14 +498,6 @@ topic_shifts:
       - 'assistant: Polled 4 agents. 3 said yes (runtime validation at the API edge), 1 said not yet. Consensus: adopt at boundaries.'
     active: [daintree.agents.poll-pinned-agents]
     run: 2026-09-24-selector-hardening
-  - query: checkpoint this, i'm closing the laptop
-    history:
-      - 'user: hey, you around?'
-      - 'assistant: Around. What''s the task?'
-  - query: set the plan up first before you touch a single file
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
 wakes:
   - query: '[watcher completed: implementation agent exited]'
     active: [daintree.orchestration.execute-durable-workflow]

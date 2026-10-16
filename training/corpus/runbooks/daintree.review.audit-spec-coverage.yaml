@@ -73,6 +73,12 @@ boundaries:
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: '#1022 got closed but were its acceptance criteria really delivered? check the code, not the thread'
     confusable_with: [daintree.workflow.follow-up-on-issue]
+  - query: Compare every acceptance requirement in docs/tenant-prd.md with main and report implemented, partial, missing or unverified evidence.
+    confusable_with:
+      - daintree.explore.repository
+      - daintree.edits.spawn-visible-agent
+      - daintree.orchestration.verify-agent-work
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: R7 isn't a requirement, it's just background — drop it and carry on
     history:

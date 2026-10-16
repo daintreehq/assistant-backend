@@ -197,3 +197,17 @@ topic_shifts:
     history:
       - 'user: have every host build the parser on its own branch'
       - 'assistant: All three hosts replied with verified branches and SHAs.'
+  - query: All host assistants are enrolled now. Test the pinned release SHA on Linux x64 and macOS arm64 without changing it, with a result row for each environment.
+    history:
+      - 'user: ready the hosts for the repository'
+      - 'assistant: The Linux and Mac hosts each have an enrolled assistant with a current generation.'
+    active: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.start-swarm]
+    run: 2026-10-16-synthetic-audit
+  - query: Use the new patched revision for a fresh Linux and macOS validation matrix. There are no results for it yet; run checks only.
+    history:
+      - 'user: why did the previous commit differ between hosts?'
+      - 'assistant: The cause is documented; a separate fix has since landed at a new revision.'
+    active: [daintree.hosts.diagnose-host-differences]
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: 2026-10-16-synthetic-audit

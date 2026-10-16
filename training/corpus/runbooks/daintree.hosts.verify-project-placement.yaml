@@ -103,6 +103,9 @@ boundaries:
   - query: 'Before I send the plugin rework to the server, check that the project there is our repository at the commit I pushed.'
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-137
+  - query: Before I send a new task, check whether the two similarly named projects on the remote server really match our repository by remote URL, full HEAD and dirty state.
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: and check the other host's project the same way

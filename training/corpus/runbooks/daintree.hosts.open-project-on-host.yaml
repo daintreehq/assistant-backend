@@ -94,6 +94,15 @@ boundaries:
   - query: Does the build box have a copy of this project yet, or does it need a clone?
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: The connected tower has no copy of the project open here. Open the Daintree project-transfer dialog so the person can choose where to clone it there.
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: 2026-10-16-synthetic-audit
+  - query: Can you put this project on my connected spare Mac? Nothing was delegated to it; I just want the repository opened there.
+    confusable_with: [daintree.hosts.reassign-host-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Open this repository on the connected media server through the project dialog. I have not assigned any hosts work on it.
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: do the same on the second server
@@ -116,6 +125,13 @@ followups:
     history:
       - "user: open this project on the remote host"
       - "assistant: The dialog is open. It found more than one matching copy on the host and waits for your choice."
+  - query: Use its existing clone and keep my unpushed branch local. Open that copy through the dialog without pushing these commits.
+    history:
+      - 'user: I need this repository available on the storage server; show the Daintree project dialog'
+      - 'assistant: The dialog found a matching clone there and offers to push the two commits available only on this laptop.'
+    active: [daintree.hosts.open-project-on-host, daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: now open this project on the build server too
@@ -126,6 +142,13 @@ topic_shifts:
     history:
       - "user: add my spare mac as a host"
       - "assistant: It is saved and shows Connected, with its projects listed."
+  - query: The host overview is enough. Open the current project on the connected render server now; let me choose its clone folder in the dialog.
+    history:
+      - 'user: what projects are on the render server?'
+      - 'assistant: It is connected; none of its listed projects is the repository open here.'
+    active: [daintree.hosts.survey-hosts]
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: 2026-10-16-synthetic-audit
 
 docs:
   - query: what does Daintree copy to the other machine when I open a project on a remote host

@@ -188,12 +188,6 @@ topic_shifts:
       - 'assistant: Started pnpm test in a visible terminal on the api worktree; 14 failures so far, all in billing.'
     active: [daintree.terminals.run-visible-command]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: ok then tell claude-3 to stop running the full e2e suite on every change, unit tests only
-    history:
-      - 'user: how much claude usage do I have left?'
-      - 'assistant: Claude Code''s usage screen shows 82% of the weekly limit used; it resets Thursday.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: the docs sweep one is editing CHANGELOG.md — tell it not to touch that file
     history:
       - 'user: rename those three claude terminals by what they''re doing'
@@ -236,3 +230,17 @@ topic_shifts:
       - 'assistant: Contract 31fe0a2; claude-2 on billing-api and codex-4 on billing-ui are working.'
     active: [daintree.orchestration.contract-first-split]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: also have it update the changelog while it's in there
+    history:
+      - 'user: get an agent to add the --json flag to the export command'
+      - 'assistant: Spawned a visible edit agent on terminal t-2 (background watcher attached).'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: Narrow term-router to routes/public.ts and tell it to leave the admin router for a separate change.
+    history:
+      - 'user: Start one agent on the router cleanup.'
+      - 'assistant: term-router is working in refactor/routes and has begun editing both public.ts and admin.ts.'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.agents.hand-off-task]
+    run: 2026-10-16-synthetic-audit

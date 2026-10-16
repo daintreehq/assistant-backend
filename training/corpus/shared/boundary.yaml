@@ -268,9 +268,6 @@ examples:
   - query: what's a good format for a daily standup in general?
     confusable_with: [daintree.git.summarize-activity]
     run: 2026-09-28-catalog-expansion
-  - query: thanks, that weekly update was exactly what I needed
-    confusable_with: [daintree.git.summarize-activity]
-    run: 2026-09-28-catalog-expansion
   - query: what does git shortlog -sn actually count?
     confusable_with: [daintree.git.summarize-activity]
     run: 2026-09-28-catalog-expansion
@@ -574,3 +571,11 @@ examples:
   - query: thanks, the demo went great, everyone loved it
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: in general how should i split worktrees vs terminals for daintree work, no action just your take
+    confusable_with: [daintree.foundation, daintree.worktree.create-plain-worktree]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: Run the approved ticket waves and separately rename the existing monitoring pane to Release overview.
+    expect: [daintree.orchestration.work-in-waves, daintree.terminals.rename]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit

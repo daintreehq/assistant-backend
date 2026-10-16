@@ -153,6 +153,9 @@ boundaries:
     confusable_with:
     - daintree.hosts.postmortem-swarm
     run: runbook-2026-10-issue-138
+  - query: Deploy the approved merge SHA 83f61a2 to staging and prove that exact revision is serving the invoice endpoint.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.terminals.run-visible-command]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: how's it going — is 3fa9c21 actually the thing serving yet?
     history:

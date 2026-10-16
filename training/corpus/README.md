@@ -3,7 +3,7 @@
 Everything under this directory is **hand-editable and reviewable**. It is the
 input to `python -m training.compile_corpus`, which produces
 `training/data/selection.jsonl`. That file is a **build artifact**: do not edit
-it, and do not treat it as the record. CI recompiles from here and fails if the
+it, and do not treat it as the record. The test suite recompiles and fails if the
 two disagree.
 
 ```
@@ -126,11 +126,18 @@ These are measured findings, not preferences. Fuller detail in
   against its neighbours, but their `whenToUse` predates it and names it
   nowhere, so without rows where the ESTABLISHED runbook is correct and the new
   one is `confusable_with`, every fence runs one way only.
-- **Never read `benchmarks/runbook_selection/cases/`.** It is the held-out
-  evaluation set and the only evidence any of this works. `compile_corpus`
-  drops EXACT collisions (query or `history`) rather than trusting anyone
-  about it; a near-duplicate still gets through, so screen generated rows,
-  history included, with difflib > 0.8 against every case suite first.
+- **Data writers never read `benchmarks/` or `tests/`.** `compile_corpus`
+  mechanically excludes exact query/history collisions with the main benchmark
+  and every holdout round, including sealed ones. Keep evaluation wording frozen
+  and remove collisions from the training sources. A near-duplicate still gets
+  through, so screen generated rows, history included, with difflib > 0.8 against
+  every case suite first; report training-row identifiers, never evaluation text.
+  `python -m training.audit_leakage --near` performs this check and exits nonzero
+  on overlap. Install `training-requirements.txt` for its accelerated candidate
+  screen; it also works with the standard-library fallback.
+- **Context variants stay in one synthetic split.** `stable_split` hashes the
+  normalised latest question alone. A cold question and the same question with a
+  workflow loaded must never appear on opposite sides of train/validation.
 
 ## Removing a bad generation run
 

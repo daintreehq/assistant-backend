@@ -23,7 +23,6 @@ positives:
   - coverage gate is failing, we dropped under the floor somewhere — find what regressed and fix it
   - why did the docker build fail
   - somethign broke the golden tests after that last commmit, fnd it and fix it
-  - get it green
   - the e2e suite is timing out on main and nobody knows why, put an agent on the diagnosis and then actually verify whatever fix comes out of it
   - ruff's complaining, fix
   - same thing on the other branch
@@ -131,8 +130,6 @@ boundaries:
     confusable_with: [daintree.forge.land-pull-request]
   - query: the issue-sync test is red again
     confusable_with: [daintree.forge.manage-issue]
-  - query: the migration test is failing in CI, sort it out
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: the frontend tests are failing on the CI run
     confusable_with: [daintree.runtime.debug-web-app]
   - query: npm test is red, three snapshot failures
@@ -217,8 +214,6 @@ boundaries:
     confusable_with: [daintree.diagnostics]
   - query: why does this check keep failing, nothing i try makes it pass
     confusable_with: [daintree.diagnostics]
-  - query: spawn an agent to fix the failing tests on ci
-    confusable_with: [daintree.edits.spawn-visible-agent]
   - query: the tests are failing on this branch, sort it out
     confusable_with: [daintree.review.review-change]
   - query: CI is red on that PR, figure out why and get it passing
@@ -505,12 +500,10 @@ boundaries:
   - query: "the build broke here after the merge and it fails the same way everywhere I tried, get it green"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: spin up claude on the api worktree and have it fix the lint errors
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: how's it going?
-    history:
-      - 'user: the unit tests are failing on this branch, work out why and fix it'
-      - 'assistant: Ran the suite in worktree wt-3 — 4 failures in tests/unit/test_selector.py, all from a changed catalog fixture. Explore agent t-14 is confirming the root cause before I put an edit agent on it.'
-    active: [daintree.ci.diagnose-and-fix]
   - query: did you tell it to run the whole suite or just that one test?
     history:
       - 'user: ci is red on pr 412, get it green'
@@ -521,27 +514,12 @@ followups:
       - 'user: three checks are failing on that PR, fix them'
       - 'assistant: Two share one root cause — a stale lockfile — so one agent covers both. The third is a genuine assertion failure and gets its own round.'
     active: [daintree.ci.diagnose-and-fix]
-  - query: yep that's what I figured
-    history:
-      - 'user: the build broke right after the merge'
-      - 'assistant: Confirmed. The docker build fails at the pip install step — requirements.lock disagrees with pyproject. Spawning an edit agent to regenerate it and rerun the build.'
-    active: [daintree.ci.diagnose-and-fix]
   - query: which agent did you put on it?
     history:
       - 'user: pytest is failing on 6 tests, diagnose and fix'
       - 'assistant: Explore agent t-21 found it: a fixture path moved. Edit agent t-22 is applying the fix and will run both the narrow command and the full suite.'
       - 'user: how long is that going to take'
       - 'assistant: The full suite is about four minutes, so it''s on an async wait rather than blocking this turn.'
-    active: [daintree.ci.diagnose-and-fix]
-  - query: quarantine it for now
-    history:
-      - 'user: test_stream_body fails maybe one run in three, is it flaky?'
-      - 'assistant: Ran it five times in the same worktree with no code change: 3 pass, 2 fail. That''s flaky, not a regression — the race is in the deadline timer. Do you want it stabilised or quarantined?'
-    active: [daintree.ci.diagnose-and-fix]
-  - query: don't just take its word for it
-    history:
-      - 'user: the golden tests are red, fix them'
-      - 'assistant: Agent t-7 says it regenerated the snapshots and everything passes now.'
     active: [daintree.ci.diagnose-and-fix]
   - query: anything else still red while that runs
     history:
@@ -559,11 +537,6 @@ topic_shifts:
       - 'user: whats blocking #221'
       - 'assistant: PR #221 has a red check — pytest (3.12) failed on 2 tests. Review is approved, so CI is the only blocker.'
     active: [daintree.workflow.follow-up-on-issue]
-  - query: hows that going
-    history:
-      - 'user: fix the failing test'
-      - 'assistant: Root cause is a stale lockfile. Patching now.'
-    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
   - query: ci went red on develop overnight, work out why and get it green
     history:
       - 'user: what happened while i was away'
@@ -660,13 +633,6 @@ topic_shifts:
       - 'user: are those 3 PRs green'
       - 'assistant: 501 and 502 green. 503 (issue 390) has a red unit-test job.'
     active: [daintree.foundation, daintree.workflow.follow-up-on-issue]
-  - query: nah thats the flaky snapshot test again, rerun and confirm
-    history:
-      - 'user: are those 3 PRs green'
-      - 'assistant: 501 and 502 green, 503 red on unit tests.'
-      - 'user: the one on 390 is red. work out why and get it passing'
-      - 'assistant: One snapshot test failing on a timestamp — looks environment-dependent rather than a real regression.'
-    active: [daintree.foundation, daintree.ci.diagnose-and-fix]
   - why is CI red on that branch
   - query: tab 3 is full of red — work out what broke and get it passing
     active: [daintree.foundation]
@@ -751,18 +717,6 @@ topic_shifts:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: same thing on the other branch
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: suite passes locally but the CI run failed, what's actually different there
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: spawn something to fix the broken auth test
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: is it flaky or real? and once you've fixed it, rerun and confirm it's green
     history:
       - 'user: the tests are failing'
@@ -805,12 +759,6 @@ topic_shifts:
       - 'assistant: Patched the null deref in parser.go; reran — still 2 failures in parser_test.go (TestEmptyInput, TestBOM).'
     active: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
-  - query: still red on CI for me
-    history:
-      - 'user: fix the failing build'
-      - 'assistant: Build green locally in t3 after fixing the import cycle. CI rerun queued.'
-    active: [daintree.ci.diagnose-and-fix]
-    run: 2026-09-24-selector-hardening
   - query: ok figure out why and fix it
     history:
       - 'user: is #512 passing?'
@@ -822,12 +770,6 @@ topic_shifts:
       - 'user: why is ci red on main'
       - 'assistant: lint fails: src/utils/date.ts:12 unused import ''addDays''. Spawned codex in t3 to remove it.'
     active: [daintree.ci.diagnose-and-fix]
-    run: 2026-09-24-selector-hardening
-  - query: great. unrelated, the integration tests are red on main since this morning, can you find out why
-    history:
-      - 'user: run the fullstack recipe'
-      - 'assistant: Ran recipe fullstack: api, web and worker terminals are up, db container healthy.'
-    active: [daintree.recipe.run-or-create]
     run: 2026-09-24-selector-hardening
   - query: the tests in ci are red on main though — something unrelated, test_invoice_totals. get that fixed
     history:
@@ -916,6 +858,32 @@ topic_shifts:
       - 'assistant: claude-2 stopped: `cargo package` refused because the build fails typechecking in src/lexer.rs:88. Nothing published.'
     active: [daintree.release.publish-package]
     run: 2026-09-28-round6-stateful
+  - query: get an agent to clean all of those up in the api package
+    history:
+      - "user: ruff output:\n src/api/routes.py:12:1 F401 unused import\n src/api/deps.py:44:9 B008 function call in default\n Fix all of these with --fix, then rename the rule set."
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: now put an agent in there on the failing benchmark
+    history:
+      - 'user: resume the box on the perf worktree'
+      - 'assistant: Resumed; status came back running.'
+    active: [daintree.worktree.manage-resource]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: it now fails on every attempt with the same assertion. stop treating it as a flake and fix it.
+    history:
+      - 'user: The flush spec used to fail randomly.'
+      - 'assistant: On the new HEAD, all 20 serial runs fail at the same missing await assertion.'
+    active: [daintree.ci.hunt-flaky-test]
+    confusable_with: [daintree.ci.hunt-flaky-test]
+    run: 2026-10-16-synthetic-audit
+  - query: the browser suite has finished, I need someone to fix that consistent 401 on the login spec now.
+    history:
+      - 'user: Run the browser suite for the login checkout.'
+      - 'assistant: The checkout server was verified. All runs reach the API but login.spec.ts fails consistently with 401; traces are saved.'
+    active: [daintree.ci.run-e2e-suite]
+    confusable_with: [daintree.ci.run-e2e-suite, daintree.runtime.debug-web-app]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[watcher w_88 fired: rerun complete, 0 failures]'
     history:
@@ -942,15 +910,10 @@ near_misses:
 docs:
   - ci is red again, sort it out
   - tests are failing on ci, sort it out
-  - ok fix it
   - query: tests are failing on ci, sort it out
     history:
       - 'user: How are you?'
       - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
-  - query: ok fix it
-    history:
-      - 'user: still awake?'
-      - 'assistant: Still here. What do you need?'
 foundation_boundaries:
   - ci is red on my branch, work out why and get it green
   - that test run in tab 2 failed — figure out the cause and fix it

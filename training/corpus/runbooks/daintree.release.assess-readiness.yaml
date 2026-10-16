@@ -79,6 +79,12 @@ boundaries:
     confusable_with:
     - daintree.release.publish-package
     run: runbook-2026-10-issue-138
+  - query: Assess release/8.0 at SHA 75a4e10 for release scope, migration, config and rollback blockers and return a go/no-go.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.ci.run-local-checks
+      - daintree.workflow.prep-branch-for-review
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: 'the milestone is ''v2.5'' — and count the two SSO issues (#788, #790) as must-haves'
     history:

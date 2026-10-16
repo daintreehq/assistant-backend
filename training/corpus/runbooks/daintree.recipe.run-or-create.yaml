@@ -6,7 +6,6 @@
 runbook: daintree.recipe.run-or-create
 run: pre-split
 positives:
-  - run the dev recipe
   - list recipes
   - what recipes do i have in this worktree?
   - spin up the fullstack recipe in the api worktree
@@ -201,8 +200,6 @@ boundaries:
     confusable_with: [daintree.worktree.relocate-agents]
   - query: create the worktree and bring up the standard terminal set with it
     confusable_with: [daintree.worktree.relocate-agents]
-  - query: run the fullstack recipe in a new worktree
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: create a worktree with the perf recipe on it
     confusable_with: [daintree.worktree.manage-resource]
   - query: run the bugfix recipe in this tree
@@ -227,8 +224,6 @@ boundaries:
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: create a worktree with the bootstrap recipe as its startup and let whatever agent it launches run
     confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: create a worktree with the backend-dev recipe
-    confusable_with: [daintree.workflow.start-work-on-issue]
   - query: run the dev-setup recipe in a fresh worktree for me
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: create a worktree for branch spike/ui and run the frontend-dev recipe in it
@@ -414,11 +409,6 @@ boundaries:
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
 followups:
-  - query: is it done yet?
-    history:
-      - 'user: run the dev recipe in the api worktree'
-      - 'assistant: Ran `dev-stack` — 4 terminals spawned, 0 failed. One of them (`term-7c1`) is a live Claude agent with no watcher attached; the other three are a vite server, a log tail and a plain shell. Want me to drive that agent in-turn or attach a background supervisor?'
-    active: [daintree.recipe.run-or-create]
   - query: the second one
     history:
       - 'user: what recipes do i have here'
@@ -429,22 +419,12 @@ followups:
       - 'user: new worktree off develop with the e2e recipe'
       - 'assistant: Created worktree `wt-11` on branch `e2e/run-2`. Recipe launched: 3 of 5 terminals spawned, 2 failed.'
     active: [daintree.recipe.run-or-create]
-  - query: fine, just do it by hand then
-    history:
-      - 'user: save this layout as a recipe called bugfix'
-      - 'assistant: I can''t — there''s no tool that authors, edits or deletes recipes; the whole surface is list/run/create-worktree-with-one. Recipes are defined in Daintree itself. I can stand the layout up by hand this once and you can save it there.'
-    active: [daintree.recipe.run-or-create]
   - query: background it and ping me when it's finished
     history:
       - 'user: kick off the frontend recipe'
       - 'assistant: Ran it — 3 terminals up, one is a live agent (`term-a02`) already running its CLI. It''ll print nothing for the first few seconds; that''s startup, not a crash.'
       - 'user: ok'
       - 'assistant: Still starting. Do you want to wait it out here or should I leave a supervisor on it?'
-    active: [daintree.recipe.run-or-create]
-  - query: now do the same in the other two
-    history:
-      - 'user: run the dev recipe in the payments worktree'
-      - 'assistant: Done — 4 terminals in `payments`, no failures, no live agents (all shells and a dev server).'
     active: [daintree.recipe.run-or-create]
   - query: what's it actually saying in there?
     history:
@@ -455,13 +435,6 @@ followups:
     history:
       - 'user: create a worktree for spike/websockets and launch the standard recipe'
       - 'assistant: Worktree `wt-19` created on `spike/websockets`, recipe launched, 4 terminals spawned.'
-    active: [daintree.recipe.run-or-create]
-  - query: yeah go for it
-    history:
-      - 'user: run the e2e recipe'
-      - 'assistant: 5 terminals spawned but 2 came back failed — the agent-terminal cap is 3 per agent-sourced run, so indices 3 and 4 overflowed.'
-      - 'user: ah right'
-      - 'assistant: Want me to run the remaining two by hand once one of the current agents finishes?'
     active: [daintree.recipe.run-or-create]
   - query: ok run it then and tell me
     history:
@@ -474,11 +447,6 @@ topic_shifts:
       - 'user: make me a worktree for release/2.3'
       - 'assistant: Worktree created at ../repo-release-2.3 tracking the existing branch. No agent launched.'
     active: [daintree.worktree.create-plain-worktree]
-  - query: seperately, spin up a worktree using the perf-bench recipe
-    history:
-      - 'user: start work on 77'
-      - 'assistant: Agent running on #77 in its own worktree with a supervisor watcher.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: new worktree with the e2e recipe on it please
     history:
       - 'user: shut down all the fan out terminals'
@@ -489,11 +457,6 @@ topic_shifts:
       - 'user: catch me up on this session'
       - 'assistant: Nothing live. Last completed unit was the serializer fix, merged.'
     active: [daintree.orchestration.status-and-resume]
-  - query: make a worktree for that with the qa recipe attached
-    history:
-      - 'user: what would i have to touch to add a new task type'
-      - 'assistant: Four places: contracts/tasks.py, the TaskProfile table, a prompt file and a golden snapshot.'
-    active: [daintree.explore.repository]
   - query: actually make a worktree for it with the hotfix recipe on it
     history:
       - 'user: find me a small bug nobodys on'
@@ -504,11 +467,6 @@ topic_shifts:
       - 'user: give the tabs proper names'
       - 'assistant: Renamed.'
     active: [daintree.terminals.rename]
-  - query: hang on, where do recipes actually live?
-    history:
-      - 'user: run the qa recipe in the payments worktree'
-      - 'assistant: Recipe ''qa'' loaded — three steps, one live agent. Launching now.'
-    active: [daintree.recipe.run-or-create, daintree.foundation]
   - query: can a recipe run on a timer or only at startup?
     history:
       - 'user: create a worktree with the review recipe on it'
@@ -534,13 +492,6 @@ topic_shifts:
       - 'assistant: A saved workspace setup you can apply to a worktree.'
       - 'user: show me which recipes ive got'
       - 'assistant: Three: ''python-dev'' (venv + pytest watch + shell), ''lint'' (ruff + mypy), and ''fullstack'' (api + web + logs).'
-    active: [daintree.recipe.run-or-create]
-  - query: can i write my own recipe?
-    history:
-      - 'user: show me which recipes ive got'
-      - 'assistant: python-dev, lint, and fullstack.'
-      - 'user: run the python one in this worktree'
-      - 'assistant: Applied python-dev here — three terminals opened, pytest watch is running.'
     active: [daintree.recipe.run-or-create]
   - query: fair enough. just run the lint one again then
     history:
@@ -626,11 +577,6 @@ topic_shifts:
       - 'user: [background wake: 4 of 4 finished]'
       - 'assistant: All four migrations written and applied against scratch databases, all reversible.'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: the recipe wake came through, did it finish?
-    history:
-      - 'user: run the bootstrap recipe in the new worktree'
-      - 'assistant: Recipe running, its agent is live and supervised.'
-    active: [daintree.recipe.run-or-create, daintree.foundation]
   - query: spin up the fullstack recipe in the api worktree
     history:
       - 'user: morning'
@@ -639,10 +585,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: run the dev recipe
-    history:
-      - 'user: still awake?'
-      - 'assistant: Still here. What do you need?'
   - query: do the same thing but with the backend recipe this time
     history:
       - 'user: hello'
@@ -651,10 +593,6 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-  - query: add a fourth tab to the dev recipe
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: start the recipe that puts claude on the docs and just let it run
     history:
       - 'user: thanks for yesterday'
@@ -703,10 +641,6 @@ topic_shifts:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: worktree.createWithRecipe off main, branch perf/spans, recipeId the perf one
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: actually make another for feat/ui-refresh but use the 'frontend' recipe on it
     history:
       - 'user: create a worktree for chore/deps-bump'
@@ -725,10 +659,20 @@ topic_shifts:
       - 'assistant: Reloaded: acme.metrics is active and the open panel remounted (scheduled).'
     active: [daintree.plugins.develop-project-plugin]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: run that one in the other worktree too
+  - query: Run that same recipe in wt-search as well.
     history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
+      - 'user: Run our search-dev recipe in wt-main.'
+      - 'assistant: search-dev launched its API, indexer and log panes in wt-main.'
+    active: [daintree.recipe.run-or-create]
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-10-16-synthetic-audit
+  - query: same recipe in the docs worktree too please.
+    history:
+      - 'user: Run the saved review-pair recipe in wt-api.'
+      - 'assistant: review-pair started its reviewer and checks panes in wt-api.'
+    active: [daintree.recipe.run-or-create]
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[watcher w_808 fired: recipe agent t_0808 finished setup]'
     history:

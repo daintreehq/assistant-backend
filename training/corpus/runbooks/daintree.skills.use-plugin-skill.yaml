@@ -181,3 +181,17 @@ topic_shifts:
       - 'assistant: Fixed: acme.release-tools is active after reload, and diagnostics show its skill release-checklist registered.'
     active: [daintree.plugins.develop-project-plugin]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Resolve the installed plugin's migration-review skill by exact id and have the existing agent follow that procedure.
+    history:
+      - 'user: Run the agent''s native review command.'
+      - 'assistant: The native command finished. The project plugin separately advertises a migration-review skill.'
+    active: [daintree.agents.run-agent-command]
+    confusable_with: [daintree.agents.run-agent-command, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: I only need the list of plugin skills installed here, don't run a slash command or edit anything.
+    history:
+      - 'user: That CLI command isn''t the review procedure I meant.'
+      - 'assistant: The CLI has a native /review command; the project also has a trusted plugin.'
+    active: [daintree.agents.run-agent-command]
+    confusable_with: [daintree.agents.run-agent-command, daintree.plugins.develop-project-plugin]
+    run: 2026-10-16-synthetic-audit

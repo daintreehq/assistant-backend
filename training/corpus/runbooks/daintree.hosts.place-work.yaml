@@ -214,6 +214,9 @@ boundaries:
   - query: "decide where each of these refactors should run among my servers"
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
+  - query: 'Place three distinct untouched issues on Remote Hosts by capacity: the tooltip bug, the docs typo, and the retry test. Give each issue one owner.'
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: yes, go ahead with that split
     history:
@@ -249,3 +252,10 @@ topic_shifts:
     history:
       - "user: start agents here on these eight issues"
       - "assistant: Five are running; this machine is under memory pressure, three are not started."
+  - query: Use that spare allowance to choose Remote Hosts for these four untouched tickets and present the placement before sending.
+    history:
+      - 'user: check Codex usage on my other machines'
+      - 'assistant: All three hosts returned their limits; the server has the largest remaining window.'
+    active: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: 2026-10-16-synthetic-audit

@@ -202,12 +202,6 @@ topic_shifts:
       - 'assistant: #301 is blocked: required check e2e failed on checkout.spec, which passed on the previous commit with no related change.'
     active: [daintree.forge.land-pull-request]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: separately — which test is polluting the websocket test? it passes alone and fails in the full run sometimes
-    history:
-      - 'user: what are all my agents doing?'
-      - 'assistant: 4 agents: claude-1 working, codex-2 finished (unverified), claude-3 waiting on a question, gemini-1 idle.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: so it's intermittent — find out what makes it flaky
     history:
       - 'user: can you repro #377, the double-submit on the payment form'
@@ -228,3 +222,40 @@ topic_shifts:
       - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
     active: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6-stateful
+  - query: quarantine it for now
+    history:
+      - 'user: test_stream_body fails maybe one run in three, is it flaky?'
+      - 'assistant: Ran it five times in the same worktree with no code change: 3 pass, 2 fail. That''s flaky, not a regression — the race is in the deadline timer. Do you want it stabilised or quarantined?'
+    active: [daintree.ci.diagnose-and-fix]
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
+  - query: nah thats the flaky snapshot test again, rerun and confirm
+    history:
+      - 'user: are those 3 PRs green'
+      - 'assistant: 501 and 502 green, 503 red on unit tests.'
+      - 'user: the one on 390 is red. work out why and get it passing'
+      - 'assistant: One snapshot test failing on a timestamp — looks environment-dependent rather than a real regression.'
+    active: [daintree.foundation, daintree.ci.diagnose-and-fix]
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
+  - query: eh don't wait. spawn claude now to fix the flaky test in auth_test.go
+    history:
+      - 'user: let me know when the build in t2 finishes, i''m heading out'
+      - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
+    active: [daintree.orchestration.watch-outcome]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: now do the same for the payments one
+    history:
+      - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
+      - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: Measure spec/reconnect.test.ts across serial and parallel repeats and isolate why only some runs miss the final event.
+    history:
+      - 'user: The reconnect check was red earlier.'
+      - 'assistant: Same commit, same command: eight passes and two timeouts with no code changes.'
+    active: [daintree.ci.diagnose-and-fix]
+    confusable_with: [daintree.ci.diagnose-and-fix, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

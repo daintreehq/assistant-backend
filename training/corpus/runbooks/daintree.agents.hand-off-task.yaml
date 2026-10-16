@@ -188,18 +188,6 @@ topic_shifts:
       - 'assistant: Not hung — it is looping: it has run the same failing migration three times in the last 15 minutes.'
     active: [daintree.agents.recover-agent]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: 'claude-7 just hit its usage limit — have gemini finish #431 in that same worktree'
-    history:
-      - 'user: start work on #431'
-      - 'assistant: Created worktree issue-431-retry-webhooks and launched claude-7 with the issue brief; it has been working for 40 minutes.'
-    active: [daintree.workflow.start-work-on-issue]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: have codex take over claude-3's pdf task and finish it
-    history:
-      - 'user: how are all the agents doing?'
-      - 'assistant: 5 agents: claude-1 working, codex-2 done and idle, claude-3 on the usage-limit screen halfway through the PDF export on feature/pdf, claude-4 working, gemini-1 waiting on nothing.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: fine, hand its task to codex in the same worktree and let it carry on
     history:
       - 'user: compact claude-3'
@@ -230,3 +218,23 @@ topic_shifts:
       - 'assistant: Froze new launches and am gathering live state for the handoff: seven children, two finished.'
     active: [daintree.orchestration.hand-off-orchestration]
     run: 2026-09-28-round6-stateful
+  - query: keep coordinating it yourself. only move the stalled API task from Claude to Codex
+    history:
+      - 'user: Four agents are working under this coordinator.'
+      - 'assistant: The API worker is at its limit; the UI, CLI and docs workers are healthy.'
+    active: [daintree.orchestration.supervise-fleet]
+    confusable_with: [daintree.orchestration.hand-off-orchestration]
+    run: 2026-10-16-synthetic-audit
+  - query: the last one gave up halfway through the parser work. dont bother resurrecting it, start a clean agent on the same job
+    history:
+      - 'user: sup'
+      - 'assistant: Not much — nothing running. What do you need?'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: Transfer the unfinished import task from the capped Claude session to Codex in the same checkout with a checked handoff.
+    history:
+      - 'user: Have Claude finish the import cursor change.'
+      - 'assistant: Claude stopped at its weekly usage cap after two commits and an uncommitted validation change in wt-import.'
+    active: [daintree.agents.recover-agent]
+    confusable_with: [daintree.agents.recover-agent, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

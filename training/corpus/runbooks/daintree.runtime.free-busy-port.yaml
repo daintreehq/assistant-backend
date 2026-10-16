@@ -269,12 +269,6 @@ topic_shifts:
       - 'assistant: Reading 2 (15:10): load down from 38 to 7 after capping the three jest runs at 2 workers. Throttles still stand on claude-1, codex-2 and claude-5.'
     active: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6-stateful
-  - query: port 3000 is already in use — what's holding it?
-    history:
-      - 'user: set up a demo of the referral feature'
-      - 'assistant: Prep done. Starting the dev server in a terminal in the referrals worktree: it exited with EADDRINUSE :3000.'
-    active: [daintree.workflow.prepare-feature-demo]
-    run: 2026-09-28-round6-stateful
   - query: port 3000 is still held by the reader's dev server — free it
     history:
       - 'user: the README setup steps are out of date, fix them'
@@ -283,3 +277,10 @@ topic_shifts:
       - 'assistant: Done: README fixed on docs/readme-setup, reader re-ran the failed steps and they now pass; --port ignored flagged as a code bug.'
     active: [daintree.edits.sync-project-docs]
     run: 2026-09-28-round6-stateful
+  - query: Identify what owns local port 4387 and free it only if it belongs to the stopped worktree server.
+    history:
+      - 'user: Start the API server in the archive checkout.'
+      - 'assistant: It exited with EADDRINUSE on 4387; no server was started by this attempt.'
+    active: [daintree.terminals.run-visible-command]
+    confusable_with: [daintree.worktree.provision-local-environment, daintree.terminals.run-visible-command]
+    run: 2026-10-16-synthetic-audit

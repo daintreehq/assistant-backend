@@ -135,6 +135,9 @@ boundaries:
   - query: free up two of my local agents for the production bug, the remote hosts are not involved at all
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
+  - query: Pause the two low-priority agents with resume notes and redirect freed capacity onto the customer data-loss blocker, keeping the release agent working.
+    confusable_with: [daintree.orchestration.park-work, daintree.orchestration.supervise-fleet]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: actually leave codex-2 alone, the settings refactor is nearly done — pause claude-1 instead
     history:

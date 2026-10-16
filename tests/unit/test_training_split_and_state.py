@@ -45,6 +45,34 @@ def test_the_split_ignores_row_order() -> None:
     assert {r["query"] for r in val_a} == {r["query"] for r in val_b}
 
 
+def test_context_variants_of_a_question_cannot_leak_into_validation() -> None:
+    rows = [
+        {
+            "query": query,
+            "history": history,
+            "active_ids": active,
+            "expect_ids": expect,
+        }
+        for query in ("Where are the settings?", "where are the settings", " WHERE are the settings! ")
+        for history, active, expect in (
+            ([], [], []),
+            (["assistant: The review is running."], ["daintree.review.review-change"], []),
+            (["user: Explain the settings."], [], ["daintree.foundation"]),
+        )
+    ]
+    train, val = stable_split(rows, 0.5)
+    assert len(train) == len(rows) or len(val) == len(rows)
+
+
+def test_serving_equivalent_countdowns_share_a_split_group() -> None:
+    rows = [
+        {"query": q}
+        for q in ("Start a timer for ten minutes", "Remind me in ten minutes")
+    ]
+    train, val = stable_split(rows, 0.5)
+    assert len(train) == len(rows) or len(val) == len(rows)
+
+
 def test_canonical_active_is_what_the_server_would_hold() -> None:
     catalog = load_catalog(default_runbooks_dir())
     specific = next(

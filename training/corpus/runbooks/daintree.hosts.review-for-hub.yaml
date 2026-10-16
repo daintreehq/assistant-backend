@@ -130,6 +130,13 @@ followups:
     history:
       - "user: start the review the hub asked for"
       - "assistant: The request names commit 4be19 on feature/sync, not the full SHA."
+  - query: Check the altered checkout and return the review to the hub with that limitation; do not present the findings as a clean findings-only review.
+    history:
+      - 'user: as this host lane, review the pinned billing commit for the hub and change nothing'
+      - 'assistant: The fresh reviewer reported findings, but status now shows an edited fixture and HEAD has advanced.'
+    active: [daintree.hosts.review-for-hub, daintree.hosts.handle-hub-message]
+    confusable_with: [daintree.hosts.verify-for-hub, daintree.hosts.handle-hub-message]
+    run: 2026-10-16-synthetic-audit
 
 boundaries:
   - query: the newest message from the hub wants the queue branch at 1f0a9b3 looked over; it only wants to hear what's wrong

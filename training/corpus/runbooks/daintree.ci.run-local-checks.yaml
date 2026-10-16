@@ -113,6 +113,12 @@ boundaries:
   - query: "lint and unit-test the feature worktree, its own scratch database and port are already in place, and list anything red"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
+  - query: open an agent and have it run the full test suite
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: Run the API checkout's lint, typecheck and unit suite and return the observed results at its current HEAD.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.workflow.prep-branch-for-review]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: and the unit tests?
     history:
@@ -156,12 +162,6 @@ topic_shifts:
       - 'user: what does this repo do?'
       - 'assistant: claude-1 read it: a Rust CLI plus a TypeScript web dashboard sharing a proto package; I checked its citations.'
     active: [daintree.explore.repository]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: run the tests and typecheck in it — nothing's broken, I just want a baseline
-    history:
-      - 'user: make a worktree for feature/export-v2'
-      - 'assistant: Created worktree export-v2 on existing branch feature/export-v2 at 6d0a1b2; no recipe or agent launched.'
-    active: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-stateful
   - query: run the test suite in each of those three and tell me which are green
     history:

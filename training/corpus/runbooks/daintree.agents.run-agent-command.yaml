@@ -206,3 +206,10 @@ topic_shifts:
       - 'assistant: Loaded sec-tools/security-review and briefed codex-1 with its id; it is on step 2.'
     active: [daintree.skills.use-plugin-skill]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Invoke the existing Codex pane's native /review command and read back its verdict.
+    history:
+      - 'user: I want the CLI review mode in term-native.'
+      - 'assistant: term-native is an idle Codex session; its command listing includes /review.'
+    active: [daintree.review.review-change]
+    confusable_with: [daintree.review.review-change, daintree.skills.use-plugin-skill]
+    run: 2026-10-16-synthetic-audit

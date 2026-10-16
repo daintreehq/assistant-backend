@@ -23,14 +23,12 @@ positives:
   - query: Nudge me about the rollout when the next twelve minutes are up
     run: 2026-09-09-mission-2-timers
   - run the migration overnight and wake me if anything blows up
-  - keep an eye on tab 3 while I grab lunch
   - set a watcher on the deploy agent, alert me if it errors out
   - let me know when PR 412 merges
   - remind me in 45 minutes to look at this again
   - i'm heading out for a few hours — can you leave something watching the two refactor agents so i get told if either one dies or starts asking questions? i'll check back in the morning
   - can you set something up so I actually get woken when the suite goes green, rather than me sitting here refreshing?
   - watch that one too
-  - what watchers do i have running right now?
   - cancel all the watchers and timers you set up earlier
   - arm it with a modelJudge on whether the suite passed with zero failures, cadence 60s, stop after 12h
   - give the wake actor permission to send commands overnight so it doesn't stall waiting for me to confirm
@@ -39,10 +37,8 @@ positives:
   - do the same for the other two
   - i don't want to sit here waiting on this, just notify me when it lands
   - wait an hour then kick off the seed script
-  - set a timer for 20 min
   - alert me if that terminal goes quiet for more than ten minutes
   - put a background supervisor on this so I can shut the laptop
-  - list every timer and grant thats still live pls
   - async wait across all four terminals and wake me once they've all finished or asked something
   - could you leave something watching the e2e run and hit me up when it's done either way?
   - kicking off the full suite now, im going to bed — wake me if it goes red
@@ -50,7 +46,6 @@ positives:
   - remind me in 45 min to check the deploy
   - ping me when 4412 merges
   - if the overnight run goes green let it push the branch, set it up so its not sitting there waiting for me to click yes at 3am
-  - whats still watching
   - kill all the watchers, im done for the day
   - there are 3 agents going, dont block on them, just tell me when all three are finished
   - wait an hour then run the benchmark suite
@@ -148,12 +143,25 @@ positives:
     run: 2026-09-28-agent-queries-2
   - query: Unsubscribe from completion notices for every agent in the payments worktree, keeping them all running.
     run: 2026-09-28-agent-queries-2
-  - query: let me know when the build terminal finishes
-    run: 2026-09-28-catalog-expansion-refine
   - query: keep an eye on the Codex agent and ping me when it's done
     run: 2026-09-28-catalog-expansion-refine
   - query: run the migration agent overnight and wake me when it stops
     run: 2026-09-28-catalog-expansion-refine
+  - query: cancel that watcher
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the async wait on the second one
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel watcher wtc_9f2a1
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on the nightly build tab
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill that async wait i left on the migration terminal
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
 boundaries:
   - query: keep checking that one agent every ten minutes and tell me the moment it's done — nothing else to start after it
     confusable_with: [daintree.orchestration.fan-out-work]
@@ -257,8 +265,6 @@ boundaries:
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: ping me when that PR merges
     confusable_with: [daintree.orchestration.status-and-resume]
-  - query: what watchers and timers have you got armed?
-    confusable_with: [daintree.orchestration.status-and-resume]
   - query: the agent is still going — ping me when it's done and tell me whether it worked
     confusable_with: [daintree.orchestration.verify-agent-work]
   - query: keep an eye on that one and wake me when it finishes
@@ -321,17 +327,11 @@ boundaries:
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: wake me when the build in tab 3 finishes
     confusable_with: [daintree.recipe.run-or-create]
-  - query: im heading out, keep an eye on the fanout and ping me when its done
-    confusable_with: [daintree.orchestration.status-and-resume]
   - query: let me know when that PR merges
-    confusable_with: [daintree.orchestration.status-and-resume]
-  - query: remind me in an hour to check the migration
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: cancel every watcher i've got but leave the terminals running
     confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: revoke that grant you set up for the overnight run
-    confusable_with: [daintree.orchestration.workspace-cleanup]
-  - query: what watchers and timers are still armed?
     confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: im off out — ping me when theyve all finished
     confusable_with: [daintree.orchestration.supervise-fleet]
@@ -345,8 +345,6 @@ boundaries:
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: set something up so i get pinged if ci on 88 finishes while im at dinner
     confusable_with: [daintree.workflow.follow-up-on-issue]
-  - query: in 10 minutes' time, spawn a terminal and run the test suite.
-    confusable_with: [daintree.edits.spawn-visible-agent]
   - query: don't start it now. in ten minutes, spawn a terminal and run the tests.
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: in ten minutes, spawn a terminal on the payments worktree and run the tests.
@@ -356,8 +354,6 @@ boundaries:
   - query: wait an hour and then start the schema migration in a fresh agent.
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: in ten minutes, spawn an agent and run the tests.
-    confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: ten minutes from now, spawn a terminal and run the tests.
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: hold off for twenty minutes, then launch claude on the auth branch
     confusable_with: [daintree.edits.spawn-visible-agent]
@@ -412,9 +408,6 @@ boundaries:
     confusable_with: [daintree.agents.recover-agent]
     run: 2026-09-24-selector-hardening
   - query: brb, keep an eye on the agents while i'm at lunch and ping me if anything breaks
-    confusable_with: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-24-selector-hardening
-  - query: let me know when the build finishes
     confusable_with: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
   - query: ok heading out for the night. let me know when the claude in t3 finishes the migration
@@ -561,16 +554,62 @@ boundaries:
   - query: 'remind me in forty minutes to look at what the hosts did'
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
+  - query: Cancel the timer called index checkpoint
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel that watcher i set earlier
+    confusable_with: [daintree.foundation, daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel that async wait on tab 4
+    confusable_with: [daintree.foundation, daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel watcher wch_4f21b
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the watcher on the deploy tab
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: drop the async wait on terminal 2, i'll just look myself
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on tab 4
+    confusable_with: [daintree.diagnostics, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on term_4c, i dont need it any more
+    confusable_with: [daintree.agents.recover-agent, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the async wait on the deploy terminal, it'll never fire
+    confusable_with: [daintree.foundation, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on the docs agent
+    confusable_with: [daintree.foundation, daintree.orchestration.supervise-fleet]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel watcher wch_8f12
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: just kill the watcher on the build tab, leave the rest alone
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel that async wait on terminal 3, only that one
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the pr watcher on 455, leave the terminals alone
+    confusable_with: [daintree.foundation, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel that one watcher on t7
+    confusable_with: [daintree.foundation, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
+  - query: stop that async wait you set up earlier
+    confusable_with: [daintree.foundation, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
+  - query: don't start now, start in twelve minutes and tell me when it ends
+    confusable_with: [daintree.orchestration.timebox-attempt, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: great, now watch them and let me know when they're all finished
     history:
       - 'user: give the running agents separate worktrees'
       - 'assistant: Created four and redirected each agent.'
-    active: [daintree.orchestration.watch-outcome]
-  - query: how long does that run for again?
-    history:
-      - 'user: watch the nightly build and wake me if it fails'
-      - 'assistant: Armed a terminal watcher (wch_9a12) on terminal-4c8f — stops on BUILD SUCCESSFUL/BUILD FAILED or exit, alerts on BUILD FAILED, 30s cadence, horizon 12h.'
     active: [daintree.orchestration.watch-outcome]
   - query: do the third one too
     history:
@@ -579,45 +618,23 @@ followups:
     active: [daintree.orchestration.watch-outcome]
   - query: actually make it two hours, and have it say check the seed data AND the index rebuild
     history:
-      - 'user: remind me in an hour to check the seed data'
-      - 'assistant: Timer tmr_5510 scheduled, fires in 60 minutes and drops a reminder in your attention queue.'
+      - 'user: Remind me in an hour to check the seed data.'
+      - 'assistant: Daintree has no timer. No verified host scheduler is available here, so I have not scheduled a reminder.'
     active: [daintree.orchestration.watch-outcome]
-  - query: will that tell me if CI goes red though?
-    history:
-      - 'user: ping me when PR 412 merges'
-      - 'assistant: watcher.watchPR is on #412. Heads up: it only sees open/merged/draft/closed, so it leaves a queue item rather than waking you.'
-    active: [daintree.orchestration.watch-outcome]
-  - query: is that enough for it to push a fix if it needs to?
-    history:
-      - 'user: run the whole test matrix overnight, i''m going to bed'
-      - 'assistant: Spawned it with watch:true (wch_77c0) and minted a wake grant (grn_2fd) for terminal.sendCommand, 8h TTL, maxUses 3.'
-    active: [daintree.orchestration.watch-outcome]
-  - query: cool. remind me what ids you left running
-    history:
-      - 'user: keep an eye on the deploy while i''m out'
-      - 'assistant: Watcher wch_04e1 is on terminal-2aa with a modelJudge on "did the deploy complete without errors", cadence 60s, stop after 4h.'
-    active: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
   - query: fine, just remind me then
     history:
-      - 'user: wait an hour and then run the backfill'
-      - 'assistant: There''s no unattended path for starting work later — a timer can''t spawn an agent. Either I start it now and watch it, or I schedule a reminder and the spawn waits for you.'
+      - 'user: Wait an hour and then run the backfill.'
+      - 'assistant: Daintree has no scheduler and no verified host scheduler is available here. I have not started or scheduled the backfill.'
     active: [daintree.orchestration.watch-outcome]
-  - query: hows it going
-    history:
-      - 'user: don''t make me sit here, notify me when the e2e suite finishes'
-      - 'assistant: Async wait registered (asy_8b3) across terminal-1f2 — it''ll wake you when the run finishes, fails, or asks a question.'
-    active: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
   - query: make it 5 and also alert if it prints panic
     history:
-      - 'user: alert me if that agent goes quiet for more than 10 min'
-      - 'assistant: Watcher wch_6d20 armed with noOutputForMs 600000 on terminal-3e7, alerting without stopping.'
+      - 'user: Alert me if the agent goes quiet for ten minutes.'
+      - 'assistant: Daintree notices report a stop; they cannot detect a silence threshold or match output. No host monitor has been verified.'
     active: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
-  - query: ping me when it merges, im going out
-    history:
-      - 'user: get this branch ready for review'
-      - 'assistant: Committed, pushed and opened PR #147 against develop.'
-    active: [daintree.workflow.prep-branch-for-review]
   - query: let me know when tab 2 finishes, im stepping out
     history:
       - 'user: take the reviewers notes in tab 6 and give them to the implementer in tab 2'
@@ -628,16 +645,6 @@ topic_shifts:
       - 'user: has PR 210 got any approvals'
       - 'assistant: One approval, checks all green, no change requests.'
     active: [daintree.workflow.follow-up-on-issue]
-  - query: same for 205
-    history:
-      - 'user: ping me when the PR merges'
-      - 'assistant: PR watch armed on #204.'
-    active: [daintree.orchestration.watch-outcome]
-  - query: actually cancel it, ill stay up
-    history:
-      - 'user: watch the overnight run'
-      - 'assistant: Watcher armed on t_7710 with a narrow retry grant.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: im off out - wake me when that agent finishes
     history:
       - 'user: create the worktree for hotfix/session-leak with the hotfix recipe'
@@ -658,38 +665,6 @@ topic_shifts:
       - 'user: is this PR any good?'
       - 'assistant: Solid overall. One medium finding about the retry loop swallowing errors.'
     active: [daintree.review.review-change]
-  - query: wait — whats the difference between a watcher and an async wait?
-    history:
-      - 'user: ping me when the build finishes'
-      - 'assistant: Watcher wtc_31a armed on t_88b with goal ''build passes''. Ending the turn.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: hold on — what exactly can a grant authorize while im asleep?
-    history:
-      - 'user: run this overnight and wake me'
-      - 'assistant: Async wait set with a long ceiling; a grant covers the one push it needs.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: before you do that — whats a watcher exactly?
-    history:
-      - 'user: keep an eye on the deploy and ping me'
-      - 'assistant: PR watch armed. I''ll wake when it flips to merged.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: explain what a watcher is and then put one on the build
-    history:
-      - 'user: right, next thing'
-      - 'assistant: Ready when you are.'
-  - query: whats the difference between an async wait and a watcher? either way wake me when the pr merges
-    history:
-      - 'user: pr is up'
-      - 'assistant: Noted — nothing watching it yet.'
-  - query: remind me what a grant is, then set up an overnight run that can push on its own
-    history:
-      - 'user: long job to run tonight'
-      - 'assistant: Go ahead.'
-  - query: how does the notification wake you back up? anyway keep an eye on the deploy and ping me when its done
-    history:
-      - 'user: deploy is going out'
-      - 'assistant: Pipeline is running.'
-    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
   - query: ping me when that agent in tab 2 finishes so i can stop staring at it
     history:
       - 'user: how long do they live'
@@ -697,12 +672,6 @@ topic_shifts:
       - 'user: remember sessions are 30 days, thats a compliance thing not an arbitrary number'
       - 'assistant: Saved with the reasoning.'
     active: [daintree.memory.manage-project-memory]
-  - query: remind me in 20 min to check on them
-    history:
-      - 'user: the one in tab 5 died. no output, nothing'
-      - 'assistant: Relaunched into the same worktree.'
-      - 'user: ok'
-      - 'assistant: All four running again.'
   - query: hang on ignore that, standup in 5. just put a watcher on tab 2 and ping me when its done
     history:
       - 'user: theres 4 tabs from last night. remind me what we were even doing'
@@ -717,13 +686,6 @@ topic_shifts:
       - 'user: and the failed one — is it hung or has daintree lost the terminal? clicking it does nothing'
       - 'assistant: The terminal id is stale — the process exited at 10:31 and the tab is an orphan in the UI. Daintree''s MCP link is fine; nothing else is affected.'
     active: [daintree.agents.recover-agent, daintree.diagnostics]
-  - query: school just rang, i have to go. park it — leave them running and tell me when all three have answered
-    history:
-      - 'user: restarted it. try again'
-      - 'assistant: Three agents up, first relay round out.'
-      - 'user: hows that going'
-      - 'assistant: Two rounds done. All three now agree the N+1 on line items dominates; they disagree on whether the index change is needed as well.'
-    active: [daintree.orchestration.multi-agent, daintree.foundation]
   - query: im in a meeting til 2. dont let them stall, wake me if one needs input
     history:
       - 'user: one sec — get an agent to look at the config loader and tell me if theres a race in there'
@@ -745,13 +707,6 @@ topic_shifts:
       - 'user: nobody. right, go'
       - 'assistant: Started #77 — worktree and branch feat/77-queue created, agent launched with a background supervisor.'
     active: [daintree.workflow.start-work-on-issue, daintree.foundation]
-  - query: what watchers have i got running
-    history:
-      - 'user: nobody. right, go'
-      - 'assistant: Started #77, agent launched on feat/77-queue.'
-      - 'user: let me know when the pr opens'
-      - 'assistant: PR watch armed on #77''s branch — I''ll wake you when a PR appears.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: watch the checks and wake me either way
     history:
       - 'user: stick it on my clipboard'
@@ -851,11 +806,6 @@ topic_shifts:
       - 'user: remind me in an hour to check the import'
       - 'assistant: Timer set for an hour. I''ll wake you then.'
     active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: you said you'd wake me when the build finished, did that actually happen?
-    history:
-      - 'user: let me know when the build finishes'
-      - 'assistant: Watching the build terminal - I''ll wake you with the result.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: did my 30 minute reminder go off or did i miss it?
     history:
       - 'user: remind me in 30 minutes to look at the queue'
@@ -886,11 +836,6 @@ topic_shifts:
       - 'user: is the preview clean now'
       - 'assistant: Clean on the newest navigation generation. Old rows survive the reload so I only judged the new ones.'
     active: [daintree.runtime.debug-web-app, daintree.foundation]
-  - query: remind me at 6 to shut things down
-    history:
-      - 'user: can you auto-pause at 6pm'
-      - 'assistant: I can''t — a timer can''t run that action. It could only be a reminder that wakes nothing.'
-    active: [daintree.worktree.manage-resource]
   - query: watch them and ping me when the last one finishes, i'm heading out
     history:
       - 'user: move the four agents into their own worktrees'
@@ -906,18 +851,10 @@ topic_shifts:
       - 'user: give each agent its own worktree'
       - 'assistant: Four created off develop; every terminal filed and instructed once.'
     active: [daintree.worktree.relocate-agents]
-  - query: what watchers do i have running right now?
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: give the overnight watcher permission to run the deploy command but only once
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: alert me if that terminal goes quiet for more than ten minutes
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: i don't want to sit here waiting on this, just notify me when it lands
     history:
       - 'user: good morning'
@@ -946,10 +883,6 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-  - query: list every timer and grant thats still live pls
-    history:
-      - 'user: thanks for yesterday'
-      - 'assistant: Any time. What''s on today?'
   - query: im lauching the seed script now it takse like 2 hrs pls wathc it and ping me
     history:
       - 'user: hello'
@@ -966,16 +899,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: ok so im away till monday and theres this long migration running in terminal 2 plus a PR i opened this morning. i want to come back to something useful — set up whatever you need so i know what happened with both
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: keep an eye on them while i grab lunch, wake me if any of them fails
-    history:
-      - 'user: how''s everyone doing? anything need me'
-      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-24-selector-hardening
   - query: let me know when it finishes, i'll be in a meeting for an hour
     history:
       - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
@@ -1012,52 +935,146 @@ topic_shifts:
       - 'assistant: Opened #530 from deps/batch-2026-09-28 listing the 11 included bot PRs; CI running.'
     active: [daintree.forge.batch-dependency-updates]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: cancel the watcher you set, i'm here anyway
+    history:
+      - 'user: 2-2? do a runoff between those two'
+      - 'assistant: Runoff between tab 1 and tab 4, same four voting.'
+      - 'user: still tied 😑'
+      - 'assistant: Third round out with a tighter brief so the ballots separate.'
+    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on tab 2, im just gonna sit here and watch it
+    history:
+      - 'user: how long do these usually take lol'
+      - 'assistant: About twenty minutes.'
+      - 'user: its stuck on a DST question. tell it IANA rules, no hardcoded offsets'
+      - 'assistant: Answered. It is continuing.'
+    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: oh and cancel that watcher i left on studio-1 yesterday
+    history:
+      - 'user: tell them its blocking not optional'
+      - 'assistant: Sent — both are reworking.'
+      - 'user: im heading out — ping me when all four are green'
+      - 'assistant: Watchers armed on all four terminals; I''ll wake you when the last one goes green.'
+    active: [daintree.foundation, daintree.orchestration.watch-outcome]
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel that async wait i left on the judge terminal
+    history:
+      - 'user: ok. start work on issue 512 with the winning approach'
+      - 'assistant: Started 512, agent launched with a supervisor.'
+      - 'user: did it get a worktree'
+      - 'assistant: Yes — worktree at ../wt-512 on branch issue-512-migration, agent running inside it.'
+    active: [daintree.foundation]
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: drop the watcher on the nightly build, i'll just look in the morning myself
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the async wait on the migration agent, i'm going to babysit that one myself
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: stop the standup reminder timer
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the twenty minute timer, plans changed
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: actually cancel that watch, i'm staying at my desk after all
+    history:
+      - 'user: ping me when the deploy finishes'
+      - 'assistant: Watcher w-31 armed on terminal t-4, goal: deploy completes or fails.'
+    active: [daintree.orchestration.watch-outcome]
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: stop watching the build, i'll just check it myself
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the PR watcher on 132. just that one, leave the others.
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on 88 too, that one's dead
+    history:
+      - 'user: wake me when PR 77 merges'
+      - 'assistant: PR watch armed on 77.'
+      - 'user: [PR watch fired: PR 77 merged]'
+      - 'assistant: PR 77 is merged into main. The watch has retired itself.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel watcher wtc_9f2a1
+    history:
+      - 'user: still awake?'
+      - 'assistant: Still here. What do you need?'
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: how does the notification wake you back up? anyway keep an eye on the deploy and ping me when its done
+    history:
+      - 'user: deploy is going out'
+      - 'assistant: Pipeline is running.'
+    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: explain what a watcher is and then put one on the build
+    history:
+      - 'user: right, next thing'
+      - 'assistant: Ready when you are.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between an async wait and a watcher? either way wake me when the pr merges
+    history:
+      - 'user: pr is up'
+      - 'assistant: Noted — nothing watching it yet.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: remind me what a grant is, then set up an overnight run that can push on its own
+    history:
+      - 'user: long job to run tonight'
+      - 'assistant: Go ahead.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: same for 205
+    history:
+      - 'user: Ping me when PR 204 merges.'
+      - 'assistant: Daintree has no PR-condition watcher. No host waiting command has been arranged yet.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: actually cancel it, ill stay up
+    history:
+      - 'user: Tell me when the overnight agent stops.'
+      - 'assistant: Stop notice armed on terminal t-71. No extra write authority was granted.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: remind me at 6 to shut things down
+    history:
+      - 'user: Can you auto-pause the agents at 6pm?'
+      - 'assistant: Daintree has no scheduler. No verified host mechanism is available, so nothing has been scheduled or paused.'
+    active: [daintree.worktree.manage-resource]
+    run: 2026-10-16-synthetic-audit
 wakes:
-  - query: '[watcher pr_482 fired: state changed open -> merged]'
-    history:
-      - 'user: ping me when the PR merges'
-      - 'assistant: Armed a PR watch on #482. I''ll wake you the moment it flips to merged.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: '[watcher fired: t_0331 output matched BUILD FAILED, exit 2]'
-    history:
-      - 'user: let me know when the build finishes'
-      - 'assistant: Watching terminal t_0331 for the build to go idle. I''ll ping you with the result.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: '[overnight watcher fired at 04:12 — terminal idle, 2 failures remaining]'
     history:
-      - 'user: run this overnight and wake me'
-      - 'assistant: Long run started in t_7710 with a watcher armed and a narrow grant so it can re-run the suite once without asking. Sleep well.'
+      - 'user: Run the test agent overnight and tell me when it stops.'
+      - 'assistant: Agent t-71 is running with a stop notice back to this pane. No retries or other follow-on commands have been authorized.'
     active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: '[timer tm_44 elapsed: 60m]'
-    history:
-      - 'user: remind me in an hour to check the deploy'
-      - 'assistant: Timer set for 60 minutes. I''ll come back to you then.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: '[wake: heartbeat timer elapsed, no output on t_5510 for 30m]'
-    history:
-      - 'user: keep an eye on the staging rollout while im out'
-      - 'assistant: Watch armed on the rollout terminal plus a 30-minute heartbeat timer. Pre-authorized a single rollback command via a narrow grant.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
 near_misses:
   - ping me when the pr merges, im heading out
   - wake me when its done
   - let me know if anything finishes
 docs:
   - set up a watcher on that branch
-  - check the timer i set is still armed
   - query: whats a watcher, and can you put one on the build while youre at it
     docs: true
-  - list my active watchers
   - yes please, keep an eye on it
   - query: whats a watcher, and can you put one on the build while youre at it
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
     docs: true
-  - query: check the timer i set is still armed
-    history:
-      - 'user: hey'
-      - 'assistant: Hey! What are we working on?'
   - query: side question, set up a watcher on that branch
     history:
       - 'user: want to settle an argument'
@@ -1066,10 +1083,30 @@ docs:
     history:
       - 'user: ping me when the deploy finishes'
       - 'assistant: Watcher w-31 armed on terminal t-4, goal: deploy completes or fails.'
+  - query: cancel the watcher
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill watcher 3
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the timer i set earlier
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill watcher 3
+    history:
+      - 'user: How are you?'
+      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
 foundation_boundaries:
   - watch the terminal running the migration and tell me when its done
   - ping me when terminal 3 finishes
-  - let me know when that test run finishes
   - keep an eye on that one
   - wake me when the claude terminal is done
   - watch trm_9f2a and alert me if it errors
@@ -1086,7 +1123,86 @@ foundation_boundaries:
   - let me know when ci goes green on that branch
   - keep an eye on the deploy while i'm out and wake me if it breaks
   - run it overnight and let me know how it went in the morning
-  - remind me in 45 minutes to check on that agent
   - tell me when the pr actually merges
   - pre-authorize it to push if the tests come back green while i'm at dinner
   - leave something watching that terminal and shout if it goes red
+
+foundation:
+  - query: stop watching it
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: drop the async wait on t_991
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill that timer
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on the deploy terminal
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: i dont need that reminder anymore, cancel it
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: stop the async wait please
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel watcher w_223
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: unwatch the build terminal
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the pending await on that agent
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the watcher you left on the api one
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: scrap the 30 min timer
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the async handle a_77
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: dont wake me for that one anymore, drop the watch
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill the async wait on trm_c4
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel that timer
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher i set on the nightly run
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on trm_e3
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel async_88
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: kill that async wait, i don't need the result any more
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: drop the watcher with id w-3
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on terminal 4
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: stop watching that pr, i don't care any more
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the watcher on t_9021
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: drop that async wait on the judge terminal
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the six o'clock reminder
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: cancel the async wait i left on t_7712, nothing else
+    confusable_with: [daintree.foundation]
+    run: 2026-10-16-synthetic-audit

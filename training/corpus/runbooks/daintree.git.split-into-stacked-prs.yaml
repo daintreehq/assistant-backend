@@ -53,6 +53,9 @@ boundaries:
   - query: My branch feat/reports is 3,000 lines — break it into a stack of reviewable PRs, schema first.
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-late
+  - query: Split the 38-file billing branch into reviewable stacked layers and prove the top stack preserves the original change.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.workflow.prep-branch-for-review]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: move the test helpers into the first layer instead of the last
     history:

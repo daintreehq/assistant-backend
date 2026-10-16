@@ -225,3 +225,16 @@ boundaries:
   - query: "call off what I sent to the hosts, the task was to rotate a key on a schedule, and keep everything they have done"
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: runbook-2026-10-issue-140
+  - query: Call off the spelling-fix run already sent to both remote machines, preserve their changes, and report which hosts acknowledged the stop.
+    active: [daintree.hosts.supervise-swarm]
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: 2026-10-16-synthetic-audit
+
+topic_shifts:
+  - query: 'Change the brief of the run already out on the Remote Hosts: require deterministic ordering too, preserve every other constraint, and collect acknowledgments.'
+    history:
+      - 'user: keep the remote sorting-library run moving'
+      - 'assistant: All three hosts are implementing and no result has returned.'
+    active: [daintree.hosts.supervise-swarm]
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: 2026-10-16-synthetic-audit

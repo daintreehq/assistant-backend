@@ -71,9 +71,6 @@ boundaries:
     confusable_with: [daintree.runtime.migrate-worktree-database]
   - query: i need a shell in the docs worktree, can you give me one
     run: pre-split
-  - query: run that one in the other worktree too
-    confusable_with: [daintree.recipe.run-or-create]
-    run: pre-split
   - query: start the dev server in this checkout
     confusable_with: [daintree.recipe.run-or-create, daintree.worktree.provision-local-environment]
     run: 2026-09-22-provision-boundary-fix
@@ -107,6 +104,9 @@ boundaries:
   - query: "open a terminal and run the docs site watcher for the portal worktree, it should stay up while I read"
     confusable_with: [daintree.ci.run-e2e-suite]
     run: runbook-2026-10-issue-135
+  - query: Run pnpm dev for wt-help in a visible shell pane and confirm its ready URL.
+    confusable_with: [daintree.recipe.run-or-create, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: what did it exit with?
     history:
@@ -181,15 +181,16 @@ topic_shifts:
       - 'assistant: Created feat/search-v2 at ~/proj-search-v2 off main; no recipe or agent launched.'
     active: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: ok, unrelated — start the storybook watcher for the ui worktree in a side panel
-    history:
-      - 'user: how much Claude usage have I got left?'
-      - 'assistant: Claude''s /usage view: 38% of the five-hour window used, resets at 16:00; weekly at 61%.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: now start the dev server again in the billing worktree so I can watch it
     history:
       - 'user: 3000 is taken, free it'
       - 'assistant: It was my term-4 in feat/billing; closed it and the recheck shows nothing listening on 3000.'
     active: [daintree.runtime.free-busy-port]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: run that one in the other worktree too, the billing one.
+    history:
+      - 'user: Run pnpm dev in the web worktree where I can watch it.'
+      - 'assistant: pnpm dev is ready in the web shell pane at http://localhost:4391.'
+    active: [daintree.terminals.run-visible-command]
+    confusable_with: [daintree.recipe.run-or-create]
+    run: 2026-10-16-synthetic-audit

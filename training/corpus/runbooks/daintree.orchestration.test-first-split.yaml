@@ -79,6 +79,20 @@ followups:
       - 'assistant: Worktree feat/email-normalise is ready, baseline 3f2a019 clean. About to launch codex-3 to write tests under tests/utils/test_email.py.'
     active: [daintree.orchestration.test-first-split]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Ask the test author to correct the missing-fixture failure and prove the behavioral assertion fails before freezing the tests for the separate implementer.
+    history:
+      - 'user: Agent A writes acceptance tests for invitation expiry; agent B implements against frozen tests.'
+      - 'assistant: The test-author commit exists, but its command failed while loading a missing fixture before any expiry assertion ran.'
+    active: [daintree.orchestration.test-first-split]
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
+  - query: the builder changed the expected result. put the test-author's version back and make it implement that
+    history:
+      - 'user: Codex owns the frozen tax tests and Claude only implements.'
+      - 'assistant: Implementation passes now, but diff from the frozen test commit changes two expected tax amounts.'
+    active: [daintree.orchestration.test-first-split]
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: 'for the next piece I want it done properly: codex writes failing tests first, claude makes them pass and isn''t allowed to touch them'
     history:

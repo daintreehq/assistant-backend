@@ -373,11 +373,6 @@ topic_shifts:
       - 'user: did anyone reply on 601'
       - 'assistant: Two replies. The reporter added a stack trace and someone else confirmed it on 1.4.2.'
     active: [daintree.workflow.follow-up-on-issue]
-  - query: this whole thing should be a ticket. title it something about the devbox never coming back from pause
-    history:
-      - 'user: is the devbox on the billing worktree still up'
-      - 'assistant: Status came back paused, last checked four minutes ago. Resume returned success but status still reads paused.'
-    active: [daintree.worktree.manage-resource]
   - query: assign 88 to mia, she wrote that module originally
     history:
       - 'user: who''s working on what right now'
@@ -460,10 +455,6 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: issue 44 has a typo in the title, recieve should be receive. fix it.
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: retitle 214. right now it just says "fix thing" which helps nobody. call it "Retry loop never terminates on 429".
     history:
       - 'user: hi'
@@ -615,7 +606,6 @@ wakes:
     active: [daintree.forge.manage-issue]
 foundation_boundaries:
   - file a bug for this
-  - 'open an issue: the export button does nothing on Safari'
   - label 88 flaky
   - assign 412 to me
   - reopen issue 77

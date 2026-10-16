@@ -65,6 +65,12 @@ boundaries:
     confusable_with: [daintree.workflow.find-issue-work]
   - query: Search the PRs labelled needs-review and get each one reviewed.
     confusable_with: [daintree.workflow.find-issue-work]
+  - query: 'Review each of PRs #1742, #1748 and #1751 at its recorded head and return one checked verdict per PR.'
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.review.review-change
+      - daintree.review.cross-review-cohort
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: 'skip #423, it''s a draft in all but name — just do the other six'
     history:
@@ -127,23 +133,11 @@ topic_shifts:
       - 'assistant: Batch #530 merged; 11 superseded bot PRs closed and read back. vitest bump left open with its failing output.'
     active: [daintree.forge.batch-dependency-updates]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: while claude-2 works on that, go through the PR review queue — every PR with review required gets a reviewer
-    history:
-      - 'user: start work on #77'
-      - 'assistant: Created worktree issue-77-rate-limit and launched claude-2 there with the issue as its brief.'
-    active: [daintree.workflow.start-work-on-issue]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: those five in review — get an agent on each one and give me a verdict per PR
     history:
       - 'user: write my standup'
       - 'assistant: Shipped: #402, #405. In review: #409, #411, #414, #418, #420. In progress: issue-77. Nothing posted.'
     active: [daintree.git.summarize-activity]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: now review everything opened against main this week, one agent per PR
-    history:
-      - 'user: rename the tabs so I can tell them apart'
-      - 'assistant: Renamed claude-2 to "auth refactor" and codex-3 to "search index".'
-    active: [daintree.terminals.rename]
     run: 2026-09-28-catalog-expansion-stateful
   - query: fine — now review the non-bot open PRs, one reviewer each
     history:

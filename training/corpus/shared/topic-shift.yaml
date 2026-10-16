@@ -86,14 +86,6 @@ examples:
       - 'user: hang on whats the difference between a watcher and a timer again'
       - 'assistant: A watcher supervises a terminal or PR and wakes me on a state change; a timer just fires after a delay regardless of what happened.'
     expect: [daintree.agents.recover-agent, daintree.orchestration.watch-outcome]
-  - query: and the failed one — is it hung or has daintree lost the terminal? clicking it does nothing
-    history:
-      - 'user: hows everyone doing'
-      - 'assistant: Two finished, one working, two waiting on questions, one failed (tab 7).'
-      - 'user: two of them are waiting on questions? unblock both, yes to everything'
-      - 'assistant: Answered both — tab 3 is running tests again, tab 6 is writing the migration. Neither asked anything destructive.'
-    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
-    expect: [daintree.agents.recover-agent, daintree.diagnostics]
   - query: red? ok dig into whats failing and ping me when its green
     history:
       - 'user: add the webhook handlers too'
@@ -150,12 +142,6 @@ examples:
       - 'assistant: Not hung - process alive, tail moved 40 seconds ago. The suite is slow here.'
     active: [daintree.agents.recover-agent, daintree.foundation]
     expect: [daintree.ci.diagnose-and-fix, daintree.diagnostics]
-  - query: theyre both just called Claude, retitle the tabs, then tell me which one needs me
-    history:
-      - 'user: how are they both doing'
-      - 'assistant: tab 4 editing logout.ts; tab 5 waiting on a question about default precedence.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
-    expect: [daintree.terminals.rename, daintree.orchestration.supervise-fleet]
   - query: 'the #388 one is done. is that pr green now, and if its still red get it fixed'
     history:
       - 'user: brb coffee'
@@ -220,14 +206,6 @@ examples:
       - 'assistant: Adopted both — supervisors attached, and they''re back in the fleet sweep.'
     active: [daintree.foundation, daintree.orchestration.supervise-fleet]
     expect: [daintree.diagnostics, daintree.agents.recover-agent]
-  - query: find me two or three small unassigned bugs and put an agent on each
-    history:
-      - 'user: where''s the rate limiter implemented anyway'
-      - 'assistant: middleware/rateLimit.ts, backed by lib/buckets.ts.'
-      - 'user: ha. of course it is'
-      - 'assistant: Want me to do anything with it while the auth batch reworks?'
-    active: [daintree.foundation, daintree.explore.repository]
-    expect: [daintree.workflow.find-issue-work, daintree.orchestration.fan-out-work]
   - query: 'grab #318 off the board and get an agent started on it — meanwhile put the question of whether we keep the legacy adapter to the pinned crew'
     expect: [daintree.workflow.start-work-on-issue, daintree.agents.poll-pinned-agents]
   - query: 'start #77, and while that runs I want the fleet''s read on the two migration strategies in the description'
@@ -469,11 +447,6 @@ examples:
       - 'user: attach the worktree and PR to the right nodes'
       - 'assistant: Both resources attached: wt_c40 to node 1 and PR #620 to node 2.'
     expect: [daintree.diagnostics, daintree.worktree.create-plain-worktree]
-  - query: let the three of them talk through the caching design and save whatever they land on as a decision note
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: Six agents running: 1,2,4 working, 3 waiting on a question, 5 finished, 6 idle.'
-    expect: [daintree.orchestration.conversation, daintree.memory.manage-project-memory]
   - query: label 88 blocked and then tell me what's actually holding it up
     history:
       - 'user: How are you?'
@@ -509,11 +482,6 @@ examples:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
     expect: [daintree.orchestration.competition, daintree.orchestration.runoff-tiebreaker]
-  - query: check what the reviewer decided on 512 and then start on 513 while I read it
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-    expect: [daintree.workflow.follow-up-on-issue, daintree.workflow.start-work-on-issue]
   - query: 'kick off #412 and set a watcher so i know the second the PR goes up'
     history:
       - 'user: good morning'
@@ -632,11 +600,6 @@ examples:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
     expect: [daintree.context.curate-copytree-bundle, daintree.workflow.follow-up-on-issue]
-  - query: read the thread on the i18n issue and remember whatever they decided about locale fallbacks
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-    expect: [daintree.workflow.follow-up-on-issue, daintree.memory.manage-project-memory]
   - query: post the closing comment on 77 and then clean up its terminals and worktree
     history:
       - 'user: hello'
@@ -660,11 +623,6 @@ examples:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
     expect: [daintree.orchestration.status-and-resume, daintree.orchestration.workspace-cleanup]
-  - query: 'start #14, and while it runs get the idle agents to compete on the best name for the package'
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-    expect: [daintree.workflow.start-work-on-issue, daintree.orchestration.competition]
   - query: ask claude read-only whether the new api shape breaks the mobile client, and remember the answer
     history:
       - 'user: sup'
@@ -698,11 +656,6 @@ examples:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
     expect: [daintree.forge.manage-issue, daintree.workflow.start-work-on-issue]
-  - query: plan the postgres migration as a durable workflow and fan the first phase out across agents
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-    expect: [daintree.orchestration.execute-durable-workflow, daintree.orchestration.fan-out-work]
   - query: land 302 and then close out its issue with a comment saying it shipped
     history:
       - 'user: thanks for yesterday'
@@ -758,11 +711,6 @@ examples:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
     expect: [daintree.workflow.prep-branch-for-review, daintree.workflow.find-issue-work]
-  - query: launch an agent on the css cleanup, and close the two finished ones while you're at it
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-    expect: [daintree.edits.spawn-visible-agent, daintree.orchestration.workspace-cleanup]
   - query: work out how the notification fan-out works, then bundle everything involved into a context file
     history:
       - 'user: starting something fresh'
@@ -811,11 +759,6 @@ examples:
       - 'user: merge the first one'
       - 'assistant: Merged. The second branch has four unpushed commits and no PR.'
     expect: [daintree.workflow.start-work-on-issue, daintree.terminals.rename]
-  - query: make a worktree for release/3.2 and get its devbox provisioned
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-    expect: [daintree.worktree.create-plain-worktree, daintree.worktree.manage-resource]
   - query: rename these tabs first so i can tell them apart, then ask them all which caching strategy they'd pick
     history:
       - 'user: sup'
@@ -974,13 +917,6 @@ examples:
     active: [daintree.ci.diagnose-and-fix]
     expect: [daintree.ci.diagnose-and-fix, daintree.workflow.prep-branch-for-review]
     run: 2026-09-24-selector-hardening
-  - query: great, squash merge it. then find me the next unassigned bug to pick up
-    history:
-      - 'user: is the PR for #190 green?'
-      - 'assistant: PR #203 (closes #190): CI green, 1 approving review from @mara, no requested changes.'
-    active: [daintree.workflow.follow-up-on-issue]
-    expect: [daintree.forge.land-pull-request, daintree.workflow.find-issue-work]
-    run: 2026-09-24-selector-hardening
   - query: pass that to claude in t2 so it can fix it, and wake me when the PR merges
     history:
       - 'user: what did the reviewer say on the auth pr'
@@ -994,20 +930,6 @@ examples:
       - 'assistant: PR #512: `unit` passed, `e2e` failed — `checkout.spec.ts › applies coupon` timed out after 30s.'
     active: [daintree.workflow.follow-up-on-issue]
     expect: [daintree.ci.diagnose-and-fix, daintree.workflow.follow-up-on-issue]
-    run: 2026-09-24-selector-hardening
-  - query: check t1's work actually landed before i trust it, and rename all the tabs so i can tell them apart
-    history:
-      - 'user: how''s everyone doing'
-      - 'assistant: 5 agents: 2 done (t1 claude, t4 grok), 1 working (t2 codex), 1 waiting on a question (t3 gemini: "use pnpm or npm?"), 1 idle unsupervised (t6).'
-    active: [daintree.orchestration.supervise-fleet]
-    expect: [daintree.orchestration.verify-agent-work, daintree.terminals.rename]
-    run: 2026-09-24-selector-hardening
-  - query: verify codex's claim that tests pass. and set something to ping me when claude in t3 is done, i'm stepping out
-    history:
-      - 'user: anything need me?'
-      - 'assistant: Swept 4 agents: t2 codex finished (claims tests pass), t3 claude still working, t5 copilot finished, t7 grok failed on a missing env var.'
-    active: [daintree.orchestration.supervise-fleet]
-    expect: [daintree.orchestration.verify-agent-work, daintree.orchestration.watch-outcome]
     run: 2026-09-24-selector-hardening
   - query: move t1 into its own worktree so it stops stepping on the others, then clean up t2 and t3 — close them
     history:
@@ -1051,13 +973,6 @@ examples:
     active: [daintree.explore.repository]
     expect: [daintree.edits.spawn-visible-agent, daintree.memory.manage-project-memory]
     run: 2026-09-24-selector-hardening
-  - query: review the last change to that file for bugs, and file an issue if it's bad
-    history:
-      - 'user: where is rate limiting implemented'
-      - 'assistant: Rate limiting is in middleware/ratelimit.go (token bucket per API key), configured from config/limits.yaml.'
-    active: [daintree.explore.repository]
-    expect: [daintree.forge.manage-issue, daintree.review.review-change]
-    run: 2026-09-24-selector-hardening
   - query: file the high one as an issue and start claude on it right away
     history:
       - 'user: review the branch feat/sso'
@@ -1086,13 +1001,6 @@ examples:
     active: [daintree.workflow.prep-branch-for-review]
     expect: [daintree.orchestration.watch-outcome, daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
-  - query: request review from @dana on it and have grok do a proper code review of the diff too
-    history:
-      - 'user: open a pr for this branch'
-      - 'assistant: Opened PR #61 fix/null-avatar → main. CI started.'
-    active: [daintree.workflow.prep-branch-for-review]
-    expect: [daintree.forge.land-pull-request, daintree.review.review-change]
-    run: 2026-09-24-selector-hardening
   - query: 417. assign it to me and start codex on it
     history:
       - 'user: find me a small bug nobody''s on'
@@ -1113,13 +1021,6 @@ examples:
       - 'assistant: Dev preview console: `TypeError: Cannot read properties of undefined (reading ''map'')` at ProductList.tsx:22. Delegated the fix to claude in t2.'
     active: [daintree.runtime.debug-web-app]
     expect: [daintree.runtime.debug-web-app, daintree.workflow.prep-branch-for-review]
-    run: 2026-09-24-selector-hardening
-  - query: t6's gemini — did that spawn even start? it never printed anything. also is 231's pr green?
-    history:
-      - 'user: where were we'
-      - 'assistant: In flight from yesterday: #231 (claude, t2, waiting review), the queue migration plan (step 3 of 5), and an orphaned gemini in t6.'
-    active: [daintree.orchestration.status-and-resume]
-    expect: [daintree.agents.recover-agent, daintree.workflow.follow-up-on-issue]
     run: 2026-09-24-selector-hardening
   - query: verify codex's work on 140 before i look, and fix that stale ledger row
     history:
@@ -1212,13 +1113,6 @@ examples:
     active: [daintree.orchestration.verify-agent-work]
     expect: [daintree.orchestration.watch-outcome, daintree.runtime.debug-web-app]
     run: 2026-09-24-selector-hardening
-  - query: 'ok. then let''s do the next thing: spin up agents on #311, #312 and #313 in parallel, and give each worktree its own postgres'
-    history:
-      - 'user: where were we'
-      - 'assistant: Open from last session: PR #310 awaiting review; nothing else active. Ledger is clean.'
-    active: [daintree.orchestration.status-and-resume]
-    expect: [daintree.orchestration.fan-out-work, daintree.worktree.provision-local-environment]
-    run: 2026-09-24-selector-hardening
   - query: great, label it bug and put gemini on it
     history:
       - 'user: file an issue for the search focus bug'
@@ -1246,3 +1140,105 @@ examples:
       - 'user: wait an hour and then run the backfill'
       - 'assistant: There''s no unattended path for starting work later — a timer can''t spawn an agent. Either I start it now and watch it, or I schedule a reminder and the spawn waits for you.'
     expect: [daintree.ci.hunt-flaky-test, daintree.forge.manage-issue]
+  - query: quick one — how many agents can i actually have pinned at once?
+    history:
+      - 'user: have the four of them pitch a caching design and vote on the best'
+      - 'assistant: All four submissions in. Ballot blinded and shuffled per voter; votes coming back.'
+    active: [daintree.orchestration.competition, daintree.foundation]
+    confusable_with: [daintree.orchestration.competition]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: wait, does each of them see the whole conversation or only what you pass along?
+    history:
+      - 'user: let the three of them talk it out about the api shape'
+      - 'assistant: Round 3 relayed. They''ve converged on versioned routes but disagree on deprecation.'
+    active: [daintree.orchestration.conversation, daintree.foundation]
+    confusable_with: [daintree.orchestration.conversation]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: hang on — how does daintree stop them just voting for themselves?
+    history:
+      - 'user: let them debate then vote the weakest position off'
+      - 'assistant: Two rounds done, final positions collected. Running the elimination vote blind.'
+    active: [daintree.orchestration.debate-elimination, daintree.foundation]
+    confusable_with: [daintree.orchestration.debate-elimination]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: does daintree cap how many terminals can run at once?
+    history:
+      - 'user: parallelise the backlog across the studios'
+      - 'assistant: Eight units, eight worktrees, one agent each. Fleet supervised in the background.'
+    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: how does daintree tell completed from exited anyway?
+    history:
+      - 'user: it says the tests pass, confirm that'
+      - 'assistant: Git read first: 4 files changed, test file touched. Pulling the tail to check the run happened.'
+    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: wait — whats the difference between a watcher and an async wait?
+    history:
+      - 'user: I want to understand Daintree notices before using one.'
+      - 'assistant: A stop notice can resume this pane when a working agent stops. I have not arranged one yet.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    confusable_with: [daintree.orchestration.watch-outcome]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: hold on — what exactly can a grant authorize while im asleep?
+    history:
+      - 'user: I want to understand Daintree notices before using one.'
+      - 'assistant: A stop notice can resume this pane when a working agent stops. I have not arranged one yet.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    confusable_with: [daintree.orchestration.watch-outcome]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: before you do that — whats a watcher exactly?
+    history:
+      - 'user: I want to understand Daintree notices before using one.'
+      - 'assistant: A stop notice can resume this pane when a working agent stops. I have not arranged one yet.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    confusable_with: [daintree.orchestration.watch-outcome]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: Acknowledge receipt of the completion report; no additional task is requested.
+    history:
+      - 'user: Run the approved two-wave issue plan.'
+      - 'assistant: Both waves are merged, their worktrees removed, and all checks passed.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: cheers, that is all
+    history:
+      - 'user: Carry the issue plan through its merge-gated waves.'
+      - 'assistant: Final wave merged and cleaned up. Nothing remains in the plan.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: what does the notice chip Stop button do in Daintree?
+    history:
+      - 'user: Run the planned issue waves.'
+      - 'assistant: The first issue agents are working with stop notices armed.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.work-in-waves, daintree.orchestration.watch-outcome]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: Explain whether Daintree notices continue after its app closes; do not change or start the current run.
+    history:
+      - 'user: Work the tickets in merge-gated groups.'
+      - 'assistant: The first group of agents is working and the next group is blocked.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.work-in-waves, daintree.orchestration.watch-outcome]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: go ahead with the merged batches, and ask the already-running docs agent if the API reference is finished
+    history:
+      - 'user: We agreed three batches of tickets, all merged between batches.'
+      - 'assistant: Batch one has not launched. Existing docs agent t-93 is working on a separate documentation task.'
+    active: [daintree.orchestration.decompose-work]
+    expect: [daintree.orchestration.work-in-waves, daintree.agents.ask-running-agent]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit

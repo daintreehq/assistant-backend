@@ -118,6 +118,15 @@ followups:
     history:
       - 'user: move our four services off the old payments client, using my machines'
       - 'assistant: No host has a project whose origin is the payments repository.'
+  - query: Hold the remaining repository units until the person approves how the pilot rules handle that extra call shape; keep completed repositories recorded separately.
+    history:
+      - 'user: replace the legacy tracing client across the repositories on my remote machines, pilot first'
+      - 'assistant: The pilot rules cover direct calls. The worker repository found calls through a wrapper that the rules do not cover; two other repositories are already complete.'
+    active:
+      - daintree.hosts.migrate-across-repositories
+      - daintree.hosts.execute-distributed-workflow
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+    run: 2026-10-16-synthetic-audit
 
 boundaries:
   - query: the same lint migration but across several repositories that only live on my remote hosts

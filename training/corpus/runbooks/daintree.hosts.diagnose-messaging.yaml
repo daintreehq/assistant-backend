@@ -228,6 +228,28 @@ boundaries:
   - query: 'Which consent does the person on the build host still owe before its assistant accepts anything from this Shell?'
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-137
+  - query: the remote mac's assistant never gets my messages, where do I even start
+    confusable_with: [daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: messaging tools are missing from my sidebar assistant even though I added a remote host
+    confusable_with: [daintree.diagnostics, daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: why can't my assistant see any assistant it can message on my second mac
+    confusable_with: [daintree.diagnostics, daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: the other mac's assistant never gets my questions, what's blocking it
+    confusable_with: [daintree.hosts.ask-host-assistant, daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: the workstation's assistant never answers when I message it from here, is a port or a setting blocking it?
+    confusable_with: [daintree.runtime.free-busy-port, daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: the hub couldn't get usage from the build host because the send came back opted_out, how do I allow messaging with it
+    confusable_with: [daintree.hosts.check-usage-limits, daintree.hosts.foundation]
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: why can't I reach the assistant on my second mac to ask it anything, even its usage
+    confusable_with: [daintree.hosts.check-usage-limits, daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: check the other hosts the same way
     history:
@@ -265,3 +287,12 @@ topic_shifts:
     history:
       - "user: ask the build box whether the migration finished"
       - "assistant: The send came back lane_unavailable; nothing was sent."
+  - query: 'host.sendMessage -> {"status":"opted_out","taskId":null}
+
+      The Remote Host is connected. Identify the messaging permission that blocked this attempt and the setting the person must change.'
+    history:
+      - 'user: copy my chosen settings to the server and then give it the CSV fix'
+      - 'assistant: The settings copy is complete. The attempted task send returned the result below.'
+    active: [daintree.hosts.copy-portable-settings, daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.copy-portable-settings, daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit

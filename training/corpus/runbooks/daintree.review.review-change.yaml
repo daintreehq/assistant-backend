@@ -454,9 +454,6 @@ boundaries:
   - query: Get two fresh read-only reviewers to look over feat/checkout and give me de-duplicated findings.
     confusable_with: [daintree.review.cross-review-cohort]
     run: 2026-09-28-catalog-expansion
-  - query: review the diff on my branch for security problems
-    confusable_with: [daintree.review.cross-review-cohort]
-    run: 2026-09-28-catalog-expansion
   - query: 'Review PR #412 for code quality and security issues and give me findings with file references.'
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion
@@ -532,11 +529,6 @@ boundaries:
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
 followups:
-  - query: how's it going?
-    history:
-      - 'user: review the diff on this branch, correctness and error handling'
-      - 'assistant: Spawned two explore-mode reviewers on worktree wt-3 — terminal 11 on correctness against intent, terminal 12 on error handling. Waiting on both.'
-    active: [daintree.review.review-change]
   - query: also have one check it for injection while you're at it
     history:
       - 'user: review PR 412'
@@ -733,7 +725,6 @@ topic_shifts:
       - 'assistant: Ran independent read-only reviewers across all six. 14 de-duplicated findings, three of them high severity.'
     active: [daintree.foundation, daintree.review.review-change]
   - explain what the agent changed in that diff and tell me whether it's any good
-  - look over the diff on this branch and tell me what's actually wrong with it
   - CI is green, tests pass, build is clean. i don't want anything fixed — i want to know whether the code is any good.
   - query: worth landing? tear it apart if it isn't.
     history:
@@ -828,14 +819,6 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: spawn a reviewer on the staged changes and tell me what it finds
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: review
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: have a look over pr 88 — or 89? whichever one is the websocket one — and tell me if it's solid
     history:
       - 'user: yo'
@@ -867,18 +850,6 @@ topic_shifts:
       - 'user: bundle everything around the billing webhooks into a copytree file'
       - 'assistant: Generated billing-webhooks.copytree.md with 14 files (handlers, models, 3 test files), 61 KB.'
     active: [daintree.context.curate-copytree-bundle]
-    run: 2026-09-24-selector-hardening
-  - query: before i mark it for anyone, have a couple reviewers go over the diff for security problems
-    history:
-      - 'user: get this branch ready for review'
-      - 'assistant: Pushed feat/export-api and opened draft PR #455. Verdict noted 2 TODOs left in exporter.go.'
-    active: [daintree.workflow.prep-branch-for-review]
-    run: 2026-09-24-selector-hardening
-  - query: do the tests too
-    history:
-      - 'user: review this branch'
-      - 'assistant: 3 findings so far from the handler diff; I haven''t looked at the test changes yet.'
-    active: [daintree.review.review-change]
     run: 2026-09-24-selector-hardening
   - query: before anything else, get a code review of the combined branch for security issues
     history:
@@ -917,11 +888,6 @@ topic_shifts:
     active: [daintree.git.resolve-semantic-conflict]
     run: 2026-09-28-round6-stateful
 wakes:
-  - query: '[terminal.awaitAll returned: t_2201 finished, t_2202 finished]'
-    history:
-      - 'user: review this branch'
-      - 'assistant: Two independent read-only reviewers running — t_2201 on correctness, t_2202 on security. I''ll de-dupe their findings when both land.'
-    active: [daintree.review.review-change, daintree.foundation]
   - query: '[wake: 2 reviewers finished, t_2203 exited nonzero before producing output]'
     history:
       - 'user: code review the diff, focus on the auth changes'
@@ -939,13 +905,5 @@ docs:
   - review the diff
   - review this branch before i merge it
   - sure, review it
-  - query: review the diff
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: one thing first, review this branch before i merge it
-    history:
-      - 'user: run the review recipe'
-      - 'assistant: Done - recipe applied, two review agents running.'
 foundation_boundaries:
   - review this diff

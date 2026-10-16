@@ -33,8 +33,6 @@ positives:
   - osv-scanner the monorepo and tell me which vulns matter
   - Check the React components for ARIA misuse and keyboard traps; findings only, nothing fixed and nothing filed.
 boundaries:
-  - query: check our deps for known CVEs and GPL licences, don't upgrade anything
-    confusable_with: [daintree.deps.upgrade-dependency]
   - query: launch codex to do an accessibility audit of the settings pages, report only
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: get an agent to audit our dependencies for bad licences
@@ -78,6 +76,12 @@ boundaries:
   - query: Scan the payments service for injection bugs and weak crypto, have two agents audit it and verify the findings.
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
+  - query: Audit the current payment handlers for authorization gaps and return verified findings with exploit conditions and file evidence.
+    confusable_with:
+      - daintree.explore.repository
+      - daintree.review.review-change
+      - daintree.edits.spawn-visible-agent
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: add a performance lens on the same paths too
     history:

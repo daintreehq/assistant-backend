@@ -58,6 +58,9 @@ positives:
     run: 2026-09-28-round6
   - query: 'Refresh the Docker quickstart in README.md: the image name, ports and volume paths all changed with the compose rewrite.'
     run: 2026-09-28-round6
+  - query: i need the docs regenerated for the new endpoints, put someone on it
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
 boundaries:
   - query: install steps in the README are wrong since we moved to uv. someone needs to fix that, put an agent on it
     confusable_with: [daintree.edits.spawn-visible-agent]
@@ -118,6 +121,9 @@ boundaries:
   - query: "update the API reference so it matches what the handlers actually accept"
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
+  - query: Reconcile docs/configuration.md with the current argument parser, then have a clean-checkout reader exercise the documented commands.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.explore.repository]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: add docs/config.md to it too, the env var table is wrong as well
     history:
@@ -195,3 +201,10 @@ topic_shifts:
       - 'assistant: claude-1 added --json to list and show on feat/cli-json; tests pass.'
     active: [daintree.edits.spawn-visible-agent]
     run: 2026-09-28-round6-stateful
+  - query: the install page still says --config-file, but the code only accepts --config now. fix the instructions and try them from scratch.
+    history:
+      - 'user: The 5.2 notes are done.'
+      - 'assistant: Draft release notes saved; no guide files were changed.'
+    active: [daintree.forge.draft-release-notes]
+    confusable_with: [daintree.forge.draft-release-notes, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

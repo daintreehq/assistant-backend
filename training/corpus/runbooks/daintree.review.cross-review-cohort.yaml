@@ -56,6 +56,12 @@ boundaries:
   - query: 'now that the four worktree agents are done, swap their work around for review and let each answer what its reviewer found'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
+  - query: Assign each of the four finished agents a different peer branch for blind review, then relay the verified findings for one fix round.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.review.review-pr-queue
+      - daintree.review.review-change
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: don't tell them whose branch it is
     history:
@@ -94,12 +100,6 @@ topic_shifts:
       - 'assistant: All four finished: claude-2, codex-3, claude-4 and codex-5 each committed on their issue branch and report tests passing.'
     active: [daintree.orchestration.fan-out-work]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: instead of a fresh reviewer, have the three agents swap and review one another's work
-    history:
-      - 'user: review the three feature branches'
-      - 'assistant: Planning one read-only reviewer per branch: feat/a, feat/b, feat/c.'
-    active: [daintree.review.review-change]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: before I integrate, have the api agent and the ui agent review each other's side and fix what the other found
     history:
       - 'user: one agent on the API, one on the UI, against the schema'
@@ -118,10 +118,4 @@ topic_shifts:
       - 'assistant: I''ll launch codex read-only on feat/export and relay its findings to claude-2.'
       - 'user: wait, the other two finished as well'
     active: [daintree.agents.relay-review-feedback]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: fine, everyone's done. swap reviews between the worktrees now
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: claude-2, codex-3 and claude-4 are waiting at the prompt with their units committed; nothing needs you.'
-    active: [daintree.orchestration.supervise-fleet]
     run: 2026-09-28-catalog-expansion-stateful

@@ -166,6 +166,13 @@ followups:
       - 'assistant: Sent claude-2 in feat/search the parking message; it will read it when its current turn ends.'
     active: [daintree.orchestration.park-work]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: right, park it there. back after lunch.
+    history:
+      - 'user: keep moving through the plan'
+      - 'assistant: Two more nodes complete. The deploy node is waiting on the release build, everything after it is blocked on that.'
+    active: [daintree.orchestration.execute-durable-workflow]
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: ok I'm done for the day — get everything to a stopping point and leave resume notes
     history:
@@ -184,12 +191,6 @@ topic_shifts:
       - 'user: split notifications: API and client in parallel against a committed schema'
       - 'assistant: Contract at d18c6a0; both sides launched and working in notifications-api and notifications-ui.'
     active: [daintree.orchestration.contract-first-split]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: ok I'm out for the night — get them all to a stopping point and tell me where each is
-    history:
-      - 'user: sweep the agents'
-      - 'assistant: claude-2, codex-1 and claude-4 are working; nothing is waiting or failed.'
-    active: [daintree.orchestration.supervise-fleet]
     run: 2026-09-28-catalog-expansion-stateful
   - query: pause them all but keep their sessions, I'll pick this up Monday
     history:
@@ -233,3 +234,16 @@ topic_shifts:
       - 'assistant: Proposal: cap claude-1 and codex-3 at 2 workers and serialize their full runs; codex-3''s run is the heaviest at 540% CPU.'
     active: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6-stateful
+  - query: checkpoint this, i'm closing the laptop
+    history:
+      - 'user: hey, you around?'
+      - 'assistant: Around. What''s the task?'
+    confusable_with: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
+  - query: never mind the hotfix tonight. stop everyone safely, notes for tomorrow, keep the panes
+    history:
+      - 'user: Pause the docs agents and move them onto the login blocker.'
+      - 'assistant: Two docs agents are paused. The blocker agent has not launched yet and one release agent is still working.'
+    active: [daintree.orchestration.reprioritize-work]
+    confusable_with: [daintree.orchestration.reprioritize-work]
+    run: 2026-10-16-synthetic-audit

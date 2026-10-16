@@ -213,9 +213,6 @@ boundaries:
   - query: codex reviewed the diff; send its findings to claude to fix
     confusable_with: [daintree.orchestration.multi-agent]
     run: 2026-09-28-agent-queries
-  - query: have codex review claude's fix without changing anything, then send its findings to claude to address
-    confusable_with: [daintree.orchestration.verify-agent-work]
-    run: 2026-09-28-agent-queries
   - query: Codex already reviewed the payments change in its pane; send its findings to claude-2 to fix
     confusable_with: [daintree.review.review-change]
     run: 2026-09-28-agent-queries
@@ -318,6 +315,9 @@ boundaries:
   - query: 'codex in the second pane found problems in claude''s branch; get those notes over to claude so it fixes them'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
+  - query: Forward the completed review to the implementer for one fix pass and report its response; do not arrange a re-review or approval loop.
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: also tell it codex is a smaller model here so push back if something looks wrong
     history:
@@ -349,11 +349,6 @@ followups:
     history:
       - 'user: relay the reviewer''s punch list to the fixer agent, tell it to treat it as advisory'
       - 'assistant: Relayed to the implementer in tab 3 with the calibration you asked for — advisory input, use judgement, verify before large changes.'
-    active: [daintree.agents.relay-review-feedback]
-  - query: ok good
-    history:
-      - 'user: send codex''s review to the claude thats working in the worktree'
-      - 'assistant: Sent the gist plus the five findings to the Claude terminal in the feature worktree.'
     active: [daintree.agents.relay-review-feedback]
 topic_shifts:
   - query: send that to the agent implementing in tab 2 and tell it to take the high sev ones seriously and ignore the nits
@@ -484,10 +479,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: forwrad the reveiwers notes to the implemnter pls
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: the left one just finished reviewing. give what it found to the other one
     history:
       - 'user: morning'
@@ -532,35 +523,15 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: the agent in tab 4 reviewed the PR and wrote up its findings there. get those over to the one still pushing commits
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: tab 3 finished its review — forward it to the agent in tab 1
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: opus reviewed, sonnet is implementing. connect them
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: gemini's done its review in t3 — point claude in t1 at those notes and tell it to skip the style nits
-    history:
-      - 'user: how''s everyone doing? anything need me'
-      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-24-selector-hardening
   - query: ok gemini posted its review notes in t6 — send them to codex in t2, tell it only to act on the correctness ones and report back if the review was any use
     history:
       - 'user: codex says #311 is done, check it actually did it before i merge'
       - 'assistant: Read the diff on fix/311-token-refresh: refresh path changed in auth/session.ts and a new test added. Ran the test suite tail — 142 passed. Verdict: verified.'
     active: [daintree.orchestration.verify-agent-work]
-    run: 2026-09-24-selector-hardening
-  - query: codex in t3 wrote up a review of claude's patch. point claude at it and have it tell me whether it was useful
-    history:
-      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
-      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
-    active: [daintree.orchestration.multi-agent]
     run: 2026-09-24-selector-hardening
   - query: do it the other way round too
     history:
@@ -596,10 +567,6 @@ near_misses:
 docs:
   - send the reviewers notes over to the implementer agent
   - send that review over to the agent thats implementing
-  - query: send that review over to the agent thats implementing
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: one thing first, send the reviewers notes over to the implementer agent
     history:
       - 'user: find me a small bug nobodys on'

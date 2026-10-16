@@ -76,6 +76,9 @@ boundaries:
   - query: have the reviewer and the implementer go back and forth until they agree on the fix
     confusable_with: [daintree.agents.relay-review-feedback, daintree.orchestration.multi-agent]
     run: pre-split
+  - query: Keep the approved implementation in a reviewer/fixer loop for at most two more rounds, retaining blocking findings and rerunning checks at the final revision.
+    confusable_with: [daintree.orchestration.verify-agent-work, daintree.agents.relay-review-feedback]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: codex found B1 and B2, both blocking — send just those to claude and have it fix them
     history:
@@ -115,6 +118,13 @@ followups:
       - 'assistant: codex-4 returned CHANGES REQUESTED: B1 (limit counter not reset on window roll) and four NITs on naming. About to send the round-1 fixes to claude-5.'
     active: [daintree.orchestration.review-until-approved]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: reviewer still says B4 blocks. send it back once more, we're not done until they approve
+    history:
+      - 'user: Codex reviews the retry change and Claude fixes until approval, max four rounds.'
+      - 'assistant: Round two returned B4: retries duplicate non-idempotent payments. Claude has not addressed it yet.'
+    active: [daintree.orchestration.review-until-approved]
+    confusable_with: [daintree.agents.relay-review-feedback]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: don't just hand it over once — keep going back and forth between them until codex has no blocking findings
     history:

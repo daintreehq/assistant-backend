@@ -466,11 +466,6 @@ topic_shifts:
       - 'user: clean up the worktrees from last week'
       - 'assistant: Removed three merged ones. Left wt_2b — it still has the devbox attached.'
     active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
-  - query: pause the remote box on the migration worktree, i'm done for the night
-    history:
-      - 'user: start work on #501'
-      - 'assistant: Worktree wt_7e created, agent running on issue-501.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: bring the devbox back up before the agent starts, it can't build without it
     history:
       - 'user: put an agent on the compile errors in the vendor package'
@@ -540,10 +535,6 @@ topic_shifts:
     history:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
-  - query: The resource action says the target is not configured even though I named another worktree.
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: is anything actually provisioned behind the hotfix worktree or is it just a checkout
     history:
       - 'user: morning'
@@ -556,22 +547,10 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: pause everything remote, im not tearing anything down yet
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: Check the current worktree's remote devbox status.
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: is my devbox still running
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-  - query: tear down the resource on the old spike tree, completely gone
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: tree's checked out already. now get its remote going
     history:
       - 'user: hey'

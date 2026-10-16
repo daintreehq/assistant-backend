@@ -7,7 +7,6 @@ runbook: daintree.orchestration.bug-bash
 run: 2026-09-28-catalog-expansion
 positives:
   - 'Bug bash the 4.0 release candidate with three agents: one on onboarding, one on billing, one throwing weird inputs at the forms. Confirmed bugs ranked by severity.'
-  - have a few agents poke at the app and try to break it before friday's launch
   - 'QA the CLI with three agents before we ship v2: one on flags and config, one on interrupting long commands, one on huge input files.'
   - 'Exploratory testing of the mobile web build: a keyboard-only user, a slow 3G connection, and a first-time signup. One charter per agent, no code changes.'
   - Run a multi-agent bug bash on the new team-invites feature in the release/2.8 worktree; I want de-duplicated repro steps.
@@ -66,6 +65,9 @@ boundaries:
   - query: Have three agents poke at the new onboarding flow and try to break it before we ship; report reproduced bugs by severity.
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
+  - query: Assign exploratory charters for keyboard navigation, concurrent edits and interrupted uploads on the running beta, then reproduce and de-duplicate reports without changing code.
+    confusable_with: [daintree.review.red-team-change, daintree.ci.run-e2e-suite]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: 'add a fourth charter: keyboard only, whole app'
     history:

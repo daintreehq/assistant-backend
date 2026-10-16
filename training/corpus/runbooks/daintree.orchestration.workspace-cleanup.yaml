@@ -93,15 +93,11 @@ positives:
     run: 2026-09-28-agent-queries
   - query: nuke the worktrees from the batch, keep the branches
     run: 2026-09-28-agent-queries
-  - query: clean up everything from the comp
-    run: 2026-09-28-agent-queries
   - query: Close the terminals from the fan-out and delete their worktrees - they're all merged.
     run: 2026-09-28-agent-queries-2
   - query: Close all the terminals whose agents have finished their tasks.
     run: 2026-09-28-agent-queries-2
   - query: tidy away the idle shells left over from this morning's fan-out
-    run: 2026-09-28-agent-queries-2
-  - query: 'The competition is over: shut down the entrants'' terminals and delete their worktrees.'
     run: 2026-09-28-agent-queries-2
   - query: Remove the worktrees for branches that were already merged, closing their panes first.
     run: 2026-09-28-agent-queries-2
@@ -274,8 +270,6 @@ boundaries:
     confusable_with: [daintree.orchestration.conversation]
   - query: close all those contest terminals, we're done here
     confusable_with: [daintree.orchestration.competition]
-  - query: close all those finished tabs and delete their worktrees
-    confusable_with: [daintree.agents.recover-agent]
   - query: close all those poll terminals, i'm done with them
     confusable_with: [daintree.agents.poll-pinned-agents]
   - query: competition's done, close all those terminals for me
@@ -296,8 +290,6 @@ boundaries:
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: tidy all this up and shut everything down
     confusable_with: [daintree.orchestration.status-and-resume]
-  - query: fan-outs done — close all those terminals and delete the worktrees
-    confusable_with: [daintree.orchestration.supervise-fleet]
   - query: tidy all this up, shut down everything from the competition
     confusable_with: [daintree.orchestration.supervise-fleet]
   - query: close all these terminals and delete the worktrees, im done
@@ -475,6 +467,9 @@ boundaries:
   - query: "ok that was the final round and everything's in. can you get rid of all the panels and worktrees it left lying around now"
     confusable_with: [daintree.orchestration.work-in-waves]
     run: transcript-2026-10-16-batch-workflows
+  - query: Delete the finished issue worktrees and close their panes after the approved run; do not start any more issues.
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: actually delete the last one, i don't need that task
     history:
@@ -490,11 +485,6 @@ followups:
     history:
       - 'user: shut down everything from the competition'
       - 'assistant: Cancelled 3 watchers and closed t-4, t-5, t-6. I left t-9 running — it''s still working — and t-1 because I can''t attribute it to this session.'
-    active: [daintree.orchestration.workspace-cleanup]
-  - query: how's it going?
-    history:
-      - 'user: tidy up, we''re done for the day'
-      - 'assistant: Inventory first — reading terminals, worktrees, watchers, async waits, timers and the workflow list.'
     active: [daintree.orchestration.workspace-cleanup]
   - query: yeah leave that one, do the rest
     history:
@@ -544,21 +534,11 @@ topic_shifts:
       - 'user: have the four of them each pitch a design and peer vote'
       - 'assistant: Winner is claude-4 with 7 points. Full tally and each submission are in the report above.'
     active: [daintree.orchestration.competition]
-  - query: close the finished ones and bin their worktrees
-    history:
-      - 'user: anything need me?'
-      - 'assistant: 2 finished cleanly, 1 was waiting on a question (answered), 1 failed. Nothing else needs you right now.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: ok were done, disarm everything and close the tabs
     history:
       - 'user: break the tie'
       - 'assistant: Runoff done — claude-2 wins 4-1 on the second round submissions.'
     active: [daintree.orchestration.runoff-tiebreaker]
-  - query: delete the worktree for 81 then, its merged
-    history:
-      - 'user: where were we'
-      - 'assistant: Three rows open: #77 (agent still running), #81 (PR merged, row stale — closed it), #90 (never started).'
-    active: [daintree.orchestration.status-and-resume]
   - query: do the cleanup one now
     history:
       - 'user: two jobs: get PR 300 merge-watched, and clean up last weeks mess'
@@ -654,13 +634,6 @@ topic_shifts:
       - 'user: bin the three dead ones'
       - 'assistant: Inventory before I touch anything: tmp-1, tmp-2, tmp-3 are safe. parser-migration and billing-fixtures are merged but have uncommitted files. Confirm the three?'
     active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
-  - query: right that's enough for today. close the finished tabs and drop their worktrees
-    history:
-      - 'user: how''s everyone doing, anything need me?'
-      - 'assistant: 2 working, 1 finished, tab 5 waiting on a question, tab 7 adopted.'
-      - 'user: tab 5''s asking something. say yes and let it carry on'
-      - 'assistant: It asked whether to delete the deprecated migration — answered yes. It''s running again.'
-    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
   - query: right, shut it all down, we're done
     history:
       - 'user: the two green ones — proper review on both before i merge'
@@ -813,13 +786,6 @@ topic_shifts:
       - 'user: pause the devbox on wt_9d'
       - 'assistant: Pause acknowledged and fresh status reads paused.'
     active: [daintree.worktree.manage-resource, daintree.foundation]
-  - query: ok that's all wrapped up, close the terminals and delete the worktrees
-    history:
-      - 'user: move the agents into separate worktrees'
-      - 'assistant: Five worktrees created and every agent told where it now works.'
-      - 'user: are they all finished?'
-      - 'assistant: All five report done and the branches are pushed.'
-    active: [daintree.worktree.relocate-agents]
   - query: tear all of this down, i'm finished for the day
     history:
       - 'user: split the agents into their own trees'
@@ -854,10 +820,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: running out of disk. how many worktrees have i got and can we bin the merged ones
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: close these
     history:
       - 'user: hows your day going'
@@ -1041,14 +1003,23 @@ topic_shifts:
       - 'assistant: Done: S1-S8 and S10-S11 verified by me, S9 deferred; checks pass on feat/drizzle; the spike is untouched.'
     active: [daintree.orchestration.productionize-prototype]
     run: 2026-09-28-round6-stateful
-wakes:
-  - query: '[wake: both worktree deletes completed]'
+  - query: we're abandoning the remaining waves. shut down the run's panes and get rid of the safe worktrees
     history:
-      - 'user: clean all this up'
-      - 'assistant: Inventoried 7 terminals, 3 worktrees, 4 watchers. Confirm and I''ll tear it down.'
-      - 'user: yep go'
-      - 'assistant: Disarming supervision first, then closing terminals and deleting worktrees in dependency order. Two deletes are still running.'
-    active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
+      - 'user: Take the board through three merge-gated waves.'
+      - 'assistant: Wave one merged and wave two has not started. Its two worktrees are still open.'
+    active: [daintree.orchestration.work-in-waves]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: close those terminals
+    history:
+      - 'user: ask the fleet what the biggest risk in this refactor is'
+      - 'assistant: Four verdicts in. Majority say the migration ordering; one says test coverage.'
+      - 'user: who dissented?'
+      - 'assistant: codex — it argued the tests are the real gap.'
+    active: [daintree.agents.poll-pinned-agents]
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    run: 2026-10-16-synthetic-audit
+wakes:
   - query: '[background wake: worktree delete failed — uncommitted changes in fix/214-token-refresh]'
     history:
       - 'user: shut it all down'
@@ -1065,10 +1036,6 @@ docs:
   - tidy up, close the fan out terminals
   - clean up — close all those terminals and drop the worktrees
   - go on then, close them
-  - query: clean up — close all those terminals and drop the worktrees
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: one thing first, clean up — close all those terminals and drop the worktrees
     history:
       - 'user: reload the preview and check'
@@ -1085,7 +1052,6 @@ foundation_boundaries:
   - get rid of all the leftover worktrees from last week
   - close these and delete the branches too
   - tear down the four worktrees and close their terminals
-  - clean up — close all the agent tabs and delete their worktrees
   - close these five terminals, none of them are needed
   - disarm everything and shut it all down for the day
   - get rid of all the competition agents and their worktrees

@@ -7,7 +7,6 @@ run: pre-split
 empty_kind: no_task
 examples:
   - thanks
-  - perfect
   - nice one
   - lgtm
   - yep thats it
@@ -28,15 +27,10 @@ examples:
   - ok that makes sense
   - brilliant, cheers
   - all good
-  - perfect thank you
   - query: lovely, cheers
     history:
       - 'user: tidy up the terminals from this morning'
       - 'assistant: Confirmed and torn down: closed 5 terminals, deleted 2 worktrees, cancelled 3 watchers, marked 3 ledger rows done.'
-  - query: much better ta
-    history:
-      - 'user: rename these tabs so i can tell them apart'
-      - 'assistant: Retitled them: ''auth-cache'', ''docs-sweep'', ''ci-flake''.'
   - query: nice
     history:
       - 'user: is that PR green?'
@@ -145,13 +139,49 @@ examples:
   - pretend i didnt say that
   - hey
   - morning
-  - you there?
   - hello
   - yo
-  - hey there
   - good morning
   - afternoon
   - im back
   - sup
   - evening, ready when you are
   - hey, give me a minute to get coffee
+  - query: Thanks, that answers everything.
+    history:
+      - 'user: write the closing report for the remote run'
+      - 'assistant: The report is complete, with every unit and the remaining workspaces listed.'
+    active: [daintree.hosts.report-swarm-results, daintree.hosts.audit-host-workspaces]
+    run: 2026-10-16-synthetic-audit
+  - query: Hold on, I am just reading the comparison.
+    history:
+      - 'user: preview copying my notification settings to the remote host'
+      - 'assistant: The comparison is ready; nothing has been copied.'
+    active: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: 👍
+    history:
+      - 'user: the hub wants these three independent fixes run on this host'
+      - 'assistant: All three children are working; I will continue on their completion notices.'
+    run: 2026-10-16-synthetic-audit
+  - query: No more changes, that summary is enough.
+    history:
+      - 'user: summarize what the stopped remote run delivered'
+      - 'assistant: The final report includes the verified artifacts and every unresolved unit.'
+    active: [daintree.hosts.report-swarm-results]
+    run: 2026-10-16-synthetic-audit
+  - query: The word swarm always makes me think of bees.
+    history:
+      - 'user: have the other hosts try the Markdown parser'
+      - 'assistant: The run finished and all results are verified.'
+    active:
+      - daintree.hosts.swarm-fan-out
+      - daintree.hosts.supervise-swarm
+      - daintree.hosts.foundation
+    run: 2026-10-16-synthetic-audit
+  - query: Great, I will show that report to the team myself.
+    history:
+      - 'user: explain why the cross-machine task failed'
+      - 'assistant: The postmortem is finished and saved in the location you chose.'
+    active: [daintree.hosts.postmortem-swarm, daintree.hosts.report-swarm-results]
+    run: 2026-10-16-synthetic-audit

@@ -221,6 +221,9 @@ boundaries:
     confusable_with:
     - daintree.runtime.measure-performance
     run: runbook-2026-10-issue-139
+  - query: Give every Remote Host the same task to implement the health-check endpoint on its own branch and return a host-by-host result table.
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

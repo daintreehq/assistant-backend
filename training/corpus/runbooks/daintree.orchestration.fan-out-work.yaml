@@ -277,8 +277,6 @@ boundaries:
     confusable_with: [daintree.orchestration.competition]
   - query: spin up three agents, one per issue, and get them all going
     confusable_with: [daintree.orchestration.multi-agent]
-  - query: put an agent on each of those worktrees and let them run in parallel
-    confusable_with: [daintree.orchestration.multi-agent]
   - query: split this refactor into three file-scoped chunks and give each chunk its own agent
     confusable_with: [daintree.orchestration.multi-agent]
   - query: spin up an agent per worktree and get them all going
@@ -654,6 +652,24 @@ boundaries:
   - query: "Work 12 issues in batches of four. Launch the next batch as soon as every agent in the current batch has opened a PR. Do not merge anything."
     confusable_with: [daintree.orchestration.work-in-waves]
     run: transcript-2026-10-16-batch-workflows
+  - query: Implement the 22 independent typo tickets with at most three agents, replacing each finished agent immediately until the queue empties; leave every PR open for human review.
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: Launch the ready issues in a rolling pool of five, with the next issue starting as soon as any slot frees; no automatic merges.
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: Work the current batch of four unrelated issues in separate worktrees and return their PR links; there is no following batch.
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: call it wave two if you like, but start the next ticket whenever a pane frees up. i'll merge them all on friday
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: same four-at-a-time queue, don't wait for anyone to merge a PR before you pick the next issue
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: 'Allocate three unrelated tickets to separate agents: fix search ordering, add invoice CSV export and update the mobile icon; there is no repeated migration pattern.'
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: yeah all of them except the docs one
     history:
@@ -691,6 +707,13 @@ followups:
       - 'user: split the parser rewrite into independent pieces and give each one an agent'
       - 'assistant: Three disjoint pieces: lexer, grammar, error messages. Which agent id should I use for the spawns? The registry has claude-code, codex and gemini.'
     active: [daintree.orchestration.fan-out-work]
+  - query: Continue dispatching the remaining lint tickets as slots free while the finished PRs wait for the maintainer to merge later.
+    history:
+      - 'user: Run these independent cleanup tickets with a cap of two.'
+      - 'assistant: One agent finished and opened PR 662; the second is working. Three tickets remain.'
+    active: [daintree.orchestration.fan-out-work]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: now split the billing cleanup into 4 chunks and put a separate agent on each
     history:
@@ -717,11 +740,6 @@ topic_shifts:
       - 'user: whats in worktree list right now'
       - 'assistant: Four worktrees: main, feature/api-v2, fix/timeouts and spike/wasm.'
     active: [daintree.foundation]
-  - query: hows it going?
-    history:
-      - 'user: fan the batch across agents'
-      - 'assistant: Six agents launched, one issue each, supervised in the background.'
-    active: [daintree.orchestration.fan-out-work, daintree.foundation]
   - query: any update?
     history:
       - 'user: put agents on 101 102 and 107'
@@ -754,20 +772,6 @@ topic_shifts:
       - 'user: put an agent on each of these five issues'
       - 'assistant: Five worktrees created, one agent each, all supervised in the background.'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: does daintree cap how many terminals can run at once?
-    history:
-      - 'user: parallelise the backlog across the studios'
-      - 'assistant: Eight units, eight worktrees, one agent each. Fleet supervised in the background.'
-    active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: how does fanning out work in daintree? anyway put an agent on each of these six issues
-    history:
-      - 'user: got a batch to get through'
-      - 'assistant: Go ahead.'
-  - query: put agents on all of these in parallel, and while they spin up explain how many can run at once
-    history:
-      - 'user: six tickets ready to go'
-      - 'assistant: All six are unassigned.'
-    active: [daintree.workflow.find-issue-work, daintree.foundation]
   - i've got 5 issues in the backlog and 5 studios free. put an agent on each
   - query: enough. split that plan into the 4 bits and put an agent on each
     history:
@@ -879,14 +883,6 @@ topic_shifts:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: same deal for issues 30 through 35
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: theres 4 wortkrees sitting there doing nothing, put agents in them
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: four suites are red and they're unrelated to each other. one agent per suite, own worktree, go
     history:
       - 'user: still awake?'
@@ -907,29 +903,15 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-  - query: distribute these across agents and make sure none of them are editing the same files
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: can we run all of these at the same time or do some of them touch the same files?
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
-  - query: assign an agent to each of the unassigned open issues plz
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: 'actually also do #141, #142, #143, #144 — one agent each, no more than 2 running at a time, start the next when one finishes'
     history:
       - 'user: start codex on #140'
       - 'assistant: Started #140 in ../repo-140; codex in t4.'
     active: [daintree.workflow.start-work-on-issue]
-    run: 2026-09-24-selector-hardening
-  - query: 'plenty left then. kick off codex on #501 #503 #507, own worktree each'
-    history:
-      - 'user: how much claude code usage do i have left'
-      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
-    active: [daintree.agents.check-usage-limits]
     run: 2026-09-24-selector-hardening
   - query: 'forget that one. start fresh: codex on #201, #204 and #207, each in its own worktree'
     history:
@@ -961,6 +943,19 @@ topic_shifts:
       - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
     active: [daintree.forge.triage-issue-backlog]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: how does fanning out work in daintree? anyway put an agent on each of these six issues
+    history:
+      - 'user: got a batch to get through'
+      - 'assistant: Go ahead.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: put agents on all of these in parallel, and while they spin up explain how many can run at once
+    history:
+      - 'user: six tickets ready to go'
+      - 'assistant: All six are unassigned.'
+    active: [daintree.workflow.find-issue-work, daintree.foundation]
+    docs: true
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[watcher w_1190 fired: t_8821 exited 0, suite green]'
     history:

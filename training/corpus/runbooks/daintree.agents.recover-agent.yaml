@@ -440,11 +440,6 @@ topic_shifts:
       - 'user: my agent is stuck'
       - 'assistant: Stale terminal id, not a hang. Re-attached.'
     active: [daintree.agents.recover-agent]
-  - query: tab 4 hasnt moved in twenty minutes. is it hung or did the spawn go bad?
-    history:
-      - 'user: hows everyone doing'
-      - 'assistant: Five agents: two finished, two working, one unsupervised - I adopted it. Nothing waiting on you.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: the agent you had helping with that has gone quiet - did it even start properly?
     history:
       - 'user: this check wont pass, get it working'
@@ -591,10 +586,6 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: should i just kill that tab and start it over? its been doing nothing for half an hour
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: that terminal id doesn't resolve any more, terminal not found
     history:
       - 'user: still awake?'
@@ -631,21 +622,11 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: the watcher woke you at 9 and then nothing for two hours, is that agent wedged or what
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: is it hung or slow? if hung, kick it and make sure it picks back up
     history:
       - 'user: my agent in t3 isn''t responding'
       - 'assistant: t3 (gemini) is hung: no output for 18 min, not waiting for input.'
     active: [daintree.agents.recover-agent]
-    run: 2026-09-24-selector-hardening
-  - query: grok in t5 hasnt printed a thing in 20 min, hung or just slow?
-    history:
-      - 'user: how''s everyone doing? anything need me'
-      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
-    active: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
   - query: 'the one on #415 never came back with a terminal id. did it even start??'
     history:
@@ -695,6 +676,13 @@ topic_shifts:
       - 'assistant: Reviews came back from codex-3 and claude-2; claude-5''s item timed out.'
     active: [daintree.review.cross-review-cohort]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: its still totally blank, did that even start
+    history:
+      - 'user: kick off 1204 with claude'
+      - 'assistant: Launched #1204 in terminal t_c4a with a background watcher. Nothing printed yet — that''s normal for the first few seconds after a spawn.'
+    active: [daintree.workflow.start-work-on-issue]
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[watcher w_77 fired: t_3300 produced output after the interrupt]'
     history:
@@ -717,7 +705,6 @@ wakes:
       - 'assistant: Relaunched — this time I captured the terminalId (t_6161) and confirmed it''s alive. Watcher armed on it.'
     active: [daintree.agents.recover-agent, daintree.foundation]
 near_misses:
-  - my agent has been sitting there for 20 min, is it hung or just slow
 docs:
   - my agent has been sat there for 20 minutes
   - my agent is stuck, been sitting there like 20 mins

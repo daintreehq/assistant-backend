@@ -144,6 +144,13 @@ followups:
     history:
       - 'user: the tower should add rate limiting middleware, send it over'
       - 'assistant: Sent to the tower with push authority; waiting on its reply.'
+  - query: Get the independent judge to rank the anonymized attempts against the agreed tests; none of the builder agents should judge its own result.
+    history:
+      - 'user: have three remote hosts race the streaming parser and choose the strongest result'
+      - 'assistant: All three attempts are pushed and their pinned commits verified. Judging has not started.'
+    active: [daintree.hosts.race-and-review, daintree.hosts.swarm-fan-out]
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: good, now race the auth timeout fix across those two
@@ -158,3 +165,10 @@ topic_shifts:
     history:
       - 'user: what did the hosts do with the parser task?'
       - 'assistant: Two hosts replied completed and git ls-remote matches what each said it pushed.'
+  - query: For a fresh experiment, intentionally have two remote machines build competing implementations and commission an independent ranking of them.
+    history:
+      - 'user: settle the duplicate receipts task on the hosts'
+      - 'assistant: That collision is resolved; one publishing owner remains and both attempts were preserved.'
+    active: [daintree.hosts.resolve-task-collisions]
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit

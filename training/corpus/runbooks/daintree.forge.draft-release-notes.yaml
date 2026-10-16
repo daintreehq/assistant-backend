@@ -68,6 +68,12 @@ boundaries:
   - query: draft the github release notes for v2.0 of the npm package, breaking changes first
     confusable_with: [daintree.release.publish-package]
     run: 2026-09-28-round6
+  - query: Write the v6.2 announcement from the commits between v6.1.4 and release/6.2, citing each user-facing change.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.edits.sync-project-docs
+      - daintree.git.summarize-activity
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: actually put them in CHANGELOG.md under a 2.5.0 heading instead of the reply
     history:
@@ -180,3 +186,10 @@ topic_shifts:
       - 'assistant: Done: README fixed on docs/readme-setup, reader re-ran the failed steps and they now pass; --port ignored flagged as a code bug.'
     active: [daintree.edits.sync-project-docs]
     run: 2026-09-28-round6-stateful
+  - query: README is fine now. can you write the 5.2 changelog from the previous release tag?
+    history:
+      - 'user: Repair the README installation steps.'
+      - 'assistant: The clean reader followed them successfully and the corrected README is ready.'
+    active: [daintree.edits.sync-project-docs]
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-10-16-synthetic-audit

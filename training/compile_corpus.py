@@ -1,4 +1,4 @@
-"""Compile the curated corpus into the training artifact. Pure, and gated in CI.
+"""Compile the curated corpus into the training artifact. Pure, and test-gated.
 
     training/corpus/**.yaml  ──►  training/data/selection.jsonl
                                   training/data/corpus-lock.json
@@ -83,14 +83,22 @@ def norm(text: str) -> str:
 
 
 def _benchmark_strings(catalog: Any) -> set[str]:
-    """Every string that appears in the held-out corpus, normalised."""
+    """Protect every evaluation suite, including sealed holdout rounds.
+
+    Read these mechanically for exclusion only. Case text must never be fed to
+    a data writer or used as a source of training examples.
+    """
+    from benchmarks.runbook_selection.cases import CASES_DIR
+
     out: set[str] = set()
-    for case in load_cases(catalog):
-        for msg in case.messages:
-            if isinstance(msg.content, str):
-                out.add(norm(msg.content))
-        if case.turn_context:
-            out.add(norm(case.turn_context))
+    suites = [CASES_DIR, *sorted((CASES_DIR.parent / "holdout").glob("*/"))]
+    for suite in suites:
+        for case in load_cases(catalog, cases_dir=suite):
+            for msg in case.messages:
+                if isinstance(msg.content, str):
+                    out.add(norm(msg.content))
+            if case.turn_context:
+                out.add(norm(case.turn_context))
     out.discard("")
     return out
 
@@ -239,7 +247,7 @@ def _build_lock(
         "compiled_sha256": hashlib.sha256(serialise(rows).encode()).hexdigest(),
         # The LABEL SPACE, not the catalog revision. A runbook body edit changes
         # the revision and changes nothing about what this corpus can label, so
-        # hashing the revision would redden the CI gate on every prose fix.
+        # hashing the revision would fail the corpus check on every prose fix.
         # Which ids exist is the thing a corpus can actually go stale against.
         "label_space_sha256": hashlib.sha256(
             "\n".join(sorted(valid_ids)).encode()
@@ -283,7 +291,7 @@ def main() -> int:
         "--check",
         action="store_true",
         help="compile and compare against the committed artifact without writing; "
-        "exit non-zero if they differ. This is the CI gate.",
+        "exit non-zero if they differ. This is the corpus reproducibility check.",
     )
     args = ap.parse_args()
 

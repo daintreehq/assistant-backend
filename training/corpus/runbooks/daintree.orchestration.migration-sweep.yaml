@@ -67,6 +67,9 @@ boundaries:
   - query: 'replace the deprecated sdk calls across this one codebase with three agents on this machine and prove none are left'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: Run one pilot conversion from legacy error strings to typed errors, then allocate the remaining packages across agents using that verified pattern and search for residual uses.
+    confusable_with: [daintree.orchestration.fan-out-work, daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: exclude the vendored packages from the count
     history:
@@ -104,6 +107,13 @@ followups:
       - 'assistant: Partitions: core, checkout, admin, marketing. Launching all four from migrate/api-client after the pilot.'
     active: [daintree.orchestration.migration-sweep]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: pilot looks right. do the rest of the packages the same way, and tell me every old import that's still left
+    history:
+      - 'user: Move all packages off the deprecated request helper with several agents.'
+      - 'assistant: The packages/media pilot is committed and verified. Eleven package shards still use legacyRequest.'
+    active: [daintree.orchestration.migration-sweep]
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: the React 19 bump is in; now sweep every class component that uses the removed lifecycles, one agent per package
     history:

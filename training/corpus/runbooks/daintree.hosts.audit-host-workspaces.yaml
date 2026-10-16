@@ -103,6 +103,12 @@ followups:
       - 'user: audit what the run left in the api project on each host'
       - 'assistant: Done: three hosts, eleven items, two unsafe.'
     active: [daintree.hosts.foundation]
+  - query: what is still left running on the hosts from that failed run? don't stop it, just tell me
+    history:
+      - 'user: write up what went wrong on the remote machines'
+      - 'assistant: Two of three hosts answered; their commits are on the remote, the third host never answered.'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: 2026-10-16-synthetic-audit
 
 boundaries:
   - query: don't remove anything yet, just tell me what the run left on each remote host and what's safe
@@ -153,3 +159,12 @@ boundaries:
   - query: "go through the worktrees the run left on my other machines and tell me which ones could be removed, report only, change nothing"
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: runbook-2026-10-issue-140
+
+topic_shifts:
+  - query: Now inventory the worktrees and listeners that run left on each Remote Host, with safe, unsafe or unknown verdicts. Remove nothing.
+    history:
+      - 'user: recover the remote exchanges after the laptop restart'
+      - 'assistant: Every exchange is accounted for and the run has ended.'
+    active: [daintree.hosts.recover-and-clean-up]
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: 2026-10-16-synthetic-audit

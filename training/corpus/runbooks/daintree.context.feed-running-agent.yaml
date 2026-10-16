@@ -125,3 +125,10 @@ topic_shifts:
       - 'assistant: Renamed claude-3 to ''api refactor''.'
     active: [daintree.terminals.rename]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Give term-validator the chosen schema and validation files, and confirm the existing session read them.
+    history:
+      - 'user: Make a context bundle for the new validation rules.'
+      - 'assistant: The bounded bundle is saved at /tmp/validation-reference.xml. term-validator is already open on the implementation.'
+    active: [daintree.context.curate-copytree-bundle]
+    confusable_with: [daintree.context.curate-copytree-bundle, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

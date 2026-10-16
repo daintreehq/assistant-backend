@@ -213,9 +213,6 @@ boundaries:
   - query: relay a conversation in which codex interviews claude about its approach, no scoring, see where it goes
     confusable_with: [daintree.orchestration.interview]
     run: 2026-09-28-agent-queries
-  - query: get claude and codex talking about event sourcing and just see where it goes
-    confusable_with: [daintree.orchestration.multi-agent]
-    run: 2026-09-28-agent-queries
   - query: host an open-ended roundtable between three agents on the future of the plugin API, no conclusion needed
     confusable_with: [daintree.orchestration.multi-agent]
     run: 2026-09-28-agent-queries
@@ -243,12 +240,10 @@ boundaries:
   - query: open conversation among the agents about whether TDD is worth it, visible turn by turn
     confusable_with: [daintree.orchestration.multi-agent]
     run: 2026-09-28-agent-queries
+  - query: Relay the panel participants' latest remarks in turn and keep the discussion visible; no winner, elimination or synthesized recommendation is requested.
+    confusable_with: [daintree.orchestration.multi-agent, daintree.orchestration.interview]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: how's it going?
-    history:
-      - 'user: get claude and codex talking about whether we should drop the redis cache'
-      - 'assistant: Spawned both in explore mode and gave Claude the floor first. Claude argues the cache is masking an N+1; relaying that to Codex now.'
-    active: [daintree.orchestration.conversation]
   - query: another two rounds then wrap it
     history:
       - 'user: facilitate a roundtable between the three pinned agents on our error handling'
@@ -326,11 +321,6 @@ topic_shifts:
       - 'user: have them each submit an idea and peer judge it'
       - 'assistant: Done - full tally attached, t_0110 wins.'
     active: [daintree.orchestration.competition]
-  - query: wait, does each of them see the whole conversation or only what you pass along?
-    history:
-      - 'user: let the three of them talk it out about the api shape'
-      - 'assistant: Round 3 relayed. They''ve converged on versioned routes but disagree on deprecation.'
-    active: [daintree.orchestration.conversation, daintree.foundation]
   - query: let the three of them talk it out about the api shape, but first tell me what each one sees
     history:
       - 'user: bored, lets try something'
@@ -429,10 +419,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: start a panel with the 3 pinned ones, topic is our retry backoff
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: run a roundtable — 3 agents, open ended, no winner, no scoring, just let them discuss the architecture and tell me what came up
     history:
       - 'user: good morning'
@@ -455,12 +441,6 @@ topic_shifts:
       - 'assistant: Round 1 done: claude is for it (shared tooling), codex against (CI time), grok wants a hybrid. Caught each up on the others; round 2 is under way.'
     active: [daintree.orchestration.conversation]
     run: 2026-09-24-selector-hardening
-  - query: thanks. unrelated, get codex and claude chatting about testing strategy, just let them go and see
-    history:
-      - 'user: remember we use pnpm'
-      - 'assistant: Saved: this project uses pnpm, not npm.'
-    active: [daintree.memory.manage-project-memory]
-    run: 2026-09-24-selector-hardening
 wakes:
   - query: '[agent task a_0302 completed]'
     history:
@@ -477,10 +457,6 @@ near_misses:
 docs:
   - get the three of them talking to each other
   - get the three of them talking to each other, see where it goes
-  - query: get the three of them talking to each other
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: side question, get the three of them talking to each other, see where it goes
     history:
       - 'user: it says the suite passes, confirm that'

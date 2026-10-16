@@ -64,6 +64,9 @@ boundaries:
   - query: agree the types first, then build the server and the web client in parallel worktrees on this machine
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
+  - query: Freeze the committed upload request types before branching a server implementer and a client implementer concurrently; use the same oversized-file error payload on both sides.
+    confusable_with: [daintree.orchestration.fan-out-work, daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: contract looks right, go ahead and start both sides
     history:
@@ -89,6 +92,13 @@ followups:
       - 'assistant: Contract branch contract/notifications is ready. I''m about to launch the contract author; I''ll show you the schema before either side starts.'
     active: [daintree.orchestration.contract-first-split]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: the schema is agreed. let the mobile agent and api agent start together now
+    history:
+      - 'user: Build device registration with one agent on the API and another on mobile, contract first.'
+      - 'assistant: Contract commit e51f33c contains request types, examples and error cases. Both implementations are still unstarted.'
+    active: [daintree.orchestration.contract-first-split]
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: next feature is bigger — the orders API and the orders page. agree the schema first, then one agent per side at the same time
     history:

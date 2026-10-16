@@ -11,6 +11,7 @@ silently degrades accuracy without producing an error anywhere.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -100,27 +101,27 @@ def device() -> str:
 
 
 def stable_split(rows: list[dict], val_fraction: float) -> tuple[list[dict], list[dict]]:
-    """Train/val split keyed on each row's CONTENT, not on a seeded shuffle.
+    """Keep all contextual versions of a question on the same side of the split.
 
     A seeded shuffle of the whole corpus reassigns rows wholesale whenever one is
     added: 63 new rows once moved ~1,020 existing rows across the split, replacing
     ~12% of the training set and turning a 0.6% data change into what behaved like
-    a new seed. Hashing the rendered input keeps every existing row on its side
-    of the split however the corpus grows, so a corpus edit perturbs training by
-    the rows it actually changed.
+    a new seed. Hashing the latest question keeps every existing row on its side
+    as the corpus grows. History and active-set augmentations share that bucket:
+    otherwise validation can contain a question already seen during training.
+    Short continuations with different contextual answers are grouped too; no
+    labels participate in the split.
     """
     import hashlib
 
     train, val = [], []
     cut = int(val_fraction * 10_000)
     for r in rows:
-        key = "\x1f".join(
-            [
-                str(r.get("query", "")),
-                "\x1e".join(str(h) for h in (r.get("history") or [])),
-                ",".join(sorted(r.get("active_ids") or [])),
-            ]
-        )
+        # Reuse serving's latest-turn normalisation (e.g. bare countdowns),
+        # then ignore casing, punctuation and whitespace as the deduper does.
+        key = " ".join(re.sub(
+            r"[^a-z0-9]+", " ", render_training_query(str(r.get("query", ""))).lower()
+        ).split())
         bucket = int(hashlib.sha1(key.encode()).hexdigest()[:8], 16) % 10_000
         (val if bucket < cut else train).append(r)
     return train, val

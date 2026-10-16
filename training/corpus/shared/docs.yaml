@@ -10,8 +10,6 @@ examples:
   - whats the difference between a timer and a watcher
   - how does auto approve work
   - does daintree support jetbrains or is it terminal only?
-  - where do i change the keybinding for focusing a terminal
-  - how do i create a worktree
   - what does the attention queue do exactly
   - can recipes take arguments
   - what is a fleet
@@ -51,7 +49,6 @@ examples:
     docs: false
   - query: nice, that worked
     docs: false
-  - whats a watcher
   - what is a recipe in daintree
   - what does pinned mean for an agent
   - explain the attention queue
@@ -97,7 +94,6 @@ examples:
   - can two people share a daintree session
   - does daintree support bitbucket
   - where do i set the default model
-  - which config file holds the api key
   - where does daintree store its data
   - where are the logs
   - where do recipes live on disk
@@ -132,7 +128,6 @@ examples:
   - difference between fanning out work and running a competition
   - is a supervisor the same thing as a watcher
   - poll vs interview, when would i use each
-  - what changed in the last release
   - is auto-approve a new thing
   - wheres the changelog
   - any breaking changes recently?
@@ -253,7 +248,6 @@ examples:
     docs: false
   - query: you around?
     docs: false
-  - what's a watcher
   - what is a worktree in daintree
   - how does the attention queue work
   - whats the difference between a watcher and a timer
@@ -399,10 +393,6 @@ examples:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
     expect: [daintree.diagnostics, daintree.orchestration.watch-outcome]
-  - query: wheres the audit log
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: whats on the roadmap
     history:
       - 'user: hello'
@@ -443,10 +433,6 @@ examples:
     history:
       - 'user: How are you?'
       - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
-  - query: where's the settings file on mac
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: sorry noob question, is daintree open source?
     history:
       - 'user: hows your day going'
@@ -483,10 +469,6 @@ examples:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: does daintree run on linux
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: how do i turn on desktop notifications
     history:
       - 'user: hello'
@@ -539,10 +521,6 @@ examples:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: whats the difference between a watcher and a timer
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: what is an async wait
     history:
       - 'user: hello'
@@ -667,18 +645,10 @@ examples:
     history:
       - 'user: land the config PR'
       - 'assistant: Merged with a rebase.'
-  - query: does daintree work offline
-    history:
-      - 'user: ci is red on my branch, sort it'
-      - 'assistant: Root cause was a stale fixture in test_selector.py. Fixed, re-ran, full suite green and verified independently.'
   - query: can daintree watch a PR or just terminals
     history:
       - 'user: Run this workflow.'
       - 'assistant: The implementation node failed its tool call.'
-  - query: does daintree support jetbrains or is it terminal only?
-    history:
-      - 'user: where were we'
-      - 'assistant: wf_8790 live and supervised. t-9 is running unsupervised on the parser worktree. Two rows closed as cancelled.'
   - query: where do daintree logs live
     history:
       - 'user: four agents debate the state token design then vote off the weakest'
@@ -687,10 +657,6 @@ examples:
     history:
       - 'user: put alice and the platform team on 512 as reviewers'
       - 'assistant: Requested. Complete lists come back as users [alice], teams [platform] — nothing was rejected. It''s still a draft, so they won''t be notified yet.'
-  - query: who makes daintree
-    history:
-      - 'user: run the qa recipe in the payments worktree'
-      - 'assistant: Recipe ''qa'' loaded — three steps, one live agent. Launching now.'
   - query: where does daintree store its data
     history:
       - 'user: let claude and codex talk it out about the schema'
@@ -723,22 +689,10 @@ examples:
     history:
       - 'user: how many services in this monorepo and what does each one do'
       - 'assistant: Five under services/: gateway (edge routing, auth), identity-svc (users, sessions), billing-svc, notify-svc and a jobs worker. Shared code lives in pkg/.'
-  - query: is there a dark mode in this app
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: is there a cap on how many watchers i can have in this app
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: how do i change the shortcut for switching terminals in this app
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: where do i change the keybinding for focusing a terminal in this app
-    history:
-      - 'user: give the agents their own worktrees'
-      - 'assistant: Four created; every agent told once to continue in its new directory.'
   - what's a blocker in a workflow graph in this app
   - query: whats a watcher in this app
     history:
@@ -825,8 +779,6 @@ examples:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - where do you change the keybinding for focusing a terminal
-  - how do you create a worktree
   - how do you rename a tab
   - query: how do you decide which runbook to load
     history:
@@ -890,20 +842,12 @@ examples:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: how do you update daintree
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - how do you set the default agent
   - query: how do you add an mcp server
     history:
       - 'user: How are you?'
       - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
   - how do you change the font size
-  - query: how do you pin an agent
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: how do you pick which runbook to load
     history:
       - 'user: hey, you around?'
@@ -919,12 +863,7 @@ examples:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - whats a watcher, and when would i want one?
   - how do i sign in, and is there a shortcut for it?
-  - query: how do i create a worktree, and is there a shortcut for it?
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - what is a blocker in a workflow graph, and when would i want one?
   - how do i change the model the assistant uses, and is there a shortcut for it?
   - how do i change the shortcut for switching terminals, and is there a shortcut for it?
@@ -989,21 +928,6 @@ examples:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
     docs: false
-  - query: say that again
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-    docs: false
-  - query: gotcha
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-    docs: false
-  - query: asdf
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-    docs: false
   - query: ok 👍
     history:
       - 'user: still awake?'
@@ -1049,11 +973,6 @@ examples:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
     docs: false
-  - query: kk!
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-    docs: false
   - query: you around?
     history:
       - 'user: hey, you around?'
@@ -1084,11 +1003,6 @@ examples:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
     docs: false
-  - query: nice, that worked
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-    docs: false
   - query: that was the right call
     history:
       - 'user: yo'
@@ -1108,11 +1022,6 @@ examples:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-    docs: false
-  - query: '...'
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
     docs: false
   - query: oops
     history:
@@ -1158,11 +1067,6 @@ examples:
     history:
       - 'user: debate and eliminate'
       - 'assistant: Eliminated the sharding position. Two positions remain.'
-    docs: false
-  - query: side question, youre repeating yourself
-    history:
-      - 'user: what was i working on'
-      - 'assistant: The ledger has three rows open; two have live agents still running in /Users/greg/src/acme.'
     docs: false
   - query: actually wait — yep the timer went off, thanks
     history:
@@ -1213,11 +1117,6 @@ examples:
     history:
       - 'user: Merge this PR once green.'
       - 'assistant: Automatic CI-triggered merging is not available from this surface.'
-    docs: false
-  - query: actually wait — back
-    history:
-      - 'user: start work on #412'
-      - 'assistant: Started "Retry backoff never resets" (#412). Worktree at ~/wt/issue-412 on branch fix/412-retry-backoff, agent running in terminal t_9f2 with supervisor watcher w_31 attached. I''ll come back when its completed event lands.'
     docs: false
   - query: hang on, before you push — no worries, it wasnt important
     history:
@@ -1466,12 +1365,6 @@ examples:
       - 'user: read the output of terminal 6'
       - 'assistant: The last lines show the build finished with 0 errors.'
     run: 2026-09-28-catalog-expansion-refine
-  - query: what does the waiting badge on a tab actually mean?
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: Two agents finished, one is waiting on a question, one still working.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-28-catalog-expansion-refine
   - query: out of curiosity, what contribution points can a plugin use?
     history:
       - 'user: my deploy-board plugin isn''t loading'
@@ -1536,3 +1429,569 @@ examples:
     expect: []
     docs: true
     run: runbook-2026-10-issue-96
+  - query: shortcut for the command palette?
+    active: [daintree.hosts.run-validation-matrix, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between a watcher and a timer
+    active: [daintree.hosts.coordinate-dev-services, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
+  - query: Where does Daintree keep its per-project settings file?
+    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: 2026-10-16-synthetic-audit
+  - query: difference between a recipe and a startup script?
+    active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i export a session transcript
+    active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: 2026-10-16-synthetic-audit
+  - query: why did it load a runbook i didnt ask for
+    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: 2026-10-16-synthetic-audit
+  - query: what happens in Daintree when an agent hits its rate limit?
+    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: 2026-10-16-synthetic-audit
+  - query: what's the difference between the browser panel and dev preview?
+    active: [daintree.orchestration.work-in-waves, daintree.foundation]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: how do you update to the latest version
+    active: [daintree.orchestration.contract-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: do watchers still run if i close the app
+    active: [daintree.orchestration.test-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: what does the workflow ledger keep track of
+    active: [daintree.orchestration.hypothesis-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
+  - query: quick q — is there a cap on how many watchers i can have
+    active: [daintree.orchestration.plan-then-implement, daintree.foundation]
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-10-16-synthetic-audit
+  - query: what happens to the conversation if I swap agents mid-task?
+    active: [daintree.orchestration.migration-sweep, daintree.foundation]
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
+  - query: where do I put custom slash commands for the Daintree assistant?
+    active: [daintree.orchestration.review-until-approved, daintree.foundation]
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
+  - query: what models does daintree use under the hood
+    active: [daintree.release.test-distributable, daintree.foundation]
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-10-16-synthetic-audit
+  - query: how do I rename a terminal tab?
+    active: [daintree.release.assess-readiness, daintree.foundation]
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-10-16-synthetic-audit
+  - query: how do I open a dev preview panel?
+    active: [daintree.review.audit-spec-coverage, daintree.foundation]
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-10-16-synthetic-audit
+  - query: whats the diff between a recipe and a fleet
+    active: [daintree.review.cross-review-cohort, daintree.foundation]
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i change the font size
+    active: [daintree.runtime.migrate-worktree-database, daintree.foundation]
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i see keyboard shortcuts
+    active: [daintree.worktree.provision-local-environment, daintree.foundation]
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-10-16-synthetic-audit
+  - query: what's the difference between waiting on a question and waiting on approval?
+    active: [daintree.hosts.shard-test-suite, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i change the shortcut for switching terminals, and is there a shortcut for it?
+    active: [daintree.hosts.run-validation-matrix, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i make a terminal read only
+    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: 2026-10-16-synthetic-audit
+  - query: if I delete a worktree in Daintree does the branch go too?
+    active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: what does 'Restart all armed agents' do?
+    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: 2026-10-16-synthetic-audit
+  - query: can I ask a running agent something without interrupting its task?
+    active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: 2026-10-16-synthetic-audit
+  - query: does Daintree have a built-in code review feature?
+    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: 2026-10-16-synthetic-audit
+  - query: sorry, unrelated — whats the workflow ledger for
+    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: 2026-10-16-synthetic-audit
+  - query: does daintree send my code to a server
+    active: [daintree.orchestration.work-in-waves, daintree.foundation]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: how are plugin-contributed skills different from Claude's own skills?
+    active: [daintree.orchestration.contract-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: what does pinned mean for an agent
+    active: [daintree.orchestration.test-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: where do i set the default model
+    active: [daintree.orchestration.hypothesis-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
+  - query: what's a blocker in a workflow graph
+    active: [daintree.orchestration.plan-then-implement, daintree.foundation]
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i configure which coding agent gets used by default
+    active: [daintree.orchestration.migration-sweep, daintree.foundation]
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between a terminal and an agent here
+    active: [daintree.orchestration.review-until-approved, daintree.foundation]
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
+  - query: how long does an async wait last before it times out
+    active: [daintree.release.test-distributable, daintree.foundation]
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-10-16-synthetic-audit
+  - query: does Daintree have a way to tell if two worktrees will conflict?
+    active: [daintree.release.assess-readiness, daintree.foundation]
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-10-16-synthetic-audit
+  - query: how much does this cost per turn
+    active: [daintree.review.audit-spec-coverage, daintree.foundation]
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-10-16-synthetic-audit
+  - query: how do watchers actually work — what wakes them up, is it polling or a hook?
+    active: [daintree.review.cross-review-cohort, daintree.foundation]
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-10-16-synthetic-audit
+  - query: what github permissions does daintree need
+    active: [daintree.runtime.migrate-worktree-database, daintree.foundation]
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-10-16-synthetic-audit
+  - query: does /clear in an agent pane close the Daintree terminal?
+    active: [daintree.worktree.provision-local-environment, daintree.foundation]
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-10-16-synthetic-audit
+  - query: How is Daintree's sidebar assistant different from an agent pane?
+    active: [daintree.hosts.shard-test-suite, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: 2026-10-16-synthetic-audit
+  - query: sorry, unrelated — how do i update to the latest version
+    active: [daintree.hosts.run-validation-matrix, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
+  - query: why does the assistant delegate instead of editing files itself in this app
+    active: [daintree.hosts.coordinate-dev-services, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
+  - query: Is there a keyboard shortcut for renaming a tab
+    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: 2026-10-16-synthetic-audit
+  - query: side question, how do i configure which coding agent gets used by default
+    active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: what does 'Staged' mean in the plugin manager?
+    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: 2026-10-16-synthetic-audit
+  - query: what's a worktree remote resource / devbox in Daintree?
+    active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: 2026-10-16-synthetic-audit
+  - query: what env vars does daintree read
+    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: 2026-10-16-synthetic-audit
+  - query: does the assistant write code itself or does it always delegate
+    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: 2026-10-16-synthetic-audit
+  - query: one thing first, what happens to my worktrees if i quit
+    active: [daintree.orchestration.work-in-waves, daintree.foundation]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: what does the 'directing' state mean in daintree's terminal list
+    active: [daintree.orchestration.contract-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: how does renaming a terminal tab work in daintree?
+    active: [daintree.orchestration.test-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: watcher vs async wait, whats the actual difference
+    active: [daintree.orchestration.hypothesis-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
+  - query: one thing first, what models can i use
+    active: [daintree.orchestration.plan-then-implement, daintree.foundation]
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-10-16-synthetic-audit
+  - query: side question, is my data used for training
+    active: [daintree.orchestration.migration-sweep, daintree.foundation]
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
+  - query: does Daintree make a worktree automatically when I start an issue?
+    active: [daintree.orchestration.review-until-approved, daintree.foundation]
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
+  - query: what does the worktrees overview actually show?
+    active: [daintree.release.test-distributable, daintree.foundation]
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-10-16-synthetic-audit
+  - query: how do you stop it auto-approving everything
+    active: [daintree.release.assess-readiness, daintree.foundation]
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-10-16-synthetic-audit
+  - query: do watchers survive a restart
+    active: [daintree.review.audit-spec-coverage, daintree.foundation]
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i stop it auto-approving everything
+    active: [daintree.review.cross-review-cohort, daintree.foundation]
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-10-16-synthetic-audit
+  - query: hang on, before you push — is there a dark mode
+    active: [daintree.runtime.migrate-worktree-database, daintree.foundation]
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i see what the assistant has remembered about this project, and is there a shortcut for it?
+    active: [daintree.worktree.provision-local-environment, daintree.foundation]
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-10-16-synthetic-audit
+  - query: how do you change the font size
+    active: [daintree.hosts.shard-test-suite, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: 2026-10-16-synthetic-audit
+  - query: does daintree send my source code anywhere
+    active: [daintree.hosts.run-validation-matrix, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
+  - query: hang on, before you push — how do i update daintree
+    active: [daintree.hosts.coordinate-dev-services, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
+  - query: what's a blocker in a workflow graph in this app
+    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: 2026-10-16-synthetic-audit
+  - query: sorry, unrelated — does daintree support bitbucket
+    active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: can daintree watch a PR or just terminals
+    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: 2026-10-16-synthetic-audit
+  - query: does Daintree itself track token usage or cost per agent?
+    active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: 2026-10-16-synthetic-audit
+  - query: can I hand a task from Claude to Codex in Daintree?
+    history:
+      - 'user: Prepare a demonstration on the mini.'
+      - 'assistant: The mini lane is collecting its local launch evidence.'
+    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: 2026-10-16-synthetic-audit
+  - query: what's the difference between a global recipe and a project recipe?
+    history:
+      - 'user: Move pending work away from the overloaded tower.'
+      - 'assistant: I have a placement proposal and am checking which lanes are free.'
+    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: 2026-10-16-synthetic-audit
+  - query: whats the cli actually called
+    history:
+      - 'user: Work through these nine tickets with two agents at a time.'
+      - 'assistant: The first two tickets are assigned; the remaining tickets are queued.'
+    active: [daintree.orchestration.work-in-waves, daintree.foundation]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: where's the settings file on mac
+    history:
+      - 'user: Pin the interface before splitting the implementation.'
+      - 'assistant: The shared schema is being checked before the two edit tasks begin.'
+    active: [daintree.orchestration.contract-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: how does daintree decide which runbook to load
+    history:
+      - 'user: Have one agent define the tests before another implements.'
+      - 'assistant: The test agent is preparing the acceptance cases.'
+    active: [daintree.orchestration.test-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: what does it mean when an agent shows as waiting?
+    history:
+      - 'user: Investigate three possible causes separately.'
+      - 'assistant: The investigators each have one falsifiable hypothesis.'
+    active: [daintree.orchestration.hypothesis-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
+  - query: does daintree support gemini cli
+    history:
+      - 'user: Write a plan for the import change before editing.'
+      - 'assistant: The plan is being drafted; implementation has not started.'
+    active: [daintree.orchestration.plan-then-implement, daintree.foundation]
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-10-16-synthetic-audit
+  - query: can two agents review each other's work in Daintree?
+    history:
+      - 'user: Migrate all callers of the old validation helper.'
+      - 'assistant: The caller inventory is ready and the first batch is under way.'
+    active: [daintree.orchestration.migration-sweep, daintree.foundation]
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
+  - query: keyboard shortcut for switching tabs?
+    history:
+      - 'user: Have Claude fix the report and Codex review each round.'
+      - 'assistant: The first bounded review round is in progress.'
+    active: [daintree.orchestration.review-until-approved, daintree.foundation]
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
+  - query: how does the plugin trust model work in Daintree?
+    history:
+      - 'user: Test the packaged application from this build.'
+      - 'assistant: The artifact is ready and the isolated smoke check is starting.'
+    active: [daintree.release.test-distributable, daintree.foundation]
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-10-16-synthetic-audit
+  - query: how do you sign in in this app
+    history:
+      - 'user: Check whether this candidate is ready to ship.'
+      - 'assistant: The release evidence is being gathered; publication has not started.'
+    active: [daintree.release.assess-readiness, daintree.foundation]
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-10-16-synthetic-audit
+  - query: does the dev preview reload by itself when files change?
+    history:
+      - 'user: Compare the implementation with this requirements document.'
+      - 'assistant: The requirements have been enumerated and are being mapped to code.'
+    active: [daintree.review.audit-spec-coverage, daintree.foundation]
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-10-16-synthetic-audit
+  - query: is there a way to see everything an agent did after the fact
+    history:
+      - 'user: Have the three implementers review each other.'
+      - 'assistant: The review assignments are ready and the first findings are pending.'
+    active: [daintree.review.cross-review-cohort, daintree.foundation]
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i switch daintree to the light theme
+    history:
+      - 'user: Restore the database for the branch worktree.'
+      - 'assistant: The branch database backup has been found; restoration is pending.'
+    active: [daintree.runtime.migrate-worktree-database, daintree.foundation]
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-10-16-synthetic-audit
+  - query: how does the attention queue decide what surfaces first
+    history:
+      - 'user: Set up a separate local environment for this branch.'
+      - 'assistant: The branch worktree exists and its local environment is being prepared.'
+    active: [daintree.worktree.provision-local-environment, daintree.foundation]
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-10-16-synthetic-audit
+  - query: one thing first, how do i change the theme
+    history:
+      - 'user: Split the backend tests between the tower and mini.'
+      - 'assistant: The suite manifest is pinned; each machine has a disjoint shard.'
+    active: [daintree.hosts.shard-test-suite, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.shard-test-suite]
+    run: 2026-10-16-synthetic-audit
+  - query: whats the keybinding for switching tabs
+    history:
+      - 'user: Check this release under Linux and macOS.'
+      - 'assistant: The two environments are running the same checks at one commit.'
+    active: [daintree.hosts.run-validation-matrix, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
+  - query: can I run slash commands in an agent from Daintree?
+    history:
+      - 'user: Find why the mini assistant cannot receive my messages.'
+      - 'assistant: I am checking delivery evidence for the affected assistant.'
+    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: 2026-10-16-synthetic-audit
+  - query: how do you quit without killing my agents
+    history:
+      - 'user: Preview copying my settings to the tower.'
+      - 'assistant: The settings preview is available; nothing has been copied yet.'
+    active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: why do i keep getting confirmation prompts
+    history:
+      - 'user: Prepare the tower for its system update.'
+      - 'assistant: The tower lane has been asked to reach a safe stopping point.'
+    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: 2026-10-16-synthetic-audit
+  - query: what happens when i hit the rate limit in this app
+    history:
+      - 'user: Agree on the service interface before remote implementation.'
+      - 'assistant: The host lanes are checking the proposed request schema.'
+    active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: 2026-10-16-synthetic-audit
+  - query: where's the setting that controls which agent daintree launches by default?
+    history:
+      - 'user: Prepare a demonstration on the mini.'
+      - 'assistant: The mini lane is collecting its local launch evidence.'
+    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: 2026-10-16-synthetic-audit
+  - query: what does Copy tree context do, and how big can the output get?
+    history:
+      - 'user: Move pending work away from the overloaded tower.'
+      - 'assistant: I have a placement proposal and am checking which lanes are free.'
+    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: 2026-10-16-synthetic-audit
+  - query: does Daintree give each worktree its own port automatically?
+    history:
+      - 'user: Work through these nine tickets with two agents at a time.'
+      - 'assistant: The first two tickets are assigned; the remaining tickets are queued.'
+    active: [daintree.orchestration.work-in-waves, daintree.foundation]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: where do project plugins live in the repo?
+    history:
+      - 'user: Pin the interface before splitting the implementation.'
+      - 'assistant: The shared schema is being checked before the two edit tasks begin.'
+    active: [daintree.orchestration.contract-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.contract-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: is there an api i can hit in this app
+    history:
+      - 'user: Have one agent define the tests before another implements.'
+      - 'assistant: The test agent is preparing the acceptance cases.'
+    active: [daintree.orchestration.test-first-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: hang on, before you push — how much does daintree cost
+    history:
+      - 'user: Investigate three possible causes separately.'
+      - 'assistant: The investigators each have one falsifiable hypothesis.'
+    active: [daintree.orchestration.hypothesis-split, daintree.foundation]
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i quit without killing my agents
+    history:
+      - 'user: Write a plan for the import change before editing.'
+      - 'assistant: The plan is being drafted; implementation has not started.'
+    active: [daintree.orchestration.plan-then-implement, daintree.foundation]
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    run: 2026-10-16-synthetic-audit
+  - query: does Daintree work with GitLab issues or only GitHub?
+    history:
+      - 'user: Migrate all callers of the old validation helper.'
+      - 'assistant: The caller inventory is ready and the first batch is under way.'
+    active: [daintree.orchestration.migration-sweep, daintree.foundation]
+    confusable_with: [daintree.orchestration.migration-sweep]
+    run: 2026-10-16-synthetic-audit
+  - query: whats the workflow ledger for
+    history:
+      - 'user: Have Claude fix the report and Codex review each round.'
+      - 'assistant: The first bounded review round is in progress.'
+    active: [daintree.orchestration.review-until-approved, daintree.foundation]
+    confusable_with: [daintree.orchestration.review-until-approved]
+    run: 2026-10-16-synthetic-audit
+  - query: what does the attention queue do exactly
+    history:
+      - 'user: Test the packaged application from this build.'
+      - 'assistant: The artifact is ready and the isolated smoke check is starting.'
+    active: [daintree.release.test-distributable, daintree.foundation]
+    confusable_with: [daintree.release.test-distributable]
+    run: 2026-10-16-synthetic-audit
+  - query: poll vs interview, when would i use each
+    history:
+      - 'user: Check whether this candidate is ready to ship.'
+      - 'assistant: The release evidence is being gathered; publication has not started.'
+    active: [daintree.release.assess-readiness, daintree.foundation]
+    confusable_with: [daintree.release.assess-readiness]
+    run: 2026-10-16-synthetic-audit
+  - query: how do i add an mcp server to daintree
+    history:
+      - 'user: Compare the implementation with this requirements document.'
+      - 'assistant: The requirements have been enumerated and are being mapped to code.'
+    active: [daintree.review.audit-spec-coverage, daintree.foundation]
+    confusable_with: [daintree.review.audit-spec-coverage]
+    run: 2026-10-16-synthetic-audit
+  - query: Can Daintree sync its settings between two machines?
+    history:
+      - 'user: Have the three implementers review each other.'
+      - 'assistant: The review assignments are ready and the first findings are pending.'
+    active: [daintree.review.cross-review-cohort, daintree.foundation]
+    confusable_with: [daintree.review.cross-review-cohort]
+    run: 2026-10-16-synthetic-audit
+  - query: do i need a separate worktree for every agent
+    history:
+      - 'user: Restore the database for the branch worktree.'
+      - 'assistant: The branch database backup has been found; restoration is pending.'
+    active: [daintree.runtime.migrate-worktree-database, daintree.foundation]
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    run: 2026-10-16-synthetic-audit
+  - query: how do you add an mcp server to this app
+    history:
+      - 'user: Set up a separate local environment for this branch.'
+      - 'assistant: The branch worktree exists and its local environment is being prepared.'
+    active: [daintree.worktree.provision-local-environment, daintree.foundation]
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: 2026-10-16-synthetic-audit
+  - query: Explain whether undoing Daintree Copy settings will preserve edits the person made later on that host; answer the behavior question without performing an undo.
+    history:
+      - 'user: revert the finished remote experiment'
+      - 'assistant: The run code reversions are complete.'
+    active: [daintree.hosts.undo-swarm-changes, daintree.hosts.recover-and-clean-up]
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    empty_kind: null
+    run: 2026-10-16-synthetic-audit
+  - query: what does that supervisor watcher actually check for?
+    history:
+      - 'user: pick up 219'
+      - 'assistant: Worktree and branch created, agent running the work command, supervisor watcher attached.'
+    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    empty_kind: null
+    run: 2026-10-16-synthetic-audit
+  - query: can i write my own recipe?
+    history:
+      - 'user: show me which recipes ive got'
+      - 'assistant: python-dev, lint, and fullstack.'
+      - 'user: run the python one in this worktree'
+      - 'assistant: Applied python-dev here — three terminals opened, pytest watch is running.'
+    active: [daintree.recipe.run-or-create]
+    confusable_with: [daintree.recipe.run-or-create]
+    empty_kind: null
+    run: 2026-10-16-synthetic-audit
+  - query: thanks, but just explain what a worktree recipe is. I'm not asking you to run one.
+    history:
+      - 'user: What recipes are available?'
+      - 'assistant: The project lists api-dev and nightly-checks. Nothing was started.'
+    active: [daintree.recipe.run-or-create]
+    confusable_with: [daintree.recipe.run-or-create]
+    empty_kind: null
+    run: 2026-10-16-synthetic-audit

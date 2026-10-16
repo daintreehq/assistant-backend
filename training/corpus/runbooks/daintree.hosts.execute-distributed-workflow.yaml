@@ -183,6 +183,13 @@ followups:
     history:
       - "user: keep the cross-machine plan going"
       - "assistant: The contract unit failed its checks; server and client are blocked on it, docs is unaffected and done."
+  - query: 'Do not release either dependent unit: verify the predecessor artifact at the approved SHA first and keep the graph blocked if it does not match.'
+    history:
+      - 'user: run the types, gateway, mobile and docs plan across my remote machines'
+      - 'assistant: The types host claims completion, but its reported commit differs from the commit on the approved run branch. Gateway and mobile are waiting.'
+    active: [daintree.hosts.execute-distributed-workflow, daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: 'now run the dependent plan across them: shared lib first, then the two apps on top of it'

@@ -93,6 +93,12 @@ boundaries:
   - query: 'plan the pieces of the search rewrite for four agents and let me approve the split'
     confusable_with: [daintree.hosts.run-local-cohort]
     run: runbook-2026-10-issue-105
+  - query: Propose merge-ordered groups for the permissions epic with file ownership and acceptance criteria; present the breakdown without starting the first group.
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: i only want the wave plan right now, no agents. split the PRD into tickets and show me which need merging first
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: merge 2 and 5 like you suggested and drop the analytics unit, then show me the waves again
     history:
@@ -131,6 +137,13 @@ followups:
       - 'user: yes emails are in'
     active: [daintree.orchestration.decompose-work]
     run: 2026-09-28-catalog-expansion-late-stateful
+  - query: Revise the planned issue waves so every dependency lands in an earlier wave; wait for user approval before filing tickets or launching agents.
+    history:
+      - 'user: Break the offline-sync PRD into agent-sized tickets.'
+      - 'assistant: Draft split has seven units in three waves. The sync engine and schema units currently overlap on shared/types.ts.'
+    active: [daintree.orchestration.decompose-work]
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: 'while those run, work out how epic #301 (billing portal) breaks into tickets for the next batch — don''t start anything'
     history:

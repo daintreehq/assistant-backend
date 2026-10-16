@@ -68,6 +68,12 @@ boundaries:
   - query: test the built RC installer on a fresh macOS profile and in a clean linux container here, not from source
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
+  - query: Install the built macOS app bundle from the release branch into a clean profile and check assets, startup and deep links.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.ci.run-local-checks
+      - daintree.release.publish-package
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: use a fresh user-data dir too, not my normal profile
     history:

@@ -132,6 +132,13 @@ followups:
     history:
       - "user: save the work on the server before I update it"
       - "assistant: The first assistant pushed its branch. The second hasn't replied yet."
+  - query: It has finished the planned update. Check projects, enrolled lanes and the pre-update exchanges before any more work goes to that host.
+    history:
+      - 'user: checkpoint the remote build host before I update Daintree there'
+      - 'assistant: Both enrolled assistants reported their branches and saved state. The impact record lists what the hub could not observe.'
+    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.connect-host]
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: "separate thing: I'm restarting Daintree on the remote server tonight, so tell me what that will stop"
@@ -142,3 +149,17 @@ topic_shifts:
     history:
       - "user: what did the build server finish today?"
       - "assistant: Both of its tasks completed and the branches are pushed."
+  - query: Before the person restarts Daintree on the connected build host this afternoon, inventory what will stop and obtain checkpoints from its enrolled assistants.
+    history:
+      - 'user: why did the send to the build host bounce?'
+      - 'assistant: Messaging is enabled again; the person now plans to update Daintree on that host.'
+    active: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    run: 2026-10-16-synthetic-audit
+  - query: Before restarting just the build host tonight, obtain its projects impact report and acknowledged checkpoints for all work there.
+    history:
+      - 'user: park the image-conversion swarm until tomorrow'
+      - 'assistant: The run is parked; the build host also has unrelated project work outside that run.'
+    active: [daintree.hosts.park-swarm]
+    confusable_with: [daintree.hosts.park-swarm]
+    run: 2026-10-16-synthetic-audit

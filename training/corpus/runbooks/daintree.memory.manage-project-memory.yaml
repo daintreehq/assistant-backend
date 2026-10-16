@@ -6,10 +6,8 @@
 runbook: daintree.memory.manage-project-memory
 run: pre-split
 positives:
-  - remember we use pnpm here, never npm
   - 'save this: never force push main'
   - always run the linter before you push — write that down somewhere permanent
-  - what did we decide about the api response shape?
   - do you remember why we dropped the redis cache?
   - what do you have stored about our branching strategy
   - forget that thing about the staging url, it's not right any more
@@ -176,9 +174,6 @@ boundaries:
   - query: fyi we use pnpm here, not npm. keep that in mind going forward
     confusable_with: [daintree.foundation]
     run: 2026-09-24-selector-hardening
-  - query: forget the thing about node 18, we're on 22 now
-    confusable_with: [daintree.foundation]
-    run: 2026-09-24-selector-hardening
   - query: always run the linter before you hand work to an agent in this repo
     confusable_with: [daintree.foundation]
     run: 2026-09-24-selector-hardening
@@ -264,11 +259,6 @@ boundaries:
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
 followups:
-  - query: also the node version, 22
-    history:
-      - 'user: remember we use pnpm here, never npm'
-      - 'assistant: Saved as mem_7ab21c — "Use pnpm for this project, never npm." Source: user, kind: semantic, category: conventions.'
-    active: [daintree.memory.manage-project-memory]
   - query: the second one
     history:
       - 'user: forget that thing about the deploy script'
@@ -307,11 +297,6 @@ followups:
       - 'assistant: Then this is a correction, not a new save. I''ll save the replacement, confirm the id, and forget the stale one after.'
     active: [daintree.memory.manage-project-memory]
 topic_shifts:
-  - query: remember that we always run pnpm not npm in this repo
-    history:
-      - 'user: pick up issue 302 and get going'
-      - 'assistant: Agent is running on issue 302 in its own worktree.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: note down that the nightly runs at 2am utc so we dont have to work it out again
     history:
       - 'user: wake me when the nightly build finishes'
@@ -322,15 +307,6 @@ topic_shifts:
       - 'user: bundle up everything to do with the importer'
       - 'assistant: 18 files selected, bundle written to .daintree/context/importer.md.'
     active: [daintree.context.curate-copytree-bundle]
-  - query: unrelated — remember for next time that migrations need a down step or CI rejects them
-    history:
-      - 'user: whats unassigned'
-      - 'assistant: #612, #615 and #620 are unassigned and unstarted.'
-      - 'user: do 615'
-      - 'assistant: Worktree and agent up on #615, supervisor attached.'
-      - 'user: hows it doing'
-      - 'assistant: Still working — it has written the migration and is now on the tests.'
-    active: [daintree.workflow.start-work-on-issue, daintree.orchestration.supervise-fleet]
   - query: also remember the linter runs before tests
     history:
       - 'user: remember we use pnpm'
@@ -361,11 +337,6 @@ topic_shifts:
       - 'user: break the tie with the same voters'
       - 'assistant: Tie broken 3-2, winner declared with the full tally.'
     active: [daintree.orchestration.runoff-tiebreaker]
-  - query: where does that get stored, is it per project or global?
-    history:
-      - 'user: remember we use pnpm here, never npm'
-      - 'assistant: Saved. Checked for a conflicting entry first — none.'
-    active: [daintree.memory.manage-project-memory, daintree.foundation]
   - query: is any of that memory sent upstream or does it stay on my machine?
     history:
       - 'user: whats stored about the api shape'
@@ -508,13 +479,6 @@ topic_shifts:
       - 'user: ping me when #598 actually merges'
       - 'assistant: Watching #598 - I''ll wake you on merge.'
     active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: one of them asked pnpm or npm. we use pnpm, remember that for good
-    history:
-      - 'user: hows everyone doing'
-      - 'assistant: Nine up: three working, four waiting, two idle.'
-      - 'user: 4 of them are sat on prompts. unblock the lot, yes to anything read only'
-      - 'assistant: Answered three. The fourth is asking whether to use pnpm or npm — that''s not a yes/no, so I held it.'
-    active: [daintree.foundation, daintree.agents.answer-waiting-agent]
   - query: did we ever settle the api versioning thing, months ago
     history:
       - 'user: interesting. get them talking to each other about it'
@@ -536,7 +500,6 @@ topic_shifts:
       - 'user: one more — just close terminal 7'
       - 'assistant: Closed terminal 7.'
     active: [daintree.foundation]
-  - remember that we always use pnpm here, never npm
   - query: remember that we always run migrations before the tests in this repo
     active: [daintree.foundation]
   - what did we decide about the retry policy a few weeks back?
@@ -603,18 +566,10 @@ topic_shifts:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: so we finally agreed yesterday that every new service goes behind the gateway and I really don't want to be repeating that to you in three weeks time, can you keep it somewhere durable rather than just for this session
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: 'note for later: the seed script is destructive, never point it at staging'
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: from now on always spawn agents read-only unless i say otherwise, remember that
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: wut did i tell you about the deploy proccess last week
     history:
       - 'user: hi'
@@ -711,9 +666,4 @@ docs:
     history:
       - 'user: track the migration as a durable plan'
       - 'assistant: Graph wfg_4a1 created: 7 nodes, 9 edges. The backfill node is ready, everything else waits on it.'
-  - query: quick q — remember that we always use pnpm here
-    history:
-      - 'user: sweep the ledger'
-      - 'assistant: Closed wf_8701 as cancelled and wf_8702 as failed. wf_8790 stays active — terminal t-4 is still in the roster and watcher w-21 covers it.'
 foundation_boundaries:
-  - what did we decide about the api shape

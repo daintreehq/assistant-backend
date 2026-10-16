@@ -55,6 +55,9 @@ boundaries:
     confusable_with: [daintree.orchestration.multi-agent]
   - query: Is the checkout slowdown the N+1 query, the image resizing or the session store? One agent per theory, no fixes.
     confusable_with: [daintree.orchestration.spike-options]
+  - query: Assign one probe to the cache-key theory and another to the stale-replica theory for the local dashboard mismatch; rerun the deciding experiment and return verdicts without edits.
+    confusable_with: [daintree.orchestration.multi-agent, daintree.orchestration.spike-options]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: 'add a fourth theory: the connection pool isn''t releasing on timeout'
     history:
@@ -86,6 +89,13 @@ followups:
       - 'assistant: All three notices are in. H1 CONFIRMED, H2 REFUTED, H3 INCONCLUSIVE. Re-running H1''s profiler experiment in probe/rerender now.'
     active: [daintree.orchestration.hypothesis-split]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: one theory's ruled out, give that agent the timezone theory instead. still no fixes
+    history:
+      - 'user: Split the local invoice-date bug by suspected cause, one experiment per agent.'
+      - 'assistant: Cache invalidation is refuted. Date parsing and replica lag probes remain in progress.'
+    active: [daintree.orchestration.hypothesis-split]
+    confusable_with: [daintree.agents.steer-running-agent]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: 'right, separate issue: the websocket drops every few minutes — could be the proxy idle timeout, our heartbeat, or the load balancer. one agent per theory'
     history:

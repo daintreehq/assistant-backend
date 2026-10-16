@@ -124,6 +124,9 @@ boundaries:
   - query: "a pair of agents here in this project are both committing to the release branch, one of them has to own it"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
+  - query: Resolve the accidental duplicate owners of issue 753 by comparing their current changes and checks, naming one owner and preserving the other branch.
+    confusable_with: [daintree.orchestration.competition, daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: go with claude-2, but have it take codex-1's redis adapter too
     history:

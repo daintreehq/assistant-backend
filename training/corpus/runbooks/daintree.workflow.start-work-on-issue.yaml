@@ -6,7 +6,6 @@
 runbook: daintree.workflow.start-work-on-issue
 run: pre-split
 positives:
-  - 'start work on #412'
   - pick up issue 88
   - kick off 1204 with claude code and just let it run in the background
   - can you get an agent going on the flaky test issue? i think its 233
@@ -32,7 +31,6 @@ positives:
   - whats the usual way to get an agent onto a ticket — actually never mind, just do it for 71
   - yep that's the one, start it
   - 'work isue #6 with gpt, worktre off develop'
-  - start 412
   - 'put claude code on #88 and branch it off develop'
   - kick of work on isseu 231 pls
   - ok do that one, the middle one
@@ -159,8 +157,6 @@ positives:
   - query: pick up issue 441 with Codex
     run: 2026-09-28-catalog-expansion-refine
 boundaries:
-  - query: start work on issue 412
-    confusable_with: [daintree.worktree.relocate-agents]
   - query: 'pick up #1187 and get an agent going on it in a worktree'
     confusable_with: [daintree.worktree.relocate-agents]
   - query: kick off the next issue with the usual setup
@@ -187,8 +183,6 @@ boundaries:
     confusable_with: [daintree.worktree.relocate-agents]
   - query: 'set up an agent and worktree for issue #777'
     confusable_with: [daintree.worktree.relocate-agents]
-  - query: start on 42
-    confusable_with: [daintree.forge.manage-issue]
   - query: pick up the CSV export ticket and put an agent on it
     confusable_with: [daintree.forge.manage-issue]
   - query: set up a worktree for 118 and get claude going in it
@@ -251,8 +245,6 @@ boundaries:
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: Start implementing issue 88 in a newly created issue worktree.
     confusable_with: [daintree.worktree.manage-resource]
-  - query: Start work on issue 42 in a new worktree.
-    confusable_with: [daintree.forge.manage-issue]
   - query: pull together the context for issue 214 and put an agent on it
     confusable_with: [daintree.context.curate-copytree-bundle]
   - query: 'start #88, and make sure whatever picks it up has the auth files and the tests in front of it'
@@ -345,8 +337,6 @@ boundaries:
     confusable_with: [daintree.workflow.prep-branch-for-review]
   - query: start on the token refresh ticket, get a worktree going
     confusable_with: [daintree.workflow.prep-branch-for-review]
-  - query: start on 214
-    confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: put an agent on 88 and get it going
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: pick up 47, worktree and all
@@ -429,9 +419,6 @@ boundaries:
   - query: that issue we picked earlier — get an agent going on it in its own worktree
     confusable_with: [daintree.orchestration.fan-out-work]
     run: 2026-09-28-agent-queries
-  - query: 'Start work on issue #640 in a new worktree with claude'
-    confusable_with: [daintree.orchestration.status-and-resume]
-    run: 2026-09-28-agent-queries
   - query: 'Set up a worktree for issue #418 and have an agent start on it.'
     confusable_with: [daintree.recipe.run-or-create]
     run: 2026-09-28-agent-queries
@@ -486,9 +473,6 @@ boundaries:
   - query: 'Start work on issue #610, the dark-mode persistence regression — worktree and an agent to fix it.'
     confusable_with: [daintree.git.bisect-regression]
     run: 2026-09-28-catalog-expansion
-  - query: 'start work on issue #512, the discount bug'
-    confusable_with: [daintree.edits.spawn-visible-agent]
-    run: 2026-09-28-catalog-expansion-refine
   - query: 'create a worktree for issue #88 and put claude on it'
     confusable_with: [daintree.worktree.create-plain-worktree]
     run: 2026-09-28-catalog-expansion-refine
@@ -505,16 +489,6 @@ boundaries:
     confusable_with: [daintree.hosts.do-delegated-work]
     run: runbook-2026-10-issue-98
 followups:
-  - query: how's it looking?
-    history:
-      - 'user: start work on #412'
-      - 'assistant: Started "Retry backoff never resets" (#412). Worktree at ~/wt/issue-412 on branch fix/412-retry-backoff, agent running in terminal t_9f2 with supervisor watcher w_31 attached. I''ll come back when its completed event lands.'
-    active: [daintree.workflow.start-work-on-issue]
-  - query: its still totally blank, did that even start
-    history:
-      - 'user: kick off 1204 with claude'
-      - 'assistant: Launched #1204 in terminal t_c4a with a background watcher. Nothing printed yet — that''s normal for the first few seconds after a spawn.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: claude, and yeah assign it to me
     history:
       - 'user: begin issue 902'
@@ -525,22 +499,10 @@ followups:
       - 'user: set up a worktree for GH-77 and put codex on it'
       - 'assistant: Ready to launch #77 with codex, branching off main. Confirm and I''ll create the worktree and spawn.'
     active: [daintree.workflow.start-work-on-issue]
-  - query: cool, leave it
-    history:
-      - 'user: start 55 and dont wait around for it'
-      - 'assistant: #55 is running in t_7bd with watcher w_12. Supervision is durable — it keeps going even if you close the assistant, and the outcome will greet you next launch.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: whats the terminal id again
     history:
       - 'user: put an agent on the docs typo one, #90'
       - 'assistant: Launched #90 — worktree ~/wt/issue-90, branch docs/90-typo, terminal t_2e8, watcher w_44. Context injected, not assigned.'
-    active: [daintree.workflow.start-work-on-issue]
-  - query: give me the short version of what it did
-    history:
-      - 'user: start work on issue 233'
-      - 'assistant: #233 is underway in terminal t_51c with watcher w_08 supervising in the background.'
-      - 'user: ok'
-      - 'assistant: Watcher w_08 just published completed_success — the agent finished, the acceptance contract was met and the worktree is clean.'
     active: [daintree.workflow.start-work-on-issue]
   - query: which one failed?
     history:
@@ -594,16 +556,6 @@ topic_shifts:
       - 'user: create a worktree for feat/parquet off develop'
       - 'assistant: Created at ../feat-parquet on a new branch. No agent, no recipe.'
     active: [daintree.worktree.create-plain-worktree]
-  - query: before it gets going — where does daintree actually put the worktree on disk?
-    history:
-      - 'user: start work on issue 412'
-      - 'assistant: Worktree wt_412 on fix/412, agent spawned, background supervisor attached.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
-  - query: what does that supervisor watcher actually check for?
-    history:
-      - 'user: pick up 219'
-      - 'assistant: Worktree and branch created, agent running the work command, supervisor watcher attached.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
   - query: put an agent on issue 214, and tell me how the supervisor watcher works while it starts
     history:
       - 'user: ok'
@@ -676,8 +628,6 @@ topic_shifts:
       - 'user: find me something small to pick up'
       - 'assistant: #58, #61 and #74 are all unassigned and scoped tight.'
     active: [daintree.workflow.find-issue-work]
-  - query: start on 312
-    active: [daintree.foundation]
   - set up whatever branch and worktree it needs — i just want an agent working issue 204.
   - i don't want a shortlist and i don't want options. issue 331. go.
   - query: no, i want to pick this one up myself. set it up.
@@ -693,11 +643,6 @@ topic_shifts:
       - 'assistant: Agent on it in tab 1, supervised.'
       - 'user: [watcher fired: tab 1 exited 0]'
       - 'assistant: #401 is done, pushed, green, and the PR is open.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
-  - query: 'i saw the supervisor report come in - how''s #417 going?'
-    history:
-      - 'user: start work on #417'
-      - 'assistant: Agent in tab 3 on fix/417, background supervisor attached.'
     active: [daintree.workflow.start-work-on-issue, daintree.foundation]
   - query: 'right, kick off #430 in its own worktree'
     history:
@@ -723,10 +668,6 @@ topic_shifts:
     history:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
-  - query: 'start work on #412'
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: ok do that one, the middle one
     history:
       - 'user: good morning'
@@ -739,10 +680,6 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-  - query: put someone on 314
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: start work on that issue we were just looking at
     history:
       - 'user: hello'
@@ -767,10 +704,6 @@ topic_shifts:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: 'work isue #6 with gpt, worktre off develop'
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: begin work on 233 but name the branch feat/cache-keys
     history:
       - 'user: still awake?'
@@ -793,12 +726,6 @@ topic_shifts:
       - 'assistant: It''s in internal/hooks/dispatch.go (retryWithBackoff, line 140) with the policy table in internal/hooks/policy.go.'
     active: [daintree.explore.repository]
     run: 2026-09-24-selector-hardening
-  - query: codex, develop
-    history:
-      - 'user: start work on #219'
-      - 'assistant: Which agent should take #219 — claude, codex or gemini? And should it branch off main or develop?'
-    active: [daintree.workflow.start-work-on-issue]
-    run: 2026-09-24-selector-hardening
   - query: ok start claude on 219
     history:
       - 'user: anything small and unassigned in the api repo?'
@@ -811,6 +738,13 @@ topic_shifts:
       - 'assistant: Plan for 38 issues: 6 duplicate groups, 4 fixed (commits confirmed on main), 7 needs info, 21 still valid with proposed labels and priority. Nothing applied yet.'
     active: [daintree.forge.triage-issue-backlog]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: get an agent to actually write the fix, don't wait for me
+    history:
+      - 'user: turn that crash into a ticket'
+      - 'assistant: Created #830 with the stack trace in the body.'
+    active: [daintree.forge.manage-issue, daintree.foundation]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[supervisor watcher fired: t_9002 idle, agent reports work complete]'
     history:
@@ -830,17 +764,7 @@ wakes:
       - 'assistant: #91 it is. workflow.startWorkOnIssue done: worktree feat/91-rate-limit, agent in t_2240, background supervisor attached. I''ll report when it lands.'
     active: [daintree.workflow.start-work-on-issue, daintree.foundation]
 docs:
-  - start on 412
   - 'put an agent on #77'
-  - yeah start it
-  - query: start on 412
-    history:
-      - 'user: hi'
-      - 'assistant: Hi — ready when you are.'
-  - query: yeah start it
-    history:
-      - 'user: good morning'
-      - 'assistant: Good morning. Everything''s idle. Where do we start?'
   - query: 'put an agent on #77'
     history:
       - 'user: good morning'

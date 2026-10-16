@@ -171,6 +171,18 @@ boundaries:
   - query: I'll restart this laptop soon but the hosts keep running, so keep answering what they ask
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
+  - query: Could you keep following the export run on my other machines, answer questions inside its brief and check each pushed result as it comes back?
+    active: [daintree.hosts.swarm-fan-out]
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: 2026-10-16-synthetic-audit
+  - query: The remote compiler task is progressing on its original machine. Keep following its exchange and answer its questions until its artifact is verified.
+    active: [daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.reassign-host-work]
+    run: 2026-10-16-synthetic-audit
+  - query: Each remote machine has a different unit and its own branch. Keep the run going, handle their questions and check the returned commits.
+    active: [daintree.hosts.place-work]
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: ok, now keep an eye on all of them and answer what you can
     history:
@@ -196,6 +208,27 @@ followups:
     history:
       - 'user: put the cache task on the three hosts that have codex signed in'
       - 'assistant: Sent to all three. Each will reply with its branch and SHA.'
+  - query: it's asking which test command to use, tell it the unit suite only
+    history:
+      - 'user: have the build box refactor the config loader and push it'
+      - 'assistant: The build host''s assistant asked a question: run the unit suite or the full integration suite?'
+    active: [daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit
+  - query: let it open the PR too
+    history:
+      - 'user: get my second mac to write the retry tests, branch only'
+      - 'assistant: The second Mac''s assistant asks whether it may push the branch and open a pull request; you said branch only.'
+    active: [daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit
+  - query: no, don't use claude there, the mini only has codex signed in, brief it for codex
+    history:
+      - 'user: get the mini to do the lint cleanup'
+      - 'assistant: The mini''s assistant replied input-required: Claude Code is not signed in on this machine.'
+    active: [daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: now that they're all working, keep the run moving and tell me when a decision comes up
@@ -210,3 +243,19 @@ topic_shifts:
     history:
       - 'user: what does a delegated exchange update line mean?'
       - 'assistant: It says an exchange you sent changed state; it names ids, never the content.'
+  - query: The correction is acknowledged everywhere. Keep the remote run moving from here and bring me only decisions outside the brief.
+    history:
+      - 'user: tell the remote hosts the new error policy'
+      - 'assistant: Every active host acknowledged the correction; each worker is implementing it.'
+    active: [daintree.hosts.steer-swarm]
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: 2026-10-16-synthetic-audit
+
+wakes:
+  - query: 'Daintree: delegated exchange update (exchange 6127e050-374a-4fd4-8ddd-d1facd035ca9).'
+    history:
+      - 'user: from this hub, have the remote tower implement the export toggle and follow it to completion'
+      - 'assistant: Sent one exchange to its assistant. The task is working and I will process its updates.'
+    active: [daintree.hosts.delegate-to-host, daintree.hosts.survey-hosts]
+    confusable_with: [daintree.hosts.handle-hub-message]
+    run: 2026-10-16-synthetic-audit

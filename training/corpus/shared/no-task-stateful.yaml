@@ -27,11 +27,6 @@ examples:
       - 'user: run the idea competition'
       - 'assistant: claude-3 won with 6 points.'
     active: [daintree.orchestration.competition]
-  - query: nice one
-    history:
-      - 'user: rename the tabs so i can tell the claudes apart'
-      - 'assistant: Retitled all five: "auth-refactor", "flaky-test-411", "docs-sweep", "review: PR 208", "idle scratch".'
-    active: [daintree.terminals.rename]
   - query: that's the one
     history:
       - 'user: figure out what each of these terminals is doing and title them'
@@ -46,7 +41,7 @@ examples:
     history:
       - 'user: retitle the agents by what theyre on'
       - 'assistant: All four renamed.'
-    active: [daintree.terminals.rename]
+    run: 2026-10-16-synthetic-audit
   - query: great, thats way clearer
     history:
       - 'user: the tabs are all called Claude, fix that'
@@ -56,7 +51,7 @@ examples:
     history:
       - 'user: review PR 208'
       - 'assistant: Reviewed — 1 high (unbounded retry loop in worker/sync.go:88), 3 medium, evidence per finding.'
-    active: [daintree.review.review-change]
+    run: 2026-10-16-synthetic-audit
   - query: yep thats what i suspected
     history:
       - 'user: review PR 208'
@@ -81,17 +76,17 @@ examples:
     history:
       - 'user: the tests are failing, sort it out'
       - 'assistant: Root cause was a stale lockfile. Fixed, suite is green — 412 passed, 0 failed.'
-    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
   - query: about time
     history:
       - 'user: why is CI red'
       - 'assistant: One assertion drifted after the timezone change. Patched and re-run — green.'
-    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
   - query: wow that was quick
     history:
       - 'user: fix the failing test'
       - 'assistant: It was genuinely flaky — a 50ms sleep racing the poller. Replaced with a condition wait, 30 consecutive passes.'
-    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: phew
     history:
       - 'user: the build broke on main'
@@ -102,21 +97,16 @@ examples:
       - 'user: this check wont pass, have a look'
       - 'assistant: Lint config and the formatter disagreed on line length. Aligned both, check is green.'
     active: [daintree.ci.diagnose-and-fix]
-  - query: great stuff
-    history:
-      - 'user: start work on 412'
-      - 'assistant: Worktree issue-412 created, agent launched, background supervisor attached.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: cheers
     history:
       - 'user: pick up ticket 88'
       - 'assistant: Branch issue-88 is up with an agent on it, watcher armed.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: beautiful
     history:
       - 'user: put agents on 101 102 and 107'
       - 'assistant: Three agents launched, one per issue, all supervised in the background.'
-    active: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
   - query: rocket fuel
     history:
       - 'user: knock out the whole backlog in parallel'
@@ -126,66 +116,36 @@ examples:
     history:
       - 'user: parallelise this across worktrees'
       - 'assistant: Split into four disjoint file-scoped units, an agent on each.'
-    active: [daintree.orchestration.fan-out-work]
-  - query: good
-    history:
-      - 'user: how''s everyone doing'
-      - 'assistant: 3 working, 1 waiting on a prompt, 1 finished clean, 1 idle. Nothing needs you right now.'
-    active: [daintree.orchestration.supervise-fleet]
-  - query: nice one, ta
-    history:
-      - 'user: anything need me?'
-      - 'assistant: No — everything is either running or done. I''ll surface anything that blocks.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: nice
     history:
       - 'user: catch me up on the agents'
       - 'assistant: All five swept. Two finished, three mid-run, none stuck.'
-    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-10-16-synthetic-audit
   - query: good catch
     history:
       - 'user: is anyone stuck'
       - 'assistant: One was — no watcher, sat idle 40 minutes. Adopted it and it''s moving again.'
     active: [daintree.orchestration.supervise-fleet]
-  - query: right, ok
-    history:
-      - 'user: where were we'
-      - 'assistant: Two workflows still open: 412 (agent mid-run) and 388 (PR open, waiting review). Everything else is closed out.'
-    active: [daintree.orchestration.status-and-resume]
-  - query: oh yeah
-    history:
-      - 'user: what was i working on yesterday'
-      - 'assistant: The rate limiter refactor on issue-390 — branch is pushed, no PR yet.'
-    active: [daintree.orchestration.status-and-resume, daintree.foundation]
   - query: thanks, thats everything i needed
     history:
       - 'user: catch me up, i was out'
       - 'assistant: The overnight run finished green, one agent hit a permission prompt and stalled, I answered it.'
-    active: [daintree.orchestration.status-and-resume]
+    run: 2026-10-16-synthetic-audit
   - query: great, much tidier
     history:
       - 'user: tidy the ledger, its showing finished work as active'
       - 'assistant: Closed 4 stale rows and recorded PR #95 onto the row for 92.'
     active: [daintree.orchestration.status-and-resume]
-  - query: perfect
-    history:
-      - 'user: ping me when the PR merges'
-      - 'assistant: PR watch armed on #204. I''ll wake you the moment it flips to merged.'
-    active: [daintree.orchestration.watch-outcome]
   - query: night
     history:
       - 'user: run this overnight and wake me'
       - 'assistant: Long run started in t_7710, watcher armed, narrow grant so it can re-run once without asking.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: sound
     history:
       - 'user: remind me in an hour'
       - 'assistant: Timer set for 15:40.'
-    active: [daintree.orchestration.watch-outcome]
-  - query: cool cool
-    history:
-      - 'user: let me know when the build finishes'
-      - 'assistant: Watcher on t_2201 will ping you on exit, pass or fail.'
     active: [daintree.orchestration.watch-outcome]
   - query: lovely, thanks
     history:
@@ -207,36 +167,26 @@ examples:
       - 'user: get 312 ready for review'
       - 'assistant: Committed, pushed, PR #318 opened against develop.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: thanks!
-    history:
-      - 'user: open a PR for this branch'
-      - 'assistant: PR #221 is up, description written from the commits.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
   - query: grand
     history:
       - 'user: is this branch ready to push'
       - 'assistant: Verdict says yes — clean tree, tests green, no debug leftovers. Pushed.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: great
-    history:
-      - 'user: is PR 95 green'
-      - 'assistant: All 7 checks passed, reviewDecision APPROVED, no unresolved threads.'
-    active: [daintree.workflow.follow-up-on-issue]
   - query: gotcha
     history:
       - 'user: whats blocking 140'
       - 'assistant: One requested change on the migration file, nothing else. Reviewer replied 20 minutes ago.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: thanks
     history:
       - 'user: comment on it and close it'
       - 'assistant: Posted the summary comment and closed issue 92.'
-    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-10-16-synthetic-audit
   - query: nice list
     history:
       - 'user: find me a small bug nobody''s on'
       - 'assistant: Four unassigned hits; #451 and #460 look genuinely small and nobody has a worktree on either.'
-    active: [daintree.workflow.find-issue-work]
+    run: 2026-10-16-synthetic-audit
   - query: ok let me think about it
     history:
       - 'user: what should i pick up next'
@@ -251,27 +201,22 @@ examples:
     history:
       - 'user: get an agent to look at the auth module and report back'
       - 'assistant: It flagged the session refresh as the weak point — token rotates but the cookie doesn''t.'
-    active: [daintree.agents.ask-and-relay, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ok good enough for me
     history:
       - 'user: poll the fleet on whether we should drop the legacy endpoint'
       - 'assistant: 4 of 5 say drop it, one says deprecate first. Consensus: drop with a 30-day header warning.'
-    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-10-16-synthetic-audit
   - query: b it is
     history:
       - 'user: vote among the three options'
       - 'assistant: Option B took it 3-1-1. Reasons were consistent: fewest moving parts.'
     active: [daintree.agents.poll-pinned-agents, daintree.foundation]
-  - query: yep good
-    history:
-      - 'user: the agent is asking something, tell it yes'
-      - 'assistant: Answered the prompt in t_3302, it''s continuing. It''s now on step 4 of 6.'
-    active: [daintree.agents.answer-waiting-agent]
   - query: top stuff
     history:
       - 'user: three of them are waiting on questions, unblock them'
       - 'assistant: All three answered and running again.'
-    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ahh right
     history:
       - 'user: my agent is stuck'
@@ -297,11 +242,6 @@ examples:
       - 'user: what does this repo do'
       - 'assistant: It''s a billing reconciliation service — ingest, match, settle. Entry point cmd/reconcile/main.go.'
     active: [daintree.explore.repository]
-  - query: lovely
-    history:
-      - 'user: where is the rate limiter implemented'
-      - 'assistant: middleware/ratelimit.go:40, token bucket, backed by Redis. Config in config/limits.yaml.'
-    active: [daintree.explore.repository, daintree.foundation]
   - query: sorted
     history:
       - 'user: spawn an agent to refactor the parser'
@@ -321,12 +261,7 @@ examples:
     history:
       - 'user: make a context bundle for the auth subsystem including tests'
       - 'assistant: Done — 28 files, 190KB, generated to disk.'
-    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
-  - query: all good
-    history:
-      - 'user: create a worktree for feature/pricing-v2'
-      - 'assistant: Worktree created at ../wt-pricing-v2 on a new branch off develop. No agent launched.'
-    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-10-16-synthetic-audit
   - query: champion
     history:
       - 'user: check out release/3.2 as a worktree'
@@ -336,7 +271,7 @@ examples:
     history:
       - 'user: run the bugfix recipe on a new worktree'
       - 'assistant: Worktree created with the bugfix recipe as its startup recipe; the agent it spawned is live and supervised.'
-    active: [daintree.recipe.run-or-create]
+    run: 2026-10-16-synthetic-audit
   - query: ok noted
     history:
       - 'user: what recipes do we have'
@@ -391,7 +326,7 @@ examples:
     history:
       - 'user: get two agents cross checking each other on the migration plan until they agree'
       - 'assistant: They converged: dual-write first, backfill second, cutover last.'
-    active: [daintree.orchestration.multi-agent, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: settled then
     history:
       - 'user: it tied, run a runoff'
@@ -407,26 +342,6 @@ examples:
       - 'user: point the agent in tab 4 at what the reviewer said'
       - 'assistant: Relayed. It acknowledged and is reworking the middleware now.'
     active: [daintree.agents.relay-review-feedback, daintree.foundation]
-  - query: ignore that
-    history:
-      - 'user: put an agent on 412'
-      - 'assistant: Agent launched in worktree issue-412, supervisor attached.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
-  - query: never mind
-    history:
-      - 'user: fan the four tickets out across agents'
-      - 'assistant: Four agents launched, one per ticket, all supervised.'
-    active: [daintree.orchestration.fan-out-work]
-  - query: scratch that
-    history:
-      - 'user: review the branch'
-      - 'assistant: Reviewed — 2 medium findings with file evidence.'
-    active: [daintree.review.review-change]
-  - query: wait, go back
-    history:
-      - 'user: rename the tabs'
-      - 'assistant: All five retitled from what each agent is doing.'
-    active: [daintree.terminals.rename]
   - query: hang on, forget i said anything
     history:
       - 'user: clean up the worktrees'
@@ -441,12 +356,12 @@ examples:
     history:
       - 'user: get the fleet swept'
       - 'assistant: 5 agents: 3 working, 1 done, 1 waiting. Nothing blocked.'
-    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-10-16-synthetic-audit
   - query: sorry wrong window
     history:
       - 'user: verify what the agent claimed'
       - 'assistant: Verified against the diff — the claim holds.'
-    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: oops, ignore, that was meant for slack
     history:
       - 'user: spawn an agent on the parser refactor'
@@ -456,17 +371,7 @@ examples:
     history:
       - 'user: watch the PR and ping me'
       - 'assistant: PR watch armed on #204.'
-    active: [daintree.orchestration.watch-outcome]
-  - query: one sec
-    history:
-      - 'user: open the PR for this branch'
-      - 'assistant: PR #318 opened.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
-  - query: brb
-    history:
-      - 'user: find me something unassigned to pick up'
-      - 'assistant: Three candidates, none in flight.'
-    active: [daintree.workflow.find-issue-work]
+    run: 2026-10-16-synthetic-audit
   - query: give me a minute
     history:
       - 'user: answer the waiting agents'
@@ -476,7 +381,7 @@ examples:
     history:
       - 'user: fix the red test'
       - 'assistant: Fixed and verified green.'
-    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: typo sorry, ignore
     history:
       - 'user: recover that hung agent'
@@ -491,32 +396,17 @@ examples:
     history:
       - 'user: review PR 208'
       - 'assistant: 1 high, 3 medium, evidence per finding.'
-    active: [daintree.review.review-change]
-  - query: how does a bloom filter work
-    history:
-      - 'user: fix the failing build'
-      - 'assistant: Pinned the drifting dependency, build is back to green.'
-    active: [daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
   - query: tell me a joke
     history:
       - 'user: rename all the tabs'
       - 'assistant: Retitled from each agent''s actual task.'
-    active: [daintree.terminals.rename]
-  - query: whats the capital of peru
-    history:
-      - 'user: sweep the fleet'
-      - 'assistant: 4 working, 1 finished, nothing stuck.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: how many ml in a cup
     history:
       - 'user: get 312 up for review'
       - 'assistant: Committed, pushed, PR opened.'
-    active: [daintree.workflow.prep-branch-for-review]
-  - query: whats a good pasta recipe for tonight
-    history:
-      - 'user: where were we'
-      - 'assistant: Two workflows open: 412 mid-run, 388 waiting on review.'
-    active: [daintree.orchestration.status-and-resume]
+    run: 2026-10-16-synthetic-audit
   - query: what time is it in tokyo right now
     history:
       - 'user: watch the overnight run'
@@ -526,22 +416,22 @@ examples:
     history:
       - 'user: poll the fleet on the endpoint question'
       - 'assistant: 4 of 5 say drop it. Consensus recorded.'
-    active: [daintree.agents.poll-pinned-agents]
+    run: 2026-10-16-synthetic-audit
   - query: convert 180 lbs to kg
     history:
       - 'user: bundle the auth subsystem'
       - 'assistant: 28 files bundled to .copytree/auth.md.'
-    active: [daintree.context.curate-copytree-bundle]
+    run: 2026-10-16-synthetic-audit
   - query: recommend me a podcast for the gym
     history:
       - 'user: start issue 55'
       - 'assistant: Worktree, branch and agent are live.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: whats the best mechanical keyboard switch
     history:
       - 'user: verify the agent''s claim before i merge'
       - 'assistant: Verified — diff matches, tests genuinely green.'
-    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-10-16-synthetic-audit
   - query: is it worth learning rust in 2026
     history:
       - 'user: clean it all up'
@@ -561,12 +451,12 @@ examples:
     history:
       - 'user: run the competition'
       - 'assistant: claude-3 won with 6 points.'
-    active: [daintree.orchestration.competition]
+    run: 2026-10-16-synthetic-audit
   - query: whats 2^32 again
     history:
       - 'user: comment and close 92'
       - 'assistant: Comment posted, issue closed.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: how do i get better at typing
     history:
       - 'user: create a worktree for the pricing branch'
@@ -576,17 +466,12 @@ examples:
     history:
       - 'user: remember we use pnpm'
       - 'assistant: Saved to project memory.'
-    active: [daintree.memory.manage-project-memory]
+    run: 2026-10-16-synthetic-audit
   - query: sing me a haiku about deadlines
     history:
       - 'user: relay the review to the implementer'
       - 'assistant: Forwarded with your calibration.'
     active: [daintree.agents.relay-review-feedback, daintree.foundation]
-  - query: what is a git worktree actually
-    history:
-      - 'user: create a worktree for feature/pricing-v2'
-      - 'assistant: Created at ../wt-pricing-v2 on a new branch off develop.'
-    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
   - query: whats the difference between a worktree and just cloning twice, conceptually
     history:
       - 'user: make a worktree for the release branch'
@@ -601,7 +486,7 @@ examples:
     history:
       - 'user: prep the branch for review'
       - 'assistant: Clean tree, tests green, PR up.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: why are time based tests flaky in general
     history:
       - 'user: fix the flaky test'
@@ -611,17 +496,17 @@ examples:
     history:
       - 'user: sort out the red CI'
       - 'assistant: Stale lockfile. Fixed, all checks green.'
-    active: [daintree.ci.diagnose-and-fix, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: in general how do you decide when parallel work is worth the coordination cost
     history:
       - 'user: fan the batch out across agents'
       - 'assistant: Six agents, one issue each.'
-    active: [daintree.orchestration.fan-out-work]
+    run: 2026-10-16-synthetic-audit
   - query: whats amdahls law again
     history:
       - 'user: put an agent on each of those tickets'
       - 'assistant: Four launched, all supervised.'
-    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: whats the difference between exponential backoff and jitter
     history:
       - 'user: review the diff'
@@ -667,30 +552,16 @@ examples:
       - 'user: tidy the ledger'
       - 'assistant: Four stale rows closed.'
     active: [daintree.orchestration.status-and-resume]
-  - query: whats the difference between concurrency and parallelism
-    history:
-      - 'user: sweep the agents'
-      - 'assistant: 3 working, 1 waiting, 1 done.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
   - query: why do LLMs hallucinate test results like that
     history:
       - 'user: verify what it claimed'
       - 'assistant: Contradicted — two failures it summarised away.'
-    active: [daintree.orchestration.verify-agent-work]
+    run: 2026-10-16-synthetic-audit
   - query: does git gc actually reclaim much space
     history:
       - 'user: close everything down'
       - 'assistant: Terminals closed, worktrees deleted, ledger settled.'
     active: [daintree.orchestration.workspace-cleanup, daintree.foundation]
-  - query: amazing, thanks
-    history:
-      - 'user: find me a couple of small unassigned bugs'
-      - 'assistant: #451 and #460 — both self-contained, nobody on either.'
-      - 'user: start 451'
-      - 'assistant: Worktree issue-451 created, agent launched, supervisor attached.'
-      - 'user: hows it going'
-      - 'assistant: It''s finished — 3 files changed, tests green, branch pushed.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
   - query: beautiful, exactly what i wanted
     history:
       - 'user: put agents on 101 102 107'
@@ -717,16 +588,7 @@ examples:
       - 'assistant: Relayed to t_4402 as blocking.'
       - 'user: did it take it on board'
       - 'assistant: Yes — it''s reworked the retry loop and pushed.'
-    active: [daintree.agents.relay-review-feedback, daintree.review.review-change]
-  - query: great, ill hit merge myself
-    history:
-      - 'user: where were we'
-      - 'assistant: 412 mid-run, 388 waiting on review.'
-      - 'user: check 388''s PR'
-      - 'assistant: Green, approved, no unresolved threads.'
-      - 'user: merge-ready then'
-      - 'assistant: Yes — nothing blocking it.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.orchestration.status-and-resume]
+    run: 2026-10-16-synthetic-audit
   - query: hah, poor codex
     history:
       - 'user: get the four of them debating the schema change'
@@ -779,7 +641,7 @@ examples:
       - 'assistant: Verified — diff matches the claim, tests genuinely green.'
       - 'user: good, open the PR'
       - 'assistant: PR #418 opened against develop.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.orchestration.verify-agent-work]
+    run: 2026-10-16-synthetic-audit
   - query: good, thanks
     history:
       - 'user: poll the fleet on dropping the legacy endpoint'
@@ -813,16 +675,11 @@ examples:
       - 'user: good'
       - 'assistant: Three still working, two finished cleanly.'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: side question, whats the difference between a watcher and an async wait?
-    history:
-      - 'user: get this branch ready for review'
-      - 'assistant: Committed, pushed, PR #147 open.'
-    active: [daintree.workflow.prep-branch-for-review]
   - query: different thing entirely - whats the syntax for a match guard in rust again
     history:
       - 'user: review the diff'
       - 'assistant: Three findings, one high severity in the cache eviction path.'
-    active: [daintree.review.review-change]
+    run: 2026-10-16-synthetic-audit
   - query: how do i create a worktree from the ui rather than asking you?
     history:
       - 'user: sort the failing tests'
@@ -834,32 +691,11 @@ examples:
       - 'user: poll the pinned agents on the caching question'
       - 'assistant: Consensus: in-process with a small TTL, 4 of 5.'
     active: [daintree.agents.poll-pinned-agents]
-  - query: where do i change the keybinding for switching tabs?
-    history:
-      - 'user: close everything from the fan-out'
-      - 'assistant: Six terminals closed, four worktrees deleted, ledger settled.'
-    active: [daintree.orchestration.workspace-cleanup]
-    docs: true
   - query: actually hold on, let me think about what i want next
     history:
       - 'user: catch me up on what was in flight'
       - 'assistant: Nothing live. Both PRs from yesterday merged and their rows are closed.'
     active: [daintree.orchestration.status-and-resume]
-  - query: unrelated - whats the recommended way to pin a python dependency for reproducible builds
-    history:
-      - 'user: start work on #302'
-      - 'assistant: Worktree, branch and agent all up for #302 with a supervisor attached.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
-  - query: what does the little dot next to a tab name actually mean?
-    history:
-      - 'user: rename the tabs so i can tell them apart'
-      - 'assistant: All five retitled by task.'
-    active: [daintree.terminals.rename]
-  - query: nice one, thats exactly what i needed
-    history:
-      - 'user: verify the agent did what it claimed'
-      - 'assistant: Verified against git - the claim holds.'
-    active: [daintree.orchestration.verify-agent-work]
   - query: different subject - how do i update daintree to the latest version?
     history:
       - 'user: spawn an agent to fix the exporter null check'
@@ -1088,11 +924,6 @@ examples:
       - 'user: hi'
       - 'assistant: Hi there.'
     docs: true
-  - query: how do i change the keybinding for switching terminals?
-    history:
-      - 'user: hey'
-      - 'assistant: Hi.'
-    docs: true
   - query: does daintree work over ssh?
     history:
       - 'user: hi'
@@ -1165,7 +996,7 @@ examples:
       - 'assistant: Separate checkout per branch, own terminals, no collisions.'
       - 'user: make me one then. new branch spike/cache'
       - 'assistant: Created the worktree on a new branch spike/cache off main. No recipe or agent launched.'
-    active: [daintree.worktree.create-plain-worktree]
+    run: 2026-10-16-synthetic-audit
   - query: nice one, thanks
     history:
       - 'user: what did it say about the tax lines exactly'
@@ -1190,36 +1021,29 @@ examples:
       - 'assistant: New package under plugins/ with an init() calling Register.'
       - 'user: every tab is just called Claude, give them proper names'
       - 'assistant: Retitled all four from what each is doing: ''plugins-refactor'', ''limiter-412'', ''test-watch'' and ''scratch''.'
-    active: [daintree.terminals.rename]
+    run: 2026-10-16-synthetic-audit
   - quick one — whats the difference between a worktree and a plain branch in daintree
-  - query: brb making coffee
-    history:
-      - 'user: makes sense. which worktrees do i have right now'
-      - 'assistant: main, api-v2 and fix/limiter-412.'
-      - 'user: whats the api-v2 one about, i forget'
-      - 'assistant: It''s a second handler tree under api/v2 with a new envelope shape and cursor pagination; v1 is untouched and both are mounted in router.go.'
-    active: [daintree.explore.repository]
   - query: sorry, my bad
     history:
       - 'user: actually hang on, check thats true in the code first'
       - 'assistant: gateway/internal/session/store.go writes users.last_seen_at directly.'
       - 'user: yeah gateway does write to it. fix what you saved'
       - 'assistant: Corrected the stored fact: identity-svc owns the table, gateway writes last_seen_at directly as a known exception.'
-    active: [daintree.memory.manage-project-memory]
+    run: 2026-10-16-synthetic-audit
   - query: great, thanks
     history:
       - 'user: save that command, ill want it again'
       - 'assistant: Saved.'
       - 'user: is my key actually working? dont want to find that out after burning credit'
       - 'assistant: Confirmed signed in and the key authenticates — a status read alone wouldn''t have told you that, so I checked properly.'
-    active: [daintree.diagnostics]
+    run: 2026-10-16-synthetic-audit
   - query: cheers
     history:
       - 'user: remember we cap retries at 5, thats a product call not a technical one'
       - 'assistant: Saved.'
       - 'user: the mcp link keeps dropping and my tabs are all called the same thing, sort both out'
       - 'assistant: The MCP server was restarting on idle timeout — raised it and reconnected. Also retitled the five tabs by what each is running.'
-    active: [daintree.diagnostics, daintree.terminals.rename]
+    run: 2026-10-16-synthetic-audit
   - query: haha tab 5 wins. ok cool
     history:
       - 'user: two way tie? ugh. run a tiebreak between those two'
@@ -1233,7 +1057,7 @@ examples:
       - 'assistant: Tab 5 has the floor, caught up on tab 3.'
       - 'user: ok that''s enough, back to the interview. have the judge call it'
       - 'assistant: Judge resumed with the transcript. Verdict: tab 3 — stronger on unfamiliar code, weaker on tests.'
-    active: [daintree.orchestration.interview, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ok so what did they actually agree on, in two sentences
     history:
       - 'user: make sure nobody can see who wrote what'
@@ -1247,24 +1071,14 @@ examples:
       - 'assistant: Agent up in the worktree.'
       - 'user: it says done. did it actually write the migration or just talk about it'
       - 'assistant: Real: new file under migrations/, committed, and the tail matches the claim.'
-    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: cheers
     history:
       - 'user: right, back to the issue agents. anything need me?'
       - 'assistant: Three done, one still working.'
       - 'user: check each one actually landed and then close those three down'
       - 'assistant: All three verified — commits, tests, branches pushed. Terminals closed, worktrees kept, ledger rows settled.'
-    active:
-      - daintree.orchestration.verify-agent-work
-      - daintree.orchestration.workspace-cleanup
-      - daintree.foundation
-  - query: much better
-    history:
-      - 'user: gemini is asking me something, tell it yes'
-      - 'assistant: Answered.'
-      - 'user: name them by what they''re each arguing for'
-      - 'assistant: Renamed: ''result types'', ''panic+recover'', ''sentinel errors''.'
-    active: [daintree.terminals.rename, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: great, that's me done for the day
     history:
       - 'user: cancel the watcher you set, i''m here anyway'
@@ -1272,13 +1086,6 @@ examples:
       - 'user: so who actually won in the end'
       - 'assistant: Tab 4, 3–1 on the third round.'
     active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
-  - query: perfect ta
-    history:
-      - 'user: tell it the security one matters, the style nits don''t'
-      - 'assistant: Told tab 3 the security finding is blocking.'
-      - 'user: did it actually deal with the security one'
-      - 'assistant: Yes — the comparison is constant-time now and there''s a test covering it.'
-    active: [daintree.orchestration.verify-agent-work, daintree.foundation]
   - query: ok it's back
     history:
       - 'user: one of them voted for its own, discount that'
@@ -1292,7 +1099,7 @@ examples:
       - 'assistant: Three working, one finished, none waiting.'
       - 'user: the one in tab 5 died. no output, nothing'
       - 'assistant: The process is gone — spawn saga shows it exited during startup. Relaunched into the same worktree.'
-    active: [daintree.agents.recover-agent, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: wait who's the judge again - actually doesn't matter
     history:
       - 'user: forget it, run with the other 3'
@@ -1313,19 +1120,14 @@ examples:
       - 'assistant: Vote came back tied.'
       - 'user: tie for worst. runoff on those two'
       - 'assistant: Runoff over the same three voters — the ''leave it'' position is out, 2–1.'
-    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ta
     history:
       - 'user: right the parser thing. check if that agent actually finished the migration bit, it said it did'
       - 'assistant: Not verified — no commits since 19:40 and two named files are unchanged.'
       - 'user: hang on ignore that, standup in 5. just put a watcher on tab 2 and ping me when its done'
       - 'assistant: Watcher armed on tab 2. I''ll wake you when it goes idle or asks a question.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: nice
-    history:
-      - 'user: start work on issue 412'
-      - 'assistant: Started 412 — worktree issue-412 created, agent launched in tab 5, background supervisor attached.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: hang on whats the difference between a watcher and a timer again
     history:
       - 'user: is claude still going in tab 3?'
@@ -1339,7 +1141,7 @@ examples:
       - 'assistant: docs-site is running, dev server up on :3000.'
       - 'user: also set me up a plain worktree off main called spike/fonts. no agent no recipe'
       - 'assistant: Created worktree spike/fonts from main. Nothing launched in it.'
-    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ah yeah that was me. ok
     history:
       - 'user: 3-3?? ugh. run a runoff between them'
@@ -1374,7 +1176,7 @@ examples:
       - 'assistant: Narrowed to middleware/: the high plus one medium (nil check on the claims map, auth.go:88).'
       - 'user: ok. send those findings to the agent that wrote it, tell it the first two are blocking and it can push back on the third'
       - 'assistant: Sent to tab 4 (fix/418-token-refresh) with that calibration. It acknowledged and started on the logging one.'
-    active: [daintree.agents.relay-review-feedback, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: cheers, later
     history:
       - 'user: good. get the branch pushed and the PR updated'
@@ -1388,21 +1190,21 @@ examples:
       - 'assistant: Clean apart from a stale version reference, fixed. PR #433 open.'
       - 'user: put the fixes-#221 line in the description too'
       - 'assistant: Added Fixes #221 to the PR body.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ta
     history:
       - 'user: anything dodgy in the token parsing bit?'
       - 'assistant: Nothing security-relevant.'
       - 'user: fine. push it and open the pr'
       - 'assistant: Pushed fix/518-selector-retry-log, opened PR #534 with Fixes #518. Checks queued.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: much better
     history:
       - 'user: retitle them so i can tell which pr is which'
       - 'assistant: Renamed: rebase #287, #295, #302, #311.'
       - 'user: that did nothing, the titles are unchanged. sort it out and rename them'
       - 'assistant: The MCP link had dropped, so the rename calls went nowhere. Reconnected and re-applied the titles — they''re showing now.'
-    active: [daintree.terminals.rename, daintree.diagnostics, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: thanks, appreciate it
     history:
       - 'user: is my key even live?'
@@ -1416,7 +1218,7 @@ examples:
       - 'assistant: Opened PR #540 against develop. Checks queued.'
       - 'user: watch the checks and wake me either way'
       - 'assistant: Watching #540 — I''ll wake you when the checks settle, green or red.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: cheers, good session
     history:
       - 'user: how long''s that one been going'
@@ -1430,12 +1232,12 @@ examples:
       - 'assistant: Verified — commit on release/2.3, guard present, regression test runs.'
       - 'user: ok good. now do the comment'
       - 'assistant: Posted the comment on #90 citing the 2.3 commit and closed the issue.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: ok
     history:
       - 'user: the csv one, #412. nobody on it? right, start it'
       - 'assistant: Started #412 - worktree fix/412-csv-export, agent in tab 3, background watcher attached.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: k ta
     history:
       - 'user: put claude in there and get it fixing'
@@ -1449,14 +1251,14 @@ examples:
       - 'assistant: logout.ts:28 clears sessionStorage only.'
       - 'user: spawn an agent in a new worktree off develop, branch fix/filters-logout'
       - 'assistant: Worktree created, Claude running in tab 4 with that file as the starting point.'
-    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: brb coffee
     history:
       - 'user: is it actually flaky or real?'
       - 'assistant: Real.'
       - 'user: put a separate agent on each of the other 3'
       - 'assistant: Three agents up, one per test, each in its own worktree, all supervised in the background.'
-    active: [daintree.orchestration.fan-out-work, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: whats a watcher again exactly, do they cost anything to leave running
     history:
       - 'user: is #388''s pr green now'
@@ -1484,7 +1286,7 @@ examples:
       - 'assistant: Sam wants page 0 covered and flags repo.go:88.'
       - 'user: forward both to the agent in tab 2'
       - 'assistant: Forwarded both comments with the file references.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: wait does that make the worktree itself or was i supposed to do that first
     history:
       - 'user: #501 looks fine. start it'
@@ -1504,13 +1306,6 @@ examples:
       - 'user: fixed. ready the branch'
       - 'assistant: Pushed fix/77-dst; PR #629 open against develop.'
     active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
-  - query: nice one
-    history:
-      - 'user: how are they all doing'
-      - 'assistant: Four working, two waiting on questions.'
-      - 'user: two of them are asking me something. just say yes to both'
-      - 'assistant: Answered both — they''ve resumed. Six working now.'
-    active: [daintree.foundation, daintree.agents.answer-waiting-agent]
   - query: cheers, coffee time
     history:
       - 'user: poll all six — how confident is each that its change is safe to merge'
@@ -1541,28 +1336,28 @@ examples:
       - 'assistant: About halfway.'
       - 'user: ping me when it finishes, im not sitting here for it'
       - 'assistant: Watcher armed on that terminal — I''ll wake you when it reports done or stalls.'
-    active: [daintree.foundation, daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
   - query: beautiful
     history:
       - 'user: nah thats the flaky snapshot test again, rerun and confirm'
       - 'assistant: Green both reruns. Flaky, not a regression.'
       - 'user: all green. comment on the issues and close them out'
       - 'assistant: Posted a closing comment on 388, 389 and 390 and closed all three.'
-    active: [daintree.foundation, daintree.workflow.follow-up-on-issue]
+    run: 2026-10-16-synthetic-audit
   - query: night
     history:
       - 'user: mcp dropped again mid batch. get it working and restart the two that died'
       - 'assistant: Link back, both relaunched.'
       - 'user: leave watchers on all 5 overnight, wake me if any of them fail'
       - 'assistant: Watchers armed on all five with a failure-only wake condition.'
-    active: [daintree.foundation, daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
   - query: fair enough
     history:
       - 'user: run the bootstrap one on the other two worktrees'
       - 'assistant: Both bootstrapped.'
       - 'user: can you write me a new recipe that runs migrations first'
       - 'assistant: I can''t author recipes — no tool exposes that. I can run an existing one, or just run the migration command in each worktree for you.'
-    active: [daintree.foundation, daintree.recipe.run-or-create]
+    run: 2026-10-16-synthetic-audit
   - query: cool
     history:
       - 'user: fair enough'
@@ -1577,20 +1372,13 @@ examples:
       - 'user: thats wrong, forget it, we went the other way in the end'
       - 'assistant: Removed that fact. Tell me the decision you actually landed on and I''ll store it instead.'
     active: [daintree.foundation, daintree.memory.manage-project-memory]
-  - query: ha. of course it is
-    history:
-      - 'user: chuck the tests in too'
-      - 'assistant: 31 files, bundle written.'
-      - 'user: where''s the rate limiter implemented anyway'
-      - 'assistant: middleware/rateLimit.ts, backed by the token bucket in lib/buckets.ts and wired in server/app.ts.'
-    active: [daintree.foundation, daintree.explore.repository]
   - query: night
     history:
       - 'user: did all the sprint-9 issues actually close on github'
       - 'assistant: Eleven of twelve; #397 is still open.'
       - 'user: one didnt. comment on it and close it'
       - 'assistant: Commented with the merged PR link and closed #397.'
-    active: [daintree.foundation, daintree.workflow.follow-up-on-issue]
+    run: 2026-10-16-synthetic-audit
   - query: done for today
     history:
       - 'user: right, tear down everything from the interview'
@@ -1612,25 +1400,10 @@ examples:
       - 'assistant: Started — agent is running in tab 3 with a background watcher on it.'
     active: [daintree.workflow.start-work-on-issue]
   - how many ml in a us cup
-  - query: did you catch the cricket score last night
-    history:
-      - 'user: how are the agents doing'
-      - 'assistant: Two finished, one still grinding on the migration.'
-    active: [daintree.orchestration.supervise-fleet]
   - tell me a joke while i wait
-  - query: right. what should i have for lunch
-    history:
-      - 'user: review the branch'
-      - 'assistant: Three findings, all minor — details above.'
-    active: [daintree.review.review-change]
   - how do you say 'thank you very much' in japanese
   - whats the capital of mongolia
   - convert 98.6 fahrenheit to celsius for me
-  - query: any big news today?
-    history:
-      - 'user: anything need me'
-      - 'assistant: Nothing right now — all three agents are mid-run.'
-    active: [daintree.orchestration.supervise-fleet]
   - my back is killing me from sitting all day, any advice
   - how long is the flight from joburg to london
   - is it worth getting a standing desk do you reckon
@@ -1670,11 +1443,6 @@ examples:
   - trunk based development vs gitflow — which do teams actually run in practice
   - what model are you running on
   - how big is your context window
-  - query: do you remember what we did yesterday?
-    history:
-      - 'user: start work on #91'
-      - 'assistant: Agent is up in tab 2, watcher attached.'
-    active: [daintree.workflow.start-work-on-issue]
   - how much is this costing me per message, roughly
   - are you gpt or claude under the hood
   - do you learn from the stuff i tell you
@@ -1686,7 +1454,6 @@ examples:
   - are my messages stored anywhere after the session ends
   - whats my username on this box
   - what macos version am i on
-  - how much disk space have i got left
   - what shell am i using
   - whats today's date
   - query: quick one, what time is it here
@@ -1700,27 +1467,22 @@ examples:
     history:
       - 'user: rename these tabs'
       - 'assistant: Done — they''re now api, ui, docs, tests.'
-    active: [daintree.terminals.rename]
+    run: 2026-10-16-synthetic-audit
   - query: nice one
     history:
       - 'user: is the PR green'
       - 'assistant: Yes, all six checks passed.'
-    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-10-16-synthetic-audit
   - query: lgtm
     history:
       - 'user: review the diff'
       - 'assistant: Two nits, nothing blocking.'
-    active: [daintree.review.review-change]
-  - query: wow that was fast
-    history:
-      - 'user: whats everyone doing'
-      - 'assistant: Four agents running, none need you.'
-    active: [daintree.orchestration.supervise-fleet]
+    run: 2026-10-16-synthetic-audit
   - query: finally
     history:
       - 'user: is CI done yet'
       - 'assistant: Green, just came through.'
-    active: [daintree.workflow.follow-up-on-issue]
+    run: 2026-10-16-synthetic-audit
   - about time
   - you're quick
   - query: yep thats the one
@@ -1732,12 +1494,12 @@ examples:
     history:
       - 'user: put an agent on the auth refactor'
       - 'assistant: Before I start — which worktree should it run in?'
-    active: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
   - query: scratch that
     history:
       - 'user: find me a small bug to pick up'
       - 'assistant: Three unassigned candidates, listed above.'
-    active: [daintree.workflow.find-issue-work]
+    run: 2026-10-16-synthetic-audit
   - query: disregard the last message, i mistyped
     history:
       - 'user: close tab 4'
@@ -1749,12 +1511,7 @@ examples:
     history:
       - 'user: have the two of them cross-check the design'
       - 'assistant: Round one relayed; both have replied.'
-    active: [daintree.orchestration.multi-agent]
-  - query: actually don't
-    history:
-      - 'user: open a PR for this branch'
-      - 'assistant: There are two uncommitted files — commit them first?'
-    active: [daintree.workflow.prep-branch-for-review]
+    run: 2026-10-16-synthetic-audit
   - hold off on that for now
   - query: leave it for now
     history:
@@ -1776,8 +1533,6 @@ examples:
       - 'assistant: Setting up the worktree now...'
     active: [daintree.workflow.start-work-on-issue]
   - query: what actually is a watcher
-    docs: true
-  - query: how do i change the keybinding for switching tabs
     docs: true
   - query: where do i set the default coding agent
     docs: true
@@ -1850,20 +1605,6 @@ examples:
   - just deal with it, i'm going for lunch
   - again
   - meh, never mind
-  - query: ok good
-    history:
-      - 'user: start #412'
-      - 'assistant: Worktree fix/412 created, agent in tab 3, background watcher attached.'
-      - 'user: [watcher w_88 fired: tab 3 exited 0, branch pushed]'
-      - 'assistant: #412 is done: CSV export fix committed and pushed to fix/412, suite green on the branch.'
-    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
-  - query: hmm ok
-    history:
-      - 'user: watch the deploy and wake me'
-      - 'assistant: Watching the deploy terminal.'
-      - 'user: [watcher fired: deploy finished, exit 0]'
-      - 'assistant: Deploy is out - the new revision is serving and the health probe is green.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: alright
     history:
       - 'user: put an agent on the docs rewrite'
@@ -1878,7 +1619,7 @@ examples:
   - query: That is enough, no more resource actions.
     history:
       - 'user: Resume the cloud devbox.'
-    active: [daintree.worktree.manage-resource]
+    run: 2026-10-16-synthetic-audit
   - query: Thanks, I will inspect the pixels myself.
     history:
       - 'user: Verify the preview visually.'
@@ -1907,12 +1648,12 @@ examples:
     history:
       - 'user: merge it'
       - 'assistant: Which merge method — merge, squash or rebase? I won''t take the provider default silently.'
-    active: [daintree.forge.land-pull-request]
+    run: 2026-10-16-synthetic-audit
   - query: cheers
     history:
       - 'user: request changes on it'
       - 'assistant: Changes requested with your reason in the body.'
-    active: [daintree.forge.land-pull-request]
+    run: 2026-10-16-synthetic-audit
   - query: nah forget it
     history:
       - 'user: close 291 without merging'
@@ -1923,11 +1664,6 @@ examples:
       - 'user: merge 640'
       - 'assistant: Merged and confirmed on re-read.'
     active: [daintree.forge.land-pull-request]
-  - query: perfect
-    history:
-      - 'user: file that crash as an issue'
-      - 'assistant: Created #830 with the stack trace; read back and the labels match.'
-    active: [daintree.forge.manage-issue, daintree.foundation]
   - query: yeah that title's fine
     history:
       - 'user: turn this into a ticket'
@@ -1937,7 +1673,7 @@ examples:
     history:
       - 'user: label 470 good first issue'
       - 'assistant: Added; the full label set now reads good-first-issue, docs.'
-    active: [daintree.forge.manage-issue]
+    run: 2026-10-16-synthetic-audit
   - query: hmm, let me think about the wording
     history:
       - 'user: rewrite the body of 155'
@@ -1947,7 +1683,7 @@ examples:
     history:
       - 'user: create the issue on the platform repo'
       - 'assistant: Created #55 there.'
-    active: [daintree.forge.manage-issue]
+    run: 2026-10-16-synthetic-audit
   - query: lovely stuff
     history:
       - 'user: assign 88 to mia'
@@ -1957,7 +1693,7 @@ examples:
     history:
       - 'user: reopen 289'
       - 'assistant: Reopened and confirmed.'
-    active: [daintree.forge.manage-issue]
+    run: 2026-10-16-synthetic-audit
   - query: ok give me two minutes
     history:
       - 'user: file it and assign it to me'
@@ -1972,7 +1708,7 @@ examples:
     history:
       - 'user: reconcile it'
       - 'assistant: Patch applied — two nodes advanced, one blocker cleared.'
-    active: [daintree.orchestration.execute-durable-workflow]
+    run: 2026-10-16-synthetic-audit
   - query: hang on, i want to rethink the scope before we go further
     history:
       - 'user: plan the rename'
@@ -1992,7 +1728,7 @@ examples:
     history:
       - 'user: what''s ready to run'
       - 'assistant: Two ready nodes, three waiting, no blockers.'
-    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: that's a lot more nodes than i expected but fine
     history:
       - 'user: plan the index rebuild'
@@ -2002,7 +1738,7 @@ examples:
     history:
       - 'user: reconcile after the wake'
       - 'assistant: Applied; the reindex node is done and the deploy node is ready.'
-    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: great, thanks for flagging that
     history:
       - 'user: is the graph tracking the rollback path'
@@ -2017,12 +1753,12 @@ examples:
     history:
       - 'user: what''s in the console'
       - 'assistant: One error and a deprecation warning about a legacy lifecycle method.'
-    active: [daintree.runtime.debug-web-app]
+    run: 2026-10-16-synthetic-audit
   - query: makes sense
     history:
       - 'user: can you just look at the page and tell me if it looks right'
       - 'assistant: I can''t — screenshots don''t reach me as images on this path, only console text. Visual QA still needs your eyes.'
-    active: [daintree.runtime.debug-web-app, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: wait, my kid needs something. one sec
     history:
       - 'user: check the preview console'
@@ -2077,32 +1813,27 @@ examples:
     history:
       - 'user: status on the devbox'
       - 'assistant: Configured and running, checked 30 seconds ago.'
-    active: [daintree.worktree.manage-resource]
+    run: 2026-10-16-synthetic-audit
   - query: right, understood
     history:
       - 'user: how do i connect to it'
       - 'assistant: Connect is a UI-only action here — use the worktree card''s connect control. I won''t invent an ssh command from the status metadata.'
-    active: [daintree.worktree.manage-resource, daintree.foundation]
+    run: 2026-10-16-synthetic-audit
   - query: thanks
     history:
       - 'user: move the four agents into their own worktrees'
       - 'assistant: Four worktrees created off develop, every terminal filed and told once to continue in its new directory.'
-    active: [daintree.worktree.relocate-agents]
-  - query: perfect, thank you
-    history:
-      - 'user: separate the running agents into worktrees'
-      - 'assistant: Three created, three redirected, nothing closed.'
-    active: [daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
   - query: ok
     history:
       - 'user: give each agent its own worktree'
       - 'assistant: Done — wt_a1, wt_a2, wt_a3 off develop, all agents instructed.'
-    active: [daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
   - query: got it
     history:
       - 'user: split the agents into separate trees'
       - 'assistant: Four worktrees created and each terminal filed under its own.'
-    active: [daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
   - query: nice, that's exactly what i wanted
     history:
       - 'user: isolate these agents'
@@ -2127,12 +1858,12 @@ examples:
     history:
       - 'user: one worktree per running agent'
       - 'assistant: Four created, all four filed and told.'
-    active: [daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
   - query: no worries
     history:
       - 'user: move the agents into worktrees'
       - 'assistant: Done for three of four; the fourth filing was refused, but it was still told where to work.'
-    active: [daintree.worktree.relocate-agents]
+    run: 2026-10-16-synthetic-audit
   - query: brb, grabbing coffee
     history:
       - 'user: separate the four agents into worktrees'
@@ -2188,10 +1919,6 @@ examples:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: what does ACID stand for
-    history:
-      - 'user: hello'
-      - 'assistant: Hello. Everything''s idle — what would you like to do?'
   - query: any good films out at the moment
     history:
       - 'user: good morning'
@@ -2200,10 +1927,6 @@ examples:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: how long is a fortnight
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: if something takes 45 min how long for 17 of them
     history:
       - 'user: How are you?'
@@ -2252,14 +1975,6 @@ examples:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: that was painless for once
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: how does dns resolution work step by step
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: what is a draft PR for
     history:
       - 'user: still awake?'
@@ -2324,26 +2039,10 @@ examples:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: i keep forgetting how much i like this setup
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: is rebasing public branches actually considered harmful or is that dogma
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: what is backpressure
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: what does git reset --soft actually do
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: hey
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: hmm let me word that better
     history:
       - 'user: still awake?'
@@ -2412,10 +2111,6 @@ examples:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: cool, thats me done for the day
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: what does fungible mean
     history:
       - 'user: hows your day going'
@@ -2460,18 +2155,11 @@ examples:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: thanks
-    history:
-      - 'user: how''s everyone doing? anything need me'
-      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-24-selector-hardening
   - query: nice one
     history:
       - 'user: codex says #311 is done, check it actually did it before i merge'
       - 'assistant: Read the diff on fix/311-token-refresh: refresh path changed in auth/session.ts and a new test added. Ran the test suite tail — 142 passed. Verdict: verified.'
-    active: [daintree.orchestration.verify-agent-work]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: which of those three ideas did you like best?
     history:
       - 'user: get claude, codex and gemini to each come up with one idea for speeding up cold start, then have them vote on the best'
@@ -2484,35 +2172,17 @@ examples:
       - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
     active: [daintree.orchestration.fan-out-work]
     run: 2026-09-24-selector-hardening
-  - query: huh, lower than i thought
-    history:
-      - 'user: how much claude code usage do i have left'
-      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-24-selector-hardening
   - query: never mind, leave it for now
     history:
       - 'user: my agent in t6 has been sitting there for ages'
       - 'assistant: Checked the spawn saga for t6: launch succeeded, codex started, last output 22 minutes ago and no process activity since. Looks hung rather than slow.'
     active: [daintree.agents.recover-agent]
     run: 2026-09-24-selector-hardening
-  - query: interesting take. do you agree with it?
-    history:
-      - 'user: ask claude what it makes of the retry logic in client.go'
-      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
-    active: [daintree.agents.ask-and-relay]
-    run: 2026-09-24-selector-hardening
   - query: cool
     history:
       - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
       - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
     active: [daintree.edits.spawn-visible-agent]
-    run: 2026-09-24-selector-hardening
-  - query: what did you mean by 'acknowledged'? did it reply?
-    history:
-      - 'user: gemini finished reviewing in t2, send its notes to codex in t1 and tell it the perf comments matter most'
-      - 'assistant: Read gemini''s review from t2 (7 points, 3 on perf). Sent codex in t1 a pointer to them with your weighting; it acknowledged and is working through the perf items.'
-    active: [daintree.agents.relay-review-feedback]
     run: 2026-09-24-selector-hardening
   - query: honestly i'm with grok on this one
     history:
@@ -2542,20 +2212,12 @@ examples:
     history:
       - 'user: have claude interview codex, gemini and grok on how they''d do the plugin sandbox, pick the best'
       - 'assistant: Claude (t1) is the judge. Relayed its first three questions and all answers; it''s verifying gemini''s claim about the existing ipc layer against src/ipc now.'
-    active: [daintree.orchestration.interview]
-    run: 2026-09-24-selector-hardening
-  - query: ok leave it there, i'll decide later
-    history:
-      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
-      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
-    active: [daintree.orchestration.multi-agent]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: sounds good 👍
     history:
       - 'user: plan out the postgres 14 -> 16 migration as a tracked workflow, it''s going to take days'
       - 'assistant: Created workflow with 6 nodes: dump schema, test restore on staging, fix extension incompatibilities, cut over, verify, decommission. Node 1 is done; node 2 is running in t3.'
-    active: [daintree.orchestration.execute-durable-workflow]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: ugh, forgot about that leak branch
     history:
       - 'user: where were we, what was i working on yesterday'
@@ -2566,43 +2228,23 @@ examples:
     history:
       - 'user: let me know when the build in t2 finishes, i''m heading out'
       - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
-    active: [daintree.orchestration.watch-outcome]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: never mind, leave it all as is
     history:
       - 'user: clean up everything from the competition earlier'
       - 'assistant: Inventory: 4 terminals (t1–t4), 3 worktrees, 1 watcher. Safe: t1–t3 and their worktrees (merged). Unknown: t4 has uncommitted changes. Confirm before I close anything?'
     active: [daintree.orchestration.workspace-cleanup]
     run: 2026-09-24-selector-hardening
-  - query: what does 'idle' mean there exactly, is that bad?
-    history:
-      - 'user: how''s everyone doing? anything need me'
-      - 'assistant: Swept 5 agents: claude (t1) finished on feat/csv-export, codex (t2) and gemini (t3) still working, cursor (t4) idle 18m, grok (t5) failed with exit 1 on npm test. Nothing is waiting on a question.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-24-selector-hardening
   - query: nice, thanks
     history:
       - 'user: codex on #412 #415 #419 #420, one worktree each, run /implement then /review'
       - 'assistant: Spawned 4 codex terminals (t2–t5) in worktrees issue-412…issue-420. All four are on /implement; each chain advances independently.'
-    active: [daintree.orchestration.fan-out-work]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: which answer would YOU have picked?
     history:
       - 'user: get claude, codex and gemini to each come up with one idea for speeding up cold start, then have them vote on the best'
       - 'assistant: Collected three submissions (lazy-load plugins, snapshot the module graph, defer telemetry init). Sent each agent the other two anonymised; waiting on votes in t1–t3.'
     active: [daintree.orchestration.competition]
-    run: 2026-09-24-selector-hardening
-  - query: weird that it resets on mondays
-    history:
-      - 'user: how much claude code usage do i have left'
-      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-24-selector-hardening
-  - query: hm ok
-    history:
-      - 'user: ask claude what it makes of the retry logic in client.go'
-      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
-    active: [daintree.agents.ask-and-relay]
     run: 2026-09-24-selector-hardening
   - query: thanks, i'll look through them later
     history:
@@ -2610,18 +2252,11 @@ examples:
       - 'assistant: 3 candidates: #418 settings typo, #420 flaky tz test, #431 badge contrast. None assigned or linked to a branch.'
     active: [daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
-  - query: huh, faster than i expected
-    history:
-      - 'user: is #300 green'
-      - 'assistant: PR #300 is green, 9/9 checks passed, approved by @ana.'
-    active: [daintree.workflow.follow-up-on-issue]
-    run: 2026-09-24-selector-hardening
   - query: nice one 🙌
     history:
       - 'user: merge #555'
       - 'assistant: Merged #555 via squash; forge reads MERGED.'
-    active: [daintree.forge.land-pull-request]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: what do you mean by double ack exactly?
     history:
       - 'user: review feat/queue-rework'
@@ -2644,20 +2279,12 @@ examples:
     history:
       - 'user: label #510 as bug and assign me'
       - 'assistant: #510 now has label `bug`, assigned to @gpriday — read back confirmed.'
-    active: [daintree.forge.manage-issue]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: hm, that's more convoluted than i'd like tbh
     history:
       - 'user: how does caching work in this repo'
       - 'assistant: Two layers: an LRU in cache/mem.go and a Redis tier in cache/remote.go, fronted by cache.Get with read-through (cache.go:40).'
-    active: [daintree.explore.repository]
-    run: 2026-09-24-selector-hardening
-  - query: why'd you put it in ../ rather than inside the repo?
-    history:
-      - 'user: make a worktree for feat/i18n'
-      - 'assistant: Created plain worktree feat/i18n at ../app-i18n off main.'
-    active: [daintree.worktree.create-plain-worktree]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: ok good, that should stop the clobbering
     history:
       - 'user: move the agents into their own worktrees'
@@ -2668,8 +2295,7 @@ examples:
     history:
       - 'user: my worktrees all share one db'
       - 'assistant: Wrote setup.sh (creates app_$BRANCH db, writes .env) and teardown.sh (drops it), registered in .daintree/worktree.json.'
-    active: [daintree.worktree.provision-local-environment]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: thank you
     history:
       - 'user: pause the devbox on feat/ml'
@@ -2692,8 +2318,7 @@ examples:
     history:
       - 'user: remember we use pnpm'
       - 'assistant: Saved to project memory: "Package manager is pnpm" (no existing entry to update).'
-    active: [daintree.memory.manage-project-memory]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: why did you skip the fixtures?
     history:
       - 'user: bundle the parser code'
@@ -2704,8 +2329,7 @@ examples:
     history:
       - 'user: give the tabs proper names'
       - 'assistant: Renamed t1 "api tests", t2 "migration", t3 "docs pass".'
-    active: [daintree.terminals.rename]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: ah vite strikes again
     history:
       - 'user: preview''s blank'
@@ -2717,18 +2341,6 @@ examples:
       - 'user: find closed PRs about rate limiting'
       - 'assistant: 3 closed PRs: #140 (initial limiter), #212 (token bucket), #288 (reverted — broke websockets).'
     active: [daintree.workflow.find-issue-work]
-    run: 2026-09-24-selector-hardening
-  - query: jo's being a bit picky there imo
-    history:
-      - 'user: what''s blocking #377'
-      - 'assistant: #377: review decision CHANGES_REQUESTED by @jo — wants the migration split out; CI green.'
-    active: [daintree.workflow.follow-up-on-issue]
-    run: 2026-09-24-selector-hardening
-  - query: makes sense, can you say more about why midnight specifically?
-    history:
-      - 'user: is the tz test flaky or broken?'
-      - 'assistant: Ran it 20x in t5: failed 6 times, always near midnight UTC — flaky, caused by time.Now() in the fixture.'
-    active: [daintree.ci.diagnose-and-fix]
     run: 2026-09-24-selector-hardening
   - query: i'll merge it myself tomorrow, don't touch it
     history:
@@ -2752,8 +2364,7 @@ examples:
     history:
       - 'user: have codex interview claude and gemini about the build system and pick one'
       - 'assistant: Codex narrowed it to claude after verifying its claim about the bazel cache against BUILD files. Winner: claude.'
-    active: [daintree.orchestration.interview]
-    run: 2026-09-24-selector-hardening
+    run: 2026-10-16-synthetic-audit
   - query: cheers, makes sense
     history:
       - 'user: review pr 812'
@@ -2800,11 +2411,6 @@ examples:
       - 'user: pause the devbox on ml-train'
       - 'assistant: Paused the remote resource for ml-train. Fresh status: paused, billing stopped.'
     run: 2026-09-24-selector-hardening
-  - query: that layout is great
-    history:
-      - 'user: run the fullstack recipe'
-      - 'assistant: Ran recipe ''fullstack'' in feat/orders: opened api, web and a claude terminal. Claude is up and idle.'
-    run: 2026-09-24-selector-hardening
   - query: ok got it
     history:
       - 'user: whats open right now'
@@ -2830,3 +2436,350 @@ examples:
       - 'user: why cant i see the terminal tools'
       - 'assistant: The Daintree MCP was connected but the tool list was stale; it refreshed and the terminal tools are offered again. Recent error log shows one timeout at 09:14.'
     run: 2026-09-24-selector-hardening
+  - query: explain cherry-pick vs revert
+    history:
+      - 'user: Split the backend tests between the tower and mini.'
+      - 'assistant: The suite manifest is pinned; each machine has a disjoint shard.'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats a kanban wip limit for
+    history:
+      - 'user: Check this release under Linux and macOS.'
+      - 'assistant: The two environments are running the same checks at one commit.'
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: concurrency vs parallelism explain
+    history:
+      - 'user: Bring up the API remotely and the client here.'
+      - 'assistant: The API is starting on the tower; its endpoint is pending.'
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: why do models hallucinate
+    history:
+      - 'user: Find why the mini assistant cannot receive my messages.'
+      - 'assistant: I am checking delivery evidence for the affected assistant.'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the tallest mountain in africa
+    history:
+      - 'user: Preview copying my settings to the tower.'
+      - 'assistant: The settings preview is available; nothing has been copied yet.'
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what makes a good code review
+    history:
+      - 'user: Prepare the tower for its system update.'
+      - 'assistant: The tower lane has been asked to reach a safe stopping point.'
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: how do ansi escape codes work
+    history:
+      - 'user: Agree on the service interface before remote implementation.'
+      - 'assistant: The host lanes are checking the proposed request schema.'
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what does a language server actually do
+    history:
+      - 'user: Prepare a demonstration on the mini.'
+      - 'assistant: The mini lane is collecting its local launch evidence.'
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: explain stdin stdout stderr
+    history:
+      - 'user: Move pending work away from the overloaded tower.'
+      - 'assistant: I have a placement proposal and am checking which lanes are free.'
+    confusable_with: [daintree.hosts.rebalance-load]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what does exit code 137 mean generally
+    history:
+      - 'user: Work through these nine tickets with two agents at a time.'
+      - 'assistant: The first two tickets are assigned; the remaining tickets are queued.'
+    confusable_with: [daintree.orchestration.work-in-waves]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: convert 2.5h to minutes
+    history:
+      - 'user: Pin the interface before splitting the implementation.'
+      - 'assistant: The shared schema is being checked before the two edit tasks begin.'
+    confusable_with: [daintree.orchestration.contract-first-split]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what is cors and why does it exist
+    history:
+      - 'user: Have one agent define the tests before another implements.'
+      - 'assistant: The test agent is preparing the acceptance cases.'
+    confusable_with: [daintree.orchestration.test-first-split]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: is a standing desk actually worth it
+    history:
+      - 'user: Investigate three possible causes separately.'
+      - 'assistant: The investigators each have one falsifiable hypothesis.'
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what does hermetic build mean
+    history:
+      - 'user: Migrate all callers of the old validation helper.'
+      - 'assistant: The caller inventory is ready and the first batch is under way.'
+    confusable_with: [daintree.orchestration.migration-sweep]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what is a file descriptor
+    history:
+      - 'user: Test the packaged application from this build.'
+      - 'assistant: The artifact is ready and the isolated smoke check is starting.'
+    confusable_with: [daintree.release.test-distributable]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what is prompt caching and why does it save money
+    history:
+      - 'user: Check whether this candidate is ready to ship.'
+      - 'assistant: The release evidence is being gathered; publication has not started.'
+    confusable_with: [daintree.release.assess-readiness]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the square root of 4096
+    history:
+      - 'user: Compare the implementation with this requirements document.'
+      - 'assistant: The requirements have been enumerated and are being mapped to code.'
+    confusable_with: [daintree.review.audit-spec-coverage]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: definately or definitely
+    history:
+      - 'user: Have the three implementers review each other.'
+      - 'assistant: The review assignments are ready and the first findings are pending.'
+    confusable_with: [daintree.review.cross-review-cohort]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the wisdom of crowds thing about
+    history:
+      - 'user: Restore the database for the branch worktree.'
+      - 'assistant: The branch database backup has been found; restoration is pending.'
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats a red black tree actually for
+    history:
+      - 'user: Set up a separate local environment for this branch.'
+      - 'assistant: The branch worktree exists and its local environment is being prepared.'
+    confusable_with: [daintree.worktree.provision-local-environment]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: memoization vs caching, whats the difference
+    history:
+      - 'user: Split the backend tests between the tower and mini.'
+      - 'assistant: The suite manifest is pinned; each machine has a disjoint shard.'
+    confusable_with: [daintree.hosts.shard-test-suite]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between a compiler and an interpreter
+    history:
+      - 'user: Check this release under Linux and macOS.'
+      - 'assistant: The two environments are running the same checks at one commit.'
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: branch naming conventions — is there a standard?
+    history:
+      - 'user: Bring up the API remotely and the client here.'
+      - 'assistant: The API is starting on the tower; its endpoint is pending.'
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats rubber duck debugging
+    history:
+      - 'user: Find why the mini assistant cannot receive my messages.'
+      - 'assistant: I am checking delivery evidence for the affected assistant.'
+    confusable_with: [daintree.hosts.diagnose-messaging]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: explain what a linter actually checks vs a formatter
+    history:
+      - 'user: Preview copying my settings to the tower.'
+      - 'assistant: The settings preview is available; nothing has been copied yet.'
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between a left join and an inner join
+    history:
+      - 'user: Prepare the tower for its system update.'
+      - 'assistant: The tower lane has been asked to reach a safe stopping point.'
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between a fork and a branch
+    history:
+      - 'user: Agree on the service interface before remote implementation.'
+      - 'assistant: The host lanes are checking the proposed request schema.'
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the score in the arsenal game
+    history:
+      - 'user: Prepare a demonstration on the mini.'
+      - 'assistant: The mini lane is collecting its local launch evidence.'
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: test pyramid vs testing trophy, whats the argument
+    history:
+      - 'user: Move pending work away from the overloaded tower.'
+      - 'assistant: I have a placement proposal and am checking which lanes are free.'
+    confusable_with: [daintree.hosts.rebalance-load]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: is code review actually effective at finding bugs, is there research
+    history:
+      - 'user: Work through these nine tickets with two agents at a time.'
+      - 'assistant: The first two tickets are assigned; the remaining tickets are queued.'
+    confusable_with: [daintree.orchestration.work-in-waves]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: whats the difference between rebase and merge
+    history:
+      - 'user: Pin the interface before splitting the implementation.'
+      - 'assistant: The shared schema is being checked before the two edit tasks begin.'
+    confusable_with: [daintree.orchestration.contract-first-split]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: explain unix pipes to me like im new
+    history:
+      - 'user: Have one agent define the tests before another implements.'
+      - 'assistant: The test agent is preparing the acceptance cases.'
+    confusable_with: [daintree.orchestration.test-first-split]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: explain dependency injection like im five
+    history:
+      - 'user: Investigate three possible causes separately.'
+      - 'assistant: The investigators each have one falsifiable hypothesis.'
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: why do people hate mocks so much
+    history:
+      - 'user: Write a plan for the import change before editing.'
+      - 'assistant: The plan is being drafted; implementation has not started.'
+    confusable_with: [daintree.orchestration.plan-then-implement]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what does zero copy mean
+    history:
+      - 'user: Migrate all callers of the old validation helper.'
+      - 'assistant: The caller inventory is ready and the first batch is under way.'
+    confusable_with: [daintree.orchestration.migration-sweep]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what is a system prompt vs a user prompt
+    history:
+      - 'user: Have Claude fix the report and Codex review each round.'
+      - 'assistant: The first bounded review round is in progress.'
+    confusable_with: [daintree.orchestration.review-until-approved]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: explain what a race condition is
+    history:
+      - 'user: Test the packaged application from this build.'
+      - 'assistant: The artifact is ready and the isolated smoke check is starting.'
+    confusable_with: [daintree.release.test-distributable]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: how do worktrees work under the hood in git
+    history:
+      - 'user: Check whether this candidate is ready to ship.'
+      - 'assistant: The release evidence is being gathered; publication has not started.'
+    confusable_with: [daintree.release.assess-readiness]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: who won the cricket last night
+    history:
+      - 'user: Compare the implementation with this requirements document.'
+      - 'assistant: The requirements have been enumerated and are being mapped to code.'
+    confusable_with: [daintree.review.audit-spec-coverage]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: when is quicksort worse than mergesort
+    history:
+      - 'user: Have the three implementers review each other.'
+      - 'assistant: The review assignments are ready and the first findings are pending.'
+    confusable_with: [daintree.review.cross-review-cohort]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: what is a heartbeat in a distributed system
+    history:
+      - 'user: Restore the database for the branch worktree.'
+      - 'assistant: The branch database backup has been found; restoration is pending.'
+    confusable_with: [daintree.runtime.migrate-worktree-database]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: how does tool calling work in llms generally
+    history:
+      - 'user: Set up a separate local environment for this branch.'
+      - 'assistant: The branch worktree exists and its local environment is being prepared.'
+    confusable_with: [daintree.worktree.provision-local-environment]
+    empty_kind: off_domain
+    run: 2026-10-16-synthetic-audit
+  - query: nice, thanks
+    history:
+      - 'user: poll the configured agents on which of these three names is best'
+      - 'assistant: Options labelled A/B/C in a different order for each agent, so the tally maps back cleanly. Awaiting all five.'
+    confusable_with: [daintree.agents.poll-pinned-agents]
+    empty_kind: no_task
+    run: 2026-10-16-synthetic-audit
+  - query: ok good
+    history:
+      - 'user: send codex''s review to the claude thats working in the worktree'
+      - 'assistant: Sent the gist plus the five findings to the Claude terminal in the feature worktree.'
+    active: [daintree.agents.relay-review-feedback]
+    confusable_with: [daintree.agents.relay-review-feedback]
+    empty_kind: no_task
+    run: 2026-10-16-synthetic-audit
+  - query: yep that's what I figured
+    history:
+      - 'user: the build broke right after the merge'
+      - 'assistant: Confirmed. The docker build fails at the pip install step — requirements.lock disagrees with pyproject. Spawning an edit agent to regenerate it and rerun the build.'
+    active: [daintree.ci.diagnose-and-fix]
+    confusable_with: [daintree.ci.diagnose-and-fix]
+    empty_kind: no_task
+    run: 2026-10-16-synthetic-audit
+  - query: yeah that's fine, carry on
+    history:
+      - 'user: throw an agent at cleaning up the error messages in the cli parser'
+      - 'assistant: Agent spawned on terminal t-4 with a watcher; acceptance criteria are that every parser error names the offending flag and the suite stays green.'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    empty_kind: no_task
+    run: 2026-10-16-synthetic-audit
+  - query: cool, leave it
+    history:
+      - 'user: start 55 and dont wait around for it'
+      - 'assistant: #55 is running in t_7bd with watcher w_12. Supervision is durable — it keeps going even if you close the assistant, and the outcome will greet you next launch.'
+    active: [daintree.workflow.start-work-on-issue]
+    confusable_with: [daintree.workflow.start-work-on-issue]
+    empty_kind: no_task
+    run: 2026-10-16-synthetic-audit
+  - query: great, that's all I needed, cheers.
+    history:
+      - 'user: Check lint and unit tests in wt-ledger.'
+      - 'assistant: At HEAD f98c210, lint and all 63 unit tests pass. Nothing changed.'
+    active: [daintree.ci.run-local-checks]
+    confusable_with: [daintree.ci.run-local-checks]
+    run: 2026-10-16-synthetic-audit
+  - query: okay, understood. thank you.
+    history:
+      - 'user: Give the unfinished import work to Gemini.'
+      - 'assistant: Gemini is continuing in the same checkout from the verified handoff. The predecessor is stopped.'
+    active: [daintree.agents.hand-off-task]
+    confusable_with: [daintree.agents.hand-off-task]
+    run: 2026-10-16-synthetic-audit

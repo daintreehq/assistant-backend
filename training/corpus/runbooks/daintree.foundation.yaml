@@ -19,8 +19,6 @@ positives:
   - read the last 20 lines of the third one
   - focus that terminal
   - close terminal 2
-  - cancel that watcher
-  - kill the async wait on the second one
   - quick sanity check — is daintree connected? nothing's wrong, i just want to confirm before i lean on it
   - give me a straight snapshot of what exists right now — terminals, worktrees, branches, anything running. no actions, just the picture
   - what branch am i on and is anything uncommitted
@@ -28,7 +26,6 @@ positives:
   - wat agents exist right now
   - show me the tail of the claude tab
   - pull up the output from the review terminal, just the last handful of lines, i don't need the whole thing
-  - cancel watcher wtc_9f2a1
   - async.list
   - how many terminals do i have open
   - close the one i named earlier
@@ -38,7 +35,6 @@ positives:
   - worktree list
   - show me the last bit of output in the tab called api-refactor
   - close term_8f2a, im done with it
-  - cancel the watcher on the nightly build tab
   - quick sanity check — is daintree actually connected?
   - what watchers and timers do i still have going
   - which worktree am i in
@@ -47,7 +43,6 @@ positives:
   - ok so before i start anything else i want to know exactly whats alive — terminals, worktrees, any watchers left over from this morning. just tell me, dont touch anything
   - wat terminls r ther
   - is terminal 12 still a thing? i thought i had one there
-  - kill that async wait i left on the migration terminal
   - how many agents do i have running, just the count
   - whats the branch situation across my worktrees
   - could you give me a quick rundown of what's currently open? no changes, just looking
@@ -61,18 +56,22 @@ positives:
   - does t_a91 still exist from yesterday or is that gone
   - what is each of these tabs called at the moment
   - 'give me the full picture: terminals, worktrees, watchers, queue'
+  - query: what watchers do i have running right now?
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: list every timer and grant thats still live pls
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: whats still watching
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 boundaries:
   - query: Show the timers that are currently pending
-    confusable_with: [daintree.orchestration.watch-outcome]
-    run: 2026-09-09-mission-2-timers
-  - query: Cancel the timer called index checkpoint
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
   - query: What time is the release reminder due
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
-  - query: which worktrees do we have open
-    confusable_with: [daintree.worktree.relocate-agents]
   - query: switch me over to the billing worktree
     confusable_with: [daintree.worktree.relocate-agents]
   - query: Show me which current terminal is filed under each worktree and which branch each tree uses; do not change anything.
@@ -82,8 +81,6 @@ boundaries:
   - query: list the worktrees and their branches
     confusable_with: [daintree.worktree.relocate-agents]
   - query: close terminal 5, that's the only one i want gone
-    confusable_with: [daintree.worktree.relocate-agents]
-  - query: cancel that watcher i set earlier
     confusable_with: [daintree.worktree.relocate-agents]
   - query: focus the terminal running the api tests
     confusable_with: [daintree.worktree.relocate-agents]
@@ -100,8 +97,6 @@ boundaries:
   - query: what's running right now
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: list the worktrees
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
-  - query: cancel that async wait on tab 4
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: close the browser panel i left open earlier
     confusable_with: [daintree.runtime.debug-web-app]
@@ -137,12 +132,6 @@ boundaries:
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: anything in the attention queue?
     confusable_with: [daintree.orchestration.status-and-resume]
-  - query: cancel watcher wch_4f21b
-    confusable_with: [daintree.orchestration.watch-outcome]
-  - query: kill the watcher on the deploy tab
-    confusable_with: [daintree.orchestration.watch-outcome]
-  - query: drop the async wait on terminal 2, i'll just look myself
-    confusable_with: [daintree.orchestration.watch-outcome]
   - query: list the terminals
     confusable_with: [daintree.orchestration.supervise-fleet]
   - query: what worktrees have i got open
@@ -165,12 +154,8 @@ boundaries:
     confusable_with: [daintree.terminals.rename]
   - query: switch to the tab named reviewer
     confusable_with: [daintree.terminals.rename]
-  - query: which worktrees do I have open right now?
-    confusable_with: [daintree.worktree.create-plain-worktree]
   - query: whats the current worktree
     confusable_with: [daintree.context.curate-copytree-bundle]
-  - query: cancel the watcher on tab 4
-    confusable_with: [daintree.diagnostics]
   - query: list my worktrees and which branch each is on
     confusable_with: [daintree.diagnostics]
   - query: remember terminal 3 is the migration one so you dont mix them up
@@ -180,8 +165,6 @@ boundaries:
   - query: hang onto that terminal id, ill need it in the next step
     confusable_with: [daintree.memory.manage-project-memory]
   - query: which terminals are open right now
-    confusable_with: [daintree.agents.recover-agent]
-  - query: cancel the watcher on term_4c, i dont need it any more
     confusable_with: [daintree.agents.recover-agent]
   - query: which terminals are open right now and what state is each one in?
     confusable_with: [daintree.agents.answer-waiting-agent]
@@ -197,24 +180,14 @@ boundaries:
     confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: cancel wat_4a1
     confusable_with: [daintree.orchestration.workspace-cleanup]
-  - query: kill the async wait on the deploy terminal, it'll never fire
-    confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: what terminals do i have open?
     confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: how many terminals have i got open
     confusable_with: [daintree.orchestration.supervise-fleet]
   - query: close the second tab, im done with it
     confusable_with: [daintree.orchestration.supervise-fleet]
-  - query: cancel the watcher on the docs agent
-    confusable_with: [daintree.orchestration.supervise-fleet]
   - query: what branch am i on and is the tree dirty?
     confusable_with: [daintree.review.review-change]
-  - query: cancel watcher wch_8f12
-    confusable_with: [daintree.orchestration.watch-outcome]
-  - query: just kill the watcher on the build tab, leave the rest alone
-    confusable_with: [daintree.orchestration.watch-outcome]
-  - query: cancel that async wait on terminal 3, only that one
-    confusable_with: [daintree.orchestration.watch-outcome]
   - query: list the terminals with their names
     confusable_with: [daintree.terminals.rename]
   - query: what are the tabs called right now
@@ -223,29 +196,15 @@ boundaries:
     confusable_with: [daintree.terminals.rename]
   - query: focus the one titled docs pass
     confusable_with: [daintree.terminals.rename]
-  - query: what worktrees do i have open right now?
-    confusable_with: [daintree.worktree.create-plain-worktree]
   - query: which branch is my current worktree on?
     confusable_with: [daintree.worktree.create-plain-worktree]
-  - query: in general how should i split worktrees vs terminals for daintree work, no action just your take
-    confusable_with: [daintree.worktree.create-plain-worktree]
-    run: 2026-09-24-selector-hardening
   - query: close t9
-    confusable_with: [daintree.orchestration.workspace-cleanup]
-    run: 2026-09-24-selector-hardening
-  - query: cancel the pr watcher on 455, leave the terminals alone
     confusable_with: [daintree.orchestration.workspace-cleanup]
     run: 2026-09-24-selector-hardening
   - query: close the terminal called scratch
     confusable_with: [daintree.orchestration.workspace-cleanup]
     run: 2026-09-24-selector-hardening
-  - query: cancel that one watcher on t7
-    confusable_with: [daintree.orchestration.workspace-cleanup]
-    run: 2026-09-24-selector-hardening
   - query: kill the logs tab
-    confusable_with: [daintree.orchestration.workspace-cleanup]
-    run: 2026-09-24-selector-hardening
-  - query: stop that async wait you set up earlier
     confusable_with: [daintree.orchestration.workspace-cleanup]
     run: 2026-09-24-selector-hardening
   - query: morning. just close t4 for me, done with it
@@ -302,6 +261,12 @@ boundaries:
   - query: What are the tabs currently titled? Just read them, don't change anything
     confusable_with: [daintree.terminals.rename]
     run: 2026-09-28-agent-queries
+  - query: what watchers and timers have you got armed?
+    confusable_with: [daintree.orchestration.status-and-resume, daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: what watchers and timers are still armed?
+    confusable_with: [daintree.orchestration.watch-outcome, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: read the last 20 lines of the third one
     history:
@@ -328,11 +293,6 @@ followups:
       - 'user: is daintree connected? nothing''s wrong, just checking'
       - 'assistant: Yes — MCP link is up, three servers attached, tools resolving normally.'
     active: [daintree.foundation]
-  - query: hows that going
-    history:
-      - 'user: show me the async waits'
-      - 'assistant: One async wait: async_5c11 over term_a91c, opened 4 minutes ago.'
-    active: [daintree.foundation]
   - query: thanks — same for the other two
     history:
       - 'user: read the tail of the backend tab'
@@ -345,6 +305,12 @@ followups:
       - 'user: focus term_44de'
       - 'assistant: Focused it — that''s the UI only, nothing sent.'
     active: [daintree.foundation]
+  - query: cool. remind me what ids you left running
+    history:
+      - 'user: Tell me when the deploy-check agent stops.'
+      - 'assistant: Stop notice armed on terminal t-53 with note: read deploy-check result and report. No other observation is arranged.'
+    active: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: what terminals have i got open right now
     history:
@@ -391,10 +357,6 @@ topic_shifts:
       - 'user: run the review recipe on this worktree'
       - 'assistant: Recipe applied - two review agents up and working.'
     active: [daintree.recipe.run-or-create]
-  - query: what happens to watchers when i close a terminal? close term 3 for me
-    history:
-      - 'user: three terminals open'
-      - 'assistant: t_11a, t_44d, t_7b0.'
   - query: explain how the queue badge is counted, and show me what terminals are open
     history:
       - 'user: hi again'
@@ -412,10 +374,6 @@ topic_shifts:
       - 'assistant: Retitled all four.'
       - 'user: much better'
       - 'assistant: Glad that helps — shout if any of them drift again.'
-  - query: makes sense. which worktrees do i have right now
-    history:
-      - 'user: quick one — whats the difference between a worktree and a plain branch in daintree'
-      - 'assistant: A branch is just git; a worktree is a checkout of that branch in its own directory, so agents and terminals can work several branches at once without stashing.'
   - read me whats in the terminal titled scratch
   - query: close it
     history:
@@ -442,13 +400,6 @@ topic_shifts:
       - 'user: now get them to vote the weakest one out'
       - 'assistant: Blind vote — ''panic+recover'' is out, 2–1.'
     active: [daintree.orchestration.debate-elimination, daintree.foundation]
-  - query: cancel the watcher you set, i'm here anyway
-    history:
-      - 'user: 2-2? do a runoff between those two'
-      - 'assistant: Runoff between tab 1 and tab 4, same four voting.'
-      - 'user: still tied 😑'
-      - 'assistant: Third round out with a tighter brief so the ballots separate.'
-    active: [daintree.orchestration.runoff-tiebreaker, daintree.foundation]
   - morning. whats actually running right now
   - query: cool. close tab 2, im done with it
     history:
@@ -534,20 +485,6 @@ topic_shifts:
       - 'user: the agent wants a breakpoint. tell it 768'
       - 'assistant: Answered - 768px. It is continuing.'
     active: [daintree.agents.answer-waiting-agent, daintree.foundation]
-  - query: cancel the watcher on tab 2, im just gonna sit here and watch it
-    history:
-      - 'user: how long do these usually take lol'
-      - 'assistant: About twenty minutes.'
-      - 'user: its stuck on a DST question. tell it IANA rules, no hardcoded offsets'
-      - 'assistant: Answered. It is continuing.'
-    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
-  - query: oh and cancel that watcher i left on studio-1 yesterday
-    history:
-      - 'user: tell them its blocking not optional'
-      - 'assistant: Sent — both are reworking.'
-      - 'user: im heading out — ping me when all four are green'
-      - 'assistant: Watchers armed on all four terminals; I''ll wake you when the last one goes green.'
-    active: [daintree.foundation, daintree.orchestration.watch-outcome]
   - query: fine. how far has the implementer got
     history:
       - 'user: close the other four terminals'
@@ -583,13 +520,6 @@ topic_shifts:
       - 'user: ok. start work on issue 512 with the winning approach'
       - 'assistant: Started 512 — worktree and branch created, agent launched with the incremental plan as its brief, supervisor attached.'
     active: [daintree.foundation, daintree.workflow.start-work-on-issue]
-  - query: cancel that async wait i left on the judge terminal
-    history:
-      - 'user: ok. start work on issue 512 with the winning approach'
-      - 'assistant: Started 512, agent launched with a supervisor.'
-      - 'user: did it get a worktree'
-      - 'assistant: Yes — worktree at ../wt-512 on branch issue-512-migration, agent running inside it.'
-    active: [daintree.foundation]
   - what terminals have i got
   - what model is the agent in tab 3 running?
   - query: can you see what that agent just printed?
@@ -617,7 +547,6 @@ topic_shifts:
   - names alone aren't enough — print the roster with the ids
   - what's the id for the tab titled nightly
   - is trm_77 still a thing or did it go away when i restarted the app
-  - yo what's running
   - sup, anything alive in here
   - whats the state of play tab wise
   - i've been in another window all morning — just tell me what's open, nothing else
@@ -640,10 +569,6 @@ topic_shifts:
   - read me out whatever's sitting at the bottom of that window
   - close the one i opened by accident — the empty shell in the api worktree
   - shut tab 6, it's finished and i've read it
-  - drop the watcher on the nightly build, i'll just look in the morning myself
-  - cancel the async wait on the migration agent, i'm going to babysit that one myself
-  - stop the standup reminder timer
-  - kill the twenty minute timer, plans changed
   - mark q_31 as dealt with, i've read it
   - clear that queue item, i already told the team about it
   - resolve the one about the failed push — handled
@@ -668,46 +593,21 @@ topic_shifts:
       - 'user: put an agent on each of those four issues'
       - 'assistant: Four worktrees created, an agent live in each, background watchers attached.'
     active: [daintree.orchestration.fan-out-work]
-  - query: focus the one that's asking, i'll read the prompt myself
-    history:
-      - 'user: how''s everyone doing'
-      - 'assistant: Three working, one waiting on a question, one finished clean.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: which terminal was entrant B in again
     history:
       - 'user: run the fact competition across the pinned four'
       - 'assistant: Submissions collected, blind ballot relayed, gemini won 3-1.'
     active: [daintree.orchestration.competition]
-  - query: just close t-9, i don't want it running while i'm out
-    history:
-      - 'user: where were we'
-      - 'assistant: wf_8790 live and supervised. t-9 is running unsupervised on the parser worktree. Two rows closed as cancelled.'
-    active: [daintree.orchestration.status-and-resume]
-  - query: actually cancel that watch, i'm staying at my desk after all
-    history:
-      - 'user: ping me when the deploy finishes'
-      - 'assistant: Watcher w-31 armed on terminal t-4, goal: deploy completes or fails.'
-    active: [daintree.orchestration.watch-outcome]
   - query: what branch did that land on in the end
     history:
       - 'user: ci is red, get it green'
       - 'assistant: Missing fixture import. Fixed by the edit agent, suite green, verified independently.'
     active: [daintree.ci.diagnose-and-fix]
-  - query: and what's the worktree path for that one
-    history:
-      - 'user: start on 312'
-      - 'assistant: workflow.startWorkOnIssue ran — worktree issue-312, agent live in t-7, supervisor attached.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: ok, confirm the link's back up now
     history:
       - 'user: nothing''s responding'
       - 'assistant: The MCP link had dropped. Reconnected from the status panel — tools are being offered again.'
     active: [daintree.diagnostics]
-  - query: put the reviewer's tab up so i can skim it before you send anything
-    history:
-      - 'user: review the branch'
-      - 'assistant: Two reviewers ran read-only. Six findings, deduped, one high severity in the token refresh path.'
-    active: [daintree.review.review-change]
   - query: which terminals are still open from all that
     history:
       - 'user: get this ready for review'
@@ -733,27 +633,15 @@ topic_shifts:
       - 'user: have them debate the caching approach then vote one off'
       - 'assistant: Three rounds relayed, codex eliminated 3-1.'
     active: [daintree.orchestration.debate-elimination]
-  - query: what's in the queue after all that
-    history:
-      - 'user: sweep the fleet'
-      - 'assistant: Two finished and reported, one answered, one still working with a watcher on it.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: just tell me which of them are still open, i'm not asking you to do anything
     history:
       - 'user: close the merged worktrees'
       - 'assistant: Inventoried nine, classified six safe. I need an explicit go-ahead before deleting.'
     active: [daintree.orchestration.workspace-cleanup]
-  - stop watching the build, i'll just check it myself
-  - query: right, i've seen enough of the roster. terminal 6 is the one i care about — show me it.
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: Six agents running: 1,2,4 working, 3 waiting on a question, 5 finished, 6 idle.'
-    active: [daintree.orchestration.supervise-fleet]
   - tidy up — well, actually just close tab 4. that's the only one i'm done with.
   - what terminals and worktrees do i have open right now? not the watchers, just those.
   - use your cleanup runbook or whatever — actually no, hang on. what terminals are even open?
   - nothing is broken, i just want to know whether daintree is connected
-  - cancel the PR watcher on 132. just that one, leave the others.
   - we're not tearing anything down. i just want to know how many worktrees exist.
   - query: cancel the one on tab 2
     history:
@@ -792,13 +680,6 @@ topic_shifts:
       - 'user: [background wake: 4 of 4 finished]'
       - 'assistant: All four landed and pushed.'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: cancel the watcher on 88 too, that one's dead
-    history:
-      - 'user: wake me when PR 77 merges'
-      - 'assistant: PR watch armed on 77.'
-      - 'user: [PR watch fired: PR 77 merged]'
-      - 'assistant: PR 77 is merged into main. The watch has retired itself.'
-    active: [daintree.orchestration.watch-outcome, daintree.foundation]
   - query: was that everything you had watching?
     history:
       - 'user: watch all three of those and wake me when they''re done'
@@ -806,21 +687,6 @@ topic_shifts:
       - 'user: [background wake: all three watchers fired, all three exited 0]'
       - 'assistant: All three finished cleanly and I''ve reported each one above.'
     active: [daintree.orchestration.watch-outcome, daintree.foundation]
-  - query: read me the tail of whichever one just pinged
-    history:
-      - 'user: sweep the fleet'
-      - 'assistant: Six agents, all healthy. Watchers armed on the two closest to done.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
-  - query: focus the terminal that just fired
-    history:
-      - 'user: anything need me?'
-      - 'assistant: Nothing right now. I left watchers on all four so you''ll be told the moment that changes.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
-  - query: was that a timer or a watcher that just went off?
-    history:
-      - 'user: sweep the agents'
-      - 'assistant: Five running, nothing stuck. Watchers armed, and there''s a timer on the nightly too.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
   - query: Forget the migration; just list the open terminals.
     history:
       - 'user: Track this migration durably.'
@@ -833,10 +699,6 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: queue digest
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: ok so before i start anything else i want to know exactly whats alive — terminals, worktrees, any watchers left over from this morning. just tell me, dont touch anything
     history:
       - 'user: hey, you around?'
@@ -873,10 +735,6 @@ topic_shifts:
     history:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
-  - query: cancel watcher wtc_9f2a1
-    history:
-      - 'user: still awake?'
-      - 'assistant: Still here. What do you need?'
   - query: wat terminls r ther
     history:
       - 'user: sup'
@@ -903,6 +761,27 @@ topic_shifts:
       - 'assistant: Renamed t2 ''scratch'', t3 ''api-refactor'', t4 ''e2e''.'
     active: [daintree.terminals.rename]
     run: 2026-09-24-selector-hardening
+  - query: what happens to watchers when i close a terminal? close term 3 for me
+    history:
+      - 'user: three terminals open'
+      - 'assistant: t_11a, t_44d, t_7b0.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: list every timer and grant thats still live pls
+    history:
+      - 'user: thanks for yesterday'
+      - 'assistant: Any time. What''s on today?'
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: what watchers have i got running
+    history:
+      - 'user: nobody. right, go'
+      - 'assistant: Started #77, agent launched on feat/77-queue.'
+      - 'user: let me know when the pr opens'
+      - 'assistant: PR watch armed on #77''s branch — I''ll wake you when a PR appears.'
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[background wake: t_0004 idle]'
     history:
@@ -919,26 +798,23 @@ near_misses:
   - just list whats open, dont touch anything
   - any timers still armed?
 docs:
-  - cancel the watcher
-  - kill watcher 3
-  - kill the timer i set earlier
   - whats running right now
-  - query: kill watcher 3
-    history:
-      - 'user: How are you?'
-      - 'assistant: Good — thanks. Everything''s quiet here: worktree develop is stable, and one terminal is open. How can I help?'
-  - query: cancel the watcher
-    history:
-      - 'user: thanks for yesterday'
-      - 'assistant: Any time. What''s on today?'
   - query: whats running right now
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: kill the timer i set earlier
+  - query: check the timer i set is still armed
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: check the timer i set is still armed
     history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
+      - 'user: hey'
+      - 'assistant: Hey! What are we working on?'
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
+  - query: list my active watchers
+    confusable_with: [daintree.orchestration.watch-outcome]
+    run: 2026-10-16-synthetic-audit
 foundation:
   - put the deploy terminal up on screen
   - focus tab 3
@@ -994,22 +870,8 @@ foundation:
   - drop the migration terminal
   - close the one thats just sitting there idle
   - shut that window
-  - stop watching it
-  - drop the async wait on t_991
-  - kill that timer
-  - cancel the watcher on the deploy terminal
-  - i dont need that reminder anymore, cancel it
   - turn off the watch on tab 3
-  - stop the async wait please
   - remove the timer i set earlier
-  - cancel watcher w_223
-  - unwatch the build terminal
-  - cancel the pending await on that agent
-  - kill the watcher you left on the api one
-  - stop that supervisor, i'll check it myself
-  - scrap the 30 min timer
-  - cancel the async handle a_77
-  - dont wake me for that one anymore, drop the watch
   - clear that attention item, i dealt with it
   - mark that one resolved
   - that inbox thing is done, get rid of it
@@ -1028,7 +890,6 @@ foundation:
   - that one's sorted, mark it done in the queue
   - which worktrees have i got
   - list the agents
-  - what's running
   - any watchers active
   - what branch am i on
   - how many tabs do i have open
@@ -1062,11 +923,8 @@ foundation:
   - show me the claude terminal
   - read the last 50 lines of trm_9f2a
   - whats the second one printing right now
-  - kill the async wait on trm_c4
-  - cancel that timer
   - read the tail of the codex agent
   - focus the pr terminal
-  - cancel the watcher i set on the nightly run
   - focus the second agents tab
   - list my watchers
   - which watchers are still live
@@ -1081,7 +939,6 @@ foundation:
   - close trm_a1b2
   - close the idle one
   - close that terminal
-  - cancel the watcher on trm_e3
   - read the last of it then close that tab
   - close the terminal i opened for the docs build
   - check the mcp link
@@ -1118,12 +975,10 @@ foundation:
   - read 30 lines from the top agent
   - snapshot the current state
   - what did that terminal print last
-  - cancel async_88
   - focus the last terminal you opened
   - close the terminal i asked you to open earlier
   - which branch am i sitting on right now
   - any uncommitted changes in here?
-  - what worktrees do i have open and what branch is each on
   - am i on develop or did i end up on some feature branch
   - how far ahead of main is this branch
   - is the working tree clean or have i got junk lying around
@@ -1151,14 +1006,11 @@ foundation:
   - that attention item is dealt with, take it off the queue
   - clear the queue item for the review agent, i handled it myself
   - close terminal 6, i'm finished with it
-  - kill that async wait, i don't need the result any more
   - resolve queue item q-88
   - what's sitting in the attention queue
   - any timers still set?
-  - drop the watcher with id w-3
   - shut the tab called scratch
   - what async waits are still live
-  - snapshot the current state and summarize what's running
   - take a context snapshot and give me the highlights
   - list everything — terminals, worktrees, watchers
   - what agents exist right now and what are they called
@@ -1169,9 +1021,7 @@ foundation:
   - quick inventory of what's live
   - how many agents are up, and are any of them idle
   - how long until that timer fires
-  - cancel the watcher on terminal 4
   - what supervisors are still armed
-  - stop watching that pr, i don't care any more
   - what are my terminals called at the moment
   - list the tab titles in order
   - is daintree connected? nothing's wrong, i just want to check before i start
@@ -1221,12 +1071,9 @@ foundation:
   - which of these panels is the dev preview and which are just shells
   - put the storefront tab in front
   - is the preview panel still open or did i close it earlier
-  - cancel the watcher on t_9021
   - what timers have i got set
   - list the live watchers
-  - drop that async wait on the judge terminal
   - anything sitting in the queue right now?
-  - cancel the six o'clock reminder
   - how many watchers are armed
   - Quick one — is the MCP link up? Nothing's wrong, I just want to know before I start.
   - just list the agents that exist, i don't need status on them
@@ -1240,7 +1087,6 @@ foundation:
   - focus tab 2
   - 'which terminal is the agent for #144 running in'
   - what worktrees exist for the assistant repo
-  - cancel the async wait i left on t_7712, nothing else
   - do i have a watcher on the release branch worktree?
   - what's the id of the dev preview panel
   - any timers left over from yesterday? just list them

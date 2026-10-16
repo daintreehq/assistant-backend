@@ -354,9 +354,6 @@ examples:
   - query: find the closed PRs about the websocket reconnect, and explain where reconnect lives in the code now
     expect: [daintree.explore.repository, daintree.workflow.find-issue-work]
     run: 2026-09-24-selector-hardening
-  - query: make a worktree for fix/tz-bug then spawn cursor in it to fix the timezone rounding
-    expect: [daintree.edits.spawn-visible-agent, daintree.worktree.create-plain-worktree]
-    run: 2026-09-24-selector-hardening
   - query: 'debate between the 4 pinned agents: graphql or rest for v2, vote off the weakest. after that clean up all their terminals'
     expect: [daintree.orchestration.debate-elimination, daintree.orchestration.workspace-cleanup]
     run: 2026-09-24-selector-hardening
@@ -1399,3 +1396,62 @@ examples:
   - query: Fix the out-of-date setup guide, and add a rule to AGENTS.md that agents must update docs/config.md whenever they add a config key.
     expect: [daintree.edits.sync-project-docs, daintree.memory.manage-project-memory]
     run: 2026-09-28-round6
+  - query: Produce a read-only connection and load snapshot of every Remote Host. Separately preview copying only this laptop theme to the already-connected graphics server.
+    active: [daintree.hosts.delegate-to-host]
+    expect: [daintree.hosts.survey-hosts, daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: Read the remaining Claude allowance on each Remote Host. Independently inventory the workspaces left by finished run image-62, with no removal.
+    active: [daintree.hosts.recover-and-clean-up, daintree.hosts.survey-hosts]
+    expect: [daintree.hosts.check-usage-limits, daintree.hosts.audit-host-workspaces]
+    run: 2026-10-16-synthetic-audit
+  - query: As hub, give the connected Linux server the new docs-index fix on its own branch. Separately help add the newly bought Mac as a Daintree Remote Host.
+    active: [daintree.hosts.survey-hosts]
+    expect: [daintree.hosts.delegate-to-host, daintree.hosts.connect-host]
+    run: 2026-10-16-synthetic-audit
+  - query: Prepare a running demo of last week completed invoice feature on the media host. Separately park the unrelated live localization swarm until Tuesday with a resume record.
+    active: [daintree.hosts.supervise-swarm, daintree.hosts.delegate-to-host]
+    expect: [daintree.hosts.prepare-remote-demo, daintree.hosts.park-swarm]
+    run: 2026-10-16-synthetic-audit
+  - query: On this receiving host lane, run only the hub requested checks of its pinned cache commit. Separately remove the panes this lane created for the unrelated finished glossary run.
+    active: [daintree.hosts.handle-hub-message]
+    expect: [daintree.hosts.verify-for-hub, daintree.hosts.clean-up-for-hub]
+    run: 2026-10-16-synthetic-audit
+  - query: On this lane, review the hub pinned webhook commit with findings only. Independently serve the already-built catalog demo at the other SHA the hub named, using synthetic records.
+    active: [daintree.hosts.handle-hub-message, daintree.hosts.do-delegated-work]
+    expect: [daintree.hosts.review-for-hub, daintree.hosts.demo-for-hub]
+    run: 2026-10-16-synthetic-audit
+  - query: Write the verified final results report for ended remote run sketch-8. Separately investigate why the different ended run trace-19 repeated a unit and stalled, with an evidence timeline.
+    active: [daintree.hosts.supervise-swarm]
+    expect: [daintree.hosts.report-swarm-results, daintree.hosts.postmortem-swarm]
+    run: 2026-10-16-synthetic-audit
+  - query: Place the three untouched documentation tickets on remote machines by capacity. Separately rebalance the already-running renderer swarm that is swapping on the GPU host.
+    active: [daintree.hosts.check-usage-limits, daintree.hosts.survey-hosts]
+    expect: [daintree.hosts.place-work, daintree.hosts.rebalance-load]
+    run: 2026-10-16-synthetic-audit
+  - query: Check which candidate project on the Linux host is our intended repository before sending anything. Independently preview a one-time copy of notification preferences to the connected Mac host.
+    active: [daintree.hosts.open-project-on-host]
+    expect: [daintree.hosts.verify-project-placement, daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit
+  - query: Checkpoint the lab host before its planned Daintree update. Separately connect the web and API development services on the two unaffected remote hosts and prove a marked request reaches the API.
+    active:
+      - daintree.hosts.survey-hosts
+      - daintree.hosts.supervise-swarm
+      - daintree.hosts.delegate-to-host
+    expect: [daintree.hosts.prepare-host-maintenance, daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
+  - query: check the open PR's review decision, and separately run the unit tests in my unrelated scheduler worktree.
+    history:
+      - 'user: Open the parser PR.'
+      - 'assistant: Parser PR #1804 is open; scheduler worktree is a separate branch.'
+    active: [daintree.workflow.prep-branch-for-review]
+    expect: [daintree.workflow.follow-up-on-issue, daintree.ci.run-local-checks]
+    confusable_with: [daintree.workflow.prep-branch-for-review, daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
+  - query: bring feature/receipts up to date with main, and also tell me which of my other worktrees have unpushed work. don't delete any.
+    history:
+      - 'user: The feature branch is behind.'
+      - 'assistant: feature/receipts is nine commits behind main; no update has been attempted.'
+    active: [daintree.git.sync-with-base]
+    expect: [daintree.git.sync-with-base, daintree.worktree.audit-worktrees]
+    confusable_with: [daintree.orchestration.workspace-cleanup, daintree.worktree.compare-worktrees]
+    run: 2026-10-16-synthetic-audit

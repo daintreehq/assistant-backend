@@ -141,3 +141,19 @@ followups:
     history:
       - "user: did the hosts finish the dependency bump?"
       - "assistant: Yes, both pushed their branches, but the build on the integration box now fails on the bumped package."
+  - query: The ambiguous edit is mine. Preserve it and continue reverting only the commits attributable to that remote run, in dependency order.
+    history:
+      - 'user: back out the remote run in the service and app repositories'
+      - 'assistant: Writers stopped. The app revert is ready, but one local configuration hunk cannot be attributed to the run or the person.'
+    active: [daintree.hosts.undo-swarm-changes, daintree.hosts.steer-swarm]
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: 2026-10-16-synthetic-audit
+
+topic_shifts:
+  - query: 'Separate from the settings: back out the ended barcode run code commits across both remote repositories, retaining edits by everyone else.'
+    history:
+      - 'user: copy my theme to the server'
+      - 'assistant: The one-time settings copy is complete and verified.'
+    active: [daintree.hosts.copy-portable-settings]
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: 2026-10-16-synthetic-audit

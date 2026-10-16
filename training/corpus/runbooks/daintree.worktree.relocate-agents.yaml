@@ -1268,16 +1268,6 @@ topic_shifts:
       - 'user: have an agent fix the flaky retry test'
       - 'assistant: term_f1 is on it, running in your current checkout.'
     active: [daintree.edits.spawn-visible-agent]
-  - query: split the ones that are still working into separate worktrees
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: Five agents: two finished, two still working, one waiting on a question. All five are in /Users/greg/src/acme.'
-    active: [daintree.orchestration.supervise-fleet]
-  - query: give the two that are still going their own trees so they don't fight
-    history:
-      - 'user: anything need me?'
-      - 'assistant: term_11 and term_12 are still working, term_13 is done. Nothing is blocked.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: ok before we go further, move each of those agents into its own worktree
     history:
       - 'user: catch me up on the agents'
@@ -1295,11 +1285,6 @@ topic_shifts:
       - 'user: show me the next one'
       - 'assistant: term_22 is on the migration work, still running. Three others are alive in the same worktree.'
     active: [daintree.orchestration.supervise-fleet]
-  - query: 'this one and the agent from #310 should each have their own worktree, move them'
-    history:
-      - 'user: start work on issue 341'
-      - 'assistant: Started #341 — agent launched with a background supervisor watching it.'
-    active: [daintree.workflow.start-work-on-issue]
   - query: we've got three issue agents running in one tree now, separate them
     history:
       - 'user: pick up ticket 412 and get an agent on it'
@@ -1325,16 +1310,6 @@ topic_shifts:
       - 'user: check out release/2.4 as a worktree'
       - 'assistant: wt_702 created at /Users/greg/src/acme-2.4 for the existing release/2.4 branch.'
     active: [daintree.worktree.create-plain-worktree]
-  - query: let's get the still-running ones into their own worktrees before picking anything else up
-    history:
-      - 'user: where were we?'
-      - 'assistant: Two agents from yesterday are still alive in the main checkout, both mid-task on the importer and the exporter.'
-    active: [daintree.orchestration.status-and-resume]
-  - query: separate those two into worktrees so we can carry on safely
-    history:
-      - 'user: what was i working on'
-      - 'assistant: The ledger has three rows open; two have live agents still running in /Users/greg/src/acme.'
-    active: [daintree.orchestration.status-and-resume]
   - query: give every one of those live agents its own worktree
     history:
       - 'user: catch me up, what happened while i was away'
@@ -1353,10 +1328,6 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: The autofix agent is rewriting files underneath the agent doing the semantic refactor. Please split those existing terminals into separate checkouts while they still have their task context.
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: Three panes are midway through the refactor, and they all started from develop. Move each current session into its own worktree before the next edit.
     history:
       - 'user: hey, you around?'
@@ -1377,10 +1348,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: i'd rather each of these had an isolated tree so their test runs stop interfering. base main, move the running terminals over
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: the agents were spawned into the main worktree by mistake. move them into per-agent worktrees off develop now, keeping their context
     history:
       - 'user: hello'
@@ -1393,22 +1360,10 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: split the three of them out, tell each where it lives now
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: these three are on one branch and it's a problem, one branch each in its own folder
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: branch as docs/api-reference and docs/getting-started off main, move the two docs agents into those worktrees, and tell each one to continue there
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: branch them off main as wt/discovery, wt/scoring and wt/ranking and shift the three search agents into those worktrees without interrupting them
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: move the running sessions into new worktrees and tell each one the path
     history:
       - 'user: thanks for yesterday'
@@ -1421,26 +1376,14 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: put every one of the four into a dedicated worktree and let them carry on
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: one repo copy per agent, move the ones that exist
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: move the agents that are currently working into per-agent worktrees off develop and tell me which terminal ended up in which path
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: shift the running agents off develop and into their own trees
     history:
       - 'user: hows your day going'
       - 'assistant: Going fine. Nothing queued here — what''s first?'
-  - query: relocate each working terminal to a private checkout
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: relocate the terminals into per-task worktrees
     history:
       - 'user: hows your day going'
@@ -1473,14 +1416,6 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: the two agents are both touching pnpm-lock.yaml. separate checkouts off main for each, move them, tell them
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: hey can you separate these agents, they're all going at the same files
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: one agent keeps stashing the other's work. separate worktrees please
     history:
       - 'user: hey, you around?'
@@ -1517,10 +1452,6 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: put the running agents in separate checkouts named after their tickets — wt/DAI-412, wt/DAI-418, wt/DAI-425 — branched from develop, then notify each
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: i need them apart. same agents, different trees.
     history:
       - 'user: good morning'
@@ -1529,10 +1460,6 @@ topic_shifts:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: make individual worktrees for these and move them all across
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: give each of the four running agents an isolated tree so the lockfile stops churning. base develop, and please tell each one where it moved
     history:
       - 'user: morning'
@@ -1541,10 +1468,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: move the live sessions into separate worktrees and let each know
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: can you pull the live agents apart into individual work trees, they've been going a while
     history:
       - 'user: hi'
@@ -1613,10 +1536,6 @@ topic_shifts:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: One agent normalizes fixtures while another deliberately corrupts them for a regression case. Separate the already-open sessions into isolated trees before either writes again.
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: The environment agent keeps rewriting the tracked example config while the deployment agent compares its version. Put the two open terminals in isolated work trees.
     history:
       - 'user: hey'
@@ -1645,10 +1564,6 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: move each agent into a new worktree and say something so they notice
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: get these agents into isolated worktrees without losing their context
     history:
       - 'user: sup'
@@ -1657,18 +1572,10 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: these two need splitting up, they're both hammering the same files
-    history:
-      - 'user: hello'
-      - 'assistant: Hello. Everything''s idle — what would you like to do?'
   - query: create wt/ingest, wt/transform and wt/export off develop, relocate the three pipeline agents into them, and send each the continue-in-directory message
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: set up isolated trees for the agents so their npm installs stop stomping on each other. develop as base, one per agent, move and notify
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: The two sessions I already opened are alternately regenerating package-lock.json, so neither patch is reviewable. Can you move each session to its own branch folder without starting them over?
     history:
       - 'user: good morning'
@@ -1677,10 +1584,6 @@ topic_shifts:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: gemini is on the docs rewrite and claude is on the search relevance work. separate checkouts for both, branched from develop, and send each the directory
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: The reviewers will inspect these changes separately, so the four agents already working should not share a git diff. Move each pane to an isolated tree without replacing the sessions.
     history:
       - 'user: hi'
@@ -1693,10 +1596,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: i want each running terminal moved into a private tree branched from develop, and i want each agent told the exact path it should work in
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: one directory each, move the live terminals, no respawns
     history:
       - 'user: hey'
@@ -1733,10 +1632,6 @@ topic_shifts:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
-  - query: The three pytest sessions share one .pytest_cache, which is making the rerun analysis suspect. Move the current agents, not new copies, into separate work trees.
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: the agents need separating. worktree each, keep them alive
     history:
       - 'user: hello'
@@ -1745,10 +1640,6 @@ topic_shifts:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: gemini, codex and claude are all in the same folder. branch them as review/gemini, review/codex and review/claude off main, relocate them, and let each one know where it is
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: also codex and grok are both mid-task in main and colliding on files, move each into its own worktree
     history:
       - 'user: new worktree for spike/grpc please'
@@ -1761,15 +1652,23 @@ topic_shifts:
       - 'assistant: I''d move t1, t2, t4 and t6 into 4 fresh worktrees. t3 looks idle — include it too?'
     active: [daintree.worktree.relocate-agents]
     run: 2026-09-24-selector-hardening
-  - query: actually the codex and gemini tabs already going in main, give them each their own too
-    history:
-      - 'user: make a worktree for feat/export'
-      - 'assistant: Created worktree feat/export from main. Nothing launched.'
-    active: [daintree.worktree.create-plain-worktree]
-    run: 2026-09-24-selector-hardening
   - query: they're sharing one checkout — move each agent into its own worktree
     history:
       - 'user: are claude-3 and codex-1 touching the same files?'
       - 'assistant: They''re both in the same worktree, feat/importer, so their edits land in one tree: 4 files touched by both.'
     active: [daintree.worktree.compare-worktrees]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: different jobs, same checkout. move them into separate worktrees, both keep going
+    history:
+      - 'user: Check why the two agents are in one folder.'
+      - 'assistant: Claude owns issue 72 and Codex owns 79; their briefs and files are disjoint, but both terminals are in main.'
+    active: [daintree.orchestration.supervise-fleet]
+    confusable_with: [daintree.orchestration.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit
+  - query: they're on different tasks but one checkout. split those two into their own worktrees and keep the sessions.
+    history:
+      - 'user: Are they duplicating the same job?'
+      - 'assistant: No. term-form edits the UI and term-tax edits tax rules, both from the root checkout.'
+    active: [daintree.worktree.compare-worktrees]
+    confusable_with: [daintree.orchestration.resolve-task-collisions, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

@@ -62,6 +62,9 @@ boundaries:
   - query: 'pull the review comments off PR #231 and get the agent to address them'
     confusable_with: [daintree.agents.relay-review-feedback, daintree.workflow.follow-up-on-issue]
     run: 2026-09-24-selector-hardening
+  - query: 'Work through PR #1687''s unresolved inline review threads, fix or answer each one and verify the resulting branch.'
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.agents.relay-review-feedback]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: skip the two nits, maria said they're optional
     history:

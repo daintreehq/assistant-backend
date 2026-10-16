@@ -79,7 +79,6 @@ foundation:
     docs: true
   - query: can my two remote hosts talk to each other directly or does it all go through this machine
     docs: true
-  - the remote mac's assistant never gets my messages, where do I even start
   - query: when I message the other machine's assistant how does its answer get back to me
     docs: true
   - query: what happens if I message the other machine while it's offline
@@ -126,10 +125,6 @@ foundation:
       other directly, or does every message go through the assistant on my main machine?
     docs: true
 boundaries:
-  - query: messaging tools are missing from my sidebar assistant even though I added a remote host
-    confusable_with: [daintree.diagnostics]
-  - query: why can't my assistant see any assistant it can message on my second mac
-    confusable_with: [daintree.diagnostics]
   - query: connect the assistant on my remote mac to the one here
     confusable_with: [daintree.worktree.manage-resource]
   - query: "before I hand work to my other mac's assistant, what has to be switched on for this shell to reach it"
@@ -168,9 +163,6 @@ boundaries:
     confusable_with: [daintree.hosts.start-swarm]
     docs: true
     run: runbook-2026-10-issue-102
-  - query: the other mac's assistant never gets my questions, what's blocking it
-    confusable_with: [daintree.hosts.ask-host-assistant]
-    run: runbook-2026-10-issue-88
   - query: set things up so I can ask the build box's assistant questions from here
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
@@ -181,10 +173,6 @@ boundaries:
   - query: is the second machine's assistant able to take questions from this shell yet
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
-  - query: the workstation's assistant never answers when I message it from here, is a port or a setting blocking it?
-    confusable_with:
-    - daintree.runtime.free-busy-port
-    run: runbook-2026-10-issue-131
   - query: can my laptop's assistant ask the one on the workstation what's running there? how do I switch that on
     confusable_with:
     - daintree.runtime.free-busy-port
@@ -198,14 +186,6 @@ boundaries:
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
 
-  - query: "the hub couldn't get usage from the build host because the send came back opted_out, how do I allow messaging with it"
-    confusable_with: [daintree.hosts.check-usage-limits]
-    docs: true
-    run: runbook-2026-10-issue-91
-  - query: "why can't I reach the assistant on my second mac to ask it anything, even its usage"
-    confusable_with: [daintree.hosts.check-usage-limits]
-    docs: true
-    run: runbook-2026-10-issue-91
   - query: 'how does the hub decide whether it may message a host''s assistant at all?'
     confusable_with: [daintree.hosts.diagnose-messaging]
     docs: true

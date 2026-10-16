@@ -135,3 +135,19 @@ followups:
     history:
       - "user: wire the two dev servers across the hosts"
       - "assistant: That edge is blocked: the API only listens on loopback on host two. I can co-locate the services or use a private address you name."
+  - query: Test the address from the browser that makes the call and match one marked request in the remote API log before declaring the stack connected.
+    history:
+      - 'user: connect the UI on one remote host to the API on another'
+      - 'assistant: Both services report ready. The client-side fetch runs in the browser on this laptop, not in the UI host process.'
+    active: [daintree.hosts.coordinate-dev-services, daintree.hosts.prepare-remote-demo]
+    confusable_with: [daintree.hosts.prepare-remote-demo]
+    run: 2026-10-16-synthetic-audit
+
+topic_shifts:
+  - query: The contract is approved and both implementations are built. Bring the dev services up on their separate hosts and prove the client reaches the intended provider.
+    history:
+      - 'user: settle the inventory API between the two remote repositories'
+      - 'assistant: Both sides adopted the final contract and their commits are verified.'
+    active: [daintree.hosts.coordinate-contract-change]
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+    run: 2026-10-16-synthetic-audit

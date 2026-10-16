@@ -57,8 +57,6 @@ positives:
   - each writes one test-strategy proposal, then peer review — everyone reads everyone's and picks a winner
   - whole fleet, one haiku each about our build system, then vote on the best
   - tally it up, tell me who won, and close everything except the winner's tab
-  - query: Have Claude and Codex each write their own version of the debounce hook for the search bar in separate worktrees, then judge which implementation is better.
-    run: 2026-09-28-agent-queries
   - query: 'Contest between codex, claude-2 and gemini: each proposes a name for the new CLI package, then they blind-vote on the others'' entries and I get the winner.'
     run: 2026-09-28-agent-queries
   - query: Each of the three pinned agents independently rewrites src/parser/tokenize.ts for speed in its own worktree; benchmark results decide the winner.
@@ -249,9 +247,6 @@ boundaries:
   - query: ask each pinned agent for one onboarding experiment it would run and tell me whose proposal is best
     confusable_with: [daintree.agents.poll-pinned-agents]
     run: transcript-2026-09-26-fact-contest-named-agents
-  - query: have claude and codex each write their own version of the retry helper, then tell me which one is better
-    confusable_with: [daintree.agents.ask-and-relay]
-    run: 2026-09-28-agent-queries
   - query: each of three agents proposes its own name for the new CLI, then they peer-vote on the best entry
     confusable_with: [daintree.agents.ask-and-relay]
     run: 2026-09-28-agent-queries
@@ -341,9 +336,6 @@ boundaries:
     run: 2026-09-28-agent-queries
   - query: each agent pitches its best idea for the hackathon, then they vote on the best pitch
     confusable_with: [daintree.orchestration.debate-elimination]
-    run: 2026-09-28-agent-queries
-  - query: Have claude and codex each write their own version of the cache layer, then pick the better diff
-    confusable_with: [daintree.orchestration.fan-out-work]
     run: 2026-09-28-agent-queries
   - query: have each agent write its own version of the date parser and have gemini score the entries
     confusable_with: [daintree.orchestration.interview]
@@ -438,12 +430,10 @@ boundaries:
   - query: 'run a contest between the agents on this machine for the cleanest regex'
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
+  - query: Give each agent the identical editor brief and let each choose its own implementation, then blind-judge the independent entries and name a winner.
+    confusable_with: [daintree.orchestration.spike-options]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: how's it going?
-    history:
-      - 'user: run a contest — four agents, one interesting fact each, then they vote on the best'
-      - 'assistant: Spawned four agents (Alpha, Bravo, Charlie, Delta), each asked for one fact. Waiting on all four now.'
-    active: [daintree.orchestration.competition]
   - query: did they vote yet?
     history:
       - 'user: three agents, one design idea each, then blind peer vote'
@@ -506,15 +496,6 @@ topic_shifts:
       - 'user: have them debate it then vote the weakest position off'
       - 'assistant: Debate ran, elimination ballot tallied - the eager-loading position was voted off 3-1.'
     active: [daintree.orchestration.debate-elimination]
-  - query: quick one — how many agents can i actually have pinned at once?
-    history:
-      - 'user: have the four of them pitch a caching design and vote on the best'
-      - 'assistant: All four submissions in. Ballot blinded and shuffled per voter; votes coming back.'
-    active: [daintree.orchestration.competition, daintree.foundation]
-  - query: run a competition between them on caching designs — first explain how the blind vote works
-    history:
-      - 'user: four agents idle'
-      - 'assistant: All four are free.'
   - ok i've got 4 claudes pinned. get each of them to come up with the most interesting thing about this codebase then have them vote on whose is best
   - query: yes blind. go
     history:
@@ -528,13 +509,6 @@ topic_shifts:
       - 'user: yes blind. go'
       - 'assistant: All four have the prompt. Two submissions in, waiting on tab 4 and tab 5.'
     active: [daintree.orchestration.competition, daintree.foundation]
-  - query: ok park that for a sec. different thing - i want 3 agents to each pitch a design for the new watcher api and then vote on whose pitch is best
-    history:
-      - 'user: how''s everyone doing'
-      - 'assistant: Two working, two waiting on questions, one finished.'
-      - 'user: two of them are waiting on a question, just say yes to both'
-      - 'assistant: Both answered and generating again.'
-    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
   - query: ok now show each of them everyone else's answer and get them to pick the best one, blind, and score it
     history:
       - 'user: ask claude in tab 2 what it makes of the retry logic'
@@ -605,14 +579,6 @@ topic_shifts:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
-  - query: who wins if we let them judge each other's answers?
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: run a bake-off between them
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: run a little contest between the agents — each one gives me an interesting fact, then they all read each other's and vote on the best one, and you tally it up at the end
     history:
       - 'user: How are you?'
@@ -645,10 +611,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: run the fact competition again but with six agents this time
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: fun. now have each of them submit their own worst production bug story, then they vote on the best one, points to the winner
     history:
       - 'user: poll the pinned agents: should we drop node 18 support? want a consensus'
@@ -673,16 +635,18 @@ topic_shifts:
       - 'assistant: Both rewrote the tokenizer independently: 11 overlapping files, different approaches; trial merge conflicts in 9.'
     active: [daintree.worktree.compare-worktrees]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: winner gets to write its own acceptance speech, send it over
-    history:
-      - 'user: still awake?'
-      - 'assistant: Still here. What do you need?'
   - query: actually let both finish their own version, then have them blind-judge which one is better
     history:
       - 'user: claude-2 and codex-1 are both building the export feature, sort it out'
       - 'assistant: Held both. claude-2 has CSV export done with tests; codex-1 has CSV plus XLSX, fewer tests. The evidence doesn''t clearly separate them.'
     active: [daintree.orchestration.resolve-task-collisions]
     run: 2026-09-28-round6-stateful
+  - query: run a competition between them on caching designs — first explain how the blind vote works
+    history:
+      - 'user: four agents idle'
+      - 'assistant: All four are free.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[terminal.awaitAll returned: 4 submissions in]'
     history:
@@ -708,7 +672,3 @@ docs:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
-  - query: quick q — run a little competition, best idea wins
-    history:
-      - 'user: hows everyone doing'
-      - 'assistant: Swept the fleet: two finished, three working, one waiting. Watchers armed on the movers.'

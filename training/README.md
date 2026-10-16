@@ -70,7 +70,7 @@ can delete from.
 ```
 training/journals/   RAW      what a generating agent returned. Append-only, committed.
 training/corpus/     CURATED  hand-edited YAML, one file per runbook. SOURCE OF TRUTH.
-training/data/       COMPILED selection.jsonl + corpus-lock.json. Generated; CI-gated.
+training/data/       COMPILED selection.jsonl + corpus-lock.json. Generated; test-gated.
 ```
 
 `training/corpus/README.md` is the authoring reference — read it before writing
@@ -120,12 +120,20 @@ get the same bytes.
 
 ## The one rule that matters
 
-**`benchmarks/runbook_selection/cases/` is held out.** Generating agents are
-forbidden from reading it; `compile_corpus` normalises every query — and every
-history line, which is model input too — and drops collisions, measuring the
-count rather than trusting anyone about it; `tests/unit/test_training_corpus.py`
-asserts none survived. Thresholds are tuned on held-out *synthetic*
-splits only. After many inspect-iterate cycles the benchmark has drifted toward
+**Evaluation cases are excluded from training.** Generating agents must not read
+`benchmarks/` or `tests/`. `compile_corpus` protects both
+`benchmarks/runbook_selection/cases/` and every `holdout/` round, including sealed
+rounds, by normalising every query and history line and dropping exact collisions.
+The corpus guards assert that the curated sources contain none. Keep evaluation
+wording frozen; remove collisions from training. Near-duplicates still need a
+separate screening pass, including history, before new data lands.
+
+The synthetic train/validation split groups normalised latest questions together,
+including their history and active-set variants. Adding context must not place a
+question already used for training into validation. This changes the split from
+the pre-October recipe, so old synthetic validation scores are not comparable.
+Thresholds are tuned on held-out *synthetic* splits only. After many inspect-iterate
+cycles the benchmark has drifted toward
 a dev set — before any final adoption claim, write a fresh ~50-case signoff set
 blind.
 

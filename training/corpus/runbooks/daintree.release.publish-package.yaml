@@ -146,6 +146,12 @@ boundaries:
     confusable_with:
     - daintree.release.deploy-and-verify
     run: runbook-2026-10-issue-138
+  - query: Build client-sdk 5.4.0 from the pinned clean tree, publish to the stable npm channel and test a clean install.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.release.deploy-and-verify
+      - daintree.release.test-distributable
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: ok, looks clean. publish it
     history:

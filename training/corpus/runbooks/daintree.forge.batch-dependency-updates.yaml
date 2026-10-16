@@ -78,6 +78,12 @@ boundaries:
   - query: merge the safe dependabot bumps and close the rest
     confusable_with: [daintree.forge.land-pull-request]
     run: 2026-09-28-catalog-expansion-late
+  - query: Collect the open Renovate patch PRs in org/payments, batch compatible bumps and send the framework major to its own upgrade.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.forge.land-pull-request
+      - daintree.deps.upgrade-dependency
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: yes, but leave zod out entirely for now
     history:

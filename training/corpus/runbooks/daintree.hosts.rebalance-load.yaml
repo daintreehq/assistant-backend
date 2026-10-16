@@ -146,6 +146,13 @@ followups:
     history:
       - "user: the tower is too hot, move some swarm work off it"
       - "assistant: The tower's assistant cut to two agents and held four units; those four went to the other hosts."
+  - query: Take a fresh load reading now and show what improved; do not shift the units that are already running just to make the counts equal.
+    history:
+      - 'user: ease the pressure on the remote host that was swapping'
+      - 'assistant: Its lane lowered concurrency and released two unstarted units, which were placed on the idle host. Three original agents remain active.'
+    active: [daintree.hosts.rebalance-load, daintree.hosts.place-work]
+    confusable_with: [daintree.hosts.place-work]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: right, now one of them is drowning, spread the load better

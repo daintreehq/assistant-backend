@@ -119,6 +119,13 @@ followups:
     history:
       - "user: park the run on my two hosts"
       - "assistant: One host replied with every agent stopped; nothing yet from the other."
+  - query: Resume from that record, reconcile the hosts current task records first, and reuse any worker still alive instead of launching another.
+    history:
+      - 'user: hold the remote migration until Monday and save its resume record'
+      - 'assistant: The record contains both hosts branches and worktrees; one host acknowledged parking and the other remained unconfirmed.'
+    active: [daintree.hosts.park-swarm, daintree.hosts.recover-and-clean-up]
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: never mind the PR. park everything on the other machines for tonight instead
@@ -129,6 +136,13 @@ topic_shifts:
     history:
       - "user: how much usage is left on each host?"
       - "assistant: Checking each host now."
+  - query: Actually the update can wait. Park the whole run on every Remote Host until next week and keep a resume record.
+    history:
+      - 'user: prepare the server for an update'
+      - 'assistant: I have only reported the impact so far; no checkpoint requests were sent.'
+    active: [daintree.hosts.prepare-host-maintenance]
+    confusable_with: [daintree.hosts.prepare-host-maintenance]
+    run: 2026-10-16-synthetic-audit
 
 boundaries:
   - query: halt the remote run for the night but I want to continue it tomorrow exactly where it stopped

@@ -32,6 +32,9 @@ positives:
   - Queue consumers in production are crash-looping after deploy 2026-09-27.3; get investigators on the diff from 2026-09-26.1 and on the error logs.
   - 'customer reports flooding in that uploads fail on prod, started around when we shipped PR #1201. triage the incident and propose mitigations'
   - Nothing is loading on our production dashboard at dash.internal — it's our Next.js app, not the Daintree app. Get agents triaging the outage.
+  - query: prod is down, i've got two agents with conflicting theories, ping between them fast and tell me which cause is real
+    confusable_with: [daintree.orchestration.multi-agent]
+    run: 2026-10-16-synthetic-audit
 boundaries:
   - query: prod has been throwing 500s since the 3pm deploy, get agents on it
     confusable_with: [daintree.agents.postmortem-run]
@@ -98,6 +101,12 @@ boundaries:
   - query: 'the production site is down right now; what changed in the last deploy'
     confusable_with: [daintree.hosts.postmortem-swarm]
     run: runbook-2026-10-issue-121
+  - query: Investigate the live checkout outage from the deployed SHA, request logs and deploy timeline; return ranked causes and mitigation options.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.ci.diagnose-and-fix
+      - daintree.release.rollback-deployment
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: the payments service is throwing timeouts too - add that to the logs lens
     history:

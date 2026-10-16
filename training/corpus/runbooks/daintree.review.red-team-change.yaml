@@ -79,6 +79,15 @@ boundaries:
     confusable_with: [daintree.review.review-change]
   - query: Check the auth PR for security problems by having an agent attempt exploits against it, and run each one it writes.
     confusable_with: [daintree.review.review-change]
+  - query: Attack only PR 648's new archive permission checks with an independent adversarial agent and require demonstrated breaks in that change.
+    confusable_with: [daintree.orchestration.bug-bash]
+    run: 2026-10-16-synthetic-audit
+  - query: Have an adversarial agent break the completed upload change with executable inputs and verify each reproduced failure against its base.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.review.review-change
+      - daintree.review.audit-codebase
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: add a concurrency attacker too
     history:

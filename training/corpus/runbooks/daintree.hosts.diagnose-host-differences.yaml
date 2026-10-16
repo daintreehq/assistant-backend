@@ -147,6 +147,9 @@ boundaries:
   - query: 'The plugin''s unit tests pass on the Linux host and fail on the Mac host at the same commit; find out why and fix nothing yet.'
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-137
+  - query: Both Remote Hosts connect normally, but the identical release commit passes the template tests on one and fails on the other. Establish why their results differ without edits.
+    confusable_with: [daintree.hosts.connect-host]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed
@@ -171,3 +174,19 @@ topic_shifts:
     history:
       - "user: which hosts are connected right now?"
       - "assistant: Two are connected: the build host and the laptop host."
+  - query: Investigate why the same checked-out SHA failed on Linux and passed on the Mac; compare host evidence before proposing any fix.
+    history:
+      - 'user: test the release candidate on Linux and macOS'
+      - 'assistant: Both rows ran the pinned commit. Linux failed the file-lock test; macOS passed.'
+    active: [daintree.hosts.run-validation-matrix]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
+  - query: 'macOS arm64: SHA matches, 286 passed. Linux x64: SHA matches, 1 locale assertion failed.
+
+      Find why this same commit behaves differently on the two Remote Hosts, without modifying either checkout.'
+    history:
+      - 'user: validate the release candidate on the Mac and Linux hosts'
+      - 'assistant: Both environments completed their requested test run.'
+    active: [daintree.hosts.run-validation-matrix]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit

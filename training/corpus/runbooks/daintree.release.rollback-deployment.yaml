@@ -103,3 +103,13 @@ topic_shifts:
       - 'assistant: Sent the redirect to claude-3; it acknowledged and is now working in src/parser/.'
     active: [daintree.agents.steer-running-agent]
     run: 2026-09-28-round6-stateful
+  - query: Restore production traffic to the known-good image for v8.1.2 after checking current schema compatibility, then verify checkout.
+    history:
+      - 'user: Checkout broke after the new image rolled out.'
+      - 'assistant: Production serves v8.2.0. The previous release v8.1.2 is retained in the platform.'
+    active: [daintree.debug.investigate-outage]
+    confusable_with:
+      - daintree.release.deploy-and-verify
+      - daintree.git.undo-agent-changes
+      - daintree.ci.diagnose-and-fix
+    run: 2026-10-16-synthetic-audit

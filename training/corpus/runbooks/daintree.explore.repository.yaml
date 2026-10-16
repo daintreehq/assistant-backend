@@ -7,11 +7,9 @@ runbook: daintree.explore.repository
 run: pre-split
 positives:
   - what does this repo actually do
-  - where is the rate limiter implemented
   - explain how auth works end to end here — where the token comes in, where it gets validated, what happens when it fails. cite files
   - im new to this codebase, give me a tour of the main subsystems and how they hang together
   - which file owns the websocket reconnect logic?
-  - what would i have to touch to add a second payment provider?
   - find the code that writes the audit log
   - trace the request lifecycle from the http handler down through middleware to the db layer, file:line for each hop
   - wheres the migration stuff live
@@ -167,8 +165,6 @@ boundaries:
     confusable_with: [daintree.forge.manage-issue]
   - query: where does the migration runner actually live in this repo
     confusable_with: [daintree.orchestration.execute-durable-workflow]
-  - query: how does the routing work in this app
-    confusable_with: [daintree.runtime.debug-web-app]
   - query: where is the theme provider set up
     confusable_with: [daintree.runtime.debug-web-app]
   - query: explain the state management on the client side
@@ -247,8 +243,6 @@ boundaries:
     confusable_with: [daintree.diagnostics]
   - query: explain why this service ignores the env var, where does it read settings from
     confusable_with: [daintree.diagnostics]
-  - query: where is the rate limiting implemented in this repo?
-    confusable_with: [daintree.edits.spawn-visible-agent]
   - query: walk me through what this service actually does and how a request flows through it
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: how does the docs lookup actually work here? go find out and tell me
@@ -283,12 +277,8 @@ boundaries:
     confusable_with: [daintree.memory.manage-project-memory]
   - query: we decided the retry backoff somewhere in the code, find it
     confusable_with: [daintree.memory.manage-project-memory]
-  - query: where is rate limiting actually implemented in this repo?
-    confusable_with: [daintree.edits.spawn-visible-agent]
   - query: explain how a request gets from the router down to the db
     confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: where is the rate limiting implemented?
-    confusable_with: [daintree.agents.ask-and-relay]
   - query: what does this scheduler file actually do?
     confusable_with: [daintree.agents.ask-and-relay]
   - query: have an agent explore the repo and tell me how the auth flow actually works
@@ -426,20 +416,10 @@ boundaries:
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-96
 followups:
-  - query: hows it going?
-    history:
-      - 'user: explain how auth works end to end in this repo'
-      - 'assistant: Spawned a read-only explore agent (terminal 4) with the question and asked for file:line evidence. Waiting on it now.'
-    active: [daintree.explore.repository]
   - query: also do the same for the session refresh path
     history:
       - 'user: where does the sync worker handle conflicts'
       - 'assistant: Searched and found it in worker/sync.go:210 — last-write-wins with a version check. Spawned an explore agent for the full picture since the flow spans three files.'
-    active: [daintree.explore.repository]
-  - query: nice. anything else it couldnt work out?
-    history:
-      - 'user: what would i have to touch to add a second payment provider'
-      - 'assistant: The explore agent came back: the provider interface at billing/provider.py:18, the factory at billing/factory.py:44, and config plumbing in settings.py:130. It could not determine whether webhooks are provider-specific.'
     active: [daintree.explore.repository]
   - query: which terminal is that in again
     history:
@@ -484,11 +464,6 @@ topic_shifts:
       - 'user: what does this repo do'
       - 'assistant: Billing reconciliation — ingest, match, settle.'
     active: [daintree.explore.repository]
-  - query: different thing entirely - where is the websocket reconnect actually handled in this repo?
-    history:
-      - 'user: run the review recipe'
-      - 'assistant: Done - recipe applied, two review agents running.'
-    active: [daintree.recipe.run-or-create]
   - query: different question, how does the plugin loader decide load order?
     history:
       - 'user: have an agent update the readme for the new flags'
@@ -595,13 +570,6 @@ topic_shifts:
       - 'user: i inherited this repo. whats the overall architecture'
       - 'assistant: A modular monolith: HTTP edge in api/, four domain packages behind interfaces, and an in-process event bus in events/ that everything publishes to. Persistence is Postgres via sqlc.'
     active: [daintree.explore.repository]
-  - query: whats the api-v2 one about, i forget
-    history:
-      - 'user: quick one — whats the difference between a worktree and a plain branch in daintree'
-      - 'assistant: A worktree is a separate checkout so several branches can be worked at once.'
-      - 'user: makes sense. which worktrees do i have right now'
-      - 'assistant: Three: main, api-v2 and fix/limiter-412.'
-    active: [daintree.foundation]
   - query: back. how does pagination work in that service
     history:
       - 'user: whats the api-v2 one about, i forget'
@@ -719,13 +687,6 @@ topic_shifts:
       - 'user: fair enough'
       - 'assistant: Want me to run the migration command directly in the three worktrees instead?'
     active: [daintree.foundation, daintree.recipe.run-or-create]
-  - query: where's the rate limiter implemented anyway
-    history:
-      - 'user: bundle everything touching the auth module into one context file'
-      - 'assistant: 22 files selected, generating.'
-      - 'user: chuck the tests in too'
-      - 'assistant: Added the auth test directories — 31 files, one bundle written. Not copied to the clipboard since you didn''t ask.'
-    active: [daintree.foundation, daintree.context.curate-copytree-bundle]
   - how does our retry logic work, and where does it live
   - how does our sign-in flow work — dig into the code and tell me
   - query: where does the retry backoff actually live in this codebase
@@ -828,10 +789,6 @@ topic_shifts:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: who calls processPayment
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: trace the request lifecycle from the http handler down through middleware to the db layer, file:line for each hop
     history:
       - 'user: morning'
@@ -840,14 +797,6 @@ topic_shifts:
     history:
       - 'user: yo'
       - 'assistant: Yo. What are we doing?'
-  - query: does anything still use the old redis client or is that dead now
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: which files actually make up billing? not bundling anything yet, i just want the shape of it
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: map the dependency graph between the packages in this monorepo, which ones are leaf nodes
     history:
       - 'user: sup'
@@ -902,16 +851,20 @@ topic_shifts:
       - 'assistant: Generated retry-context.xml with src/net/retry.ts, backoff.ts and their tests.'
     active: [daintree.context.curate-copytree-bundle]
     run: 2026-09-24-selector-hardening
+  - query: I don't need a new setup script. show me where the existing worktree bootstrap gets its database name from.
+    history:
+      - 'user: New worktrees get separate databases now.'
+      - 'assistant: The project setup hook already provisions one schema per checkout.'
+    active: [daintree.worktree.provision-local-environment]
+    confusable_with:
+      - daintree.worktree.provision-local-environment
+      - daintree.runtime.migrate-worktree-database
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[agent task a_1140 completed]'
     history:
       - 'user: what does this repo actually do'
       - 'assistant: Read-only explore agent up in t_1140 with instructions to cite files. I''ll summarize what it finds.'
-    active: [daintree.explore.repository, daintree.foundation]
-  - query: '[watcher fired: t_2288 exited 1 — agent errored out before answering]'
-    history:
-      - 'user: where is the retry logic implemented'
-      - 'assistant: Explore agent searching read-only in t_2288. Back shortly with file evidence.'
     active: [daintree.explore.repository, daintree.foundation]
   - query: '[timer elapsed: 20m — explore agent still running]'
     history:
@@ -923,7 +876,6 @@ near_misses:
   - whats this repo even do
 docs:
   - how does our auth middleware decide the tenant
-  - where's rate limiting implemented in here
   - what does this codebase actually do
   - which file handles the stripe webhook
   - explain how the job queue works in this repo
@@ -940,16 +892,11 @@ docs:
   - why does this app have two entrypoints
   - where does the session token get validated on our backend
   - how does our retry logic work?
-  - where is the rate limiter implemented in this repo
   - explain how our auth flow works end to end
   - query: how does our retry logic work?
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: whats the difference between the two user models in this repo
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: find the code that builds the invoice pdf
     history:
       - 'user: morning'
@@ -962,10 +909,6 @@ docs:
     history:
       - 'user: thanks for yesterday'
       - 'assistant: Any time. What''s on today?'
-  - query: where's rate limiting implemented in here
-    history:
-      - 'user: hey, you around?'
-      - 'assistant: Around. What''s the task?'
   - query: why does this app have two entrypoints
     history:
       - 'user: morning'
@@ -982,10 +925,6 @@ docs:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: hang on, before you push — does our http client retry anywhere
-    history:
-      - 'user: anything need me?'
-      - 'assistant: term_11 and term_12 are still working, term_13 is done. Nothing is blocked.'
   - query: side question, which file handles the stripe webhook
     history:
       - 'user: theres a diff waiting'
@@ -1011,4 +950,3 @@ docs:
       - 'user: focus terminal 2'
       - 'assistant: Focused.'
 foundation_boundaries:
-  - where is the retry logic implemented

@@ -322,3 +322,12 @@ boundaries:
   - query: "what did the remote machines finish with the api-key rotation work I handed over while I was away"
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: runbook-2026-10-issue-140
+
+topic_shifts:
+  - query: The inventory is enough. Have each host remove only the clean pushed worktrees from that run and tell me which items it kept.
+    history:
+      - 'user: audit the parser experiment leftovers on the hosts'
+      - 'assistant: Three worktrees are safe; a fourth has unpushed commits and is unsafe. Nothing was removed.'
+    active: [daintree.hosts.audit-host-workspaces]
+    confusable_with: [daintree.hosts.audit-host-workspaces]
+    run: 2026-10-16-synthetic-audit

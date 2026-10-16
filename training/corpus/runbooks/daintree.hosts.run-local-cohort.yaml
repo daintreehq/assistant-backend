@@ -118,6 +118,13 @@ followups:
   history:
   - 'user: work the hub''s four tickets here'
   - 'assistant: Four agents launched in their own worktrees; three have committed so far.'
+- query: Only start one more child for this hub batch. Two are still running, and the brief caps this host at three concurrent workers.
+  history:
+    - 'user: the hub assigned this host seven independent markdown-rendering fixes, no more than three at once'
+    - 'assistant: Two children are still implementing and one just finished; four units have not started.'
+  active: [daintree.hosts.run-local-cohort, daintree.hosts.do-delegated-work]
+  confusable_with: [daintree.hosts.do-delegated-work]
+  run: 2026-10-16-synthetic-audit
 boundaries:
 - query: the hub sent this host two unrelated fixes, each needs its own worktree and agent
   confusable_with:

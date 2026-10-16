@@ -82,9 +82,6 @@ positives:
 - morning! could you give the remote hosts a 10 minute crack at the typo sweep and then stop them?
 - thanks for getting the hosts connected. now let's see what they can do in fifteen minutes on the
   auth bug, stop them after that
-- query: ok, give them twenty minutes at it and then stop them
-  history: ['user: are both remote hosts connected?', 'assistant: Yes, both hosts are connected and
-      each has an assistant ready in the project.']
 - query: fine, but cap it at ten minutes on each machine
   history: ['user: can the other macs try the css refactor?', 'assistant: I can send it to both hosts.
       Do you want a time limit, or should they run until done?']
@@ -112,6 +109,12 @@ positives:
     it up for a 15 minute try at the bug', docs: true}
 - {query: 'how does a time limit work when I send work to my remote hosts? give them twenty minutes
     on the export fix', docs: true}
+- query: ok, give them twenty minutes at it and then stop them
+  history:
+    - 'user: are the two Remote Hosts ready to attempt the malformed-date parsing fix?'
+    - 'assistant: Both have an enrolled assistant in this repository; no work has been sent.'
+  active: [daintree.hosts.start-swarm]
+  run: 2026-10-16-synthetic-audit
 boundaries:
 - query: have each remote host try the caching idea for ten minutes, not an agent on this machine
   confusable_with: [daintree.orchestration.timebox-attempt]
@@ -181,3 +184,10 @@ followups:
   history: ['user: let both remote machines try the upgrade until 3pm', 'assistant: Both replied.
       One stopped at 14:59 by its own clock; the other at 15:02, which is two minutes late by its
       report.']
+- query: That machine has not confirmed stopping. Keep it unconfirmed in the deadline results and show the other hosts stop times and partial work.
+  history:
+    - 'user: give the three Remote Hosts twelve minutes each on the encoder bug, then stop'
+    - 'assistant: The deadline passed. Two hosts supplied their stop evidence; the third lost its link before answering.'
+  active: [daintree.hosts.timebox-swarm, daintree.hosts.supervise-swarm]
+  confusable_with: [daintree.hosts.supervise-swarm]
+  run: 2026-10-16-synthetic-audit

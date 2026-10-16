@@ -116,12 +116,6 @@ examples:
       - 'assistant: Submission round is out to all four. I''ll collect them and run the blind peer vote.'
     active: [daintree.orchestration.competition, daintree.foundation]
     expect: [daintree.orchestration.competition, daintree.agents.answer-waiting-agent]
-  - query: '[watcher fired: t_5501 waiting on input - ''apply destructive migration? y/N'']'
-    history:
-      - 'user: run the migrate recipe in the billing worktree'
-      - 'assistant: Recipe running - it spawned a live agent in t_5501, which I''m watching.'
-    active: [daintree.recipe.run-or-create, daintree.foundation]
-    expect: [daintree.recipe.run-or-create, daintree.agents.answer-waiting-agent]
   - query: '[stall watcher fired: t_8822 no output for 40 minutes, not asking anything]'
     history:
       - 'user: put an agent on each of the three failing packages'
@@ -194,12 +188,6 @@ examples:
       - 'assistant: PR watch armed on 88. I''ll pick it up when the checks conclude.'
     active: [daintree.orchestration.watch-outcome, daintree.foundation]
     expect: [daintree.workflow.follow-up-on-issue, daintree.ci.diagnose-and-fix]
-  - query: '[watcher fired: PR 141 - lint green, unit tests red with 7 failures]'
-    history:
-      - 'user: get this branch ready and open the PR'
-      - 'assistant: Committed, pushed, PR 141 opened. Checks are queued - I''ll watch them.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
-    expect: [daintree.workflow.prep-branch-for-review, daintree.ci.diagnose-and-fix]
   - query: '[background wake: 2 of 5 branches now have red CI - feat/a12 and fix/b09]'
     history:
       - 'user: put an agent on each of those five tickets'
@@ -230,21 +218,11 @@ examples:
       - 'assistant: Watchers armed on both.'
     active: [daintree.orchestration.watch-outcome, daintree.foundation]
     expect: [daintree.agents.answer-waiting-agent, daintree.agents.recover-agent]
-  - query: '[wake: PR watch on #640 reports draft -> open]'
-    history:
-      - 'user: mark 640 ready for review'
-      - 'assistant: Out of draft; reviewers requested.'
-    active: [daintree.forge.land-pull-request]
   - query: '[background wake: forge webhook noise, no state change on #412]'
     history:
       - 'user: keep an eye on 412'
       - 'assistant: PR watch armed.'
     active: [daintree.forge.land-pull-request, daintree.foundation]
-  - query: '[terminal 3 exited with code 0]'
-    history:
-      - 'user: approve and merge 301'
-      - 'assistant: Merged with a squash.'
-    active: [daintree.forge.land-pull-request]
   - query: '[wake: notification dismissed]'
     history:
       - 'user: file that as an issue'
@@ -275,11 +253,6 @@ examples:
       - 'user: restart the preview'
       - 'assistant: Restarted; the page loads.'
     active: [daintree.runtime.debug-web-app]
-  - query: '[wake: session reconnected, no events since the last checkpoint]'
-    history:
-      - 'user: reconcile the graph'
-      - 'assistant: Applied; nothing had changed since the last checkpoint.'
-    active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
   - query: '[agent finished: pr-review]'
     history:
       - 'user: land it once the reviewer is happy'

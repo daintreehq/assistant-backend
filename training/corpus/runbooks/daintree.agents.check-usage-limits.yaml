@@ -62,8 +62,6 @@ positives:
     run: 2026-09-28-agent-queries
   - query: rate limit headroom for gemini and claude-2, figures from their own usage output
     run: 2026-09-28-agent-queries
-  - query: how much claude usage do i have left
-    run: 2026-09-28-agent-queries
   - query: am i close to my codex weekly cap?
     run: 2026-09-28-agent-queries
   - query: when does my claude 5 hour limit reset
@@ -78,8 +76,6 @@ positives:
     run: 2026-09-28-agent-queries
   - query: Check Claude Code and Codex remaining allowance and when each resets.
     run: 2026-09-28-agent-queries-2
-  - query: check how much Codex usage I've got left this week
-    run: 2026-09-28-catalog-expansion-refine
   - query: when does my Claude five-hour limit reset?
     run: 2026-09-28-catalog-expansion-refine
 boundaries:
@@ -280,11 +276,6 @@ followups:
       - 'user: how much usage do i have left in claude and codex'
       - 'assistant: Claude: 34% of the week left, resets Sep 28. Codex: 25% of the weekly limit left, resets Sep 26.'
     active: [daintree.agents.check-usage-limits]
-  - query: and antigravity?
-    history:
-      - 'user: check my codex limits'
-      - 'assistant: Codex /status shows 25% of the weekly limit left, resetting Sep 26 at 08:30.'
-    active: [daintree.agents.check-usage-limits]
   - query: same for gemini please
     history:
       - 'user: how much quota is left on antigravity'
@@ -342,18 +333,6 @@ topic_shifts:
       - 'assistant: Created workflow with 6 nodes: dump schema, test restore on staging, fix extension incompatibilities, cut over, verify, decommission. Node 1 is done; node 2 is running in t3.'
     active: [daintree.orchestration.execute-durable-workflow]
     run: 2026-09-24-selector-hardening
-  - query: and gemini?
-    history:
-      - 'user: how much claude code usage do i have left'
-      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-24-selector-hardening
-  - query: what about grok and kimi
-    history:
-      - 'user: how much claude code usage do i have left'
-      - 'assistant: Ran /usage inside claude (t1): session 62% used, weekly 41% used, resets Mon 09:00. Figures read off its own usage screen.'
-    active: [daintree.agents.check-usage-limits]
-    run: 2026-09-24-selector-hardening
   - query: ha nice. unrelated — how much of my claude weekly limit is left?
     history:
       - 'user: have everyone write a haiku about rust and vote'
@@ -372,3 +351,10 @@ topic_shifts:
       - 'assistant: codex-3 is planning in feat/session-store (read-only). Waiting for its plan.'
     active: [daintree.orchestration.plan-then-implement]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: Read Claude's account allowance screen and report the weekly remainder and reset time.
+    history:
+      - 'user: Switch the model in the Claude pane.'
+      - 'assistant: Switched it and confirmed the model on screen.'
+    active: [daintree.agents.run-agent-command]
+    confusable_with: [daintree.agents.run-agent-command, daintree.agents.ask-running-agent]
+    run: 2026-10-16-synthetic-audit

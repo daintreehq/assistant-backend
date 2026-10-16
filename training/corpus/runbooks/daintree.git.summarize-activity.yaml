@@ -79,6 +79,12 @@ boundaries:
   - query: 'what did the repo see this week? commits, PRs and what''s still in progress, for a standup'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: Write the team's October 7–11 activity update from merged PRs, reviews and remaining in-flight branches.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.forge.draft-release-notes
+      - daintree.orchestration.status-and-resume
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: can you regroup it by person instead of by theme?
     history:
@@ -112,12 +118,6 @@ followups:
     active: [daintree.git.summarize-activity]
     run: 2026-09-28-catalog-expansion-stateful
 topic_shifts:
-  - query: ok, now write up what the agents actually landed today for my standup
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: claude-1 is working on #412, codex-2 finished feat/export and handed back, claude-3 is waiting on approval - I approved it.'
-    active: [daintree.orchestration.supervise-fleet]
-    run: 2026-09-28-catalog-expansion-stateful
   - query: great. now give me a summary of everything I shipped this week for the weekly update
     history:
       - 'user: squash-merge #915'

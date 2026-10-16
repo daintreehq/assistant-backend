@@ -238,11 +238,6 @@ boundaries:
     confusable_with: [daintree.orchestration.runoff-tiebreaker]
     run: 2026-09-28-agent-queries
 followups:
-  - query: how's it going?
-    history:
-      - 'user: get four agents debating whether we should move the selector off openrouter, then vote the weakest off'
-      - 'assistant: Spawned four explore agents (Claude, Codex, Gemini, Qwen) with opening prompts on the topic. Round 1 positions are coming in now.'
-    active: [daintree.orchestration.debate-elimination]
   - query: skip the third round, go straight to the vote
     history:
       - 'user: three agents debate the retry design then eliminate the weakest'
@@ -301,11 +296,6 @@ topic_shifts:
       - 'user: debate until they converge on one plan'
       - 'assistant: They converged - single plan delivered.'
     active: [daintree.orchestration.multi-agent]
-  - query: hang on — how does daintree stop them just voting for themselves?
-    history:
-      - 'user: let them debate then vote the weakest position off'
-      - 'assistant: Two rounds done, final positions collected. Running the elimination vote blind.'
-    active: [daintree.orchestration.debate-elimination, daintree.foundation]
   - query: explain what the elimination round does, then have them debate and vote the weakest off
     history:
       - 'user: want to settle an argument'
@@ -413,6 +403,13 @@ topic_shifts:
       - 'assistant: It asked whether to delete the legacy fixtures; I answered yes. It continued and finished the cleanup.'
     active: [daintree.agents.answer-waiting-agent]
     run: 2026-09-24-selector-hardening
+  - query: Turn the ongoing design discussion into a final-position ballot that removes the weakest position and reports each vote.
+    history:
+      - 'user: Let the three agents discuss the new cache policy openly.'
+      - 'assistant: Three rounds are complete and all positions have been relayed. No voting has taken place.'
+    active: [daintree.orchestration.conversation]
+    confusable_with: [daintree.orchestration.conversation, daintree.orchestration.competition]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[terminal.awaitAll returned: 4 elimination votes in]'
     history:

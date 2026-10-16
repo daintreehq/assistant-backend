@@ -63,6 +63,9 @@ boundaries:
     confusable_with: [daintree.workflow.find-issue-work]
   - query: Track down the merged pull request that introduced the webhook retry regression by running the test across history.
     confusable_with: [daintree.workflow.find-issue-work]
+  - query: Use the passing v4.3 tag and failing main to bisect the first commit that makes the parser reproducer fail.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: it says commit 4c1e won't even build — tell it to skip that one, not mark it bad
     history:

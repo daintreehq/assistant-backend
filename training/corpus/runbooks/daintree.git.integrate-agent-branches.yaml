@@ -104,6 +104,18 @@ boundaries:
   - query: "Agents on 88, 90 and 93 are done. Bring their branches together on a fresh integration worktree, tests after each merge, nothing pushed and no PR yet."
     confusable_with: [daintree.orchestration.work-in-waves]
     run: transcript-2026-10-16-batch-workflows
+  - query: Merge the three completed agent branches into one integration branch and run combined checks; no additional tickets or follow-on waves are requested.
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: these are the last three branches, just integrate them together. there's no next group to launch
+    confusable_with: [daintree.orchestration.work-in-waves]
+    run: 2026-10-16-synthetic-audit
+  - query: Combine the finished docs, API and UI branches in a new integration worktree, checking after each merge.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.forge.land-pull-request
+      - daintree.worktree.compare-worktrees
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: ok, the codex one is committed now, add feat/search-index as the last merge
     history:

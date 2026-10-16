@@ -175,3 +175,10 @@ topic_shifts:
     history:
       - "user: clean up the panes the last run left on the hosts"
       - "assistant: Two hosts have panes from it; I can ask each host's assistant to remove them."
+  - query: 'Different run: I accidentally sent the receipts issue to two other hosts. Settle one owner and preserve both attempts.'
+    history:
+      - 'user: compare the deliberate parser race attempts'
+      - 'assistant: The parser race is finished and its ranking is recorded.'
+    active: [daintree.hosts.race-and-review]
+    confusable_with: [daintree.hosts.race-and-review]
+    run: 2026-10-16-synthetic-audit

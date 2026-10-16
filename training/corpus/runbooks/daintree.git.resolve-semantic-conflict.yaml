@@ -130,3 +130,20 @@ topic_shifts:
       - 'assistant: Merged cleanly, but test_refund now fails: main made refunds async, while the payments branch assumes they complete synchronously.'
     active: [daintree.git.sync-with-base]
     run: 2026-09-28-round6-stateful
+  - query: Pin the shipping/promotions clash as a failing test on their combined tree, reconcile their intended discount order and implement the agreed behaviour.
+    history:
+      - 'user: Merge both pricing branches into integrate/pricing.'
+      - 'assistant: Git merged cleanly. Each branch passes alone; combined, the promotion is applied before shipping and the checkout total is wrong.'
+    active: [daintree.git.integrate-agent-branches]
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.git.sync-with-base
+      - daintree.ci.diagnose-and-fix
+    run: 2026-10-16-synthetic-audit
+  - query: git merged without a conflict, but both discounts get applied now. each branch passes alone. help settle what the combined rule should be.
+    history:
+      - 'user: Catch feature/loyalty up with main.'
+      - 'assistant: The update merged cleanly and its tests pass. The promotion branch was subsequently integrated too.'
+    active: [daintree.git.sync-with-base]
+    confusable_with: [daintree.git.sync-with-base, daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit

@@ -177,6 +177,9 @@ boundaries:
     confusable_with:
     - daintree.release.deploy-and-verify
     run: runbook-2026-10-issue-138
+  - query: The laptop host went offline while combining the pinned inputs. Move that unfinished integration unit to the server from its last verified push and establish one publishing owner.
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: fine, move that one to the tower then
@@ -199,6 +202,13 @@ followups:
     history:
       - "user: the build box is out of claude usage, move its half-done ticket"
       - "assistant: The tower has Claude Code with allowance left and the same repository; I'd move the ticket there. Go ahead?"
+  - query: The original host is back and says it kept editing. Reconcile both attempts and keep only the replacement authorized to publish; preserve the original work.
+    history:
+      - 'user: move the unfinished locale fix off the disconnected lab host to the server'
+      - 'assistant: The server continued from the lab host last verified push. The lab host never acknowledged the stop.'
+    active: [daintree.hosts.reassign-host-work, daintree.hosts.supervise-swarm]
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: ok forget the cleanup, the third host's unfinished ticket should go to another machine

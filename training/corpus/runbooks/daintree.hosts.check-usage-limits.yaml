@@ -191,3 +191,17 @@ topic_shifts:
       - "user: status of the agents in this project?"
       - "assistant: Three are working and one is waiting on a question in terminal 4."
     active: [daintree.orchestration.supervise-fleet]
+  - query: What Claude and Codex allowance is left on the remote machines right now? Read the usage screens there and give me one row for each account.
+    history:
+      - 'user: catch me up after the connection dropped'
+      - 'assistant: All earlier exchanges are accounted for; nothing needs recovering.'
+    active: [daintree.hosts.recover-and-clean-up]
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: 2026-10-16-synthetic-audit
+  - query: Before deciding any placement, read each remote machine usage screen and report the remaining Claude allowance and resets only.
+    history:
+      - 'user: split the new tracker issues across the hosts'
+      - 'assistant: I have not sent anything; the available agent allowance has not been checked.'
+    active: [daintree.hosts.place-work]
+    confusable_with: [daintree.hosts.place-work]
+    run: 2026-10-16-synthetic-audit

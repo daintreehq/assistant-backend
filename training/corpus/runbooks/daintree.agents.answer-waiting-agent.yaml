@@ -305,11 +305,6 @@ boundaries:
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
 followups:
-  - query: how's it going?
-    history:
-      - 'user: three agents are parked on questions, read them and answer the obvious ones'
-      - 'assistant: Sent yes to term-a and term-c (both asking to add tests for the touched files). term-b is asking whether to drop the legacy column — that''s destructive, I left it for you. term-a and term-c are running again.'
-    active: [daintree.agents.answer-waiting-agent]
   - query: did it finish yet
     history:
       - 'user: the deploy agent is asking to continue, tell it yes and give me the url when it lands'
@@ -353,11 +348,6 @@ topic_shifts:
       - 'user: ask claude what it makes of the retry logic'
       - 'assistant: It says the backoff is fine but the jitter is applied after the cap, so long tails collapse. Quoted retries.py:58.'
     active: [daintree.agents.ask-and-relay]
-  - query: the two waiting ones — answer them, both yes, and tell me what they come back with
-    history:
-      - 'user: sweep the fleet'
-      - 'assistant: 5 running, 1 unsupervised (adopted), 2 waiting on questions.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: two more just started asking, do those as well
     history:
       - 'user: the agent is asking something, say yes'
@@ -373,11 +363,6 @@ topic_shifts:
       - 'user: push this and get a PR up'
       - 'assistant: Pushed, PR #402 open.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: so how does daintree know its asking rather than just idle?
-    history:
-      - 'user: the agent is asking something, tell it yes'
-      - 'assistant: It asked whether to overwrite the existing migration. Replied yes, waiting for it to continue.'
-    active: [daintree.agents.answer-waiting-agent, daintree.foundation]
   - query: why do they stop and ask instead of just going — is that a daintree setting?
     history:
       - 'user: three of them are waiting on questions, unblock them'
@@ -387,13 +372,6 @@ topic_shifts:
     history:
       - 'user: somethings blinking in tab 3'
       - 'assistant: That agent is waiting on a prompt.'
-  - query: two of them are waiting on a question, just say yes to both and let them carry on
-    history:
-      - 'user: i''ve got 5 issues and 5 studios free. put an agent on each'
-      - 'assistant: Five agents launched, one issue each.'
-      - 'user: how''s everyone doing'
-      - 'assistant: Two working, two waiting on questions, one finished.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
   - query: gemini is asking me something before it'll answer, tell it yes
     history:
       - 'user: codex never came up, nothing happened when you launched it'
@@ -408,18 +386,6 @@ topic_shifts:
       - 'user: checks are red? work out why and get it green'
       - 'assistant: Both failures come from the session fixture not being reset between cases. Fix pushed, rerun in progress. Also — the agent on 412 is waiting on a question: reuse the existing retry config, or add a new one?'
     active: [daintree.ci.diagnose-and-fix, daintree.foundation]
-  - query: two of them are waiting on questions? unblock both, yes to everything
-    history:
-      - 'user: hows everyone doing'
-      - 'assistant: Six agents: two finished, one working, two waiting on questions, one failed. The failed one is tab 7.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
-  - query: tab 5's asking something. say yes and let it carry on
-    history:
-      - 'user: yeah, forward it to the agent'
-      - 'assistant: Relayed both comments to tab 3 with anchors.'
-      - 'user: how''s everyone doing, anything need me?'
-      - 'assistant: 5 agents: 2 working, 1 finished (tab 6, clean), 1 waiting on a question (tab 5), 1 unsupervised (tab 7 — adopted, watcher attached). Tab 5 is the only one that needs you.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
   - query: it's asking whether to bump the lockfile. tell it yes, pnpm only
     history:
       - 'user: i''m afk — watch it, and check the issue thread'
@@ -447,16 +413,6 @@ topic_shifts:
       - 'user: now put claude in there and get it fixing'
       - 'assistant: Claude running in tab 2 in that worktree, briefed on the double-doubling in the sleep calc.'
     active: [daintree.edits.spawn-visible-agent, daintree.foundation]
-  - query: the filters one is asking about a null check now. answer it - yes, guard it
-    history:
-      - 'user: how are they both doing'
-      - 'assistant: tab 4 editing, tab 5 waiting on a question.'
-      - 'user: retitle the tabs then tell me which needs me'
-      - 'assistant: Renamed to ''filters-logout'' and ''config-loader''. config-loader needs you - precedence question.'
-    active:
-      - daintree.terminals.rename
-      - daintree.orchestration.supervise-fleet
-      - daintree.foundation
   - query: the agent wants to know which breakpoint to target. tell it 768
     history:
       - 'user: what recipes have we got'
@@ -470,18 +426,6 @@ topic_shifts:
       - 'assistant: Started #77, agent in tab 2.'
       - 'user: how long do these usually take lol'
       - 'assistant: Depends on the bug - this one is probably twenty minutes.'
-  - query: two of them are asking me something. just say yes to both
-    history:
-      - 'user: each one gets its own worktree yeah?'
-      - 'assistant: Confirmed — six separate worktrees. All six agents running.'
-      - 'user: how are they all doing'
-      - 'assistant: Four working, two waiting on questions, none failed. The two waiting want confirmation before touching migration files.'
-    active: [daintree.foundation, daintree.orchestration.supervise-fleet]
-  - query: 4 of them are sat on prompts. unblock the lot, yes to anything read only
-    history:
-      - 'user: hows everyone doing'
-      - 'assistant: Nine agents up: three working, four waiting on questions, two finished and idle.'
-    active: [daintree.foundation, daintree.orchestration.supervise-fleet]
   - query: right now tell it pnpm and let it carry on
     history:
       - 'user: 4 of them are sat on prompts. unblock the lot'
@@ -517,11 +461,6 @@ topic_shifts:
       - 'user: five agents, one ticket each'
       - 'assistant: Five up and supervised.'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: which agent is asking me something? i got a ping
-    history:
-      - 'user: how are the agents doing'
-      - 'assistant: Four working, one nearly done. Watchers armed on all of them.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
   - query: the agent pinged me - i think it's asking something, go answer it
     history:
       - 'user: get an agent adding the missing tests'
@@ -578,23 +517,11 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: yes, and tell me what it does after
-    history:
-      - 'user: codex is waiting on something'
-      - 'assistant: Codex (t2) asks: "Proceed with deleting 3 unused migrations? (y/n)"'
-    active: [daintree.agents.answer-waiting-agent]
-    run: 2026-09-24-selector-hardening
   - query: no, yes, yes. and report back what each does next
     history:
       - 'user: three of them are asking questions'
       - 'assistant: t1 claude: "keep the old API?"; t3 gemini: "trust this folder?"; t5 codex: "run migrations now?"'
     active: [daintree.agents.answer-waiting-agent]
-    run: 2026-09-24-selector-hardening
-  - query: the two sitting on prompts — tell both yes, use pnpm
-    history:
-      - 'user: anything need me?'
-      - 'assistant: Swept 6 agents: 3 working, 1 finished, and codex (t2) and cursor (t4) are waiting on questions — both asking which package manager to use.'
-    active: [daintree.orchestration.supervise-fleet]
     run: 2026-09-24-selector-hardening
   - query: oh wait it's not hung, scrolled up — it's asking whether to trust the folder. tell it yes
     history:
@@ -634,6 +561,28 @@ topic_shifts:
       - 'assistant: claude-5 is waiting on a question, ''Run the migrations against the dev DB? (y/n)'', so I haven''t fed it yet.'
     active: [daintree.context.feed-running-agent]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: just tell it yes
+    history:
+      - 'user: get an agent to look at the auth middleware and tell me what it finds'
+      - 'assistant: Agent spawned on terminal t-9. It''s asking whether it should include the test files in scope.'
+    active: [daintree.agents.ask-and-relay]
+    confusable_with: [daintree.agents.ask-and-relay]
+    run: 2026-10-16-synthetic-audit
+  - query: no, keep it to exactly what i asked
+    history:
+      - 'user: spawn an agent to strip the dead feature flags out of settings'
+      - 'assistant: Spawned edit agent on terminal t-7 with a watcher. I''ll report when it lands.'
+      - 'assistant: The agent is asking whether it should also update the snapshot tests that reference the removed flags.'
+    active: [daintree.edits.spawn-visible-agent]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
+  - query: Reply keep the old enum to the question waiting in term-schema, then confirm it resumed.
+    history:
+      - 'user: Check how the enum migration is going.'
+      - 'assistant: term-schema is paused asking whether to delete the old enum or keep it during the compatibility period.'
+    active: [daintree.agents.ask-running-agent]
+    confusable_with: [daintree.agents.ask-running-agent, daintree.agents.steer-running-agent]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[watcher fired: t_0022 stopped again — askingQuestion, wants a second confirmation]'
     history:
@@ -663,8 +612,6 @@ wakes:
 near_misses:
   - the agent in tab 3 is asking something, tell it yes
 docs:
-  - agent 2 is asking something, tell it yes
-  - the agent is asking something, tell it yes
   - go ahead and answer it
   - yes tell it yes
   - query: yes tell it yes

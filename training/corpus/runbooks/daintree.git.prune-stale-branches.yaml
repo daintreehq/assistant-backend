@@ -57,6 +57,12 @@ boundaries:
   - query: which remote branches are abandoned and safe to delete? list them with evidence first
     confusable_with: [daintree.git.recover-lost-work]
     run: 2026-09-28-round6
+  - query: Inventory branches without worktrees, identify the merged ones with evidence and delete only the approved list.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.orchestration.workspace-cleanup
+      - daintree.worktree.audit-worktrees
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: delete the merged ones, keep the abandoned for now
     history:

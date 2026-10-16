@@ -96,6 +96,13 @@ followups:
     history:
       - 'user: the hub answered: take the api host''s side in that conflict'
       - 'assistant: The integration worktree is still at the first merge, and its agent is idle.'
+  - query: Use only the commits pinned by the hub; leave the source branch newer tip out and continue checks after each merge.
+    history:
+      - 'user: on this receiving lane, integrate the two commits the hub approved'
+      - 'assistant: The first input is merged and checked. The second source branch advanced, but the exact pinned commit is available locally.'
+    active: [daintree.hosts.integrate-for-hub, daintree.hosts.handle-hub-message]
+    confusable_with: [daintree.hosts.handle-hub-message, daintree.hosts.integrate-host-branches]
+    run: 2026-10-16-synthetic-audit
 
 
 boundaries:

@@ -200,6 +200,12 @@ boundaries:
   - query: "get the build box and the mac mini both ready with a Codex assistant for the repo"
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
+  - query: Get assistants enrolled in the project on the remote API and web machines before I send either any work. Leave the dev servers stopped.
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
+  - query: There is no remote run to hand over yet. Get an assistant ready in this repository on my other two machines first.
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: 'now get them ready'
     history:
@@ -221,3 +227,17 @@ topic_shifts:
       - 'user: what''s left on my codex plan this week'
       - 'assistant: Codex shows 62% of the weekly limit left, resetting Monday.'
     active: [daintree.agents.check-usage-limits]
+  - query: Enroll one assistant for the telemetry repository on each connected Remote Host and return the ready lanes; no job has been assigned.
+    history:
+      - 'user: compare the Claude usage left on my machines'
+      - 'assistant: Both remote hosts reported their allowance and reset times.'
+    active: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.hosts.check-usage-limits]
+    run: 2026-10-16-synthetic-audit
+  - query: Prepare missing enrolled assistants in this repository on those Remote Hosts so they can take work; return the ready table.
+    history:
+      - 'user: give me a snapshot of my remote machines'
+      - 'assistant: Two connected hosts list this project but no enrolled assistant.'
+    active: [daintree.hosts.survey-hosts]
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: 2026-10-16-synthetic-audit

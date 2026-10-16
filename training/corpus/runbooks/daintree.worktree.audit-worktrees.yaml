@@ -101,6 +101,9 @@ boundaries:
   - query: which of these worktrees on this machine can I let go of?
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
+  - query: Classify all local worktrees by merge state and unpushed or dirty work, and recommend which can be removed without deleting any.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.orchestration.workspace-cleanup]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: what exactly would I lose from feat/search-v2 if I removed it?
     history:
@@ -144,12 +147,6 @@ topic_shifts:
       - 'user: prune the branch list'
       - 'assistant: Deleted 12 merged branches with restore SHAs; kept 5 active and why.'
     active: [daintree.git.prune-stale-branches]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: ok. separately, I have 15 worktrees - what are they all and which are already merged?
-    history:
-      - 'user: anything need me?'
-      - 'assistant: No agent waiting; claude-2 finished and handed back.'
-    active: [daintree.orchestration.supervise-fleet]
     run: 2026-09-28-catalog-expansion-stateful
   - query: and the worktrees - does anything in them have uncommitted or unpushed work?
     history:

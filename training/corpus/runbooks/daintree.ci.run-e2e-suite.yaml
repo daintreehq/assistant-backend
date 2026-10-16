@@ -133,6 +133,9 @@ boundaries:
   - query: "I don't need ports or a database set up for that remote worktree, only the end-to-end specs run against a server started for the run"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-135
+  - query: Run browser checkout.spec.ts in wt-payments against that worktree's own server and collect the trace files.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.ci.diagnose-and-fix]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: rerun just those two with tracing on
     history:

@@ -379,12 +379,6 @@ topic_shifts:
       - 'assistant: Created worktree ../repo-payments-v2 on new branch feat/payments-v2 off main. No agent launched.'
     active: [daintree.worktree.create-plain-worktree]
     run: 2026-09-24-selector-hardening
-  - query: that worktree will share the dev db with main. give it its own database
-    history:
-      - 'user: start work on #77'
-      - 'assistant: Started #77 "Add CSV import" — worktree ../app-77-csv-import, claude spawned in t3 with a background supervisor watcher.'
-    active: [daintree.workflow.start-work-on-issue]
-    run: 2026-09-24-selector-hardening
   - query: problem is it'll point at the same postgres as main and the migrations will stomp each other. can each worktree get its own db
     history:
       - 'user: make me a worktree for feat/billing-v2 off develop'
@@ -433,3 +427,10 @@ topic_shifts:
       - "assistant: Started one agent per host, each on its own branch; three have pushed so far."
     active: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-132
+  - query: please make every new checkout get its own .env and database automatically. I don't want to run a one-off server command.
+    history:
+      - 'user: Start the application in wt-shipping.'
+      - 'assistant: It cannot boot: this new checkout has neither .env nor its own database. No command is running.'
+    active: [daintree.terminals.run-visible-command]
+    confusable_with: [daintree.terminals.run-visible-command, daintree.recipe.run-or-create]
+    run: 2026-10-16-synthetic-audit

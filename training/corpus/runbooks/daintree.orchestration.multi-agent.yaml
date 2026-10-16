@@ -41,7 +41,6 @@ positives:
   - those two you just interviewed — put them back on the same question and get them to agree
   - make those two argue it out until they land on the same answer
   - get the gpt one and the claude one — i think it's terminal 4 and 6? — to reconcile their estimates and give me a single number
-  - prod is down, i've got two agents with conflicting theories, ping between them fast and tell me which cause is real
   - before I commit to a schema, I'd like three agents to draft it independently and then iterate together into one final schema. can you run that?
   - converge them
   - same problem, both agents, two more rounds then summarize into one answer
@@ -371,12 +370,10 @@ boundaries:
   - query: 'get claude and codex on this machine working together on the same feature, sharing notes'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
+  - query: Relay the two investigators' findings until they reconcile them into one shared explanation; do not assign a separate suspected cause to each.
+    confusable_with: [daintree.orchestration.hypothesis-split]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: how's it going?
-    history:
-      - 'user: spin up three agents to debate the caching design and converge on one answer'
-      - 'assistant: Spawned three explore agents (terminal-a1f, terminal-b2c, terminal-c9d) and sent round 1. Waiting on all three.'
-    active: [daintree.orchestration.multi-agent]
   - query: they're still not agreeing, keep going
     history:
       - 'user: get two agents cross-checking each other on the auth bug until they agree'
@@ -436,13 +433,6 @@ topic_shifts:
     history:
       - 'user: two opinions on the schema'
       - 'assistant: Both agents are up.'
-  - query: 3 to 1 for postgres. ok now get them to actually hash it out together and come back with one recommendation i can act on
-    history:
-      - 'user: poll the pinned agents - postgres or sqlite for the local ledger'
-      - 'assistant: Same question to all four independently.'
-      - 'user: don''t score it, i just want their raw takes plus where they land'
-      - 'assistant: 3 for postgres, 1 for sqlite on the grounds of zero setup. Raw answers below.'
-    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
   - query: keep relaying til they stop disagreeing
     history:
       - 'user: don''t score it, just their raw takes'
@@ -464,20 +454,6 @@ topic_shifts:
       - 'user: hang on is the mcp even connected? none of the terminal tools seem to be there'
       - 'assistant: The Daintree MCP server is disconnected, which is why the whole terminal toolset is missing. Reconnect it from the integrations panel and the tools come back.'
     active: [daintree.diagnostics, daintree.foundation]
-  - query: hows that going
-    history:
-      - 'user: hang on is the mcp even connected? none of the terminal tools seem to be there'
-      - 'assistant: MCP was disconnected — reconnect and the tools return.'
-      - 'user: restarted it. try again'
-      - 'assistant: Three agents up in tabs 9, 10 and 11, each looking at the slow report query from a different angle. First relay round is out.'
-    active: [daintree.orchestration.multi-agent, daintree.foundation]
-  - query: right, pull their answers together into one recommendation
-    history:
-      - 'user: school just rang, i have to go. park it — leave them running and tell me when all three have answered'
-      - 'assistant: Watchers armed on all three.'
-      - 'user: where were we'
-      - 'assistant: Three agents on the slow report query. All three finished while you were out — tabs 9, 10 and 11 each posted a final answer, and none of them have been merged into anything yet.'
-    active: [daintree.orchestration.status-and-resume, daintree.foundation]
   - query: ok enough waffle. make them converge on one recommendation i can act on
     history:
       - 'user: ask the pinned ones whether our test suite is too slow'
@@ -524,10 +500,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: get two claudes to hash out the caching strategy and give me one recommendation
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: good, now round three — send each of them the other two's objections and ask for a final position
     history:
       - 'user: hi'
@@ -549,18 +521,6 @@ topic_shifts:
       - 'user: get claude, codex and grok talking about whether we should move to a monorepo, see where it goes'
       - 'assistant: Round 1 done: claude is for it (shared tooling), codex against (CI time), grok wants a hybrid. Caught each up on the others; round 2 is under way.'
     active: [daintree.orchestration.conversation]
-    run: 2026-09-24-selector-hardening
-  - query: one more pass
-    history:
-      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
-      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
-    active: [daintree.orchestration.multi-agent]
-    run: 2026-09-24-selector-hardening
-  - query: cool. totally separate, put claude and codex on the cache invalidation bug together until they agree on one fix
-    history:
-      - 'user: where were we yesterday'
-      - 'assistant: Open: #640 agent still working in t4; #611 merged; batch-7 finished. Closed 2 stale ledger rows.'
-    active: [daintree.orchestration.status-and-resume]
     run: 2026-09-24-selector-hardening
 wakes:
   - query: '[terminal.awaitAll returned: 3 finished round one]'

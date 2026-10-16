@@ -100,6 +100,13 @@ followups:
   - query: two hosts both ran shard 2, sort that out and give me the combined result
     history:
       - "assistant: Shard 2 of 4 was answered by the tower and by the linux box."
+  - query: Reconcile the shard identities against the original test manifest before merging the results; count a duplicated shard once and leave the missing tests incomplete.
+    history:
+      - 'user: divide the adapter suite into four disjoint parts over my Remote Hosts'
+      - 'assistant: The result files contain shards 1, 2, 2 and 4; every file claims green, but none reports shard 3.'
+    active: [daintree.hosts.shard-test-suite, daintree.hosts.run-validation-matrix]
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: next, split the e2e tests across the same machines

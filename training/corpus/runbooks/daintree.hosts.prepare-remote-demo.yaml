@@ -151,6 +151,13 @@ followups:
     history:
       - "assistant: The demo is serving at the commit you asked for on the host's port 3000."
       - "user: I opened localhost:3000 and it's a different app"
+  - query: Show me the Shell forward for that listener. My local port has a different number, and I want the demo at the reported commit.
+    history:
+      - 'user: demo the new reconciliation page on the remote Mac for me'
+      - 'assistant: The host says the requested commit is serving on its port 4100; the local forwarding slot is 4102 because 4100 is occupied here.'
+    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.demo-for-hub]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: separate thing, can the remote host also put the survey builder up as a demo for me to look at from here?

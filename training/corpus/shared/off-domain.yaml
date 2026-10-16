@@ -66,7 +66,6 @@ examples:
   - what does top_p actually do
   - what is a vector database for
   - how do embeddings work
-  - what does mcp stand for
   - how does tool calling work in llms generally
   - what is prompt caching and why does it save money
   - are ai coding agents actually any good yet
@@ -89,7 +88,6 @@ examples:
   - whats rubber duck debugging
   - what makes a good bug report
   - what does done mean in agile, is there a real definition
-  - what is a watchdog timer
   - what is polling vs long polling
   - webhooks vs polling, which is better
   - what does fan out mean in distributed systems
@@ -148,7 +146,6 @@ examples:
   - whats 2^32 again
   - how does a bloom filter work
   - when should i use a b-tree
-  - whats the difference between a mutex and a semaphore
   - whats a monad
   - explain CAP theorem
   - difference between tcp and udp
@@ -159,7 +156,6 @@ examples:
   - what is a race condition exactly
   - whats the difference between the stack and the heap
   - how do hash maps handle collisions
-  - what does ACID stand for
   - explain dependency injection like im five
   - whats the difference between a left join and an inner join
   - when is quicksort worse than mergesort
@@ -218,3 +214,13 @@ examples:
   - whats the score in the arsenal game
   - when is the next f1 race
   - is the new dune film any good
+  - query: What does host mean in the life cycle of a parasite?
+    history:
+      - 'user: explain why the remote assistant rejected my message'
+      - 'assistant: That messaging issue is resolved.'
+    run: 2026-10-16-synthetic-audit
+  - query: Explain the difference between a software thread and a process.
+    history:
+      - 'user: is the remote build host overloaded?'
+      - 'assistant: Its current memory pressure is nominal.'
+    run: 2026-10-16-synthetic-audit

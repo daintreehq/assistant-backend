@@ -44,7 +44,6 @@ examples:
   - whats the difference between you and the agents you run
   - are you deterministic or do i get a different answer each time
   - do you ever say no to me
-  - what timezone is this box set to
   - what time is it here
   - whats todays date
   - what day of the week is it
@@ -53,7 +52,6 @@ examples:
   - am i on ventura or sequoia
   - what shell is this
   - am i in zsh or bash
-  - how much disk have i got left
   - how much ram does this machine have
   - what cpu is in this thing
   - whats my hostname

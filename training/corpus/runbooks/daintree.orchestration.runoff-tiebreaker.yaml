@@ -240,11 +240,6 @@ boundaries:
     confusable_with: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-28-catalog-expansion-refine
 followups:
-  - query: how's it going?
-    history:
-      - 'user: agent 2 and agent 4 both ended on three points, run a runoff'
-      - 'assistant: Saved the cohort map to scratch. Sent both tied agents a prompt for one new short entry and I''m awaiting them now — the three original voters are untouched.'
-    active: [daintree.orchestration.runoff-tiebreaker]
   - query: any votes back yet
     history:
       - 'user: break the tie between claude-1 and claude-3'
@@ -436,10 +431,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: tied again. this time spawn one fresh agent as the deciding vote and rerun the tiebreak
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: brake the tie with anotehr vote between the top two
     history:
       - 'user: thanks for yesterday'
@@ -500,6 +491,13 @@ topic_shifts:
       - 'assistant: Collected 3 submissions and ran blind votes. Tally: claude 1, codex 1, gemini 1 — three-way tie.'
     active: [daintree.orchestration.competition]
     run: 2026-09-24-selector-hardening
+  - query: Run a tie-break ballot using the existing two tied entries and the original voters; keep the electorate unchanged.
+    history:
+      - 'user: Have the three agents submit and peer-judge release taglines.'
+      - 'assistant: Entry A and entry C tied at four points; all original voters are still available.'
+    active: [daintree.orchestration.competition]
+    confusable_with: [daintree.orchestration.competition, daintree.agents.poll-pinned-agents]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[wake: both runoff submissions received]'
     history:
@@ -516,11 +514,6 @@ wakes:
       - 'user: four agents, best refactor idea wins, they vote on each other'
       - 'assistant: All four submissions in, blind ballot out to the cohort.'
     active: [daintree.orchestration.competition, daintree.foundation]
-  - query: '[async wait returned: 6 verdicts collected - 3 postgres, 3 sqlite]'
-    history:
-      - 'user: poll the pinned agents - postgres or sqlite for this'
-      - 'assistant: Question out to all six, neutral phrasing, no steer.'
-    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
   - query: '[background wake: tally complete - three-way tie at 2 points each]'
     history:
       - 'user: run the contest across all eight and declare a winner'

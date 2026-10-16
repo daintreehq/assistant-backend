@@ -91,8 +91,6 @@ positives:
 boundaries:
   - query: find me a couple of small unassigned issues i could hand out
     confusable_with: [daintree.worktree.relocate-agents]
-  - query: anything unassigned i could pick up this afternoon
-    confusable_with: [daintree.forge.manage-issue]
   - query: search the tracker for open bugs mentioning the parser
     confusable_with: [daintree.forge.manage-issue]
   - query: what should i work on next
@@ -177,8 +175,6 @@ boundaries:
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: find me a small bug nobody's started
     confusable_with: [daintree.workflow.follow-up-on-issue]
-  - query: anything unassigned i could knock out this afternoon
-    confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: whats worth picking up next, check nobody else is already on it
     confusable_with: [daintree.workflow.follow-up-on-issue]
   - query: anything unassigned i could knock out in an hour?
@@ -204,9 +200,6 @@ boundaries:
     run: 2026-09-24-selector-hardening
   - query: i have no idea which of the open bugs are safe to grab without stepping on someone
     confusable_with: [daintree.workflow.start-work-on-issue]
-    run: 2026-09-24-selector-hardening
-  - query: did we ever ship the csv export thing? find the closed PRs about it
-    confusable_with: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-24-selector-hardening
   - query: which PRs touched the rate limiter in the last few months
     confusable_with: [daintree.workflow.follow-up-on-issue]
@@ -254,9 +247,6 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
     run: 2026-09-28-agent-queries
   - query: find all closed PRs that touched the payment webhook
-    confusable_with: [daintree.workflow.follow-up-on-issue]
-    run: 2026-09-28-agent-queries-2
-  - query: did we ever ship the CSV export? find the PR
     confusable_with: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-28-agent-queries-2
   - query: List open issues mentioning 'timeout' in the ingest repo
@@ -377,11 +367,6 @@ followups:
       - 'user: find me bugs nobody is on'
       - 'assistant: Query was `no:assignee label:bug`, sorted updated desc. Four hits, two already have linked PRs open.'
     active: [daintree.workflow.find-issue-work]
-  - query: hows it going
-    history:
-      - 'user: what''s free in the tracker right now'
-      - 'assistant: Searching now — reading the in-flight worktree rows first so I don''t propose something you''ve already got open.'
-    active: [daintree.workflow.find-issue-work]
   - query: drop the third, too fiddly. give me another one instead
     history:
       - 'user: shortlist three issues i could do next'
@@ -420,26 +405,11 @@ topic_shifts:
       - 'user: start on #88'
       - 'assistant: Worktree and branch created for #88, agent launched with a background supervisor attached.'
     active: [daintree.workflow.start-work-on-issue]
-  - query: whats in the backlog thats small enough for a friday afternoon
-    history:
-      - 'user: ready the branch and open a PR'
-      - 'assistant: PR #163 opened, checks queued.'
-    active: [daintree.workflow.prep-branch-for-review]
   - query: anything open in the tracker about plugins that nobodys picked up
     history:
       - 'user: explain the plugin system'
       - 'assistant: Plugins register via entry points, loaded in plugins/registry.py:22, sandboxed per call.'
     active: [daintree.explore.repository]
-  - query: widen it to include the perf label
-    history:
-      - 'user: find me something unassigned'
-      - 'assistant: Three candidates, none in flight.'
-    active: [daintree.workflow.find-issue-work, daintree.foundation]
-  - query: anything unassigned in the tracker thats small enough for an afternoon?
-    history:
-      - 'user: what was i working on last week'
-      - 'assistant: The websocket reconnect work - branch merged, ledger row closed. Nothing outstanding.'
-    active: [daintree.orchestration.status-and-resume]
   - query: fine. find me an unassigned bug nobodys started, small one
     history:
       - 'user: can you make me a recipe that does lint then test'
@@ -460,14 +430,6 @@ topic_shifts:
       - 'user: find me something small nobody''s on'
       - 'assistant: Six unassigned candidates; two already in flight in existing worktrees. Shortlist of four.'
     active: [daintree.workflow.find-issue-work, daintree.foundation]
-  - query: explain how issue search works in daintree and find me an unassigned small bug
-    history:
-      - 'user: got an hour spare'
-      - 'assistant: Nothing in flight.'
-  - query: how does daintree decide something is already in flight? screen the backlog and shortlist what nobodys on
-    history:
-      - 'user: backlogs a mess'
-      - 'assistant: 40 open issues.'
   - query: any open issues about rate limiting that nobodys on?
     history:
       - 'user: bundle the limiter, its tests and whatever config it reads'
@@ -482,12 +444,6 @@ topic_shifts:
       - 'user: 412 looks right, get someone on it'
       - 'assistant: Started #412 — worktree and branch created, agent spawned, background supervisor attached.'
     active: [daintree.workflow.start-work-on-issue]
-  - query: while thats going find me something small i can do myself. anything unassigned and tiny
-    history:
-      - 'user: start work on issue 412'
-      - 'assistant: Started 412 — worktree issue-412 created, agent launched in tab 5, background supervisor attached.'
-      - 'user: nice'
-      - 'assistant: It''ll wake me if it needs anything.'
   - query: actually hang on, is there already an issue open for that?
     history:
       - 'user: and what would i have to touch to add a jitter option'
@@ -585,14 +541,6 @@ topic_shifts:
     history:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
-  - query: do the same filter for the other repo — unassigned, open, nothing with a linked PR
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
-  - query: pull the open issues and filter out anything with a linked PR
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: 77 vs 91 — which one is less of a rabbit hole
     history:
       - 'user: hey, you around?'
@@ -639,6 +587,18 @@ topic_shifts:
       - 'assistant: claude-3 wrote the 1.9.0 section from v1.8.2..main: 7 features, 10 fixes.'
     active: [daintree.forge.draft-release-notes]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: explain how issue search works in daintree and find me an unassigned small bug
+    history:
+      - 'user: got an hour spare'
+      - 'assistant: Nothing in flight.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: how does daintree decide something is already in flight? screen the backlog and shortlist what nobodys on
+    history:
+      - 'user: backlogs a mess'
+      - 'assistant: 40 open issues.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[agent task a_12 completed: cross-check against in-flight worktrees done]'
     history:
@@ -655,12 +615,7 @@ near_misses:
   - anything small i could pick up
   - whats worth doing next
 docs:
-  - find me a small unassigned bug nobody's on
   - find me a small bug nobody's picked up yet
-  - query: find me a small unassigned bug nobody's on
-    history:
-      - 'user: yo'
-      - 'assistant: Yo. What are we doing?'
   - query: find me a small bug nobody's picked up yet
     history:
       - 'user: How are you?'

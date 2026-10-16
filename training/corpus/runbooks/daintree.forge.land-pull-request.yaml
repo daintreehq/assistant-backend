@@ -414,11 +414,6 @@ followups:
       - 'user: put alice and the platform team on 512 as reviewers'
       - 'assistant: Requested. Complete lists come back as users [alice], teams [platform] — nothing was rejected. It''s still a draft, so they won''t be notified yet.'
     active: [daintree.forge.land-pull-request]
-  - query: what did the forge actually give back
-    history:
-      - 'user: squash it in'
-      - 'assistant: Merged #412 with squash. Result merged true, sha 7d1e02b, and the re-read confirms merged true, state MERGED.'
-    active: [daintree.forge.land-pull-request]
   - query: id's 3129884
     history:
       - 'user: dismiss that stale review on 77'
@@ -484,11 +479,6 @@ topic_shifts:
       - 'user: rerun it'
       - 'assistant: Rerun triggered, all four jobs green now.'
     active: [daintree.ci.diagnose-and-fix]
-  - query: put sarah and the platform team on that PR as reviewers
-    history:
-      - 'user: what''s the state of #204'
-      - 'assistant: Open, CI green, no reviews yet, one comment from the bot about coverage.'
-    active: [daintree.workflow.follow-up-on-issue, daintree.foundation]
   - query: flip it out of draft, it's ready for people to look at now
     history:
       - 'user: push this up and open a PR'
@@ -534,21 +524,11 @@ topic_shifts:
       - 'user: bundle everything touching the billing webhooks'
       - 'assistant: 22 files bundled to ./context/billing-webhooks.xml, nothing truncated.'
     active: [daintree.context.curate-copytree-bundle]
-  - query: land 520 please, whichever merge method the repo normally uses is fine but tell me which one you're using
-    history:
-      - 'user: how are the agents doing'
-      - 'assistant: Three finished, one still writing tests. The finished ones all have PRs up: 518, 519, 520.'
-    active: [daintree.orchestration.supervise-fleet, daintree.foundation]
   - query: mark the docs one ready for review, it's been sitting in draft since tuesday
     history:
       - 'user: tidy up the terminals from friday''s batch'
       - 'assistant: Closed five exited terminals and removed two merged worktrees. Left the docs worktree alone, it still has uncommitted work.'
     active: [daintree.orchestration.workspace-cleanup]
-  - query: go ahead and merge the hotfix PR, we need it out before the demo
-    history:
-      - 'user: remind me in 30 minutes to check the deploy'
-      - 'assistant: Timer set for 30 minutes.'
-    active: [daintree.orchestration.watch-outcome]
   - query: merge the fix PR, it's green
     history:
       - 'user: reload the preview and check'
@@ -582,14 +562,6 @@ topic_shifts:
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: 'merge it, squash, and use the commit title ''fix(auth): drop the stale session probe'''
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
-  - query: Close PR 12 without merging it.
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: checks are red but it's the unrelated lint job and we're abandoning this anyway. close it
     history:
       - 'user: thanks for yesterday'
@@ -622,10 +594,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: merge it once it's ready
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: Use squash to land this exact PR and verify the merged state afterward.
     history:
       - 'user: thanks for yesterday'
@@ -661,12 +629,6 @@ topic_shifts:
       - 'user: is my PR green'
       - 'assistant: PR #77: all checks green, approved by @sam.'
     active: [daintree.workflow.follow-up-on-issue]
-    run: 2026-09-24-selector-hardening
-  - query: approve and merge it once checks are done, rebase style
-    history:
-      - 'user: open the pr for this branch'
-      - 'assistant: Readiness verdict clean. Committed, pushed feat/onboarding-copy and opened PR #377 against main.'
-    active: [daintree.workflow.prep-branch-for-review]
     run: 2026-09-24-selector-hardening
   - query: great, approve it and squash merge
     history:
@@ -784,6 +746,15 @@ topic_shifts:
       - 'assistant: Demo running from search-rework at 44ab1e0 (PR #88), walkthrough and works/missing list handed over.'
     active: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6-stateful
+  - query: flip it out of draft then
+    history:
+      - 'user: readiness check on this worktree'
+      - 'assistant: Verdict blocked_uncommitted_changes — 11 unstaged files on fix/selector-cadence. Nothing is committed yet.'
+      - 'user: commit it all and push'
+      - 'assistant: Committed and pushed. There''s already an open PR (#402) with headRef fix/selector-cadence, so the push updated it rather than creating a new one.'
+    active: [daintree.workflow.prep-branch-for-review]
+    confusable_with: [daintree.workflow.prep-branch-for-review]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[forge activity: pull request changed]'
     active: [daintree.forge.land-pull-request]

@@ -64,6 +64,9 @@ boundaries:
     confusable_with: [daintree.orchestration.productionize-prototype]
   - query: codex's importer attempt failed overall but keep the parser and its fixtures in a new branch
     confusable_with: [daintree.orchestration.productionize-prototype]
+  - query: Extract only the standalone retry helper and its tests from the abandoned queue rewrite onto a fresh base branch, preserving the failed checkout.
+    confusable_with: [daintree.orchestration.productionize-prototype, daintree.agents.hand-off-task]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: keep 1 and 2, and adapt those two parser tests so they don't need the new evaluator
     history:
@@ -138,3 +141,10 @@ topic_shifts:
       - 'assistant: claude-5 tried twice. The Stripe v12 migration it made is fundamentally broken — 23 failures across the charge flow — but its webhook signature check passes its own tests.'
     active: [daintree.ci.diagnose-and-fix]
     run: 2026-09-28-round6-stateful
+  - query: the whole rewrite was a dead end. keep the unicode parser bits, fresh branch, nothing else
+    history:
+      - 'user: Assess whether the parser rewrite can be completed.'
+      - 'assistant: Its architecture cannot support incremental input. The Unicode scanning module and its tests are independently usable.'
+    active: [daintree.agents.postmortem-run]
+    confusable_with: [daintree.orchestration.productionize-prototype]
+    run: 2026-10-16-synthetic-audit

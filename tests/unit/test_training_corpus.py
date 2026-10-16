@@ -7,7 +7,7 @@ the curated YAML under ``training/corpus/`` is the source, and without a gate
 the two drift the moment somebody edits the artifact directly, which is exactly
 the trap the old single-file corpus was.
 
-These run in ordinary CI, not in the training environment. The compile path
+These run in the ordinary test suite, not the training environment. The compile path
 touches no torch, no transformers and no model weights — only the catalog, the
 benchmark cases and the serving-side query renderer — which is what lets the
 corpus be gated on every push rather than only when someone retrains.
@@ -134,7 +134,11 @@ def test_confusable_with_is_carried_by_the_boundary_rows(compiled: tuple[list[di
     rows, _ = compiled
     carrying = [r for r in rows if r["confusable_with"]]
     assert len(carrying) > 1000, f"only {len(carrying)} rows carry confusable_with"
-    assert all(r["source"] in ("boundary", "foundation_boundary") for r in carrying)
+    boundaries = [r for r in carrying if r["source"] in ("boundary", "foundation_boundary")]
+    assert len(boundaries) > 1000, "authored boundary evidence has disappeared"
+    # Followups, topic shifts and docs turns can also carry authored fences.
+    # Source names where a row came from; it does not restrict its loss inputs.
+    assert all(not (set(r["expect_ids"]) & set(r["confusable_with"])) for r in carrying)
 
 
 def test_every_section_name_maps_to_a_source() -> None:
@@ -263,6 +267,35 @@ def test_a_runbook_file_round_trips_every_optional_field(tmp_path: Path) -> None
         )
 
     assert {fields(e) for e in read_back.examples} == {fields(e) for e in written}
+
+
+def test_evaluation_protection_includes_holdout_history_and_turn_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from benchmarks.runbook_selection import cases
+    from training import compile_corpus
+
+    main = tmp_path / "cases"
+    sealed = tmp_path / "holdout" / "sealed-round"
+    main.mkdir()
+    sealed.mkdir(parents=True)
+    monkeypatch.setattr(cases, "CASES_DIR", main)
+
+    def load(_catalog: object, *, cases_dir: Path) -> list:
+        if cases_dir == main:
+            return []
+        assert cases_dir == sealed
+        return [SimpleNamespace(
+            messages=[SimpleNamespace(content="Earlier protected message!")],
+            turn_context="Protected runtime context.",
+        )]
+
+    monkeypatch.setattr(compile_corpus, "load_cases", load)
+    assert compile_corpus._benchmark_strings(object()) == {
+        "earlier protected message", "protected runtime context",
+    }
 
 
 def test_an_unknown_key_in_an_example_is_refused(tmp_path: Path) -> None:

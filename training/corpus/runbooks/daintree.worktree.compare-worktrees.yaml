@@ -32,8 +32,6 @@ positives:
   - suggest a merge order for the 5 finished agent branches, nothing merged
   - Which of the three agent worktrees would conflict with origin/main as it stands? Report files, change no branch or index.
   - Predict collisions between feat/cart, feat/wishlist and the codex-refactor worktree before anyone merges.
-  - query: will the auth and billing worktrees conflict when I merge them?
-    run: 2026-09-28-catalog-expansion-refine
 boundaries:
   - query: Show me what differs between the hotfix worktree and my feature worktree, read-only.
     confusable_with: [daintree.git.cherry-pick-changes]
@@ -76,6 +74,9 @@ boundaries:
   - query: Forecast whether the parser and lexer branches will conflict before I merge them.
     confusable_with: [daintree.orchestration.resolve-task-collisions]
     run: 2026-09-28-round6
+  - query: Compare the auth, permissions and UI branches for overlapping changes and trial-merge conflicts, returning a merge order without integrating them.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.git.integrate-agent-branches]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: ok and now do the same for the api worktree against billing
     history:

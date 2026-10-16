@@ -98,6 +98,13 @@ topic_shifts:
     history:
       - "user: start a worktree for the docs fix"
       - "assistant: Created the worktree docs-fix from main."
+  - query: 'Separate question for that remote assistant: what does it think the memory spike came from? Relay its answer; no further task.'
+    history:
+      - 'user: have the server fix the log format'
+      - 'assistant: Its pushed change is verified and that exchange is complete.'
+    active: [daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: 2026-10-16-synthetic-audit
 
 boundaries:
   - query: ask the other mac's assistant why its project picked that schema

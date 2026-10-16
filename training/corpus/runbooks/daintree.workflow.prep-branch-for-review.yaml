@@ -7,7 +7,6 @@ runbook: daintree.workflow.prep-branch-for-review
 run: pre-split
 positives:
   - prep this branch for review
-  - open a pr for this
   - prep for review
   - commit and push it
   - we're done here, get it reviewable
@@ -122,10 +121,6 @@ positives:
   - query: commit what's left, push the branch and open the PR
     run: runbook-2026-10-issue-90
 boundaries:
-  - query: get the branch ready for review and open the PR
-    confusable_with: [daintree.worktree.relocate-agents]
-  - query: open a PR for this branch
-    confusable_with: [daintree.forge.land-pull-request]
   - query: commit what's here, push it, and raise the PR against develop
     confusable_with: [daintree.forge.land-pull-request]
   - query: is this branch actually ready to push
@@ -194,8 +189,6 @@ boundaries:
     confusable_with: [daintree.forge.manage-issue]
   - query: Commit these local changes, push them and create a new pull request.
     confusable_with: [daintree.forge.land-pull-request]
-  - query: Prepare the current branch for review and open its PR.
-    confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: Prepare the frontend branch for review and open a pull request.
     confusable_with: [daintree.runtime.debug-web-app]
   - query: Commit this branch, push it, and open a pull request.
@@ -216,11 +209,7 @@ boundaries:
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: get an agent to tidy the branch up and push it for review
     confusable_with: [daintree.edits.spawn-visible-agent]
-  - query: get this branch ready for review
-    confusable_with: [daintree.review.review-change]
   - query: commit and push this then open a PR so it can be reviewed
-    confusable_with: [daintree.review.review-change]
-  - query: is this branch ready to go up for review yet?
     confusable_with: [daintree.review.review-change]
   - query: the agent's done — get the branch ready and open the PR
     confusable_with: [daintree.orchestration.verify-agent-work]
@@ -245,8 +234,6 @@ boundaries:
   - query: branch looks done and everything's committed — push it and open the pr
     confusable_with: [daintree.foundation]
   - query: tests are green locally, push it and open the PR
-    confusable_with: [daintree.ci.diagnose-and-fix]
-  - query: is this branch ready to go up for review?
     confusable_with: [daintree.ci.diagnose-and-fix]
   - query: wrap up that failing-test fix, commit it, push, get a PR up
     confusable_with: [daintree.ci.diagnose-and-fix]
@@ -402,13 +389,6 @@ followups:
       - 'user: wrap up the auth worktree and open a PR'
       - 'assistant: Verdict ready. Committed, pushed with upstream set, and opened PR #418 against develop.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: how's it going?
-    history:
-      - 'user: get this branch ready to push'
-      - 'assistant: Verdict came back blocked_merge_conflicts on feat/watchers-v2.'
-      - 'user: get an agent on the conflicts then carry on'
-      - 'assistant: Spawned an edit agent in that worktree (terminal t-7, watcher w-3). I''ll pick the prep back up once it''s clean.'
-    active: [daintree.workflow.prep-branch-for-review]
   - query: base it off develop not main
     history:
       - 'user: commit, push and put the PR up'
@@ -429,44 +409,17 @@ followups:
       - 'user: finish off 312 and get it up for review'
       - 'assistant: Verdict ready. Committed as "Fix stale ledger rows on resume" and pushed. Opening the PR now.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: nah don't bother, just push it and mark it draft
-    history:
-      - 'user: prep the branch and open a pr'
-      - 'assistant: Verdict ready, but the detected pytest runner came back passed:false, exit 1. Want the failures fixed before the PR goes up?'
-    active: [daintree.workflow.prep-branch-for-review]
-  - query: flip it out of draft then
-    history:
-      - 'user: readiness check on this worktree'
-      - 'assistant: Verdict blocked_uncommitted_changes — 11 unstaged files on fix/selector-cadence. Nothing is committed yet.'
-      - 'user: commit it all and push'
-      - 'assistant: Committed and pushed. There''s already an open PR (#402) with headRef fix/selector-cadence, so the push updated it rather than creating a new one.'
-    active: [daintree.workflow.prep-branch-for-review]
 topic_shifts:
-  - query: great, commit that and open the PR
-    history:
-      - 'user: ci is red on my branch, sort it'
-      - 'assistant: Root cause was a stale fixture in test_selector.py. Fixed, re-ran, full suite green and verified independently.'
-    active: [daintree.ci.diagnose-and-fix]
   - query: good, push it up and get a PR open
     history:
       - 'user: verify the agent actually landed the fix'
       - 'assistant: Verified against the diff and the test output — it did.'
     active: [daintree.orchestration.verify-agent-work]
-  - query: fine then, ship it up as a PR
-    history:
-      - 'user: review whats on this branch'
-      - 'assistant: 2 findings, both low severity. Nothing blocking.'
-    active: [daintree.review.review-change]
   - query: make it a draft actually
     history:
       - 'user: get 312 ready for review'
       - 'assistant: Committed and pushed. Opening the PR now.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: add the issue link to the description
-    history:
-      - 'user: open a PR for this branch'
-      - 'assistant: PR #221 is up.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
   - query: the auth one - get it committed and up as a PR
     history:
       - 'user: pick up where we left off'
@@ -479,11 +432,6 @@ topic_shifts:
       - 'user: ok'
       - 'assistant: 51 and 52 are still going, 53 finished and pushed.'
     active: [daintree.orchestration.fan-out-work]
-  - query: the finished one - commit its work and open the PR
-    history:
-      - 'user: anything need me?'
-      - 'assistant: No. Three agents working, one finished cleanly in t_2203.'
-    active: [daintree.orchestration.supervise-fleet]
   - query: good, push it and open a PR against develop
     history:
       - 'user: spawn something to add tests for the parser'
@@ -491,25 +439,11 @@ topic_shifts:
       - 'user: done?'
       - 'assistant: Yes - 14 new tests, all passing locally.'
     active: [daintree.edits.spawn-visible-agent]
-  - query: hang on, before you push — what does daintree do with the worktree once the pr is merged?
-    history:
-      - 'user: prep this branch for review'
-      - 'assistant: Readiness check first — 3 uncommitted files, tests not run yet. Running it now.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
   - query: quick — does daintree link the pr back to the issue automatically?
     history:
       - 'user: wrap this up for review'
       - 'assistant: Committed, pushed, PR #221 opened against develop.'
     active: [daintree.workflow.prep-branch-for-review]
-  - query: ok and does the pr get opened as draft or ready?
-    history:
-      - 'user: remind me how worktree cleanup works, then go ahead and prep this branch for review'
-      - 'assistant: Worktrees stay until you tear them down; cleanup asks first. Now running the readiness check.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
-  - query: remind me how worktree cleanup works, then go ahead and prep this branch for review
-    history:
-      - 'user: hey'
-      - 'assistant: Hi — workspace is idle, nothing running.'
   - query: what does prep-for-review actually do? do it on this branch
     history:
       - 'user: morning'
@@ -569,13 +503,6 @@ topic_shifts:
       - 'user: what''s the uncommitted stuff'
       - 'assistant: Three prompt partials under main/base/ and one golden snapshot. The snapshot matches the partials, so it was regenerated.'
     active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
-  - query: ta. right, open the pr now
-    history:
-      - 'user: include the tests and the migrations too'
-      - 'assistant: Regenerated, 31 files total.'
-      - 'user: stick it on my clipboard'
-      - 'assistant: Copied — the bundle is on your clipboard.'
-    active: [daintree.context.curate-copytree-bundle, daintree.foundation]
   - query: good enough. push it up and open the pr
     history:
       - 'user: ping me when it finishes'
@@ -644,11 +571,6 @@ topic_shifts:
       - 'user: [background wake: all three finished]'
       - 'assistant: All three landed on their own branches, committed but not pushed anywhere yet.'
     active: [daintree.orchestration.fan-out-work, daintree.foundation]
-  - query: got a notification about the PR - did it actually open?
-    history:
-      - 'user: get this branch ready for review'
-      - 'assistant: Review-readiness check came back clean, committing and pushing now.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
   - query: get the other branch ready and open its PR too
     history:
       - 'user: merge the first one'
@@ -669,10 +591,6 @@ topic_shifts:
       - 'user: give the running agents their own worktrees'
       - 'assistant: Three worktrees created off develop, all three agents redirected.'
     active: [daintree.worktree.relocate-agents]
-  - query: branch prep pls
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: cna you preo the branhc for reveiw pls
     history:
       - 'user: hi'
@@ -713,10 +631,6 @@ topic_shifts:
     history:
       - 'user: still awake?'
       - 'assistant: Still here. What do you need?'
-  - query: what's stopping this from being pushed?
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: sweet, commit that and open a PR
     history:
       - 'user: the snapshot tests broke after the icon change'
@@ -861,11 +775,6 @@ topic_shifts:
     active: [daintree.edits.sync-project-docs]
     run: 2026-09-28-round6-stateful
 wakes:
-  - query: '[agent a_3390 completed: readiness verdict ready]'
-    history:
-      - 'user: get this branch ready for review'
-      - 'assistant: Review-readiness agent running read-only in t_3390 first — once its verdict is in I''ll commit, push and open the PR.'
-    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
   - query: '[watcher fired: t_9002 idle — agent finished]'
     history:
       - 'user: open the PR for 214 when the agent is done'
@@ -875,8 +784,3 @@ near_misses:
   - is this branch ready
   - am i good to push
 docs:
-  - yep, ship it
-  - query: yep, ship it
-    history:
-      - 'user: hi'
-      - 'assistant: Hi — ready when you are.'

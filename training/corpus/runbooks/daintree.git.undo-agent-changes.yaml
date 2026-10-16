@@ -146,6 +146,9 @@ boundaries:
       afternoon are staged in the same checkout and must survive, and there is no push.
     confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
+  - query: Back out only term-style's formatting commits and uncommitted changes, retaining the user's staged authentication fix.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.git.recover-lost-work]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: the pricing.ts hunk is mine, leave it alone. reverse the rest
     history:
@@ -234,3 +237,10 @@ topic_shifts:
       - 'assistant: Restored feat/export''s four commits onto recover/export from ''was 3f9a0bc''; verified and pinned.'
     active: [daintree.git.recover-lost-work]
     run: 2026-09-28-round6-stateful
+  - query: those commits aren't missing, I just don't want what the agent added. undo its changes and keep mine.
+    history:
+      - 'user: Can you recover the branch?'
+      - 'assistant: The branch and all commits are still present. The agent''s edits are in two identified commits above your own.'
+    active: [daintree.git.recover-lost-work]
+    confusable_with: [daintree.git.recover-lost-work]
+    run: 2026-10-16-synthetic-audit

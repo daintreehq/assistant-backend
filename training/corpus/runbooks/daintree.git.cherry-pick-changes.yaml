@@ -74,6 +74,9 @@ boundaries:
   - query: 'copy just the two logging commits from the other host''s branch onto my release branch'
     confusable_with: [daintree.hosts.integrate-for-hub]
     run: runbook-2026-10-issue-107
+  - query: Port commits 2ac8f17 and 6bd903e from the completed parser branch to release/4.1 and verify the adaptation there.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.git.integrate-agent-branches]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: ok and now do the same for release/2.2
     history:
@@ -155,3 +158,12 @@ topic_shifts:
       - 'assistant: Done: codex-2''s three commits reverted by claude-8; your commit c0ffee1 (the null check in sessions.ts) is untouched and the suite passes.'
     active: [daintree.git.undo-agent-changes]
     run: 2026-09-28-round6-stateful
+  - query: spawn claude in the new one and get it to cherry-pick the three doc fixes off develop
+    history:
+      - 'user: i need a worktree for release/2.4, no agent'
+      - 'assistant: Created at ../assistant-backend-release-2.4.'
+      - 'user: what worktrees have i got now'
+      - 'assistant: Three: the main checkout on develop, feat/selector-cache, and the new release/2.4 one.'
+    active: [daintree.foundation]
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

@@ -77,9 +77,9 @@ def test_no_curated_example_collides_with_the_held_out_benchmark() -> None:
     and so covered greetings alone; the source plane makes the general form
     checkable.
 
-    A failure is fixed by rewording the BENCHMARK case, not by deleting the
-    training row: the benchmark is the held-out evidence and the corpus is what
-    is allowed to move.
+    Protect the main benchmark AND every holdout round. A failure is fixed in
+    the curated training data; evaluation wording stays frozen. New examples
+    must be authored from the catalog, never by paraphrasing a protected case.
     """
     held_out = _benchmark_strings_cached()
     collisions = sorted(
@@ -93,7 +93,7 @@ def test_no_curated_example_collides_with_the_held_out_benchmark() -> None:
     assert not collisions, (
         f"{len(collisions)} curated string(s) also appear in a benchmark case: "
         f"{collisions[:3]}. Every row carrying one is silently dropped at compile. "
-        f"Reword the benchmark case."
+        f"Remove the collision from the curated corpus; keep evaluation cases frozen."
     )
 
 
@@ -164,40 +164,29 @@ def test_history_does_not_predict_the_documentation_label() -> None:
 
 
 @pytest.mark.skipif(not CORPUS.is_file(), reason="training corpus not present")
-def test_the_active_set_remains_a_KNOWN_shortcut_and_does_not_worsen() -> None:
-    """The half that was NOT repaired, ratcheted at its current size.
+def test_active_state_does_not_predict_the_documentation_label() -> None:
+    """Docs questions must also occur while real workflows are active.
 
-    Measured on today's corpus: a documentation positive is 17.58x rarer on a row
-    with an active runbook (0.358%, 7 of 1,956) than without (6.293%, 492 of
-    7,818). That is the same shape as the history shortcut on the other axis, and
-    it is why the bare-question second pass in ``setwise.py`` is still
-    load-bearing rather than a historical note — with only seven active-bearing
-    positives the head is severely underexposed to that combination, so the
-    contextual query is not where its docs logit can be read.
-
-    The ceiling is 20x, not a round 25x, and the difference is the whole point:
-    at these denominators, losing ONE of the seven positives gives 20.5x and
-    fails. That makes it a ratchet rather than a permission slip for a 50%
-    regression.
-
-    Closing it is corpus work — docs questions asked mid-workflow, with one and
-    two runbooks loaded (`training/EXPERIMENTS.md`). Until someone does it, this is
-    the record of how far there is to go.
+    This used to tolerate a 20x disparity: only seven active-bearing docs
+    positives existed. The October audit adds independently checked questions
+    during local and host workflows. Preserve the repair at the same 2x bound
+    as the history guard. This says nothing about the already-trained weights;
+    the serving second pass still needs model-quality evidence before removal.
     """
     rows = _corpus_rows()
     with_active, n_with = _rate(rows, True, lambda r: bool(r.get("active_ids")))
     without, _ = _rate(rows, False, lambda r: bool(r.get("active_ids")))
     assert n_with > 500, "too few active-bearing rows to judge"
     positives = sum(1 for r in rows if r.get("active_ids") and r.get("is_docs"))
-    assert positives >= 7, (
+    assert positives >= 75, (
         f"only {positives} docs positives carry an active set — the ratio below "
         f"is measured against a shrinking numerator"
     )
     ratio = max(with_active, without) / max(min(with_active, without), 1e-9)
-    assert ratio < 20.0, (
+    assert ratio < 2.0, (
         f"documentation positives are now {ratio:.1f}x rarer with an active set "
-        f"than without ({with_active:.4f} vs {without:.4f}) — this was 17.6x when "
-        f"the guard was written and the fix is docs rows that carry an active "
+        f"than without ({with_active:.4f} vs {without:.4f}) — "
+        f"the fix is docs rows that carry an active "
         f"set, not a wider threshold here"
     )
 

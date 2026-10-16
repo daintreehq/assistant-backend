@@ -130,6 +130,13 @@ followups:
     history:
       - 'user: split the five migration units across my machines'
       - 'assistant: All five units have a reply or a final state now.'
+  - query: Complete the written final account, distinguish the unchecked host claim from the verified branches, and include the unit that expired.
+    history:
+      - 'user: the cross-host font-rendering experiment has ended; write up every unit'
+      - 'assistant: Two branches are verified, one host claimed completion without a matching pushed SHA, and the fourth unit expired.'
+    active: [daintree.hosts.report-swarm-results, daintree.hosts.supervise-swarm]
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: now give me the final report of that run on the remote hosts, with checks confirmed

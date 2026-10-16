@@ -101,8 +101,6 @@ boundaries:
     confusable_with: [daintree.agents.poll-pinned-agents]
   - query: get one agent to grill the others about the codebase and tell me which one is best
     confusable_with: [daintree.agents.ask-and-relay]
-  - query: have one agent interview the other three and pick who'd be the best pair programmer
-    confusable_with: [daintree.orchestration.competition]
   - query: get claude to grill the other agents on the architecture and tell me which one actually knows it
     confusable_with: [daintree.orchestration.competition]
   - query: one judge agent, three candidates, question them properly and crown a winner
@@ -222,11 +220,6 @@ boundaries:
     confusable_with: [daintree.orchestration.multi-agent]
     run: 2026-09-28-agent-queries
 followups:
-  - query: how's it going?
-    history:
-      - 'user: have one agent interview the other three about the caching layer and pick the best'
-      - 'assistant: Spawned a judge (Interviewer) plus three candidates in explore mode and relayed the judge''s opening questions. Awaiting their answers now.'
-    active: [daintree.orchestration.interview]
   - query: have it verify their claims against the code before it decides
     history:
       - 'user: run an interview, one judge and three candidates, topic is the auth refactor'
@@ -264,6 +257,13 @@ followups:
       - 'user: run the interview across the fleet, light q and a is fine'
       - 'assistant: All four answered round 1. Relaying the condensed answers to the judge.'
     active: [daintree.orchestration.interview]
+  - query: Give the judge a follow-up questioning round for the two remaining candidates, verify their repository claims and ask it to name the winner.
+    history:
+      - 'user: Have one agent interview the others to choose a pair programmer.'
+      - 'assistant: The judge narrowed the candidates to Claude and Codex after round one; no winner yet.'
+    active: [daintree.orchestration.interview]
+    confusable_with: [daintree.orchestration.competition]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: now have one of them grill the others on it and pick who understood it best
     history:
@@ -422,11 +422,6 @@ topic_shifts:
     active: [daintree.forge.land-pull-request]
     run: 2026-09-24-selector-hardening
 wakes:
-  - query: '[wake: 3 candidate answers ready for the judge]'
-    history:
-      - 'user: have one of them interview the others and pick the best pair programmer'
-      - 'assistant: t_0100 is the judge. First round of questions relayed to the three candidates — waiting on their answers.'
-    active: [daintree.orchestration.interview, daintree.foundation]
   - query: '[background wake: judge terminal t_0100 idle — verification pass done]'
     history:
       - 'user: grill them properly, make the judge check their claims against the code'
@@ -446,7 +441,3 @@ docs:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: quick q — have one agent interview the other three and pick a winner
-    history:
-      - 'user: how''s everyone doing?'
-      - 'assistant: Six agents running: 1,2,4 working, 3 waiting on a question, 5 finished, 6 idle.'

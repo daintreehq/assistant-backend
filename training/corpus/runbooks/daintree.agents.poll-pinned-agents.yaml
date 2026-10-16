@@ -568,11 +568,6 @@ boundaries:
     confusable_with: [daintree.orchestration.spike-options]
     run: 2026-09-28-catalog-expansion-refine
 followups:
-  - query: how's it going?
-    history:
-      - 'user: poll the pinned agents on whether we should drop the redis cache'
-      - 'assistant: Spawned four read-only poll terminals — claude, codex, gemini and grok — each with the same neutral brief. Waiting on all four now.'
-    active: [daintree.agents.poll-pinned-agents]
   - query: did they all come back yet
     history:
       - 'user: ask all the configured agents which of these two retry designs they''d pick'
@@ -587,13 +582,6 @@ followups:
     history:
       - 'user: poll my pinned agents on the schema change'
       - 'assistant: Polled claude, codex and gemini. Consensus 2-1 that it''s safe; gemini flagged the backfill.'
-    active: [daintree.agents.poll-pinned-agents]
-  - query: close those terminals
-    history:
-      - 'user: ask the fleet what the biggest risk in this refactor is'
-      - 'assistant: Four verdicts in. Majority say the migration ordering; one says test coverage.'
-      - 'user: who dissented?'
-      - 'assistant: codex — it argued the tests are the real gap.'
     active: [daintree.agents.poll-pinned-agents]
   - query: just skip that one and give me the rest
     history:
@@ -614,11 +602,6 @@ followups:
     history:
       - 'user: can you see my pinned agents?'
       - 'assistant: Yes — four pinned: claude, codex, gemini, grok.'
-    active: [daintree.agents.poll-pinned-agents]
-  - query: nice, thanks
-    history:
-      - 'user: poll the configured agents on which of these three names is best'
-      - 'assistant: Options labelled A/B/C in a different order for each agent, so the tally maps back cleanly. Awaiting all five.'
     active: [daintree.agents.poll-pinned-agents]
 topic_shifts:
   - query: quick one for the pinned lot — should we bump to python 3.13 now or after the release? get me a consensus
@@ -665,12 +648,6 @@ topic_shifts:
     history:
       - 'user: need a decision made'
       - 'assistant: Four agents are pinned.'
-  - poll the pinned agents - postgres or sqlite for the local ledger
-  - query: don't score it, i just want their raw takes plus where they land
-    history:
-      - 'user: poll the pinned agents - postgres or sqlite for the local ledger'
-      - 'assistant: Same question to all four, independently, no cross-talk. Collecting verdicts.'
-    active: [daintree.agents.poll-pinned-agents, daintree.foundation]
   - query: actually no, i already wrote the three designs. just show all of them the same three and get them to pick one
     history:
       - 'user: two of them are waiting on a question, just say yes to both'
@@ -742,13 +719,6 @@ topic_shifts:
   - ask the pinned lot which of these two migration strategies they'd pick and give me the consensus
   - don't fan anything out. i want the pinned agents to vote on which retry strategy we ship — exponential, jittered, or fixed — and score each one out of 10.
   - poll the pinned agents on the two options and tell me where they land
-  - query: now put it in front of the pinned agents and see if they'd merge it
-    history:
-      - 'user: get the rate limiter implemented'
-      - 'assistant: Agent in t_5252, supervised.'
-      - 'user: [watcher fired: t_5252 exited 0]'
-      - 'assistant: Rate limiter in, token bucket per key, tests green, committed on feat/ratelimit.'
-    active: [daintree.edits.spawn-visible-agent, daintree.foundation]
   - query: the poll's done right? give me the consensus
     history:
       - 'user: poll the pinned agents on the rollout order'
@@ -770,10 +740,6 @@ topic_shifts:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: second opinion from the fleet please
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: so i've got two ways to do the cache invalidation and honestly both look fine to me. i'd rather not decide alone. can you put both to my pinned agents, no hints about which one i wrote, and tell me which way it lands
     history:
       - 'user: hows your day going'
@@ -782,10 +748,6 @@ topic_shifts:
     history:
       - 'user: good morning'
       - 'assistant: Good morning. Everything''s idle. Where do we start?'
-  - query: one terminal per pinned agent, same question to each, nobody talks to anybody — what should we name the module
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: ask them all and i specifically want to know who disagreed and why
     history:
       - 'user: thanks for yesterday'
@@ -802,23 +764,11 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: now put the same question to all the pinned agents and tell me where they agree
-    history:
-      - 'user: ask claude what it makes of the retry logic in client.go'
-      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
-    active: [daintree.agents.ask-and-relay]
-    run: 2026-09-24-selector-hardening
   - query: 'separate thing: quick poll of the pinned agents, sqlite or postgres for the local cache? one line each'
     history:
       - 'user: have claude, codex, gemini and grok debate rest vs graphql for the public api, then vote off the weakest'
       - 'assistant: Two debate rounds done. Final positions collected: claude REST, codex GraphQL, gemini tRPC, grok REST+webhooks. Now running the peer vote.'
     active: [daintree.orchestration.debate-elimination]
-    run: 2026-09-24-selector-hardening
-  - query: 'different q — poll the pinned agents: tabs or spaces for the new repo, one word each, give me the consensus'
-    history:
-      - 'user: get claude and codex to work out the caching strategy together until they agree on one design'
-      - 'assistant: Relayed claude''s draft to codex and codex''s critique back. Round 2: they agree on an LRU in front of redis, still split on TTL vs event invalidation.'
-    active: [daintree.orchestration.multi-agent]
     run: 2026-09-24-selector-hardening
   - query: same but add copilot this time
     history:
@@ -861,10 +811,6 @@ docs:
       - 'user: hey, you around?'
       - 'assistant: Around. What''s the task?'
     docs: true
-  - query: poll the pinned agents on which approach to take
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: poll the pinned agents on which approach we should take
     history:
       - 'user: still awake?'

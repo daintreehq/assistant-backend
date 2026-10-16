@@ -77,6 +77,9 @@ boundaries:
   - query: write a failing test that reproduces the discount bug first, don't fix it
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: 2026-09-28-catalog-expansion-refine
+  - query: Turn the support report of a trailing blank CSV row into an observed failing reproduction on main; stop before fixing it.
+    confusable_with: [daintree.edits.spawn-visible-agent, daintree.workflow.start-work-on-issue]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: the reporter says it only happens with more than 1000 rows — make sure the repro uses that
     history:
@@ -153,3 +156,8 @@ topic_shifts:
       - 'assistant: Two reviewers read PR #220 at head 6c2f0aa: one blocking finding (unchecked null in mapRow) and two nits, each with file evidence.'
     active: [daintree.review.review-change]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: can you get someone to reproduce this and tell me if it's real?
+    history:
+      - 'user: bug report: "Steps: 1. run make dev  2. open three terminals  3. rename them  4. observe the crash on the second request"'
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit

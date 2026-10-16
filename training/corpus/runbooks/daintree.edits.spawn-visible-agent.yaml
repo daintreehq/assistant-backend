@@ -27,8 +27,6 @@ positives:
   - there's a TODO in scheduler.go about the leaked ticker, put an agent on it
   - one agent, edit mode, auth worktree — task is delete the legacy session code and update whatever calls it
   - have an agent go clean up the type errors in the reporting module
-  - i need the docs regenerated for the new endpoints, put someone on it
-  - do that for the third one as well
   - shoud i just spawn an agnet for the logging cleanup or is that overkill
   - put claude on the rate limiter, it needs retry with backoff
   - spwan an agnet to fix the null deref in payemnts/refund.go, its blowing up on partial refunds
@@ -146,8 +144,6 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
     run: 2026-09-09-mission-2-timers
   - query: spawn a claude to refactor the auth middleware
-    confusable_with: [daintree.worktree.relocate-agents]
-  - query: get an agent to look through the migration code and tell me what it finds
     confusable_with: [daintree.worktree.relocate-agents]
   - query: open a codex terminal and have it add tests for the parser
     confusable_with: [daintree.worktree.relocate-agents]
@@ -305,17 +301,11 @@ boundaries:
     confusable_with: [daintree.workflow.start-work-on-issue]
   - query: start work on the readme rewrite, no issue for it, just do it
     confusable_with: [daintree.workflow.start-work-on-issue]
-  - query: spawn an agent on the payments worktree and get the tests running
-    confusable_with: [daintree.orchestration.watch-outcome]
   - query: start a claude agent on the auth branch now
-    confusable_with: [daintree.orchestration.watch-outcome]
-  - query: open an agent and have it run the full test suite
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: launch an explore agent over the billing code
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: get an agent going on the migration branch
-    confusable_with: [daintree.orchestration.watch-outcome]
-  - query: spin up claude on the api worktree and have it fix the lint errors
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: open a new worktree and put a fresh claude in it to rewrite the readme
     confusable_with: [daintree.worktree.create-plain-worktree]
@@ -871,9 +861,6 @@ boundaries:
     run: 2026-09-28-catalog-expansion
   - query: can you check what the staging url is actually serving right now
     confusable_with: [daintree.runtime.debug-web-app]
-  - query: test the checkout flow on the staging site yourself in the browser
-    confusable_with: [daintree.edits.spawn-visible-agent]
-    run: transcript-2026-09-27-help-release
   - query: cut the hotfix with git flow and merge it back into develop
     confusable_with:
       - daintree.orchestration.execute-durable-workflow
@@ -1217,51 +1204,20 @@ boundaries:
   - query: 'put claude on the scheduler''s midnight bug, fresh branch from main'
     confusable_with: [daintree.hosts.do-delegated-work]
     run: runbook-2026-10-issue-98
+  - query: Delegate the new route and its tests to one implementer in the current checkout, with no separate test author or freeze gate.
+    confusable_with: [daintree.orchestration.test-first-split]
+    run: 2026-10-16-synthetic-audit
+  - query: make a worktree for fix/tz-bug then spawn cursor in it to fix the timezone rounding
+    confusable_with: [daintree.worktree.create-plain-worktree]
+    run: 2026-10-16-synthetic-audit
+  - query: can you add a make target for the export command? I want the Makefile changed, not a process running.
+    confusable_with: [daintree.terminals.run-visible-command]
+    run: 2026-10-16-synthetic-audit
 followups:
-  - query: how's it going?
-    history:
-      - 'user: put an agent on refactoring the config loader in the api worktree'
-      - 'assistant: This needs file changes, so I spawned a visible edit agent (terminal t-3, watcher w-11) with acceptance criteria that the existing suite still passes and nothing outside config/ changes.'
-    active: [daintree.edits.spawn-visible-agent]
-  - query: no, keep it to exactly what i asked
-    history:
-      - 'user: spawn an agent to strip the dead feature flags out of settings'
-      - 'assistant: Spawned edit agent on terminal t-7 with a watcher. I''ll report when it lands.'
-      - 'assistant: The agent is asking whether it should also update the snapshot tests that reference the removed flags.'
-    active: [daintree.edits.spawn-visible-agent]
-  - query: also have it update the changelog while it's in there
-    history:
-      - 'user: get an agent to add the --json flag to the export command'
-      - 'assistant: Spawned a visible edit agent on terminal t-2 (background watcher attached).'
-    active: [daintree.edits.spawn-visible-agent]
-  - query: what did it say about the backoff timer?
-    history:
-      - 'user: launch a read-only agent to dig into the websocket reconnect path, i want to watch it'
-      - 'assistant: Spawned an explore agent on terminal t-9, no watcher — I''m waiting on it in this turn.'
-    active: [daintree.edits.spawn-visible-agent]
-  - query: yeah that's fine, carry on
-    history:
-      - 'user: throw an agent at cleaning up the error messages in the cli parser'
-      - 'assistant: Agent spawned on terminal t-4 with a watcher; acceptance criteria are that every parser error names the offending flag and the suite stays green.'
-    active: [daintree.edits.spawn-visible-agent]
   - query: how long does one of these usually take before i should worry
     history:
       - 'user: spawn an agent to write the migration for the new users table'
       - 'assistant: Spawned edit agent t-6 in the db worktree with a background watcher. Ending my turn; the watcher will wake me.'
-    active: [daintree.edits.spawn-visible-agent]
-  - query: yeah do that, scope it to auth/session only
-    history:
-      - 'user: put an agent on removing the legacy session code'
-      - 'assistant: Spawned t-8 in the auth worktree.'
-      - 'user: hmm the prompt was too broad, it''s touching the middleware too'
-      - 'assistant: I can cancel that watch and re-spawn with a tighter scope.'
-    active: [daintree.edits.spawn-visible-agent]
-  - query: do the same for the circuit breaker once it's finished
-    history:
-      - 'user: spawn an agent to add tests for the retry backoff'
-      - 'assistant: Spawned edit agent t-5 with a watcher; criteria are new tests covering the jitter path and the full suite passing.'
-      - 'user: how''s it looking'
-      - 'assistant: The agent reports it has added three cases and is running the suite now.'
     active: [daintree.edits.spawn-visible-agent]
 topic_shifts:
   - query: ok get an agent on it, make the window configurable
@@ -1269,11 +1225,6 @@ topic_shifts:
       - 'user: where is rate limiting actually implemented'
       - 'assistant: It lives in middleware/throttle.py:40-96, wired in the app factory at main.py:71. The explore agent cited both.'
     active: [daintree.explore.repository]
-  - query: now drop an agent in there to sketch out the parser
-    history:
-      - 'user: create a worktree for feature/import-csv'
-      - 'assistant: Worktree created for the new branch feature/import-csv off develop.'
-    active: [daintree.worktree.create-plain-worktree]
   - query: great, now the build part
     history:
       - 'user: run the competition first, then i want the winners idea actually built'
@@ -1325,13 +1276,6 @@ topic_shifts:
       - 'user: keep relaying til they stop disagreeing'
       - 'assistant: Converged: postgres, with sqlite kept for CI. One agreed recommendation.'
     active: [daintree.orchestration.multi-agent, daintree.foundation]
-  - query: tab 3 won. put it on actually implementing its fix then
-    history:
-      - 'user: have tab 1 grill the other two on the cache bug and pick a winner'
-      - 'assistant: Tab 1 judging, tabs 2 and 3 candidates.'
-      - 'user: it should verify what they claim against the actual code before deciding'
-      - 'assistant: Judge is checking each claim against the cache module, then follow-ups. Verdict: tab 3.'
-    active: [daintree.orchestration.interview, daintree.foundation]
   - query: yeah thought so. spawn a fresh agent on that file and have it redo the error handling properly
     history:
       - 'user: im back. did anything happen'
@@ -1346,13 +1290,6 @@ topic_shifts:
       - 'user: and what would i have to touch to add a jitter option'
       - 'assistant: Three places: the backoff helper in retry.py, the settings field, and the two tests that assert exact sleep durations.'
     active: [daintree.explore.repository, daintree.foundation]
-  - query: spawn claude in the new one and get it to cherry-pick the three doc fixes off develop
-    history:
-      - 'user: i need a worktree for release/2.4, no agent'
-      - 'assistant: Created at ../assistant-backend-release-2.4.'
-      - 'user: what worktrees have i got now'
-      - 'assistant: Three: the main checkout on develop, feat/selector-cache, and the new release/2.4 one.'
-    active: [daintree.foundation]
   - query: now put claude in there and get it fixing, the doubling is in the sleep calc
     history:
       - 'user: what have i got running?'
@@ -1397,12 +1334,6 @@ topic_shifts:
     active: [daintree.foundation]
   - get something looking into why the config loader is so slow — i want to watch it work
   - no ticket, no PR, no workflow. put an agent on refactoring the config loader and let me watch it.
-  - query: get an agent to clean all of those up in the api package
-    history:
-      - "user: ruff output:\n src/api/routes.py:12:1 F401 unused import\n src/api/deps.py:44:9 B008 function call in default\n Fix all of these with --fix, then rename the rule set."
-  - query: can you get someone to reproduce this and tell me if it's real?
-    history:
-      - 'user: bug report: "Steps: 1. run make dev  2. open three terminals  3. rename them  4. observe the crash on the second request"'
   - spin up an agent on the checkout bug and make sure it actually did it
   - query: now do the same for the billing package
     history:
@@ -1416,21 +1347,11 @@ topic_shifts:
       - 'user: land the config PR'
       - 'assistant: Merged with a rebase.'
     active: [daintree.forge.land-pull-request, daintree.foundation]
-  - query: get an agent to actually write the fix, don't wait for me
-    history:
-      - 'user: turn that crash into a ticket'
-      - 'assistant: Created #830 with the stack trace in the body.'
-    active: [daintree.forge.manage-issue, daintree.foundation]
   - query: forget the plan for a sec — just get an agent to do the first bit now
     history:
       - 'user: track the migration as a durable plan'
       - 'assistant: Graph wfg_4a1 created: 7 nodes, 9 edges. The backfill node is ready, everything else waits on it.'
     active: [daintree.orchestration.execute-durable-workflow, daintree.foundation]
-  - query: now put an agent in there on the failing benchmark
-    history:
-      - 'user: resume the box on the perf worktree'
-      - 'assistant: Resumed; status came back running.'
-    active: [daintree.worktree.manage-resource]
   - query: use claude-cod, or whatever the anthropic one is actually called - have it rewrite the csv importer to stream instead of loading the whole file
     history:
       - 'user: yo'
@@ -1447,18 +1368,10 @@ topic_shifts:
     history:
       - 'user: hello'
       - 'assistant: Hello. Everything''s idle — what would you like to do?'
-  - query: put clod code on the settings panel, the toggle doesnt persist after reload
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: launch an explore agent and have it dig through the websocket reconnect path, keep the tab open so i can steer it
     history:
       - 'user: hey'
       - 'assistant: Hey! What are we working on?'
-  - query: kick off an agent to implement pagination on the search results, background it and ping me when it lands
-    history:
-      - 'user: you there?'
-      - 'assistant: Here. What do you need?'
   - query: kick off an agent to convert the remaining class components to hooks, im going to lunch, dont make me sit here watching it
     history:
       - 'user: hey'
@@ -1475,29 +1388,11 @@ topic_shifts:
     history:
       - 'user: morning'
       - 'assistant: Morning. Nothing running right now — what''s first?'
-  - query: good answer. ok have claude actually fix it then, visible terminal on a branch
-    history:
-      - 'user: ask claude what it makes of the retry logic in client.go'
-      - 'assistant: Spawned claude read-only in t7 and waited. Its answer: the backoff has no jitter and retries on 4xx, so a bad token gets hammered 5 times. Suggests capping retries to 5xx and 429.'
-    active: [daintree.agents.ask-and-relay]
-    run: 2026-09-24-selector-hardening
   - query: grok won, fine. spin up a fresh grok in a visible terminal and have it implement the sandbox in src/plugins
     history:
       - 'user: have claude interview codex, gemini and grok on the plugin sandbox and pick the best'
       - 'assistant: Judge''s verdict: grok — only candidate whose ipc claims checked out against src/ipc and whose design handled permission revocation.'
     active: [daintree.orchestration.interview]
-    run: 2026-09-24-selector-hardening
-  - query: eh don't wait. spawn claude now to fix the flaky test in auth_test.go
-    history:
-      - 'user: let me know when the build in t2 finishes, i''m heading out'
-      - 'assistant: Set a watcher on t2 for exit; it will wake me on completion or failure and I''ll report the result.'
-    active: [daintree.orchestration.watch-outcome]
-    run: 2026-09-24-selector-hardening
-  - query: now do the same for the payments one
-    history:
-      - 'user: get claude to fix the flaky test in auth_test.go, visible terminal please'
-      - 'assistant: Spawned claude in t4 on branch fix/flaky-auth-test with the task. It''s reading auth_test.go now.'
-    active: [daintree.edits.spawn-visible-agent]
     run: 2026-09-24-selector-hardening
   - query: spin up a new codex in feature/search-ui to build the results page
     history:
@@ -1547,10 +1442,6 @@ topic_shifts:
       - 'assistant: Applied; artisan migrate:status shows no pending migrations, and the worktree''s own database is proven isolated.'
     active: [daintree.runtime.migrate-worktree-database]
     run: 2026-09-28-catalog-expansion-stateful
-  - query: the last one gave up halfway through the parser work. dont bother resurrecting it, start a clean agent on the same job
-    history:
-      - 'user: sup'
-      - 'assistant: Not much — nothing running. What do you need?'
   - query: ok, have an agent implement R14 — the proration rule — in the billing worktree
     history:
       - 'user: how much of docs/billing.md is actually built?'
@@ -1559,6 +1450,13 @@ topic_shifts:
       - 'assistant: Audit done: 11 implemented (checked), 3 partial, 4 missing (R8, R14, R15, R17), R7 dropped as background.'
     active: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6-stateful
+  - query: there's one spelling mistake in the README heading. change Recieve to Receive, that's all.
+    history:
+      - 'user: Are the setup instructions still accurate?'
+      - 'assistant: The setup steps were exercised successfully. Only the heading has a typo.'
+    active: [daintree.edits.sync-project-docs]
+    confusable_with: [daintree.edits.sync-project-docs]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[watcher fired: t_1414 idle, agent reports the refactor is complete]'
     history:
@@ -1581,17 +1479,7 @@ near_misses:
   - spawn an agent to refactor the config loader
 docs:
   - spawn an agent to add jsdoc across the utils folder
-  - spawn an agent to fix the lint errors
   - yes go ahead and spawn it
-  - do it
-  - query: spawn an agent to fix the lint errors
-    history:
-      - 'user: hey'
-      - 'assistant: Hey! What are we working on?'
-  - query: one thing first, spawn an agent to fix the lint errors
-    history:
-      - 'user: split these agents into worktrees'
-      - 'assistant: Ready — four branches off develop, one per agent, named for their tasks.'
 foundation_boundaries:
   - spawn an agent to fix that
   - open a terminal and put claude in it to add the missing tests

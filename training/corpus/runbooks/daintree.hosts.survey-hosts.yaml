@@ -184,3 +184,10 @@ topic_shifts:
     history:
       - "user: summarise the diff on the auth branch"
       - "assistant: It adds token refresh and removes the legacy session check."
+  - query: Just show the hosts current connection and listed assistants once. Do not start the missing ones.
+    history:
+      - 'user: shall we get the other machines ready?'
+      - 'assistant: I can enroll assistants after checking what is already there. Nothing has started.'
+    active: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.start-swarm]
+    run: 2026-10-16-synthetic-audit

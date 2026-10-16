@@ -1,0 +1,25 @@
+# Curated rows tagged `followup` whose answer is not exactly one runbook.
+#
+# See ../README.md. `source`, `docs` and `empty_kind` at the top are defaults
+# every example inherits; an example may override any of them.
+source: followup
+run: 2026-10-16-synthetic-audit
+examples:
+  - query: how long does that run for again?
+    history:
+      - 'user: Tell me when the nightly test agent stops.'
+      - 'assistant: Armed a stop notice on terminal t-48. It ends with this pane or a Daintree restart; it has no deadline.'
+    active: [daintree.orchestration.watch-outcome]
+    docs: true
+  - query: will that tell me if CI goes red though?
+    history:
+      - 'user: Ping me when PR 412 merges.'
+      - 'assistant: Daintree does not provide a PR-condition watcher. I have not arranged a host command or another continuation yet.'
+    active: [daintree.orchestration.watch-outcome]
+    docs: true
+  - query: is that enough for it to push a fix if it needs to?
+    history:
+      - 'user: Run the test matrix with the agent and tell me when it stops.'
+      - 'assistant: Agent t-81 is running with a stop notice back to this pane. The notice confers no additional write authority.'
+    active: [daintree.orchestration.watch-outcome]
+    docs: true

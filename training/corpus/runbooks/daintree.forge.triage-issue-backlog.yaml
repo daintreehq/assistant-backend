@@ -87,6 +87,12 @@ boundaries:
   - query: go through the open bugs in the tracker and tell me which are already fixed, then label them
     confusable_with: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6
+  - query: Triage the last 40 unlabelled bug issues in org/client, group duplicate reports and propose one label-and-closure plan.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.workflow.find-issue-work
+      - daintree.forge.manage-issue
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: also check last month's closed issues when you look for duplicates
     history:
@@ -136,12 +142,6 @@ topic_shifts:
       - 'user: log the export crash as an issue'
       - 'assistant: Filed #612 "CSV export crashes on empty rows" with label bug; read back.'
     active: [daintree.forge.manage-issue]
-    run: 2026-09-28-catalog-expansion-stateful
-  - query: there are probably loads like that — find which open bugs are already fixed and close them
-    history:
-      - 'user: comment on #300 that it''s fixed and close it'
-      - 'assistant: Commented "Fixed by #298" and closed #300 as completed; read back.'
-    active: [daintree.workflow.follow-up-on-issue]
     run: 2026-09-28-catalog-expansion-stateful
   - query: while they work, prioritise the rest of the backlog — labels and priority on every open issue
     history:

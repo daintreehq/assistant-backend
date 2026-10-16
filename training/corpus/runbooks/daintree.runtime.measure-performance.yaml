@@ -162,6 +162,12 @@ boundaries:
     confusable_with:
     - daintree.hosts.swarm-fan-out
     run: runbook-2026-10-issue-139
+  - query: Compare heap use and throughput on main versus feature/batched-index with repeated matched builds and report uncertainty.
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.orchestration.verify-agent-work
+      - daintree.runtime.relieve-resource-contention
+    run: 2026-10-16-synthetic-audit
 
 topic_shifts:
   - query: is migrate/date-fns faster than main? the bundle feels bigger — measure it
@@ -228,6 +234,13 @@ topic_shifts:
     active:
     - daintree.hosts.rebalance-load
     run: runbook-2026-10-issue-139
+  - query: the machine's calm again. was the new parser actually faster than the release version, or just noise?
+    history:
+      - 'user: Ease the local build overload.'
+      - 'assistant: Authorized jobs are now serialized; memory pressure is green and CPU has settled.'
+    active: [daintree.runtime.relieve-resource-contention]
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: does that hold on my other machines too?

@@ -68,6 +68,9 @@ boundaries:
   - query: write the handover so another session can take over the agents I launched in this window
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
+  - query: Pass coordination of the entire live issue run to a successor session with child resource ids, pending decisions and a never-replay list; keep workers in place.
+    confusable_with: [daintree.agents.hand-off-task, daintree.orchestration.status-and-resume]
+    run: 2026-10-16-synthetic-audit
 
 followups:
   - query: use codex as the successor, not claude

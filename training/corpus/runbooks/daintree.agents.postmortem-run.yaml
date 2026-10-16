@@ -184,3 +184,10 @@ topic_shifts:
       - 'assistant: Surveyor''s list: keep the new config loader and its tests; drop the plugin registry rewrite (it breaks 17 tests). Confirm and I''ll create the salvage worktree.'
     active: [daintree.orchestration.salvage-failed-attempt]
     run: 2026-09-28-round6-stateful
+  - query: Trace the finished export run's first departure from its file scope and propose a prevention rule.
+    history:
+      - 'user: Is the exporter agent still running?'
+      - 'assistant: No. The run ended yesterday and rewrote unrelated authentication files before it exited.'
+    active: [daintree.agents.recover-agent]
+    confusable_with: [daintree.agents.recover-agent, daintree.git.undo-agent-changes]
+    run: 2026-10-16-synthetic-audit

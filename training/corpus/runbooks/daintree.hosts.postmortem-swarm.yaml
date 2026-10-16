@@ -138,10 +138,13 @@ followups:
   history:
   - 'user: why did the run on the other machines go wrong?'
   - 'assistant: First divergence: the brief named a branch without a SHA, so host B built an older commit. Second, a long gap on host A.'
-- query: what is still left running on the hosts from that failed run? don't stop it, just tell me
+- query: Leave the reason for the unobserved hour unknown, and show the first divergence actually supported by the message and artifact timeline.
   history:
-  - 'user: write up what went wrong on the remote machines'
-  - 'assistant: Two of three hosts answered; their commits are on the remote, the third host never answered.'
+    - 'user: explain why the ended run on the remote machines stalled'
+    - 'assistant: There is an hour between inbox read and the host answer, with no observation inside it; later the host reported a commit built from an unapproved base.'
+  active: [daintree.hosts.postmortem-swarm, daintree.hosts.report-swarm-results]
+  confusable_with: [daintree.hosts.report-swarm-results]
+  run: 2026-10-16-synthetic-audit
 topic_shifts:
 - query: why did the run on my remote hosts end the way it did, with the evidence
   history:

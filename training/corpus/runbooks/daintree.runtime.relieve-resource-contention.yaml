@@ -216,3 +216,20 @@ topic_shifts:
       - 'assistant: Paused claude-1 and codex-2 at clean points; launched claude-5 and codex-6 on the blocker in fix/release-blocker. claude-4 and codex-3 kept going.'
     active: [daintree.orchestration.reprioritize-work]
     run: 2026-09-28-round6-stateful
+  - query: Measure the build processes causing swap pressure, map them to agent terminals and serialize the authorized workloads.
+    history:
+      - 'user: Why did all the coding panes slow down?'
+      - 'assistant: Six live test runners are active and the OS reports memory pressure. No individual agent has exited or asked a question.'
+    active: [daintree.agents.recover-agent]
+    confusable_with:
+      - daintree.edits.spawn-visible-agent
+      - daintree.agents.recover-agent
+      - daintree.runtime.measure-performance
+    run: 2026-10-16-synthetic-audit
+  - query: no benchmark please, the laptop is swapping with all these agents. find what's using the memory and ease it off.
+    history:
+      - 'user: Is the new parser faster?'
+      - 'assistant: A comparison needs stable machine conditions; several concurrent builds are saturating RAM.'
+    active: [daintree.runtime.measure-performance]
+    confusable_with: [daintree.runtime.measure-performance, daintree.agents.recover-agent]
+    run: 2026-10-16-synthetic-audit

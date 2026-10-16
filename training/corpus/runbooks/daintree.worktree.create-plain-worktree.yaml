@@ -206,8 +206,6 @@ boundaries:
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: make a worktree for the frontend redesign branch
     confusable_with: [daintree.runtime.debug-web-app]
-  - query: create a worktree for feat/search off develop
-    confusable_with: [daintree.worktree.manage-resource]
   - query: make a new branch in its own worktree, call it fix/login
     confusable_with: [daintree.worktree.manage-resource]
   - query: check out release/2.1 as a worktree please
@@ -404,11 +402,6 @@ followups:
       - 'user: create a worktree for a new branch fix/session-timeout off main'
       - 'assistant: Created worktree wt_8f2 at ~/code/app-fix-session-timeout on branch fix/session-timeout, based on main. recipeLaunched was false and no agent was launched.'
     active: [daintree.worktree.create-plain-worktree]
-  - query: ah right. then make a new one, billing-v2, based on billing
-    history:
-      - 'user: make a worktree for the billing branch'
-      - 'assistant: billing is already checked out in worktree wt_3a1 at ~/code/app-billing, so I did not create a duplicate checkout.'
-    active: [daintree.worktree.create-plain-worktree]
   - query: anything, you pick
     history:
       - 'user: worktree please, new branch, base develop'
@@ -454,11 +447,6 @@ topic_shifts:
       - 'user: tell me what happened while i was on holiday'
       - 'assistant: 6 workflows completed, 2 abandoned mid-way, and 1 PR is still waiting on you. Stale rows tidied.'
     active: [daintree.orchestration.status-and-resume]
-  - query: make one for feature/billing-v2 too
-    history:
-      - 'user: create a worktree for feature/pricing-v2'
-      - 'assistant: Created at ../wt-pricing-v2.'
-    active: [daintree.worktree.create-plain-worktree]
   - query: unrelated - make me a plain worktree off release/2.1, no agent no recipe
     history:
       - 'user: pick up ticket 302'
@@ -489,10 +477,6 @@ topic_shifts:
       - 'user: check out release/3.2 as a worktree'
       - 'assistant: Existing branch checked out at ../wt-release-3.2.'
     active: [daintree.worktree.create-plain-worktree, daintree.foundation]
-  - query: explain how daintree picks a worktree path, then make me one for feat/search
-    history:
-      - 'user: new bit of work coming'
-      - 'assistant: Ready.'
   - query: how do recipe worktrees differ from plain ones? just make me a plain one for hotfix/ssl
     history:
       - 'user: need a clean checkout'
@@ -564,10 +548,6 @@ topic_shifts:
     history:
       - 'user: hi'
       - 'assistant: Hi — ready when you are.'
-  - query: does daintree do git worktree add? i want feat/websockets in its own directory
-    history:
-      - 'user: hows it going'
-      - 'assistant: All quiet — two worktrees, no agents running. What''s up?'
   - query: I need a clean isolated checkout to run the old test suite against — worktree off the v2.1 maintenance branch, nothing launched in it
     history:
       - 'user: How are you?'
@@ -584,18 +564,25 @@ topic_shifts:
       - 'assistant: Created 4 worktrees, re-filed t2,t3,t5,t6 under them, each agent told to cd and continue.'
     active: [daintree.worktree.relocate-agents]
     run: 2026-09-24-selector-hardening
-  - query: off develop actually
-    history:
-      - 'user: make a worktree for feat/api-v3'
-      - 'assistant: Should feat/api-v3 be a new branch off main, or check out the existing remote branch?'
-    active: [daintree.worktree.create-plain-worktree]
-    run: 2026-09-24-selector-hardening
   - query: sweet. on a different note, create a plain worktree for chore/deps-bump
     history:
       - 'user: tell me when the e2e run in t5 finishes'
       - 'assistant: Watcher armed on t5; I''ll wake you when it completes or fails.'
     active: [daintree.orchestration.watch-outcome]
     run: 2026-09-24-selector-hardening
+  - query: explain how daintree picks a worktree path, then make me one for feat/search
+    history:
+      - 'user: new bit of work coming'
+      - 'assistant: Ready.'
+    docs: true
+    run: 2026-10-16-synthetic-audit
+  - query: Create a standalone checkout for experiment/token-codec from origin/develop, leaving existing agents where they are.
+    history:
+      - 'user: The three existing agents are already in separate worktrees.'
+      - 'assistant: Confirmed their current directory assignments.'
+    active: [daintree.worktree.relocate-agents]
+    confusable_with: [daintree.worktree.relocate-agents, daintree.edits.spawn-visible-agent]
+    run: 2026-10-16-synthetic-audit
 wakes:
   - query: '[wake: worktree creation completed]'
     history:
@@ -610,7 +597,6 @@ wakes:
 near_misses:
   - make me a worktree for the auth fix
 docs:
-  - open a worktree for feat/billing
   - worktree for the hotfix branch, no agent
   - query: i dont really get worktrees but make me one for feature/login anyway
     docs: true
@@ -620,10 +606,6 @@ docs:
     history:
       - 'user: sup'
       - 'assistant: Not much — nothing running. What do you need?'
-  - query: open a worktree for feat/billing
-    history:
-      - 'user: hey'
-      - 'assistant: Hey! What are we working on?'
   - query: make a worktree for feature/search off a new branch
     history:
       - 'user: good morning'

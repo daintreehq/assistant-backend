@@ -4,6 +4,7 @@ sentence-transformers>=3.0
 accelerate>=0.33
 datasets>=2.20
 scikit-learn>=1.5
+rapidfuzz>=3.14,<4
 onnx>=1.16
 onnxruntime>=1.19
 optimum[onnxruntime]>=1.21

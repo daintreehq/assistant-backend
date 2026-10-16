@@ -329,6 +329,18 @@ boundaries:
   - query: "give this bug to the remote host, I want its PR link back"
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
+  - query: Have the archive server implement the thumbnail queue and push a PR. I will run the resulting feature myself later.
+    confusable_with: [daintree.hosts.demo-for-hub]
+    run: 2026-10-16-synthetic-audit
+  - query: From the hub, send the reporting fix to the assistant on the named Linux host and verify its pushed commit when it returns.
+    confusable_with: [daintree.hosts.foundation]
+    run: 2026-10-16-synthetic-audit
+  - query: I am on the sending machine. Hand the cache eviction fix to the assistant on the graphics workstation and get its branch back.
+    confusable_with: [daintree.hosts.handle-hub-message]
+    run: 2026-10-16-synthetic-audit
+  - query: Send exactly one new compression-library fix to the named build host, on a fresh run branch, and verify the commit it reports.
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:
@@ -345,27 +357,16 @@ followups:
       - "user: get the mini to add the feature flags module"
       - "assistant: Verified: feature-flags-module is on the remote at 9b41e07, matching the mini's report."
     active: [daintree.hosts.delegate-to-host]
-  - query: it's asking which test command to use, tell it the unit suite only
-    history:
-      - "user: have the build box refactor the config loader and push it"
-      - "assistant: The build host's assistant asked a question: run the unit suite or the full integration suite?"
-    active: [daintree.hosts.delegate-to-host]
-  - query: let it open the PR too
-    history:
-      - "user: get my second mac to write the retry tests, branch only"
-      - "assistant: The second Mac's assistant asks whether it may push the branch and open a pull request; you said branch only."
-    active: [daintree.hosts.delegate-to-host]
   - query: actually do that on the linux box instead of here
     history:
       - "user: fix the flaky export test"
       - "assistant: I can launch an agent in this worktree to fix it."
-  - query: ok and the other host should do the frontend half once that's in
+
+topic_shifts:
+  - query: Send the remote assistant a new job to fix the cause it identified, with a branch and checked commit as the deliverable.
     history:
-      - "user: have the iMac's assistant build the upload API"
-      - "assistant: Sent to the iMac's assistant; the exchange is working."
-    active: [daintree.hosts.delegate-to-host]
-  - query: no, don't use claude there, the mini only has codex signed in, brief it for codex
-    history:
-      - "user: get the mini to do the lint cleanup"
-      - "assistant: The mini's assistant replied input-required: Claude Code is not signed in on this machine."
-    active: [daintree.hosts.delegate-to-host]
+      - 'user: ask the remote server why imports fail'
+      - 'assistant: Its assistant attributes the failure to an outdated path mapping and has changed nothing.'
+    active: [daintree.hosts.ask-host-assistant]
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: 2026-10-16-synthetic-audit
