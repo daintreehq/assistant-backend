@@ -2713,3 +2713,43 @@ trials:
       - "Hub transcript at the report: host.listAssistants, host.listTasks and host.getTask came before the one host.sendMessage per enrolled lane, and the message told the lane to let any write in flight finish before stopping."
       - "Hub transcript after the restart: host.listAssistants and host.listTasks (cursor 0 for {host_a}) came before any host.sendMessage; nothing waited for an update line from before the restart."
       - "The lane, back after the last prompt, inspected its worktree and panes before acting."
+  - id: measure-performance-per-host
+    runbook: daintree.runtime.measure-performance
+    also: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
+    issue: 139
+    caller: hub
+    path: fleet
+    hosts: 2
+    needs: [busy-host]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Two real machines of clearly different speed (an older, slower one and a newer one) with enrolled lanes in {project}; {sha} and {sha_b} on {remote}, cloned on each. {project} has a small benchmark script (node bench.js: a fixed loop over a fixed input, one number out) whose candidate commit {sha_b} adds a known extra 25 percent of work over {sha}."
+      - "Keep {host_a} busy with unrelated CPU work of the person's own (two long-running busy loops) from before the first prompt until the run ends; leave {host_b} quiet. Note each machine's load in the Shell's host list before the prompt."
+    steps:
+      - say: |-
+          Is {sha_b} slower than {sha} for node bench.js in {project}? Measure it on {host_a} and on {host_b}, each machine against its own baseline, never one machine's seconds against the other's. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.runtime.measure-performance]
+            calls: [host.list, host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.startAssistant, host.cancelTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.handle-hub-message, daintree.runtime.measure-performance]
+            calls: [assistant.getInbox, worktree.createWithRecipe, agent.launch, assistant.reply]
+            never: [terminal.closeMany, worktree.delete]
+            notices: [lane-wake]
+    checks:
+      - "On each machine, the operator times bench.js at {sha} and at {sha_b}, alternating, at least 10 pairs, with nothing else added: the candidate/baseline ratio is about 1.25 on both, while the baseline seconds on the slow machine are clearly larger than on the fast one."
+      - "The hub's per-host ratio matches the operator's own for that host within the spread the lane reported, and both hosts are reported slower; no pooled or cross-machine number appears before the per-host rows."
+      - "The busy host's reply carries load readings with times from its own machine, and its verdict is qualified by them: beyond-threshold only if the whole spread is, otherwise inconclusive; never presented as a clean result."
+      - "On each machine the two worktrees sit at exactly {sha} and {sha_b}, clean, outside the person's own checkout; no tooling was installed and no process priority or affinity was changed (git status, the process list with nice values, the installed-package list before and after)."
+      - "The Shell's exchange record (Settings > Hosts overview): one exchange per host, completed, none resent."
+    execution:
+      - "The hub pinned both sides as full SHAs on {remote}, sent one message per host naming the pair, carried no waitMs, and ended its turn until the update line (hub transcript)."
+      - "The hub recomputed each host's ratio from the pairs in the reply rather than repeating the lane's claim, and read the Shell's host list load beside the lane's own readings (hub transcript)."
+      - "Each lane built both sides the same way, alternated them with warmups, recorded OS, CPU, runtime and load with times, and replied once with the pairs inline (lane transcript)."
