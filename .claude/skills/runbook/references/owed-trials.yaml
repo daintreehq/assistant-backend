@@ -1490,6 +1490,7 @@ trials:
       - "The format's branch holds the first version and then the second; nothing force-pushed."
     execution:
       - "The hub reported {host_b}'s pause acknowledgement and adoption as unresolved, never as adopted or done, and named what brings it back: the person turning messaging on again there (hub transcript)."
+
   - id: timebox-swarm
     runbook: daintree.hosts.timebox-swarm
     also: [daintree.orchestration.timebox-attempt, daintree.hosts.handle-hub-message]
@@ -1719,3 +1720,57 @@ trials:
       - "{host_b} has exactly one worktree and agent each for run/{run}/round and run/{run}/money."
     execution:
       - "Hub transcript before the yes: {host_a} named disconnected, its load sample called old and its agent count not measured; qty kept as started (moving it only by reassignment, on the person's word); round and money proposed for {host_b}."
+  - id: resolve-task-collisions-overlap
+    runbook: daintree.hosts.resolve-task-collisions
+    also: [daintree.hosts.steer-for-hub, daintree.hosts.do-delegated-work]
+    issue: 114
+    caller: hub
+    path: staged
+    hosts: 2
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts with enrolled lanes in {project}; {project} at {sha} on {remote}."
+    steps:
+      - say: |-
+          Have {host_a} work on this in {project} at {sha}: on a new branch {branch}, make applyDiscount accept 100 percent and add a test for it. Push the first commit that passes npm test to {branch} on {remote}, then keep improving it without pushing. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - say: |-
+          Have {host_b} work on this in {project} at {sha}: on a new branch {branch}-alt, support a 100 percent discount in applyDiscount and test it. Push the first commit that passes npm test to {branch}-alt on {remote}. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "Once {branch} and {branch}-alt each have one pushed commit and {host_a}'s worktree holds an uncommitted edit, continue. Do not touch either agent."
+      - say: |-
+          I just realised {host_a} and {host_b} are both doing the 100 percent discount in applyDiscount, by mistake. Sort it out: one of them keeps it, and don't lose what the other did.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.resolve-task-collisions]
+            calls: [host.getTask, host.sendMessage]
+            never: [host.startAssistant]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.steer-for-hub]
+            calls: [terminal.list, terminal.getStatus, assistant.reply]
+            never: [terminal.close, worktree.delete]
+      - say: Whichever fits the task better. Go ahead, and keep the other one's work where it is.
+        expect:
+          hub:
+            calls: [host.listAssistants, host.sendMessage]
+            notices: [hub-update]
+    checks:
+      - "{branch} on {remote} ends at the commit {host_a}'s lane reported pushed and {branch}-alt at {host_b}'s: git --git-dir {remote} for-each-ref before and after shows neither deleted, force-pushed or moved by anyone but its own host."
+      - "After the decision only the chosen owner's branch gets new commits; the other host pushes nothing (for-each-ref after a pause)."
+      - "Snapshot {host_a}'s uncommitted edit (git diff) before the hub is asked to sort it out. Afterwards the parked host's worktree still holds its edit unchanged, and the owner's work contains it (committed or still dirty); no pane or worktree was closed or deleted on either host."
+      - "The Shell's record (Settings > Hosts overview): per host one hold exchange and one decision exchange, none resent; no cancel recorded on an exchange the lane had already read."
+    execution:
+      - "The hub sent a hold to each lane and ended its turn before comparing; the hold named the unit and asked for the remote, branch, HEAD, pushed or not, and the uncommitted files, and said to commit, push and revert nothing (hub transcript)."
+      - "The hub checked each pushed SHA itself (git ls-remote) before naming an owner, and the decision messages named the owner as the only one to publish, and the other's branch and worktree as kept (hub transcript)."
+      - "A side that did not acknowledge its stop was reported as possibly still writing, not as settled (hub transcript)."
