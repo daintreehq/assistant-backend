@@ -265,3 +265,12 @@ boundaries:
   - query: 'have each remote host''s assistant remove the worktrees and panes it made for last night''s run'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'before the hub restarted I sent work to all my other machines. which of those tasks ever completed?'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'I gave every host a job earlier and then Daintree was relaunched on this Mac. did any of those exchanges finish?'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120
+  - query: 'my hub got replaced halfway through the run I''d given the remote machines. where does each exchange stand now?'
+    confusable_with: [daintree.hosts.report-swarm-results]
+    run: runbook-2026-10-issue-120

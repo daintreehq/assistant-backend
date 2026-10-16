@@ -21,8 +21,8 @@ cases:
   - id: report-swarm-results-issue-collect
     category: single-runbook
     note: >-
-      The issue's first request, after a run on the hosts. Decided by "when a run SENT to the
-      Remote Hosts has ENDED, or been stopped, and the person wants its FINAL ACCOUNT, trusted". On its own the sentence reads as sending work to every host
+      The issue's first request, after a run on the hosts. Decided by "the written, evidence-checked
+      FINAL ACCOUNT of a swarm that has ENDED or been stopped". On its own the sentence reads as sending work to every host
       (daintree.hosts.swarm-fan-out); the history is what makes it a report.
     messages:
       - role: user
@@ -122,7 +122,7 @@ cases:
     category: routing-trap
     note: >-
       The hosts are all in and the person wants the final account. Decided by "keeping a run
-      moving while it works (daintree.hosts.supervise-swarm)" and "has ENDED, or been stopped". The neighbour is wrong here: nothing is left to follow.
+      moving while it works (daintree.hosts.supervise-swarm)" and "a swarm that has ENDED or been stopped". The neighbour is wrong here: nothing is left to follow.
     messages:
       - role: user
         content: All four hosts have reported on the run. Write the final report, which units are verified on the remote and which only say they finished.
@@ -146,7 +146,7 @@ cases:
     category: routing-trap
     note: >-
       A run already stopped, now the account of it. Decided by "stopping or changing it
-      (daintree.hosts.steer-swarm)" and "has ENDED, or been stopped".
+      (daintree.hosts.steer-swarm)" and "a swarm that has ENDED or been stopped".
     messages:
       - role: user
         content: I stopped the remote run this morning. Write the final report of what each host had finished by then, with every commit checked.
