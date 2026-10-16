@@ -282,6 +282,15 @@ boundaries:
   - query: 'have the mini''s assistant replace the deprecated client in the one billing repo it has and push a branch'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: ask the linux host's assistant to fix the flaky payments test and tell me the PR number once it's open
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: have my other Mac implement the CSV export and report the branch and SHA
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: get the build machine to review the pushed branch and send me the findings
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:

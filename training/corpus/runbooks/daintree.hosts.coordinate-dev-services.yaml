@@ -1,0 +1,131 @@
+# daintree.hosts.coordinate-dev-services: the hub gets development services that run on
+# DIFFERENT Remote Hosts reaching each other: each connection's calling process and address
+# written down and checked from where the caller runs, dependencies started first, and one
+# marked request proving the end-to-end path.
+#
+# Positives are invented stacks in agent and user words, short and long, some with a social
+# lead-in, a constraint or an earlier turn; one how-to question carries docs. Boundaries are
+# requests this runbook wins against a neighbour whose vocabulary they share: a plan of
+# dependent code units (execute-distributed-workflow), an interface to agree or change
+# (coordinate-contract-change), one hand-over (delegate-to-host), a host's own side of a demo
+# (demo-for-hub), per-worktree resources on one machine (provision-local-environment), a port
+# clash (free-busy-port) and an open preview's own failure (debug-web-app). Followups are the
+# stack as a second turn. Machine names are generic.
+runbook: daintree.hosts.coordinate-dev-services
+run: runbook-2026-10-issue-126
+
+positives:
+  - Bring up the React storefront on the mac mini host and the orders service on the linux host, start the service first, and show that a request from the storefront reaches the orders service at the address I configured
+  - the frontend is on one remote machine and the API on another. the frontend's env file points at localhost:8080, which can't be right. work out what address it should use and prove it
+  - Map each of the two dev servers to its host, project, commit and listener, then make the web client call the API across hosts and verify with a request that carries a build marker
+  - can you get my dashboard talking to the metrics api? they're on different remote machines
+  - the admin panel dev server runs on the build host and the auth service on the other host, and logins fail with connection refused
+  - >-
+    I'm developing a mobile web client and its gateway on separate remote machines. The gateway
+    needs to be up first, the client should reach it by an address that really works from the
+    client's machine, and I want one real request to go all the way through before you tell me
+    it works. Nothing should be exposed publicly.
+  - Start the search service on host B, then the indexer on host A configured to call it; confirm the indexer's request reaches the search service and report which address each side used
+  - 'connection refused from the client host to the api host: is the address wrong, or is the api bound to loopback?'
+  - make the checkout app on the first machine use the pricing service running on the second, verify it end to end and tell me who owns stopping each
+  - get the web ui on host one calling the backend on host two and check they actually talk
+  - hey! the UI dev server and the API dev server live on two different remote hosts and the UI shows a network error. sort out the addresses and prove it works
+  - the frontend from the other machine opens fine in my window but its calls to the API fail, and the API runs on yet another remote host. what can reach what?
+  - Bring both halves of the notes app up on their own hosts and tell me which process talks to which, from where, and at what address
+  - does the worker on the linux host actually reach the queue service on the mac host? start them in the right order and show me with a request
+  - I want the web app on a remote host to hit the dev API on another remote host, with fake data only and nothing public. set it up and verify
+  - service A on host one needs service B on host two during development; record listeners, owners and addresses, and put a revision marker in the verification request
+  - run the client and server of this app on different remote machines for a dev session, and tell me when they're really connected
+  - the frontend and backend repositories live on different machines. start both dev servers and make sure the frontend is really calling the backend from my branch, not an old one
+  - 'client config says localhost:3001 but the API is on another machine entirely. whose localhost is that, and what should the client call?'
+  - Start the graphql gateway on one remote host, point the web app on the other at it, and report exactly where the connection is blocked if the hosts can't see each other
+  - after the backend host restarted, the frontend on the other host can't reach it any more. bring the backend back and re-verify the connection between them
+  - we have three dev services across two remote hosts, a web app, an api and a worker. figure out who calls whom and bring them up dependencies first
+  - get the sync server on one remote machine and the companion app's backend on another talking to each other, verified with a tagged request
+  - both servers answer from my laptop but I don't know whether they can reach each other. check, don't assume
+  - Make the web client on one remote host call the API on my other remote host. Don't open any ports to the internet and don't copy any keys between them
+  - >-
+    Observed: the frontend dev server on host-a returns 502 for /api and the backend dev server
+    on host-b is bound to 127.0.0.1:4000. Wanted: frontend requests reach the backend, verified
+    by a request carrying the commit marker, no public exposure. Constraints: synthetic data
+    only, no credential transfer, report any connection that cannot work.
+  - api first on the second remote host, web second on the first one, record each pid and who stops it, and prove one request round trips
+  - 'thanks for sorting the hosts earlier. next: the web client on machine one has to call the API on machine two, bring both up and check the link between them'
+  - good morning. my api and my frontend are on different remote hosts and I keep getting refused and cors errors. can you get them wired up properly?
+  - is the connection between the frontend host and the api host real, or only working because both fall back to local mocks? verify with something the API itself records
+  - pair the dev backend on the linux box with the dev frontend on the mini so they talk to each other, using the exact commits we pushed
+  - the order, billing and inventory services are split across two hosts for dev. map the call graph, start them bottom-up, and verify each call that crosses hosts
+  - the frontend on host 1 opens fine but anything it loads from the API on host 2 fails. check the addresses and what the browser can actually reach
+  - tell me which process makes the call from the web app to the API, the browser or the dev server, and bring the services up accordingly
+  - deliberately give the client a bad API address and show me you report the broken connection rather than fixing it behind my back
+  - spin up the websocket server on one host and the chat client on another and confirm messages flow between them
+  - the cache service on host b must be running before the app on host a will start. sequence it and verify the app really uses that cache
+  - 'Search task: coordinate two dev servers on separate Remote Hosts so one calls the other'
+  - two repos, two remote machines, one running stack. get it up and prove the pieces connect
+  - wire the Next.js app on the first remote host to the Rails API on the second and verify with a request, with every address and owner written down
+  - client on host x, server on host y. localhost isn't going to work between them, so what do we use instead, and is it actually reachable?
+  - >-
+    The reporting UI runs on one of my remote hosts and the data service on another. I tried
+    pointing the UI at the data service's hostname and got timeouts. Find out whether the two
+    machines can reach each other at all, and if they can't, tell me which connection is the
+    problem instead of changing anything.
+  - query: how do two dev servers on different remote hosts reach each other, and why doesn't localhost work between them?
+    docs: true
+
+boundaries:
+  - query: Start the API on host two, then the web client on host one with the client's API address set, and prove one request gets through
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: the order service has to be up on one remote machine before the storefront on the other will run; start them in that order and check the storefront can really call it
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: the client and the API are on separate hosts and already agree on the endpoints; I just need both running and the client's base URL pointing at the right machine, with a request to prove it
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+  - query: bring up the producer and the consumer dev services on their own hosts and show the consumer receiving a message from the producer through an address that works
+    confusable_with: [daintree.hosts.coordinate-contract-change]
+  - query: have the assistants on both machines start their dev servers and connect them, then tell me whether the client reaches the API
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: get the second host's assistant to run the backend and the first host's to run the frontend against it, and verify the connection yourself
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: the frontend host and the API host each need the other's address for the dev stack. work out which address works from where, and verify with a request
+    confusable_with: [daintree.hosts.demo-for-hub]
+  - query: two services that live on different remote machines need each other's addresses during development, and nothing here is about worktrees on this machine
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: my frontend and my API run on separate remote hosts, not different worktrees on this Mac. Wire them up and check they talk
+    confusable_with: [daintree.worktree.provision-local-environment]
+  - query: the client on host a calls localhost:3001 but the API runs on host b; which machine's localhost is that and what should the client call instead?
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: the frontend host gets connection refused calling the API host's address. is the API listening on a reachable address or only on loopback?
+    confusable_with: [daintree.runtime.free-busy-port]
+  - query: the web app on host a can't call the API on host b; start both properly and work out the address the app should use
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: the page on the first host fails to load data because the API on the second host is down or unreachable; bring the stack up and check the address the page uses
+    confusable_with: [daintree.runtime.debug-web-app]
+  - query: run the frontend project on one remote host and the backend project on another, not the same task everywhere, and verify they connect
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: bring up the full stack, web client on one remote machine and API on another, each through the assistant that owns that project, and make sure they connect
+    confusable_with: [daintree.hosts.start-swarm]
+
+followups:
+  - query: now start the frontend against it
+    history:
+      - "user: start the API on the second host for the dev stack"
+      - "assistant: The API is up on host two, listening on loopback port 4000. The frontend on host one is next."
+  - query: can the frontend host reach it?
+    history:
+      - "user: bring up the backend on host two and the web client on host one"
+      - "assistant: The backend is ready on host two, bound to loopback. Before starting the client I need an address it can use from host one."
+  - query: send one request through the client to prove it
+    history:
+      - "user: get the web client and the API talking across the two hosts"
+      - "assistant: Both services are up and each reported its commit. The address the client uses was reached from its own machine."
+  - query: stop the dev stack, client first
+    history:
+      - "user: the web client and the API are running on their hosts and the request check passed"
+      - "assistant: Verified end to end. The client listens on host one, the API on host two."
+  - query: the address failed from the client host, what now?
+    history:
+      - "user: connect the frontend on host one to the API on host two"
+      - "assistant: The API is ready, but the request from host one to its address was refused."
+  - query: ok use the private address I gave you and retry
+    history:
+      - "user: wire the two dev servers across the hosts"
+      - "assistant: That edge is blocked: the API only listens on loopback on host two. I can co-locate the services or use a private address you name."

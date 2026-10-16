@@ -119,6 +119,15 @@ boundaries:
   - query: 'the web client on one machine needs an extra field in the orders payload that the api repo on another produces; settle the payload version first, then get both hosts onto it'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: the notifications API and its client are built on two of my hosts and the field name changed; settle one version of the schema and get both sides onto it
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: two hosts disagree about the shape of the payload between their repos; pick one contract version and brief both
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: before the producer and the consumer start building on separate machines, agree the message schema once
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 followups:
   - query: ok, freeze that version and send it to both machines
     history:

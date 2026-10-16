@@ -164,6 +164,12 @@ boundaries:
   - query: "is the port clash coming from a listener on the remote host or from the port this Shell forwards to it?"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: something already listens on 4000 on the remote host so my API won't start there; what holds it?
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: which process is on 5432 on this machine and is it one of my worktrees' servers?
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 followups:
   - query: it's mine actually, I forgot about it — go ahead and kill it
     history:

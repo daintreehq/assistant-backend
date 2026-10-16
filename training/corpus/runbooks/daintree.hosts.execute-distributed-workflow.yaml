@@ -153,6 +153,15 @@ boundaries:
   - query: 'the client repos can only start once the server repo''s new endpoint is verified; carry the three stages through the hosts in order'
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
+  - query: 'Run the stages across my hosts: migrate the schema on the db machine, then land the API change against that migration commit, then the web change against the API commit'
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: five code changes on three machines, the last two wait on the first three being pushed and verified; keep going until all are in
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: 'execute this staged plan: library bump on the build host, then the services that consume it on the other hosts, then the changelog'
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 followups:
   - query: yes, run it
     history:

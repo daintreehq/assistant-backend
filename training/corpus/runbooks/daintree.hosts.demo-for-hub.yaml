@@ -129,6 +129,15 @@ boundaries:
   - query: 'the last demo here was cleaned up, and the hub wants the onboarding branch served again for the person to try'
     confusable_with: [daintree.hosts.clean-up-for-hub]
     run: runbook-2026-10-issue-100
+  - query: 'Hub request: leave the inventory service running on this host with fake data and reply with its listener and the commit it serves'
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: the hub wants the reporting API up here with sample rows so the person can poke at it; reply with the port and the SHA
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: start the dashboard branch on this machine for the hub and say how the Shell would reach it
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 
 followups:
   - query: good, start the preview and check it serves that commit

@@ -268,6 +268,12 @@ boundaries:
   - query: "new worktrees on this machine come up without the .env, so the db tests fail in every one of them; make the setup script provision it"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: every worktree of this project should get its own port and database for its dev stack, released when it is deleted
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: two worktrees on this machine run the same frontend and API on the same ports and clash; give each its own
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 topic_shifts:
   - query: ok but it'll fight the main checkout over postgres. give it its own db, and set it up so every new worktree gets one automatically
     history:

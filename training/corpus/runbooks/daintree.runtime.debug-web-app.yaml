@@ -287,6 +287,12 @@ boundaries:
   - query: "The preview I started for the hub's demo shows a blank page and a console error; find out why it doesn't render"
     confusable_with: [daintree.hosts.demo-for-hub]
     run: runbook-2026-10-issue-108
+  - query: the dev preview that is open shows a blank page and the console has a CORS error from the API call; fix the frontend config and reload
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
+  - query: the open preview panel keeps failing to fetch /api/items, read the console and have an agent fix it
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: runbook-2026-10-issue-126
 followups:
   - query: and the second one?
     history:
