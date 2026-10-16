@@ -479,3 +479,107 @@ cases:
     expect:
       required: [daintree.orchestration.watch-outcome]
       optional: [daintree.foundation, daintree.orchestration.supervise-fleet]
+
+  - id: tx-batch-rounds-agent-query
+    category: routing-trap
+    note: >-
+      Help-assistant session ee668b08, 2026-10-16: the agent's query for a batch run
+      that merged each round's pull requests before picking the next. A deployment
+      gap at the time: the served build predated work-in-waves and returned
+      fan-out-work alone (1.0000), which has no merge between batches. Decided by
+      work-in-waves' "WAVES (or rounds, or ordered batches) … where the next wave
+      starts only once the previous wave's pull requests are merged" and its fence
+      "one batch, or a rolling queue under a cap, with no merge between waves
+      (daintree.orchestration.fan-out-work)".
+    messages:
+      - role: user
+        content: >-
+          Work batches of issues in parallel worktrees, merge their pull requests, then
+          start the next batch
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: tx-batch-drain-user-words
+    category: routing-trap
+    note: >-
+      Same session, the user's words with the skill name removed, after one round had
+      landed: rounds until the backlog is empty, each round's worktrees deleted. The
+      history carries the merge between rounds that "the batch workflow" names.
+      Verbatim, bench search put workspace-cleanup first (0.9946) on "delete
+      worktrees"; here the teardown is a step of the round cycle. Decided by
+      work-in-waves' "merge them, delete the worktrees and start the next wave" and
+      "keep going until all the waves are done".
+    messages:
+      - role: user
+        content: >-
+          Run one batch: pick the ready issues, a worktree and agent for each, merge
+          their pull requests once they're all done, then clean up
+      - role: assistant
+        content: >-
+          The batch is done: all eight pull requests are merged and the worktrees are
+          gone.
+      - role: user
+        content: >-
+          Now do the full batch workflow again, but this time drain all available
+          issues. So keep on going until there are none left. Make sure to delete
+          worktrees between each batch.
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: tx-issues-left-mid-run
+    category: continuation
+    note: >-
+      Same session, mid-run: the user asked which open issues would still be left once
+      the round in progress landed, and the assistant answered from its own pick
+      report. The question continues the run. Read alone, the same words selected
+      check-usage-limits at 0.9975 on "remaining", whose procedure launches an agent
+      pane to read its plan allowance. Decided by work-in-waves' "keep going until all
+      the waves are done" (a drain's remaining work is the run's) and check-usage-limits'
+      fence "which issues or tasks are still left to do
+      (daintree.workflow.find-issue-work)".
+    active: [daintree.orchestration.work-in-waves]
+    messages:
+      - role: user
+        content: >-
+          Drain the ready issues in batches: worktree and agent per issue, merge each
+          batch's pull requests, delete the worktrees, then pick the next batch
+      - role: assistant
+        content: >-
+          Round 3 is under way: four issues, each with its own worktree and agent, all
+          working.
+      - role: user
+        content: which 2 issues will be remaining by the time you're done with this batch?
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation, daintree.workflow.find-issue-work]
+
+  - id: tx-issues-left-after-batch-not-usage
+    category: routing-trap
+    note: >-
+      Same words read alone, as a search query would arrive with no run in context: a
+      tracker read of open issues, less those in flight. check-usage-limits took it at
+      0.9975 on "remaining". Decided by find-issue-work's "check whether an issue is
+      already being worked" and check-usage-limits' fence "which issues or tasks are
+      still left to do (daintree.workflow.find-issue-work)"; status-and-resume's "what
+      is still open" is allowed beside it.
+    messages:
+      - role: user
+        content: which 2 issues will be remaining by the time you're done with this batch?
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation, daintree.orchestration.status-and-resume]
+
+  - id: tx-own-chat-history-file
+    category: no-task
+    note: >-
+      Same session: the user asked for the assistant's own session transcript, which
+      it found on disk. No catalog workflow covers locating an existing transcript;
+      curate-copytree-bundle ranked first unselected (0.8946), but it curates project
+      context into a bundle.
+    messages:
+      - role: user
+        content: And can you please give me your chat history file?
+    expect:
+      required: []
