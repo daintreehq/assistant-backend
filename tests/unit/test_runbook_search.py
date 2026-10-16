@@ -26,7 +26,7 @@ _ARTIFACT = (
 
 def _artifact_present() -> bool:
     head = _ARTIFACT / "head.onnx"
-    # An un-pulled LFS file is a ~130-byte pointer, not a graph.
+    # Absent until `training/fetch_selector.sh` has run; a stub is not a graph.
     return head.exists() and head.stat().st_size > 1024
 
 
@@ -138,7 +138,7 @@ def test_the_scripted_seam_matches_the_search_signature() -> None:
     assert inspect.signature(ScriptedSelector.search) == protocol
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_shipped_search_finds_the_obvious_runbook() -> None:
     from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
@@ -167,7 +167,7 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
     assert scores == sorted(scores, reverse=True)
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None:
     """Issue #153's pairs: the same fan-out request with and without hosts, and a
     lane with no hosts of its own still answered from its inbox wake line."""

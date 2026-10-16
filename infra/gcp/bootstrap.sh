@@ -19,8 +19,8 @@
 # own. Making it public — which an MCP server anyone can add must be — is a
 # deliberate cutover; see the "Public access" section at the bottom of this file.
 #
-# The service holds no secrets. The only Secret Manager secret involved is the
-# GitHub connection's token, which the build reads to fetch the LFS model.
+# The service holds no secrets, and neither does the build: it reads the selector model
+# from a private bucket with its own service account (see "Selector model bucket").
 
 set -euo pipefail
 
@@ -35,6 +35,8 @@ CONNECTION="${CONNECTION:-daintree-github}"
 GITHUB_OWNER="${GITHUB_OWNER:-daintreehq}"
 GITHUB_REPO="${GITHUB_REPO:-assistant-backend}"
 DOMAIN="${DOMAIN:-assistant.daintree.org}"
+# Must match the bucket selector.lock names; a unit test holds the two together.
+SELECTOR_BUCKET="${SELECTOR_BUCKET:-daintree-research-selector}"
 
 RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT}.iam.gserviceaccount.com"
 BUILD_SA_EMAIL="${BUILD_SA}@${PROJECT}.iam.gserviceaccount.com"
@@ -130,6 +132,26 @@ retry 12 gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" 
 ok "granted serviceAccountUser on $RUNTIME_SA"
 
 # ---------------------------------------------------------------------------
+say "Selector model bucket"
+# The model files are not in Git. selector.lock names each by SHA-256 and the bucket it
+# lives in; the build's fetch-selector step downloads them with the build service account's
+# own credentials. Private (public access prevention enforced), uniform access, and
+# unversioned on purpose: pruning an object must really remove it. Same region as the build.
+# `training/selector_store.py publish` writes to it and `prune` clears what no lock names.
+if gcloud storage buckets describe "gs://${SELECTOR_BUCKET}" --project="$PROJECT" >/dev/null 2>&1; then
+  ok "bucket ${SELECTOR_BUCKET} already exists"
+else
+  gcloud storage buckets create "gs://${SELECTOR_BUCKET}" --project="$PROJECT" \
+    --location="$REGION" --default-storage-class=STANDARD \
+    --uniform-bucket-level-access --public-access-prevention
+  ok "created bucket ${SELECTOR_BUCKET}"
+fi
+retry 12 gcloud storage buckets add-iam-policy-binding "gs://${SELECTOR_BUCKET}" \
+  --member="serviceAccount:${BUILD_SA_EMAIL}" --role=roles/storage.objectViewer \
+  --project="$PROJECT" >/dev/null
+ok "granted the build service account storage.objectViewer on ${SELECTOR_BUCKET}"
+
+# ---------------------------------------------------------------------------
 say "GitHub repository connection"
 # Cloud Build triggers require a Cloud Build *v2 connection* plus a repository
 # resource under it. Note that the Cloud Run console's "connect a repository"
@@ -177,20 +199,6 @@ else
     --connection="$CONNECTION" --region="$REGION" --project="$PROJECT" \
     --remote-uri="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git"
   ok "linked ${GITHUB_OWNER}/${GITHUB_REPO}"
-fi
-
-# The Developer Connect connection's GitHub OAuth token. The fetch-lfs build
-# step reads it to pull LFS content (the model artifact) from the PRIVATE repo
-# — the v2 checkout leaves no git credential behind. The secret's name carries
-# a random suffix minted by Developer Connect, so it is discovered, not
-# hardcoded. Granted here, after both the build service account and the
-# connection exist, so neither is referenced before it is created.
-GH_TOKEN_SECRET=$(gcloud secrets list --project="$PROJECT"   --filter="name~daintree-github-github-oauthtoken"   --format="value(name)" --limit=1 || true)
-if [ -n "$GH_TOKEN_SECRET" ]; then
-  retry 12 gcloud secrets add-iam-policy-binding "$GH_TOKEN_SECRET"     --member="serviceAccount:${BUILD_SA_EMAIL}"     --role=roles/secretmanager.secretAccessor     --project="$PROJECT" --quiet >/dev/null
-  ok "granted deploy SA secretAccessor on $GH_TOKEN_SECRET (LFS fetch)"
-else
-  ok "!! no daintree-github oauthtoken secret found — LFS fetch will fail until granted"
 fi
 
 # ---------------------------------------------------------------------------

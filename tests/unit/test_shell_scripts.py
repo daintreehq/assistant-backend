@@ -306,23 +306,20 @@ def test_bootstrap_never_removes_a_public_binding() -> None:
 
 
 def test_bootstrap_provisions_no_runtime_secret() -> None:
-    """The service holds no credential, so there is nothing to create or mount.
-
-    The one secret the pipeline still touches is the GitHub connection's token,
-    which the BUILD reads to fetch LFS content. A `secrets create`, a version
-    write or a payload read here would be the provider-key plumbing coming back.
+    """The service and the build hold no credential, so there is nothing to create, mount,
+    grant or read: the build reads the selector model from a bucket with its own service
+    account. A `secrets create`, a version write, a payload read or a secret grant here would
+    be the provider-key plumbing (or the GitHub token) coming back.
     """
     text = BOOTSTRAP.read_text(encoding="utf-8")
-    for forbidden in ("secrets create", "versions add", "versions access"):
+    for forbidden in (
+        "secrets create",
+        "versions add",
+        "versions access",
+        "secrets add-iam-policy-binding",
+    ):
         offending = [line for _, line in _command_lines(text) if forbidden in line]
         assert not offending, f"bootstrap.sh runs {forbidden!r}: {offending}"
-    grants = [
-        line
-        for _, line in _command_lines(text)
-        if "secrets add-iam-policy-binding" in line
-    ]
-    assert len(grants) == 1, "expected exactly one secret grant (the LFS token)"
-    assert "GH_TOKEN_SECRET" in grants[0]
 
 
 def test_the_command_scanner_can_tell_an_instruction_from_an_example() -> None:

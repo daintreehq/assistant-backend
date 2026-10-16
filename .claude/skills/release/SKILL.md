@@ -254,7 +254,7 @@ That should print the new revision followed by `True`. Also check the
 `RELEASE_SHA`.
 
 A `/readyz` 503 is a startup failure — an unparseable runbook file, or a
-missing or LFS-pointer selector artifact. The response withholds the
+missing or corrupt selector artifact. The response withholds the
 reason in production, so read the real error from the logs:
 
 ```bash

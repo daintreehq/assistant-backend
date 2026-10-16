@@ -45,7 +45,7 @@ ARTIFACT = (
 
 pytestmark = pytest.mark.skipif(
     not (ARTIFACT / "retriever" / "tokenizer.json").is_file(),
-    reason="selector artifact not present (LFS)",
+    reason="selector model not fetched (training/fetch_selector.sh)",
 )
 
 #: Non-repeating prose. Repeated text tokenizes far more efficiently than real

@@ -22,7 +22,9 @@ allowed-tools:
    artifact back and exits non-zero. **Run it on a rented Lambda Labs GPU, not here and not on
    the Studios** (next section): at ~150 runbooks it is hours on a Mac, and the retriever's
    peak memory no longer fits a 32-36 GB one.
-3. Commit (the artifact is Git LFS) and `/release`. The release does not wait for CI.
+3. `python3 training/selector_store.py publish` uploads the model to the bucket and rewrites
+   `selector.lock`; commit the lock (the model is not in Git) and `/release`. The release does
+   not wait for CI.
 
 Everything below — seed sweeps, holdout rounds, decision rules — is for investigating a
 routing problem, not a requirement of every retrain.
@@ -86,7 +88,7 @@ A10's 24 GB; drop it on a bigger card. Poll `.tmp/retrain.out` and
 `src/daintree_assistant_server/runbooks/local/artifacts/selector/` with `rsync -a --delete`,
 terminate the instance, then gate here with
 `.venv/bin/python -m benchmarks.runbook_selection.bench local` (and the unit suite).
-`git checkout` the artifact directory if the gate fails. CLAUDE.md ("Training on a remote
+If the gate fails, `training/fetch_selector.sh` puts the committed model back. CLAUDE.md ("Training on a remote
 machine") has the same recipe for a plain SSH box.
 
 ## Read this first: a retrain is a QUALITY step, not an unblocking step
@@ -360,9 +362,11 @@ git add -A .
 git diff --cached --numstat | awk '{a+=$1} END {print a" staged lines"}'  # thousands, not 100k+
 ```
 
-Model graphs, tokenizers and `vectors.npz` are Git LFS. Commit the regenerated
-`training/data/*.jsonl` with the weights — the corpus is the record of what the
-shipped encoders were trained on.
+Model graphs, tokenizers and `vectors.npz` are not in Git: run
+`python3 training/selector_store.py publish` (after `bench local` passes) and commit the
+rewritten `selector.lock`. Commit the regenerated `training/data/*.jsonl` with it — the corpus
+is the record of what the shipped encoders were trained on. The old model's objects stay in the
+bucket until `selector_store.py prune --delete` clears what no lock names.
 
 ## Scaling
 

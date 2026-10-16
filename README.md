@@ -56,7 +56,7 @@ python -m benchmarks.runbook_selection.bench local      # routing quality gate
 ## Development
 
 ```bash
-git lfs pull                              # the selector artifact is Git LFS
+training/fetch_selector.sh                # the selector model, as selector.lock names it (needs gcloud)
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" -c requirements.lock
 

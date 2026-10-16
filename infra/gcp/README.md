@@ -34,8 +34,10 @@ that pipeline — they do not replace it.
    it with the build id. Every marker the later steps write opens with that id,
    and every read checks it, because those markers are the release's verdict and
    `/workspace` is the repository checkout.
-3. **`fetch-lfs`, `build`, `push`** — the selector model is in Git LFS; the build
-   fails if either encoder is still a pointer file.
+3. **`fetch-selector`, `build`, `push`** — the selector model is not in Git:
+   `selector.lock` names each file by SHA-256 and the bucket holding it, and
+   `fetch-selector` downloads them and checks every byte against the lock, so a
+   missing or altered file fails the build. No secret is read.
 4. **`deploy-rc`** validates `_ENVIRONMENT` (`development|test|staging|production`)
    and `_INGRESS` (`all|internal|internal-and-cloud-load-balancing`), writes the
    revision's whole environment — `ENVIRONMENT` and `LOG_LEVEL`, nothing else —

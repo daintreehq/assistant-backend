@@ -230,7 +230,7 @@ _ARTIFACT = (
 
 
 def _artifact_present() -> bool:
-    """True when both served encoder graphs are real bytes, not unfetched LFS pointers."""
+    """True when both served encoder graphs are real bytes: the model is fetched, not in Git."""
     graphs = [
         _ARTIFACT / "retriever" / "model.onnx",
         _ARTIFACT / "ranking" / "model_int8.onnx",
@@ -251,7 +251,7 @@ def _live_selector():  # type: ignore[no-untyped-def]
     return clf, catalog
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_shipped_classifier_selects_a_plausible_runbook() -> None:
     clf, _ = _live_selector()
     sel = clf.select("rename my terminals so i can tell the agents apart", [])
@@ -259,13 +259,13 @@ def test_shipped_classifier_selects_a_plausible_runbook() -> None:
     assert 0 < sel.cardinality <= 3
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_shipped_classifier_returns_empty_on_chatter() -> None:
     clf, _ = _live_selector()
     assert clf.select("thanks, that's perfect", []).runbook_ids == []
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_shipped_table_covers_exactly_the_selectable_catalog() -> None:
     """The table is built FROM the live catalog, so it can only ever match it.
 
@@ -279,7 +279,7 @@ def test_shipped_table_covers_exactly_the_selectable_catalog() -> None:
     assert set(table.ids) == set(catalog.selectable_ids)
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_runbook_added_after_training_is_routable_without_retraining() -> None:
     """The property the whole two-stage design exists for.
 
@@ -355,7 +355,7 @@ class _CatalogPlusOne:
         return self._extra if sid == self._extra.id else self._base.get(sid)
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
@@ -387,7 +387,7 @@ def test_shipped_classifier_routes_each_new_mcp_runbook(query: str, expected: st
     assert expected in clf.select(query, []).runbook_ids
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 @pytest.mark.parametrize(
     ("query", "excluded"),
     [
@@ -493,7 +493,7 @@ def test_pool_rejects_when_every_admission_slot_is_taken() -> None:
 # decision in ``setwise.py`` for the corpus measurements behind it.
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
     """THE regression. The shape of session ses_aa9b63b4 turn 2.
 
@@ -533,7 +533,7 @@ def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
     # gets its documentation — and it holds under both artifacts.
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_conversation_context_no_longer_suppresses_documentation() -> None:
     """Recall must not depend on how far into a conversation the question lands."""
     clf, catalog = _live_selector()
@@ -566,7 +566,7 @@ def test_conversation_context_no_longer_suppresses_documentation() -> None:
         assert loaded.docs_wanted, f"{q!r} lost its docs lookup mid-conversation"
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_chatter_still_does_not_retrieve_documentation() -> None:
     """The threshold sits below 0.5; the no-task side must not have moved.
 
@@ -578,7 +578,7 @@ def test_chatter_still_does_not_retrieve_documentation() -> None:
         assert not clf.select(q, [], catalog=catalog, docs_query=q).docs_wanted, q
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_the_docs_pass_does_not_disturb_runbook_selection() -> None:
     """Only the docs logit is re-read; the ranking answer must be untouched."""
     clf, catalog = _live_selector()
@@ -589,7 +589,7 @@ def test_the_docs_pass_does_not_disturb_runbook_selection() -> None:
     assert without.cardinality == with_docs.cardinality
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_the_second_pass_is_skipped_when_the_strings_already_agree() -> None:
     """A cold opening turn pays nothing — asserted by COUNTING the work.
 
@@ -628,7 +628,7 @@ class _Counting:
         return getattr(self.inner, name)
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_an_empty_docs_query_behaves_like_no_docs_query() -> None:
     """"" is not a question. It must not be embedded and rated as one."""
     clf, catalog = _live_selector()
@@ -644,7 +644,7 @@ def test_an_empty_docs_query_behaves_like_no_docs_query() -> None:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_an_active_runbook_reaches_the_head_even_when_retrieval_ranks_it_last() -> None:
     """The reservation guarantee, measured against the real retriever.
 
@@ -727,7 +727,7 @@ def _table_hiding(clf: Any, runbook_id: str, text: str):  # type: ignore[no-unty
     )
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None:
     """The tensor the head is actually fed, on a turn that really did reserve.
 
@@ -765,7 +765,7 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
     assert np.allclose(feed["candidates"][0][slot], table.ranking[row])
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
     """The promise reservation makes, end to end: a hearing.
 
@@ -796,7 +796,7 @@ def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
     assert feed["mask"][0][slot] == 1.0
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_topic_shift_evicts_the_prior_runbook() -> None:
     """The same rule on the UNMODIFIED catalog, where retrieval works normally.
 
@@ -811,7 +811,7 @@ def test_a_topic_shift_evicts_the_prior_runbook() -> None:
     assert "daintree.terminals.rename" not in sel.runbook_ids
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
     """At 38 runbooks the change is inert in practice, and that is worth pinning.
 
@@ -841,7 +841,7 @@ def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
         )
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_pinned_nonselectable_runbook_is_never_seated_as_a_candidate() -> None:
     """The docs runbook is server-pinned and hidden from selection.
 
@@ -950,7 +950,7 @@ def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
 
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_table_built_by_the_int8_retriever_is_not_adopted(tmp_path: Path) -> None:
     """The retriever became fp32 on 2026-09-28; a table stamped plain "int8" predates it.
 

@@ -260,10 +260,10 @@ EOF
 ```
 
 If that fails (no app checkout, or no fetch), research has nothing to ground against:
-stop with the Blocked report and write no `env.sh`. Then check the selector artifact is real, not a Git LFS pointer (a pointer fails
-readiness and every bench): `head -c 60
-"$ROOT/src/daintree_assistant_server/runbooks/local/artifacts/selector/head.onnx"`. If
-it reads `version https://git-lfs`, run `git -C "$ROOT" lfs pull`.
+stop with the Blocked report and write no `env.sh`. Then put the selector model in place: it is not in Git, so a fresh worktree has none and
+fails readiness and every bench without it. Run `"$ROOT/training/fetch_selector.sh"`; it copies
+from `~/.cache/daintree-selector` and does nothing when the files already match
+`selector.lock`.
 
 **5. Baseline (hard gate; nothing is edited before it).** Through a §Checks agent:
 

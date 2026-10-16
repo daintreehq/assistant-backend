@@ -57,13 +57,14 @@ and a PR into `develop`. Runbook issues follow `references/issue-format.md` ther
 | `training/` | The selector's training pipeline, corpus and experiment log. |
 | `benchmarks/runbook_selection/` | The routing benchmark and its quality gate. |
 | `tests/fixtures/daintree_mcp/` | The Daintree app's MCP surfaces per caller (pane, sidebar, the sidebar as cross-host hub and lane, API-key), captured from one app commit: the authority on which actions runbooks may name. |
+| `selector.lock`, `training/selector_store.py` | The selector's model files are not in Git: the lock names each by SHA-256 and the bucket holding it; the tool fetches, verifies, publishes and prunes. |
 | `infra/gcp/`, `cloudbuild.yaml`, `Dockerfile` | The Cloud Run deployment. |
 
 ## Commands
 
 ```bash
 # Setup
-git lfs pull                             # the selector artifact is Git LFS
+training/fetch_selector.sh               # the selector model, as selector.lock names it (needs gcloud)
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" -c requirements.lock
 
@@ -120,7 +121,7 @@ come back from a search. It stays because the corpus and benchmark name it.
 
 Failure posture: a search the pool refuses or the graph fails is `None`, which the tool
 reports as a retryable `isError` result — never an empty ranking. A malformed runbook or a
-missing/LFS-pointer artifact fails **readiness** (`/readyz` 503) without crashing liveness,
+missing/corrupt artifact fails **readiness** (`/readyz` 503) without crashing liveness,
 so Cloud Run never promotes it.
 
 ## Runbooks
@@ -191,6 +192,20 @@ several cases by seed, so judge a recipe over several seeds. `TODO.md` carries t
 retrain-triggered entries (reservation retention, renamed routing text, `k=64` at ~200
 runbooks, domain foundations).
 
+**The model is not in Git.** The ONNX graphs, tokenizer vocabularies and `vectors.npz` live in a
+private bucket (`gs://daintree-research-selector`), one object per distinct content, named by
+SHA-256; `selector.lock` (committed) lists each file's path, hash and size, and is the model's
+identity. `training/fetch_selector.sh` puts them in place (files that already match are left
+alone, and downloads are cached in `~/.cache/daintree-selector`, so a worktree is a copy, not a
+transfer); Cloud Build's `fetch-selector` step does the same and checks every byte. After a
+retrain passes `bench local`, `python3 training/selector_store.py publish` uploads what the
+bucket lacks and rewrites the lock: commit the lock, and nothing else about the model, with the
+retrain. `test_selector_lock.py` fails a lock that disagrees with the files on disk.
+`selector_store.py prune` lists (and with `--delete` removes) bucket objects no lock names,
+keeping the current model, the three before it (read from the committed locks), what
+`origin/main` names, and anything under a day old. The files under the selector directory are
+git-ignored local copies; Git never holds a model version.
+
 **Training on a remote machine.** Training is heavy (stage 1 re-embeds the whole catalog with
 gradients every step), so prefer an idle Apple-silicon box over this one. Everything lives in a
 throwaway directory there; only the exported artifact comes back. Over SSH (non-interactive
@@ -200,10 +215,9 @@ shells have no Homebrew on `PATH`, so export it):
 H=studio-01.local                       # any Apple-silicon Mac you can ssh to
 git push origin develop                 # the remote clones from GitHub, so push first
 ssh $H 'export PATH=/opt/homebrew/bin:$PATH
-  brew install python@3.12 git-lfs      # once per machine
-  git lfs install --skip-repo
+  brew install python@3.12              # once per machine
   git clone --branch develop git@github.com:daintreehq/assistant-backend.git ~/tmp/daintree-retrain
-  cd ~/tmp/daintree-retrain && git lfs pull
+  cd ~/tmp/daintree-retrain
   python3.12 -m venv .venv-train
   .venv-train/bin/pip install -r training/requirements-train.lock
   .venv-train/bin/pip install --no-deps -e .'
@@ -214,7 +228,7 @@ ssh $H 'export PATH=/opt/homebrew/bin:$PATH; cd ~/tmp/daintree-retrain; mkdir -p
 rsync -a --delete $H:tmp/daintree-retrain/.tmp/retrain/artifact/ \
   src/daintree_assistant_server/runbooks/local/artifacts/selector/
 .venv/bin/python -m benchmarks.runbook_selection.bench local   # the gate; restore the old artifact
-                                                               # with `git checkout` if it fails
+                                                               # with training/fetch_selector.sh if it fails
 ```
 
 `--grad-checkpoint` is required below ~64 GB of unified memory: the retriever's peak passed
@@ -241,7 +255,7 @@ MCP spec rather than frozen.
 There is no hosted CI: GitHub runs nothing on a push or a PR. The full check runs locally
 before work lands: install from lock, ruff, `mypy --strict src`, pytest with coverage
 (`pytest -q --cov --cov-report=term:skip-covered`, `fail_under = 90`), `bench coverage`,
-`bench local`. It needs the LFS artifact pulled. It is not a release gate either (Cloud Build's
+`bench local`. It needs the model fetched (`training/fetch_selector.sh`). It is not a release gate either (Cloud Build's
 candidate smoke test guards production). `bench local` is the routing verdict: it attributes every
 miss to the stage that lost it, and `candidate_miss` (a required runbook that never
 reached the head) is gated at zero — it is the first number to move as the catalog
@@ -251,7 +265,7 @@ grows, and `bench scale` measures when.
 
 Nothing is built or pushed from a dev machine. **Pushing to `main` is the deploy** — work
 lands on `develop`, and a release fast-forwards `main`. `cloudbuild.yaml`: substitution
-guard → LFS fetch → build → push → deploy a **no-traffic** revision tagged `rc-<build>`
+guard → model fetch by lock → build → push → deploy a **no-traffic** revision tagged `rc-<build>`
 (env replaced wholesale, `--clear-secrets`, readback verified) → `infra/gcp/smoke.sh`
 against the tag's URL, including a real search → promote to 100% → `release-gate` retires
 the tag and renders the verdict. The first-ever deploy of a service goes out at 100% behind

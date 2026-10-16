@@ -37,7 +37,7 @@ _ALL_STATES = [
 
 def _artifact_present() -> bool:
     head = _ARTIFACT / "head.onnx"
-    # An un-pulled LFS file is a ~130-byte pointer, not a graph.
+    # Absent until `training/fetch_selector.sh` has run; a stub is not a graph.
     return head.exists() and head.stat().st_size > 1024
 
 
@@ -248,7 +248,7 @@ def test_a_case_may_not_expect_what_its_state_leaves_out(catalog: Catalog) -> No
 # ---- the selector, against the shipped artifact ------------------------------
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_excluded_runbooks_free_their_shortlist_slots_for_eligible_ones(
     catalog: Catalog,
 ) -> None:
@@ -274,7 +274,7 @@ def test_excluded_runbooks_free_their_shortlist_slots_for_eligible_ones(
     assert clf.select(query, [], catalog=catalog, exclude=frozenset()).ranked == whole.ranked
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(catalog: Catalog) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
@@ -288,7 +288,7 @@ def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(catalog: Catalo
     assert active not in sel.runbook_ids and active not in sel.reserved_ids
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
@@ -298,7 +298,7 @@ def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> No
     assert sel.runbook_ids == [] and sel.ranked == ()
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_the_docs_pass_builds_its_own_ballot_under_the_same_exclusion(
     catalog: Catalog,
 ) -> None:

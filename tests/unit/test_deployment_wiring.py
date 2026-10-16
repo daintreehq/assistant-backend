@@ -631,12 +631,23 @@ def test_the_deploy_clears_secrets_and_never_sets_one(deploy_step: dict[str, Any
             assert flag not in code, f"{step.get('id')} mounts a secret with {flag}"
 
 
-def test_the_only_secret_the_build_reads_is_the_lfs_token(cloudbuild: dict[str, Any]) -> None:
-    """The GitHub connection's token, for `git lfs pull`, and only in that step."""
-    available = cloudbuild["availableSecrets"]["secretManager"]
-    assert [entry["env"] for entry in available] == ["GITHUB_TOKEN"]
-    holders = [s["id"] for s in cloudbuild["steps"] if s.get("secretEnv")]
-    assert holders == ["fetch-lfs"]
+def test_the_build_reads_no_secret_at_all(cloudbuild: dict[str, Any]) -> None:
+    """The model comes from a bucket the build service account can read, not from a
+    GitHub token: no secret is declared and no step is handed one."""
+    assert "availableSecrets" not in cloudbuild
+    assert [s["id"] for s in cloudbuild["steps"] if s.get("secretEnv")] == []
+
+
+def test_the_selector_is_fetched_by_lock_before_the_image_is_built(
+    cloudbuild: dict[str, Any],
+) -> None:
+    """`fetch-selector` runs `selector_store.py fetch`, which checks every file against
+    selector.lock, and it runs before `build` copies the checkout into the image."""
+    ids = [s["id"] for s in cloudbuild["steps"]]
+    assert ids.index("fetch-selector") < ids.index("build")
+    step = cloudbuild["steps"][ids.index("fetch-selector")]
+    assert "training/selector_store.py fetch" in "\n".join(step["args"])
+    assert "allowFailure" not in step, "a model that did not arrive must stop the build"
 
 
 def test_the_build_never_reads_a_secret_value() -> None:

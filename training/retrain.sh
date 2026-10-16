@@ -47,7 +47,7 @@ rm -rf "$WORK/previous" && cp -R "$ART" "$WORK/previous"
 rsync -a --delete "$WORK/artifact/" "$ART/"
 if .venv/bin/python -m benchmarks.runbook_selection.bench local --no-save > "$WORK/bench.txt" 2>&1; then
   grep -E 'recall-pass|QUALITY GATE' "$WORK/bench.txt"
-  echo "installed. Commit the artifact (it is Git LFS) and release."
+  echo "installed. Run 'python3 training/selector_store.py publish', commit selector.lock, and release."
 else
   grep -E 'recall-pass|QUALITY GATE|FAIL' "$WORK/bench.txt" || true
   rsync -a --delete "$WORK/previous/" "$ART/"

@@ -61,8 +61,8 @@ Thumbs.db
 uv.lock
 
 # Local runbook selection (training side). The SERVING artifacts under
-# src/daintree_assistant_server/runbooks/local/artifacts/ are tracked via Git LFS —
-# they ship in the image. Everything here is the machinery that produced them and
+# src/daintree_assistant_server/runbooks/local/artifacts/ ship in the image (see below).
+# Everything here is the machinery that produced them and
 # is reproducible from `training/`, so it stays out of the repo.
 # NOTE: git has no trailing-comment syntax — a "path  # why" line makes the
 # comment part of the pattern and silently matches nothing. Keep these bare.
@@ -92,19 +92,21 @@ training/results/
 #                       weights were trained on — ~3 MB, well under anything that
 #                       would justify LFS or DVC.
 
-# Local runbook selection (serving side). Model GRAPHS are tracked via Git LFS
-# (.gitattributes). Only the served precision ships: the int8 ranking encoder and
-# the fp32 RETRIEVER (served fp32 since 2026-09-28 — see SetwiseClassifier). The
-# fp32 ranking graph exists only so the exporter can measure what quantisation
-# costs, and stays untracked.
+# Local runbook selection (serving side). The model files (the ONNX graphs, the tokenizer
+# vocabularies and vectors.npz) are NOT in Git: they live in the bucket selector.lock names,
+# addressed by hash, and `training/fetch_selector.sh` puts them here. What stays tracked is
+# the small text beside them (meta.json, labels.json, tokenizer_config.json, ...).
+# Only the served precision ships: the int8 ranking encoder and the fp32 RETRIEVER. The fp32
+# ranking graph exists only so the exporter can measure what quantisation costs, is never
+# stored, and is ignored with the rest.
 #
-# vectors.npz IS tracked — unlike the index the abandoned bi-encoder design kept,
-# it cannot go stale in a way that matters. Every row is keyed by the digest of
-# the document it was built from, so serving re-embeds exactly what moved and
-# reuses the rest; committing it just means the first turn after a deploy does
-# not pay for embedding a catalog that usually has not changed.
-src/daintree_assistant_server/runbooks/local/artifacts/**/model.onnx
-!src/daintree_assistant_server/runbooks/local/artifacts/selector/retriever/model.onnx
+# vectors.npz is stored with the model, not rebuilt: every row is keyed by the digest of the
+# document it was built from, so serving re-embeds exactly what moved and reuses the rest;
+# shipping it just means the first turn after a deploy does not pay for embedding a catalog
+# that usually has not changed.
+src/daintree_assistant_server/runbooks/local/artifacts/**/*.onnx
+src/daintree_assistant_server/runbooks/local/artifacts/**/*.npz
+src/daintree_assistant_server/runbooks/local/artifacts/**/tokenizer.json
 # vocab.txt is a ~30k-line side-file the exporter emits beside tokenizer.json,
 # which is self-contained and is what `_tokenizer` actually loads
 # (Tokenizer.from_file). Verified by removing both from a checkout: the token ids

@@ -32,11 +32,11 @@ _ARTIFACT = selector_artifact_dir()
 
 def _artifact_present() -> bool:
     head = _ARTIFACT / "head.onnx"
-    # An LFS pointer is a few hundred bytes; the real graph is megabytes.
+    # Absent until `training/fetch_selector.sh` has run; the real graph is megabytes.
     return head.exists() and head.stat().st_size > 1_000_000
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_every_runbook_document_fits_the_shipped_document_cap() -> None:
     meta = json.loads((_ARTIFACT / "meta.json").read_text())
     cap = int(meta["doc_max_length"])
@@ -58,7 +58,7 @@ def test_every_runbook_document_fits_the_shipped_document_cap() -> None:
     )
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_a_runbook_vector_does_not_depend_on_what_it_was_synced_with() -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
