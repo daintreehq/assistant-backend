@@ -37,7 +37,7 @@ positives:
     run: 2026-09-28-catalog-expansion-refine
   - query: have the running Codex follow our plugin's security-review skill
     run: 2026-09-28-catalog-expansion-refine
-  - query: "The reviewer lane on the build box should use its own installed accessibility plugin skill on the settings screens, not whatever I have on this laptop."
+  - query: "The hub asked this machine's agent to review the settings screens with the accessibility plugin skill; use the one installed on this host, not whatever the hub's laptop has."
     run: runbook-2026-10-issue-136
   - query: "what skills do the plugins on this host provide? the hub wants to know before it sends anything"
     run: runbook-2026-10-issue-136
@@ -45,13 +45,13 @@ positives:
     run: runbook-2026-10-issue-136
   - query: "the hub's note says to follow the api-contract skill; look it up on this host, load that one and have claude follow it on the orders branch"
     run: runbook-2026-10-issue-136
-  - query: "i don't trust that the changelog skill on the staging host matches mine, load what that host lists and use that for the release notes"
+  - query: "I'm the assistant on the staging host and the hub wants the changelog plugin skill used for release notes; its copy may differ from mine, so load what this host lists and use that."
     run: runbook-2026-10-issue-136
   - query: "The delegated task asks the agent here to apply the dependency-audit plugin skill to the lockfile diff on the feature branch. Search this host's plugin skills for it, load it by the id this host returns, brief the agent in the task checkout with that id and the hub's limits (local changes only, no push), and check each step it reports."
     run: runbook-2026-10-issue-136
   - query: "plugin skill release-kit.sign-off isn't in this machine's list. don't copy anything over from the other host, just tell the hub it's not here"
     run: runbook-2026-10-issue-136
-  - query: "Our remote host has its own plugins installed. Use its security-review skill for the auth diff."
+  - query: "This lane's host has its own plugins installed; the hub wants its security-review skill used on the auth diff here."
     run: runbook-2026-10-issue-136
   - query: "hey, quick one: is the tdd plugin skill available on this host? if so have the agent here follow it on the parser change"
     run: runbook-2026-10-issue-136
