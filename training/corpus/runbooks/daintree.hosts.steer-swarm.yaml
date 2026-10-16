@@ -165,7 +165,6 @@ boundaries:
   - query: "tell the hosts to stop the run and leave their commits exactly as they are"
     confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
-  - query: the run I sent to both machines needs one more acceptance criterion, the rest of the brief stands
   - query: tell the machines working on the importer run that the deadline moved to friday; nothing else in their brief changes
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
