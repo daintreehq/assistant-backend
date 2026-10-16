@@ -38,7 +38,7 @@ positives:
   - put the urgent fix at the front of my remote queue and park only as much of the running work as it takes to start it
   - Can you bump the data-loss bug above everything that's running on my other computers? Hold the least important jobs and tell me what you paused.
   - The CEO's demo environment is down. Take whatever you need from the hosts that are running docs and refactor tasks and put the agents on it.
-  - 'Agent query: when an urgent task arrives while a run is spread over remote hosts, pause lower-priority tasks through their lanes with resume notes and allocate the freed capacity to the urgent work in fresh worktrees.'
+  - the payments outage just landed in the middle of the importer run I have spread over the studio and the build box; make those hosts give up the low-priority tasks, note where each one stopped, and put the outage fix on the freed machines
   - the library release is blocked by one failing test. Two of my remote hosts are idle-ish; take the rest of their load away and have them fix it, the other jobs resume afterwards
   - make the incident fix the top job across the hosts, anything unrelated waits until I say go
   - Priority one just changed. I want my remote hosts on the broken build, and the half-finished feature work paused with a precise note on the next step so nobody redoes anything.
@@ -64,7 +64,7 @@ positives:
   - make space on the remote machines for an urgent fix without losing their half-done tasks, then give me the way to restart them
   - urgent bug, remote swarm busy. keep going what's close to done, pause the long ones, point the freed agents at the bug
   - we have to preempt the remote refactor for a customer escalation, and be careful about its uncommitted work
-  - 'Task: priority preemption across Remote Hosts. Inputs: the urgent task, the current run, what may give way. Output: per task keep, pause or redirect with the lane acknowledgements, and the urgent worker branches verified.'
+  - something more important than the cache rewrite just came in; across the mac mini and the linux box decide what keeps going, what pauses and what moves over to it, and check the new worker's branch before telling me it's started
   - I'm going to hand you something urgent. The hosts are saturated, so decide what to pause there and what to keep, then start it once there is room
   - redo the allocation across my remote hosts, the support-blocking bug is first now
   - it's a fire drill. two of my remote agents on the cleanup run should switch to the broken deploy, and pause the cleanup where they are
@@ -118,7 +118,7 @@ boundaries:
     confusable_with: [daintree.hosts.steer-swarm]
   - query: tell the lanes to pause two of the tasks I sent them because something more important arrived, and report which ones stopped
     confusable_with: [daintree.hosts.steer-swarm]
-  - query: hold the docs and refactor tasks on the hosts only until the blocker is fixed, then I will tell you which ones to restart
+  - query: the blocker is more important than the docs and refactor work running on the hosts, so have those hosts give up their agents to it, and I will tell you which ones to restart afterwards
     confusable_with: [daintree.hosts.park-swarm]
   - query: pause part of the remote run with notes on where each task stopped so the urgent fix can have those agents, I will say when to resume
     confusable_with: [daintree.hosts.park-swarm]
