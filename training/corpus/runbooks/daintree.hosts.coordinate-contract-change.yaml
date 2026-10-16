@@ -35,7 +35,7 @@ positives:
   - we changed our minds about the error codes in the api contract, make sure both remote projects pick up the new revision
   - which version of the contract did each of my hosts end up building against
   - the sdk repo on the laptop and the service repo on the workstation have to speak the same protocol; set that up first and then have both implement it
-  - one of my hosts edited its own copy of the schema instead of asking; get everyone back on the agreed version
+  - the dashboard machine quietly turned a field into a string in the schema file it builds from; nobody agreed that, so undo the drift and make changes come through me
   - both sides say done but the client was built on v1 of the contract and we're on v2 now
   - the new version of the contract is out but the frontend box is offline, keep track of who has adopted it and who hasn't
   - agree the avro schema between the producer repo and the consumer repo on my two remote machines and freeze it
@@ -140,8 +140,8 @@ followups:
 topic_shifts:
   - query: different thing, the two remote services need to agree their message schema before they build; set that up
     history:
-      - "user: how much usage is left on each machine?"
-      - "assistant: The tower has about 40 percent left and the mini about 75 percent."
+      - "user: is anything still running on the build box?"
+      - "assistant: One agent there is still working on the parser tests."
   - query: forget the cleanup for now, the payload format between the two repos on my hosts changed and both sides need the new version
     history:
       - "user: tidy up the worktrees the hosts made yesterday"

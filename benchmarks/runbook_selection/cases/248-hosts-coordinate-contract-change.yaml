@@ -93,12 +93,13 @@ cases:
   - id: coordinate-contract-change-not-contract-first-split
     category: routing-trap
     note: >-
-      The issue's evidence phrasing, which selected the local runbook before. Decided by "Remote Hosts
-      build the sides of ONE INTERFACE in DIFFERENT REPOSITORIES"; this runbook fences "both sides
-      built by agents on this machine (daintree.orchestration.contract-first-split)".
+      An interface agreed and frozen first, its two sides in separate repositories on two hosts.
+      Decided by "Remote Hosts build the sides of ONE INTERFACE in DIFFERENT REPOSITORIES"; this
+      runbook fences "both sides built by agents on this machine
+      (daintree.orchestration.contract-first-split)".
     messages:
       - role: user
-        content: Agree and freeze an API contract across host projects before the remote frontend and backend agents implement it
+        content: settle and freeze the interface between the worker service and its dashboard before either remote host writes code; they are separate repos on separate machines
     expect:
       required: [daintree.hosts.coordinate-contract-change]
       optional: [daintree.hosts.foundation]

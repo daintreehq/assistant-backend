@@ -1465,7 +1465,7 @@ trials:
       - "Stage as coordinate-contract-change-amend: {project} on {host_a} at {sha} on {remote}, tally-web on {host_b} at {sha_b} on its own remote, a lane enrolled in each."
     steps:
       - say: |-
-          {project} on {host_a} is to serve a totals summary that tally-web on {host_b} will display. Have the format written in {project} as a JSON schema with an example, an error case and a small check both sides can run; I leave its details to you, no need to show me. Then have each machine build its side against it on a run/{run} branch and push that branch. Launch any agents with model haiku.
+          {project} on {host_a} is to serve a totals summary that tally-web on {host_b} will display. Have the format written in {project} as a JSON schema with an example, an error case and a small check both sides can run; I leave its details to you, no need to show me. Then have each machine build its side against it on a run/{run} branch and push that branch; the format's branch may be pushed too. Launch any agents with model haiku.
           Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
         expect:
           hub:
@@ -1485,7 +1485,7 @@ trials:
             calls: [terminal.getStatus, assistant.reply]
     checks:
       - "{host_a}'s final run/{run} commit carries the second version of the format file unchanged and its check passes there in a fresh clone."
-      - "No second-version message reached {host_b} (Shell's record); its worktree and branch are as they were when messaging went off."
+      - "No second-version message reached {host_b} (Shell's record) and none is reported adopted there; its run/{run} worktree and commits are kept."
       - "The format's branch holds the first version and then the second; nothing force-pushed."
     execution:
       - "The hub reported {host_b}'s pause acknowledgement and adoption as unresolved, never as adopted or done, and named what brings it back: the person turning messaging on again there (hub transcript)."
