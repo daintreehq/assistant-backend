@@ -12,9 +12,10 @@ cases:
   - id: verify-project-placement-copies-same-repo
     category: single-runbook
     note: >-
-      The issue's first request. Decided by "is really the intended repository at the
-      intended revision, not a different project that shares its name, path or id" and its
-      own example "are my copies on the other machines the same repo and ready for this".
+      The issue's first request. Decided by "is really the repository meant for the work
+      about to be sent, whatever the project is called", with the deliverable "its
+      remote URLs against ours, its full commit SHA against the one wanted, clean or
+      dirty, setup in place".
     messages:
       - role: user
         content: Check my project copies on the hosts are the same repository and ready for this task.
@@ -25,8 +26,8 @@ cases:
   - id: verify-project-placement-same-name-which-receives
     category: single-runbook
     note: >-
-      The issue's second request. Decided by "two host projects with one name and the
-      question of which should take the work".
+      The issue's second request. Decided by "a name shared by projects" and "Names,
+      paths and ids never decide".
     messages:
       - role: user
         content: Two host projects have the same name; which one should receive this work?
@@ -37,9 +38,8 @@ cases:
   - id: verify-project-placement-repository-revision-identity
     category: single-runbook
     note: >-
-      The issue's third request, in an agent's words. Decided by "the intended repository at
-      the intended revision" and the deliverable "canonical remote compared with ours, full
-      SHA against the revision wanted".
+      The issue's third request, in an agent's words. Decided by the deliverable "its
+      remote URLs against ours, its full commit SHA against the one wanted".
     messages:
       - role: user
         content: Verify repository and revision identity for selected host/project lanes.
@@ -50,9 +50,9 @@ cases:
   - id: verify-project-placement-agent-compare-each-host
     category: single-runbook
     note: >-
-      Agent-phrased outcome. Decided by "a read-only verdict per host and project from that
-      project's own assistant: canonical remote compared with ours, full SHA against the
-      revision wanted, clean or dirty, setup in place".
+      Agent-phrased outcome. Decided by "a read-only identity check of each candidate
+      project, from the assistant working in it: its remote URLs against ours, its full
+      commit SHA against the one wanted, clean or dirty, setup in place".
     messages:
       - role: user
         content: "Before sending anything out, compare each host's project with the local repository: canonical remote, full commit SHA, clean or dirty tree and whether setup is in place. Report which are the right repository. Read-only."
@@ -63,8 +63,8 @@ cases:
   - id: verify-project-placement-user-two-projects-called-api
     category: single-runbook
     note: >-
-      Same name on two machines. Decided by "not a different project that shares its name,
-      path or id".
+      Same name on two machines. Decided by "a name shared by projects" and "Names,
+      paths and ids never decide".
     messages:
       - role: user
         content: The mini and the Linux box both have a project called api. Which one is actually our repo?
@@ -75,8 +75,8 @@ cases:
   - id: verify-project-placement-fork-not-upstream
     category: single-runbook
     note: >-
-      A fork where the upstream was meant. Decided by "a fork where the upstream was meant"
-      and "forks, omitted projects and choices left to the person named as unresolved".
+      A fork where the upstream was meant. Decided by "a fork where the upstream was
+      meant" and "its remote URLs against ours".
     messages:
       - role: user
         content: The project on the second machine might be a fork rather than ours. Which remote does it point at and what commit is it on?
@@ -87,7 +87,8 @@ cases:
   - id: verify-project-placement-renamed-folder
     category: single-runbook
     note: >-
-      A renamed folder. Decided by "a folder renamed or cloned there".
+      A renamed folder. Decided by "a renamed folder" and "Names, paths and ids never
+      decide".
     messages:
       - role: user
         content: I renamed the billing folder on the build host. Make sure it is still the same repository before the task goes there.
@@ -98,8 +99,8 @@ cases:
   - id: verify-project-placement-project-not-listed
     category: single-runbook
     note: >-
-      A project the host list does not show. Decided by "a project the host does not list"
-      and "omitted projects" named as unresolved.
+      A project the host list does not show. Decided by "a project the host does not
+      list".
     messages:
       - role: user
         content: The build host's project list is cut off and I can't see our repo. Before I send this out, is the right project there?
@@ -110,8 +111,8 @@ cases:
   - id: verify-project-placement-cloned-twice
     category: single-runbook
     note: >-
-      Two clones on one host. Decided by "a folder renamed or cloned there" and "several
-      candidates" resolved by the remote, not the name.
+      Two clones on one host under different folder names. Decided by "a renamed
+      folder", "a name shared by projects" and "Names, paths and ids never decide".
     messages:
       - role: user
         content: I cloned the repo again on the laptop host under another folder name. Which of its two projects is the one to use, and are they the same repo?
@@ -122,8 +123,8 @@ cases:
   - id: verify-project-placement-fork-compare-remotes
     category: single-runbook
     note: >-
-      Terse, no punctuation, agent-style. Decided by "a fork where the upstream was meant"
-      and "canonical remote compared with ours".
+      Terse, no punctuation, agent-style. Decided by "a fork where the upstream was
+      meant" and "its remote URLs against ours".
     messages:
       - role: user
         content: whether the project on the other host is a fork, compare its remotes with ours
