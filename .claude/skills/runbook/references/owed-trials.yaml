@@ -2019,3 +2019,57 @@ trials:
     execution:
       - "host.listAssistants and host.listTasks for each connected host went out in one round (hub transcript)."
       - "In each survey host.getTask was called at most once for the input-required exchange and for no other exchange (hub transcript)."
+  - id: report-swarm-results
+    runbook: daintree.hosts.report-swarm-results
+    also: [daintree.hosts.handle-hub-message, daintree.hosts.swarm-fan-out, daintree.hosts.do-delegated-work]
+    issue: 120
+    caller: hub
+    path: staged
+    hosts: 2
+    needs: [host-restart]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "Stage two hosts. {project} at {sha} on {remote}, cloned on the Shell and on both hosts, with a dev script that serves on {port}; a lane enrolled in it on each host with the combo's lane CLI; the hub with the hub CLI."
+      - "On {host_b} set the project's origin pushurl to an empty scratch bare repository, so its pushes succeed there and never reach {remote}: a completion claim the shared remote contradicts."
+    steps:
+      - say: |-
+          Have {host_a} and {host_b} each add a --json option to the tally CLI that prints the total as JSON, with a test: {host_a} on branch {branch}-a and {host_b} on {branch}-b, both pushed to origin, and tell me what each did. Launch any agents with model haiku.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.swarm-fan-out]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.do-delegated-work]
+            calls: [assistant.getInbox, agent.launch, assistant.reply]
+      - person: "When both hosts have replied: on {host_a} run the dev script in the {branch}-a worktree's pane and leave it serving on {port}."
+      - say: Also have {host_b} add a --version option on branch {branch}-c, pushed to origin.
+        expect:
+          hub:
+            calls: [host.sendMessage]
+      - person: "Right after that send, and before {host_b} replies, quit the {host_b} instance and leave it stopped."
+      - say: |-
+          The run is over. Give me the final report: what each unit produced, what you checked yourself and what the hosts only claimed, any report that is false or missing, and what is still running on the machines. Change nothing and clean nothing up.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.report-swarm-results]
+            calls: [host.listTasks, host.getTask, host.sendMessage]
+            never: [host.cancelTask, host.startAssistant]
+          lane:
+            selected: [daintree.hosts.handle-hub-message]
+            calls: [assistant.getInbox, terminal.list, assistant.reply]
+            never: [terminal.close, worktree.delete]
+            notices: [lane-wake]
+    checks:
+      - "The report has a row per unit: {branch}-a verified (its commit equals git ls-remote {remote} {branch}-a; in a fresh clone of {branch}-a, tally --json prints the total as JSON and npm test passes, as the report says), {branch}-b contradicted (the commit the host claimed is on no branch of {remote}, git branch -r --contains finds nothing, and the report quotes it beside what the remote has, without claiming to know whether it was ever there), {branch}-c missing (no reply, the delivery times from the Shell's exchange record)."
+      - "The dev server on {port} is listed under {host_a} with its PID and port exactly as lsof shows them, with the person as the one who decides; it is still running afterwards."
+      - "Nothing changed: ls-remote of {remote} equals what it was before the final prompt and the scratch repository holds the only copy of {branch}-b; no pane or worktree closed on either host; no cancel and no cleanup message in the Shell's exchange record; exactly one report question, to {host_a}, none to the stopped {host_b}."
+    execution:
+      - "The hub checked each branch in its own shell with git ls-remote or a scratch clone, not by asking the lane (hub transcript)."
+      - "{host_b}'s empty or lost reply was reported as gone or missing, never as a pass or a failure of the code (hub transcript)."
+      - "The question to {host_a} was read-only: the lane listed panes, worktrees and the listener with terminal.list and git reads and changed nothing (lane transcript)."
