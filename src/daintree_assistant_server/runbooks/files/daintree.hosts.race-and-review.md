@@ -15,6 +15,7 @@ requiredTools:
 optionalTools:
   - host.listTasks
   - terminal.sendKeys
+hostEligibility: connected
 ---
 Judges and reviewers give findings, never edits; never rank by a builder's reply, merge, force-push or delete a branch.
 

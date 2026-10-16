@@ -300,7 +300,9 @@ def main() -> int:
             # docs_query, because this gate scores `docs_wanted`. Serving decides
             # that on the bare last user message via a second pass; omitting it
             # here would compare two artifacts on a code path neither ships.
-            sel = clf_local.select(q, active, docs_query=last_user_text(case.messages))
+            sel = clf_local.select(
+                q, active, docs_query=last_user_text(case.messages), exclude=case.exclude
+            )
             result.append((tuple(sel.runbook_ids), sel.docs_wanted))
         return result
 

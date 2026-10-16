@@ -12,6 +12,7 @@ requiredTools:
   - host.sendMessage
 optionalTools:
   - host.cancelTask
+hostEligibility: connected
 ---
 Only work not started moves; a started unit stays, throttled, or goes to daintree.hosts.reassign-host-work on the person's word. Allowance is per host and account, never summed.
 

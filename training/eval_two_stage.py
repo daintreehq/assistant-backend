@@ -185,7 +185,7 @@ def _ablate(artifact: Path, catalog, cases, baseline_picked) -> None:  # type: i
             continue  # a background wake never reaches the model at all
         query = query_document(case.messages, turn_context=case.turn_context)
         visible = [sid for sid in case.active if sid in selectable]
-        after = _select_reversed(clf, query, visible, np)
+        after = _select_reversed(clf, query, visible, np, case.exclude)
         scored += 1
         moved += sorted(after) != sorted(before)
     print(
@@ -194,7 +194,7 @@ def _ablate(artifact: Path, catalog, cases, baseline_picked) -> None:  # type: i
     )
 
 
-def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def]
+def _select_reversed(clf, query, active_ids, np, exclude):  # type: ignore[no-untyped-def]
     """Re-run one selection with the ballot handed over in reverse order.
 
     The BALLOT is the serving one — ``assemble_candidates``, actives seated —
@@ -215,7 +215,7 @@ def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def
     q_ret = _run_encoder(clf._retriever, clf._retriever_tok, [text], normalize=True)[0]
     sims = table.retrieval @ q_ret
     active = set(active_ids)
-    chosen = assemble_candidates(sims, table.ids, active, clf._k)
+    chosen = assemble_candidates(sims, table.ids, active, clf._k, exclude=exclude)
     k = len(chosen)
     top = chosen.indices[::-1]
 

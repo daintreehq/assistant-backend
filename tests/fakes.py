@@ -24,9 +24,14 @@ class ScriptedSelector:
         #: Makes the model "unable to answer".
         self.search_fails = False
         self.search_requests: list[tuple[str, int]] = []
+        #: What each search was told to leave out, parallel to ``search_requests``.
+        self.search_excludes: list[frozenset[str]] = []
 
-    async def search(self, query: str, *, limit: int) -> list[RunbookSearchHit] | None:
+    async def search(
+        self, query: str, *, limit: int, exclude: frozenset[str] = frozenset()
+    ) -> list[RunbookSearchHit] | None:
         self.search_requests.append((query, limit))
+        self.search_excludes.append(exclude)
         if self.search_fails:
             return None
         hits = self.search_hits
@@ -36,4 +41,5 @@ class ScriptedSelector:
         return [
             RunbookSearchHit(runbook_id=sid, score=score, selected=selected)
             for sid, score, selected in hits
+            if sid not in exclude
         ][:limit]

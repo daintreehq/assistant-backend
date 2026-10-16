@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 1. Pin the remote URL, the full SHA (`git ls-remote`), the exact command, input data digests, a time cap, and what each host showed.
 2. `host.list`, `host.listAssistants`: on each named host, the project holding that repository and an `available` lane. None: daintree.hosts.diagnose-messaging; no substitute host.

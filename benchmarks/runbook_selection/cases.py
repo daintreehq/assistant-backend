@@ -6,6 +6,12 @@ frozen conversation plus the prior active-runbook set and the EXPECTED selection
 - ``required``: ids that must ALL be picked (recall). Empty means "must clear".
 - ``optional``: ids that are allowed but not demanded (typically the domain
   foundation — both a lean selector and a pairing selector should pass).
+- ``host_state`` (optional): the caller's reported host state, as Daintree sends it
+  in its headers (``{hosts: none|configured|connected, lane: reachable}``). The case
+  is scored with the host runbooks that state does not fit left out, as a search
+  for that caller leaves them out. Omitted is an unreported caller, offered the
+  whole catalog. A case may not expect, or hold active, a runbook its state leaves
+  out: that would score as a selector miss what is really a broken case.
 
 Anything picked outside ``required + optional`` is an ``extra`` (precision
 failure). Every id is validated against the real catalog at load time so a typo
@@ -48,6 +54,7 @@ import yaml
 
 from daintree_assistant_server.contracts.openai import ChatMessage, FunctionCall, ToolCall
 from daintree_assistant_server.runbooks.catalog import Catalog
+from daintree_assistant_server.runbooks.host_state import HostState, parse_host_state
 from daintree_assistant_server.runbooks.models import Runbook
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
@@ -123,6 +130,11 @@ class BenchCase:
     # The hub's emitted brief this lane case's query was drawn from (``pairs.py``
     # checks its shape). Lane cases only.
     brief: str | None = None
+    #: The caller's reported host state; ``None`` is unreported.
+    host_state: HostState | None = None
+    #: What a search for this caller leaves out (``Catalog.excluded_for``), resolved
+    #: at load so every replay passes the same set to ``select(exclude=...)``.
+    exclude: frozenset[str] = frozenset()
 
     @property
     def allowed(self) -> set[str]:
@@ -169,6 +181,26 @@ def _check_foundation_convention(required: list[str], catalog: Catalog, case_id:
         )
 
 
+def _build_host_state(raw: Any, case_id: str) -> HostState | None:
+    """Strict, unlike the transport: a case's state is authored, so a typo fails."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) - {"hosts", "lane"}:
+        raise CaseError(f"{case_id}: host_state takes only 'hosts' and 'lane'")
+    hosts, lane = raw.get("hosts"), raw.get("lane")
+    state = (
+        parse_host_state(hosts, lane)
+        if isinstance(hosts, str) and (lane is None or isinstance(lane, str))
+        else None
+    )
+    if state is None:
+        raise CaseError(
+            f"{case_id}: host_state.hosts must be none, configured or connected, "
+            "and host_state.lane reachable or omitted"
+        )
+    return state
+
+
 def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase:
     case_id = raw.get("id")
     if not case_id or not isinstance(case_id, str):
@@ -206,6 +238,14 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
             f"{case_id}: {', '.join(clash)} is forbidden for this case (the wrong end of the "
             "hub/lane pair, or named in expect.forbid) and also expected"
         )
+    host_state = _build_host_state(raw.get("host_state"), case_id)
+    exclude = catalog.excluded_for(host_state)
+    named = set(required) | set(optional) | set(raw.get("active") or [])
+    if named & exclude:
+        raise CaseError(
+            f"{case_id}: its host_state leaves out {', '.join(sorted(named & exclude))}, "
+            "which it expects or holds active"
+        )
     return BenchCase(
         id=case_id,
         category=str(raw.get("category") or "uncategorized"),
@@ -222,6 +262,8 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
         role=role,
         forbid=tuple(forbid),
         brief=brief,
+        host_state=host_state,
+        exclude=exclude,
     )
 
 

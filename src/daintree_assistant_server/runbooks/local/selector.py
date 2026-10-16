@@ -46,7 +46,9 @@ class RunbookSelector(Protocol):
     ``tests/fakes.py``; ``tests/unit/test_runbook_search.py`` pins the two
     signatures against each other."""
 
-    async def search(self, query: str, *, limit: int) -> list[RunbookSearchHit] | None: ...
+    async def search(
+        self, query: str, *, limit: int, exclude: frozenset[str] = frozenset()
+    ) -> list[RunbookSearchHit] | None: ...
 
 
 class LocalSelector:
@@ -62,13 +64,19 @@ class LocalSelector:
         self._pool = pool
         self._catalog = catalog
 
-    async def search(self, query: str, *, limit: int) -> list[RunbookSearchHit] | None:
+    async def search(
+        self, query: str, *, limit: int, exclude: frozenset[str] = frozenset()
+    ) -> list[RunbookSearchHit] | None:
         """Rank the selectable catalog against ``query``; the top ``limit`` hits.
 
         The query is a lone user message with nothing loaded. The classifier's
         admitted set becomes ``selected``, but the ranking is what is returned,
         so a caller asking for five runbooks gets five even where the classifier
         would have loaded one or none.
+
+        ``exclude`` is what this caller may not be offered (``Catalog.excluded_for``
+        its host state). It is applied before the shortlist, so the rest of the
+        catalog ranks as if those runbooks were not there.
 
         ``None`` when the model could not answer (pool refused, graph failed),
         distinct from ``[]``, which is an honest empty catalog.
@@ -86,7 +94,9 @@ class LocalSelector:
             text = fit_query(
                 [ChatMessage(role="user", content=query)], fits=classifier.query_fits
             )
-            return classifier.select(text, [], catalog=catalog, max_active=MAX_SELECTED)
+            return classifier.select(
+                text, [], catalog=catalog, max_active=MAX_SELECTED, exclude=exclude
+            )
 
         result = await self._pool.run(rank)
         if result is None:
@@ -95,5 +105,5 @@ class LocalSelector:
         return [
             RunbookSearchHit(runbook_id=sid, score=float(p), selected=sid in selected)
             for sid, p in result.ranked
-            if sid in catalog.selectable_ids
+            if sid in catalog.selectable_ids and sid not in exclude
         ][:limit]

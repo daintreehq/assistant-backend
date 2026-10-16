@@ -200,6 +200,7 @@ def run_local(
                 catalog=catalog,
                 max_active=MAX_ACTIVE,
                 docs_query=last_user_text(case.messages),
+                exclude=case.exclude,
             )
             picked = [sid for sid in sel.runbook_ids if sid in selectable]
             docs_q = "q" if sel.docs_wanted else None

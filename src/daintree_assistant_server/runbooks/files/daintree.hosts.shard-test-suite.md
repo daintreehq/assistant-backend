@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 1. Pin the remote, full SHA (`git ls-remote`), a run id and the suite (the person's scope or manifest, within the repository's rules; unclear: ask). Lanes (`host.listAssistants`): per host an `available` one in the repository's project, one open shard each.
 2. Discovery, one `host.sendMessage` per lane, no `waitMs`: "Follow daintree.hosts.verify-for-hub"; remote, SHA, run id, the shards' environment and limits; check: list the suite's tests with its own runner, none run; report runner version, its shard option per its help, count and sha256 of the sorted ids, the ids (else files) if they fit. End the turn.

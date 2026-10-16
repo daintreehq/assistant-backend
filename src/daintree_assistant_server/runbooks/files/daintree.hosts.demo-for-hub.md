@@ -14,6 +14,7 @@ optionalTools:
   - worktree.setActive
   - devPreview.restart
   - devPreview.reloadPreview
+hostEligibility: lane
 ---
 Build the hub's demo by daintree.workflow.prepare-feature-demo with these changes; the exchange and its one reply are daintree.hosts.handle-hub-message's (`get_runbook` either if absent). That reply carries the demo's Report back and step 5.
 

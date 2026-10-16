@@ -10,6 +10,7 @@ requiredTools:
   - host.listTasks
   - host.getTask
   - host.sendMessage
+hostEligibility: configured
 ---
 Code only: a deployed service, credentials, data and the run's panes and worktrees are separate; name them, do none.
 

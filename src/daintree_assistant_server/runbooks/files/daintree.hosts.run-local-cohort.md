@@ -18,6 +18,7 @@ optionalTools:
   - terminal.sendCommand
   - worktree.list
   - terminal.notifyWhenIdle
+hostEligibility: lane
 ---
 After daintree.hosts.handle-hub-message fitted it; keep its `taskId`.
 

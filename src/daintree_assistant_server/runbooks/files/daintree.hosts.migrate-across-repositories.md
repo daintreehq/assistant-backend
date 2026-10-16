@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 Each unit is a daintree.hosts.delegate-to-host unit: its brief and checks (`get_runbook` if absent). Keep here the rulebook, the searches and each repository's units, one writer each; lost: send nothing until restored.
 

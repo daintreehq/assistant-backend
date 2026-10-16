@@ -12,6 +12,7 @@ requiredTools:
   - host.sendMessage
 optionalTools:
   - host.startAssistant
+hostEligibility: configured
 ---
 Nothing on a host is touched from here: its own assistant does the work.
 

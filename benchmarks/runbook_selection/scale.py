@@ -206,11 +206,15 @@ def sweep(
             by_cat: dict[str, list[int]] = {}
             for case, (vec, visible, required) in zip(scored, encoded, strict=True):
                 sims = table.retrieval @ vec
-                ballot = assemble_candidates(sims, table.ids, set(visible), k)
+                ballot = assemble_candidates(
+                    sims, table.ids, set(visible), k, exclude=case.exclude
+                )
                 ids = {table.ids[int(i)] for i in ballot.indices}
                 dense = {
                     table.ids[int(i)]
-                    for i in assemble_candidates(sims, table.ids, (), k).indices
+                    for i in assemble_candidates(
+                        sims, table.ids, (), k, exclude=case.exclude
+                    ).indices
                 }
                 if required:
                     need += 1

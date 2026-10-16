@@ -11,6 +11,7 @@ import hashlib
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
+from .host_state import HostState, fits
 from .loader import RunbookLoadError, load_runbooks_dir
 from .models import Runbook
 
@@ -280,6 +281,21 @@ class Catalog:
         """
         return [sid for sid in runbook_ids if sid in self._selectable_ids]
 
+    def excluded_for(self, state: HostState | None) -> frozenset[str]:
+        """Runbooks a search must leave out for a caller in host ``state``.
+
+        Empty when the state is unreported, so such a caller searches the whole
+        catalog. Only runbooks declaring ``hostEligibility`` can appear: the rest of
+        the catalog fits every caller. Exact retrieval and supporting delivery
+        ignore it; it narrows what a search offers, nothing else.
+        """
+        if state is None:
+            return frozenset()
+        return frozenset(
+            s.id
+            for s in self._runbooks
+            if s.meta.host_eligibility is not None and not fits(s.meta.host_eligibility, state)
+        )
 
 
 def load_catalog(runbooks_dir: Path | None = None) -> Catalog:

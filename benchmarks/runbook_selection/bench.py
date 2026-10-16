@@ -63,6 +63,8 @@ def _cmd_local(args: argparse.Namespace) -> int:
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
+    from daintree_assistant_server.runbooks.host_state import HostState
+
     from .search import print_search, read_queries, request_errors, search
 
     queries = list(args.queries) + (read_queries(Path(args.file)) if args.file else [])
@@ -71,7 +73,13 @@ def _cmd_search(args: argparse.Namespace) -> int:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
         return 2
-    catalog, results, shrunk = search(queries, limit=args.max_results)
+    if args.lane and args.hosts is None:
+        print("error: --lane is part of a reported host state; give --hosts too", file=sys.stderr)
+        return 2
+    host_state = (
+        HostState(hosts=args.hosts, lane_reachable=args.lane) if args.hosts is not None else None
+    )
+    catalog, results, shrunk = search(queries, limit=args.max_results, host_state=host_state)
     print_search(catalog, queries, results, shrunk)
     return 0 if all(hits is not None for hits in results) else 1
 
@@ -204,6 +212,17 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument("--file", help="more queries, one per line (# comments skipped)")
     search.add_argument(
         "--max-results", type=int, default=5, help="hits per query (default 5, as the tool)"
+    )
+    search.add_argument(
+        "--hosts",
+        choices=("none", "configured", "connected"),
+        help="rank for a caller reporting this host state, as Daintree-Hosts does "
+        "(default: unreported, the whole catalog)",
+    )
+    search.add_argument(
+        "--lane",
+        action="store_true",
+        help="with --hosts: the caller is reachable by another machine's assistant",
     )
     search.set_defaults(func=_cmd_search)
 

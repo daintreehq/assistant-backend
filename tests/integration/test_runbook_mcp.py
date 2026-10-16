@@ -26,6 +26,7 @@ from daintree_assistant_server.runbook_mcp import (
     TOOL_NAME,
 )
 from daintree_assistant_server.runbooks.catalog import DOCS_RUNBOOK_ID
+from daintree_assistant_server.runbooks.host_state import HostState
 
 URL = "/v1/daintree/mcp"
 HEADERS = {"Accept": "application/json, text/event-stream"}
@@ -257,6 +258,49 @@ def test_max_results_defaults_to_three(client: TestClient, app: Any) -> None:
     assert DEFAULT_MAX_RESULTS == 3
     assert len(response.json()["result"]["structuredContent"]["runbooks"]) == 3
     assert app.state.container.selector.search_requests == [("anything", 3)]
+
+
+def test_each_search_is_narrowed_by_the_host_state_its_own_request_reports(
+    client: TestClient, app: Any
+) -> None:
+    """Read from every POST and never stored: a later request without the headers is
+    an unreported caller again, offered the whole catalog."""
+    selector = app.state.container.selector
+    catalog = app.state.container.catalog
+    none = catalog.excluded_for(HostState("none"))
+    lane = catalog.excluded_for(HostState("configured", lane_reachable=True))
+    assert none and lane and none != lane
+
+    _call(client, {"query": "q"}, headers={"Daintree-Hosts": "none"})
+    _call(
+        client,
+        {"query": "q"},
+        headers={"Daintree-Hosts": "configured", "Daintree-Lane": "reachable"},
+    )
+    _call(client, {"query": "q"})
+    assert selector.search_excludes == [none, lane, frozenset()]
+
+
+def test_a_malformed_host_state_filters_nothing(client: TestClient, app: Any) -> None:
+    """Fails open, and is never an error: an unknown value is not a definite no."""
+    for headers in (
+        {"Daintree-Hosts": "several"},
+        {"Daintree-Lane": "reachable"},
+        {"Daintree-Hosts": "connected", "Daintree-Lane": "maybe"},
+    ):
+        response = _call(client, {"query": "q"}, headers=headers)
+        assert response.status_code == 200
+        assert response.json()["result"]["isError"] is False
+    assert app.state.container.selector.search_excludes == [frozenset()] * 3
+
+
+def test_get_runbook_ignores_the_host_state(client: TestClient) -> None:
+    """Exact retrieval of a named id: the state narrows what a search offers only."""
+    result = _get(
+        client, {"id": "daintree.hosts.swarm-fan-out"}, headers={"Daintree-Hosts": "none"}
+    ).json()["result"]
+    assert result["isError"] is False
+    assert result["structuredContent"]["runbook"]["id"] == "daintree.hosts.swarm-fan-out"
 
 
 def test_get_runbook_returns_the_exact_runbook_and_its_foundation(

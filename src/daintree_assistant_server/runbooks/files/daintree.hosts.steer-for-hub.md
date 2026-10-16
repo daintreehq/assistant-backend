@@ -13,6 +13,7 @@ requiredTools:
   - assistant.reply
 optionalTools:
   - assistant.sendMessage
+hostEligibility: lane
 ---
 After daintree.hosts.handle-hub-message has read it: steer only the agents this lane launched for the run the hub names. A hub cancel never shows here; act on its message.
 

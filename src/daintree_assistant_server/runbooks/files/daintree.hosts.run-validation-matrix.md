@@ -11,6 +11,7 @@ requiredTools:
   - host.getTask
 optionalTools:
   - host.listTasks
+hostEligibility: connected
 ---
 1. Rows: one per environment asked for (platform, architecture, runtime versions, checks); another agent CLI is not another row. Pin the remote URL, the full SHA (`git ls-remote`; a tag's commit) and a run id. Keep pins and a row queue: row id, environment, host, `taskId`, state; surveys and follow-ups apart.
 2. `host.list`, then `host.listAssistants`: each host's project for the repository with an `available` lane. None: set one up only if the request covers it (daintree.hosts.start-swarm).
