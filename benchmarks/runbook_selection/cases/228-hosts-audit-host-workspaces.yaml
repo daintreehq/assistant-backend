@@ -1,0 +1,287 @@
+# daintree.hosts.audit-host-workspaces: the hub's read-only inventory of what one run left on its
+# Remote Hosts. Each host's own assistant inventories its own project (the local worktree audit
+# plus listeners, panes and retained resources), the hub classes every item safe, unsafe or unknown
+# from the evidence, names the hosts and projects it could not observe, and removes nothing.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, an
+# uncommitted-and-unpushed question per host, a coverage-gap question and a running-server
+# question. Traps: this runbook wins against performing a run's cleanup
+# (daintree.hosts.recover-and-clean-up), a lane's own removal (daintree.hosts.clean-up-for-hub),
+# the local audit (daintree.worktree.audit-worktrees), local teardown
+# (daintree.orchestration.workspace-cleanup) and a why-do-hosts-differ diagnosis
+# (daintree.hosts.diagnose-host-differences). Reverse traps: each of those wins its own request and
+# this runbook must not ride along, plus the inbox wake on a host (daintree.hosts.handle-hub-message).
+#
+# Lane receivers: on the receiving host the hub's audit request is read through
+# daintree.hosts.handle-hub-message and carried out with daintree.worktree.audit-worktrees, which
+# the hub's brief names. The last case pins that search agrees; a lane-worded request shares
+# the audit vocabulary and the hub runbook is untrained, so it is carried by corpus rows.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: audit-host-workspaces-issue-audit-left-across-hosts
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "wants to SEE what a run or swarm left on their Remote
+      Hosts before anything is cleaned up, and which of it could go". At base it selected
+      daintree.hosts.check-usage-limits and daintree.worktree.audit-worktrees.
+    messages:
+      - role: user
+        content: Audit the workspaces the swarm left across my hosts.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-issue-unpushed-or-in-use
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "its dirty files, unpushed commits, merged evidence
+      and listener owner". At base daintree.worktree.audit-worktrees took it alone.
+    messages:
+      - role: user
+        content: Which remote worktrees have unpushed work or are still in use?
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-issue-inventory-by-run-and-owner
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "other owners' items counted and left alone" with "a
+      report per host and project". At base daintree.hosts.check-usage-limits took it.
+    messages:
+      - role: user
+        content: Read-only cross-host cleanup inventory by run and owner.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-agent-phrased-inventory
+    category: single-runbook
+    note: >-
+      How a hub agent writes the search. Decided by "each item the run made (worktree, pane,
+      branch, running server, retained resource) classed safe, unsafe or unknown" and "hosts or
+      projects not observed as explicit gaps".
+    messages:
+      - role: user
+        content: >-
+          Produce a read-only inventory of the worktrees, panes and dev servers that run r-42 left
+          on each Remote Host. Class each item safe, unsafe or unknown to clean up and list any host
+          that could not be checked.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-user-casual-leftovers
+    category: single-runbook
+    note: >-
+      A person's own words, nothing deleted. Decided by "wants to SEE what a run or swarm left on
+      their Remote Hosts before anything is cleaned up".
+    messages:
+      - role: user
+        content: >-
+          what's still lying around on the other machines from that run, dirty trees, unpushed
+          stuff, servers still running? just look, don't touch anything
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-uncommitted-unpushed-per-host
+    category: single-runbook
+    note: >-
+      Per-host evidence before any cleanup. Decided by "its dirty files, unpushed commits, merged
+      evidence and listener owner".
+    messages:
+      - role: user
+        content: >-
+          One remote host still has uncommitted edits from the swarm and another has none. Before
+          anything is cleaned, list what each host left uncommitted or unpushed and who owns it.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-coverage-gaps
+    category: single-runbook
+    note: >-
+      A gap question. Decided by "hosts or projects not observed as explicit gaps".
+    messages:
+      - role: user
+        content: >-
+          Take stock of what the swarm left running on each remote host, including dev servers, and
+          tell me which hosts you could not look at.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-running-server-safe-to-remove
+    category: single-runbook
+    note: >-
+      A running server and a removal question, answered by report only. Decided by "classed safe,
+      unsafe or unknown with its dirty files, unpushed commits, merged evidence and listener
+      owner".
+    messages:
+      - role: user
+        content: Is the swarm's dev server still running on the build box, and is that worktree safe to remove?
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------ traps: this runbook wins
+  - id: audit-host-workspaces-not-recover-and-clean-up
+    category: routing-trap
+    note: >-
+      Inventory before tidying, nothing deleted. Decided by "Do not use for performing a named
+      run's cleanup (daintree.hosts.recover-and-clean-up)": the deliverable is the report, not the
+      removal.
+    messages:
+      - role: user
+        content: >-
+          The swarm finished. Before I tidy up, tell me what it left on my remote hosts and which
+          pieces are safe to clean up. Nothing gets deleted yet.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-not-audit-worktrees
+    category: routing-trap
+    note: >-
+      Remote worktrees, report only. Decided by "for worktrees on this machine
+      (daintree.worktree.audit-worktrees". The worktrees are on the Remote Hosts.
+    messages:
+      - role: user
+        content: >-
+          Give me a read-only report of which remote worktrees from the swarm have dirty files, and
+          which have commits that were never pushed.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-not-clean-up-for-hub
+    category: routing-trap
+    note: >-
+      Whose leftovers, report only, asked on the hub. Decided by "for a host's own assistant
+      removing what it made for the hub (daintree.hosts.clean-up-for-hub)": nothing is removed.
+    messages:
+      - role: user
+        content: Which of the remote leftovers are mine to delete and which belong to other runs? Report only.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-not-workspace-cleanup
+    category: routing-trap
+    note: >-
+      Two machines, report without touching. Decided by "tearing them down,
+      daintree.orchestration.workspace-cleanup": no teardown is asked.
+    messages:
+      - role: user
+        content: >-
+          Two of my machines each ran part of the run. Report, for each, which worktrees and servers
+          are still around and which could be removed later, without touching them.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-not-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      Per-host leftovers, not a behaviour difference. Decided by "Do not use for ... why one host
+      differs from another (daintree.hosts.diagnose-host-differences)"; the ask is what each host
+      holds.
+    messages:
+      - role: user
+        content: >-
+          The build box and the mini both ran units of the run. List what each of them still has
+          open: worktrees, branches, servers, and what is unpushed.
+    expect:
+      required: [daintree.hosts.audit-host-workspaces]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------ reverse traps: the neighbour wins
+  - id: audit-host-workspaces-reverse-recover-and-clean-up
+    category: routing-trap
+    note: >-
+      Each host's assistant is to remove what the run made. Decided by recover-and-clean-up's "its
+      panes (usage-check panes included), worktrees and branches, cleaned up through each host's
+      own assistant".
+    messages:
+      - role: user
+        content: >-
+          Clean up after run r-42 on the remote hosts through each host's own assistant: panes
+          closed, clean worktrees removed, a list of what stayed and why.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.clean-up-for-hub, daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-clean-up-for-hub
+    category: routing-trap
+    note: >-
+      On a host: the hub asks this assistant to remove what it made. Decided by clean-up-for-hub's
+      "asks it to remove what it made on this machine for one of the hub's runs".
+    messages:
+      - role: user
+        content: The hub asked me to tidy up the worktrees I made for its parser job and tell it what I kept.
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-audit-worktrees
+    category: routing-trap
+    note: >-
+      This machine's own worktrees. Decided by audit-worktrees' "what STATE their worktrees are
+      in and which ones they could let go".
+    messages:
+      - role: user
+        content: "Audit the worktrees on this machine: which are merged, stale or hold unpushed work?"
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+
+  - id: audit-host-workspaces-reverse-workspace-cleanup
+    category: routing-trap
+    note: >-
+      Local teardown ordered. Decided by workspace-cleanup's "explicitly asks to tear down
+      workspace state".
+    messages:
+      - role: user
+        content: I want every merged worktree on this computer deleted and its terminals closed.
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+
+  - id: audit-host-workspaces-reverse-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      Same code, different results per host. Decided by diagnose-host-differences' "the SAME CODE
+      BEHAVES DIFFERENTLY ON TWO OR MORE Remote Hosts".
+    messages:
+      - role: user
+        content: Tests pass on the Linux box but fail on the Mac host. Find out why.
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-handle-hub-message
+    category: routing-trap
+    note: >-
+      The wake line on a host that holds the hub's audit request. Decided by handle-hub-message's
+      "the inbox wake line".
+    messages:
+      - role: user
+        content: "Daintree: assistant inbox has a new message (exchange 7c1). Read it with assistant.getInbox."
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-lane-inventory-request
+    category: routing-trap
+    note: >-
+      On a host, the hub's audit request. Decided by "its answering the hub's audit request
+      (daintree.hosts.handle-hub-message)"; this lane reads the hub's message and carries the
+      inventory out with the local audit. Untrained: carried by corpus rows (retrain owed).
+    messages:
+      - role: user
+        content: >-
+          The hub asked me to list the worktrees and dev servers I made for its run and say which
+          are safe to remove. Don't remove anything, just report back.
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.worktree.audit-worktrees, daintree.hosts.foundation]
