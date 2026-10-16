@@ -243,8 +243,9 @@ cases:
     category: routing-trap
     note: >-
       Reverse trap: confirming a host's project is the intended repository is
-      daintree.hosts.verify-project-placement ("whether a project on another machine ... is
-      really the repository meant"), not a plugin question.
+      daintree.hosts.verify-project-placement ("whether a project on another machine, a Remote
+      Host this Shell reaches, is really the repository meant for the work about to be sent"),
+      not a plugin question.
     messages:
       - role: user
         content: >-
