@@ -13,22 +13,22 @@ optionalTools:
   - host.listTasks
   - host.startAssistant
 ---
-Read-only. A host's project `name`, `path` and `projectId` are its own hints: equal ones prove nothing across machines, clones and forks inherit an id, and a repeated id lists once, so a second clone can hide.
+Read-only. A host's project `name`, `path` and `projectId` are its own hints: equal ones prove nothing across machines, clones and forks inherit an id, and a repeated id lists once, hiding a clone.
 
-1. Pin here the intended `origin` (`git remote -v`, credentials removed) and the full base SHA (`git ls-remote`), or the person's.
-2. Per host, `host.listAssistants`. Every project that could be it is a candidate, whatever its name: several are asked, never chosen by name. `projectsOmitted` above 0: that many unseen, with no page to ask for; an unlisted project is unverified, not missing. A candidate with no `available` lane: unverified; the foundation's step 2, or the person. Never ask a lane in another project to look.
+1. Pin here the intended `origin` (credentials removed) and the full base SHA (`git ls-remote`), or the person's.
+2. Per host, `host.listAssistants`. Every project that could be it is a candidate; several are asked, never chosen by name. `projectsOmitted` above 0: that many unseen, with no page to ask for; an unlisted project is unverified, not missing. A candidate with no `available` lane: unverified; the foundation's step 2, or the person. Never ask a lane in another project to look.
 3. One `host.sendMessage` per candidate project, to one available lane at its listed `slot`, no `waitMs`; end the turn:
 
 ```json tool=host.sendMessage surface=hub-full
-{"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","text":"Question only: change nothing, fetch nothing, start no other work. For this project report its root folder, every remote with its URL (credentials removed), current branch, full HEAD SHA, whether <base SHA> is an ancestor of HEAD, tracked and untracked changes as counts, and whether <setup the task needs> is in place. Say what you cannot tell."}
+{"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","text":"Question only: change nothing, fetch nothing, start no other work. For this project report its root folder, every remote with its URL (credentials removed), current branch, full HEAD SHA, whether <base SHA> is an ancestor of HEAD, tracked and untracked change counts, and whether <setup the task needs> is in place. Say what you cannot tell."}
 ```
 
-On notice or resume: judge only a `completed` exchange; unsent, open or empty is unverified or pending, a missing field unknown. The answer is the lane's claim, attributed; redact URL credentials before relaying.
-- Same repository: a credential-free URL equal to ours in host, port and path (case kept; scheme and `.git` ignored). Remote names prove nothing: a match on one other than `origin` is a fork or mirror claim for the person.
-- Revision: its SHA equal to the pinned one; else its ancestry answer, claimed (`git ls-remote` lists tips only, so an unlisted SHA is unknown).
+On notice or resume: judge only `completed`; unsent, open or empty is unverified, a missing field unknown. The answer is the lane's claim, attributed; redact URL credentials before relaying.
+- Same repository: a credential-free network URL equal to ours in host, port and path (case kept; scheme and `.git` ignored); `file:` and local paths prove nothing. Remote names prove nothing: a match on one other than `origin` is a fork or mirror claim for the person.
+- Revision: its SHA equal to the pinned one; else `git merge-base --is-ancestor` if your clone holds it, else its ancestry answer, claimed (`git ls-remote` lists tips only; an unlisted SHA is unknown).
 - Dirty or unset-up: findings, not failures.
-- Verdict per project: match, match needing a sync, fork, different repository, unverified. Two matches on a host, or none: the person chooses.
+- Verdict, bound to the project, slot and root that answered: match, match needing a sync, fork, different repository, unverified. A different root for one project, two matches on a host, or none: the person chooses.
 
 Stop and recovery: fetch, reset, clone, setup or a start is a separate step the person authorises.
 
-Report back: per host, project, slot and root folder, verdict with the remote and SHA seen, and the choices left open.
+Report back: per host: project, slot, root, verdict with the remote and SHA seen, choices left open.
