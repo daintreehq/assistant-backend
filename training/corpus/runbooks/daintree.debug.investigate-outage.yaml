@@ -92,6 +92,12 @@ boundaries:
   - query: production is down right now and nothing else is running anywhere, work out what broke and why
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
+  - query: 'payments api error rate tripled after this morning''s rollout; get read-only investigators on it and give me mitigation options'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'the production site is down right now; what changed in the last deploy'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 followups:
   - query: the payments service is throwing timeouts too - add that to the logs lens
     history:

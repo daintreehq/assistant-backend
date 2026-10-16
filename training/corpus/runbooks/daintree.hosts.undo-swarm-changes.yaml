@@ -102,6 +102,9 @@ boundaries:
     confusable_with: [daintree.hosts.execute-distributed-workflow]
   - query: the dependent plan we ran across the hosts needs undoing, consumers first, then the schema
     confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: 'revert the commits the run put on the remote hosts'' branches; I have the list of what went in'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 
 followups:
   - query: ok that's wrong, revert all of it on both hosts

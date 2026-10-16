@@ -112,6 +112,12 @@ boundaries:
   - query: 'this build only hangs on one of my remote machines. work out what differs between it and the others'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'same commit, same command: green on the Linux host and red on the Mac host. find out why, change nothing'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'the test hangs on only one of my remote hosts; compare their environments and rank the differences'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

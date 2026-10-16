@@ -200,6 +200,15 @@ boundaries:
   - query: "sends reach the mac host but the linux host's come back lane_unavailable, why"
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
+  - query: 'I can see the Linux host in the list but its assistant shows as unavailable, which switch do I flip'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'the second machine says paused every time I try to send it a message, which gate is that'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'my messages to that host''s assistant are refused as not enrolled, work out why and what the person does'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 
   - query: "the assistant on my second Mac shows as unavailable and my messages to it bounce; which setting is in the way?"
     confusable_with: [daintree.hosts.survey-hosts]

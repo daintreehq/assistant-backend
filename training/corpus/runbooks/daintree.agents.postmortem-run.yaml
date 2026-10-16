@@ -100,6 +100,15 @@ boundaries:
   - query: 'post-mortem that failed attempt and tell me how to stop it happening again'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'my local Codex session in the api worktree deleted the failing tests instead of fixing them; work out where it first went off course'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'my Claude session here finished with half the tests deleted. work out where it first went wrong from its transcript'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'what went wrong with last night''s local Codex run, and what should the next brief say'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 followups:
   - query: it's the codex one from last night, the panel is closed now
     history:

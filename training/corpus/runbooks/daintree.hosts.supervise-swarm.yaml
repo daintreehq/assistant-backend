@@ -146,6 +146,15 @@ boundaries:
   - query: 'two machines have reported and the third is still working. keep following until all three are done and answer what they ask'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'the three hosts are mid-task and one has gone much quieter than the others; check on it once and carry on, the lessons can wait until it is all done'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'stay with the units out on the remote machines until each one is verified, and relay any question one of them asks'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'work is still out on the other computers. keep an eye on it and tell me when the last host is in'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 
   - query: "keep an eye on the remote hosts until their work is finished, answer what they ask and tell me when everything is in"
     confusable_with: [daintree.hosts.survey-hosts]

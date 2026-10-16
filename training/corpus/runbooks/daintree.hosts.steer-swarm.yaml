@@ -210,3 +210,6 @@ boundaries:
   - query: 'change the acceptance criteria for the work already out on the remote hosts; the rest of the brief stands'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'one of the hosts is heading the wrong way right now; stop it and point it at the other approach'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121

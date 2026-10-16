@@ -274,3 +274,12 @@ boundaries:
   - query: 'my hub got replaced halfway through the run I''d given the remote machines. where does each exchange stand now?'
     confusable_with: [daintree.hosts.report-swarm-results]
     run: runbook-2026-10-issue-120
+  - query: 'daintree restarted while the other machines were mid-task; list which exchanges finished, which are still open and which nobody will answer'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'which tasks I sent to the other machines are still open, and is it safe to send any of them again'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
+  - query: 'have each remote host''s assistant close the panes and worktrees this job opened there'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121

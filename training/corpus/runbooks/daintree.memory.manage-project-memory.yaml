@@ -254,6 +254,9 @@ boundaries:
   - query: 'Add a rule to AGENTS.md: agents must never paste API keys into prompts or logs.'
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
+  - query: 'remember that our briefs to the other machines must always name the exact commit'
+    confusable_with: [daintree.hosts.postmortem-swarm]
+    run: runbook-2026-10-issue-121
 followups:
   - query: also the node version, 22
     history:
