@@ -1,0 +1,228 @@
+# daintree.runtime.measure-performance, measured per host.
+#
+# The runbook now covers the same baseline/candidate pair on several Remote Hosts: each
+# host times both revisions itself and per-host ratios come before any fleet summary.
+# Recall cases are phrased the ways a person or an agent asks for it (including the
+# receiving machine's own voice); the traps pin the five declared hosts neighbours both
+# ways: forward (this runbook wins) and reverse (the neighbour wins and this must not
+# ride along).
+
+cases:
+  # --- recall ---------------------------------------------------------------------
+  - id: perf-hosts-user-linux-vs-mac
+    category: single-runbook
+    note: >-
+      User phrasing; a speed question across two machines of different speed. Decided
+      by "The same pair measured on SEVERAL machines, the Remote Hosts this Shell
+      reaches or this one at a hub's request, is this runbook's too".
+    messages:
+      - role: user
+        content: is the new parser really faster, or is it just that my Linux box is quicker than the Mac? test it properly on both
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-agent-fleet-after-per-host
+    category: single-runbook
+    note: >-
+      Agent phrasing; asks for the fleet verdict only after the per-machine numbers.
+      Decided by "one row per host (hardware, runtime, load and thermal readings with
+      times, ratio with its spread, verdict) before any fleet summary".
+    messages:
+      - role: user
+        content: Time the candidate against the baseline on every machine and only then tell me whether the fleet as a whole got faster
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-user-compile-times
+    category: single-runbook
+    note: >-
+      User phrasing; build time as the metric on three machines, with the warning that
+      machine speed must not be mistaken for the change. Decided by "never raw times
+      compared across machines".
+    messages:
+      - role: user
+        content: Compare the old and new compile times on my three machines and don't mix up which machine is just faster
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-no-punctuation
+    category: single-runbook
+    note: >-
+      No punctuation, casual; a regression suspicion across machines. Decided by "Each
+      host measures both revisions itself".
+    messages:
+      - role: user
+        content: did perf slow down on any of my machines after the cache change compare both revisions per host
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-agent-claimed-speedup
+    category: single-runbook
+    note: >-
+      Agent phrasing; a claimed speedup checked on each machine separately because the
+      machines differ in speed. Decided by "Each host measures both revisions itself".
+    messages:
+      - role: user
+        content: Check the claimed 30 percent speedup on each of my machines separately, old commit against new, since one machine is slower than the others.
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-lane-time-here
+    category: single-runbook
+    note: >-
+      The receiving machine's own voice, as a lane describes the work it was sent.
+      Decided by "or this one at a hub's request" and "Each host measures both
+      revisions itself".
+    messages:
+      - role: user
+        content: Time the baseline and candidate builds here, same setup for both, and reply with the raw run pairs, the median ratio and this machine's load readings
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  # --- forward traps: this runbook wins -----------------------------------------------
+  - id: perf-hosts-trap-not-fan-out-average
+    category: routing-trap
+    note: >-
+      A request to average raw seconds across machines still belongs here; the runbook
+      refuses the pooled number. Decided by "never raw times compared across machines".
+      daintree.hosts.swarm-fan-out (the same work on every host) must not ride along.
+    messages:
+      - role: user
+        content: Fan out the same benchmark to all my machines and average the raw seconds so I get one number for the speedup
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-trap-not-validation-matrix
+    category: routing-trap
+    note: >-
+      Two pinned revisions timed per machine is a speed comparison, not a pass/fail
+      matrix. Decided by "Do not use for a check matrix across environments
+      (daintree.hosts.run-validation-matrix)".
+    messages:
+      - role: user
+        content: Compare two pinned revisions for speed on each of my machines, one before-and-after pair per machine, and report the change per machine.
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-trap-not-shard-test-suite
+    category: routing-trap
+    note: >-
+      The same suite timed on each machine for two revisions is a measurement, not a
+      split of one run. Decided by "Do not use for ... a test suite split across hosts
+      (daintree.hosts.shard-test-suite)".
+    messages:
+      - role: user
+        content: How much faster does the test suite run on the candidate than on the baseline, measured separately on each of my machines?
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-trap-not-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      Machines that differ in speed are expected, not a failure to diagnose; the question
+      is whether the change helps on each. Decided by "Do not use for ... why the same
+      code differs between hosts (daintree.hosts.diagnose-host-differences)".
+    messages:
+      - role: user
+        content: Is the speedup from the new commit real on every machine I have? Time the old and new revision on each one by itself, since the machines differ in speed.
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-trap-not-rebalance-load
+    category: routing-trap
+    note: >-
+      A loaded host is a caveat on its measurement, not a swarm to rebalance. Decided by
+      "Do not use for ... a lopsided swarm's load (daintree.hosts.rebalance-load)" and
+      "load and thermal readings with times".
+    messages:
+      - role: user
+        content: Benchmark old and new on every host. One host is busy with someone's work, so tell me how much to trust its numbers.
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: perf-hosts-trap-not-hosts-usage
+    category: routing-trap
+    note: >-
+      Memory of two builds per host is a measurement, not the agent usage screen.
+      Decided by "Do not use for ... plan allowance per host
+      (daintree.hosts.check-usage-limits)".
+    messages:
+      - role: user
+        content: Measure memory use of the new allocator versus the old one on all three hosts and tell me the per host change, the hosts have different amounts of RAM
+    expect:
+      required: [daintree.runtime.measure-performance]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  # --- reverse traps: the neighbour wins, this runbook must not ride along -----------------
+  - id: perf-hosts-reverse-validation-matrix
+    category: routing-trap
+    note: >-
+      One commit under several runtime versions, one result per runtime. Decided by
+      run-validation-matrix's "run the checks on Node 20 and Node 22 across my machines
+      and give me the matrix". This runbook is not involved: nothing is timed.
+    messages:
+      - role: user
+        content: Build and test this exact commit on each of my hosts under Node 18 and Node 20 and give me a matrix with one row per runtime
+    expect:
+      required: [daintree.hosts.run-validation-matrix]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: perf-hosts-reverse-shard-test-suite
+    category: routing-trap
+    note: >-
+      One suite divided over machines to finish sooner. Decided by shard-test-suite's
+      "ONE test suite run faster by SPLITTING it between their Remote Hosts".
+    messages:
+      - role: user
+        content: Run the unit tests faster by dividing the files into shards over my hosts and merging the reports
+    expect:
+      required: [daintree.hosts.shard-test-suite]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: perf-hosts-reverse-diagnose-host-differences
+    category: routing-trap
+    note: >-
+      A pass on one machine and a failure on another, asking why. Decided by
+      diagnose-host-differences's "tests green on one machine and red on another".
+    messages:
+      - role: user
+        content: Why does the same commit pass its tests on the Mac and fail on the Linux host?
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: perf-hosts-reverse-rebalance-load
+    category: routing-trap
+    note: >-
+      Pressure on one host of a running swarm, nothing to measure between revisions.
+      Decided by rebalance-load's "one machine is swapping, hot, pegged or running too
+      many agents while others sit idle".
+    messages:
+      - role: user
+        content: the linux host is swapping and the mac is idle, take the load off the linux one
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: perf-hosts-reverse-check-usage-limits
+    category: routing-trap
+    note: >-
+      Agent allowance left per machine. Decided by check-usage-limits's "how much Claude
+      Code or Codex allowance each Remote Host this Shell reaches has left".
+    messages:
+      - role: user
+        content: Which of my machines has the most Claude usage left?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
