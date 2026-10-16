@@ -12,18 +12,18 @@ requiredTools:
 optionalTools:
   - host.listTasks
 ---
-1. Tell the person first: nothing here keeps time; each host's assistant holds its own box; its reply is the only stop evidence; a host cut off may neither stop nor answer; you report as hosts answer or when asked. Asked for a stop guaranteed on every host: it cannot be had; send once they accept that.
+1. Tell the person first: nothing here keeps time; each host's assistant holds its own box; its reply is the only stop evidence; a host cut off may neither stop nor answer; you report as hosts answer. Asked for a stop guaranteed on every host: it cannot be had; send once they accept.
 2. Hosts named, else `host.list`; one `host.listAssistants` round: each host's project and lane, else "not reached". In your shell: remote, base SHA (`git ls-remote`), run id, per host a new branch `<run>/<unit>`; then `date -u` and the UTC deadline with its date.
 3. One `host.sendMessage` per lane, back to back, no `waitMs`, keeping the deadline and each send time; end the turn. Text:
-   "Run <run> unit <unit>: follow daintree.orchestration.timebox-attempt here: <task, acceptance>; new worktree on <branch> from <SHA> of <remote>; CLI <named, else yours>. The box ends <deadline> by this host's `date -u`, setup included, never restarted. Under two minutes left: launch nothing; say so. Unable to hold a wait to it: <best effort | ask back first>. Push only if <said>; no new work after the box. Reply with its report, branch, HEAD, what enforced the stop, `date -u` on reading."
+   "Run <run> unit <unit>: follow daintree.orchestration.timebox-attempt here: <task, acceptance>; new worktree on <branch> from <SHA> of <remote>; CLI <named, else yours>. The box ends <deadline> by this host's `date -u`, setup included, never restarted; hold every wait to end then; ask for the report after. Under two minutes left: launch nothing; say so. Unable to hold a wait to it: <best effort | ask back first>. Push only if <said>; no new work after the box. Reply with its report, branch, HEAD, what enforced the stop, `date -u` on reading."
 
 ```json tool=host.sendMessage surface=hub-full
 {"hostId":"<hostId>","projectId":"<projectId>","slot":0,"generation":"<generation>","text":"<brief>"}
 ```
 
-   A native wakeup (Claude Code's `ScheduleWakeup`): set it for the deadline plus ten minutes; Codex has none.
+   If your tools list a native wakeup, set one for the deadline plus ten minutes.
 
-On notice or resume: `host.getTask` each named task; past the deadline, every open one too.
+On notice or resume: past the deadline, `host.getTask` every open task, named or not.
 - `input-required`, cannot hold the box: the person picks best effort (same deadline) or drops it.
 - `completed`: its row in host time (`delivery.acceptedAt` minus your send time is clock offset plus transit). Stopped by the deadline only if seen on the agent's screen by then; unpushed work stays the lane's claim.
 - Ten minutes past it, still `submitted`/`working` or host disconnected: unconfirmed, never stopped; one stop via daintree.hosts.steer-swarm.

@@ -210,8 +210,8 @@ cases:
     category: routing-trap
     note: >-
       No bound set up front; a run already out is stopped now: daintree.hosts.steer-swarm "wants
-      work they ALREADY SENT to their other machines ... STOPPED, CALLED OFF or CHANGED while it
-      is under way". This runbook's fence: "stopping or changing a run already sent
+      work they ALREADY SENT to their other machines" and "STOPPED, CALLED OFF or CHANGED while
+      it is under way". This runbook's fence: "stopping or changing a run already sent
       (daintree.hosts.steer-swarm)".
     messages:
       - role: user

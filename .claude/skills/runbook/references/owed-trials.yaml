@@ -1550,7 +1550,7 @@ trials:
       - {hub: claude, lane: claude}
       - {hub: codex, lane: claude}
     setup:
-      - "Start {host_a}'s instance with MCP_TOOL_TIMEOUT=60000 in its environment (the app keeps a value already set, lifecycle.ts:728-732), so its Claude Code lane's MCP calls end after a minute."
+      - "Make the lane's Claude Code launch carry MCP_TOOL_TIMEOUT=60000: the app fills that variable from the launch's own environment only when it is unset (lifecycle.ts:552, 730-731), so setting it on the app process does nothing. Put a wrapper named claude first on {host_a}'s PATH that exports it and execs the real CLI, then read the lane's effective environment (process list or /proc) to confirm 60000 before the trial."
       - "Enroll a Claude Code lane in {project} on {host_a}; {project} at {sha} on {remote}, cloned on the Shell and on {host_a}."
     steps:
       - say: |-
@@ -1568,6 +1568,7 @@ trials:
     checks:
       - "On {host_a}: one worker pane for the unit, still open, its worktree and edits intact; nothing relaunched, closed or discarded."
       - "The Shell's record: one exchange, completed after the deadline; nothing resent."
+      - "Operator, watching {host_a}'s worker pane and reading that host's `date -u`: the worker's prompt returns (or does not) and at what time. The hub's classification (stopped by the deadline, stopped late, unconfirmed) must match that observed time."
     execution:
       - "The lane's first held wait ended after about a minute with no reply; the lane then kept holding in short waits to the deadline or ended its turn on the agent's own clock, and its reply says which enforced the stop (lane transcript)."
       - "The hub reported the stop as the lane described it (enforced by the lane's waits, or only by the agent's own clock, or late), never as a clean stop by the deadline the lane did not confirm (hub transcript)."
