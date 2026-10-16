@@ -210,7 +210,7 @@ cases:
       FAILING and the user wants it working"; this runbook must not ride along.
     messages:
       - role: user
-        content: the build broke after I merged main into my branch, track down what's wrong and make it compile again
+        content: pytest dies at collection with an ImportError in conftest on this checkout; get the suite running again
     expect:
       required: [daintree.ci.diagnose-and-fix]
 
@@ -230,13 +230,14 @@ cases:
     category: routing-trap
     note: >-
       The lane's side, testing the hub's commit: daintree.hosts.verify-for-hub wins on "the hub asks
-      this lane to TEST or VERIFY a commit"; this runbook must not ride along.
+      this lane to TEST or VERIFY a commit"; this runbook must not ride along. The lane's message
+      handler may ride along, as in the verify-for-hub cases.
     messages:
       - role: user
-        content: the hub wants 7c2d9e1 tested on this machine with the unit and lint commands it listed; report results, don't fix anything
+        content: the hub's request is to confirm whether 3b9e2f4 compiles on this arm machine and passes its smoke tests; leave the code as it is
     expect:
       required: [daintree.hosts.verify-for-hub]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: diagnose-host-differences-reverse-diagnose-messaging
     category: routing-trap
