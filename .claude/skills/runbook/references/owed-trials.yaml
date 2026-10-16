@@ -817,6 +817,44 @@ trials:
       - "The Shell's forward uses a different local port from {port} because {port} is held; the reply does not offer a localhost URL as the person's."
       - "The database is the invented seed; the unrelated Shell listener is alive."
 
+  - id: prepare-remote-demo
+    runbook: daintree.hosts.prepare-remote-demo
+    also: [daintree.hosts.demo-for-hub]
+    issue: 125
+    caller: hub
+    path: fleet
+    hosts: 1
+    needs: [separate-loopback]
+    status: owed
+    combos:
+      - {hub: claude, lane: codex}
+      - {hub: codex, lane: claude}
+    setup:
+      - "{project} at {sha} is pushed to {remote} and cloned clean on {host_a}, on {branch} at {sha}, with a tiny web server (npm run serve on {port}) over an invented SQLite seed that prints the revision on its page; on the Shell an unrelated listener already holds {port}."
+    steps:
+      - say: |-
+          Get {host_a} to prepare a demo of {project} on {branch} at {sha} with sample data, running on that machine, and tell me how I open it from this Mac. Use model haiku for any Claude Code agent.
+          Before acting, use search_runbooks from the daintree-runbooks MCP to find the procedure for this and follow it.
+        expect:
+          hub:
+            selected: [daintree.hosts.prepare-remote-demo]
+            calls: [host.listAssistants, host.sendMessage, host.getTask]
+            never: [host.switch, project.openOnHost]
+            notices: [hub-update]
+          lane:
+            selected: [daintree.hosts.demo-for-hub]
+            calls: [worktree.list, terminal.list, agent.launch, assistant.reply]
+            notices: [lane-wake]
+      - person: "Cmd/Ctrl-click {host_a}'s row in the host menu, open {project} in that window, show its Dev Preview and tell the hub the address it shows."
+    checks:
+      - "The hub's reply names {sha} as served and the host's port {port} as the host's, and offers no localhost URL for the person's browser."
+      - "The address the person read serves the demo page showing {sha}; its local port is not the host's {port}, which the Shell's unrelated listener holds."
+      - "The host listener is on loopback, started after the pin, with its cwd in the demo worktree (lsof on {host_a}); the data is the invented seed."
+      - "The Shell's unrelated listener on {port} is alive; the hub made no forward, ssh tunnel or window switch."
+    execution:
+      - "The hub sent one message, ended its turn, and compared the reply's SHA with the pin and {remote} before giving the person a route (hub transcript)."
+      - "The hub curled exactly the address the person read, not one it built (hub transcript)."
+
   - id: connect-host
     runbook: daintree.hosts.connect-host
     issue: 122
