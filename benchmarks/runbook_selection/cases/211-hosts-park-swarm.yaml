@@ -103,9 +103,7 @@ cases:
     category: routing-trap
     note: >-
       A hold to come back to, not a stop: "PUT ON HOLD TO COME BACK TO" against this runbook's
-      fence "a stop or change with no comeback planned (daintree.hosts.steer-swarm)", and
-      steer-swarm's own "for holding the run to resume later from a record
-      (daintree.hosts.park-swarm)".
+      fence "a stop or change with no comeback planned (daintree.hosts.steer-swarm)".
     messages:
       - role: user
         content: can you put the remote swarm on hold till monday, i want to pick it back up exactly where each machine was
