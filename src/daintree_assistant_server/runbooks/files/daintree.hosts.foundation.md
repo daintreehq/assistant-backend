@@ -29,6 +29,6 @@ On notice or resume: the hub's `Daintree: delegated exchange update` line names 
 - `input-required`: answer within the user's request by a new `host.sendMessage` to that lane naming the task in `referenceTaskIds`, or ask the person.
 - A host's message needing a decision beyond the request: the person decides; `assistant.reply` it.
 
-Stop and recovery: an outcome is not a host failure; read `detail`. `taskId: null`: not sent; otherwise look it up before any resend. Uncertain start: re-list the host's assistants; never start blindly. A cancel after delivery is only a request and a pause only blocks new messages: neither stops work. Hop and rate limits are stops.
+Stop and recovery: an outcome is not a host failure; read `detail`. `taskId: null`: not sent; otherwise look it up before any resend. Uncertain start: re-list the host's assistants; never start blindly. A cancel after delivery is a request and a pause blocks new messages: neither stops work. Rate limit: wait `retryAfterMs`.
 
 Report back: per host, outcome, `taskId`, state, `delivery` times; timings, not theories.
