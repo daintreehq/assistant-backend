@@ -10,7 +10,7 @@ positives:
   - EADDRINUSE :::8080 in the api worktree. Free it if it turns out to be one of ours.
   - what's running on 5173?
   - 'Identify which worktree''s server is listening on port 4000. Read-only: don''t stop anything.'
-  - There's a zombie node process from a terminal I closed yesterday still sitting on 3001, get rid of it
+  - A leftover node server from a tab I shut last night still has 3001 and the new build needs it; stop that process
   - Something grabbed 9229 so the node debugger can't attach. Who owns that port?
   - Port 6006 busy, storybook won't start. Attribute the listener to a Daintree terminal and worktree.
   - The server claude-2 started in its worktree is squatting on 8000 and main needs it. Find it and give the user the options without killing it.

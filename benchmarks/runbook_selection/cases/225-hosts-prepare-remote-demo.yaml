@@ -23,7 +23,7 @@ cases:
         content: Show me the dev server the remote assistant started, through the correct forwarded port
     expect:
       required: [daintree.hosts.prepare-remote-demo]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.demo-for-hub, daintree.terminals.run-visible-command]
+      optional: [daintree.hosts.foundation, daintree.foundation, daintree.terminals.run-visible-command]
 
   - id: prepare-remote-demo-issue-open-from-here
     category: single-runbook
@@ -35,7 +35,7 @@ cases:
         content: Prepare a demo on the remote host and tell me how to open it from here
     expect:
       required: [daintree.hosts.prepare-remote-demo]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.hosts.demo-for-hub, daintree.workflow.prepare-feature-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-remote-demo-issue-shell-side-access
     category: single-runbook
@@ -73,7 +73,7 @@ cases:
         content: get the other machine to run the new onboarding screens at the commit i pushed, then tell me how to look at them from here
     expect:
       required: [daintree.hosts.prepare-remote-demo]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.workflow.prepare-feature-demo]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-remote-demo-local-port-busy
     category: single-runbook

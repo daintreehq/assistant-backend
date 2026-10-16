@@ -224,14 +224,14 @@ cases:
     category: routing-trap
     note: >-
       The person on the Shell asking another machine's assistant for a running page is the
-      hub's side: daintree.hosts.delegate-to-host ("Use when the person wants ONE piece of WORK
-      done by the Daintree assistant on another machine"), with the hosts foundation along.
-      This runbook ("Use on a Remote Host's lane") must not ride along.
+      hub's side: daintree.hosts.prepare-remote-demo ("Use on the hub, the person's own Shell,
+      when the person wants to SEE a feature running on another machine"), with the hosts
+      foundation along. This runbook ("Use on a Remote Host's lane") must not ride along.
     messages:
       - role: user
         content: Ask the assistant on the build server to get the new reports page running and send back the port
     expect:
-      required: [daintree.hosts.delegate-to-host]
+      required: [daintree.hosts.prepare-remote-demo]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-reverse-hub-side-my-host
