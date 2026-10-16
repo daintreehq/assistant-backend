@@ -128,6 +128,12 @@ boundaries:
   - query: the plugin I wrote fails validation on the remote machine, fix it
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
+  - query: "the plugin I wrote lives in this project on the remote host and its panel is blank after pulling; get it loaded there"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "validate and reload the project plugin on this machine, the manager says it's staged"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
 followups:
   - query: why is it staged, what do I have to do?
     history:

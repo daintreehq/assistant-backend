@@ -166,3 +166,12 @@ boundaries:
   - query: "the hub wants a new worktree on this host where an agent adds the invoices migration and commits it, reply with the sha"
     confusable_with: [daintree.runtime.migrate-worktree-database]
     run: runbook-2026-10-issue-133
+  - query: "The hub's work order for this host: rewrite the csv exporter on a new branch from the base commit, and use the plugin's style skill if this machine has it; reply with the commit."
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "hub message: build the retry wrapper in a fresh worktree with claude; it suggests applying the api-design plugin skill, reply with the SHA"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "from the hub: new worktree on its branch, codex implements the sorting fix, follow the plugin's tdd skill, report the commit"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136

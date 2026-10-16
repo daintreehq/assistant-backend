@@ -37,6 +37,38 @@ positives:
     run: 2026-09-28-catalog-expansion-refine
   - query: have the running Codex follow our plugin's security-review skill
     run: 2026-09-28-catalog-expansion-refine
+  - query: "The reviewer lane on the build box should use its own installed accessibility plugin skill on the settings screens, not whatever I have on this laptop."
+    run: runbook-2026-10-issue-136
+  - query: "what skills do the plugins on this host provide? the hub wants to know before it sends anything"
+    run: runbook-2026-10-issue-136
+  - query: "Check that the lint-rules plugin skill is actually installed on this machine and load it before the agent starts on the importer cleanup."
+    run: runbook-2026-10-issue-136
+  - query: "the hub's note says to follow the api-contract skill; look it up on this host, load that one and have claude follow it on the orders branch"
+    run: runbook-2026-10-issue-136
+  - query: "i don't trust that the changelog skill on the staging host matches mine, load what that host lists and use that for the release notes"
+    run: runbook-2026-10-issue-136
+  - query: "The delegated task asks the agent here to apply the dependency-audit plugin skill to the lockfile diff on the feature branch. Search this host's plugin skills for it, load it by the id this host returns, brief the agent in the task checkout with that id and the hub's limits (local changes only, no push), and check each step it reports."
+    run: runbook-2026-10-issue-136
+  - query: "plugin skill release-kit.sign-off isn't in this machine's list. don't copy anything over from the other host, just tell the hub it's not here"
+    run: runbook-2026-10-issue-136
+  - query: "Our remote host has its own plugins installed. Use its security-review skill for the auth diff."
+    run: runbook-2026-10-issue-136
+  - query: "hey, quick one: is the tdd plugin skill available on this host? if so have the agent here follow it on the parser change"
+    run: runbook-2026-10-issue-136
+  - query: "The skill I loaded wants to push the branch and open a PR, but the request was a local fix only. Skip those steps and have the agent here report them as skipped."
+    run: runbook-2026-10-issue-136
+  - query: "Find out whether this machine's schema-review plugin skill reads the same as the one on my other computer before the agent relies on it."
+    run: runbook-2026-10-issue-136
+  - query: "List every plugin skill this lane can see on its own machine, nothing else."
+    run: runbook-2026-10-issue-136
+  - query: "The plugin the hub mentioned is installed on this machine but switched off, so its skill doesn't show. Say it isn't listed here so the person can turn it on."
+    run: runbook-2026-10-issue-136
+  - query: "Run the hub's named plugin skill, db-migration-check, against this machine's checkout and report each step's result with the commit it ran at."
+    run: runbook-2026-10-issue-136
+  - query: "sorry to bug you, can the agent in this worktree use the plugin's code-review rubric? the one installed on this machine, mine at home is older"
+    run: runbook-2026-10-issue-136
+  - query: "The host I'm on has a different plugin set from the main computer. Which skill do I have for release checklists here, and can the open codex follow it on the hotfix branch?"
+    run: runbook-2026-10-issue-136
 boundaries:
   - query: Have the running agent follow the Daintree plugin's migration-review skill on this branch.
     confusable_with: [daintree.agents.run-agent-command]
@@ -57,6 +89,18 @@ boundaries:
   - query: follow the plugin's release-checklist skill on the release/4.2 branch
     confusable_with: [daintree.memory.manage-project-memory]
     run: 2026-09-28-catalog-expansion-late
+  - query: "The hub already has a unit running here and only wants to know whether the perf-review plugin skill exists on this host and what it covers."
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-136
+  - query: "Before anything the hub asked for is built, find which review plugin skill this machine has and load it by its listed id."
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-136
+  - query: "I'm sitting at the build machine: load the migration-review skill from this machine's own plugin list and have the agent follow it."
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-136
+  - query: "the release-kit plugin is installed on this host; load its release-checklist skill and have the agent follow it on the hotfix branch"
+    confusable_with: [daintree.plugins.develop-project-plugin]
+    run: runbook-2026-10-issue-136
 followups:
   - query: actually yes, include the publish step too
     history:
@@ -88,6 +132,18 @@ followups:
       - 'assistant: skills.search ''api contract'' found acme-qa/api-contract-check (''Compare OpenAPI spec against handlers'').'
     active: [daintree.skills.use-plugin-skill]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: "ok load the one on this machine"
+    history:
+      - "user: use the migration-review plugin skill for the orders change"
+      - "assistant: Two hosts list a migration-review skill with different descriptions; this one's is the stricter."
+    active: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "and if it isn't installed here just tell the hub"
+    history:
+      - "user: the hub wants the agent to use the release-kit checklist skill"
+      - "assistant: Searching this machine's plugin skills for release-kit now."
+    active: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
 topic_shifts:
   - query: run the plugin's migration-review skill on it as well
     history:

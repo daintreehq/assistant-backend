@@ -132,6 +132,12 @@ boundaries:
   - query: run /compact in the claude that's already open
     confusable_with: [daintree.edits.spawn-visible-agent]
     run: 2026-09-28-catalog-expansion-refine
+  - query: "Run the /standup-notes command we keep in the repo inside the open Claude here and read me its output"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "which slash commands does the Codex pane on this machine offer for the repo?"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
 followups:
   - query: do the same for claude-3, focus on the billing tests
     history:

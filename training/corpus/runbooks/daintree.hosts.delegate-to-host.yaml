@@ -294,6 +294,15 @@ boundaries:
   - query: get the build machine to review the pushed branch and send me the findings
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: runbook-2026-10-issue-126
+  - query: "I'd like the staging machine's own assistant to chase down the login test that keeps flaking, on a branch it creates, applying its tdd plugin skill; tell me the commit"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "get the build host to implement the cache invalidation fix, following whichever review plugin skill it has installed, and send me the SHA"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
+  - query: "send the second Mac the job of tidying the config loader, with its plugin lint skill applied; I need the branch name back"
+    confusable_with: [daintree.skills.use-plugin-skill]
+    run: runbook-2026-10-issue-136
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:
