@@ -50,7 +50,7 @@ positives:
     run: runbook-2026-10-issue-135
   - query: "Execute the Playwright suite for worktree wt-claims at its HEAD on the host, pin the base URL to a free port, and return the listener pid, working directory and build id along with pass and fail counts."
     run: runbook-2026-10-issue-135
-  - query: "the e2e job on the linux host finished in forty seconds which is suspiciously quick. was it testing an old build that was already running?"
+  - query: "the e2e job on the linux host finished in forty seconds which is suspiciously quick. rerun it and make sure it isn't testing an old build that is already running"
     run: runbook-2026-10-issue-135
   - query: "Hey, quick favour: run the end-to-end tests against the remote worktree's own server and show me which build served them."
     run: runbook-2026-10-issue-135
@@ -124,7 +124,7 @@ boundaries:
   - query: "run the e2e specs on the other machine's worktree; those need the app up, so prove which server served them"
     confusable_with: [daintree.ci.run-local-checks]
     run: runbook-2026-10-issue-135
-  - query: "the integration run on the remote machine passed; demonstrate it never reached another worktree's app"
+  - query: "rerun the integration tests on the remote machine and demonstrate they reach only this worktree's app"
     confusable_with: [daintree.orchestration.verify-agent-work]
     run: runbook-2026-10-issue-135
 followups:

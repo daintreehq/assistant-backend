@@ -99,7 +99,7 @@ cases:
       green".
     messages:
       - role: user
-        content: the e2e run on the other host was green but I want to know it exercised this worktree's server at this commit and not whatever was already on the port
+        content: the e2e run on the other host was green but I don't trust it; rerun it so it exercises this worktree's server at this commit and not whatever was already on the port
     expect:
       required: [daintree.ci.run-e2e-suite]
       optional: [daintree.foundation]
