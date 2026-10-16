@@ -22,7 +22,7 @@ After daintree.hosts.handle-hub-message has read and fitted it: one hub unit, by
 
 1. Pin from the brief: run and unit ids, remote, base SHA, unit branch, CLI, checks, push or PR authority; gaps: ask back. Git runs as `git -C <project path>` (`actions.getContext`): `remote get-url origin` must match (else ask back); `cat-file -e <SHA>`, else `fetch` once, else blocker.
 2. Reconcile first: `worktree.list`, `git worktree list`, `terminal.getStatus` on `<run>-<unit>`. What the unit has is resumed, never remade; its branch alone, still at the base SHA, is `existingBranch`; else blocker.
-3. Create, then `worktree.waitUntilReady`: only `ready` admits the launch, else (after a few `timedOut`) blocker. No `recipeId`: its terminals start before setup; a named recipe: ask back.
+3. Create, then `worktree.waitUntilReady`: only `ready` admits the launch, else (after a few `timedOut`) blocker. No `recipeId`: no terminals start, setup still runs; a named recipe: ask back.
 
 ```json tool=worktree.createWithRecipe surface=lane-full
 {"source":{"kind":"newBranch","branchName":"<unit branch>","baseBranch":"<base SHA>","collisionPolicy":"error"}}
