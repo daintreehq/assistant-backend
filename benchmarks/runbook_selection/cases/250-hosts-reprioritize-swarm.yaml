@@ -1,0 +1,199 @@
+# daintree.hosts.reprioritize-swarm: the hub re-planning a run busy on the Remote Hosts when
+# something urgent jumps the queue. Each running task is kept, paused with a resume note or
+# redirected through its host's own assistant, the urgent work starts first on a lane with the
+# repository and room, a pause counts only when the lane's reply says so, and a paused task
+# resumes only on the person's word.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line and a
+# long one with kept, paused and redirected tasks. Traps: this runbook wins against
+# re-planning agents on this machine (daintree.orchestration.reprioritize-work), stopping or
+# changing a run with nothing urgent (daintree.hosts.steer-swarm) and parking for later
+# (daintree.hosts.park-swarm); and the reverse traps, where each neighbour keeps its own request
+# and this runbook must not ride along: reprioritize-work, steer-swarm, park-swarm, and placing
+# a new batch (daintree.hosts.place-work) and following a run (daintree.hosts.supervise-swarm),
+# which declare no fence of their own against it.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: reprioritize-swarm-issue-release-blocker
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "something URGENT arrives while their Remote Hosts
+      are busy with a run and it must JUMP THE QUEUE across those machines". At base the local
+      daintree.orchestration.reprioritize-work won every cross-host urgent request.
+    messages:
+      - role: user
+        content: Reprioritize my running swarm around this urgent release blocker.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-issue-pause-docs
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "each running task kept, paused with its resume
+      note, or turned to the urgent work". The local daintree.orchestration.reprioritize-work
+      still rides along untrained, so this case passes recall and fails strict until a retrain.
+    messages:
+      - role: user
+        content: Pause the remote docs tasks and put two workers on the urgent bug without losing their work.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-issue-preemption-notes
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "a priority reallocation: each running task kept,
+      paused with its resume note, or turned to the urgent work, as its host's assistant
+      acknowledged".
+    messages:
+      - role: user
+        content: Coordinate priority preemption across host assistants and preserve resume notes.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-agent-phrased
+    category: single-runbook
+    note: >-
+      An agent-phrased task description with the decision per task. Decided by "a priority
+      reallocation: each running task kept, paused with its resume note, or turned to the
+      urgent work".
+    messages:
+      - role: user
+        content: "Urgent customer escalation: decide which remote tasks continue, which pause with a note about where they stopped, and which agents move to it."
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-user-phrased
+    category: single-runbook
+    note: >-
+      A casual line with no punctuation, naming the other machines. Decided by "when something
+      URGENT arrives while their Remote Hosts are busy with a run and it must JUMP THE QUEUE
+      across those machines".
+    messages:
+      - role: user
+        content: the other machines are all busy but this crash fix cant wait, shuffle them so two of them jump on it
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-long-kept-paused-redirected
+    category: single-runbook
+    note: >-
+      A long request with a task to keep, tasks to pause and capacity for the urgent work.
+      Decided by "each running task kept, paused with its resume note, or turned to the urgent
+      work, as its host's assistant acknowledged, with the urgent work under way first".
+    messages:
+      - role: user
+        content: The checkout service is down and the fix is the most important thing today. My remote hosts are full of lower-priority tasks, so pause the minimum of them, keep the data migration running and give me two workers on the fix.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps: this runbook wins
+  - id: reprioritize-swarm-not-local-reprioritize
+    category: routing-trap
+    note: >-
+      Urgent work with every machine busy, no agents on this machine named. Decided by "Use on
+      the hub, the person's own Shell, when something URGENT arrives while their Remote Hosts are
+      busy with a run" against the local owner's "Do not use for agents on this machine
+      (daintree.orchestration.reprioritize-work)".
+    messages:
+      - role: user
+        content: The urgent bug takes priority over the remote work, keep it simple - pause the docs tasks, start the fix, ask me before resuming anything.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-not-steer-swarm
+    category: routing-trap
+    note: >-
+      Stopping part of a run, but to give its agents to something urgent. Decided by "the urgent
+      work under way first" against "or when nothing urgent needs the room
+      (daintree.hosts.steer-swarm, daintree.hosts.park-swarm)".
+    messages:
+      - role: user
+        content: Stop the low-priority tasks of the run on my remote hosts so the hotfix gets their agents, the rest of the run carries on.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-not-park-swarm
+    category: routing-trap
+    note: >-
+      Pausing the remote tasks and coming back only on the person's word, because something
+      outranks them. Decided by "something URGENT arrives" and "it must JUMP THE QUEUE across
+      those machines" against park-swarm's hold with nothing waiting.
+    messages:
+      - role: user
+        content: Something outranks the remote run now; pause the refactor tasks on the hosts so the fix gets their capacity, restart them only when I ask.
+    expect:
+      required: [daintree.hosts.reprioritize-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps: the neighbour wins
+  - id: reprioritize-swarm-reverse-local-reprioritize
+    category: routing-trap
+    note: >-
+      Agents on this machine, nothing sent to a Remote Host. The local runbook's "something
+      became URGENT while agents are already busy" decides; the hosts runbook declares "Do not
+      use for agents on this machine (daintree.orchestration.reprioritize-work)".
+    messages:
+      - role: user
+        content: An urgent bug just landed and my local agents are busy, pause the docs ones and put two on the bug.
+    expect:
+      required: [daintree.orchestration.reprioritize-work]
+      optional: [daintree.foundation]
+
+  - id: reprioritize-swarm-reverse-steer-swarm
+    category: routing-trap
+    note: >-
+      Stopping a run on the Remote Hosts with nothing urgent. steer-swarm's "STOPPED, CALLED OFF
+      or CHANGED while it is under way" decides; this runbook says "when nothing urgent needs the
+      room (daintree.hosts.steer-swarm, daintree.hosts.park-swarm)".
+    messages:
+      - role: user
+        content: Stop the run I sent to the remote machines and tell me which hosts confirmed.
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-reverse-park-swarm
+    category: routing-trap
+    note: >-
+      Holding the run for later with nothing urgent. park-swarm's "PUT ON HOLD TO COME BACK TO,
+      over a break or across a restart" decides.
+    messages:
+      - role: user
+        content: Park the swarm until Monday morning, nothing is urgent, I just want it held with a resume record.
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-reverse-place-work
+    category: routing-trap
+    note: >-
+      A new batch with room and nothing to pause. place-work's "wants each put on whichever
+      Remote Host this Shell reaches can best take it" decides; nothing is urgent and nothing
+      running gives way.
+    messages:
+      - role: user
+        content: Split these three bug reports across whichever remote machines have room, nothing running is touched.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: reprioritize-swarm-reverse-supervise-swarm
+    category: routing-trap
+    note: >-
+      Following a run that is out on the hosts, no change of priority. supervise-swarm's "the
+      person wants the run followed to its end" decides.
+    messages:
+      - role: user
+        content: Keep following the remote run and give me one row per task when they land.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
