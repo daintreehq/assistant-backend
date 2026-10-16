@@ -31,7 +31,7 @@ cases:
         content: What's going on across my other Macs?
     expect:
       required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation, daintree.diagnostics]
+      optional: [daintree.hosts.foundation]
 
   - id: survey-hosts-connected-and-waiting
     category: single-runbook
@@ -43,7 +43,7 @@ cases:
         content: Are my other Macs all connected, and is anything waiting on me?
     expect:
       required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation, daintree.foundation, daintree.diagnostics]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: survey-hosts-one-page-status
     category: single-runbook
@@ -300,3 +300,42 @@ cases:
     expect:
       required: [daintree.hosts.ask-host-assistant]
       optional: [daintree.hosts.foundation]
+
+  - id: survey-hosts-not-connect-host
+    category: routing-trap
+    note: >-
+      Listing the machines already added, whether each is connected and what is open on each is
+      this runbook's "whether the Remote Hosts are connected ... which projects have an assistant
+      enrolled", not "adding a machine as a Remote Host (daintree.hosts.connect-host)".
+    messages:
+      - role: user
+        content: List the machines I have already added to Daintree, whether each is connected right now, and the projects open on each.
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: survey-hosts-not-diagnose-messaging
+    category: routing-trap
+    note: >-
+      Saying which projects have an assistant that can be messaged and which have none is "which
+      projects have an assistant enrolled and taking messages" in one read-only report, not "why
+      one assistant cannot be messaged (daintree.hosts.diagnose-messaging)".
+    messages:
+      - role: user
+        content: For every host, say which projects have an assistant I could message right now and which projects have none, just the picture.
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
+
+  - id: survey-hosts-not-recover-and-clean-up
+    category: routing-trap
+    note: >-
+      A current picture of the open exchanges and what waits on the person is "which exchanges
+      with them are still open, and whether anything waits on the person" as recorded now, not
+      "where work already sent stands, finished or unanswered (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: Which exchanges with my Remote Hosts are open right now, and is anything waiting on me? Just the current picture.
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]

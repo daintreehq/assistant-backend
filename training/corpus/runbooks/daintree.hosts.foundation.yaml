@@ -224,6 +224,7 @@ boundaries:
     run: runbook-2026-10-issue-103
   - query: "how does messaging between the assistants on two of my machines work, and how do I switch it on?"
     confusable_with: [daintree.hosts.survey-hosts]
+    docs: true
     run: runbook-2026-10-issue-87
 followups:
   - query: can the panes do it instead
