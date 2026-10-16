@@ -208,3 +208,12 @@ boundaries:
   - query: "the task I gave the linux server's assistant yesterday never came back, find out what happened to it"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: "remove the worktrees the remote run left on my hosts, its commits are already on the remote and stay"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "clean up the panes from yesterday's swarm on every host, don't revert anything"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "the hosts restarted overnight; tell me which of the tasks I sent them are still open, and I'll decide about reverting anything later"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151

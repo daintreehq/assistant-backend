@@ -156,3 +156,12 @@ boundaries:
   - query: "the run on the hosts is heading the wrong way; tell every host to stop where it is and keep its commits"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: "pause the remote run on all hosts, I'll decide later whether to revert anything"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "Stop the swarm everywhere. Don't undo anything it committed, I want to look at it first."
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "tell the hosts to stop the run and leave their commits exactly as they are"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151

@@ -58,6 +58,12 @@ boundaries:
     confusable_with: [daintree.runtime.migrate-worktree-database]
   - query: roll staging back to v2.4.1, the new release broke checkout
     confusable_with: [daintree.runtime.migrate-worktree-database]
+  - query: "the remote run's release is live and broken, put the previous image back on staging"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "roll production back to the revision before the swarm's deploy; leave the code on the hosts alone for now"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
 topic_shifts:
   - query: checkout is broken on staging after that — roll staging back to the previous revision
     history:

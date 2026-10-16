@@ -1,0 +1,134 @@
+# daintree.hosts.undo-swarm-changes: the hub backing out exactly the code one named run changed
+# across its Remote Hosts' repositories. Writers are stopped first, dependents are reverted
+# before what they build on, each host's own assistant follows the local undo procedure through
+# a fresh agent, and every revert is checked against what the lane reports.
+#
+# Rows: reversal requests in people's own words and as hub agents describe them, with the
+# situations the procedure handles (two repositories with a dependency between them, hand
+# edits and other agents' work to keep, a run still writing, a host that restarted mid-revert,
+# a hunk nobody can attribute, a consumer outside the run); followups after a run reported or
+# was stopped; and boundaries against the local undo procedure
+# (daintree.git.undo-agent-changes), stopping a run (daintree.hosts.steer-swarm), cleaning up
+# its resources (daintree.hosts.recover-and-clean-up), a deployment rollback
+# (daintree.release.rollback-deployment) and running a dependent plan forward
+# (daintree.hosts.execute-distributed-workflow), each with reverse rows in that neighbour's
+# file. Lane-side rows (a host asked by the hub to revert in its own project) live in
+# daintree.git.undo-agent-changes.yaml.
+runbook: daintree.hosts.undo-swarm-changes
+run: runbook-2026-10-issue-151
+
+positives:
+  - revert everything last night's remote run committed, on every machine it touched
+  - The run I sent to the build box and the laptop broke both repos. Take its commits back and keep whatever else is in those checkouts.
+  - back out the swarm's changes to the payments service and the dashboard, nothing else
+  - Undo the refactor my other Macs did this afternoon. It touched three repositories; I only want its commits gone, not my own work.
+  - 'Hub task: reverse the commits of run price-sync on both hosts. The dashboard commit was built on the API commit, so the dashboard goes first.'
+  - can you roll back the code the remote agents wrote for the migration job, but leave the other agents' branches over there alone
+  - The schema change from the cross-machine run broke the mobile client. Revert the run's commits in both projects in a safe order.
+  - take back what the remote swarm did to the docs repo and the cli repo
+  - hey, so the experiment I farmed out to the servers was a bad idea. please revert its commits on each server and tell me the revert hashes
+  - Revert the run's work in the api and web repositories on my remote hosts; there are hand edits of mine staged in the web checkout that must survive.
+  - Everything the hosts committed for the logging run needs to be reverted. Nothing force-pushed, no resets.
+  - the parser run on my two linux boxes is wrong, back it out per repo and keep anything uncommitted that wasn't from it
+  - 'Person wants run search-v3 reverted on all three Remote Hosts. Units: index (host A), query api (host B, depends on index), ui (host C, depends on query api). Revert in reverse dependency order and report each original and revert SHA.'
+  - Please undo the code changes the remote run made. One of the repos also has another agent's unrelated work in progress, so be careful with that.
+  - get rid of the commits the swarm made on the mini and the build box, just those
+  - revert the remote job's changes but don't rewrite any history on those branches
+  - The hosts finished the theme update and I hate it. Revert what they committed in each project.
+  - 'Hub: the person asked to back out the cross-host feature run. One host is still mid-task. Stop it, then revert the run''s commits in each repository.'
+  - The remote run's server change is already merged into main over there and a client outside the run uses it. Work out how to back the run out without breaking that client.
+  - Undo what the swarm changed in the shared library and the two apps that use it, library last.
+  - back out yesterday's distributed run, the one that renamed the config keys, on every host
+  - Revert the run's commits on the remote machines and list anything you can't tell was the run's, so I can decide.
+  - roll back what my other computers' agents committed for the auth run, keep my own edits on those computers
+  - Revert the cross-host run's changes. The build box was rebooted during it, so check what is actually on that branch before redoing anything.
+  - I need the swarm's changes gone from both repos before the release cut tomorrow. Only its commits, please.
+  - 'Hub agent: reverse run perf-tune on hosts alpha and beta. Base SHAs and the unit commits are in the plan table above. Keep unrelated staged, unstaged and untracked work on both.'
+  - the cross-machine job introduced a regression, revert its commits everywhere it ran and run the tests after
+  - undo the run on my hosts, its commits only, the web one first because it depends on the server one
+  - Can the hosts' assistants revert what their agents committed for this morning's run? I want each revert checked.
+  - take the remote run's commits back out of the backend and frontend repos and tell me which ones you reverted
+  - Revert the work the swarm did in the infra repo on one host and the app repo on the other; leave the other branches on those machines untouched.
+  - Okay, the run is a write-off. Revert its commits on every host, keep everything else there, and tell me what you couldn't attribute.
+  - reverse the remote run's changes without a force push, I share those branches with other people
+  - 'From the hub: two repositories changed by run docs-sync need their run commits reverted; the guide repo consumed the API repo''s new schema, so revert the guide first.'
+  - roll back everything the agents on the other machines committed for the upgrade run
+  - My other Macs made a mess of the localisation run. Back out only what that run committed in each project.
+  - remote swarm change undo, both repos, keep my edits
+  - revert the code the cross-host job changed but leave the deploy alone, I'll handle that separately
+  - "hi! quick favour: undo whatever my remote hosts committed for the caching run, but keep everyone else's work there"
+  - >-
+    I sent a three-unit run across my hosts yesterday: a protocol change in one repository and
+    two consumers of it in two others. The protocol change turned out to be wrong. Revert the
+    run's commits in all three, consumers before the protocol, and keep anything on those
+    machines that wasn't part of the run.
+  - >-
+    The person wants the remote run's work taken back. It is finished on two hosts and one
+    agent is still working on the third. Each repository has unrelated uncommitted changes.
+    Stop what is still running, then have each host revert only the run's commits, and report
+    original and revert SHAs per repository.
+  - >-
+    We let the swarm loose on the monorepo split last week and it went badly. Two of my
+    machines committed to the shared library and one committed to the app that depends on it.
+    Back all of it out without resetting anything, and tell me about any change you are not
+    sure came from the run.
+  - query: how do you undo what a run did on several of my machines without wrecking the work I did by hand there? and then do it for the export run
+    docs: true
+  - query: explain how you'd keep the order safe when reverting a remote run whose client change depends on its server change, then go ahead
+    docs: true
+
+boundaries:
+  - query: revert what the run's agents committed on my two remote hosts, in both repos, and keep my own changes on those machines
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: undo what the agents committed for the run, but they ran on my other Macs, not this one
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: back out the codex agents' commits from the remote run, all of them, across the hosts' repositories
+    confusable_with: [daintree.git.undo-agent-changes]
+  - query: The run on my hosts already stopped. I want what it committed taken back now.
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: don't just stop the remote run, undo what it changed in each repo
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: call off the swarm and revert its commits on every host
+    confusable_with: [daintree.hosts.steer-swarm]
+  - query: keep the run's worktrees and panes on the hosts, I only want the commits it made reverted
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: not a cleanup, a revert. the remote run's commits in both repos have to go, its worktrees can stay
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+  - query: no rollback of prod needed, just revert the run's source changes in each host's repository
+    confusable_with: [daintree.release.rollback-deployment]
+  - query: undo the swarm's code changes across the repos; the deployed service is someone else's job
+    confusable_with: [daintree.release.rollback-deployment]
+  - query: run the reversal across my hosts in dependency order, the reverse of how the plan went out
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+  - query: the dependent plan we ran across the hosts needs undoing, consumers first, then the schema
+    confusable_with: [daintree.hosts.execute-distributed-workflow]
+
+followups:
+  - query: ok that's wrong, revert all of it on both hosts
+    history:
+      - "user: how did the remote run go?"
+      - "assistant: Both hosts finished. The server repository has two new commits on run/limits/api and the client repository one on run/limits/web; checks pass on both."
+  - query: right, now undo what they committed
+    history:
+      - "user: stop the run on my other machines"
+      - "assistant: Both hosts' assistants confirmed their agents stopped. The api checkout has three run commits and one uncommitted file; the web checkout has two run commits."
+  - query: revert the run's commits then, client first
+    history:
+      - "user: the client on the laptop is failing against the new server, why?"
+      - "assistant: The run changed the server's response shape in its first unit, and the client unit was built against it on the other host."
+  - query: just the ones from the run, keep the rest
+    history:
+      - "user: revert what my hosts committed today"
+      - "assistant: Today's commits on those hosts include the run's five and two you made by hand on the build box. Which should go?"
+  - query: yes, revert the run's commits on all three
+    history:
+      - "user: list what the swarm committed on each host"
+      - "assistant: Host one: 3 commits in the api repository. Host two: 2 in the web repository. Host three: 1 in the docs repository."
+  - query: the uncertain hunk is mine, keep it. revert the rest
+    history:
+      - "user: back out the remote run's changes"
+      - "assistant: The web host reverted two commits. One hunk in settings.ts could be the run's or yours, so it was left unchanged pending your call."
+  - query: undo that whole run on the hosts
+    history:
+      - "user: did the hosts finish the dependency bump?"
+      - "assistant: Yes, both pushed their branches, but the build on the integration box now fails on the bumped package."

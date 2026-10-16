@@ -113,6 +113,39 @@ boundaries:
   - query: undo the last commit codex made on feat/mailer but keep my own changes
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
+  - query: "revert what the gemini agent committed in this worktree this morning, my staged changes stay"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "back out the two commits the agent in the api worktree made here; nothing on my other machines is involved"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "undo that codex session's commits on this branch, keep the files I edited by hand"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "the hub wants the commits its run made in this project reverted, keep my uncommitted work"
+    confusable_with: [daintree.hosts.undo-swarm-changes, daintree.hosts.clean-up-for-hub]
+    run: runbook-2026-10-issue-151
+  - query: "Hub asked this lane to revert run commits a1b2c3d and e4f5a6b on branch run/limits/api, newest first, no push, and to report the revert SHAs"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "On this host: revert the commits the run's agent made here for the hub, and leave its worktree where it is"
+    confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "the hub says undo its unit's changes in this repo but keep the other agent's work, then reply with what got reverted"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "As the lane, the hub listed three of the run's commits and one uncommitted hunk to take back in this checkout; do that and keep everything else"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "The hub wants to know, without anything changing yet, whether its run's commits here already have reverts on the branch, and then the remaining ones reverted"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: >-
+      The hub's message says the run it sent to this machine went wrong and asks me to revert the
+      two commits that run's agent made on its branch in this project. My own edits from this
+      afternoon are staged in the same checkout and must survive, and there is no push.
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
 followups:
   - query: the pricing.ts hunk is mine, leave it alone. reverse the rest
     history:

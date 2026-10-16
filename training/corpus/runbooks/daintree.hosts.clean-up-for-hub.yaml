@@ -142,3 +142,9 @@ boundaries:
   - query: "The hub wants the leftovers from its benchmark run removed from this machine now that every agent has stopped."
     confusable_with: [daintree.hosts.steer-for-hub]
     run: runbook-2026-10-issue-106
+  - query: "the hub asked me to close the run's panes and delete its pushed worktrees here, keep every commit"
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: runbook-2026-10-issue-151
+  - query: "hub wants the worktrees from its run removed on this machine, nothing reverted"
+    confusable_with: [daintree.git.undo-agent-changes]
+    run: runbook-2026-10-issue-151

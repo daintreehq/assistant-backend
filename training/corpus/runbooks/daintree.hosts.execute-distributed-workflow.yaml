@@ -134,6 +134,12 @@ boundaries:
   - query: "docs wait on both apps and both apps wait on the schema; drive that plan across my machines to the end"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
+  - query: "carry the plan across my hosts: the schema unit first, then both apps built against it, and keep going until it's done"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
+  - query: "the api commit is verified, release the next stage of the cross-host plan"
+    confusable_with: [daintree.hosts.undo-swarm-changes]
+    run: runbook-2026-10-issue-151
 
 followups:
   - query: yes, run it
