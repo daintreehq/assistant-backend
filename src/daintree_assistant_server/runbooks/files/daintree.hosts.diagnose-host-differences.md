@@ -17,15 +17,15 @@ optionalTools:
 3. One `host.sendMessage` per host, the same brief, no `waitMs`; end the turn. One reply, the same fields from every host, unknown as unknown:
    - Objective: explain a difference, fix nothing: no edits, cache deletion, settings changes, pushes, installs outside the worktree, or unnamed shared services.
    - Where it was seen, read only: `origin`, HEAD, branch, changed and untracked source paths, the lockfile's `git hash-object`, the build output's recorded SHA (else unknown).
-   - The run, per daintree.hosts.verify-for-hub (worktree at the SHA): exit code, counts, failing tests, first error, start time, duration; at the cap, a hang with its last output; no runner: incomplete.
+   - The run, per daintree.hosts.verify-for-hub (worktree at the SHA): exit code, counts, failing tests, first error, start time, duration; at the cap, incomplete: a hang, with its last output.
    - Fingerprint: OS and release, architecture; runtime, package manager, tool and plugin versions the command uses; installed versions of dependencies the failure involves; locale, timezone; services reached (host, port, database). No secrets: strip credentials from URLs and errors; no env dumps.
 
 On notice or resume, check: the SHA on the remote; `git rev-parse <SHA>:<lockfile>` where your clone has it, against each host's hash. In order:
 - Off the SHA, another `origin`, changed source, another lockfile or a stale build: a revision mismatch, reported first. It explains the original result only if the runs at the SHA agree.
-- Compare runs at the SHA, hangs included, never incomplete ones. Still different: list every fingerprint difference, ranked by the evidence tying it to the failure (the error text, a confirmation run); untested ones stay hypotheses.
+- Compare runs at the SHA; of incomplete ones, only hangs. Still different: list every fingerprint difference, ranked by the evidence tying it to the failure (the error text, a confirmation run); untested ones stay hypotheses.
 - Missing evidence: one narrow question in that exchange's `contextId`.
 
-Confirmation, within the person's authority: one message in the failing host's `contextId`: the same command in the same worktree, one variable changed (`TZ=UTC`, a runtime it already has), nothing persisted.
+Confirmation, within the person's authority: one message in the failing host's `contextId` naming its worktree: continue there, the same command, one variable changed (`TZ=UTC`, a runtime it already has), nothing persisted.
 
 Stop and recovery: one send per host per round; another SHA or an unasked re-run is a new request.
 
