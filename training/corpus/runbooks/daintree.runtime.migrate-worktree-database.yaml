@@ -167,6 +167,9 @@ boundaries:
   - query: "The hub asked this host to apply the pending migrations on the worktree for unit 4"
     confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
     run: runbook-2026-10-issue-133
+  - query: "the migration for unit 3 is committed in its worktree on this host; run it against that worktree's database and report the version, but only if the database is the worktree's own"
+    confusable_with: [daintree.hosts.do-delegated-work]
+    run: runbook-2026-10-issue-133
 followups:
   - query: did it prove the database isn't the same one main uses?
     history:

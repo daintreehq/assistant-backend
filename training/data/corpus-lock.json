@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 22017,
-  "compiled_sha256": "b55189df179e4844ae8ff828a5470b23128923938ded5cb96d77256c68bcfe17",
+  "rows": 22018,
+  "compiled_sha256": "74f876e50cf4c65acc56491b567f1107cebc62275287dbdae06587351a18b85e",
   "label_space_sha256": "33049b7245f1e45307ecd6e2e6956d76a4954ee7f77e7ae99745e08784fe656a",
   "label_space_size": 151,
   "by_source": {
-    "boundary": 7070,
+    "boundary": 7071,
     "docs": 848,
     "followup": 1058,
     "foundation": 440,
@@ -69,7 +69,7 @@
     "runbook-2026-10-issue-127": 85,
     "runbook-2026-10-issue-128": 85,
     "runbook-2026-10-issue-131": 46,
-    "runbook-2026-10-issue-133": 37,
+    "runbook-2026-10-issue-133": 38,
     "runbook-2026-10-issue-148": 80,
     "runbook-2026-10-issue-149": 89,
     "runbook-2026-10-issue-150": 85,
@@ -905,10 +905,10 @@
       "sha256": "6025752f89fd8d4a37bc9cc43bec229aba0e46f33e452448963da83c3f5e1a88"
     },
     "runbooks/daintree.runtime.migrate-worktree-database.yaml": {
-      "examples": 99,
-      "rows": 99,
+      "examples": 100,
+      "rows": 100,
       "runbook": "daintree.runtime.migrate-worktree-database",
-      "sha256": "c5a1f9f83c2925446b4e96989474fe9c20b0a69d22031980f7dc442d00db148c"
+      "sha256": "d52daa78a10c64e03420a3124d6c3824752454e9196d002ba9b94fb1437fd26f"
     },
     "runbooks/daintree.runtime.relieve-resource-contention.yaml": {
       "examples": 65,

@@ -51,7 +51,7 @@ cases:
     - daintree.foundation
 - id: migrate-db-rollback-other-server
   category: single-runbook
-  note: 'Rollback only after the server behind the connection string is compared with the main checkout''s ("ROLLBACK ... run against a worktree''s local database now").'
+  note: 'Rollback only after the server behind the connection string is compared with the main checkout''s ("wants a MIGRATION, SEED, ROLLBACK, DATABASE RESET or RESTORE FROM A BACKUP run against a worktree''s local database now").'
   messages:
   - role: user
     content: Roll back the last migration on the worktree's local postgres, but first confirm the server behind its connection string is not the one the main checkout talks to.
