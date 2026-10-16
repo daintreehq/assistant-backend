@@ -1,0 +1,262 @@
+# daintree.hosts.coordinate-contract-change: the hub has one interface contract (an API, a schema,
+# a message format) agreed and frozen at a commit in the one repository that holds it, briefs the
+# hosts building each side in their own repositories with that version, carries each change as a
+# new version the affected hosts pause for and adopt, and rejects results built on an older one.
+# Recall cases are the issue's three requests plus agent- and user-phrased requests: a copy edited
+# instead of amended, a new field mid-build, and two user phrasings (a stale result, a schema agreed
+# before two machines build) that an untrained runbook loses to trained hosts neighbours: honest
+# measurement, retrain owed. Routing traps: this runbook wins against each declared neighbour;
+# reverse traps: each close neighbour wins its own request and this runbook stays out.
+cases:
+  - id: coordinate-contract-change-issue-agree-then-build
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "Use on the hub when Remote Hosts build the sides of ONE
+      INTERFACE in DIFFERENT REPOSITORIES" and "the CONTRACT between them has to be agreed before
+      they build".
+    messages:
+      - role: user
+        content: Agree the API contract, then have the remote frontend and backend projects build against it.
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-issue-changed-mid-swarm
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "or CHANGED while they do" and "a change made a new
+      version, sent once the affected hosts acknowledged pausing, then adopted side by side".
+    messages:
+      - role: user
+        content: The contract changed mid-swarm; stop the affected work and get every side onto the same version.
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-issue-across-repositories
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "Use on the hub when Remote Hosts build the sides of ONE
+      INTERFACE in DIFFERENT REPOSITORIES". Measured: daintree.hosts.place-work wins it for the
+      untrained runbook (rank_miss); the boundary is carried by corpus rows, retrain owed.
+    messages:
+      - role: user
+        content: Coordinate a contract-first split across repositories through their owning host assistants.
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-user-copy-edited
+    category: single-runbook
+    note: >-
+      A side changed its copy instead of asking. Decided by "every version a commit by full SHA in the
+      one repository that holds it" and "a result built on an older version rejected as stale".
+    messages:
+      - role: user
+        content: the client host edited its own copy of the schema instead of asking for a change; reject it and get both sides back on the agreed version
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-user-new-field
+    category: single-runbook
+    note: >-
+      A side needs the interface changed mid-build. Decided by "or CHANGED while they do" and "a change
+      made a new version, sent once the affected hosts acknowledged pausing, then adopted side by side".
+    messages:
+      - role: user
+        content: the client host needs a new field in the response schema; amend the contract and make sure the server host moves to the new version too
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-user-stale-result
+    category: single-runbook
+    note: >-
+      A side finished on a superseded version. Decided by "a result built on an older version rejected
+      as stale". Measured: daintree.hosts.reassign-host-work wins it for the untrained runbook
+      (rank_miss); retrain owed.
+    messages:
+      - role: user
+        content: the producer machine finished against the first draft of the event contract after we amended it; that build doesn't count, get it onto the amended version
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-user-schema-first-two-machines
+    category: single-runbook
+    note: >-
+      A schema agreed before two machines build their sides. Decided by "the CONTRACT between them has
+      to be agreed before they build". Measured: daintree.hosts.integrate-host-branches wins it for the
+      untrained runbook (rank_miss); retrain owed.
+    messages:
+      - role: user
+        content: agree the event schema first, then have the assistants on my two other machines build the publisher and the subscriber in their own repos
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-contract-change-not-contract-first-split
+    category: routing-trap
+    note: >-
+      The issue's evidence phrasing, which selected the local runbook before. Decided by "Remote Hosts
+      build the sides of ONE INTERFACE in DIFFERENT REPOSITORIES"; this runbook fences "both sides
+      built by agents on this machine (daintree.orchestration.contract-first-split)".
+    messages:
+      - role: user
+        content: Agree and freeze an API contract across host projects before the remote frontend and backend agents implement it
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-execute-distributed-workflow
+    category: routing-trap
+    note: >-
+      Agent-phrased: the contract and its adoption, not a staged plan. Decided by "The deliverable is
+      the contract's versions and each side's adoption"; this runbook fences "a staged plan of
+      dependent units with no contract to agree or change (daintree.hosts.execute-distributed-workflow)".
+    messages:
+      - role: user
+        content: >-
+          Freeze one versioned interface contract for a producer and a consumer that live in different
+          repositories on two Remote Hosts, brief each host's lane with the pinned contract commit, and
+          record which version each side adopts
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-delegate-to-host
+    category: routing-trap
+    note: >-
+      A change negotiated between two hosts, not one unit for one host. Decided by "or CHANGED while
+      they do"; this runbook fences "one unit for one host or a single hand-over between two
+      (daintree.hosts.delegate-to-host)".
+    messages:
+      - role: user
+        content: the consumer machine wants to change the message format, renegotiate the contract with the producer machine before either carries on
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-steer-swarm
+    category: routing-trap
+    note: >-
+      A pause for a contract amendment. Decided by "a change made a new version, sent once the affected
+      hosts acknowledged pausing"; this runbook fences "stopping or changing sent work with no contract
+      change (daintree.hosts.steer-swarm)".
+    messages:
+      - role: user
+        content: pause the hosts that are still building against the old API spec, issue the amended contract as a new version and get each one to confirm it moved over
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-integrate-host-branches
+    category: routing-trap
+    note: >-
+      Finished sides checked against the contract, nothing combined. Decided by "every side checked
+      with the same compatibility test"; this runbook fences "finished branches combined into one
+      (daintree.hosts.integrate-host-branches)". Measured: the neighbour still rides along as an extra
+      for the untrained runbook (recall passes, strict does not).
+    messages:
+      - role: user
+        content: both remote sides finished; before anyone combines anything, prove each one is on the latest contract commit, since they live in separate repositories
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-do-delegated-work
+    category: routing-trap
+    note: >-
+      The hub's briefing of the lanes, not a lane's own unit. Decided by "each side briefed with that
+      version on its own repository's base"; this runbook fences "on a host's lane building or testing
+      its side (daintree.hosts.do-delegated-work, daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: "two repos on two machines, one interface between them: hand each host's lane the frozen contract commit to build against and have it come back to me if the contract must change"
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-verify-for-hub
+    category: routing-trap
+    note: >-
+      The hub accepting finished sides against a version, not a lane's test run. Decided by "every side
+      checked with the same compatibility test" and "a result built on an older version rejected as
+      stale"; this runbook fences "on a host's lane building or testing its side
+      (daintree.hosts.do-delegated-work, daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: the server host and the client host finished, but I want proof they both match contract version two before I accept either
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+
+  - id: coordinate-contract-change-reverse-contract-first-split
+    category: routing-trap
+    note: >-
+      Both sides by agents on this machine. Decided by "separate agents are to build the two sides AT
+      THE SAME TIME against an interface agreed first"; the local runbook now fences "sides built on
+      other machines by their hosts' assistants (use daintree.hosts.coordinate-contract-change)".
+    messages:
+      - role: user
+        content: two agents on this machine build the billing endpoint and its page simultaneously, off a typed interface we commit first
+    expect:
+      required: [daintree.orchestration.contract-first-split]
+      optional: [daintree.foundation]
+  - id: coordinate-contract-change-reverse-execute-distributed-workflow
+    category: routing-trap
+    note: >-
+      A staged plan whose interface is already settled. Decided by "a dependency graph of three or
+      more units"; the plan runbook now fences "agreeing or changing the contract its units share
+      (daintree.hosts.coordinate-contract-change)".
+    messages:
+      - role: user
+        content: the interface between them is settled already; run the three units across my hosts in order and tell me when the last one is verified
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-steer-swarm
+    category: routing-trap
+    note: >-
+      A change to sent work that touches no shared contract. Decided by "STOPPED, CALLED OFF or CHANGED
+      while it is under way"; steer-swarm now fences "a change to the contract the hosts build against
+      (daintree.hosts.coordinate-contract-change)".
+    messages:
+      - role: user
+        content: the hosts' run needs one more acceptance criterion; tell me which machines took it
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-integrate-host-branches
+    category: routing-trap
+    note: >-
+      Pushed parts of one repository combined on one machine. Decided by "work that SEVERAL Remote
+      Hosts finished has to end up on ONE branch and one machine is to do the combining".
+    messages:
+      - role: user
+        content: my three remote machines each pushed their part of the web app; have the build box combine those exact commits into one branch and check it
+    expect:
+      required: [daintree.hosts.integrate-host-branches]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-delegate-to-host
+    category: routing-trap
+    note: >-
+      One piece of work for one host, no shared interface. Decided by "ONE piece of WORK done by the
+      Daintree assistant on another machine".
+    messages:
+      - role: user
+        content: ask my other Mac's assistant to fix the parser test that keeps flaking, push a branch, and report the SHA
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-do-delegated-work
+    category: routing-trap
+    note: >-
+      The lane building its side against a pinned contract. Decided by "Use on a Remote Host's lane when
+      the hub asks THIS machine to implement, fix or build something as one unit of work".
+    messages:
+      - role: user
+        content: "hub message: implement the consumer side against contract commit 4be1c7a in a new worktree and reply with the SHA"
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-verify-for-hub
+    category: routing-trap
+    note: >-
+      The lane testing a commit for the hub. Decided by "Use when the hub asks this lane to TEST or
+      VERIFY a commit or branch here and report the results, with no fixes".
+    messages:
+      - role: user
+        content: the hub wants this machine to run the contract tests at commit 9f3e2a1 and report the counts, no fixes
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.foundation]
