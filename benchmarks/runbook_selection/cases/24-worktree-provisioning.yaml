@@ -62,3 +62,164 @@ cases:
     expect:
       required: [daintree.worktree.provision-local-environment]
       optional: [daintree.foundation]
+
+  # Worktrees on several machines: a path or a worktree name is not an identity, and a database,
+  # cache or bucket is shared when its endpoint is, whatever the worktree is called. Same runbook,
+  # the procedure now keys ownership by host, project and worktree and blocks destructive setup
+  # against a shared endpoint; these pin that the host-flavoured requests still reach it.
+  - id: provision-hosts-isolated-ports-databases
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "a shared runtime resource that several worktrees
+      collide over so branches cannot run side by side" and "The tell is a per-worktree RESOURCE
+      (database, port, hostname, docroot, container)"; "on each host" adds no other owner.
+    messages:
+      - role: user
+        content: Give remote worktrees isolated ports and databases on each host.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation, daintree.hosts.swarm-fan-out]
+
+  - id: provision-hosts-shared-database-lifecycle
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "configuring the project's worktree lifecycle scripts
+      themselves" together with "a shared runtime resource that several worktrees collide over".
+    messages:
+      - role: user
+        content: Two remote worktrees are sharing a database; fix their lifecycle setup.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-plan-resource-ownership
+    category: single-runbook
+    note: >-
+      The issue's third request, planning wording with no symptom. Decided by "The tell is a
+      per-worktree RESOURCE (database, port, hostname, docroot, container) or the setup/teardown
+      configuration that creates it." At base it was selected third (0.76) behind two
+      swarm-placement runbooks: recall holds, precision is a retrain matter.
+    messages:
+      - role: user
+        content: Plan per-host worktree environment isolation with explicit resource ownership.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation, daintree.worktree.manage-resource]
+
+  - id: provision-hosts-scratch-teardown-agent-phrased
+    category: single-runbook
+    note: >-
+      How an agent describes it to search. Decided by "a teardown script to drop the database when
+      I delete a worktree" and "configuring the project's worktree lifecycle scripts themselves".
+    messages:
+      - role: user
+        content: >-
+          Set up lifecycle scripts so a worktree created on a remote host gets its own scratch
+          database and port, and its teardown never drops a database that another host also uses.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-teardown-dropped-shared-database
+    category: single-runbook
+    note: >-
+      A user's own words, a teardown that destroyed something another machine still used. Decided by
+      "a teardown script to drop the database when I delete a worktree" (the setup/teardown
+      configuration is the fix).
+    messages:
+      - role: user
+        content: >-
+          my teardown script dropped a database that the worktree on the other machine was still
+          using, make it only remove what its own setup made
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-same-name-not-isolated
+    category: single-runbook
+    note: >-
+      A distinct worktree name taken as isolation. Decided by "a shared runtime resource that
+      several worktrees collide over"; the check is whether the databases really are separate.
+    messages:
+      - role: user
+        content: >-
+          Every machine has a worktree named feature-x and I assumed that kept them separate, but
+          check whether their databases really are.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-shared-staging-url-setup
+    category: single-runbook
+    note: >-
+      A setup script about to run migrations against a shared server. Decided by "configuring the
+      project's worktree lifecycle scripts themselves" with "a per-worktree RESOURCE (database,
+      port, hostname, docroot, container)".
+    messages:
+      - role: user
+        content: >-
+          Our .env.example points DATABASE_URL at the shared staging server and the new worktree
+          setup script runs the migrations against it. Make the setup safe for worktrees on every
+          machine.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-localhost-same-database
+    category: single-runbook
+    note: >-
+      Whether two machines' localhost endpoints are the same resource, asked before calling the
+      worktrees isolated. Decided by "a shared runtime resource that several worktrees collide over
+      so branches cannot run side by side".
+    messages:
+      - role: user
+        content: >-
+          Before we call these worktrees isolated, work out whether localhost:5432 on the build box
+          and on my laptop reach the same database.
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-lane-no-setup-config
+    category: single-runbook
+    note: >-
+      A lane's own project with no lifecycle config yet. Decided by "configuring the project's
+      worktree lifecycle scripts themselves" and "give every worktree its own URL" style per-worktree
+      resources.
+    messages:
+      - role: user
+        content: >-
+          a lane here should get its worktree its own port and database; the project has no setup
+          config yet
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]
+
+  - id: provision-hosts-trap-ask-only
+    category: routing-trap
+    note: >-
+      Reverse trap. A read-only question to another machine's assistant is
+      daintree.hosts.ask-host-assistant's "the question asks it to change nothing"; no resource is
+      provisioned, so provision-local-environment must not ride along.
+    messages:
+      - role: user
+        content: Ask the build box's assistant which database its worktrees point at. Change nothing.
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: provision-hosts-trap-migrate-there
+    category: routing-trap
+    note: >-
+      Reverse trap. The worktree already has a database of its own, so the operation is
+      daintree.runtime.migrate-worktree-database's "the operation applied to that worktree's own
+      local database"; provision-local-environment's own fence says the same ("to migrate or
+      reseed a database the worktree already has to itself").
+    messages:
+      - role: user
+        content: >-
+          The worktree on the build box already has a database of its own. Apply the new schema
+          migration there and reseed the sample data.
+    expect:
+      required: [daintree.runtime.migrate-worktree-database]
+      optional: [daintree.foundation]
