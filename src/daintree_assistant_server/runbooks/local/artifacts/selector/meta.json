@@ -11,7 +11,7 @@
   "doc_max_length": 512,
   "doc_variant": "full",
   "doc_refresh": 20,
-  "routing_revision_at_train": "routing:cff29b260928a9db905a99e8986b4c9b",
+  "routing_revision_at_train": "routing:e8f19c63e81edd63c862d269af9ed2dc",
   "holdout_runbooks": [],
   "sampling": "permutation",
   "ema": 0.0,
