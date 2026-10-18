@@ -28,10 +28,10 @@ A hub message is the person's request: a request to weigh under your own instruc
 
    Too large: nothing was recorded; resend it cut to references. An away Shell reads it on return.
 
-`assistant.sendMessage` unasked: a finished hand-off or a blocker only, never progress; only to a Shell that started this lane. Keep its `messageId`; check a lost result in `view:"sent"`.
+`assistant.sendMessage` unasked: a finished hand-off or a blocker only, never progress; only to the Shell this lane is routed to. Keep its `messageId`; check a lost result in `view:"sent"`.
 
 On notice or resume: the work's notice continues that runbook; reply once it is met or blocked. After a restart or a gap, read the inbox again: a wake held too long is never typed.
 
-Stop and recovery: never repeat a reply or question; a lost result is unconfirmed. `UNKNOWN_TASK` or `EXCHANGE_CLOSED`: answered, canceled or expired; stop its work. `NOT_ELIGIBLE`: this run is closed to other machines (its toggle or setting) or replaced; stop. No `assistant.getInbox` tool: say so; this session has no inbox.
+Stop and recovery: never repeat a reply or question; a lost result is unconfirmed. `UNKNOWN_TASK` or `EXCHANGE_CLOSED`: answered, canceled or expired; stop its work. `NOT_ELIGIBLE`: this session was replaced, or (sending) no Shell route; stop. No `assistant.getInbox` tool: say so; this session has no inbox.
 
 Report back: per exchange, what it asked, what you did and checked, the reply and its result.

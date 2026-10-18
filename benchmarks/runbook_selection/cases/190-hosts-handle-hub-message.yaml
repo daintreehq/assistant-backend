@@ -83,13 +83,13 @@ cases:
   - id: handle-hub-message-revoked-enrollment
     category: single-runbook
     note: >-
-      The lane's inbox refuses because this run stopped taking messages. Routing is decided by "Use on a
+      The lane's inbox refuses because a newer session replaced this one. Routing is decided by "Use on a
       Remote Host's Daintree assistant acting as a lane" and "read once with
       assistant.getInbox"; the body's stop rule answers it. The hosts foundation may ride
       along for the consent settings.
     messages:
       - role: user
-        content: assistant.getInbox comes back NOT_ELIGIBLE now, so this lane no longer takes messages from the hub that messaged it.
+        content: assistant.getInbox comes back NOT_ELIGIBLE now, since a newer session replaced this one in the lane the hub messaged.
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]

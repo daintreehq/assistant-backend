@@ -268,7 +268,7 @@ const SURFACES: SurfaceSpec[] = [
     paneApproval: false,
     machine: { hosts: false, listening: true },
     description:
-      "The sidebar assistant on a machine listening as a Remote Host (a lane), Tool set = Full, captured at session start. The lane tools are listed from the start, at Core as at Full. Every running lane is open to every authenticated Shell unless its own toggle or the host's setting is off (#13467); assistant.sendMessage goes only to the Shell that started the lane.",
+      "The sidebar assistant on a machine listening as a Remote Host (a lane), Tool set = Full, captured at session start. The lane tools are listed from the start, at Core as at Full. Every running lane takes new messages from every authenticated Shell unless its own toggle, the host's setting or the pause stops them (#13467); assistant.sendMessage goes only to the Shell the lane is routed to.",
   },
   {
     name: "external",

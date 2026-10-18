@@ -16,17 +16,17 @@ Reads only: never send, start, cancel or resend. Quote `outcome` and `detail`; f
 
 1. No `host.*` tools, or `NOT_ELIGIBLE`: foundation step 1.
 2. `host.list`. Host missing: not added, or "Allow assistant messaging with this host" off (Settings, Hosts, that host). `connecting`/`disconnected`: the link (daintree.hosts.connect-host); give `lastSeenAt`.
-3. `host.listAssistants`: match project, slot. No project: see `projectsOmitted`; no assistant: none running. Running, `generation: null`: closed by its own "Accept messages from other machines" (its menu), its host's default (Settings, Daintree Assistant) or an old Daintree. A generation, `available:false`: not taking messages, or paused on either machine; every host at once points to this Shell. Pause: "Pause messages between machines", More actions, that machine's assistant.
-4. A known exchange: `host.getTask` (lost id: `host.listTasks`); a `taskId` with `task: null` is not acceptance. `delivery`: `acceptedAt` host has it, `wakeTypedAt` lane notified, `inboxFetchedAt` lane read it, `replyReceivedAt` completed (a question leaves it null). Null is unobserved; later stamps can exist without it. `outcomeCode`: `wake-held` (notice held, cause unknown; stale if `wakeTypedAt` is set), `wake-expired` (no notice in 10 minutes; still in its inbox), `wake-unavailable` (lane not running, notices off), `inbox-refused`, `expired` (24 h). `not_found`: no record visible now.
+3. `host.listAssistants`: match project, slot. No project: see `projectsOmitted`; no assistant: none running. Running, `generation: null`: closed by its own "Accept messages from other machines" (its menu), its host's default (Settings, Daintree Assistant) or an old Daintree. A generation, `available:false`: not taking messages, or paused on either machine; every host at once points to this Shell. Pause: "Pause messages between machines", More actions, on that machine.
+4. A known exchange: `host.getTask` (lost id: `host.listTasks`); a `taskId` with `task: null` is not acceptance. `delivery`: `acceptedAt` host has it, `wakeTypedAt` lane notified, `inboxFetchedAt` lane read it, `replyReceivedAt` completed (a question: null). Null is unobserved; later stamps can exist without it. `outcomeCode`: `wake-held` (notice held, cause unknown; stale if `wakeTypedAt` is set), `wake-expired` (no notice in 10 minutes; still in its inbox), `wake-unavailable` (lane not running, notices off), `inbox-refused`, `expired` (24 h). `not_found`: no record visible now.
 
 Outcomes:
-- Sends: `opted_out` step 2's switch, or that default off here; `paused`, `policy_rejected` step 3; `lane_unavailable`: list again.
-- Starts: `opted_out`: "Let the assistant start assistants on this host" off (step 2); else `detail` names the gate (window, project, slot, CLI); list again.
+- Sends: `opted_out` step 2's switch, or this Shell's default (step 3); `paused`, `policy_rejected` step 3; `lane_unavailable`: list again.
+- Starts: `opted_out` as sends, or "Let the assistant start assistants on this host" off (step 2); else `detail` names it (window, project, slot, CLI); list again.
 - `disconnected`: a send never left; reads may be cached (`observedAt: null`). `unsupported`: an older Daintree there, or no messaging.
 - `rate_limited` (per Shell): sends and starts 10 per host, 30 in all, a minute; reads 120; wait `retryAfterMs`.
 - `ambiguous`: step 4. `conflict`, `expired`, `too_large`: that message, not a gate.
 - `SESSION_BINDING_GONE`, `NO_FRONTEND_ATTACHED`, `CONFIRMATION_TIMEOUT`, a project driven elsewhere: only from a lane's reply or a start's `detail`; quote, never infer or take over.
 
-Never route around a gate (SSH, host MCP key, other Shell or window, terminals).
+Never bypass a gate (SSH, host MCP key, other Shell or window, terminals).
 
 Report back per host and lane: gate, evidence, fix and where, unknowns.

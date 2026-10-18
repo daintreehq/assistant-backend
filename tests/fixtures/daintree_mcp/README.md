@@ -47,20 +47,21 @@ on a machine messaging can reach (`sessionServer.ts`, the `*Offered` gates):
   Shell, so any of its assistants may read or cancel one. The hub's own lane
   also gets `assistant.getInbox` and `assistant.reply` (host-initiated
   messages). It is not offered `assistant.sendMessage` here; a Shell that also
-  listens as a host would list it, but those calls refuse unless a remote Shell
-  started that lane. The machine has a host, so `host.switch` and
+  listens as a host would list it, but those calls refuse unless that lane is
+  routed to a remote Shell. The machine has a host, so `host.switch` and
   `project.openOnHost` are listed too: the only host actions that stay Full.
-- **Lane** (`lane-full`): a machine listening as a host. Every running lane is
-  open to every authenticated Shell unless its own toggle or the host's
-  setting is off: `assistant.getInbox`, `assistant.reply`,
-  `assistant.sendMessage`, all on Core. Its own `assistant.sendMessage` goes
-  only to the Shell that started it.
+- **Lane** (`lane-full`): a machine listening as a host. Every running lane
+  takes new messages from every authenticated Shell unless its own toggle, the
+  host's setting or the pause stops them: `assistant.getInbox`,
+  `assistant.reply`, `assistant.sendMessage`, all on Core. Its own
+  `assistant.sendMessage` goes only to the Shell the lane is routed to: the one
+  that started it, or whose view it runs in.
 
 They are listed from the start of such a session: Codex reads the tool list
 once and never acts on `tools/list_changed`, so the app offers them on
 reachability alone. A pane or API-key caller is refused (`NOT_ELIGIBLE`), as is
-a lane's run that is closed to other machines. The capture is that
-start-of-session listing.
+a lane session another has replaced; a run turned off still reads and answers
+what reached it. The capture is that start-of-session listing.
 
 **Stored as deltas.** A hub or lane surface is the sidebar surface of the same
 tier plus a handful of tools, so it is written as `<name>.delta.json`:

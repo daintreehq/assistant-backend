@@ -194,7 +194,8 @@ def test_messaging_is_the_same_on_core_and_full() -> None:
     assert set(lane_core["added"]) == LANE_TOOLS
     assert action_ids("hub-full") & HUB_TOOLS == HUB_TOOLS
     assert action_ids("hub-full") & LANE_TOOLS == inbox
-    assert window_moves <= action_ids("hub-full") and not window_moves & set(hub_core["added"])
+    assert window_moves <= action_ids("hub-full")
+    assert not window_moves & (action_ids("help-core") | set(hub_core["added"]))
     assert action_ids("lane-full") & MESSAGING_TOOLS == LANE_TOOLS
 
 

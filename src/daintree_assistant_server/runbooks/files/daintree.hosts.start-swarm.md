@@ -16,7 +16,7 @@ Readies one lane per host and sends no work. Start only what the person asked to
 2. `host.listAssistants` for each, in one parallel round. Not `ok`, or no project names: unknown, not absent; start nothing there. Find the project in each host's own listing; another host's or this Shell's name, path or projectId proves nothing. A match the person named is usable; one found only from this project's name needs their yes before any start. None (see `projectsOmitted`) or several: ask.
 3. Per host:
    - a lane with a `generation`, `available:true` and the CLI asked for (if any): ready, no call;
-   - a lane with a `generation` but `available:false`, or on another CLI than asked: report it, never start beside it unasked;
+   - a lane with `generation: null`, `available:false` or another CLI than asked: report it, never start beside it unasked;
    - otherwise one `host.startAssistant`, `agentId` as asked, else the project's assistants' CLI, else omitted. `startNew` only for more than one per project.
 
 ```json tool=host.startAssistant surface=hub-full
