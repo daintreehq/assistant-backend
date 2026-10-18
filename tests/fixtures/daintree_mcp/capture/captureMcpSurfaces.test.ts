@@ -232,7 +232,7 @@ const SURFACES: SurfaceSpec[] = [
     workspaceBound: false,
     paneApproval: false,
     machine: { hosts: true, listening: false },
-    description: "The hub sidebar session with Tool set = Core: the reads only.",
+    description: "The hub sidebar session with Tool set = Core: every host.* messaging tool, as at Full.",
   },
   {
     name: "hub-full",
@@ -244,7 +244,7 @@ const SURFACES: SurfaceSpec[] = [
     paneApproval: false,
     machine: { hosts: true, listening: false },
     description:
-      "The sidebar assistant on a Shell with a Remote Host configured (the hub), Tool set = Full, captured at session start before enrollment. The hub's host.* tools and its own lane's inbox tools are listed from the start; the calls refuse until the session is enrolled as the hub. At Core the hub is offered only the reads (help-core's allowlisted_but_not_listed shows which).",
+      "The sidebar assistant on a Shell with a Remote Host configured (the hub), Tool set = Full, captured at session start. Every Daintree Assistant in one of the Shell's own views is offered the host.* tools at Core and Full alike, with nothing to enroll (#13468, #13469); only host.switch and project.openOnHost stay Full. Its own lane's inbox tools are listed too.",
   },
   {
     name: "lane-core",
@@ -268,7 +268,7 @@ const SURFACES: SurfaceSpec[] = [
     paneApproval: false,
     machine: { hosts: false, listening: true },
     description:
-      "The sidebar assistant on a machine listening as a Remote Host (a lane a remote Shell can enroll), Tool set = Full, captured at session start before enrollment. The lane tools are listed from the start, at Core as at Full; the calls refuse until a remote Shell enrolls the lane.",
+      "The sidebar assistant on a machine listening as a Remote Host (a lane), Tool set = Full, captured at session start. The lane tools are listed from the start, at Core as at Full. Every running lane is open to every authenticated Shell unless its own toggle or the host's setting is off (#13467); assistant.sendMessage goes only to the Shell that started the lane.",
   },
   {
     name: "external",

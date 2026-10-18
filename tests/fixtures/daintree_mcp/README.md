@@ -6,23 +6,22 @@ sends each class of caller in `tools/list`: the exact wire tool entries
 captured from the app itself rather than written by hand. Runbooks that show
 Daintree MCP calls can validate their tagged JSON examples against these.
 
-**Source:** `daintreehq/daintree` commit `0436363469` ("feat(services): give
-the hub and host assistants their swarm roles"), the head of branch
-`test/hub-assistant-messaging-live` (app `develop` plus the hub/lane messaging
-fixes, `host.listAssistants`, `host.startAssistant` and the swarm-role
-addendum; pinned by the user while that branch awaits merge), app version
-0.43.0, MCP SDK 1.30, protocol `2025-11-25`. Captured 2026-10-15. Previous
-capture: `c5f42a0935` (2026-09-26).
+**Source:** `daintreehq/daintree` commit `f91badae47` ("Merge pull request
+#13492 from daintreehq/feature/issue-13468"), app `develop` with default-on
+assistant messaging merged (#13467, #13468, #13469: no enrollment, no hub
+singleton, messaging on Core), app version 0.44.0, MCP SDK 1.30, protocol
+`2025-11-25`. Captured 2026-10-18. Previous capture: `0436363469`
+(2026-10-15).
 
 | file | caller | tier | tools | `mcp.surface` hash |
 |---|---|---|---|---|
-| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 74 (33 run, 41 ask first) | `55f93b2c…` |
-| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 74 | `047bcaa6…` |
-| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 35 | `c4ce4baa…` |
-| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 78 | `18ce9aba…` |
-| `hub-full.delta.json` | the sidebar assistant on a Shell with a Remote Host (the hub), Full | `full` | 89 = help-full + 11 | `a53ac6a4…` |
-| `lane-full.delta.json` | the sidebar assistant on a machine listening as a host (a lane), Full | `full` | 81 = help-full + 3 | `27d6ac4a…` |
-| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `af5e418c…` |
+| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 78 (34 run, 44 ask first) | `f35b6dd3…` |
+| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 78 | `2aa4d74a…` |
+| `help-core.json` | Daintree's sidebar assistant (help session), Tool set = Core | `core` | 36 | `d9732a8b…` |
+| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 82 | `a5ed0ff1…` |
+| `hub-full.delta.json` | the sidebar assistant on a Shell with a Remote Host (the hub), Full | `full` | 94 = help-full + 12 | `75ff468d…` |
+| `lane-full.delta.json` | the sidebar assistant on a machine listening as a host (a lane), Full | `full` | 85 = help-full + 3 | `efcef010…` |
+| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `8746e6e1…` |
 
 Full hashes are in each file's `capture.surface_hash`.
 
@@ -40,24 +39,28 @@ The `host.*` hub tools and a lane's `assistant.*` inbox are offered only to a
 sidebar-assistant session (a help-session bearer, `sessionHelpIdMap`), and only
 on a machine messaging can reach (`sessionServer.ts`, the `*Offered` gates):
 
-- **Hub** (`hub-full`): a Shell with at least one Remote Host. `host.list`,
-  `host.listAssistants`, `host.getTask`, `host.listTasks` are on Core;
-  `host.sendMessage`, `host.cancelTask` and `host.startAssistant` are Full only
-  (`help-core`'s `allowlisted_but_not_listed` shows the Core set). The hub's own
-  lane also gets `assistant.getInbox` and `assistant.reply` (host-initiated
+- **Hub** (`hub-full`): any sidebar assistant in one of a Shell's own views,
+  where the Shell has at least one Remote Host. Every `host.*` tool
+  (`host.list`, `host.listAssistants`, `host.sendMessage`, `host.getTask`,
+  `host.listTasks`, `host.cancelTask`, `host.startAssistant`,
+  `host.readQuota`) is on Core, with nothing to enroll; tasks belong to the
+  Shell, so any of its assistants may read or cancel one. The hub's own lane
+  also gets `assistant.getInbox` and `assistant.reply` (host-initiated
   messages). It is not offered `assistant.sendMessage` here; a Shell that also
-  listens as a host would list it, but the hub's own calls refuse, since it has
-  no hub to write to. The machine has a host, so
-  `host.switch` and `project.openOnHost` are listed too.
-- **Lane** (`lane-full`): a machine listening as a host, so a remote Shell
-  can enroll its assistant: `assistant.getInbox`, `assistant.reply`,
-  `assistant.sendMessage`, all on Core.
+  listens as a host would list it, but those calls refuse unless a remote Shell
+  started that lane. The machine has a host, so `host.switch` and
+  `project.openOnHost` are listed too: the only host actions that stay Full.
+- **Lane** (`lane-full`): a machine listening as a host. Every running lane is
+  open to every authenticated Shell unless its own toggle or the host's
+  setting is off: `assistant.getInbox`, `assistant.reply`,
+  `assistant.sendMessage`, all on Core. Its own `assistant.sendMessage` goes
+  only to the Shell that started it.
 
-They are listed from the start of such a session, before anything is
-enrolled: Codex reads the tool list once and never acts on
-`tools/list_changed`, so the app offers them on reachability alone, and the
-calls refuse (`NOT_ELIGIBLE`) until the person enrolls the lane. The capture
-is that start-of-session listing.
+They are listed from the start of such a session: Codex reads the tool list
+once and never acts on `tools/list_changed`, so the app offers them on
+reachability alone. A pane or API-key caller is refused (`NOT_ELIGIBLE`), as is
+a lane's run that is closed to other machines. The capture is that
+start-of-session listing.
 
 **Stored as deltas.** A hub or lane surface is the sidebar surface of the same
 tier plus a handful of tools, so it is written as `<name>.delta.json`:
@@ -126,7 +129,7 @@ in the pane's `--mcp-config` and in the help session's settings, so Claude Code
 shows these as `mcp__daintree__<name>`; whatever further character mapping a
 client applies to the dots is the client's and is not captured here.
 
-**Agent panes list the same 74 tools at core and full.** A pane's tier is where
+**Agent panes list the same 78 tools at core and full.** A pane's tier is where
 auto-approval stops, not a ceiling (#12692): `tools/list` carries everything up to
 the full surface a non-assistant origin may hold, and a call above the tier asks
 the user instead of being refused. The two pane files are identical on the wire;
@@ -166,7 +169,7 @@ Needs the app checked out with `node_modules` installed (`npm ci`).
 
 ```bash
 tests/fixtures/daintree_mcp/capture/capture.sh <commit-ish> [branch-label]
-# e.g. tests/fixtures/daintree_mcp/capture/capture.sh 0436363469 test/hub-assistant-messaging-live
+# e.g. tests/fixtures/daintree_mcp/capture/capture.sh f91badae47 develop
 ```
 
 `DAINTREE_APP_REPO` points it at the app checkout (default
@@ -205,7 +208,7 @@ the test: it is the one place the harness says what each caller is.
   proven offline only by the app's own tests at the same commit, which
   `capture.sh` runs after the capture (`HostAssistantStarter`,
   `HubMessagingRuntime`, `install`, `hostMessagingTools`,
-  `assistantMessagingTools`; 73 passed at `0436363469`), and fully only live.
+  `assistantMessagingTools`; 126 passed at `f91badae47`), and fully only live.
 - **The wire schema is looser than what the app accepts.** The listing strips
   `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `minItems`,
   `maxItems` and similar bounds (`shared/utils/mcpWireSchema.ts`); the app
