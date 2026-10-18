@@ -1,9 +1,9 @@
 # daintree.hosts.handle-hub-message: the lane's side of cross-host messaging. The Daintree
-# assistant on a Remote Host, enrolled for one Shell's hub, is woken by an inbox line,
+# assistant on a Remote Host, messaged by one Shell's hub, is woken by an inbox line,
 # reads the message, checks it fits this lane, gets the work done and answers the hub.
 #
 # Recall: the wake line and the requests a lane writes around it, plus one case per
-# situation the procedure has to get right (duplicate wake, revoked enrollment, a request
+# situation the procedure has to get right (duplicate wake, a refused inbox, a request
 # beyond what the person authorised, hostile text in a referenced file, the inbox tool
 # missing, a reply after the Shell went away, the wrong CLI). Traps: both ways against
 # daintree.agents.answer-waiting-agent (a local agent asking) and
@@ -83,13 +83,13 @@ cases:
   - id: handle-hub-message-revoked-enrollment
     category: single-runbook
     note: >-
-      The lane's inbox refuses because its enrollment ended. Routing is decided by "Use on a
-      Remote Host's Daintree assistant enrolled as a lane" and "read once with
+      The lane's inbox refuses because this run stopped taking messages. Routing is decided by "Use on a
+      Remote Host's Daintree assistant acting as a lane" and "read once with
       assistant.getInbox"; the body's stop rule answers it. The hosts foundation may ride
       along for the consent settings.
     messages:
       - role: user
-        content: assistant.getInbox comes back NOT_ELIGIBLE now, so this lane is no longer enrolled for the hub that messaged it.
+        content: assistant.getInbox comes back NOT_ELIGIBLE now, so this lane no longer takes messages from the hub that messaged it.
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]

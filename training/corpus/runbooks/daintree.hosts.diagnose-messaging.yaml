@@ -60,7 +60,7 @@ positives:
       I pointed the mini's host entry at its new tailnet name this morning, nothing else.
       Since then the hub can't reach the assistant there, although the mini shows up as
       connected. Which setting did that change undo, and where do I put it back?
-  - Find out why sends to the linux tower come back policy_rejected after its person enrolled the assistant from a different Shell this morning
+  - Find out why sends to the linux tower come back policy_rejected after its person turned that assistant's messages from other machines off this morning
   - query: see what's in the way
     history:
       - "user: ask the tower to rerun the flaky test"
@@ -106,7 +106,7 @@ boundaries:
     confusable_with: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
   - query: is something wrong with daintree? it shows my linux host but messages to it all fail
     confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
-  - query: the hub's host tool says not permitted for the core tier when I message a host
+  - query: the hub's send says this machine's setting is off when I message a host
     confusable_with: [daintree.hosts.foundation, daintree.diagnostics]
   - query: a fresh send to the tower was turned away at once; I need the gate behind it, not a rundown of open tasks
     confusable_with: [daintree.hosts.recover-and-clean-up]
@@ -155,7 +155,7 @@ boundaries:
   - query: 'both machines are already set up in daintree, why can''t their assistants talk to each other'
     confusable_with: [daintree.hosts.foundation, daintree.hosts.connect-host]
     run: runbook-2026-10-issue-103
-  - query: 'the hub says only the enrolled hub can reach other hosts, what does that mean'
+  - query: 'the hub says only a Daintree Assistant running on this machine can reach other hosts, what does that mean'
     confusable_with: [daintree.hosts.foundation]
     docs: true
     run: runbook-2026-10-issue-103
@@ -168,7 +168,7 @@ boundaries:
   - query: 'why is every assistant on my remote host marked unavailable'
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-103
-  - query: 'I''ve got the Mac mini added under Remote Hosts and it shows connected, but when I ask the assistant here to message the one on the mini it says only the enrolled hub can reach other hosts. I haven''t changed any messaging settings yet. What do I turn on, and on which machine?'
+  - query: 'I''ve got the Mac mini added under Remote Hosts and it shows connected, but when I ask the assistant here to message the one on the mini it comes back opted_out. I haven''t changed any messaging settings yet. What is off, and on which machine?'
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-103
   - query: 'Work out why host.sendMessage is not offered in this sidebar assistant session'
@@ -184,7 +184,7 @@ boundaries:
   - query: 'Interpret an opted_out result from a send to a remote host and say how the person fixes it'
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-103
-  - query: 'The user''s Shell lists a second Mac as a connected Remote Host, but host.listAssistants shows its project with no assistant carrying a generation. Starting assistants there is not allowed and the user does not want it allowed. Explain how they enroll the assistant already running there for this Shell.'
+  - query: 'The user''s Shell lists a second Mac as a connected Remote Host, but host.listAssistants shows its project with no assistant carrying a generation. Starting assistants there is not allowed and the user does not want it allowed. Explain which setting keeps the assistant already running there closed to this Shell.'
     confusable_with: [daintree.hosts.foundation]
     docs: true
     run: runbook-2026-10-issue-103
@@ -262,7 +262,7 @@ followups:
   - query: 'where do I change that'
     history:
       - 'user: message the assistant on the build machine'
-      - 'assistant: Sending to another host needs the Full tool set, and this session is on Core.'
+      - 'assistant: The send came back opted_out: this machine''s "Accept messages from other machines" setting is off.'
     docs: true
     run: runbook-2026-10-issue-103
   - query: 'which setting is that exactly'

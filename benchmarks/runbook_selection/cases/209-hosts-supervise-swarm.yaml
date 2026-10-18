@@ -152,7 +152,7 @@ cases:
     note: >-
       A host's own message to the hub mid-run. Decided by "a host's own message answered";
       handle-hub-message is the lane receiving the hub's message ("Use on a Remote
-      Host's Daintree assistant enrolled as a lane when the hub, the assistant on the person's main machine, has messaged it"), the
+      Host's Daintree assistant acting as a lane when the hub, the assistant on the person's main machine, has messaged it"), the
       other direction. Retrain owed.
     messages:
       - role: user
@@ -232,7 +232,7 @@ cases:
     category: routing-trap
     note: >-
       Said on the hub about the lanes, so not daintree.hosts.handle-hub-message, which is "Use on
-      a Remote Host's Daintree assistant enrolled as a lane when the hub, the assistant on the person's main machine, has messaged it";
+      a Remote Host's Daintree assistant acting as a lane when the hub, the assistant on the person's main machine, has messaged it";
       decided by "the run kept moving" and "a host's question answered within the person's
       request".
     messages:
