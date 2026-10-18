@@ -44,21 +44,40 @@ maintainers wrote the traps into it.
   the rest raises an approval. Owned tools: `terminal.sendCommandOwned`,
   `terminal.closeOwned`, `terminal.injectOwned`.
 - `help-core` / `help-full`: Daintree's sidebar assistant, which gets the unscoped
-  `terminal.sendCommand` and `terminal.close`.
+  `terminal.sendCommand` and `terminal.close`, and alone is offered `host.list` and
+  `host.call` (direct control of a Remote Host) and `assistant.list`/`assistant.start`.
+- `relayed-core` / `relayed-full`: what a Remote Host offers inside `host.call`, at the
+  calling assistant's Tool set: the owned terminal tools, agents, worktrees,
+  `assistant.*`, and at Full the checks and the command runner (`project.runCheck`,
+  `project.runCommand`). Never a `host.*` tool: calls do not chain.
 - `external`: an API-key client. It gets a curated subset, and **no `notify`** on
   `agent.launch` or the send, and no `terminal.notifyWhenIdle`.
-- `hub-full` / `lane-full`: the sidebar assistant in cross-host messaging, as the
-  hub on a Shell with a Remote Host (`host.*`) or as a lane on a machine listening
-  as a host (`assistant.getInbox`, `assistant.reply`, `assistant.sendMessage`).
-  No other caller is ever offered these tools.
 
 **Which caller a runbook is checked against** is decided by its id namespace,
 never by its tool lists (`CALLER_POLICY` in `tests/daintree_mcp_surfaces.py`).
 Every runbook is followed from an agent pane, so its `requiredTools` must be on
 `pane-core`, except `daintree.hosts.*`: sidebar-only by design, its whole
-baseline must be on ONE of `hub-full` or `lane-full`. A pane runbook with a hub
-branch (asking the hosts too) lists the `host.*` tools in `optionalTools`, never
-`requiredTools`, and tags that branch's examples `surface=hub-full`.
+baseline must be on ONE of `help-core` or `help-full`. A pane runbook with a host
+branch lists `host.list`/`host.call` in `optionalTools`, never `requiredTools`, and
+tags that branch's examples `surface=help-core`. A `host.call` example is validated
+twice: the call against the help surface, and its `tool` and `args` against the
+relayed surface of the same tier, so a Core example cannot run the Full-only command
+runner on a host.
+
+**Two catalogs.** v0.44 clients drive their hosts through an inbox (hub, lanes,
+tasks), and later builds control them directly, so the server serves each its own
+catalog ([MCP.md](MCP.md#host-model-and-host-state)). `runbooks/files/` is the control
+catalog, the one you edit. `runbooks/inbox/` holds the v0.44 copies, frozen, of every
+hosts runbook and of each shared runbook whose text differs between the models; its
+surfaces are frozen beside it in `tests/fixtures/daintree_mcp/inbox/`. Every other
+runbook is shared. Before changing a shared runbook in a way a v0.44 client cannot
+follow (a tool v0.44 lacks, `host.call`), copy it into `inbox/` first;
+`tests/unit/test_catalogs.py` pins that directory and refuses a copy identical to its
+shared runbook.
+
+A caller with a host connected gets `daintree.hosts.foundation` with every runbook,
+so a pane runbook's host branch is a sentence or two ("on a host, each step through
+`host.call` there"), never a second copy of the hosts foundation.
 
 The capture proves what is listed, not what happens when an action is called. Notice
 delivery in particular is only proven by a live trial in a Daintree pane.
@@ -160,10 +179,10 @@ It gets no empty notice or checkpoint sections.
 | `whenToUse` | yes | the routing text above |
 | `foundation` | no | `true` for a domain's base-judgment runbook |
 | `risk` | no | `read local ui terminal project external git system`, descriptive only, not a permission |
-| `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `hub-full` or `lane-full` for `daintree.hosts.*`) |
+| `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `help-core` or `help-full` for `daintree.hosts.*`) |
 | `optionalTools` | no | app action ids a conditional branch, caller variant or enhancement calls |
 | `requires` | no | other runbook ids whose instructions must be read first |
-| `hostEligibility` | `daintree.hosts.*` only, and required there | the caller host state it fits: `connected`, `configured`, `lane` or `any` ([MCP.md](MCP.md#host-state)); search leaves it out for a caller whose reported state does not fit |
+| `hostEligibility` | `daintree.hosts.*` only, and required there | the caller host state it fits: `connected`, `configured` or `any` (`lane` only in the frozen inbox catalog) ([MCP.md](MCP.md#host-model-and-host-state)); search leaves it out for a caller whose reported state does not fit |
 
 Unknown keys are rejected (`runbooks/models.py`). A tool may not be both required and
 optional. The nearest domain foundation is delivered automatically and needs no

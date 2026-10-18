@@ -43,10 +43,13 @@ codex mcp add daintree-runbooks --url https://assistant.daintree.org/v1/daintree
 ```
 
 When Daintree itself configures the connection for an assistant it launches, it also
-sends the caller's coarse host state as two headers on every request,
-`Daintree-Hosts` and `Daintree-Lane` ([MCP.md](../MCP.md#host-state)): Claude Code's
-`headers` on the `type: "http"` entry, Codex's `http_headers`. A connection without
-them is offered the whole catalog.
+sends headers on every request ([MCP.md](../MCP.md#host-model-and-host-state)):
+`Daintree-Host-Control: 1`, naming the host-control model its build speaks, and the
+caller's coarse host state as `Daintree-Hosts` (Claude Code's `headers` on the
+`type: "http"` entry, Codex's `http_headers`). A connection without
+`Daintree-Host-Control` is served the inbox catalog v0.44 clients get, whose host
+procedures need v0.44's messaging tools; one without `Daintree-Hosts` is offered its
+model's whole catalog.
 
 Check the installed client's `--help` and configuration scope before changing
 someone's existing setup. Never put a Daintree bearer in a committed config or an

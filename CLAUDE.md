@@ -51,12 +51,13 @@ and a PR into `develop`. Runbook issues follow `references/issue-format.md` ther
 | `src/daintree_assistant_server/api/mcp.py` | The HTTP transport: Origin check, content negotiation, parse errors, session ids, 405 for GET/DELETE. |
 | `src/daintree_assistant_server/mcp_sessions.py` | Per-session record of supporting runbooks already sent in full; bounded, and every gap errs toward resending. |
 | `src/daintree_assistant_server/api/health.py`, `api/root.py` | `/health`, `/healthz`, `/readyz`, `/version`, `/` redirect. |
-| `src/daintree_assistant_server/main.py` | App factory and lifespan: loads the catalog and selector; body-size limit; request ids. |
+| `src/daintree_assistant_server/main.py` | App factory and lifespan: loads both catalogs and the selector; body-size limit; request ids. |
 | `src/daintree_assistant_server/config.py` | Tiny `Settings`: environment, log level, build sha, bind address, body cap. |
-| `src/daintree_assistant_server/runbooks/` | Catalog (incl. dependency validation and `supporting_for`), loader, frontmatter model, and `local/` — the selector. |
+| `src/daintree_assistant_server/runbooks/` | Catalog (incl. dependency validation and `supporting_for`), the per-model catalog pair (`load_catalogs`), loader, frontmatter model, `host_state.py` (the caller's headers), and `local/` — the selector. |
+| `src/daintree_assistant_server/runbooks/files/`, `runbooks/inbox/` | The runbooks: `files/` is the control catalog, `inbox/` the frozen v0.44 copies the inbox catalog swaps in. |
 | `training/` | The selector's training pipeline, corpus and experiment log. |
 | `benchmarks/runbook_selection/` | The routing benchmark and its quality gate. |
-| `tests/fixtures/daintree_mcp/` | The Daintree app's MCP surfaces per caller (pane, sidebar, the sidebar as cross-host hub and lane, API-key), captured from one app commit: the authority on which actions runbooks may name. |
+| `tests/fixtures/daintree_mcp/` | The Daintree app's MCP surfaces per caller (pane, sidebar, what a host offers inside `host.call`, API-key), captured from one app commit: the authority on which actions runbooks may name. `inbox/` is the v0.44.0 capture, frozen with the inbox catalog. |
 | `selector.lock`, `training/selector_store.py` | The selector's model files are not in Git: the lock names each by SHA-256 and the bucket holding it; the tool fetches, verifies, publishes and prunes. |
 | `infra/gcp/`, `cloudbuild.yaml`, `Dockerfile` | The Cloud Run deployment. |
 
@@ -124,6 +125,23 @@ reports as a retryable `isError` result — never an empty ranking. A malformed 
 missing/corrupt artifact fails **readiness** (`/readyz` 503) without crashing liveness,
 so Cloud Run never promotes it.
 
+## Two catalogs, one per host model
+
+Daintree drives Remote Hosts one of two ways, and both are installed: v0.44 messages a
+host's assistant through an inbox (hub, lanes, tasks), and later builds control the host
+directly (`host.call`) and delegate to its assistant as to any agent. The server serves
+each its own catalog, picked per request by `Daintree-Host-Control` (`1`: control; absent
+or anything else: inbox, failing closed) before search, `get_runbook`, supporting delivery
+and `catalog_revision` (`runbooks/catalog.py`, `load_catalogs`; `docs/MCP.md`).
+`runbooks/files/` is the control catalog and what every tool's `load_catalog()` reads. The
+inbox catalog is `files/` minus the hosts namespace and whatever `inbox/` overrides, plus
+`inbox/`: frozen v0.44 copies of every hosts runbook and of each shared runbook whose text
+differs between the models (`test_catalogs.py` pins the directory). Shared runbooks keep
+improving for both; copy one into `inbox/` before changing it in a way v0.44 cannot follow.
+A control caller reporting `Daintree-Hosts: connected` gets `daintree.hosts.foundation`
+with every runbook it is served in full. One classifier keeps a table per catalog; `bench
+local` and `bench coverage` qualify each against its own suite (a case's `host_model`).
+
 ## Runbooks
 
 **Where they live:** `src/daintree_assistant_server/runbooks/files/<id>.md` — one file per
@@ -148,10 +166,10 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 | `whenToUse` | yes | the *primary* routing signal (→ `when_to_use`) |
 | `foundation` | no | `true` marks a domain foundation (base judgment for a dotted namespace) |
 | `risk` | no | enum `read local ui terminal project external git system` — descriptive only |
-| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the caller's surface: `pane-core`, or for `daintree.hosts.*` one of `hub-full`/`lane-full` (`CALLER_POLICY`) (→ `required_tools`) |
+| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the caller's surface: `pane-core`, or for `daintree.hosts.*` one of `help-core`/`help-full` (`CALLER_POLICY`) (→ `required_tools`) |
 | `optionalTools` | no | action ids a conditional branch or caller variant calls (→ `optional_tools`); never also required |
 | `requires` | no | other runbook ids whose instructions must be read first; validated for existence, visibility and cycles (the implicit foundation edge included), and delivered as `supporting_runbooks` |
-| `hostEligibility` | `daintree.hosts.*` only, required there | `connected` `configured` `lane` `any`: the caller host state (`Daintree-Hosts`/`Daintree-Lane` headers, `runbooks/host_state.py`) the runbook fits; search excludes it before the shortlist when the reported state does not fit, and an unreported caller is offered everything |
+| `hostEligibility` | `daintree.hosts.*` only, required there | `connected` `configured` `any` (`lane` in the inbox catalog only): the caller host state (`Daintree-Hosts` header, and `Daintree-Lane` for an inbox caller; `runbooks/host_state.py`) the runbook fits; search excludes it before the shortlist when the reported state does not fit, and an unreported caller is offered everything |
 
 The routing document the ranker embeds is title + summary + `whenToUse`, **not the body**.
 Editing routing text re-embeds that runbook and must be measured with `bench local`.
@@ -162,9 +180,11 @@ per session), and a caller that prints the whole result pays for both the text b
 
 **Runbooks name Daintree app MCP actions**, and `tests/fixtures/daintree_mcp/` is the
 authority on which exist and what each caller is offered: an agent pane (owned tools such as
-`terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand`),
-the sidebar as a cross-host messaging hub or lane (`host.*`, `assistant.*`; nobody else), and an
-API-key client (no `notify`, no `terminal.notifyWhenIdle`). The hygiene test checks
+`terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand`, and
+alone `host.list`/`host.call`), what a Remote Host offers inside `host.call` (the relayed
+surface: owned tools, no `host.*`), and an API-key client (no `notify`, no
+`terminal.notifyWhenIdle`). A `host.call` example is validated against both the call's surface
+and the relayed one of the same tier. The hygiene test checks
 every declared tool against them, `test_runbook_examples.py` validates tagged
 ```` ```json tool=<action> [surface=<caller>] ```` examples against that caller's schema, and
 `test_runbook_migration.py` fails any action-shaped name no caller is offered — which is
