@@ -586,8 +586,8 @@ def test_hub_and_lane_are_separate_sessions_each_sent_its_prerequisites_once(
     """The hub and the lane are two clients, so two sessions: each is sent the general
     foundation and the hosts foundation in full on its first search, and a later search in the
     same session only names them. One session's record never spares the other's reading."""
-    catalog: Catalog = app.state.container.catalog
-    selector = app.state.container.selector
+    catalog: Catalog = app.state.container.catalogs.inbox
+    selector = app.state.container.selectors["inbox"]
     hub_id, lane_id = _ends(name)
     expected = [r.id for r in catalog.supporting_for([hub_id])]
     assert expected == [r.id for r in catalog.supporting_for([lane_id])]

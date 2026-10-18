@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -377,8 +377,12 @@ async def handle_message(
     catalog: Catalog,
     search: SearchFn,
     delivered: Mapping[str, str] | None = None,
+    attach: Sequence[str] = (),
 ) -> McpReply:
     """Answer ONE JSON-RPC message.
+
+    ``catalog`` is the caller's own (``catalog.Catalogs.view_for``), and ``attach``
+    what it gets with every runbook served in full (``Catalog.supporting_for``).
 
     ``delivered`` is what the caller's session was already sent in full (runbook
     id to content hash; ``mcp_sessions``), or None for no session. It is only
@@ -486,7 +490,7 @@ async def handle_message(
             # A sessionless revision: a session header it happens to carry is not
             # a session, and such a caller is always sent everything.
             delivered = None
-        return await _call_tool(request_id, params, headers, catalog, search, delivered)
+        return await _call_tool(request_id, params, headers, catalog, search, delivered, attach)
     return error_reply(request_id, METHOD_NOT_FOUND, f"Method not found: {method}")
 
 
@@ -497,6 +501,7 @@ async def _call_tool(
     catalog: Catalog,
     search: SearchFn,
     delivered: Mapping[str, str] | None,
+    attach: Sequence[str],
 ) -> McpReply:
     name = params.get("name")
     if headers.name is not None and headers.name != name:
@@ -517,8 +522,8 @@ async def _call_tool(
     # routes them back to the model, which can read the message and correct the
     # call — a protocol error would be swallowed by the client instead.
     if name == GET_TOOL_NAME:
-        return _get_runbook(request_id, arguments, catalog, delivered)
-    return await _search_runbooks(request_id, arguments, catalog, search, delivered)
+        return _get_runbook(request_id, arguments, catalog, delivered, attach)
+    return await _search_runbooks(request_id, arguments, catalog, search, delivered, attach)
 
 
 async def _search_runbooks(
@@ -527,6 +532,7 @@ async def _search_runbooks(
     catalog: Catalog,
     search: SearchFn,
     delivered: Mapping[str, str] | None,
+    attach: Sequence[str],
 ) -> McpReply:
     unknown = sorted(set(arguments) - {"query", "max_results"})
     if unknown:
@@ -569,7 +575,7 @@ async def _search_runbooks(
     # Prerequisites of what the caller will follow. A foundation ranked as an
     # unselected neighbour still arrives here in full when a selected hit needs it.
     supporting, sent = _supporting(
-        catalog.supporting_for([r.id for r in selected]), selected, delivered
+        catalog.supporting_for([r.id for r in selected], attach=attach), selected, delivered
     )
     structured = {
         "catalog_revision": catalog.revision,
@@ -584,6 +590,7 @@ def _get_runbook(
     arguments: dict[str, Any],
     catalog: Catalog,
     delivered: Mapping[str, str] | None,
+    attach: Sequence[str],
 ) -> McpReply:
     unknown = sorted(set(arguments) - {"id"})
     if unknown:
@@ -601,7 +608,9 @@ def _get_runbook(
             request_id,
             "No runbook has that id. Use search_runbooks to find one by task.",
         )
-    supporting, sent = _supporting(catalog.supporting_for([runbook.id]), [runbook], delivered)
+    supporting, sent = _supporting(
+        catalog.supporting_for([runbook.id], attach=attach), [runbook], delivered
+    )
     structured = {
         "catalog_revision": catalog.revision,
         # Always in full, even when this session has it: fetching a runbook by id is

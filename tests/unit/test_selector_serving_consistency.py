@@ -82,7 +82,7 @@ def test_a_runbook_vector_does_not_depend_on_what_it_was_synced_with() -> None:
         clf = SetwiseClassifier(_ARTIFACT)
         # Forget the shipped table and the memo so every document is ENCODED here,
         # which is the path whose batching used to leak into the vectors.
-        clf._cached = None
+        clf._tables = {}
         clf._vec_memo.clear()
         return clf.sync(cat)
 

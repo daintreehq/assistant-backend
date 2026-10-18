@@ -128,8 +128,8 @@ def test_stateless_2026_client_discovers_and_calls_with_no_handshake(client: Tes
 
 
 def test_search_returns_full_runbooks_as_structured_json(client: TestClient, app: Any) -> None:
-    selector = app.state.container.selector
-    catalog = app.state.container.catalog
+    selector = app.state.container.selectors["inbox"]
+    catalog = app.state.container.catalogs.inbox
     first, second = sorted(catalog.selectable_ids)[:2]
     selector.search_hits = [(second, 0.97, True), (first, 0.41, False)]
 
@@ -168,8 +168,8 @@ def test_search_delivers_each_prerequisite_once_outside_the_ranking(
 ) -> None:
     """Two selected specifics sharing a foundation bring it once, in
     `supporting_runbooks`, and it does not count against `max_results`."""
-    catalog = app.state.container.catalog
-    app.state.container.selector.search_hits = [
+    catalog = app.state.container.catalogs.inbox
+    app.state.container.selectors["inbox"].search_hits = [
         ("daintree.terminals.rename", 0.9, True),
         ("daintree.agents.ask-and-relay", 0.6, True),
     ]
@@ -196,8 +196,8 @@ def test_search_delivers_each_prerequisite_once_outside_the_ranking(
 def test_a_foundation_ranked_as_a_neighbour_still_arrives_in_full_for_a_selected_hit(
     client: TestClient, app: Any
 ) -> None:
-    catalog = app.state.container.catalog
-    app.state.container.selector.search_hits = [
+    catalog = app.state.container.catalogs.inbox
+    app.state.container.selectors["inbox"].search_hits = [
         ("daintree.terminals.rename", 0.9, True),
         ("daintree.foundation", 0.1, False),
     ]
@@ -215,7 +215,7 @@ def test_a_foundation_ranked_as_a_neighbour_still_arrives_in_full_for_a_selected
 
 def test_nothing_selected_delivers_no_procedures_at_all(client: TestClient, app: Any) -> None:
     """No runbook fits: the caller carries on, so no procedure is worth its context."""
-    app.state.container.selector.search_hits = [
+    app.state.container.selectors["inbox"].search_hits = [
         ("daintree.terminals.rename", 0.2, False),
         ("daintree.agents.ask-and-relay", 0.1, False),
     ]
@@ -230,7 +230,7 @@ def test_nothing_selected_delivers_no_procedures_at_all(client: TestClient, app:
 def test_the_output_schema_refuses_a_neighbour_carrying_a_procedure(
     client: TestClient, app: Any
 ) -> None:
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.2, False)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.2, False)]
     structured = _call(client, {"query": "x", "max_results": 1}).json()["result"][
         "structuredContent"
     ]
@@ -242,7 +242,7 @@ def test_the_output_schema_refuses_a_neighbour_carrying_a_procedure(
 def test_a_foundation_that_is_itself_a_hit_is_not_sent_twice(
     client: TestClient, app: Any
 ) -> None:
-    app.state.container.selector.search_hits = [
+    app.state.container.selectors["inbox"].search_hits = [
         ("daintree.foundation", 0.9, True),
         ("daintree.terminals.rename", 0.5, True),
     ]
@@ -257,7 +257,7 @@ def test_max_results_defaults_to_three(client: TestClient, app: Any) -> None:
     response = _call(client, {"query": "anything"})
     assert DEFAULT_MAX_RESULTS == 3
     assert len(response.json()["result"]["structuredContent"]["runbooks"]) == 3
-    assert app.state.container.selector.search_requests == [("anything", 3)]
+    assert app.state.container.selectors["inbox"].search_requests == [("anything", 3)]
 
 
 def test_each_search_is_narrowed_by_the_host_state_its_own_request_reports(
@@ -265,8 +265,8 @@ def test_each_search_is_narrowed_by_the_host_state_its_own_request_reports(
 ) -> None:
     """Read from every POST and never stored: a later request without the headers is
     an unreported caller again, offered the whole catalog."""
-    selector = app.state.container.selector
-    catalog = app.state.container.catalog
+    selector = app.state.container.selectors["inbox"]
+    catalog = app.state.container.catalogs.inbox
     none = catalog.excluded_for(HostState("none"))
     lane = catalog.excluded_for(HostState("configured", lane_reachable=True))
     assert none and lane and none != lane
@@ -291,7 +291,7 @@ def test_a_malformed_host_state_filters_nothing(client: TestClient, app: Any) ->
         response = _call(client, {"query": "q"}, headers=headers)
         assert response.status_code == 200
         assert response.json()["result"]["isError"] is False
-    assert app.state.container.selector.search_excludes == [frozenset()] * 3
+    assert app.state.container.selectors["inbox"].search_excludes == [frozenset()] * 3
 
 
 def test_get_runbook_ignores_the_host_state(client: TestClient) -> None:
@@ -306,7 +306,7 @@ def test_get_runbook_ignores_the_host_state(client: TestClient) -> None:
 def test_get_runbook_returns_the_exact_runbook_and_its_foundation(
     client: TestClient, app: Any
 ) -> None:
-    catalog = app.state.container.catalog
+    catalog = app.state.container.catalogs.inbox
     result = _get(client, {"id": "daintree.terminals.rename"}).json()["result"]
     assert result["isError"] is False
     structured = result["structuredContent"]
@@ -321,7 +321,7 @@ def test_get_runbook_returns_the_exact_runbook_and_its_foundation(
     assert json.loads(result["content"][0]["text"]) == structured
     _assert_schema(GET_TOOL_DEFINITION, structured)
     # No classifier involved.
-    assert app.state.container.selector.search_requests == []
+    assert app.state.container.selectors["inbox"].search_requests == []
 
 
 def test_get_runbook_of_the_foundation_has_no_supporting_runbooks(client: TestClient) -> None:
@@ -373,7 +373,7 @@ def test_bad_arguments_are_tool_errors_the_model_can_read(client: TestClient) ->
 def test_a_failed_search_is_a_retryable_tool_error_not_an_empty_answer(
     client: TestClient, app: Any
 ) -> None:
-    app.state.container.selector.search_fails = True
+    app.state.container.selectors["inbox"].search_fails = True
     result = _call(client, {"query": "anything"}).json()["result"]
     assert result["isError"] is True
     assert "unavailable" in result["content"][0]["text"]
@@ -487,7 +487,7 @@ def test_not_ready_refuses_before_searching(client: TestClient, app: Any) -> Non
     app.state.ready = False
     response = _call(client, {"query": "anything"})
     assert response.status_code == 503
-    assert app.state.container.selector.search_requests == []
+    assert app.state.container.selectors["inbox"].search_requests == []
 
 
 def test_no_credential_is_needed(client: TestClient) -> None:
@@ -545,9 +545,9 @@ def _supporting(response: Any) -> list[dict[str, Any]]:
 
 
 def test_a_session_is_sent_its_foundation_in_full_once(client: TestClient, app: Any) -> None:
-    catalog = app.state.container.catalog
+    catalog = app.state.container.catalogs.inbox
     foundation = catalog.get("daintree.foundation")
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     session = _open_session(client)
 
     first = _call(client, {"query": "x", "max_results": 1}, headers=session)
@@ -582,7 +582,7 @@ def test_get_runbook_shares_the_sessions_record(client: TestClient) -> None:
 
 
 def test_a_foundation_fetched_by_id_counts_as_sent(client: TestClient, app: Any) -> None:
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     session = _open_session(client)
     _get(client, {"id": "daintree.foundation"}, headers=session)
     searched = _call(client, {"query": "x", "max_results": 1}, headers=session)
@@ -591,7 +591,7 @@ def test_a_foundation_fetched_by_id_counts_as_sent(client: TestClient, app: Any)
 
 def test_a_new_handshake_starts_over(client: TestClient, app: Any) -> None:
     """A client that reconnects initializes again, and its new session has seen nothing."""
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     old = _open_session(client)
     _call(client, {"query": "x", "max_results": 1}, headers=old)
     new = _open_session(client)
@@ -602,7 +602,7 @@ def test_a_new_handshake_starts_over(client: TestClient, app: Any) -> None:
 def test_no_session_or_a_malformed_one_is_always_sent_everything(
     client: TestClient, app: Any
 ) -> None:
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     for headers in ({}, {"Mcp-Session-Id": "x" * 500}):
         for _ in range(2):
             response = _call(client, {"query": "x", "max_results": 1}, headers=headers)
@@ -614,7 +614,7 @@ def test_an_id_this_instance_never_issued_is_adopted_not_refused(
 ) -> None:
     """A sibling instance issued it, or this one restarted: serve it, and send
     everything the first time rather than trust a record that is not here."""
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     foreign = {"Mcp-Session-Id": "issued-elsewhere"}
     first = _call(client, {"query": "x", "max_results": 1}, headers=foreign)
     assert first.status_code == 200
@@ -623,7 +623,7 @@ def test_an_id_this_instance_never_issued_is_adopted_not_refused(
 
 
 def test_a_changed_foundation_is_sent_again(client: TestClient, app: Any) -> None:
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     session = _open_session(client)
     _call(client, {"query": "x", "max_results": 1}, headers=session)
     record = app.state.container.sessions.delivered(session["Mcp-Session-Id"])
@@ -634,7 +634,7 @@ def test_a_changed_foundation_is_sent_again(client: TestClient, app: Any) -> Non
 
 def test_a_sessionless_revision_ignores_a_session_header(client: TestClient, app: Any) -> None:
     """2026-07-28 has no sessions, so an id it happens to carry changes nothing."""
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     session = _open_session(client)
     meta = {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}
     for _ in range(2):
@@ -650,7 +650,7 @@ def test_a_sessionless_revision_ignores_a_session_header(client: TestClient, app
 def test_a_reply_that_fails_to_render_marks_nothing_as_sent(client: TestClient, app: Any) -> None:
     """A lone surrogate is a valid JSON string id that cannot be encoded as UTF-8:
     the reply never leaves, so the session must not believe it was sent."""
-    app.state.container.selector.search_hits = [("daintree.terminals.rename", 0.9, True)]
+    app.state.container.selectors["inbox"].search_hits = [("daintree.terminals.rename", 0.9, True)]
     session = _open_session(client)
     body = (
         '{"jsonrpc":"2.0","id":"\\ud800","method":"tools/call","params":'
@@ -663,3 +663,118 @@ def test_a_reply_that_fails_to_render_marks_nothing_as_sent(client: TestClient, 
             headers={**HEADERS, **session, "Content-Type": "application/json"},
         )
     assert app.state.container.sessions.delivered(session["Mcp-Session-Id"]) == {}
+
+
+# ---- one catalog per host model (issue #159) ------------------------------------
+
+CONTROL = {"Daintree-Host-Control": "1"}
+
+
+def test_each_model_is_served_from_its_own_catalog(client: TestClient, app: Any) -> None:
+    """The model picks the catalog before anything else: the revision, the hits a
+    search can name, exact retrieval and supporting delivery all come from it."""
+    catalogs = app.state.container.catalogs
+    lane = "daintree.hosts.handle-hub-message"
+    assert lane in catalogs.inbox and lane not in catalogs.control
+
+    inbox = _get(client, {"id": lane}).json()["result"]
+    assert inbox["isError"] is False
+    assert inbox["structuredContent"]["catalog_revision"] == catalogs.inbox.revision
+    assert _get(client, {"id": lane}, headers=CONTROL).json()["result"]["isError"] is True
+
+    app.state.container.selectors["control"].search_hits = [(lane, 0.9, True)]
+    searched = _call(client, {"query": "q"}, headers=CONTROL).json()["result"]
+    assert searched["structuredContent"]["runbooks"] == []
+    assert searched["structuredContent"]["catalog_revision"] == catalogs.control.revision
+
+
+def test_an_unknown_model_is_served_the_inbox_catalog(client: TestClient, app: Any) -> None:
+    for value in ("0", "2", "true", ""):
+        structured = _get(
+            client, {"id": "daintree.terminals.rename"}, headers={"Daintree-Host-Control": value}
+        ).json()["result"]["structuredContent"]
+        assert structured["catalog_revision"] == app.state.container.catalogs.inbox.revision
+
+
+def test_a_connected_control_caller_gets_the_hosts_foundation_with_every_runbook(
+    client: TestClient, app: Any
+) -> None:
+    catalogs = app.state.container.catalogs
+    hosts_foundation = catalogs.control.get("daintree.hosts.foundation")
+    connected = {**CONTROL, "Daintree-Hosts": "connected"}
+    fetched = _get(client, {"id": "daintree.terminals.rename"}, headers=connected)
+    supporting = _supporting(fetched)
+    assert [r["id"] for r in supporting] == ["daintree.foundation", "daintree.hosts.foundation"]
+    assert supporting[1]["instructions"] == hosts_foundation.body
+    _assert_schema(GET_TOOL_DEFINITION, fetched.json()["result"]["structuredContent"])
+
+    app.state.container.selectors["control"].search_hits = [
+        ("daintree.terminals.rename", 0.9, True),
+        ("daintree.agents.ask-and-relay", 0.8, True),
+        ("daintree.foundation", 0.1, False),
+    ]
+    searched = _call(client, {"query": "q"}, headers=connected)
+    assert [r["id"] for r in _supporting(searched)] == [
+        "daintree.foundation",
+        "daintree.hosts.foundation",
+    ]
+    # Only what is delivered in full brings anything with it.
+    app.state.container.selectors["control"].search_hits = [
+        ("daintree.terminals.rename", 0.9, False)
+    ]
+    assert _supporting(_call(client, {"query": "q"}, headers=connected)) == []
+
+
+def test_no_other_caller_gets_the_hosts_foundation_with_a_plain_runbook(
+    client: TestClient,
+) -> None:
+    for headers in (
+        CONTROL,
+        {**CONTROL, "Daintree-Hosts": "none"},
+        {**CONTROL, "Daintree-Hosts": "configured"},
+        {"Daintree-Hosts": "connected"},
+        {"Daintree-Hosts": "connected", "Daintree-Lane": "reachable"},
+    ):
+        fetched = _get(client, {"id": "daintree.terminals.rename"}, headers=headers)
+        assert [r["id"] for r in _supporting(fetched)] == ["daintree.foundation"], headers
+
+
+def test_a_control_callers_search_is_narrowed_within_its_own_catalog(
+    client: TestClient, app: Any
+) -> None:
+    catalogs = app.state.container.catalogs
+    selector = app.state.container.selectors["control"]
+    _call(client, {"query": "q"}, headers={**CONTROL, "Daintree-Hosts": "none"})
+    # A lane header means nothing to a control caller: its snapshot stays reported.
+    _call(
+        client,
+        {"query": "q"},
+        headers={**CONTROL, "Daintree-Hosts": "configured", "Daintree-Lane": "maybe"},
+    )
+    assert selector.search_excludes == [
+        catalogs.control.excluded_for(HostState("none")),
+        catalogs.control.excluded_for(HostState("configured")),
+    ]
+
+
+def test_a_session_across_models_resends_what_differs(client: TestClient, app: Any) -> None:
+    """The session record is by content hash, so a runbook the other model words
+    differently arrives in full, and one both share is named."""
+    catalogs = app.state.container.catalogs
+    session = _open_session(client)
+    connected = {**CONTROL, "Daintree-Hosts": "connected", **session}
+    _get(client, {"id": "daintree.hosts.connect-host"}, headers=connected)
+
+    later = _get(
+        client,
+        {"id": "daintree.hosts.connect-host"},
+        headers={"Daintree-Hosts": "connected", **session},
+    )
+    by_id = {r["id"]: r for r in _supporting(later)}
+    for runbook_id in ("daintree.foundation", "daintree.hosts.foundation"):
+        same = catalogs.inbox.get(runbook_id).content_hash == (
+            catalogs.control.get(runbook_id).content_hash
+        )
+        assert ("note" in by_id[runbook_id]) is same, runbook_id
+        if not same:
+            assert by_id[runbook_id]["instructions"] == catalogs.inbox.get(runbook_id).body

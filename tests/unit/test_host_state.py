@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from daintree_assistant_server.runbooks.catalog import Catalog, default_runbooks_dir, load_catalog
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
 from daintree_assistant_server.runbooks.host_state import (
     HOST_ELIGIBILITY,
     HostEligibility,
@@ -43,7 +43,9 @@ def _artifact_present() -> bool:
 
 @pytest.fixture(scope="module")
 def catalog() -> Catalog:
-    return load_catalog(default_runbooks_dir())
+    """The inbox catalog: the one v0.44 clients, the only callers with lanes, are
+    served. The control catalog's hosts runbooks are checked in ``test_catalogs.py``."""
+    return load_catalogs().inbox
 
 
 # ---- the header contract ------------------------------------------------

@@ -53,6 +53,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 daintree_assistant_server = [
     "runbooks/files/*.md",
+    # The inbox catalog's frozen v0.44 copies (runbooks/catalog.py, load_catalogs).
+    "runbooks/inbox/*.md",
     # The local two-stage runbook selector — the SHIPPED selector. The ranking
     # encoder ships int8 only (its fp32 graph is gitignored and exists locally so
     # the export can measure what quantisation costs); the retriever ships fp32,
