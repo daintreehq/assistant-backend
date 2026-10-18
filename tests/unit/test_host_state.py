@@ -211,7 +211,9 @@ def _case(**fields: object) -> dict[str, object]:
 def test_a_case_carries_its_state_and_the_exclusion_it_implies(catalog: Catalog) -> None:
     from benchmarks.runbook_selection.cases import _build_case
 
-    case = _build_case(_case(host_state={"hosts": "none", "lane": "reachable"}), "f", catalog)
+    case = _build_case(
+        _case(host_model="inbox", host_state={"hosts": "none", "lane": "reachable"}), "f", catalog
+    )
     assert case.host_state == HostState("none", lane_reachable=True)
     assert case.exclude == catalog.excluded_for(case.host_state)
     unreported = _build_case(_case(), "f", catalog)
@@ -230,6 +232,13 @@ def test_a_malformed_case_state_fails_loudly(catalog: Catalog, host_state: objec
 
     with pytest.raises(CaseError, match="host_state"):
         _build_case(_case(host_state=host_state), "f", catalog)
+
+
+def test_a_reachable_lane_is_the_inbox_models(catalog: Catalog) -> None:
+    from benchmarks.runbook_selection.cases import CaseError, _build_case
+
+    with pytest.raises(CaseError, match="inbox model's"):
+        _build_case(_case(host_state={"hosts": "none", "lane": "reachable"}), "f", catalog)
 
 
 def test_a_case_may_not_expect_what_its_state_leaves_out(catalog: Catalog) -> None:

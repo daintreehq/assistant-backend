@@ -1402,7 +1402,7 @@ examples:
     run: 2026-10-16-synthetic-audit
   - query: Read the remaining Claude allowance on each Remote Host. Independently inventory the workspaces left by finished run image-62, with no removal.
     active: [daintree.hosts.recover-and-clean-up, daintree.hosts.survey-hosts]
-    expect: [daintree.hosts.check-usage-limits, daintree.hosts.audit-host-workspaces]
+    expect: [daintree.agents.check-usage-limits, daintree.hosts.audit-host-workspaces]
     run: 2026-10-16-synthetic-audit
   - query: As hub, give the connected Linux server the new docs-index fix on its own branch. Separately help add the newly bought Mac as a Daintree Remote Host.
     active: [daintree.hosts.survey-hosts]
@@ -1412,20 +1412,12 @@ examples:
     active: [daintree.hosts.supervise-swarm, daintree.hosts.delegate-to-host]
     expect: [daintree.hosts.prepare-remote-demo, daintree.hosts.park-swarm]
     run: 2026-10-16-synthetic-audit
-  - query: On this receiving host lane, run only the hub requested checks of its pinned cache commit. Separately remove the panes this lane created for the unrelated finished glossary run.
-    active: [daintree.hosts.handle-hub-message]
-    expect: [daintree.hosts.verify-for-hub, daintree.hosts.clean-up-for-hub]
-    run: 2026-10-16-synthetic-audit
-  - query: On this lane, review the hub pinned webhook commit with findings only. Independently serve the already-built catalog demo at the other SHA the hub named, using synthetic records.
-    active: [daintree.hosts.handle-hub-message, daintree.hosts.do-delegated-work]
-    expect: [daintree.hosts.review-for-hub, daintree.hosts.demo-for-hub]
-    run: 2026-10-16-synthetic-audit
   - query: Write the verified final results report for ended remote run sketch-8. Separately investigate why the different ended run trace-19 repeated a unit and stalled, with an evidence timeline.
     active: [daintree.hosts.supervise-swarm]
-    expect: [daintree.hosts.report-swarm-results, daintree.hosts.postmortem-swarm]
+    expect: [daintree.hosts.supervise-swarm, daintree.agents.postmortem-run]
     run: 2026-10-16-synthetic-audit
   - query: Place the three untouched documentation tickets on remote machines by capacity. Separately rebalance the already-running renderer swarm that is swapping on the GPU host.
-    active: [daintree.hosts.check-usage-limits, daintree.hosts.survey-hosts]
+    active: [daintree.agents.check-usage-limits, daintree.hosts.survey-hosts]
     expect: [daintree.hosts.place-work, daintree.hosts.rebalance-load]
     run: 2026-10-16-synthetic-audit
   - query: Check which candidate project on the Linux host is our intended repository before sending anything. Independently preview a one-time copy of notification preferences to the connected Mac host.

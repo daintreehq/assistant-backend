@@ -164,9 +164,9 @@ boundaries:
   - query: the hub came back up, carry on with the run we parked on the hosts
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: as the hub, have every host pause the agents it launched for the run and report back, so we can resume later
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
   - query: tell the lanes to stop their agents at a safe point tonight and record what each has, we continue tomorrow
-    confusable_with: [daintree.hosts.steer-for-hub, daintree.orchestration.park-work]
+    confusable_with: [daintree.orchestration.park-work]
   - query: make a restart-proof checkpoint of the multi-machine run and pause it
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: keep the remote run's state in a record I can resume from after the hub restarts, and put it on hold now

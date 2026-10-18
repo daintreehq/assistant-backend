@@ -137,21 +137,14 @@ boundaries:
     - daintree.release.assess-readiness
     run: runbook-2026-10-issue-138
   - query: 'hub message: deploy 7d3b9e0 to the staging environment from this machine and reply with what is serving'
-    confusable_with:
-    - daintree.hosts.handle-hub-message
-    - daintree.hosts.do-delegated-work
     run: runbook-2026-10-issue-138
   - query: The hub told this host to be the deployer for production. Verify the target here is the right one, deploy once and answer with what the platform shows.
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-138
   - query: the hub says tag v2.0.1 was built and tested on another machine; this host should now deploy that tag to staging and say what is serving
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-138
   - query: last night's release run left the staging deploy unconfirmed. skip the write-up, just check what staging is serving now
     confusable_with:
-    - daintree.hosts.postmortem-swarm
+    - daintree.agents.postmortem-run
     run: runbook-2026-10-issue-138
   - query: Deploy the approved merge SHA 83f61a2 to staging and prove that exact revision is serving the invoice endpoint.
     confusable_with: [daintree.edits.spawn-visible-agent, daintree.terminals.run-visible-command]

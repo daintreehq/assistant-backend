@@ -89,17 +89,17 @@ boundaries:
   - query: not sure if the mini or the linux box should do the export fix, pick by load and send it
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: look at the claude and codex usage left on each host, then decide which machine gets each of these tasks
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: which host has the most allowance to spare? give it the big refactor
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: use the hosts' remaining weekly usage to divide up these three issues
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: which of my machines can take work right now? put these four tickets on those
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: the lanes are already enrolled on every host, so just decide who takes each of these bugs and send them
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: get the six issues onto the hosts, wherever an assistant is ready and the load is low
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: parallelize these independent issues across my remote machines, not local worktrees
     confusable_with: [daintree.orchestration.fan-out-work]
   - query: one agent per ticket, but on the other hosts, picked by how loaded they are
@@ -256,6 +256,6 @@ topic_shifts:
     history:
       - 'user: check Codex usage on my other machines'
       - 'assistant: All three hosts returned their limits; the server has the largest remaining window.'
-    active: [daintree.hosts.check-usage-limits]
-    confusable_with: [daintree.hosts.check-usage-limits]
+    active: [daintree.agents.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: 2026-10-16-synthetic-audit

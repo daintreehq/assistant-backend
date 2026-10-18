@@ -8,7 +8,6 @@
 # a second turn after a unit was sent. Machine names are generic.
 runbook: daintree.hosts.delegate-to-host
 run: runbook-2026-10-issue-89
-
 positives:
   - have the mini do the changelog cleanup and push it to a branch
   - get the GPU box to retrain the tokenizer fixtures and tell me which commit it lands
@@ -32,29 +31,12 @@ positives:
   - Delegate updating the API reference for the new pagination parameters to the assistant on the Linux host and check what it pushed
   - Route the fix for the crash on empty uploads to the assistant in the uploads project on the remote host and confirm the commit before telling the user
   - Hand the extraction of the billing client into its own package to the assistant on a Remote Host and pick it up again when its exchange moves
-  - query: >-
-      The user wants the assistant on their Linux workstation to port the image resizing
-      helper to the new storage API, push a branch and open a draft pull request. The work
-      should be checked against the shared remote before anyone says it is done.
-  - query: >-
-      Hand the migration of the notifications table to the assistant on the remote build
-      host. It should branch from the current main commit, run the project's own migration
-      tests there, and report the commit SHA and test results; nothing should be merged.
-  - query: >-
-      The user is at the Shell and wants a second machine to take on a self-contained task:
-      add rate limiting to the public upload route in the API project, commit it on its own
-      branch, and send back the branch and SHA so the user can review it later.
-  - query: >-
-      The other Mac has the repository open with an assistant enrolled for this Shell. The
-      user wants it to fix the timezone bug in the scheduler and push a branch; confirm the
-      pushed commit before reporting back.
-  - query: >-
-      Get the GPU workstation to write the benchmark harness for the inference module,
-      because only that machine has the hardware for it, and verify the commit it pushes.
-  - query: >-
-      The user says their mini is idle and wants it to take the Python 3.12 compatibility
-      fixes in the CLI project, open a PR, and tell them when it is up.
-  # relay positives: one hop from a verified result on one host to work on another
+  - The user wants the assistant on their Linux workstation to port the image resizing helper to the new storage API, push a branch and open a draft pull request. The work should be checked against the shared remote before anyone says it is done.
+  - Hand the migration of the notifications table to the assistant on the remote build host. It should branch from the current main commit, run the project's own migration tests there, and report the commit SHA and test results; nothing should be merged.
+  - 'The user is at the Shell and wants a second machine to take on a self-contained task: add rate limiting to the public upload route in the API project, commit it on its own branch, and send back the branch and SHA so the user can review it later.'
+  - The other Mac has the repository open with an assistant enrolled for this Shell. The user wants it to fix the timezone bug in the scheduler and push a branch; confirm the pushed commit before reporting back.
+  - Get the GPU workstation to write the benchmark harness for the inference module, because only that machine has the hardware for it, and verify the commit it pushes.
+  - The user says their mini is idle and wants it to take the Python 3.12 compatibility fixes in the CLI project, open a PR, and tell them when it is up.
   - when the linux box has pushed the schema change, have the mac mini build the migration script on top of it
   - once the GPU box lands the model export, get the laptop host to wire it into the app
   - the server machine is doing the API, then the other mac should write the SDK against whatever it pushes
@@ -62,46 +44,129 @@ positives:
   - Take the GPU host's verified commit with the new embedding format and have the laptop host update the search indexer on top of it
   - Have one host implement the protocol change, verify its pushed commit, then brief a second host to update the client on that commit
   - Have the build server's assistant rename the config keys, and once that commit is verified, the iMac's assistant updates the deploy scripts to match
-  - query: >-
-      The backend change has to exist before the frontend work can start. The user wants
-      the assistant on the Linux host to add the new endpoint and push it, and only then
-      the assistant on the iMac to build the settings page against that exact commit.
-  - query: >-
-      The user wants the build machine to regenerate the protobuf types and push them, and
-      once that branch is verified, the second Mac's assistant should update the mobile
-      client to the new types starting from that commit.
-  # social lead-ins
+  - The backend change has to exist before the frontend work can start. The user wants the assistant on the Linux host to add the new endpoint and push it, and only then the assistant on the iMac to build the settings page against that exact commit.
+  - The user wants the build machine to regenerate the protobuf types and push them, and once that branch is verified, the second Mac's assistant should update the mobile client to the new types starting from that commit.
   - sorry to bother you again, but could the other machine pick up the pagination bug? it has the repo already
   - quick one before I head out, get the mini to fix the broken link checker and push a branch
   - thanks for earlier. next, have the remote host add the health check endpoint and send me the commit
   - ok cool. now get the linux box to do the same lint fixes on its checkout and push them
   - I'm stepping away for an hour, have my second mac implement the export retry and open a PR, check it when it's back
-
+  - query: The user will split a slow test suite across their remote machines tomorrow and wants a Codex assistant waiting in this repository on each connected host tonight; two hosts may still have one from yesterday
+    run: runbook-2026-10-issue-102
+  - query: User has three remote hosts connected and wants the swarm ready before lunch; they are not sure which hosts let the hub start assistants and want to hear what to switch on
+    run: runbook-2026-10-issue-102
+  - query: Some of the user's hosts kept their assistants in this project from last week's run and others were rebooted since; they want every host to have one again without doubling up
+    run: runbook-2026-10-issue-102
+  - query: Ready an assistant lane on the Linux build server and the Mac mini for this repository without dispatching any tasks
+    run: runbook-2026-10-issue-102
+  - query: The user switched on assistant messaging for four hosts this morning but may not have allowed starts on all of them; they want assistants in this repository wherever possible and a list of the hosts still waiting on them
+    run: runbook-2026-10-issue-102
+  - query: A replacement Mac mini joined as a host yesterday and has nothing on it yet; the user wants it holding a Claude Code assistant in this project like the other hosts
+    run: runbook-2026-10-issue-102
+  - query: Before a multi-machine run of the database migration, the user wants an assistant sitting in this repository on each remote host, and only then will they decide who gets which part
+    run: runbook-2026-10-issue-102
+  - query: After a Shell restart the user can't tell which remote hosts still have an assistant in this repository; they want each host covered again and to know what is blocking any that aren't
+    run: runbook-2026-10-issue-102
+  - query: The user wants their remote hosts ready to receive work on the monorepo this afternoon, but nothing should go out until they have looked at the plan
+    run: runbook-2026-10-issue-102
+  - query: The user is choosing which machines get tonight's benchmark runs and needs every remote host holding an assistant in this project before deciding
+    run: runbook-2026-10-issue-102
+  - query: The Linux host refused a Claude Code start because that project's assistants run Codex, and the user says Codex is fine there
+    run: runbook-2026-10-issue-102
+  - query: 'I''ve got four machines hooked up to this Shell now: the two Mac minis, the Linux tower and my old laptop in host mode. Tomorrow I want to split the integration tests across them. Can you get an assistant into this repo on each one tonight and tell me which ones you couldn''t? Don''t start anything yet.'
+    run: runbook-2026-10-issue-102
+  - query: 'Hub task: the user plans a cross-machine review later today. Three hosts are connected and one is still connecting; the repository shows up under the same name on two of them and in a different folder on the third. They want each of those machines holding an assistant in it, with the third match checked with them first, and a readiness summary.'
+    run: runbook-2026-10-issue-102
+  - query: Last time I tried this two of the machines came back saying starting assistants was turned off, and I've fixed that since. Try again for this project on all of them, and keep the ones that already worked.
+    run: runbook-2026-10-issue-102
+  - query: get the other macs ready for this project
+    run: runbook-2026-10-issue-102
+  - query: put an assistant on each of my remote machines
+    run: runbook-2026-10-issue-102
+  - query: can you get my two other computers ready to help on this repo
+    run: runbook-2026-10-issue-102
+  - query: i want codex on the linux box and claude on the mac mini, both in this project
+    run: runbook-2026-10-issue-102
+  - query: spin up the swarm on my other machines but no tasks yet
+    run: runbook-2026-10-issue-102
+  - query: make sure every host has an assistant in this repo
+    run: runbook-2026-10-issue-102
+  - query: which of my machines are ready for work
+    run: runbook-2026-10-issue-102
+  - query: who's ready to take a task on the other machines
+    run: runbook-2026-10-issue-102
+  - query: get assistants ready on the hosts and reuse whatever's there
+    run: runbook-2026-10-issue-102
+  - query: line up an assistant on each server before I hand things out
+    run: runbook-2026-10-issue-102
+  - query: start an assistant on the build server in this project
+    run: runbook-2026-10-issue-102
+  - query: set up assistants on all three remote machines for this codebase
+    run: runbook-2026-10-issue-102
+  - query: are the other hosts staffed for this project yet
+    run: runbook-2026-10-issue-102
+  - query: get claude running on the mac mini for this repo so I can send it stuff later
+    run: runbook-2026-10-issue-102
+  - query: prep the fleet, one assistant per box in this project
+    run: runbook-2026-10-issue-102
+  - query: is anybody free on the hosts to take a job in this repo
+    run: runbook-2026-10-issue-102
+  - query: fill the empty hosts with assistants for this project and leave the ones that already have one alone
+    run: runbook-2026-10-issue-102
+  - query: morning! before I split up today's tickets, can you make sure each of my remote hosts has an assistant in this project
+    run: runbook-2026-10-issue-102
+  - query: ok so the mac studio and the linux tower are both connected now, get each of them an assistant in this repo and tell me if anything needs me
+    run: runbook-2026-10-issue-102
+  - query: hey, quick one, I'd like an assistant ready on every machine I've connected for this project, but don't give them anything to do yet
+    run: runbook-2026-10-issue-102
+  - query: I'm about to run a big refactor across machines, first just get the assistants in place on each host and show me where they landed
+    run: runbook-2026-10-issue-102
+  - query: thanks for that. next, can you set up assistants for this repo on the remote machines and let me know which ones you couldn't
+    run: runbook-2026-10-issue-102
+  - query: do it for all of them
+    history:
+      - 'user: is there an assistant on the mac mini for this project?'
+      - 'assistant: No. The project is listed there, but no assistant is enrolled for this Shell.'
+    run: runbook-2026-10-issue-102
+  - query: ok get them ready
+    history:
+      - 'user: which of my hosts have this repo?'
+      - 'assistant: The Mac mini and the Linux box both list it; neither has an assistant enrolled for you.'
+    run: runbook-2026-10-issue-102
+  - query: go ahead and start the missing ones
+    history:
+      - 'user: get my hosts ready for this repo'
+      - 'assistant: Two hosts already have enrolled assistants. The Linux box has none yet and its start setting is on.'
+    run: runbook-2026-10-issue-102
+  - query: fine, use codex there then
+    history:
+      - 'user: line up the hosts for this project'
+      - 'assistant: The Linux box refused a Claude Code start: that project''s assistants run a different agent CLI.'
+    run: runbook-2026-10-issue-102
+  - query: I turned the start setting on for the tower, try it now
+    history:
+      - 'user: ready the remote hosts for this codebase'
+      - 'assistant: The tower answered opted_out: starting assistants is turned off for it in this Shell''s host settings.'
+    run: runbook-2026-10-issue-102
 boundaries:
-  # a code change, but for another machine's assistant (not one agent here)
   - query: have the assistant on the build box add the missing null check in the parser and push a branch
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: the mini should do the webhook retry change, not an agent on this machine
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: Delegate adding request logging to the assistant on a Remote Host instead of spawning a local agent
     confusable_with: [daintree.edits.spawn-visible-agent]
-  # several things here vs one unit on another machine
   - query: give only the search bug to the remote host's assistant; the other issues stay here
     confusable_with: [daintree.orchestration.fan-out-work]
-  # handing over a started task to another machine, not another local agent
   - query: I pushed my half-finished image cache rewrite to wip/image-cache from this laptop; let the mini's assistant finish it from that branch
     confusable_with: [daintree.agents.hand-off-task]
   - query: pass the unfinished pagination work over to the linux box's assistant and have it complete it
     confusable_with: [daintree.agents.hand-off-task]
-  # a start that waits on another host's work, not a timed start here
   - query: after the GPU box pushes the weights loader, have the laptop host write its tests
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: when the other machine has its fix on the remote, get the mini to rebase the docs branch onto it
     confusable_with: [daintree.orchestration.watch-outcome]
-  # one dependency between two hosts, not a durable plan here
   - query: Have one remote host build the parser and a second host write the CLI on its verified commit
     confusable_with: [daintree.orchestration.execute-durable-workflow]
-  # the work's content belongs to a local owner, but the machine is another one
   - query: get my other mac to track down why the upload test is flaky and fix it on a branch
     confusable_with: [daintree.ci.hunt-flaky-test]
   - query: the linux host should chase the intermittent timeout in the integration suite and push a fix
@@ -116,8 +181,8 @@ boundaries:
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: get the second mac to sync the API docs with the code and push it
     confusable_with: [daintree.edits.sync-project-docs]
-  - query: 'the date parsing bug needs fixing; send it to the Linux box''s assistant and get a branch back'
-    confusable_with: [daintree.hosts.start-swarm]
+  - query: the date parsing bug needs fixing; send it to the Linux box's assistant and get a branch back
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: ask the build box to regenerate the API docs and push them
     confusable_with: [daintree.hosts.ask-host-assistant]
@@ -131,85 +196,72 @@ boundaries:
   - query: have the other Mac's assistant change the dev server's default port in the project config and open a PR for it
     confusable_with: [daintree.runtime.free-busy-port]
     run: runbook-2026-10-issue-131
-  - query: "the linux host is connected now; have its assistant run the migration and tell me the commit"
+  - query: the linux host is connected now; have its assistant run the migration and tell me the commit
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
-  - query: 'ask my second mac''s assistant to write the orders index migration and report the commit back'
-    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: ask my second mac's assistant to write the orders index migration and report the commit back
     run: runbook-2026-10-issue-98
-  - query: 'get the other computer''s assistant to take the webhook retry change, and check its branch when it reports'
-    confusable_with: [daintree.hosts.do-delegated-work]
+  - query: get the other computer's assistant to take the webhook retry change, and check its branch when it reports
     run: runbook-2026-10-issue-98
   - query: get the assistant on the build server to run the integration tests on the release candidate and tell me what broke
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
   - query: ask the assistant on my other mac to check whether this sha passes its unit tests
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
   - query: send the build host a request to verify the release commit and report back what failed
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
-  - query: 'the codex box should go over what my laptop pushed to feature/ingest at 3e9c1a7 and send the problems back to me'
-    confusable_with: [daintree.hosts.review-for-hub]
+  - query: the codex box should go over what my laptop pushed to feature/ingest at 3e9c1a7 and send the problems back to me
     run: runbook-2026-10-issue-99
-  - query: 'have the other machine''s assistant do a findings-only review of the retry branch at its pinned commit'
-    confusable_with: [daintree.hosts.review-for-hub]
+  - query: have the other machine's assistant do a findings-only review of the retry branch at its pinned commit
     run: runbook-2026-10-issue-99
-  - query: 'have the build server look over the PR my desktop opened and report back what it finds'
-    confusable_with: [daintree.hosts.review-for-hub]
+  - query: have the build server look over the PR my desktop opened and report back what it finds
     run: runbook-2026-10-issue-99
-  - query: 'only the linux box should do the debounce helper, leave the other hosts alone'
+  - query: only the linux box should do the debounce helper, leave the other hosts alone
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
-  - query: 'give this one bug to the mini''s assistant and verify its commit, nobody else gets it'
+  - query: give this one bug to the mini's assistant and verify its commit, nobody else gets it
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
-  - query: 'the second machine should start on the importer only after the first one''s branch is pushed and checked'
+  - query: the second machine should start on the importer only after the first one's branch is pushed and checked
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
-  - query: 'get the other mac to build the client on top of the API commit the first machine just pushed, then send me its SHA'
-    confusable_with: [daintree.hosts.integrate-for-hub]
+  - query: get the other mac to build the client on top of the API commit the first machine just pushed, then send me its SHA
     run: runbook-2026-10-issue-107
-  - query: 'messaging with the build box is back on, so hand its assistant the lint fix now and get me the PR'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+  - query: messaging with the build box is back on, so hand its assistant the lint fix now and get me the PR
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
-  - query: "Send the second laptop a brief for a new unit it hasn't been given yet, based on the corrected base commit, and have its assistant report the PR."
-    confusable_with: [daintree.hosts.steer-for-hub]
+  - query: Send the second laptop a brief for a new unit it hasn't been given yet, based on the corrected base commit, and have its assistant report the PR.
     run: runbook-2026-10-issue-106
-  - query: "the linux workstation has the most room, so hand it the export bug"
+  - query: the linux workstation has the most room, so hand it the export bug
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
-  - query: "put the auth refactor on the mac mini, I've already checked it's the least busy"
+  - query: put the auth refactor on the mac mini, I've already checked it's the least busy
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
-  - query: 'have the tower build the importer on top of the commit the laptop pushed, on one new branch, and send me its SHA'
+  - query: have the tower build the importer on top of the commit the laptop pushed, on one new branch, and send me its SHA
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
-  - query: 'get the build box to resolve the conflicts on its own feature branch and push that one branch'
+  - query: get the build box to resolve the conflicts on its own feature branch and push that one branch
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
-  - query: 'ask the mini''s assistant to rebase its branch onto the latest main and report the new commit'
+  - query: ask the mini's assistant to rebase its branch onto the latest main and report the new commit
     confusable_with: [daintree.hosts.integrate-host-branches]
     run: runbook-2026-10-issue-116
-  - query: 'The build box finished the parser change but skipped the docs; send it a follow-up task to add them on the same branch.'
+  - query: The build box finished the parser change but skipped the docs; send it a follow-up task to add them on the same branch.
     confusable_with: [daintree.hosts.steer-swarm]
     run: runbook-2026-10-issue-110
-  - query: 'Once the server''s branch is pushed, have my other Mac start the client work on top of it.'
+  - query: Once the server's branch is pushed, have my other Mac start the client work on top of it.
     confusable_with: [daintree.hosts.steer-swarm]
     run: runbook-2026-10-issue-110
-  - query: 'have the studio implement the new webhook retry issue on its own branch and report the SHA'
+  - query: have the studio implement the new webhook retry issue on its own branch and report the SHA
     confusable_with: [daintree.hosts.reassign-host-work]
     run: runbook-2026-10-issue-113
-  - query: 'get the workstation''s assistant to build the csv export feature from scratch and open a PR when the checks pass'
+  - query: get the workstation's assistant to build the csv export feature from scratch and open a PR when the checks pass
     confusable_with: [daintree.hosts.reassign-host-work]
     run: runbook-2026-10-issue-113
-  - query: "The tower already delivered the CSV export; give it a fresh job to redo it so empty files don't crash, and send me the commit."
+  - query: The tower already delivered the CSV export; give it a fresh job to redo it so empty files don't crash, and send me the commit.
     confusable_with: [daintree.hosts.reassign-host-work]
     run: runbook-2026-10-issue-113
-  - query: "Ask the build box to take another pass at the login page it finished yesterday, this time with the new copy, and report the PR."
+  - query: Ask the build box to take another pass at the login page it finished yesterday, this time with the new copy, and report the PR.
     confusable_with: [daintree.hosts.reassign-host-work]
     run: runbook-2026-10-issue-113
   - query: when the linux host has pushed the parser fix, have the mini build the cli change on that exact commit
@@ -230,29 +282,29 @@ boundaries:
   - query: have the mac host chase down the slow startup on its own and send me the branch with its fix
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
-  - query: "hand the export-flag change to the build box's assistant on a fresh branch and follow it until it reports the sha"
+  - query: hand the export-flag change to the build box's assistant on a fresh branch and follow it until it reports the sha
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
-  - query: 'I opened a PR for the docs fix; get the tower''s assistant to review it and tell me what it thinks'
+  - query: I opened a PR for the docs fix; get the tower's assistant to review it and tell me what it thinks
     confusable_with: [daintree.hosts.race-and-review]
     run: runbook-2026-10-issue-94
-  - query: "now that we know it's the timezone, have the linux host fix the test and open a PR"
+  - query: now that we know it's the timezone, have the linux host fix the test and open a PR
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
-  - query: "have the build host fix the test that only fails there and push a branch"
+  - query: have the build host fix the test that only fails there and push a branch
     confusable_with: [daintree.hosts.diagnose-host-differences]
     run: runbook-2026-10-issue-119
   - query: have the build box implement the consumer against the schema at commit 5e21c0d, push a branch and tell me the sha
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: runbook-2026-10-issue-148
-  - query: 'have the other mac implement the CSV import and report the commit when it''s done, no rush'
+  - query: have the other mac implement the CSV import and report the commit when it's done, no rush
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
-  - query: 'ask the build box''s assistant to fix the flaky upload test and tell me the commit once it''s pushed'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: ask the build box's assistant to fix the flaky upload test and tell me the commit once it's pushed
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'have the linux server implement the retry option, then when that lands have the mini build the client against it'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: have the linux server implement the retry option, then when that lands have the mini build the client against it
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: hand the pagination fix to the project on the server and have it open a pull request
     confusable_with: [daintree.hosts.verify-project-placement]
@@ -263,26 +315,25 @@ boundaries:
   - query: give the build box the flaky checkout test to fix in our repo, and if its remote differs from ours stop and tell me
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
-  - query: 'The repo is already on the build server; have its assistant add pagination to the list endpoint and open a PR'
+  - query: The repo is already on the build server; have its assistant add pagination to the list endpoint and open a PR
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
-  - query: 'Ask the other Mac to run the migration branch''s tests and tell me which commit it checked'
+  - query: Ask the other Mac to run the migration branch's tests and tell me which commit it checked
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
-  - query: "ask the other Mac's assistant to write a fixtures loader for the sample orders, commit it to its own branch, and send me the commit"
+  - query: ask the other Mac's assistant to write a fixtures loader for the sample orders, commit it to its own branch, and send me the commit
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
-  - query: "ask the Linux host's assistant to implement the new settings page on a feature branch and open a PR when the tests pass"
+  - query: ask the Linux host's assistant to implement the new settings page on a feature branch and open a PR when the tests pass
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
-  - query: "get the build machine's assistant to add a dev server config to the web app and push it, I'll review the diff here"
+  - query: get the build machine's assistant to add a dev server config to the web app and push it, I'll review the diff here
     confusable_with: [daintree.hosts.prepare-remote-demo]
     run: runbook-2026-10-issue-125
-
-  - query: 'get the tower to swap the date library in the admin repo and tell me the commit'
+  - query: get the tower to swap the date library in the admin repo and tell me the commit
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
-  - query: 'have the mini''s assistant replace the deprecated client in the one billing repo it has and push a branch'
+  - query: have the mini's assistant replace the deprecated client in the one billing repo it has and push a branch
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
   - query: ask the linux host's assistant to fix the flaky payments test and tell me the PR number once it's open
@@ -294,74 +345,241 @@ boundaries:
   - query: get the build machine to review the pushed branch and send me the findings
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: runbook-2026-10-issue-126
-  - query: "I'd like the staging machine's own assistant to chase down the login test that keeps flaking, on a branch it creates, applying its tdd plugin skill; tell me the commit"
+  - query: I'd like the staging machine's own assistant to chase down the login test that keeps flaking, on a branch it creates, applying its tdd plugin skill; tell me the commit
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
-  - query: "get the build host to implement the cache invalidation fix, following whichever review plugin skill it has installed, and send me the SHA"
+  - query: get the build host to implement the cache invalidation fix, following whichever review plugin skill it has installed, and send me the SHA
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
-  - query: "send the second Mac the job of tidying the config loader, with its plugin lint skill applied; I need the branch name back"
+  - query: send the second Mac the job of tidying the config loader, with its plugin lint skill applied; I need the branch name back
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
-  - query: "have the other host's assistant move its worktree to the new database driver, check it against that worktree's own database and open a PR"
+  - query: have the other host's assistant move its worktree to the new database driver, check it against that worktree's own database and open a PR
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
-  - query: "have the other Mac's assistant write its own setup and teardown scripts so each worktree there gets a private database and port"
+  - query: have the other Mac's assistant write its own setup and teardown scripts so each worktree there gets a private database and port
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
   - query: Ask the build box's assistant to bump the package version to 2.4.0 on a branch and open a PR; nothing gets published
-    confusable_with:
-    - daintree.release.publish-package
+    confusable_with: [daintree.release.publish-package]
     run: runbook-2026-10-issue-138
   - query: ask the assistant on the Linux host to repair the broken staging smoke test and open a pull request
-    confusable_with:
-    - daintree.release.deploy-and-verify
+    confusable_with: [daintree.release.deploy-and-verify]
     run: runbook-2026-10-issue-138
-  - query: "send the pagination fix to my remote server and verify the branch it comes back with"
+  - query: send the pagination fix to my remote server and verify the branch it comes back with
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
-  - query: "get the linux server to add the retry backoff and report which branch it landed on"
+  - query: get the linux server to add the retry backoff and report which branch it landed on
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
-  - query: "let the studio machine take the lint cleanup and report the sha"
+  - query: let the studio machine take the lint cleanup and report the sha
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
-  - query: "give this bug to the remote host, I want its PR link back"
+  - query: give this bug to the remote host, I want its PR link back
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
   - query: Have the archive server implement the thumbnail queue and push a PR. I will run the resulting feature myself later.
-    confusable_with: [daintree.hosts.demo-for-hub]
     run: 2026-10-16-synthetic-audit
   - query: From the hub, send the reporting fix to the assistant on the named Linux host and verify its pushed commit when it returns.
     confusable_with: [daintree.hosts.foundation]
     run: 2026-10-16-synthetic-audit
   - query: I am on the sending machine. Hand the cache eviction fix to the assistant on the graphics workstation and get its branch back.
-    confusable_with: [daintree.hosts.handle-hub-message]
     run: 2026-10-16-synthetic-audit
   - query: Send exactly one new compression-library fix to the named build host, on a fresh run branch, and verify the commit it reports.
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: 2026-10-16-synthetic-audit
+  - query: provision assistants on the remote hosts for this project
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-102
+  - query: get the remote machines ready for this repo
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-102
+  - query: connect an assistant on each remote host to this project
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-102
+  - query: each machine should get its own assistant in this repository
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-102
+  - query: set up every remote host with an assistant for this codebase
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-102
+  - query: give every remote machine its own assistant on this project
+    confusable_with: [daintree.worktree.provision-local-environment]
+    run: runbook-2026-10-issue-102
+  - query: one assistant per machine for this repo, I'll split the issues across them after
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: runbook-2026-10-issue-102
+  - query: spread assistants across my hosts for this project but don't hand out the issues yet
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: runbook-2026-10-issue-102
+  - query: get a swarm of assistants going across my machines with no tasks yet
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: runbook-2026-10-issue-102
+  - query: which machines have an assistant that can take something new right now
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: runbook-2026-10-issue-102
+  - query: anyone on the other hosts free for a new job in this repo?
+    confusable_with: [daintree.orchestration.supervise-fleet]
+    run: runbook-2026-10-issue-102
+  - query: start a codex assistant on the linux host for this repo
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: runbook-2026-10-issue-102
+  - query: spin up a claude on the mac mini in this project
+    confusable_with: [daintree.edits.spawn-visible-agent]
+    run: runbook-2026-10-issue-102
+  - query: get the assistant on my other mac ready in this project so I can message it later
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-102
+  - query: enroll an assistant on each remote host for this project
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-issue-102
+  - query: my other two macs should each have claude running in this project
+    confusable_with: [daintree.diagnostics]
+    run: runbook-2026-10-issue-102
+  - query: get codex going on every machine for this repo using whatever each one is signed into
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: runbook-2026-10-issue-102
+  - query: which hosts can I give work to in this project
+    confusable_with: [daintree.workflow.find-issue-work]
+    run: runbook-2026-10-issue-102
+  - query: which remote machine has room for an assistant in this repo
+    confusable_with: [daintree.runtime.relieve-resource-contention]
+    run: runbook-2026-10-issue-102
+  - query: bootstrap the assistant lanes on each host for this repo
+    confusable_with: [daintree.deps.upgrade-dependency]
+    run: runbook-2026-10-issue-102
+  - query: get an assistant ready on the build box for this repo, I'll hand it the flaky test later
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-102
+  - query: after the restart, put the assistants back on my hosts in this project so they can take new work
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-102
+  - query: check which of my remote machines have an assistant that could take a task, without sending anything yet
+    confusable_with: [daintree.hosts.ask-host-assistant]
+    run: runbook-2026-10-issue-88
+  - query: every host is added already, get an assistant enrolled on each one for the api repo
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: the machines show connected under hosts; ready a codex lane on each before I split the work
+    confusable_with: [daintree.hosts.connect-host]
+    run: runbook-2026-10-issue-122
+  - query: get claude ready on each host for this project, but no work goes out yet
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: before I hand out the parser task, make sure every machine has an assistant in this repo
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: spin up the swarm for the web repo on all the hosts, assistants only, the tasks come tomorrow
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: I need an enrolled assistant on each of the four machines in the billing project before anything else
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-92
+  - query: get an assistant going on every host in this repo, and if any refuse tell me what to switch on
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-103
+  - query: set up claude on the mini and the tower for this project, no work yet
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-103
+  - query: which machines could take work right now? just show me what's ready, I'll hand out the tickets later
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-93
+  - query: get an assistant ready on each remote host so I can spread issues across them tomorrow
+    confusable_with: [daintree.hosts.place-work]
+    run: runbook-2026-10-issue-93
+  - query: get the assistants ready on the linux and mac hosts in this repo so I can run a test matrix afterwards, nothing sent yet
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: before the cross-platform test run, make sure every host has an enrolled assistant in this project and show me the ready table
+    confusable_with: [daintree.hosts.run-validation-matrix]
+    run: runbook-2026-10-issue-117
+  - query: get an assistant ready in this repo on every remote host before I hand anything out
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-109
+  - query: which of my machines could take more work right now? just get an assistant ready on each, send nothing yet
+    confusable_with: [daintree.hosts.rebalance-load]
+    run: runbook-2026-10-issue-127
+  - query: get an assistant running in our project on every remote machine so they are ready to take tasks
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: which of my other machines have a ready assistant in this project, start the missing ones if I allow it
+    confusable_with: [daintree.hosts.verify-project-placement]
+    run: runbook-2026-10-issue-124
+  - query: The project is already open on every remote host; get an assistant enrolled in each one before any work goes out
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: Which remote hosts have an assistant ready in this repository? Start one on the hosts that lack it
+    confusable_with: [daintree.hosts.open-project-on-host]
+    run: runbook-2026-10-issue-123
+  - query: 'get the hosts ready: an assistant in this repo on every remote machine, reuse what''s there'
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: I'm about to send work out, so first make sure every remote machine has an assistant of its own in this project
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: which machines can I give work to right now? start assistants where they are missing and allowed
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-87
+  - query: is the other machine's assistant enrolled for this shell yet
+    confusable_with: [daintree.hosts.foundation]
+    run: runbook-2026-10-coordinator
+  - query: is the remote machine's assistant ready to take work from this shell
+    confusable_with: [daintree.hosts.foundation, daintree.worktree.manage-resource]
+    run: runbook-2026-10-coordinator
+  - query: get the remote box's assistant set up so this shell can send it tasks
+    confusable_with: [daintree.hosts.foundation, daintree.worktree.manage-resource]
+    run: runbook-2026-10-coordinator
+  - query: get an assistant ready on every other machine for this repo so I can send work to them
+    confusable_with: [daintree.hosts.copy-portable-settings]
+    run: runbook-2026-10-issue-129
+  - query: make sure every one of my remote servers has an assistant running for this repo before I send anything out
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: Which remote hosts already have an enrolled assistant in this project? Start one on any that don't, if I allow it.
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: bring my other machines up to ready for this project, one assistant each, and list who is ready
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: get the build box and the mac mini both ready with a Codex assistant for the repo
+    confusable_with: [daintree.worktree.manage-resource]
+    run: runbook-2026-10-issue-134
+  - query: Get assistants enrolled in the project on the remote API and web machines before I send either any work. Leave the dev servers stopped.
+    confusable_with: [daintree.hosts.coordinate-dev-services]
+    run: 2026-10-16-synthetic-audit
+  - query: There is no remote run to hand over yet. Get an assistant ready in this repository on my other two machines first.
+    confusable_with: [daintree.hosts.hand-off-swarm]
+    run: 2026-10-16-synthetic-audit
 followups:
   - query: when it's pushed, have the mini start the client against that commit
     history:
-      - "user: get the linux box to add the orders endpoint and push a branch"
-      - "assistant: Sent to the assistant on the Linux host (orders project, slot 0). I'll verify the branch on the remote when it replies."
+      - 'user: get the linux box to add the orders endpoint and push a branch'
+      - 'assistant: Sent to the assistant on the Linux host (orders project, slot 0). I''ll verify the branch on the remote when it replies.'
     active: [daintree.hosts.delegate-to-host]
   - query: did it actually push what it says? check before you tell me
     history:
-      - "user: have the other mac fix the date picker bug"
-      - "assistant: The other Mac's assistant replied completed: branch fix/date-picker at 3f2a9c1, tests passed."
+      - 'user: have the other mac fix the date picker bug'
+      - 'assistant: The other Mac''s assistant replied completed: branch fix/date-picker at 3f2a9c1, tests passed.'
     active: [daintree.hosts.delegate-to-host]
   - query: good, now hand the next part to the GPU box, starting from that commit
     history:
-      - "user: get the mini to add the feature flags module"
-      - "assistant: Verified: feature-flags-module is on the remote at 9b41e07, matching the mini's report."
+      - 'user: get the mini to add the feature flags module'
+      - 'assistant: Verified: feature-flags-module is on the remote at 9b41e07, matching the mini''s report.'
     active: [daintree.hosts.delegate-to-host]
   - query: actually do that on the linux box instead of here
     history:
-      - "user: fix the flaky export test"
-      - "assistant: I can launch an agent in this worktree to fix it."
-
+      - 'user: fix the flaky export test'
+      - 'assistant: I can launch an agent in this worktree to fix it.'
+  - query: now get them ready
+    history:
+      - 'user: which of my hosts are connected?'
+      - 'assistant: The Mac mini and the Linux tower are connected; the laptop host is offline.'
+    run: runbook-2026-10-issue-102
+  - query: and start one on the tower too
+    history:
+      - 'user: is the mac mini''s assistant enrolled for this project?'
+      - 'assistant: Yes: slot 0, Codex, with a current generation for this Shell.'
+    run: runbook-2026-10-issue-102
 topic_shifts:
   - query: Send the remote assistant a new job to fix the cause it identified, with a branch and checked commit as the deliverable.
     history:
@@ -369,4 +587,30 @@ topic_shifts:
       - 'assistant: Its assistant attributes the failure to an outdated path mapping and has changed nothing.'
     active: [daintree.hosts.ask-host-assistant]
     confusable_with: [daintree.hosts.ask-host-assistant]
+    run: 2026-10-16-synthetic-audit
+  - query: before that, put an assistant on each remote host in this repo
+    history:
+      - 'user: rename these tabs by what each agent is doing'
+      - 'assistant: Retitled all four.'
+    active: [daintree.terminals.rename]
+    run: runbook-2026-10-issue-102
+  - query: different thing, are the hosts ready to take work on this project?
+    history:
+      - 'user: what''s left on my codex plan this week'
+      - 'assistant: Codex shows 62% of the weekly limit left, resetting Monday.'
+    active: [daintree.agents.check-usage-limits]
+    run: runbook-2026-10-issue-102
+  - query: Enroll one assistant for the telemetry repository on each connected Remote Host and return the ready lanes; no job has been assigned.
+    history:
+      - 'user: compare the Claude usage left on my machines'
+      - 'assistant: Both remote hosts reported their allowance and reset times.'
+    active: [daintree.agents.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: 2026-10-16-synthetic-audit
+  - query: Prepare missing enrolled assistants in this repository on those Remote Hosts so they can take work; return the ready table.
+    history:
+      - 'user: give me a snapshot of my remote machines'
+      - 'assistant: Two connected hosts list this project but no enrolled assistant.'
+    active: [daintree.hosts.survey-hosts]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit

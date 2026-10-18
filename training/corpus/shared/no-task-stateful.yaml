@@ -2461,7 +2461,7 @@ examples:
     history:
       - 'user: Find why the mini assistant cannot receive my messages.'
       - 'assistant: I am checking delivery evidence for the affected assistant.'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     empty_kind: off_domain
     run: 2026-10-16-synthetic-audit
   - query: whats the tallest mountain in africa
@@ -2601,7 +2601,7 @@ examples:
     history:
       - 'user: Find why the mini assistant cannot receive my messages.'
       - 'assistant: I am checking delivery evidence for the affected assistant.'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     empty_kind: off_domain
     run: 2026-10-16-synthetic-audit
   - query: explain what a linter actually checks vs a formatter

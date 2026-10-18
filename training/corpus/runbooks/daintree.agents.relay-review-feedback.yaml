@@ -307,10 +307,10 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: 'once the read-only codex pass over the importer branch is done, its findings go to the claude pane so it can fix them'
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-99
   - query: 'once this lane''s review for the hub is in, the codex findings need to reach the agent that owns that branch so it can make the fixes'
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-99
   - query: 'codex in the second pane found problems in claude''s branch; get those notes over to claude so it fixes them'
     confusable_with: [daintree.hosts.race-and-review]

@@ -181,6 +181,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: provision-hosts-lane-no-setup-config
+    host_model: inbox
     category: single-runbook
     note: >-
       A lane's own project with no lifecycle config yet. Decided by "configuring the project's

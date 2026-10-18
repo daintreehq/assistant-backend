@@ -91,9 +91,9 @@ boundaries:
   - query: check with each host's assistant why the same commit behaves differently on them
     confusable_with: [daintree.hosts.ask-host-assistant]
   - query: the overnight runs on my two servers disagree for the same revision, one red and one green; work out what the red one does differently
-    confusable_with: [daintree.hosts.verify-for-hub]
+    confusable_with: []
   - query: messaging works with both machines, that's not it; the real issue is the build only fails on one of them
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
   - query: the suite takes 9 minutes on the old intel host and 3 on the new one at the same commit, and two tests time out on the intel one; find what differs between them
     confusable_with: [daintree.runtime.relieve-resource-contention]
   - query: get both machines' assistants digging into why the integration suite only breaks on the arm one
@@ -107,16 +107,16 @@ boundaries:
   - query: the db tests fail on one host, probably something in its setup, but the other host passes at the same sha. compare them
     confusable_with: [daintree.worktree.provision-local-environment]
   - query: 'the same commit passes its tests on the mac host and fails on the linux server. find out why'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'this build only hangs on one of my remote machines. work out what differs between it and the others'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'same commit, same command: green on the Linux host and red on the Mac host. find out why, change nothing'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: 'the test hangs on only one of my remote hosts; compare their environments and rank the differences'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: the same commit passes tests on one machine and hangs on the other, work out what differs
     confusable_with: [daintree.hosts.verify-project-placement]

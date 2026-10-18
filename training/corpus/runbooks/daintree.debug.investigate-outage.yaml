@@ -96,10 +96,10 @@ boundaries:
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
   - query: 'payments api error rate tripled after this morning''s rollout; get read-only investigators on it and give me mitigation options'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: 'the production site is down right now; what changed in the last deploy'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: Investigate the live checkout outage from the deployed SHA, request logs and deploy timeline; return ranked causes and mitigation options.
     confusable_with:

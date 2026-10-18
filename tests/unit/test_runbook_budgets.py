@@ -3,11 +3,22 @@
 Every search result carries a runbook's full body, so a body is paid for in the
 calling agent's context on every hit. The ceilings are generous — they catch
 drift toward bloat, not every incremental edit.
+
+Both host models' catalogs are checked (``runbooks/catalog.py``, ``load_catalogs``):
+every runbook either one serves, and every bundle as each kind of caller is sent it.
 """
 
 from __future__ import annotations
 
-from daintree_assistant_server.runbooks.catalog import load_catalog
+import pytest
+
+from daintree_assistant_server.runbooks.catalog import (
+    HOSTS_FOUNDATION_ID,
+    load_catalog,
+    load_catalogs,
+)
+from daintree_assistant_server.runbooks.host_state import CallerState, HostState
+from daintree_assistant_server.runbooks.models import Runbook
 
 # whenToUse is the classifier's primary routing signal and a search result field.
 RUNBOOK_WHEN_TO_USE_CEILING = 2048
@@ -22,8 +33,21 @@ OVERSIZE_ALLOWLIST: set[str] = {
 }
 
 
+def _every_runbook() -> list[Runbook]:
+    """Each distinct runbook either catalog serves: the shared ones once, and both
+    versions of one whose text differs between the models."""
+    catalogs = load_catalogs()
+    seen: set[str] = set()
+    out: list[Runbook] = []
+    for runbook in (*catalogs.control.runbooks, *catalogs.inbox.runbooks):
+        if runbook.content_hash not in seen:
+            seen.add(runbook.content_hash)
+            out.append(runbook)
+    return out
+
+
 def test_runbook_when_to_use_under_ceiling() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         size = len(runbook.when_to_use.encode("utf-8"))
         assert size <= RUNBOOK_WHEN_TO_USE_CEILING, (
             f"{runbook.id} whenToUse is {size}B, over the {RUNBOOK_WHEN_TO_USE_CEILING}B "
@@ -32,7 +56,7 @@ def test_runbook_when_to_use_under_ceiling() -> None:
 
 
 def test_runbook_summary_under_ceiling() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         size = len(runbook.summary.encode("utf-8"))
         assert size <= RUNBOOK_SUMMARY_CEILING, (
             f"{runbook.id} summary is {size}B, over the {RUNBOOK_SUMMARY_CEILING}B ceiling; "
@@ -41,13 +65,13 @@ def test_runbook_summary_under_ceiling() -> None:
 
 
 def test_runbook_bodies_under_hard_ceiling() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         size = len(runbook.body.encode("utf-8"))
         assert size <= RUNBOOK_BODY_HARD_CEILING, f"{runbook.id} body {size}B exceeds hard ceiling"
 
 
 def test_runbook_bodies_under_recommended_budget() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         if runbook.id in OVERSIZE_ALLOWLIST:
             continue
         size = len(runbook.body.encode("utf-8"))
@@ -69,12 +93,12 @@ def test_oversize_allowlist_is_not_stale() -> None:
 
 
 def test_runbooks_have_no_pipe_tables() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         assert "|---" not in runbook.body, f"{runbook.id} contains a pipe table"
 
 
 def test_runbooks_end_with_report_back() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         assert "report back" in runbook.body.lower(), f"{runbook.id} has no Report-back template"
 
 
@@ -91,10 +115,16 @@ FOUNDATION_BODY_CEILING = 5400
 # with it. Measured at the same point: 28.1KB at the largest (fan-out-work); 14.9KB
 # after the foundation cut (edits.spawn-visible-agent); 9.1KB after the 2026-09-26 cut.
 RUNBOOK_BUNDLE_CEILING = 10 * 1024
+# The control catalog's hosts foundation (issue #159) comes with EVERY runbook a caller
+# with a host connected is served, not only the hosts ones, and there is no room for it
+# inside RUNBOOK_BUNDLE_CEILING (most bundles were within 20B of it). So it is bounded
+# on its own, and a bundle that carries it may be this much larger: everything else in
+# it still fits the ordinary ceiling. Written at 2.9KB.
+HOSTS_FOUNDATION_BODY_CEILING = 3 * 1024
 
 
 def test_foundations_stay_compact() -> None:
-    for runbook in load_catalog().runbooks:
+    for runbook in _every_runbook():
         if not runbook.meta.foundation:
             continue
         size = len(runbook.body.encode("utf-8"))
@@ -104,14 +134,39 @@ def test_foundations_stay_compact() -> None:
         )
 
 
-def test_a_runbook_with_its_supporting_runbooks_stays_bounded() -> None:
-    catalog = load_catalog()
+def test_the_hosts_foundation_stays_within_its_own_ceiling() -> None:
+    hosts_foundation = load_catalogs().control.get(HOSTS_FOUNDATION_ID)
+    assert hosts_foundation is not None
+    size = len(hosts_foundation.body.encode("utf-8"))
+    assert size <= HOSTS_FOUNDATION_BODY_CEILING, (
+        f"{HOSTS_FOUNDATION_ID} body is {size}B, over {HOSTS_FOUNDATION_BODY_CEILING}B; it "
+        "is sent with every runbook while a host is connected"
+    )
+
+
+#: Every kind of caller each catalog serves, by what changes its bundles.
+CALLERS = [
+    CallerState("control", None),
+    CallerState("control", HostState("connected")),
+    CallerState("inbox", None),
+]
+
+
+@pytest.mark.parametrize("caller", CALLERS, ids=lambda c: f"{c.model}-{c.hosts}")
+def test_a_runbook_with_its_supporting_runbooks_stays_bounded(caller: CallerState) -> None:
+    """Measured as delivered, first time in a session: the runbook, its supporting
+    runbooks, and what this caller gets with every runbook (``CatalogView.attach``)."""
+    view = load_catalogs().view_for(caller)
+    catalog = view.catalog
     for runbook in catalog.runbooks:
         if runbook.id not in catalog.selectable_ids:
             continue
-        bundle = [runbook, *catalog.supporting_for([runbook.id])]
+        bundle = [runbook, *catalog.supporting_for([runbook.id], attach=view.attach)]
         size = sum(len(r.body.encode("utf-8")) for r in bundle)
-        assert size <= RUNBOOK_BUNDLE_CEILING, (
-            f"{runbook.id} with its supporting runbooks is {size}B, over "
-            f"{RUNBOOK_BUNDLE_CEILING}B: {[r.id for r in bundle]}"
+        ceiling = RUNBOOK_BUNDLE_CEILING
+        if caller.model == "control" and HOSTS_FOUNDATION_ID in {r.id for r in bundle}:
+            ceiling += HOSTS_FOUNDATION_BODY_CEILING
+        assert size <= ceiling, (
+            f"{runbook.id} with its supporting runbooks is {size}B for a {caller} caller, "
+            f"over {ceiling}B: {[r.id for r in bundle]}"
         )

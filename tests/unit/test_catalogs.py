@@ -256,7 +256,7 @@ def test_host_state_narrows_the_search_within_the_callers_catalog() -> None:
 #: inbox catalog is what every v0.44 client is served, frozen at the post-#161
 #: catalog (revision ``sha256:f863c7a9…`` when it was split off). Change a file
 #: there only to fix something wrong for v0.44 clients, and update this with it.
-INBOX_DIGEST = "sha256:aa7d938c04a1acf56602c76bc05837ac95d06258b2e85374f61af39c654161c2"
+INBOX_DIGEST = "sha256:b9eba7fd8cd72c0fe0bd94c29dfde2c832e17ff036413d0cb0f28b31a79432a7"
 
 
 def _inbox_digest(directory: Path) -> str:
@@ -329,3 +329,35 @@ def test_alternating_catalogs_never_rebuild_a_table() -> None:
     narrowed = Catalog([r for r in catalogs.control.runbooks if r.id != shared])
     clf.sync(narrowed)
     assert clf.sync(catalogs.inbox) is inbox
+
+
+def test_every_control_hosts_runbook_is_classified() -> None:
+    """The control catalog has no lanes. Adding the first host and the domain's base
+    judgment fit a caller with none; what is wanted right after hosts drop, and the
+    read-only survey that diagnoses why one cannot be reached, stays offered while they
+    are down."""
+    control = load_catalogs().control
+    hosts = {
+        r.id: r.meta.host_eligibility for r in control.runbooks if r.id.startswith("daintree.hosts.")
+    }
+    assert hosts and all(v is not None for v in hosts.values())
+    assert "lane" not in hosts.values()
+    assert {rid for rid, v in hosts.items() if v == "any"} == {
+        "daintree.hosts.connect-host",
+        HOSTS_FOUNDATION_ID,
+    }
+    for leaf in (
+        "recover-and-clean-up",
+        "park-swarm",
+        "undo-swarm-changes",
+        "survey-hosts",
+        "copy-portable-settings",
+        "open-project-on-host",
+        "supervise-swarm",
+    ):
+        assert hosts[f"daintree.hosts.{leaf}"] == "configured", leaf
+    offered = control.selectable_ids - control.excluded_for(HostState("none"))
+    assert {rid for rid in offered if rid.startswith("daintree.hosts.")} == {
+        "daintree.hosts.connect-host",
+        HOSTS_FOUNDATION_ID,
+    }

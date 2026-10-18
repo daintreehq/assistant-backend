@@ -15,6 +15,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: run-local-cohort-four-issues-here
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first selection case. Decided by the positive clause's own example "the hub
@@ -27,6 +28,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-three-attempts-best
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second selection case: attempts the hub explicitly asked for. Decided by "the
@@ -40,6 +42,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-split-batch-local-agents
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's request. Decided by "the hub hands THIS machine SEVERAL pieces of work at
@@ -52,6 +55,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-share-of-swarm
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's request, quoted in the positive clause: "run my share of the swarm in separate
@@ -64,6 +68,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-agent-phrased
+    host_model: inbox
     category: host-query
     note: >-
       The lane's own search query. Decided by "a batch of independent units for this project",
@@ -77,6 +82,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-user-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual, as typed by the person at the host. Decided by "the hub hands THIS machine SEVERAL
@@ -89,6 +95,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-after-reading-message
+    host_model: inbox
     category: continuation
     note: >-
       The batch as a second turn once the hub's message was read. Decided by "a batch of
@@ -107,6 +114,7 @@ cases:
 
   # ------------------------------------------------------------------- traps
   - id: run-local-cohort-not-do-delegated-work
+    host_model: inbox
     category: routing-trap
     note: >-
       Two pieces, not one. "SEVERAL pieces of work at once"; the fence sends "one unit of work"
@@ -119,6 +127,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-fan-out-work
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's batch with its cap, not the person's own. "a batch of independent units for this
@@ -132,6 +141,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-competition
+    host_model: inbox
     category: routing-trap
     note: >-
       Attempts the hub asked for, judged here and reported. "rival attempts at one task when the
@@ -145,6 +155,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-decompose-work
+    host_model: inbox
     category: routing-trap
     note: >-
       Units the hub already scoped, nothing to break down. "a batch of independent units for this
@@ -158,6 +169,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-spike-options
+    host_model: inbox
     category: routing-trap
     note: >-
       Approaches the hub assigned, built here and the best reported. "rival attempts at one task
@@ -172,6 +184,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-steer-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       New pieces to start beside agents still running, nothing to redirect. "the hub hands THIS
@@ -186,6 +199,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-swarm-fan-out
+    host_model: inbox
     category: routing-trap
     note: >-
       This host's share, not the hub sending to every host. "the hub hands THIS machine SEVERAL
@@ -199,6 +213,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
 
   - id: run-local-cohort-not-handle-hub-message
+    host_model: inbox
     category: routing-trap
     note: >-
       The message is already read; what is left is the batch. "a batch of independent units for
@@ -214,6 +229,7 @@ cases:
 
   # ----------------------------------------------------------- reverse traps
   - id: run-local-cohort-reverse-one-fix
+    host_model: inbox
     category: routing-trap
     note: >-
       One fix from the hub authorises no parallel attempts. daintree.hosts.do-delegated-work
@@ -261,6 +277,7 @@ cases:
       required: [daintree.orchestration.spike-options]
 
   - id: run-local-cohort-reverse-steer-running
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub redirecting agents already at work here. daintree.hosts.steer-for-hub ("to STOP,
@@ -298,6 +315,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: run-local-cohort-reverse-read-message
+    host_model: inbox
     category: routing-trap
     note: >-
       Reading the hub's message, no work yet. daintree.hosts.handle-hub-message ("the hub, the

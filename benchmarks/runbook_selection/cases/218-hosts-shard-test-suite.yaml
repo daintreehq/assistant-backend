@@ -157,6 +157,7 @@ cases:
 
   # ------------------------------------------------------------------ reverse: the neighbour wins
   - id: shard-test-suite-reverse-lane-shard
+    host_model: inbox
     category: routing-trap
     note: >-
       This machine is the lane running one shard the hub assigned. daintree.hosts.verify-for-hub

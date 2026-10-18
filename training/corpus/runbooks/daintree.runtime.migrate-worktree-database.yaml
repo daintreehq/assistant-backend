@@ -144,16 +144,16 @@ boundaries:
     confusable_with: [daintree.worktree.provision-local-environment]
     run: 2026-09-28-round6
   - query: "the hub only wants this worktree's database migrated and seeded with invented customers, no server and no demo"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "The hub asked this host to reseed the sample database for the worktree on the pricing branch and said nothing about serving it; make sure it is the worktree's own database first."
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-133
   - query: "hub request: put the seed rows into the worktree's database here and tell it the row counts"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-133
   - query: "Apply the migrations the hub asked for in the checkout on this host, and check the database is not the one another checkout here uses."
-    confusable_with: [daintree.hosts.handle-hub-message]
+    confusable_with: []
     run: runbook-2026-10-issue-133
   - query: "reset the database in the worktree; the db host is a tunnel to a shared box so check that before anything is wiped"
     confusable_with: [daintree.worktree.manage-resource]
@@ -165,10 +165,10 @@ boundaries:
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-133
   - query: "The hub asked this host to apply the pending migrations on the worktree for unit 4"
-    confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
+    confusable_with: []
     run: runbook-2026-10-issue-133
   - query: "the migration for unit 3 is committed in its worktree on this host; run it against that worktree's database and report the version, but only if the database is the worktree's own"
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-133
   - query: "roll back the last migration in the linux host's worktree and run it again; its database is separate from everyone else's"
     confusable_with: [daintree.worktree.provision-local-environment]

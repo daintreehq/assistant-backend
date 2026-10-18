@@ -444,13 +444,13 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
   - query: 'my agents from the docs race are done; close their panes on this laptop and remove the clean worktrees'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'shut down the agents from my swarm here and remove the clean worktrees'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'clean up everything the race left on my laptop except the winner''s worktree'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: close all the terminals and delete the merged worktrees from the swarm run on this machine
     confusable_with: [daintree.hosts.audit-host-workspaces]

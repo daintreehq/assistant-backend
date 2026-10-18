@@ -250,7 +250,7 @@ boundaries:
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: 2026-09-28-round6
   - query: 'remember that our briefs to the other machines must always name the exact commit'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: remember that the host assistant should check the lockfile before installing anything
     confusable_with: [daintree.hosts.copy-portable-settings]

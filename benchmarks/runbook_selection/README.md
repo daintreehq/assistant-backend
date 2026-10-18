@@ -50,11 +50,11 @@ well below the measurement, so a precision collapse still reddens the suite.
 
 ```bash
 # from the repo root, venv active
-python -m benchmarks.runbook_selection.bench local         # THE gate: shipped ONNX, free
+python -m benchmarks.runbook_selection.bench local         # THE gate: shipped ONNX, free, both catalogs
 python -m benchmarks.runbook_selection.bench local --fp32  # same, unquantised
 python -m benchmarks.runbook_selection.bench list          # validate cases
 python -m benchmarks.runbook_selection.bench coverage      # per-runbook coverage matrix
-python -m benchmarks.runbook_selection.bench pairs         # paired hub/lane scenarios, per end
+python -m benchmarks.runbook_selection.bench pairs         # paired hub/lane scenarios (inbox), per end
 python -m benchmarks.runbook_selection.bench search "…"    # queries as search_runbooks ranks them
 
 python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
@@ -63,6 +63,13 @@ python -m benchmarks.runbook_selection.bench compare results/a.json results/b.js
 Everything here is offline and free. `local` and `report` exit NON-ZERO on a
 quality failure, graded by `runbook_selection_local_verdict()` in `quality.py`;
 `report` regrades a saved run under today's floors.
+
+**Two suites.** The server serves a catalog per host model (`runbooks/catalog.py`,
+`load_catalogs`): the control catalog to builds that send `Daintree-Host-Control: 1`,
+the frozen inbox catalog to v0.44. `local` and `coverage` qualify each against its own
+suite and fail if either fails; `--host-model control|inbox` runs one. `list` and
+`search` take the same flag (default control). A pass on one never stands in for the
+other.
 
 ## Cases (`cases/*.yaml`)
 
@@ -81,6 +88,12 @@ Each case freezes a conversation, the prior active-runbook set, optional
     optional: [daintree.foundation]     # allowed, not demanded
 ```
 
+A case may carry `host_model: control` or `host_model: inbox`; without one it holds for
+both and is scored against each, so every id it names must exist in both catalogs.
+Cases naming a runbook only one model has, paired hub/lane cases and a reachable lane
+are the inbox model's; their control twins (merged runbooks mapped to what absorbed
+them, retired lane runbooks dropped) carry `host_model: control`.
+
 Scoring is strict per trial: `missing = required - picked` (recall failure),
 `extra = picked - (required + optional)` (precision failure), pass = neither, not
 degraded. `required: []` means the selector must **clear** the active set. Every id
@@ -93,6 +106,10 @@ encode **product intent** — when a case's ground truth is debatable, the case
 carries a `note` saying why.
 
 ### Paired hub/lane cases (`scenario` + `role`, `bench pairs`)
+
+The inbox model's (v0.44) only, each `host_model: inbox`: the control model has no
+lanes, and a host's assistant that receives a brief searches the ordinary catalog
+(`cases/1160-hosts-receiver-briefs.yaml`).
 
 A hosts scenario is one piece of work seen from both ends: the person's request on the
 hub, and the receiving lane's search after it has read the hub's brief. Cases that name

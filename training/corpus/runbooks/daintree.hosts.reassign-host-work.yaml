@@ -111,13 +111,13 @@ boundaries:
   - query: the codex agent on the other mac is out of usage, move its unfinished work to another host rather than swapping agents there
     confusable_with: [daintree.agents.hand-off-task]
   - query: if the dead host's worker can still be reached stop it, then get the unit going on another machine
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
   - query: the mini isn't answering messages at all; don't debug it, just move its task to another host
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
   - query: the remote host shows no reply since this morning and I can't get to it, have another host finish its task
     confusable_with: [daintree.hosts.connect-host]
   - query: the linux host is out of codex credit, move its unfinished task to a host that has credit left
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: the host doing the urgent login fix went down; get that unit onto another remote machine now
     confusable_with: [daintree.orchestration.reprioritize-work]
   - query: one remote host is unreachable and I want its task finished elsewhere, but make sure only one of them ends up publishing
@@ -125,7 +125,7 @@ boundaries:
   - query: the unit on the stuck host should move to another machine; first get it to stop if it still answers
     confusable_with: [daintree.agents.steer-running-agent]
   - query: the host I sent the parser unit to says its claude code isn't signed in there; move the unit to a host that has it
-    confusable_with: [daintree.hosts.handle-hub-message]
+    confusable_with: []
   - query: "the server's assistant stopped answering halfway through the export job and the run can't wait; give that unit to one of the macs from where it left off"
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109

@@ -6,6 +6,11 @@ frozen conversation plus the prior active-runbook set and the EXPECTED selection
 - ``required``: ids that must ALL be picked (recall). Empty means "must clear".
 - ``optional``: ids that are allowed but not demanded (typically the domain
   foundation — both a lean selector and a pairing selector should pass).
+- ``host_model`` (optional): ``control`` or ``inbox``, the host model whose catalog
+  the case is scored against (``runbooks/catalog.py``, ``load_catalogs``). Omitted,
+  the case holds for both and is scored against each. Every id it names must exist
+  in each catalog it is scored against, so a case naming a runbook only one model
+  has says which. Paired role cases and a reachable lane are the inbox model's.
 - ``host_state`` (optional): the caller's reported host state, as Daintree sends it
   in its headers (``{hosts: none|configured|connected, lane: reachable}``). The case
   is scored with the host runbooks that state does not fit left out, as a search
@@ -54,10 +59,13 @@ import yaml
 
 from daintree_assistant_server.contracts.openai import ChatMessage, FunctionCall, ToolCall
 from daintree_assistant_server.runbooks.catalog import Catalog
-from daintree_assistant_server.runbooks.host_state import HostState, parse_host_state
+from daintree_assistant_server.runbooks.host_state import HostModel, HostState, parse_host_state
 from daintree_assistant_server.runbooks.models import Runbook
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
+
+#: Each host model's suite, scored against its own catalog.
+HOST_MODELS: tuple[HostModel, ...] = ("control", "inbox")
 
 _VALID_ROLES = {"user", "assistant", "tool"}
 
@@ -135,6 +143,8 @@ class BenchCase:
     #: What a search for this caller leaves out (``Catalog.excluded_for``), resolved
     #: at load so every replay passes the same set to ``select(exclude=...)``.
     exclude: frozenset[str] = frozenset()
+    #: The one model the case is written for, or ``None`` for both.
+    host_model: HostModel | None = None
 
     @property
     def allowed(self) -> set[str]:
@@ -201,10 +211,21 @@ def _build_host_state(raw: Any, case_id: str) -> HostState | None:
     return state
 
 
+def _case_model(raw: dict[str, Any], case_id: str) -> HostModel | None:
+    value = raw.get("host_model")
+    if value is None:
+        return None
+    if value not in HOST_MODELS:
+        raise CaseError(f"{case_id}: host_model must be one of {HOST_MODELS}, or omitted")
+    model: HostModel = value
+    return model
+
+
 def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase:
     case_id = raw.get("id")
     if not case_id or not isinstance(case_id, str):
         raise CaseError(f"{source}: case missing string 'id'")
+    host_model = _case_model(raw, case_id)
     messages_raw = raw.get("messages") or []
     if not messages_raw:
         raise CaseError(f"{case_id}: no messages")
@@ -220,6 +241,8 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
         raise CaseError(f"{case_id}: scenario and role come together, or not at all")
     if role is not None and (role not in CALLER_ROLES or not isinstance(scenario, str)):
         raise CaseError(f"{case_id}: role must be one of {CALLER_ROLES} and scenario a string")
+    if role is not None and host_model != "inbox":
+        raise CaseError(f"{case_id}: hub and lane roles are the inbox model's (host_model: inbox)")
     brief = raw.get("brief")
     if brief is not None and (role != "lane" or not isinstance(brief, str)):
         raise CaseError(f"{case_id}: a brief is a string on a lane case")
@@ -239,6 +262,8 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
             "hub/lane pair, or named in expect.forbid) and also expected"
         )
     host_state = _build_host_state(raw.get("host_state"), case_id)
+    if host_state is not None and host_state.lane_reachable and host_model != "inbox":
+        raise CaseError(f"{case_id}: a reachable lane is the inbox model's (host_model: inbox)")
     exclude = catalog.excluded_for(host_state)
     named = set(required) | set(optional) | set(raw.get("active") or [])
     if named & exclude:
@@ -264,6 +289,7 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
         brief=brief,
         host_state=host_state,
         exclude=exclude,
+        host_model=host_model,
     )
 
 
@@ -271,8 +297,12 @@ def load_cases(
     catalog: Catalog,
     cases_dir: Path = CASES_DIR,
     id_filter: str | None = None,
+    *,
+    model: HostModel = "control",
 ) -> list[BenchCase]:
-    """Load, validate, and (optionally) filter the case suite."""
+    """Load, validate, and (optionally) filter ``model``'s case suite: every case
+    written for it or for both, validated against ``catalog``, which must be that
+    model's (``Catalogs.for_model``). Case ids are unique across both suites."""
     files = sorted(cases_dir.glob("*.yaml"))
     if not files:
         raise CaseError(f"no case files under {cases_dir}")
@@ -283,10 +313,14 @@ def load_cases(
         if not isinstance(data, dict) or not isinstance(data.get("cases"), list):
             raise CaseError(f"{path.name}: expected a top-level 'cases' list")
         for raw in data["cases"]:
+            case_id = raw.get("id") if isinstance(raw, dict) else None
+            if isinstance(case_id, str):
+                if case_id in seen:
+                    raise CaseError(f"duplicate case id {case_id!r} in {path.name}")
+                seen.add(case_id)
+                if _case_model(raw, case_id) not in (None, model):
+                    continue
             case = _build_case(raw, path.name, catalog)
-            if case.id in seen:
-                raise CaseError(f"duplicate case id {case.id!r} in {path.name}")
-            seen.add(case.id)
             cases.append(case)
     from .pairs import validate_pairs
 

@@ -104,6 +104,7 @@ cases:
       required: [daintree.hosts.coordinate-contract-change]
       optional: [daintree.hosts.foundation]
   - id: coordinate-contract-change-not-execute-distributed-workflow
+    host_model: inbox
     category: routing-trap
     note: >-
       Agent-phrased: the contract and its adoption, not a staged plan. Decided by "The deliverable is
@@ -156,6 +157,7 @@ cases:
       required: [daintree.hosts.coordinate-contract-change]
       optional: [daintree.hosts.foundation]
   - id: coordinate-contract-change-not-do-delegated-work
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's briefing of the lanes, not a lane's own unit. Decided by "each side briefed with that
@@ -240,6 +242,7 @@ cases:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation]
   - id: coordinate-contract-change-reverse-do-delegated-work
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane building its side against a pinned contract. Decided by "Use on a Remote Host's lane when
@@ -251,6 +254,7 @@ cases:
       required: [daintree.hosts.do-delegated-work]
       optional: [daintree.hosts.foundation]
   - id: coordinate-contract-change-reverse-verify-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane testing a commit for the hub. Decided by "Use when the hub asks this lane to TEST or

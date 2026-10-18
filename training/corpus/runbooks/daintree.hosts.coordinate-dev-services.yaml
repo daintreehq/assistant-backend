@@ -86,7 +86,7 @@ boundaries:
   - query: get the second host's assistant to run the backend and the first host's to run the frontend against it, and verify the connection yourself
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: the frontend host needs the API host's address for the dev stack. work out which address works from where, and verify with a request
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
   - query: the order service on one remote machine calls the stock service on another and needs its address during development, and nothing here is about worktrees on this machine
     confusable_with: [daintree.worktree.provision-local-environment]
   - query: my frontend and my API run on separate remote hosts, not different worktrees on this Mac. Wire them up and check they talk
@@ -102,7 +102,7 @@ boundaries:
   - query: run the frontend project on one remote host and the backend project on another, not the same task everywhere, and verify they connect
     confusable_with: [daintree.hosts.swarm-fan-out]
   - query: bring up the full stack, web client on one remote machine and API on another, each through the assistant that owns that project, and make sure they connect
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: the web client on one of my hosts cannot reach the API dev server on another, find the right address
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129

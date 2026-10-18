@@ -119,7 +119,7 @@ boundaries:
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-135
   - query: "run the cypress spec for this worktree at the commit named and prove the server was this checkout's, then reply with the report location"
-    confusable_with: [daintree.hosts.verify-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-135
   - query: "run the e2e specs on the other machine's worktree; those need the app up, so prove which server served them"
     confusable_with: [daintree.ci.run-local-checks]

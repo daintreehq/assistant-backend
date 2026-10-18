@@ -371,10 +371,10 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
   - query: "The hub's agent here has sat on a spinner with nothing new on screen for ages; unstick it."
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-106
   - query: "the codex pane doing the hub's job crashed with an error screen, bring it back without losing its conversation"
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-106
 followups:
   - query: how long has it actually been like that?

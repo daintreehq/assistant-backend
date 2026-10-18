@@ -1438,8 +1438,8 @@ examples:
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: 2026-10-16-synthetic-audit
   - query: Where does Daintree keep its per-project settings file?
-    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    active: [daintree.hosts.survey-hosts, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit
   - query: difference between a recipe and a startup script?
     active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
@@ -1518,8 +1518,8 @@ examples:
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: 2026-10-16-synthetic-audit
   - query: how do i make a terminal read only
-    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    active: [daintree.hosts.survey-hosts, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit
   - query: if I delete a worktree in Daintree does the branch go too?
     active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
@@ -1606,8 +1606,8 @@ examples:
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: 2026-10-16-synthetic-audit
   - query: Is there a keyboard shortcut for renaming a tab
-    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    active: [daintree.hosts.survey-hosts, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit
   - query: side question, how do i configure which coding agent gets used by default
     active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
@@ -1694,8 +1694,8 @@ examples:
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: 2026-10-16-synthetic-audit
   - query: what's a blocker in a workflow graph in this app
-    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    active: [daintree.hosts.survey-hosts, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit
   - query: sorry, unrelated — does daintree support bitbucket
     active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
@@ -1832,8 +1832,8 @@ examples:
     history:
       - 'user: Find why the mini assistant cannot receive my messages.'
       - 'assistant: I am checking delivery evidence for the affected assistant.'
-    active: [daintree.hosts.diagnose-messaging, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    active: [daintree.hosts.survey-hosts, daintree.hosts.foundation]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit
   - query: how do you quit without killing my agents
     history:

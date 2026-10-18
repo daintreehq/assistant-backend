@@ -56,6 +56,107 @@ positives:
     run: 2026-09-28-catalog-expansion-refine
   - query: 'Retrospective on the failed Claude run for issue #88: what diverged, what''s salvageable, proposed brief text'
     run: 2026-09-28-catalog-expansion-refine
+  - query: why did the overnight job on my other machines take so long
+    run: runbook-2026-10-issue-121
+  - query: the two remote hosts both ended up doing the same migration. how did that happen
+    run: runbook-2026-10-issue-121
+  - query: one of the hosts said it pushed the fix but the branch isn't on the remote. work out what really went on
+    run: runbook-2026-10-issue-121
+  - query: do a post-mortem on that cross-machine job
+    run: runbook-2026-10-issue-121
+  - query: where did all the time go on the remote hosts yesterday
+    run: runbook-2026-10-issue-121
+  - query: my remote machines made a mess of that run, figure out why
+    run: runbook-2026-10-issue-121
+  - query: which of the hosts told me something that turned out not to be true
+    run: runbook-2026-10-issue-121
+  - query: the swarm fell over halfway, build me the evidence trail of what happened and when
+    run: runbook-2026-10-issue-121
+  - query: the run on my remote hosts is finished, and the task I sent to one of them sat for three hours before its assistant touched it. why was that
+    run: runbook-2026-10-issue-121
+  - query: I need a proper write-up of why the multi-machine run stalled, with times
+    run: runbook-2026-10-issue-121
+  - query: 'Hub task: the run across the three remote hosts is finished and two units are missing. Reconstruct from each host''s exchange records when every unit was accepted, woken, read and answered, which stamps are absent, and which claims do not survive a check against the shared remote.'
+    run: runbook-2026-10-issue-121
+  - query: 'Our rollout over four remote hosts failed on Tuesday night: two finished by midnight, one never came back and one pushed a branch nobody asked for. Nothing should be re-run. Find out where it first went off the plan and why the slow one was slow, with the times.'
+    run: runbook-2026-10-issue-121
+  - query: The cross-host test sharding finished with one shard delivered twice and another never started. Produce a post-mortem that attributes every statement to the host or person that made it and does not replay any of the work.
+    run: runbook-2026-10-issue-121
+  - query: Analyse why a host reported success on a commit that was not the one we sent. Compare its claimed SHA with the brief that went out and the remote, and give the first point of divergence with the times from the task records.
+    run: runbook-2026-10-issue-121
+  - query: Work out from the hosts' task records and what the person told us why the run took five hours for a twenty minute job. Do not infer machine load from elapsed time alone; say what each long gap was waiting on, or that it is unknown.
+    run: runbook-2026-10-issue-121
+  - query: The overnight job across the remote machines left three half-finished branches and a dev server nobody remembers starting. Work out what happened on each host and which of the work is still worth keeping, then tell me how we stop it recurring.
+    run: runbook-2026-10-issue-121
+  - query: 'Post-mortem needed for the multi-host job that ended yesterday. Evidence only: task records, the shared remote and what the hosts themselves say. Name the earliest evidenced divergence, then the contributing factors.'
+    run: runbook-2026-10-issue-121
+  - query: 'We lost most of a day to the run on the other machines. Reconstruct it: when each host got its message, when it looked at it, when it answered, and which of its answers we can actually back up with a commit.'
+    run: runbook-2026-10-issue-121
+  - query: After the cross-host run, one lane's task record shows it was accepted at once and answered two hours later. Work out what the two hours were, attributing anything the lane says to the lane, and fold it into a timeline.
+    run: runbook-2026-10-issue-121
+  - query: hey, rough day. the run on the remote machines went sideways, can you work out exactly why and what we should change
+    run: runbook-2026-10-issue-121
+  - query: thanks for kicking that off. now that it's all over, I want to understand why it went so badly on the second machine
+    run: runbook-2026-10-issue-121
+  - query: good morning! last night's job on the remote hosts failed. what was the first thing that went wrong?
+    run: runbook-2026-10-issue-121
+  - query: before we run this again, I want to know what actually happened to the first attempt across the hosts
+    run: runbook-2026-10-issue-121
+  - query: I think a person had to click approve on every host by hand and that's why it took forever, but I'm not sure that's what happened. can you check the records and what the hosts say
+    run: runbook-2026-10-issue-121
+  - query: one host says it merged the right branch; the other says that is not what it was told. sort out who is right and how we got there, from the records and the remote, without redoing the work
+    run: runbook-2026-10-issue-121
+  - query: the run wasted hours and I want a report I can act on, with what to change in how we brief the hosts
+    run: runbook-2026-10-issue-121
+  - query: can you figure out why my remote hosts never answered half the tasks and whether it was our fault or the app's
+    run: runbook-2026-10-issue-121
+  - query: the job on my other computers got done twice and I don't know why. dig through what was sent and what came back
+    run: runbook-2026-10-issue-121
+  - query: every machine reported done, but only one of them had the right commit. explain the sequence of events
+    run: runbook-2026-10-issue-121
+  - query: what went wrong with the build farm run? I'd like times for each step per machine, and what is just unknown
+    run: runbook-2026-10-issue-121
+  - query: go through the failed run on the remote hosts and tell me which claims were false, with proof
+    run: runbook-2026-10-issue-121
+  - query: the final summary from the hosts looked fine but the result was broken. trace back where it went wrong
+    run: runbook-2026-10-issue-121
+  - query: post mortem please, the cross-machine refactor ended up half done on two of the hosts
+    run: runbook-2026-10-issue-121
+  - query: walk me through what happened during the failed distributed run, step by step, with the evidence for each step
+    run: runbook-2026-10-issue-121
+  - query: investigate why the work I handed to the remote machines was delayed, using their task records
+    run: runbook-2026-10-issue-121
+  - query: The last distributed run cost us a whole day. I want to know whether it was how we briefed the hosts, the app, or somebody not clicking approve in time, with the times to back it up, and something I can reproduce to check each fix.
+    run: runbook-2026-10-issue-121
+  - query: 'Evidence-based review of a finished swarm: three units, one reported done on a stale commit, one answered after the task expired. Preserve the partial results and list what is still sitting on the hosts, without cleaning any of it.'
+    run: runbook-2026-10-issue-121
+  - query: that went badly. why?
+    history:
+      - 'user: have both remote hosts run the full integration suite on the release branch'
+      - 'assistant: Sent to both hosts. One replied after three hours reporting 3 failures; the other replied done with no test counts.'
+    run: runbook-2026-10-issue-121
+  - query: the second one was wrong, wasn't it? how did we get there
+    history:
+      - 'user: put the lockfile update on the build machines'
+      - 'assistant: Both hosts report the lockfile update done and pushed.'
+      - 'user: the CI says one of them pushed an old commit'
+    run: runbook-2026-10-issue-121
+  - query: ok it is all over now. what actually happened on the hosts, with times
+    history:
+      - 'user: run the migration check on every remote host'
+      - 'assistant: Two hosts replied; the third never answered and its task expired.'
+    run: runbook-2026-10-issue-121
+  - query: why was the third host so slow? it shows up in the records as accepted straight away
+    history:
+      - 'user: get the three remote hosts to port the parser'
+      - 'assistant: Two hosts finished within the hour. The third finished after six.'
+    run: runbook-2026-10-issue-121
+  - query: what does Daintree keep about the tasks I send to my remote hosts, and for how long? I want to work out why last night's run stalled
+    docs: true
+    run: runbook-2026-10-issue-121
+  - query: can the hub tell whether a person was slow to approve something on a remote host, or only that the host took a long time? the run is over and I am trying to explain it
+    docs: true
+    run: runbook-2026-10-issue-121
 boundaries:
   - query: The agent went wrong and has already exited. I don't need it restarted, I need to know why it happened.
     confusable_with: [daintree.agents.recover-agent]
@@ -94,21 +195,78 @@ boundaries:
   - query: why did codex's importer attempt blow up? i want the cause, not a fix
     confusable_with: [daintree.orchestration.salvage-failed-attempt]
     run: 2026-09-28-round6
-  - query: 'why did last night''s agent run go wrong? find where it first drifted from the brief'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: why did last night's agent run go wrong? find where it first drifted from the brief
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'post-mortem that failed attempt and tell me how to stop it happening again'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: post-mortem that failed attempt and tell me how to stop it happening again
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'my local Codex session in the api worktree deleted the failing tests instead of fixing them; work out where it first went off course'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+  - query: my local Codex session in the api worktree deleted the failing tests instead of fixing them; work out where it first went off course
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
-  - query: 'my Claude session here finished with half the tests deleted. work out where it first went wrong from its transcript'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+  - query: my Claude session here finished with half the tests deleted. work out where it first went wrong from its transcript
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
-  - query: 'what went wrong with last night''s local Codex run, and what should the next brief say'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+  - query: what went wrong with last night's local Codex run, and what should the next brief say
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
+  - query: why did the claude run on my other machine rewrite half the repo, post-mortem the exchange with the remote host
+    confusable_with: [daintree.agents.postmortem-run]
+    run: runbook-2026-10-issue-121
+  - query: the run split over two remote machines failed and I want a post-mortem of the whole exchange, not one pane
+    confusable_with: [daintree.agents.postmortem-run]
+    run: runbook-2026-10-issue-121
+  - query: the hosts finished already, so no need to follow them. I want to know why the run went the way it did
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-121
+  - query: the run on my remote hosts is over and I don't want to keep watching it; explain the stall and the duplicate work with the evidence
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-121
+  - query: not where things stand, I already know that. I want to know why each exchange with the remote machines took as long as it did
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-121
+  - query: the hosts all answered; what I don't understand is why the replies took hours and one named the wrong commit
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-121
+  - query: messaging works fine now. what I need is to know why last night's run stalled for hours on one host
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-121
+  - query: we can reach every host today, but the run that failed yesterday still has to be explained from its records
+    confusable_with: [daintree.hosts.survey-hosts]
+    run: runbook-2026-10-issue-121
+  - query: the work on both remote machines is finished and wrong; explain the whole run with a timeline, not just why the two checkouts differ
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-121
+  - query: it wasn't a difference in the environments, one host just said it was done on a commit it was never told about. trace the run
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-121
+  - query: this is not production, it is a finished run on my other machines that ended with wrong commits; write up what happened
+    confusable_with: [daintree.debug.investigate-outage]
+    run: runbook-2026-10-issue-121
+  - query: no live incident here, just a post-mortem on a failed job across the remote hosts, with timings and what to change
+    confusable_with: [daintree.debug.investigate-outage]
+    run: runbook-2026-10-issue-121
+  - query: don't revert or clean anything, only explain why the remote hosts' run went wrong and what is salvageable
+    confusable_with: [daintree.hosts.undo-swarm-changes, daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-121
+  - query: nothing to stop or redirect on the remote hosts, the run already ended. I want the reasons it failed written down
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-121
+  - query: list what we should change after the failed run on the remote machines, and give me a way to reproduce each problem, not a memory note
+    confusable_with: [daintree.memory.manage-project-memory]
+    run: runbook-2026-10-issue-121
+  - query: the run is dead and the work is spread over several hosts; what happened, in order, from the exchange records
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-121
+  - query: no more waiting on the hosts. a retrospective of the failed run, per host, with what each claimed and what the remote shows
+    confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-121
+  - query: two hosts ended up doing the same issue last week and nothing is running now; I don't want it settled, I want to know how that happened
+    confusable_with: [daintree.hosts.resolve-task-collisions]
+    run: runbook-2026-10-issue-121
+  - query: 'Go over last night''s cross-host release: which host did what, where the swarm slowed down and what I should change next time'
+    confusable_with: [daintree.release.deploy-and-verify, daintree.release.publish-package]
+    run: runbook-2026-10-issue-138
 followups:
   - query: it's the codex one from last night, the panel is closed now
     history:
@@ -146,6 +304,33 @@ followups:
       - 'assistant: I have claude-4''s last messages and the notification timeline; launching a read-only analyst in its worktree next.'
     active: [daintree.agents.postmortem-run]
     run: 2026-09-28-catalog-expansion-stateful
+  - query: and which of those delays was down to how we briefed them?
+    history:
+      - 'user: why did the run on the remote hosts take so long?'
+      - 'assistant: Host B sat on its task for about two hours between its inbox being read and its answer; host A answered in minutes. The records show the times but not what host B was doing.'
+    run: runbook-2026-10-issue-121
+  - query: what was that host doing during the long gap? don't send it the work again
+    history:
+      - 'user: do a post-mortem of the failed run across my remote hosts'
+      - 'assistant: One unit shows a two-hour gap between the inbox fetch and the reply; the records do not say why.'
+    run: runbook-2026-10-issue-121
+  - query: so was the wrong commit its fault or ours? show me the message we sent
+    history:
+      - 'user: post-mortem on the remote hosts'' failed rollout'
+      - 'assistant: Host C reported commit 9f3a1c0, but the brief named a different base and the remote has no such branch on 9f3a1c0.'
+    run: runbook-2026-10-issue-121
+  - query: turn those findings into things to change, each with a way to reproduce it
+    history:
+      - 'user: why did the run on the other machines go wrong?'
+      - 'assistant: First divergence: the brief named a branch without a SHA, so host B built an older commit. Second, a long gap on host A.'
+    run: runbook-2026-10-issue-121
+  - query: Leave the reason for the unobserved hour unknown, and show the first divergence actually supported by the message and artifact timeline.
+    history:
+      - 'user: explain why the ended run on the remote machines stalled'
+      - 'assistant: There is an hour between inbox read and the host answer, with no observation inside it; later the host reported a commit built from an unapproved base.'
+    active: [daintree.agents.postmortem-run, daintree.hosts.supervise-swarm]
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: it's finished now and it clearly went wrong — why did it go off the rails, and how do we stop that next time?
     history:
@@ -191,3 +376,8 @@ topic_shifts:
     active: [daintree.agents.recover-agent]
     confusable_with: [daintree.agents.recover-agent, daintree.git.undo-agent-changes]
     run: 2026-10-16-synthetic-audit
+  - query: why did the run on my remote hosts end the way it did, with the evidence
+    history:
+      - 'user: what time is it on the build machine?'
+      - 'assistant: It is 14:20 on that host.'
+    run: runbook-2026-10-issue-121

@@ -117,6 +117,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: race-and-review-agent-cross-review
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased cross-review from the hub. Decided by "one host's pushed commit reviewed at
@@ -169,6 +170,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: race-and-review-trap-delegate
+    host_model: inbox
     category: routing-trap
     note: >-
       One host's work reviewed by another host. Decided by "one host's pushed commit reviewed
@@ -295,6 +297,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: race-and-review-reverse-review-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       A lane given a review to do. daintree.hosts.review-for-hub wins on "on a host's lane,
@@ -307,6 +310,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: race-and-review-reverse-run-local-cohort
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub asked THIS machine for rival attempts. daintree.hosts.run-local-cohort wins on
@@ -319,6 +323,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: race-and-review-reverse-do-delegated-work
+    host_model: inbox
     category: routing-trap
     note: >-
       This machine is one entry in the hub's race and only builds its own unit. The race's

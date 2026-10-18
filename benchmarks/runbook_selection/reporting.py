@@ -16,8 +16,11 @@ def save_doc(doc: dict[str, Any], out: Path | None = None) -> Path:
         meta = doc["meta"]
         # Only the retired live bench names a variant. `bench local` is told apart
         # by its precision; `bench scale` has neither, so it falls back to its suite.
+        model = f"{meta['host_model']}-" if meta.get("host_model") else ""
         label = meta.get("variant") or (
-            f"local-{meta['precision']}" if "precision" in meta else str(doc.get("suite", "run"))
+            f"local-{model}{meta['precision']}"
+            if "precision" in meta
+            else str(doc.get("suite", "run"))
         )
         out = RESULTS_DIR / f"{stamp}-{label}.json"
     out.parent.mkdir(parents=True, exist_ok=True)

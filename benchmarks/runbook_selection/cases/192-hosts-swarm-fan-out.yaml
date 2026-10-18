@@ -33,6 +33,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-swarm-it
+    host_model: inbox
     category: continuation
     note: >-
       The issue's bare request as a second turn: the first turn names the Remote Hosts and the one
@@ -104,6 +105,7 @@ cases:
 
   # ------------------------------------------------------------- routing traps
   - id: swarm-fan-out-not-start-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       The lanes are ready and the work goes out. Decided by "the SAME WORK done on EVERY Remote
@@ -165,6 +167,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-not-handle-hub-message
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's side of the exchange. Decided by "EVERY Remote Host this Shell reaches" against
@@ -190,6 +193,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-not-check-usage
+    host_model: inbox
     category: routing-trap
     note: >-
       A table per machine of work done, not usage left. Decided by "one table with a row per
@@ -229,6 +233,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-reverse-start-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       Ready, nothing sent. daintree.hosts.start-swarm owns "The deliverable is a ready table
@@ -241,6 +246,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-reverse-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       Work already sent, after a restart. daintree.hosts.recover-and-clean-up owns "which
@@ -253,6 +259,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-reverse-handle-hub-message
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane reading the hub's message. daintree.hosts.handle-hub-message owns "the hub, the
@@ -265,6 +272,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-reverse-do-delegated-work
+    host_model: inbox
     category: routing-trap
     note: >-
       This lane's own unit. daintree.hosts.do-delegated-work owns "when the hub asks THIS
@@ -277,6 +285,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
 
   - id: swarm-fan-out-reverse-check-usage
+    host_model: inbox
     category: routing-trap
     note: >-
       Usage per host. daintree.hosts.check-usage-limits owns "how much Claude Code or Codex
@@ -336,3 +345,34 @@ cases:
         content: two agents here should argue the caching bug out together until they agree on one fix
     expect:
       required: [daintree.orchestration.multi-agent]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: swarm-fan-out-reverse-start-swarm-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of swarm-fan-out-reverse-start-swarm: the same request against the control catalog.
+      Ready, nothing sent. daintree.hosts.start-swarm owns "The deliverable is a ready table (host, project,
+      slot, agent, generation) plus what needs the person, with no work sent".'
+    messages:
+    - role: user
+      content: line up a Claude assistant per remote machine for the api project, nothing to do yet
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: swarm-fan-out-reverse-check-usage-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of swarm-fan-out-reverse-check-usage: the same request against the control catalog.
+      Usage per host. daintree.hosts.check-usage-limits owns "how much Claude Code or Codex allowance each
+      Remote Host this Shell reaches has left".'
+    messages:
+    - role: user
+      content: which of my remote hosts still has Claude allowance this week? one row per machine
+    expect:
+      required:
+      - daintree.agents.check-usage-limits
+      optional:
+      - daintree.hosts.foundation

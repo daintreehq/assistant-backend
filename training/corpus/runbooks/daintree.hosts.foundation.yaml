@@ -147,20 +147,14 @@ boundaries:
     docs: true
     run: runbook-2026-10-issue-95
   - query: is the assistant on my spare desktop able to take messages from this hub yet
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: can the laptop's assistant receive work from my hub, or does something need switching on first
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     docs: true
     run: runbook-2026-10-issue-90
   - query: set things up so the assistant on the second machine accepts messages from this one
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: 'where is the setting that lets the hub start assistants on a remote host'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     docs: true
     run: runbook-2026-10-issue-102
   - query: set things up so I can ask the build box's assistant questions from here
@@ -187,15 +181,15 @@ boundaries:
     run: runbook-2026-10-issue-122
 
   - query: 'how does the hub decide whether it may message a host''s assistant at all?'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     docs: true
     run: runbook-2026-10-issue-103
   - query: 'what''s the difference between allowing messaging with a host and letting the assistant start assistants there'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     docs: true
     run: runbook-2026-10-issue-103
   - query: 'set up assistant messaging with the mac studio I just added as a host'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: "how does messaging between the assistants on two of my machines work, and how do I switch it on?"
     confusable_with: [daintree.hosts.survey-hosts]

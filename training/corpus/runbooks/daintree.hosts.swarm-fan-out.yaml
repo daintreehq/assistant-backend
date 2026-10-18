@@ -93,16 +93,16 @@ boundaries:
   - query: Send the same bug fix brief to all three remote hosts' assistants instead of one, and verify each commit
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: the assistants are ready on every host, now hand them all the same task, the webhook signature check
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: good, then the logging refactor goes to all three, separate branches
     history:
       - 'user: are the assistants up on the other boxes?'
       - 'assistant: Yes, all three hosts have an assistant enrolled in this project.'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: have every host run the code generator and report back a table of the commits, one row per machine
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: ask each remote machine's assistant to build the same feature and give me a per-host table of branch and sha
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: I don't want their opinions, I want each remote machine's assistant to build the feature flag on a branch
     confusable_with: [daintree.hosts.ask-host-assistant]
   - query: get the assistants on all my other machines to implement the fix rather than just tell me what they think
@@ -122,13 +122,13 @@ boundaries:
   - query: let every one of my other macs write its own version of the tokenizer and show me all of them
     confusable_with: [daintree.orchestration.competition]
   - query: from my desk mac, get the remote boxes' assistants all building the docs site generator and let me know what each comes back with
-    confusable_with: [daintree.hosts.handle-hub-message]
+    confusable_with: []
   - query: from the Shell I'm on, broadcast the dependency bump to every enrolled lane and list what each one committed
-    confusable_with: [daintree.hosts.handle-hub-message]
+    confusable_with: []
   - query: swarm the remote hosts with this task, the same brief for each machine
     confusable_with: [daintree.orchestration.multi-agent]
   - query: I want the importer written on all of my remote boxes, each lane making its own worktree, and the commits listed for me
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
   - query: "split the same job across every remote host, each one doing all of it on its own branch"
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
@@ -136,13 +136,13 @@ boundaries:
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
   - query: 'have my other computers each implement the same pagination tweak separately and tell me how each did'
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
     run: runbook-2026-10-issue-105
   - query: 'have all my machines each build the parser on their own branch'
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
     run: runbook-2026-10-issue-105
   - query: 'from the Shell, every host should try the caching change and report its SHA'
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
     run: runbook-2026-10-issue-105
   - query: 'have every machine build the parser on its own branch; I''ll decide later which one to merge'
     confusable_with: [daintree.hosts.integrate-host-branches]
@@ -199,10 +199,10 @@ boundaries:
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
   - query: 'put the logging change on all my other hosts, a branch each, and show me a row for every one'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'have all the hosts try the new build script at once, each on its own branch'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: have all my machines each try the parser rewrite and bring back one table of results
     confusable_with: [daintree.hosts.verify-project-placement]

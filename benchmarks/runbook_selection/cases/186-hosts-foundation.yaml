@@ -22,6 +22,7 @@ cases:
       docs: true
 
   - id: hosts-foundation-switch-on-messaging
+    host_model: inbox
     category: foundation-only
     note: >-
       Setting messaging up between two machines, in the user's words: "how to switch it
@@ -34,6 +35,7 @@ cases:
       required: [daintree.hosts.foundation]
 
   - id: hosts-foundation-unreachable-not-diagnostics
+    host_model: inbox
     category: routing-trap
     note: >-
       Another machine's assistant that cannot be reached is a messaging question
@@ -74,6 +76,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: hosts-foundation-ready-to-receive-not-devbox
+    host_model: inbox
     category: routing-trap
     note: >-
       Whether another machine's assistant is set up to receive the hub's messages is

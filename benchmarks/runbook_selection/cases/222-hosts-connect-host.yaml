@@ -139,6 +139,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: connect-host-onboard-before-messaging
+    host_model: inbox
     category: routing-trap
     note: >-
       Onboarding a host and reporting readiness before messaging is this runbook's
@@ -237,6 +238,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: connect-host-reverse-ready-lanes-is-start-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse trap. The hosts are already added; an assistant ready on each before work goes
@@ -250,3 +252,23 @@ cases:
     expect:
       required: [daintree.hosts.start-swarm]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: connect-host-reverse-ready-lanes-is-start-swarm-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of connect-host-reverse-ready-lanes-is-start-swarm: the same request against the
+      control catalog. Reverse trap. The hosts are already added; an assistant ready on each before work
+      goes out is start-swarm''s ("Claude Code or Codex ready on every Remote Host" and "bootstrapping each
+      host''s assistant lane"). Nothing is added as a host, so this runbook ("ANOTHER MAC OR LINUX MACHINE
+      added to Daintree as a Remote Host") must not ride along.'
+    messages:
+    - role: user
+      content: all three machines are already hosts here; line up one claude assistant on each for this
+        repo, no work yet
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation

@@ -1196,13 +1196,13 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: 'start a claude agent here to tidy up the logging module'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: 'launch codex in a new worktree to add the healthcheck endpoint'
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-98
   - query: 'put claude on the scheduler''s midnight bug, fresh branch from main'
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-98
   - query: Delegate the new route and its tests to one implementer in the current checkout, with no separate test author or freeze gate.
     confusable_with: [daintree.orchestration.test-first-split]

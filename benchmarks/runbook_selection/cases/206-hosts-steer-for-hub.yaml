@@ -16,6 +16,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: steer-for-hub-issue-stop-and-report
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first request. Decided by "to STOP, PAUSE or CHANGE the work of the AGENTS
@@ -30,6 +31,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-issue-acceptance-change
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second request, a correction that keeps the rest of the brief: "hub
@@ -44,6 +46,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-issue-pause-checkpoint
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's third request, after the lane has read the hub's message naming the panes:
@@ -61,6 +64,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a lane describes the task to search_runbooks: "each of those agents stopped,
@@ -74,6 +78,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-user-cancelled-still-going
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual: the hub cancelled, the child is still working. "or an agent still working on a
@@ -87,6 +92,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-mid-turn-stop
+    host_model: inbox
     category: single-runbook
     note: >-
       The live scenario of a stop mid-turn with the work kept: "each of those agents
@@ -99,6 +105,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-idle-child-correction
+    host_model: inbox
     category: single-runbook
     note: >-
       The live scenario of a correction to a child idle after its turn: "to STOP, PAUSE or
@@ -111,6 +118,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-already-done
+    host_model: inbox
     category: single-runbook
     note: >-
       The live scenario of a child that finished before the stop arrived: "found already
@@ -123,6 +131,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-unrelated-pane
+    host_model: inbox
     category: single-runbook
     note: >-
       The live scenario with an unrelated pane that must stay untouched: "the AGENTS it
@@ -136,6 +145,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: steer-for-hub-not-local-steer
+    host_model: inbox
     category: routing-trap
     note: >-
       The agent is one this lane launched for the hub's unit and the answer goes to the hub,
@@ -151,6 +161,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-not-park-work
+    host_model: inbox
     category: routing-trap
     note: >-
       A stop of one hub unit with the other panes left alone is not wrapping up for the day:
@@ -165,6 +176,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-already-finished-not-local-steer
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's stop for a unit whose agent already committed: "found already done",
@@ -180,6 +192,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-not-start-the-unit
+    host_model: inbox
     category: routing-trap
     note: >-
       A change to a unit whose agent is already working is a steer, not starting the unit:
@@ -193,6 +206,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-not-hub-side-redo
+    host_model: inbox
     category: routing-trap
     note: >-
       A change to a unit the hub already delegated here, received by this lane for the agent
@@ -207,6 +221,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-not-clean-up
+    host_model: inbox
     category: routing-trap
     note: >-
       A stop with nothing removed is not the run's cleanup: "to STOP, PAUSE or CHANGE the
@@ -221,6 +236,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-not-hung-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       A healthy agent still working on a job the hub dropped is a stop, not a recovery: "or
@@ -249,6 +265,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: steer-for-hub-trap-park-own-agents
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: the person parking their own agents for the day, the hub only mentioned to
@@ -262,6 +279,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: steer-for-hub-trap-answer-the-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: the hub's message is a question about this lane's agents, not a request to
@@ -275,6 +293,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-trap-hung-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: an agent launched for the hub that has gone quiet, not one the hub wants
@@ -288,6 +307,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: steer-for-hub-trap-start-the-unit
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: a new unit from the hub with nothing started yet. do-delegated-work owns
@@ -315,6 +335,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-for-hub-trap-clean-up
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: the run's agents are finished and the hub wants what it left here removed.

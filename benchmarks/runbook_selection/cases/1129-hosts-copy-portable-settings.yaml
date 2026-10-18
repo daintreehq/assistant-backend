@@ -222,6 +222,7 @@ cases:
     optional:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-survey-hosts
+  host_model: inbox
   category: routing-trap
   note: 'A host-by-host status report. The neighbour''s text: "The deliverable is ONE read-only report,
     host by host".'
@@ -265,6 +266,7 @@ cases:
     optional:
     - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-start-swarm
+  host_model: inbox
   category: routing-trap
   note: 'Readying assistants on hosts. The neighbour''s text: "Use when the user wants a swarm SET UP
     across their other machines before handing out work".'
@@ -287,5 +289,22 @@ cases:
   expect:
     required:
     - daintree.hosts.copy-portable-settings
+    optional:
+    - daintree.hosts.foundation
+
+# Control twins (issue #159): the same requests against the control catalog,
+# merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+- id: copy-portable-settings-reverse-start-swarm-control
+  category: routing-trap
+  host_model: control
+  note: 'Control twin of copy-portable-settings-reverse-start-swarm: the same request against the control
+    catalog. Readying assistants on hosts. The neighbour''s text: "Use when the user wants a swarm SET
+    UP across their other machines before handing out work".'
+  messages:
+  - role: user
+    content: Bootstrap an assistant for this project on each of my remote hosts and report which are ready.
+  expect:
+    required:
+    - daintree.hosts.delegate-to-host
     optional:
     - daintree.hosts.foundation

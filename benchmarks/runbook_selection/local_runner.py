@@ -54,7 +54,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.runbooks.catalog import Catalog, default_runbooks_dir, load_catalog
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
+from daintree_assistant_server.runbooks.host_state import HostModel
 from daintree_assistant_server.runbooks.local import setwise as S
 from daintree_assistant_server.runbooks.local.documents import last_user_text, query_document
 from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
@@ -150,13 +151,19 @@ def run_local(
     cases: list[BenchCase] | None = None,
     quantized: bool = True,
     id_filter: str | None = None,
+    host_model: HostModel = "control",
 ) -> dict[str, Any]:
-    """Score the shipped artifact over the corpus. No API calls, no key."""
+    """Score the shipped artifact over one host model's corpus, against that model's
+    catalog (the control catalog by default). No API calls, no key."""
     artifact = artifact or ARTIFACT
-    catalog = catalog if catalog is not None else load_catalog(default_runbooks_dir())
+    catalog = catalog if catalog is not None else load_catalogs().for_model(host_model)
     # The UNFILTERED corpus is the expectation, whatever this run executes.
-    whole = load_cases(catalog)
-    cases = cases if cases is not None else load_cases(catalog, id_filter=id_filter)
+    whole = load_cases(catalog, model=host_model)
+    cases = (
+        cases
+        if cases is not None
+        else load_cases(catalog, id_filter=id_filter, model=host_model)
+    )
 
     clf = SetwiseClassifier(artifact, quantized=quantized)
     clf.sync(catalog)
@@ -250,6 +257,7 @@ def run_local(
         candidates=clf.candidates,
         quantized=quantized,
         id_filter=id_filter,
+        host_model=host_model,
     )
 
 
@@ -267,6 +275,7 @@ def build_local_doc(
     candidates: int,
     quantized: bool = True,
     id_filter: str | None = None,
+    host_model: HostModel = "control",
 ) -> dict[str, Any]:
     """Assemble the result document, expectations and verdict.
 
@@ -334,6 +343,7 @@ def build_local_doc(
         "suite": "runbook_selection_local",
         "meta": {
             "benchmark": "runbook_selection_local",
+            "host_model": host_model,
             "artifact": str(artifact),
             "precision": "int8" if quantized else "fp32",
             "catalog_revision": catalog.revision,

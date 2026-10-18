@@ -353,7 +353,7 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-95
   - query: 'Daintree on this machine says every agent fails to start, can you check what''s broken'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: "my agents in panes here can't connect to daintree's mcp anymore"
     confusable_with: [daintree.hosts.connect-host]
@@ -362,13 +362,13 @@ boundaries:
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-122
   - query: 'the Daintree window on this mac freezes whenever I open the hosts settings page; messaging itself is not the question'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: 'every Daintree action on this laptop errors out now, not just the host ones; what is wrong with the app here?'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: 'the sidebar assistant on this machine stopped responding at all; before I blame my remote hosts, gather what Daintree shows for a bug report'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: "the Daintree tools disappeared from my sidebar assistant on this Mac and the app feels broken, work out what is wrong"
     confusable_with: [daintree.hosts.survey-hosts]

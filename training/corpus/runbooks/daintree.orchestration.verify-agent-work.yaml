@@ -342,21 +342,17 @@ boundaries:
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
   - query: my pane finished the retry logic and claims green tests; rerun them on its commit and look at the diff before I merge
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
   - query: the claude pane says the migration test passes now; double-check its commit before I tell anyone
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
   - query: 'the reviewer agent here says the branch''s tests all pass at 2a7f9c4; confirm that claim yourself before the hub hears it'
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-99
   - query: 'the agent in this worktree says it''s done and the tests pass. check that it''s true before I merge'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'I don''t trust that the local agent actually fixed the bug, verify its claim'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: "the agent on the host says its end-to-end run was green; check what it did and the diff before I merge"
     confusable_with: [daintree.ci.run-e2e-suite]

@@ -123,13 +123,13 @@ boundaries:
     confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
   - query: "the hub wants the commits its run made in this project reverted, keep my uncommitted work"
-    confusable_with: [daintree.hosts.undo-swarm-changes, daintree.hosts.clean-up-for-hub]
+    confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
   - query: "Hub asked this lane to revert run commits a1b2c3d and e4f5a6b on branch run/limits/api, newest first, no push, and to report the revert SHAs"
     confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
   - query: "On this host: revert the commits the run's agent made here for the hub, and leave its worktree where it is"
-    confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.undo-swarm-changes]
+    confusable_with: [daintree.hosts.undo-swarm-changes]
     run: runbook-2026-10-issue-151
   - query: "the hub says undo its unit's changes in this repo but keep the other agent's work, then reply with what got reverted"
     confusable_with: [daintree.hosts.undo-swarm-changes]

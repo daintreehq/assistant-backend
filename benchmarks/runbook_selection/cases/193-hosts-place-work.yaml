@@ -209,6 +209,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: place-work-reverse-check-usage
+    host_model: inbox
     category: routing-trap
     note: >-
       Usage left with no work to place: check-usage-limits' "how much Claude Code or Codex
@@ -221,6 +222,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: place-work-reverse-start-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       Readying assistants with no work: start-swarm's "a ready table (host, project, slot, agent, generation)" and "with no work sent".
@@ -254,6 +256,7 @@ cases:
       required: [daintree.runtime.relieve-resource-contention]
 
   - id: place-work-reverse-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       Where earlier exchanges stand after a restart: recover-and-clean-up's "rebuild where
@@ -265,3 +268,20 @@ cases:
     expect:
       required: [daintree.hosts.recover-and-clean-up]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: place-work-reverse-check-usage-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of place-work-reverse-check-usage: the same request against the control catalog.
+      Usage left with no work to place: check-usage-limits'' "how much Claude Code or Codex allowance each
+      Remote Host this Shell reaches has left".'
+    messages:
+    - role: user
+      content: tell me the claude weekly allowance each remote host still has, one row per machine
+    expect:
+      required:
+      - daintree.agents.check-usage-limits
+      optional:
+      - daintree.hosts.foundation

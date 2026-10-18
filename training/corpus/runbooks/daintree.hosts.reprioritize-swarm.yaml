@@ -131,6 +131,6 @@ boundaries:
   - query: nothing is broken on the hosts, they are just busy, but the new blocker needs workers there before anything else
     confusable_with: [daintree.hosts.reassign-host-work]
   - query: pause the lower-priority work on my hosts and start the urgent bug, then tell me which lanes acknowledged
-    confusable_with: [daintree.hosts.steer-for-hub, daintree.hosts.steer-swarm]
+    confusable_with: [daintree.hosts.steer-swarm]
   - query: an urgent production bug arrived and my remote hosts are running long tasks, free capacity there before anything else
     confusable_with: [daintree.debug.investigate-outage]

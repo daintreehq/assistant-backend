@@ -105,7 +105,7 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: 'the agent on the hub''s change ran out of context halfway; start a fresh session that picks up from its commits in that worktree'
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-98
   - query: 'the agent in my pane ran out of usage on the refactor, have another agent finish it in this same worktree'
     confusable_with: [daintree.hosts.reassign-host-work]

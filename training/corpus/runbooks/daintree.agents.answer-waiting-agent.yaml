@@ -279,24 +279,14 @@ boundaries:
     confusable_with: [daintree.context.feed-running-agent]
     run: 2026-09-28-catalog-expansion
   - query: the agent I started for the hub's request is stuck on a yes/no prompt about deleting the old fixtures, answer yes
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: the codex pane working on the hub's task wants to know which test runner to use; tell it vitest
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: two of the panes launched for the hub's job are waiting on questions, unblock them
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: an agent here is asking whether it may overwrite the lockfile; the hub's brief said it can, so answer it
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: the claude agent sent a question about the branch name while I was reading the inbox; tell it feat/retry
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: claude here wants to know if it may contact the other machine before continuing, say yes
     confusable_with: [daintree.hosts.ask-host-assistant]

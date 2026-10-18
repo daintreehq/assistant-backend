@@ -64,6 +64,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: migrate-across-repositories-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How the hub describes the campaign to search: "one row per selected repository, counted once
@@ -88,6 +89,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: migrate-across-repositories-new-form-answered
+    host_model: inbox
     category: continuation
     note: >-
       Second turn: the person settles a form the rulebook lacked and the campaign carries on, "a

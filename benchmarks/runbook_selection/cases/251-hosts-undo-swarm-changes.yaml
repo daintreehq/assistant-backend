@@ -229,6 +229,7 @@ cases:
 
   # --------------------------------- lane receivers (retrain owed at authoring)
   - id: undo-swarm-changes-lane-revert-run-commits
+    host_model: inbox
     category: routing-trap
     note: >-
       On the receiving host: the local procedure does the reverting, the envelope rides along.
@@ -244,6 +245,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: undo-swarm-changes-lane-exact-commits
+    host_model: inbox
     category: routing-trap
     note: >-
       A lane given the exact commits by the hub: "as a Remote Host's own assistant reverting in
@@ -256,3 +258,6 @@ cases:
     expect:
       required: [daintree.git.undo-agent-changes]
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

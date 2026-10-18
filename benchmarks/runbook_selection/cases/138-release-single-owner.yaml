@@ -40,6 +40,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: release-owner-deploy-issue-build-everywhere
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's own phrasing for the whole swarm job. The deploy clause "Also when a swarm
@@ -60,6 +61,7 @@ cases:
         - daintree.hosts.run-validation-matrix
 
   - id: release-owner-deploy-lane-preflight
+    host_model: inbox
     category: single-runbook
     note: >-
       The receiving lane's wording: its check of its own target before it writes, then what
@@ -158,6 +160,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: release-owner-publish-lane-timeout
+    host_model: inbox
     category: single-runbook
     note: >-
       The lane's view of a lost reply. The publish clause "Also when a swarm of hosts shares
@@ -220,3 +223,27 @@ cases:
     expect:
       required: [daintree.hosts.reassign-host-work]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: release-owner-deploy-issue-build-everywhere-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of release-owner-deploy-issue-build-everywhere: the same request against the control
+      catalog. The issue''s own phrasing for the whole swarm job. The deploy clause "Also when a swarm of
+      hosts shares the work and exactly one host is the deployer of a deploy authorised now: the hub''s
+      brief to it, its check of its own target, and its lost reply reconciled against the platform." decides
+      it; the plan runbooks (start-swarm, execute- distributed-workflow) carry the build side and may ride
+      along.'
+    messages:
+    - role: user
+      content: Build across the swarm but deploy once from the designated host.
+    expect:
+      required:
+      - daintree.release.deploy-and-verify
+      optional:
+      - daintree.hosts.foundation
+      - daintree.hosts.delegate-to-host
+      - daintree.hosts.execute-distributed-workflow
+      - daintree.hosts.swarm-fan-out
+      - daintree.hosts.run-validation-matrix

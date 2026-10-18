@@ -263,6 +263,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: coordinate-dev-services-reverse-demo-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane's own side: the hub asked THIS host to serve one service with sample data. Decided

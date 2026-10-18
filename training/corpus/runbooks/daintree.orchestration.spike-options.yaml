@@ -104,10 +104,10 @@ boundaries:
     confusable_with: [daintree.orchestration.productionize-prototype]
     run: 2026-09-28-round6
   - query: 'try a redis and an in-memory session store hands-on and tell me which to keep'
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
     run: runbook-2026-10-issue-105
   - query: 'spike two ORMs on this repo before we pick one'
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
     run: runbook-2026-10-issue-105
   - query: 'Assign distinct prototypes for the same document editor: a block model and a plain-text model, then compare undo correctness and startup cost without merging either.'
     confusable_with: [daintree.orchestration.competition, daintree.orchestration.hypothesis-split]

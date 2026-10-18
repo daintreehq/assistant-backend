@@ -110,14 +110,14 @@ followups:
 
 boundaries:
   - query: "Hand the other Mac a revised brief for the parser work it's already doing, with the new acceptance criteria, and have it reply with the commit."
-    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.steer-for-hub]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-110
   - query: From my main machine, the cache run has to stop on the hosts still working on it. Their own assistants should halt it and send back each agent's state.
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
   - query: From the main machine, stop the agents the other hosts launched for my run and bring back their real state.
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
   - query: I want each remote host's assistant to halt its children on the cache run and report back here.
-    confusable_with: [daintree.hosts.steer-for-hub]
+    confusable_with: []
   - query: interrupt the codex agents on my other macs that are working on the run and tell them to use pnpm
     confusable_with: [daintree.agents.steer-running-agent]
   - query: the agents I want stopped are the ones on the servers working on my run; the local panes stay as they are
@@ -205,13 +205,13 @@ boundaries:
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
   - query: 'hold everything the remote boxes are doing, do not discard their edits, and tell me which ones confirmed'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'change the acceptance criteria for the work already out on the remote hosts; the rest of the brief stands'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'one of the hosts is heading the wrong way right now; stop it and point it at the other approach'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: stop the task I gave the lab server and let me know if it confirmed
     confusable_with: [daintree.hosts.prepare-host-maintenance]

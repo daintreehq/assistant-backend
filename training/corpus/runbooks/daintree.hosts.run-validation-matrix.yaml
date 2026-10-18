@@ -73,11 +73,11 @@ boundaries:
   - query: Have each Remote Host run identical check commands against one release commit and return a per-platform matrix rather than building anything
     confusable_with: [daintree.hosts.swarm-fan-out]
   - query: send the linux host and the mac host the commit to verify, each under its own python, and collect a row per environment
-    confusable_with: [daintree.hosts.verify-for-hub]
+    confusable_with: []
   - query: From the hub, ask the host lanes to test this SHA under the listed runtimes and assemble their results into one matrix
-    confusable_with: [daintree.hosts.verify-for-hub]
+    confusable_with: []
   - query: i'm on the main machine, have the remote assistants each verify the RC in their own environment and give me the grid
-    confusable_with: [daintree.hosts.verify-for-hub]
+    confusable_with: []
   - query: run the tests for this commit on node 18 and 22, but on my remote hosts, not here
     confusable_with: [daintree.ci.run-local-checks]
   - query: lint and unit tests at the RC sha on each of my other machines' platforms, one result per platform
@@ -201,8 +201,8 @@ topic_shifts:
     history:
       - 'user: ready the hosts for the repository'
       - 'assistant: The Linux and Mac hosts each have an enrolled assistant with a current generation.'
-    active: [daintree.hosts.start-swarm]
-    confusable_with: [daintree.hosts.start-swarm]
+    active: [daintree.hosts.delegate-to-host]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: 2026-10-16-synthetic-audit
   - query: Use the new patched revision for a fresh Linux and macOS validation matrix. There are no results for it yet; run checks only.
     history:

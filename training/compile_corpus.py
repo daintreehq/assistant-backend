@@ -82,23 +82,29 @@ def norm(text: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
 
 
-def _benchmark_strings(catalog: Any) -> set[str]:
+def _benchmark_strings() -> set[str]:
     """Protect every evaluation suite, including sealed holdout rounds.
 
     Read these mechanically for exclusion only. Case text must never be fed to
     a data writer or used as a source of training examples.
-    """
-    from benchmarks.runbook_selection.cases import CASES_DIR
 
+    Both host models' suites (``cases.py``, ``host_model``): an inbox-only case is
+    held out from training as much as a control one, whichever catalog trains.
+    """
+    from benchmarks.runbook_selection.cases import CASES_DIR, HOST_MODELS
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
+
+    catalogs = load_catalogs()
     out: set[str] = set()
     suites = [CASES_DIR, *sorted((CASES_DIR.parent / "holdout").glob("*/"))]
     for suite in suites:
-        for case in load_cases(catalog, cases_dir=suite):
-            for msg in case.messages:
-                if isinstance(msg.content, str):
-                    out.add(norm(msg.content))
-            if case.turn_context:
-                out.add(norm(case.turn_context))
+        for model in HOST_MODELS:
+            for case in load_cases(catalogs.for_model(model), cases_dir=suite, model=model):
+                for msg in case.messages:
+                    if isinstance(msg.content, str):
+                        out.add(norm(msg.content))
+                if case.turn_context:
+                    out.add(norm(case.turn_context))
     out.discard("")
     return out
 
@@ -141,7 +147,7 @@ def compile_corpus(
     """Gate every curated example and return (rows, lock)."""
     catalog = load_catalog(default_runbooks_dir())
     valid_ids = set(catalog.selectable_ids)
-    held_out = _benchmark_strings(catalog)
+    held_out = _benchmark_strings()
 
     stats: Counter[str] = Counter()
     per_file: dict[str, dict[str, Any]] = {}

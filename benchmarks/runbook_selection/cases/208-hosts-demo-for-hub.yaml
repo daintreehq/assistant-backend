@@ -15,6 +15,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: demo-for-hub-issue-revision-and-port
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first request. Decided by "Use on a Remote Host's lane when the hub asks THIS
@@ -29,6 +30,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-issue-leave-running
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second request, framed as the hub's message itself. Decided by "prepare a DEMO
@@ -44,6 +46,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-issue-service-ownership
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's third request. Decided by "The deliverable is a demo served on this host and
@@ -58,6 +61,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a lane describes the task to search_runbooks: the whole deliverable. Decided by
@@ -72,6 +76,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-user-casual
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual, no punctuation, "box" for this host. Decided by "hub message: run the dashboard
@@ -86,6 +91,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-team-page-report
+    host_model: inbox
     category: single-runbook
     note: >-
       The hub's demo with its constraints and a report back. Decided by "the worktree at the
@@ -99,6 +105,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: demo-for-hub-trap-not-local-demo
+    host_model: inbox
     category: routing-trap
     note: >-
       A demo for the hub, not for a person at this screen. Decided by this runbook's fence "a demo
@@ -113,6 +120,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-trap-not-the-envelope
+    host_model: inbox
     category: routing-trap
     note: >-
       Answering the exchange is the end of the demo, not the envelope's job alone. Decided by
@@ -128,6 +136,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-trap-not-a-port-clash
+    host_model: inbox
     category: routing-trap
     note: >-
       Finding the demo's own listener is part of reporting it, not a clash. Decided by "the host
@@ -141,6 +150,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-trap-not-the-hub-side
+    host_model: inbox
     category: routing-trap
     note: >-
       This host is the one asked; "delegated" is the hub's word for it. Decided by "the hub asks
@@ -154,6 +164,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-trap-not-delegated-code
+    host_model: inbox
     category: routing-trap
     note: >-
       Code already built, to be shown, not changed. Decided by "the hub asks THIS machine to
@@ -167,6 +178,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-trap-not-a-test-run
+    host_model: inbox
     category: routing-trap
     note: >-
       A commit left running to be looked at, not checked. Decided by "prepare a DEMO of a
@@ -194,6 +206,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: demo-for-hub-reverse-envelope
+    host_model: inbox
     category: routing-trap
     note: >-
       Two exchanges to read and answer in order is the envelope's ("The deliverable is the
@@ -208,6 +221,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-reverse-port-clash
+    host_model: inbox
     category: routing-trap
     note: >-
       A port held by something else, even for the hub's demo, is daintree.runtime.free-busy-port
@@ -249,6 +263,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-reverse-delegated-code
+    host_model: inbox
     category: routing-trap
     note: >-
       Code for the hub to write here is daintree.hosts.do-delegated-work ("Use on a Remote
@@ -263,6 +278,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: demo-for-hub-reverse-test-run
+    host_model: inbox
     category: routing-trap
     note: >-
       Checks of the hub's commit with nothing left running are daintree.hosts.verify-for-hub

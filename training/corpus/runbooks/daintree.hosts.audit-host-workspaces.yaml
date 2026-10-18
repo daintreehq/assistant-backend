@@ -107,14 +107,14 @@ followups:
     history:
       - 'user: write up what went wrong on the remote machines'
       - 'assistant: Two of three hosts answered; their commits are on the remote, the third host never answered.'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: 2026-10-16-synthetic-audit
 
 boundaries:
   - query: don't remove anything yet, just tell me what the run left on each remote host and what's safe
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: 'report only: the panes, worktrees and branches the swarm made on my other machines, and which I could clean up later'
-    confusable_with: [daintree.hosts.recover-and-clean-up, daintree.hosts.clean-up-for-hub]
+    confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: before the hosts tidy up their parts, I want an inventory of what each of them would be removing
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: Give me the leftovers per host with a safe, unsafe or unknown verdict. The cleanup itself waits for my go.
@@ -126,9 +126,9 @@ boundaries:
   - query: classify the worktrees the swarm made on the remote hosts as in use, at risk or merged
     confusable_with: [daintree.worktree.audit-worktrees]
   - query: 'from my main machine: sort the leftovers on the hosts into the run''s own and other owners'', and just report, I''ll decide about removing'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
   - query: Ask every host's assistant what the run left in its project and compile one report; no one removes anything
-    confusable_with: [daintree.hosts.clean-up-for-hub, daintree.hosts.handle-hub-message]
+    confusable_with: []
   - query: list what remains from the swarm on the remote machines before I decide whether to tear any of it down
     confusable_with: [daintree.orchestration.workspace-cleanup]
   - query: tell me which of the swarm's panes and servers on the other computers are still in use, I won't close anything today
@@ -146,7 +146,7 @@ boundaries:
   - query: the swarm is finished; I want a report on its leftover workspaces across the hosts, not a status of the run
     confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]
   - query: audit the remote hosts for what the swarm left behind in their workspaces
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: which worktrees and dev servers did last night's run leave on my other machines, and does any hold unpushed work
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129

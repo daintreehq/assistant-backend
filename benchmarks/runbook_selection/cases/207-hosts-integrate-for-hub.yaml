@@ -16,6 +16,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: integrate-for-hub-issue-exact-commits
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first request. The positive clause quotes it ("integrate these exact commits
@@ -29,6 +30,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-issue-recorded-shas
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second request, quoted in the positive clause ("combine the named swarm
@@ -42,6 +44,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-issue-remote-artifacts
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's third request, receiver shorthand, quoted in the positive clause ("integrate
@@ -57,6 +60,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a lane describes the task to search. "a visible integrator agent merges each pinned
@@ -69,6 +73,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-moved-source
+    host_model: inbox
     category: single-runbook
     note: >-
       A source branch moved after the hub pinned it: "merges each pinned commit (never a
@@ -81,6 +86,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-conflict-escalated
+    host_model: inbox
     category: single-runbook
     note: >-
       A conflict between the hub's inputs with no rule in the brief: "a merge conflict the brief
@@ -98,6 +104,7 @@ cases:
 
   # ------------------------------------------------------------------ traps: this runbook wins
   - id: integrate-for-hub-handles-the-integration
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's message names the integration, so the work's owner is required and the
@@ -111,6 +118,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-not-one-unit
+    host_model: inbox
     category: routing-trap
     note: >-
       Nothing new to build: finished units merged together, not "a unit built from scratch
@@ -123,6 +131,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-not-verify
+    host_model: inbox
     category: routing-trap
     note: >-
       Merging comes first, so this is not "checks alone (daintree.hosts.verify-for-hub)".
@@ -134,6 +143,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-not-local
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub asks, not the person here: not "the person's own local merge
@@ -146,6 +156,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-not-hub-side
+    host_model: inbox
     category: routing-trap
     note: >-
       This machine is the lane doing the integration, not "the hub's side
@@ -189,6 +200,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-trap-one-unit
+    host_model: inbox
     category: routing-trap
     note: >-
       One new unit to build: daintree.hosts.do-delegated-work ("when the hub asks THIS machine
@@ -201,6 +213,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-trap-verify
+    host_model: inbox
     category: routing-trap
     note: >-
       An already-merged commit to test, nothing combined here: daintree.hosts.verify-for-hub
@@ -213,6 +226,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-for-hub-trap-question-back
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's message is unclear, so the deliverable is a question back, not an integration:

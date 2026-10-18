@@ -388,7 +388,7 @@ boundaries:
     confusable_with: [daintree.review.red-team-change]
     run: 2026-09-28-catalog-expansion-refine
   - query: 'just make a worktree for the branch run-3/unit-2, no agent in it yet'
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-98
   - query: 'Make a new worktree on this machine for the release-candidate branch, no agent needed'
     confusable_with: [daintree.hosts.open-project-on-host]

@@ -48,6 +48,7 @@ cases:
         - daintree.hosts.foundation
 
   - id: host-state-lane-wake-no-hosts
+    host_model: inbox
     category: host-state
     note: >-
       handle-hub-message-wake-line on a lane: reachable by a hub's assistant, with no hosts
@@ -75,6 +76,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: host-state-recover-hosts-down
+    host_model: inbox
     category: host-state
     note: >-
       report-swarm-results-reverse-recover-and-clean-up with hosts configured but none

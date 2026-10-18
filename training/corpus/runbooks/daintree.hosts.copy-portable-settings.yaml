@@ -92,7 +92,7 @@ boundaries:
   - query: tell me what the host's settings page says about the last copy it received
     confusable_with: [daintree.hosts.survey-hosts]
   - query: make the server's default agent and its idle terminal alerts the same as on my laptop
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: the new build server starts from defaults; bring my worktree path pattern and recipes across
     confusable_with: [daintree.worktree.provision-local-environment]
   - query: bring over my global environment variables and the bypass option for the Linux host, but show me everything first
@@ -100,7 +100,7 @@ boundaries:
   - query: copy my Daintree settings across to the remote machine, and make sure no API key or login goes with them
     confusable_with: [daintree.worktree.manage-resource]
   - query: the assistants on the host are already ready and taking messages; the one thing missing there is my notification and agent preferences, copy them over
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: my project is on the server already; what I want there now is my own Daintree notification and agent settings, not the repository
     confusable_with: [daintree.hosts.open-project-on-host]
   - query: before the remote demo, make sure the host has my Daintree notification and agent settings, and copy them if not

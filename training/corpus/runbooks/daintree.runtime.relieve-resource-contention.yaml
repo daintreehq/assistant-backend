@@ -119,13 +119,13 @@ boundaries:
     confusable_with: [daintree.runtime.measure-performance]
     run: 2026-09-28-round6
   - query: 'is this machine too loaded to take on more agents right now'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: "this machine has no headroom left, the agents are eating all the memory"
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-91
   - query: "the mac is maxed out on cpu with four agents running, free up some headroom"
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-91
   - query: "this mac is swapping with all the agents on it, find out which ones are heavy and throttle them"
     confusable_with: [daintree.hosts.place-work]

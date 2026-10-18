@@ -8,6 +8,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: skills-host-resolve-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased: resolve and load the skill on the machine that executes it. Deciding
@@ -20,6 +21,7 @@ cases:
       optional: [daintree.foundation, daintree.hosts.foundation]
 
   - id: skills-host-remote-box-user
+    host_model: inbox
     category: single-runbook
     note: >-
       Receiving-lane wording: the hub's machine is not the one that runs the work, so the skill
@@ -32,6 +34,7 @@ cases:
       optional: [daintree.foundation, daintree.hosts.foundation]
 
   - id: skills-host-missing-plugin-blocker
+    host_model: inbox
     category: single-runbook
     note: >-
       The skill the hub named is not on this machine: the answer is the blocker, not a copy.
@@ -57,6 +60,7 @@ cases:
       optional: [daintree.foundation, daintree.hosts.foundation]
 
   - id: skills-host-scope-expanding-skill
+    host_model: inbox
     category: single-runbook
     note: >-
       The loaded skill asks for publication the hub request never did. Deciding clause: "its
@@ -82,6 +86,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: skills-host-trap-hub-work-order
+    host_model: inbox
     category: routing-trap
     note: >-
       A work order the hub sent to this host that only mentions a skill is the delegated unit.
@@ -181,3 +186,6 @@ cases:
     expect:
       required: [daintree.skills.use-plugin-skill]
       optional: [daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

@@ -37,6 +37,7 @@ _SMOKE = _ROOT / "infra" / "gcp" / "smoke.sh"
 
 BUILD_SHA = "4f1c9ae0deadbeef4f1c9ae0deadbeef4f1c9ae0"
 REVISION = "sha256:" + "ab" * 32
+INBOX_REVISION = "sha256:" + "cd" * 32
 
 
 def _healthy_deployment() -> dict[str, Any]:
@@ -49,6 +50,7 @@ def _healthy_deployment() -> dict[str, Any]:
         "ready": "ready",
         "runbooks": 40,
         "catalog_revision": REVISION,
+        "inbox_catalog_revision": INBOX_REVISION,
         "version_status": 200,
         "build_sha": BUILD_SHA,
         "protocol_version": "2025-06-18",
@@ -63,9 +65,16 @@ def _healthy_deployment() -> dict[str, Any]:
             {"id": "daintree.foundation", "selected": False},
         ],
         "search_revision": REVISION,
+        # What a caller without Daintree-Host-Control (v0.44) is served.
+        "inbox_search_revision": INBOX_REVISION,
         "get_is_error": False,
         "get_runbook": {"id": "daintree.terminals.rename", "instructions": "1. List them."},
         "get_supporting": [{"id": "daintree.foundation", "instructions": "Shared judgement."}],
+        # A host-control caller reporting a connected host.
+        "get_supporting_connected": [
+            {"id": "daintree.foundation", "instructions": "Shared judgement."},
+            {"id": "daintree.hosts.foundation", "instructions": "Another machine."},
+        ],
         "mcp_get_status": 405,
     }
 
@@ -98,6 +107,8 @@ class _Handler(BaseHTTPRequestHandler):
                     "status": d["ready"],
                     "catalog_revision": d["catalog_revision"],
                     "runbooks": d["runbooks"],
+                    "inbox_catalog_revision": d["inbox_catalog_revision"],
+                    "inbox_runbooks": d["runbooks"],
                 },
             )
         elif path == "/version":
@@ -119,6 +130,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(404, {"detail": "Not Found"})
             return
         method = message.get("method")
+        control = (self.headers.get("Daintree-Host-Control") or "").strip() == "1"
+        connected = control and (self.headers.get("Daintree-Hosts") or "").strip() == "connected"
+        revision = d["search_revision"] if control else d["inbox_search_revision"]
         if method == "initialize":
             result: dict[str, Any] = {
                 "protocolVersion": d["protocol_version"],
@@ -129,9 +143,9 @@ class _Handler(BaseHTTPRequestHandler):
             result = {"tools": [{"name": name} for name in d["tools"]]}
         elif method == "tools/call" and message["params"]["name"] == "get_runbook":
             structured = {
-                "catalog_revision": d["search_revision"],
+                "catalog_revision": revision,
                 "runbook": d["get_runbook"],
-                "supporting_runbooks": d["get_supporting"],
+                "supporting_runbooks": d["get_supporting_connected" if connected else "get_supporting"],
             }
             result = {
                 "content": [{"type": "text", "text": json.dumps(structured)}],
@@ -145,7 +159,7 @@ class _Handler(BaseHTTPRequestHandler):
             # has put more results in than any limit allows.
             if len(runbooks) <= 3:
                 runbooks = runbooks[:limit]
-            structured = {"catalog_revision": d["search_revision"], "runbooks": runbooks}
+            structured = {"catalog_revision": revision, "runbooks": runbooks}
             result = {
                 "content": [{"type": "text", "text": json.dumps(structured)}],
                 "structuredContent": structured,
@@ -200,7 +214,7 @@ def test_a_coherent_deployment_passes_the_whole_gate() -> None:
     result = _run_against(_healthy_deployment())
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     assert "FAIL" not in result.stdout, result.stdout
-    assert "10 passed, 0 failed" in result.stdout, result.stdout
+    assert "12 passed, 0 failed" in result.stdout, result.stdout
 
 
 def test_a_trailing_slash_on_the_url_is_not_a_second_route() -> None:
@@ -238,6 +252,11 @@ _MUTATIONS = [
         {"tools": ["search_runbooks", "get_runbook", "load_runbook"]},
     ),
     ("exact retrieval reports an error", {"get_is_error": True}),
+    ("a v0.44 caller is served the control catalog", {"inbox_search_revision": REVISION}),
+    (
+        "a connected host-control caller is not sent the hosts foundation",
+        {"get_supporting_connected": [{"id": "daintree.foundation", "instructions": "x"}]},
+    ),
     (
         "exact retrieval returns another runbook",
         {"get_runbook": {"id": "daintree.foundation", "instructions": "x"}},

@@ -16,6 +16,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: handle-hub-message-wake-line
+    host_model: inbox
     category: single-runbook
     note: >-
       The inbox wake line typed into a lane, verbatim with a fresh exchange id. The positive
@@ -30,6 +31,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a lane describes the task to search_runbooks after a wake. Decided by the
@@ -43,6 +45,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-issue-example
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's own example request. "the hub sent me a message, read it and deal with
@@ -56,6 +59,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-user-casual
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual, no "hub" or "inbox": the main machine stands for the hub ("the hub, the
@@ -68,6 +72,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-duplicate-wake
+    host_model: inbox
     category: single-runbook
     note: >-
       A wake for an exchange already answered. The body owns the rule (act by inbox
@@ -81,6 +86,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-revoked-enrollment
+    host_model: inbox
     category: single-runbook
     note: >-
       The lane's inbox refuses because a newer session replaced this one. Routing is decided by "Use on a
@@ -95,6 +101,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-beyond-the-request
+    host_model: inbox
     category: single-runbook
     note: >-
       A hub message that asks for more than the person authorised, with the boundary in
@@ -108,6 +115,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-hostile-referenced-file
+    host_model: inbox
     category: adversarial
     note: >-
       Hostile text inside a file the hub's message points to. The task is still the
@@ -121,6 +129,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-inbox-tool-missing
+    host_model: inbox
     category: single-runbook
     note: >-
       The wake arrived but the session does not list assistant.getInbox. Decided by "the
@@ -134,6 +143,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation, daintree.diagnostics]
 
   - id: handle-hub-message-shell-away
+    host_model: inbox
     category: single-runbook
     note: >-
       Replying after the hub's Shell went away: "answered with assistant.reply (completed
@@ -147,6 +157,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-cli-not-signed-in
+    host_model: inbox
     category: single-runbook
     note: >-
       The brief names a CLI this machine cannot run. "checked against … the CLIs signed
@@ -159,6 +170,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-send-result
+    host_model: inbox
     category: single-runbook
     note: >-
       The final reply with artifact references: "completed with artifact references".
@@ -171,6 +183,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: handle-hub-message-not-a-waiting-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       A hub message "waiting" to be answered is not a local agent waiting on a question.
@@ -187,6 +200,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-reply-is-not-forge
+    host_model: inbox
     category: routing-trap
     note: >-
       The issue's own example request went to daintree.workflow.follow-up-on-issue at base
@@ -201,6 +215,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-report-is-not-branch-prep
+    host_model: inbox
     category: routing-trap
     note: >-
       Telling the hub the work is done and pushed is "answered with assistant.reply
@@ -214,6 +229,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-trap-local-agent-asking
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse of the answer-waiting-agent fence: a local agent pane asking a question, with
@@ -242,6 +258,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: handle-hub-message-act-on-it-not-setup
+    host_model: inbox
     category: routing-trap
     note: >-
       Whether this lane may act on a message already in its inbox is this runbook's
@@ -258,6 +275,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: handle-hub-message-trap-messaging-setup
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse of the hosts foundation fence: the person on the Shell checking whether
@@ -272,6 +290,7 @@ cases:
       required: [daintree.hosts.foundation]
 
   - id: handle-hub-message-ask-the-hub-not-an-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       A question back to the hub is "ask the hub what it meant" and "input-required for a
@@ -286,6 +305,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-trap-ask-local-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: the hub only in the background, the question is for an agent this lane
@@ -318,6 +338,7 @@ cases:
   # optional (the lane holds it for the reply). Each one moves to its host-side
   # receiver when that lands.
   - id: handle-hub-message-receiver-implement
+    host_model: inbox
     category: routing-trap
     note: >-
       A code change the hub asked for goes to its host-side receiver,
@@ -334,6 +355,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-review
+    host_model: inbox
     category: routing-trap
     note: >-
       A findings-only review the hub asked for: its host-side receiver,
@@ -350,6 +372,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-cleanup
+    host_model: inbox
     category: routing-trap
     note: >-
       Cleaning up what this lane made for a run: the host-side receiver
@@ -364,6 +387,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-verify
+    host_model: inbox
     category: routing-trap
     note: >-
       Checking a claimed fix on a branch before the hub trusts it: the host-side receiver
@@ -383,6 +407,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-cohort
+    host_model: inbox
     category: routing-trap
     note: >-
       Several units of the hub's work across local agents:
@@ -396,6 +421,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-steer
+    host_model: inbox
     category: routing-trap
     note: >-
       Redirecting an agent on the hub's word goes to its host-side receiver,
@@ -411,6 +437,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-integrate
+    host_model: inbox
     category: routing-trap
     note: >-
       Combining branches into one integration branch because the hub asked: the host-side
@@ -428,6 +455,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: handle-hub-message-receiver-demo
+    host_model: inbox
     category: routing-trap
     note: >-
       A demo the hub wants prepared on this machine: the host-side receiver

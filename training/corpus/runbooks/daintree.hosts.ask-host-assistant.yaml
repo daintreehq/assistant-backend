@@ -157,18 +157,18 @@ boundaries:
   - query: the deploy smoke test is failing on the build box; ask its assistant what the error says, I'll decide on a fix myself
     confusable_with: [daintree.ci.diagnose-and-fix]
   - query: ask the mini's assistant whether it has room for one more job today
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: "ask the build box's assistant whether the usage limit slowed down its test run yesterday"
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-91
   - query: "check with the laptop host whether it switched to codex because claude ran out, and what it says"
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-91
   - query: 'ask the assistant on the build box what it makes of the parser approach, it should change nothing'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
   - query: 'have the linux box''s assistant tell me why its deploy script failed'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: "ask the build host's assistant whether last night's soak test passed and bring me its answer"
     confusable_with: [daintree.hosts.supervise-swarm]

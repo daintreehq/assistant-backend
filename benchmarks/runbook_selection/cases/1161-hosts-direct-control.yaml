@@ -1,0 +1,205 @@
+# Requests to the control catalog in the words a person uses once this Shell controls its
+# Remote Hosts directly (host.call): no hub, lanes, exchanges or messaging to switch on.
+# The merges land here (readying an assistant is daintree.hosts.delegate-to-host, a host
+# that refuses calls is daintree.hosts.survey-hosts, a run's final account is
+# daintree.hosts.supervise-swarm, a postmortem and usage across hosts are the agents
+# runbooks'), with traps that hold each boundary as the whenToUse text on disk draws it.
+
+cases:
+  - id: dc-hand-off-context-full
+    category: routing-trap
+    host_model: control
+    note: >-
+      The session is being replaced while the hosts keep working: "your context is nearly
+      full, hand the cross-machine swarm to a fresh assistant". Not a pause to resume later
+      (daintree.hosts.park-swarm), nor following the run itself
+      (daintree.hosts.supervise-swarm).
+    messages:
+      - role: user
+        content: >-
+          Your context is almost full. Write the hand-over so a fresh session can keep the
+          run on my other machines going without redoing anything.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-hand-off-successor
+    category: routing-trap
+    host_model: control
+    note: >-
+      "you are the new session, take over the run from the hand-over the last one wrote";
+      a hand-over exists, so it is not an account after a restart
+      (daintree.hosts.recover-and-clean-up).
+    messages:
+      - role: user
+        content: >-
+          You're taking over the job on the remote hosts from the hand-over notes the last
+          session left in my notes folder. Pick it up from there.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-park-not-hand-off
+    category: routing-trap
+    host_model: control
+    note: >-
+      Putting the run on hold to resume later is daintree.hosts.park-swarm, which
+      daintree.hosts.hand-off-swarm fences off; no other session takes it over.
+    messages:
+      - role: user
+        content: >-
+          Stop the work on my other machines for tonight, keep everything as it is, and I'll
+          pick it back up myself tomorrow.
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-ready-codex-on-build-box
+    category: single-runbook
+    host_model: control
+    note: >-
+      Readying a host's assistant with no work sent is daintree.hosts.delegate-to-host's
+      "READY as a host's assistant ... before any work goes out".
+    messages:
+      - role: user
+        content: Start a Codex assistant on the build box in this repo, but don't give it anything yet.
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-ready-assistant-each-host
+    category: routing-trap
+    host_model: control
+    note: >-
+      Readying, on each named host, not the same work on every host
+      (daintree.hosts.swarm-fan-out) and not a read-only report
+      (daintree.hosts.survey-hosts): nothing is sent, but something is started.
+    messages:
+      - role: user
+        content: >-
+          Make sure the Mac mini and the Linux server each have a Claude assistant waiting
+          in this project before I start handing out work.
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-refused-calls
+    category: single-runbook
+    host_model: control
+    note: >-
+      "why a host this Shell lists ... refuses calls (a call that came back ...
+      policy_rejected ...) and which setting the person changes": daintree.hosts.survey-hosts.
+    messages:
+      - role: user
+        content: Every call to the build box comes back policy_rejected. What's switched off?
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-cannot-control-laptop
+    category: routing-trap
+    host_model: control
+    note: >-
+      Why a host cannot be reached is daintree.hosts.survey-hosts, which
+      daintree.hosts.ask-host-assistant fences off: there is no question for that host's
+      assistant to answer while it refuses.
+    messages:
+      - role: user
+        content: Why can't my assistant work on the laptop host anymore? It was fine yesterday.
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-who-has-room
+    category: single-runbook
+    host_model: control
+    note: >-
+      "which machines can take work right now": daintree.hosts.survey-hosts, read-only.
+    messages:
+      - role: user
+        content: Which of my other machines has room for another job right now?
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-final-report
+    category: single-runbook
+    host_model: control
+    note: >-
+      The run's final account, every claim checked: daintree.hosts.supervise-swarm's
+      "give me the final report on what my other machines did".
+    messages:
+      - role: user
+        content: >-
+          The jobs on my other machines have all stopped. Give me one table of what each
+          really delivered and what it left running.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-postmortem-across-hosts
+    category: single-runbook
+    host_model: control
+    note: >-
+      daintree.agents.postmortem-run covers "a run that spanned the Remote Hosts this Shell
+      controls (why it stalled or did the same work twice ...)".
+    messages:
+      - role: user
+        content: >-
+          Last night's run across my two remote hosts sat stuck for hours and then did one
+          piece twice. Work out what went wrong.
+    expect:
+      required: [daintree.agents.postmortem-run]
+      optional: [daintree.foundation]
+
+  - id: dc-codex-quota-each-host
+    category: single-runbook
+    host_model: control
+    note: >-
+      Usage left on each machine, machine by machine: daintree.agents.check-usage-limits,
+      which absorbed the hosts runbook for it.
+    messages:
+      - role: user
+        content: How much Codex quota is left on each of my remote hosts?
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: dc-ask-host-judgment
+    category: single-runbook
+    host_model: control
+    note: >-
+      ONE QUESTION for the host's assistant whose answer is its judgment, relayed:
+      daintree.hosts.ask-host-assistant.
+    messages:
+      - role: user
+        content: Ask the assistant on the build box what it makes of the failing migration.
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: dc-port-on-remote-host
+    category: single-runbook
+    host_model: control
+    note: >-
+      A one-off port clash on a Remote Host is daintree.runtime.free-busy-port, "on this
+      machine or a Remote Host"; a host's 3000 is not this machine's.
+    messages:
+      - role: user
+        content: Port 3000 is stuck on my Linux host and the dev server there won't start. Free it.
+    expect:
+      required: [daintree.runtime.free-busy-port]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: dc-deploy-from-one-host
+    category: single-runbook
+    host_model: control
+    note: >-
+      A deploy confirmed live, run from the one host that owns the environment:
+      daintree.release.deploy-and-verify.
+    messages:
+      - role: user
+        content: Deploy main to staging from the build server and make sure the new version is serving.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.foundation, daintree.hosts.foundation]

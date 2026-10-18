@@ -76,6 +76,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: rebalance-load-unavailable-host
+    host_model: inbox
     category: single-runbook
     note: >-
       The unavailable-host scenario. Decided by "a host dropped out mid-run" and "only that
@@ -188,6 +189,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: check-usage-limits-not-rebalance-load
+    host_model: inbox
     category: routing-trap
     note: >-
       A usage read with nothing moved. check-usage-limits's "how much Claude Code or Codex
@@ -234,3 +236,21 @@ cases:
     expect:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: check-usage-limits-not-rebalance-load-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of check-usage-limits-not-rebalance-load: the same request against the control catalog.
+      A usage read with nothing moved. check-usage-limits''s "how much Claude Code or Codex allowance each
+      Remote Host this Shell reaches has left".'
+    messages:
+    - role: user
+      content: For the swarm hosts, read off what each one's Codex usage screen says right now, one row
+        per machine.
+    expect:
+      required:
+      - daintree.agents.check-usage-limits
+      optional:
+      - daintree.hosts.foundation

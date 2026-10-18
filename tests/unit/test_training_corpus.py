@@ -96,11 +96,10 @@ def test_no_row_leaks_the_held_out_benchmark(compiled: tuple[list[dict], dict]) 
     into a training-set score, which would make every number in the report
     meaningless. The compile gate drops collisions; this asserts none survived.
     """
-    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
     from training.compile_corpus import _benchmark_strings, norm
 
     rows, _ = compiled
-    held_out = _benchmark_strings(load_catalog(default_runbooks_dir()))
+    held_out = _benchmark_strings()
     leaked = [r["query"] for r in rows if norm(r["query"]) in held_out]
     assert not leaked, f"{len(leaked)} compiled rows collide with the benchmark: {leaked[:3]}"
 
@@ -283,19 +282,26 @@ def test_evaluation_protection_includes_holdout_history_and_turn_context(
     sealed.mkdir(parents=True)
     monkeypatch.setattr(cases, "CASES_DIR", main)
 
-    def load(_catalog: object, *, cases_dir: Path) -> list:
+    models: list[str] = []
+
+    def load(_catalog: object, *, cases_dir: Path, model: str) -> list:
+        models.append(model)
         if cases_dir == main:
             return []
         assert cases_dir == sealed
         return [SimpleNamespace(
-            messages=[SimpleNamespace(content="Earlier protected message!")],
+            messages=[SimpleNamespace(content=f"Earlier protected {model} message!")],
             turn_context="Protected runtime context.",
         )]
 
     monkeypatch.setattr(compile_corpus, "load_cases", load)
-    assert compile_corpus._benchmark_strings(object()) == {
-        "earlier protected message", "protected runtime context",
+    assert compile_corpus._benchmark_strings() == {
+        "earlier protected control message",
+        "earlier protected inbox message",
+        "protected runtime context",
     }
+    # Both host models' suites are protected, the inbox-only cases included.
+    assert sorted(set(models)) == ["control", "inbox"]
 
 
 def test_an_unknown_key_in_an_example_is_refused(tmp_path: Path) -> None:
