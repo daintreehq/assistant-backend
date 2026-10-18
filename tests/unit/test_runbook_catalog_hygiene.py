@@ -11,6 +11,11 @@ The authority is ``tests/fixtures/daintree_mcp/``: the tool surfaces the Daintre
 actually lists to each kind of caller, captured from one app commit (its README says
 which, and how to refresh). The names in frontmatter are action ids, which are also
 the wire names the app lists.
+
+Each host model's catalog is checked against its own generation of those captures
+(``daintree_mcp_surfaces.GENERATIONS``): the control catalog against the current app,
+the inbox catalog against the v0.44.0 capture frozen with it. A runbook both share is
+checked against both, so it cannot name a tool a v0.44 client lacks.
 """
 
 from __future__ import annotations
@@ -19,12 +24,15 @@ import re
 
 import pytest
 from daintree_mcp_surfaces import (
-    CALLER_POLICY,
+    CALLER_POLICY_BY_MODEL,
+    HOST_CONTROL_TOOLS,
     HUB_TOOLS,
     LANE_TOOLS,
     MESSAGING_TOOLS,
+    MODELS,
     PANE_CALLERS,
-    SURFACES,
+    SURFACES_BY_MODEL,
+    Model,
     action_ids,
     baseline_callers,
     baseline_violation,
@@ -33,32 +41,45 @@ from daintree_mcp_surfaces import (
     rebuild_delta,
 )
 
-from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
 from daintree_assistant_server.runbooks.local.documents import (
     runbook_document,
     split_when_to_use,
 )
 
 
-def test_the_captures_are_one_app_build_and_not_truncated() -> None:
-    """Every surface file, one capture. A half refresh — one surface re-captured from a
-    newer app, the others left behind — would let a runbook validate against a caller
-    that never existed. The floor catches a truncated capture that would make every check
-    below pass vacuously."""
+def _catalog(model: Model) -> Catalog:
+    return load_catalogs().for_model(model)
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_the_captures_are_one_app_build_and_not_truncated(model: Model) -> None:
+    """Every surface file of a generation, one capture. A half refresh — one surface
+    re-captured from a newer app, the others left behind — would let a runbook validate
+    against a caller that never existed. The floor catches a truncated capture that
+    would make every check below pass vacuously."""
     commits = set()
-    for surface in SURFACES:
-        recorded = capture(surface)["capture"]
+    for surface in SURFACES_BY_MODEL[model]:
+        recorded = capture(surface, model)["capture"]
         commits.add(recorded["app_commit"])
-        assert len(action_ids(surface)) >= 20, f"{surface} capture looks truncated"
+        assert len(action_ids(surface, model)) >= 20, f"{surface} capture looks truncated"
     assert len(commits) == 1, f"the surface captures come from different app builds: {commits}"
     # Every API-key tool is also a pane tool; external is curated, not different.
-    assert action_ids("external") <= action_ids("pane-core")
+    assert action_ids("external", model) <= action_ids("pane-core", model)
 
 
-def test_declared_tools_are_real_app_actions() -> None:
-    known = known_action_ids()
+def test_the_two_generations_are_different_builds() -> None:
+    """The inbox capture is frozen with the inbox catalog; the control one moves on."""
+    control = capture("pane-core", "control")["capture"]["app_commit"]
+    inbox = capture("pane-core", "inbox")["capture"]["app_commit"]
+    assert control != inbox
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_declared_tools_are_real_app_actions(model: Model) -> None:
+    known = known_action_ids(model)
     unknown: list[str] = []
-    for runbook in load_catalog().runbooks:
+    for runbook in _catalog(model).runbooks:
         for tool in (*runbook.meta.required_tools, *runbook.meta.optional_tools):
             if tool not in known:
                 unknown.append(f"{runbook.id}: {tool}")
@@ -69,7 +90,8 @@ def test_declared_tools_are_real_app_actions() -> None:
     )
 
 
-def test_required_tools_are_on_the_callers_surface() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_required_tools_are_on_the_callers_surface(model: Model) -> None:
     """The documented baseline path is the one its caller can take, checked against
     that caller's capture. The caller comes from the runbook's id namespace
     (`CALLER_POLICY`), never from its tool lists.
@@ -79,52 +101,117 @@ def test_required_tools_are_on_the_callers_surface() -> None:
     sidebar assistant is offered (the unscoped send and close) belongs in
     `optionalTools`, as the caller variant it is.
 
-    `daintree.hosts` is the one sidebar-only domain: an agent pane is never a hub or
-    an enrolled lane, and is never offered `host.*` or a lane's inbox. A hosts
-    runbook's whole baseline must be offered to ONE of its callers, the hub
-    (`hub-full`) or an enrolled lane (`lane-full`).
+    `daintree.hosts` is the one sidebar-only domain: an agent pane is never offered
+    `host.*`. A hosts runbook's whole baseline must be offered to ONE of its callers:
+    the Shell's assistant at either Tool set in the control model; the hub
+    (`hub-full`) or an enrolled lane (`lane-full`) in the inbox model.
     """
     violations = [
         violation
-        for runbook in load_catalog().runbooks
-        if (violation := baseline_violation(runbook.id, runbook.meta.required_tools))
+        for runbook in _catalog(model).runbooks
+        if (violation := baseline_violation(runbook.id, runbook.meta.required_tools, model))
     ]
     assert not violations, f"required tools the runbook's caller is not offered: {violations}"
 
 
-def test_supporting_runbooks_run_on_the_same_caller() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_supporting_runbooks_run_on_the_same_caller(model: Model) -> None:
     """A runbook is delivered with its domain foundation and its `requires`, and the
     caller follows all of them, so the bundle's baselines together must still run on
     one of this runbook's callers. Otherwise a pane runbook could pull in hub-only
     instructions through `requires`, or a lane runbook inherit a hub-only foundation
-    baseline."""
-    catalog = load_catalog()
+    baseline. The control hosts foundation, which a connected caller gets with every
+    runbook, therefore requires nothing at all: a pane follows it too."""
+    catalog = _catalog(model)
     violations = []
     for runbook in catalog.runbooks:
         bundle = [runbook, *catalog.supporting_for([runbook.id])]
         required = sorted({tool for member in bundle for tool in member.meta.required_tools})
-        if violation := baseline_violation(runbook.id, required):
+        if violation := baseline_violation(runbook.id, required, model):
             violations.append(violation)
     assert not violations, f"bundles no single caller can follow: {violations}"
+    hosts_foundation = load_catalogs().control.get("daintree.hosts.foundation")
+    assert hosts_foundation is not None and not hosts_foundation.meta.required_tools
     # What this catches: a hub-only requirement reaching a lane or a pane bundle.
-    assert baseline_violation("daintree.hosts.example", ["assistant.sendMessage", "host.list"])
+    assert baseline_violation(
+        "daintree.hosts.example", ["assistant.sendMessage", "host.list"], "inbox"
+    )
     assert baseline_violation("daintree.release.example", ["terminal.list", "host.list"])
 
 
 def test_the_caller_policy_names_one_sidebar_only_domain() -> None:
     """Pinned, so widening who escapes the pane check is a deliberate edit here."""
     assert PANE_CALLERS == ("pane-core",)
-    assert CALLER_POLICY == {"daintree.hosts": ("hub-full", "lane-full")}
+    assert CALLER_POLICY_BY_MODEL == {
+        "control": {"daintree.hosts": ("help-core", "help-full")},
+        "inbox": {"daintree.hosts": ("hub-full", "lane-full")},
+    }
 
 
-def test_every_other_runbook_is_still_checked_against_the_pane() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_every_other_runbook_is_still_checked_against_the_pane(model: Model) -> None:
     """The policy exempts nothing it does not name: every runbook outside
     `daintree.hosts` keeps the pane check, whatever tools it declares."""
-    catalog = load_catalog()
-    off_pane = [rid for rid in catalog.known_ids if baseline_callers(rid) != PANE_CALLERS]
+    catalog = _catalog(model)
+    off_pane = [rid for rid in catalog.known_ids if baseline_callers(rid, model) != PANE_CALLERS]
     assert all(rid.startswith("daintree.hosts.") for rid in off_pane), off_pane
     for rid in ("daintree.hostsx.ask", "daintree.orchestration.hosts", "daintree.host.ask"):
-        assert baseline_callers(rid) == PANE_CALLERS, rid
+        assert baseline_callers(rid, model) == PANE_CALLERS, rid
+
+
+def test_metadata_cannot_make_a_runbook_a_hosts_runbook() -> None:
+    """Declaring host-control tools never moves a runbook off the pane check: outside
+    `daintree.hosts` they can only ever be `optionalTools`, the sidebar variant of a
+    pane runbook. And a hosts runbook's baseline cannot borrow a pane's owned tools."""
+    for tool in sorted(HOST_CONTROL_TOOLS | {"assistant.list", "assistant.start"}):
+        assert baseline_violation("daintree.release.ask-a-host", [tool]) is not None, tool
+    hosts = "daintree.hosts.example"
+    assert baseline_violation(hosts, ["host.list", "host.call"]) is None
+    assert baseline_violation(hosts, ["host.list", "project.openOnHost"]) is None
+    assert baseline_violation(hosts, ["host.call", "terminal.sendCommand"]) is None
+    assert baseline_violation(hosts, ["terminal.sendCommandOwned"]) is not None
+
+    off_caller = [
+        f"{runbook.id}: {tool}"
+        for runbook in load_catalogs().control.runbooks
+        if baseline_callers(runbook.id) != PANE_CALLERS
+        for tool in runbook.meta.optional_tools
+        if not any(tool in action_ids(caller) for caller in baseline_callers(runbook.id))
+    ]
+    assert not off_caller, f"optional tools no caller of the runbook is offered: {off_caller}"
+
+
+def test_only_the_shells_own_assistant_controls_a_host() -> None:
+    """`host.list` and `host.call` reach another machine, so only this machine's own
+    assistant sessions are offered them: never a pane or an API-key client, and never
+    the session a host opens for a Shell's call, so a call cannot chain. Neither
+    model's inbox tool survives anywhere."""
+    for surface in SURFACES_BY_MODEL["control"]:
+        offered = action_ids(surface)
+        assert not offered & MESSAGING_TOOLS - {"host.list"}, surface
+        if surface in ("help-core", "help-full"):
+            assert offered >= HOST_CONTROL_TOOLS, surface
+            assert {"assistant.list", "assistant.start", "agent.readQuota"} <= offered
+        else:
+            assert not offered & HOST_CONTROL_TOOLS, surface
+    for surface in ("relayed-core", "relayed-full"):
+        offered = action_ids(surface)
+        assert capture(surface)["capture"]["session"]["relay"] is True
+        assert not {tool for tool in offered if tool.startswith("host.")}, surface
+        assert {"assistant.list", "assistant.start", "terminal.sendCommandOwned"} <= offered
+    # The command runner is Full only, for a relay as for the Shell's assistant.
+    assert "project.runCommand" in action_ids("relayed-full")
+    assert "project.runCommand" not in action_ids("relayed-core")
+
+
+def test_a_host_call_reaches_the_relayed_surface_of_its_own_tier() -> None:
+    """What `host.call` can name is what the host lists to a relay at the caller's
+    Tool set: the same app build, and the tier the call carries."""
+    for help_surface, relayed in (("help-core", "relayed-core"), ("help-full", "relayed-full")):
+        assert capture(relayed)["capture"]["tier"] == capture(help_surface)["capture"]["tier"]
+    schema = capture("help-core")["tools"]
+    call = next(t for t in schema if t["action_id"] == "host.call")
+    assert call["inputSchema"]["required"] == ["hostId", "projectId", "tool"]
 
 
 def test_metadata_cannot_make_a_runbook_a_hub_or_lane_runbook() -> None:
@@ -132,25 +219,31 @@ def test_metadata_cannot_make_a_runbook_a_hub_or_lane_runbook() -> None:
     `daintree.hosts` they can only ever be `optionalTools`, the sidebar hub variant
     of a pane runbook (like the unscoped send). And a hosts runbook's baseline cannot
     borrow a pane's owned tools, or span the hub and a lane."""
+    inbox: Model = "inbox"
     for tool in sorted(MESSAGING_TOOLS):
-        assert baseline_violation("daintree.release.ask-a-host", [tool]) is not None, tool
+        assert baseline_violation("daintree.release.ask-a-host", [tool], inbox) is not None, tool
     hosts = "daintree.hosts.example"
-    assert baseline_violation(hosts, ["host.list", "host.sendMessage"]) is None
-    assert baseline_violation(hosts, ["host.list", "project.openOnHost"]) is None
-    assert baseline_violation(hosts, sorted(LANE_TOOLS)) is None
-    assert baseline_violation(hosts, ["assistant.reply", "terminal.sendKeys"]) is None
-    assert baseline_violation(hosts, ["terminal.sendCommandOwned"]) is not None
-    assert baseline_violation(hosts, ["host.sendMessage", "assistant.sendMessage"]) is not None
-    assert baseline_violation(hosts, ["host.listAssistants", "assistant.sendMessage"]) is not None
+    assert baseline_violation(hosts, ["host.list", "host.sendMessage"], inbox) is None
+    assert baseline_violation(hosts, ["host.list", "project.openOnHost"], inbox) is None
+    assert baseline_violation(hosts, sorted(LANE_TOOLS), inbox) is None
+    assert baseline_violation(hosts, ["assistant.reply", "terminal.sendKeys"], inbox) is None
+    assert baseline_violation(hosts, ["terminal.sendCommandOwned"], inbox) is not None
+    assert baseline_violation(hosts, ["host.sendMessage", "assistant.sendMessage"], inbox)
+    assert baseline_violation(hosts, ["host.listAssistants", "assistant.sendMessage"], inbox)
 
     off_caller = [
         f"{runbook.id}: {tool}"
-        for runbook in load_catalog().runbooks
-        if baseline_callers(runbook.id) != PANE_CALLERS
+        for runbook in load_catalogs().inbox.runbooks
+        if baseline_callers(runbook.id, inbox) != PANE_CALLERS
         for tool in runbook.meta.optional_tools
-        if not any(tool in action_ids(caller) for caller in baseline_callers(runbook.id))
+        if not any(
+            tool in action_ids(caller, inbox) for caller in baseline_callers(runbook.id, inbox)
+        )
     ]
     assert not off_caller, f"optional tools no caller of the runbook is offered: {off_caller}"
+
+
+# ---- the inbox model, frozen with the v0.44.0 capture -------------------------
 
 
 def test_pane_and_api_key_callers_are_never_offered_messaging() -> None:
@@ -159,12 +252,12 @@ def test_pane_and_api_key_callers_are_never_offered_messaging() -> None:
     it: they are not sidebar-assistant sessions. Nor is the ordinary sidebar
     assistant on a machine with no host and no listener."""
     for surface in ("pane-core", "pane-full", "external"):
-        recorded = capture(surface)["capture"]["messaging"]
+        recorded = capture(surface, "inbox")["capture"]["messaging"]
         assert recorded["machine_has_hosts"] and recorded["machine_listening_as_host"]
         assert not recorded["help_session"]
-        assert not action_ids(surface) & MESSAGING_TOOLS, surface
+        assert not action_ids(surface, "inbox") & MESSAGING_TOOLS, surface
     for surface in ("help-core", "help-full"):
-        assert not action_ids(surface) & MESSAGING_TOOLS, surface
+        assert not action_ids(surface, "inbox") & MESSAGING_TOOLS, surface
 
 
 def test_messaging_is_the_same_on_core_and_full() -> None:
@@ -175,8 +268,11 @@ def test_messaging_is_the_same_on_core_and_full() -> None:
     to write to; a lane on a host has no `host.*` reach. Only the window moves,
     `host.switch` and `project.openOnHost`, stay Full."""
 
+    def ids(surface: str) -> set[str]:
+        return action_ids(surface, "inbox")
+
     def allowlisted_messaging(surface: str) -> set[str]:
-        withheld = capture(surface)["capture"].get("allowlisted_but_not_listed", [])
+        withheld = capture(surface, "inbox")["capture"].get("allowlisted_but_not_listed", [])
         return {w["action_id"] for w in withheld} & MESSAGING_TOOLS
 
     inbox = {"assistant.getInbox", "assistant.reply"}
@@ -185,18 +281,19 @@ def test_messaging_is_the_same_on_core_and_full() -> None:
     assert allowlisted_messaging("help-full") == MESSAGING_TOOLS
     # The Core sessions themselves, captured with messaging reachable and recorded
     # as what they list beyond help-core.
-    hub_core = capture("hub-full")["capture"]["core_listing"]
-    lane_core = capture("lane-full")["capture"]["core_listing"]
+    hub_core = capture("hub-full", "inbox")["capture"]["core_listing"]
+    lane_core = capture("lane-full", "inbox")["capture"]["core_listing"]
+    help_core_hash = capture("help-core", "inbox")["capture"]["surface_hash"]
     for listing in (hub_core, lane_core):
-        assert listing["delta_of_surface_hash"] == capture("help-core")["capture"]["surface_hash"]
+        assert listing["delta_of_surface_hash"] == help_core_hash
         assert not listing["removed"] and not listing["changed"]
     assert set(hub_core["added"]) == HUB_TOOLS | inbox
     assert set(lane_core["added"]) == LANE_TOOLS
-    assert action_ids("hub-full") & HUB_TOOLS == HUB_TOOLS
-    assert action_ids("hub-full") & LANE_TOOLS == inbox
-    assert window_moves <= action_ids("hub-full")
-    assert not window_moves & (action_ids("help-core") | set(hub_core["added"]))
-    assert action_ids("lane-full") & MESSAGING_TOOLS == LANE_TOOLS
+    assert ids("hub-full") & HUB_TOOLS == HUB_TOOLS
+    assert ids("hub-full") & LANE_TOOLS == inbox
+    assert window_moves <= ids("hub-full")
+    assert not window_moves & (ids("help-core") | set(hub_core["added"]))
+    assert ids("lane-full") & MESSAGING_TOOLS == LANE_TOOLS
 
 
 def test_hub_and_lane_surfaces_are_the_sidebar_plus_messaging() -> None:
@@ -206,13 +303,16 @@ def test_hub_and_lane_surfaces_are_the_sidebar_plus_messaging() -> None:
     Shell with a Remote Host shows."""
     host_gated = {"host.switch", "project.openOnHost"}
     for surface in ("hub-full", "lane-full"):
-        recorded = capture(surface)["capture"]
+        recorded = capture(surface, "inbox")["capture"]
         base = recorded["delta_of"]
-        assert capture(base)["capture"]["tier"] == recorded["tier"], surface
-        assert capture(base)["capture"]["surface_hash"] == recorded["delta_of_surface_hash"]
-        assert len(capture(surface)["tools"]) == recorded["tool_count"], surface
-        assert action_ids(base) <= action_ids(surface), surface
-        assert action_ids(surface) - action_ids(base) <= MESSAGING_TOOLS | host_gated, surface
+        assert capture(base, "inbox")["capture"]["tier"] == recorded["tier"], surface
+        assert (
+            capture(base, "inbox")["capture"]["surface_hash"] == recorded["delta_of_surface_hash"]
+        )
+        assert len(capture(surface, "inbox")["tools"]) == recorded["tool_count"], surface
+        assert action_ids(base, "inbox") <= action_ids(surface, "inbox"), surface
+        added = action_ids(surface, "inbox") - action_ids(base, "inbox")
+        assert added <= MESSAGING_TOOLS | host_gated, surface
 
 
 def test_a_delta_that_does_not_apply_is_refused() -> None:
@@ -289,13 +389,14 @@ _DEFERRAL = re.compile(r"\buse\s+(?:the\s+)?([a-z0-9][a-z0-9 ./_-]{2,60}?)(?=[,.
 UNQUALIFIED_DEFERRALS = 0
 
 
-def _tool_namespace_names() -> set[str]:
+def _tool_namespace_names(model: Model) -> set[str]:
     """App action ids, which are dotted like runbook ids and legitimately quoted in
     runbook prose."""
-    return known_action_ids()
+    return known_action_ids(model)
 
 
-def test_every_dotted_reference_in_a_whenToUse_resolves() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_every_dotted_reference_in_a_whenToUse_resolves(model: Model) -> None:
     """A carve-out that points at nothing is an untestable claim.
 
     Three things legitimately wear this shape and all three are accepted: a real
@@ -304,10 +405,10 @@ def test_every_dotted_reference_in_a_whenToUse_resolves() -> None:
     (``terminal.getOutput``). Anything else is a dangling reference — a typo, or a
     runbook that was renamed or deleted, leaving a claim nothing can test.
     """
-    catalog = load_catalog(default_runbooks_dir())
+    catalog = _catalog(model)
     known = set(catalog.known_ids)
     namespaces = {sid.rsplit(".", 1)[0] for sid in known}
-    tools = _tool_namespace_names()
+    tools = _tool_namespace_names(model)
 
     dangling: list[str] = []
     for runbook in catalog.runbooks:
@@ -321,7 +422,8 @@ def test_every_dotted_reference_in_a_whenToUse_resolves() -> None:
     )
 
 
-def test_every_carve_out_defers_to_a_fully_qualified_id() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_every_carve_out_defers_to_a_fully_qualified_id(model: Model) -> None:
     """"use competition" is invisible to the routing-trap gate; "use
     daintree.orchestration.competition" is not.
 
@@ -335,11 +437,11 @@ def test_every_carve_out_defers_to_a_fully_qualified_id() -> None:
     create no coverage edge either, which is why they are counted in the message
     below rather than silently accepted.
     """
-    catalog = load_catalog(default_runbooks_dir())
+    catalog = _catalog(model)
     known = set(catalog.known_ids)
     leaves = {sid.rsplit(".", 1)[-1] for sid in known}
     namespaces = {sid.rsplit(".", 1)[0] for sid in known}
-    tools = _tool_namespace_names()
+    tools = _tool_namespace_names(model)
 
     unqualified: list[str] = []
     for runbook in catalog.runbooks:
@@ -361,7 +463,8 @@ def test_every_carve_out_defers_to_a_fully_qualified_id() -> None:
     )
 
 
-def test_no_two_runbooks_share_a_routing_surface() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_no_two_runbooks_share_a_routing_surface(model: Model) -> None:
     """Two identical routing documents are one vector in two shortlist slots.
 
     The selector embeds title + summary + whenToUse and never reads a body, so
@@ -370,7 +473,7 @@ def test_no_two_runbooks_share_a_routing_surface() -> None:
     cardinality head will be asked to choose between two things it cannot tell
     apart.
     """
-    catalog = load_catalog(default_runbooks_dir())
+    catalog = _catalog(model)
     seen: dict[str, str] = {}
     clashes: list[str] = []
     for runbook in catalog.runbooks:
@@ -381,7 +484,8 @@ def test_no_two_runbooks_share_a_routing_surface() -> None:
     assert not clashes, f"runbooks with identical routing surfaces: {clashes}"
 
 
-def test_no_runbooks_positive_trigger_is_contained_in_anothers() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_no_runbooks_positive_trigger_is_contained_in_anothers(model: Model) -> None:
     """A copy-and-extend detector, which is what it actually is.
 
     Compares the 5+-letter word sets of the POSITIVE clauses — the carve-outs
@@ -397,7 +501,7 @@ def test_no_runbooks_positive_trigger_is_contained_in_anothers() -> None:
     routing prose. Read a failure as "these two triggers were probably written
     from each other", not as proof that one owns no requests.
     """
-    catalog = load_catalog(default_runbooks_dir())
+    catalog = _catalog(model)
     triggers = {
         runbook.id: set(
             re.findall(r"[a-z]{5,}", split_when_to_use(runbook.meta.when_to_use)[0].lower())

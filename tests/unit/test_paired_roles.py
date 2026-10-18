@@ -17,6 +17,10 @@ file checks everything about the pairs that needs no model:
 
 It proves selection structure and contract. It does not prove a notice is delivered or that an
 agent follows a procedure; that takes a live hub and lane (``references/hub-lane-trials.md``).
+
+Hubs and lanes are the inbox model's, so all of it reads the inbox catalog and its frozen
+v0.44.0 capture (``runbooks/catalog.py``, ``load_catalogs``). The control model has no lanes: a
+host's assistant that receives a brief follows the ordinary catalog.
 """
 
 from __future__ import annotations
@@ -48,7 +52,7 @@ from benchmarks.runbook_selection.pairs import (
 from benchmarks.runbook_selection.scoring import score_trial
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.runbook_mcp import SENT_EARLIER_NOTE, TOOL_NAME
-from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
 
 #: What the issue's scenario list names, each seen from both ends.
 REQUIRED_SCENARIOS = {
@@ -83,12 +87,12 @@ SESSION_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 @cache
 def _catalog() -> Catalog:
-    return load_catalog()
+    return load_catalogs().inbox
 
 
 @cache
 def _all_cases() -> tuple[BenchCase, ...]:
-    return tuple(load_cases(_catalog()))
+    return tuple(load_cases(_catalog(), model="inbox"))
 
 
 def _cases() -> list[BenchCase]:
@@ -266,11 +270,11 @@ def test_the_role_reading_agrees_with_the_captured_hub_and_lane_surfaces() -> No
         required = set(runbook.meta.required_tools)
         if role == "hub":
             hub_ids.append(runbook.id)
-            assert required <= action_ids("hub-full"), runbook.id
-            assert not required <= action_ids("lane-full"), runbook.id
+            assert required <= action_ids("hub-full", "inbox"), runbook.id
+            assert not required <= action_ids("lane-full", "inbox"), runbook.id
         elif role == "lane":
             lane_ids.append(runbook.id)
-            assert required <= action_ids("lane-full"), runbook.id
+            assert required <= action_ids("lane-full", "inbox"), runbook.id
     assert {"daintree.hosts.delegate-to-host", "daintree.hosts.steer-swarm"} <= set(hub_ids)
     assert {"daintree.hosts.do-delegated-work", "daintree.hosts.handle-hub-message"} <= set(
         lane_ids
@@ -292,7 +296,7 @@ def test_the_hosts_wildcard_forbids_every_procedure_at_both_ends(tmp_path: Any) 
         "      forbid: [daintree.hosts.*]\n"
     )
     (tmp_path / "c.yaml").write_text(body, encoding="utf-8")
-    (case,) = load_cases(catalog, tmp_path)
+    (case,) = load_cases(catalog, tmp_path, model="inbox")
     procedures = {r.id for r in catalog.runbooks if baseline_role(r) is not None}
     assert set(case.forbid) == procedures
     assert {"daintree.hosts.delegate-to-host", "daintree.hosts.do-delegated-work"} <= procedures
@@ -405,10 +409,10 @@ def test_loading_refuses_a_half_declared_pair_and_a_self_contradicting_expectati
 
     def load(body: str) -> None:
         (tmp_path / "c.yaml").write_text(body, encoding="utf-8")
-        load_cases(catalog, tmp_path)
+        load_cases(catalog, tmp_path, model="inbox")
 
-    head = "cases:\n  - id: c\n    category: single-runbook\n    messages:\n"
-    head += "      - {role: user, content: x}\n"
+    head = "cases:\n  - id: c\n    category: single-runbook\n    host_model: inbox\n"
+    head += "    messages:\n      - {role: user, content: x}\n"
     with pytest.raises(CaseError, match="come together"):
         load(head + "    scenario: s\n    expect: {required: [" + lane_runbook + "]}\n")
     with pytest.raises(CaseError, match="forbidden for this case"):
@@ -432,10 +436,10 @@ def test_loading_a_scenario_with_no_trap_is_refused(tmp_path: Any) -> None:
     hub_runbook, lane_runbook = _ends("implement")
     body = (
         "cases:\n"
-        f"  - {{id: h, scenario: s, role: hub, category: single-runbook, "
+        f"  - {{id: h, scenario: s, role: hub, host_model: inbox, category: single-runbook, "
         f"messages: [{{role: user, content: 'Have my other Mac fix the flaky login test and open a PR'}}], "
         f"expect: {{required: [{hub_runbook}]}}}}\n"
-        f"  - {{id: l, scenario: s, role: lane, category: single-runbook, "
+        f"  - {{id: l, scenario: s, role: lane, host_model: inbox, category: single-runbook, "
         f"brief: 'Objective: Fix the flaky login test. Deliverable: one commit.\\nScope: here\\n"
         f"Report: SHA\\nStop: ask', "
         f"messages: [{{role: user, content: 'Fix the flaky login test in a new worktree here'}}], "
@@ -443,7 +447,7 @@ def test_loading_a_scenario_with_no_trap_is_refused(tmp_path: Any) -> None:
     )
     (tmp_path / "c.yaml").write_text(body, encoding="utf-8")
     with pytest.raises(CaseError, match="no wrong-role routing trap"):
-        load_cases(catalog, tmp_path)
+        load_cases(catalog, tmp_path, model="inbox")
 
 
 def test_a_forbidden_load_fails_recall_and_is_reported_per_case() -> None:
@@ -507,15 +511,16 @@ def test_each_scenarios_runbooks_run_on_their_own_caller_and_hide_nothing_in_opt
     for runbook, surface in ((hub, "hub-full"), (lane, "lane-full")):
         bundle = [runbook, *catalog.supporting_for([runbook.id])]
         baseline = {t for member in bundle for t in member.meta.required_tools}
-        assert baseline <= action_ids(surface), (runbook.id, sorted(baseline - action_ids(surface)))
+        offered = action_ids(surface, "inbox")
+        assert baseline <= offered, (runbook.id, sorted(baseline - offered))
         # `optionalTools` is for branches and caller variants the caller IS offered. A tool this
         # caller lacks parked there would let a baseline escape the contract unchecked.
-        stray = set(runbook.meta.optional_tools) - action_ids(surface)
+        stray = set(runbook.meta.optional_tools) - action_ids(surface, "inbox")
         assert not stray, (runbook.id, sorted(stray))
         assert not set(runbook.meta.optional_tools) & set(runbook.meta.required_tools)
     # The hub's baseline is something a lane cannot execute; that is the whole reason a lane
     # must not be handed it.
-    assert not set(hub.meta.required_tools) <= action_ids("lane-full"), hub_id
+    assert not set(hub.meta.required_tools) <= action_ids("lane-full", "inbox"), hub_id
     # The lane runbook's own procedure never calls the hub-only send.
     assert "host.sendMessage" not in lane.body, lane_id
 

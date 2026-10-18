@@ -6,8 +6,10 @@
 # Creates a throwaway DETACHED worktree of the app at <commit-ish>, gives it a
 # node_modules made of symlinks into the app checkout's own node_modules (the
 # workspace packages are re-pointed at the worktree's packages/), copies
-# captureMcpSurfaces.test.ts into it, runs that one vitest file, writes the
-# fixtures next to this directory, and removes the worktree.
+# captureMcpSurfaces.test.ts into it, runs that one vitest file, writes one
+# whole <surface>.json per caller (pane-core, pane-full, help-core, help-full,
+# external, relayed-core, relayed-full), then runs the app's own tests of the
+# direct host-control contract at the same commit, and removes the worktree.
 #
 # Nothing is written into the app checkout itself: the worktree has a real
 # node_modules directory (so vite's cache lands there), and only links are
@@ -104,15 +106,41 @@ mkdir -p "$out"
     CAPTURE_APP_BRANCH="$branch" \
     CAPTURE_AT="${CAPTURE_AT:-}" \
     ./node_modules/.bin/vitest run src/services/actions/__tests__/captureMcpSurfaces.test.ts
-  # The messaging contract a listing cannot show (start consent, the assistant
-  # limit, one CLI per project, consent withdrawn mid-start, outcomes, the hub's
-  # update line), proven by the app's own tests at the same commit.
-  ./node_modules/.bin/vitest run \
-    electron/remote/assistant/__tests__/HostAssistantStarter.test.ts \
-    electron/remote/assistant/__tests__/HubMessagingRuntime.test.ts \
-    electron/remote/assistant/__tests__/install.test.ts \
-    electron/services/mcp-server/__tests__/hostMessagingTools.test.ts \
-    electron/services/mcp-server/__tests__/assistantMessagingTools.test.ts
+  # The host-control contract a listing cannot show, proven by the app's own
+  # tests at the same commit: who the runtime counts as one of this machine's
+  # assistants and the per-host switch (HostCallRuntime, install), a call's
+  # outcomes and its callId running at most once (HostCallRuntime.call,
+  # relayCallLedger), the host admitting each call through a relayed session of
+  # its own (hostMcpRelay, httpLifecycle.relay), that session's gates and the
+  # drive rule (sessionServer.relay, relayWriteRule), notices typed back into
+  # the calling run (HostCallRuntime.notices, relayNoticeOutbox,
+  # terminalNotify.relay), confirmations put to the Shell (HostCallRuntime.approval,
+  # relayApprovals), the session-side refusals (hostControlTools), and one
+  # assistant addressing another (AssistantTerminalControl).
+  contract_tests=(
+    electron/remote/assistant/__tests__/HostCallRuntime.test.ts
+    electron/remote/assistant/__tests__/HostCallRuntime.call.test.ts
+    electron/remote/assistant/__tests__/HostCallRuntime.approval.test.ts
+    electron/remote/assistant/__tests__/HostCallRuntime.notices.test.ts
+    electron/remote/assistant/__tests__/hostMcpRelay.test.ts
+    electron/remote/assistant/__tests__/install.test.ts
+    electron/remote/assistant/__tests__/relayCallLedger.test.ts
+    electron/remote/assistant/__tests__/relayApprovals.test.ts
+    electron/remote/assistant/__tests__/relayNoticeOutbox.test.ts
+    electron/services/mcp-server/__tests__/hostControlTools.test.ts
+    electron/services/mcp-server/__tests__/sessionServer.relay.test.ts
+    electron/services/mcp-server/__tests__/httpLifecycle.relay.test.ts
+    electron/services/mcp-server/__tests__/relayWriteRule.test.ts
+    electron/services/mcp-server/__tests__/terminalNotify.relay.test.ts
+    electron/services/assistants/__tests__/AssistantTerminalControl.test.ts
+  )
+  for t in "${contract_tests[@]}"; do
+    if [[ ! -f "$t" ]]; then
+      echo "error: contract test $t is not at $commit; update capture.sh's list" >&2
+      exit 1
+    fi
+  done
+  ./node_modules/.bin/vitest run "${contract_tests[@]}"
 )
 
 node -e '
@@ -120,7 +148,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 for (const file of fs.readdirSync(process.argv[1]).filter((f) => f.endsWith(".json")).sort()) {
   const f = JSON.parse(fs.readFileSync(path.join(process.argv[1], file), "utf8"));
-  const delta = f.capture.delta_of ? `  delta_of=${f.capture.delta_of} +${f.added.length} ~${f.changed.length} -${f.removed.length}` : "";
-  console.log(`${file}  tools=${f.capture.tool_count}  hash=${f.capture.surface_hash}${delta}`);
+  const variants = Object.entries(f.capture.variants ?? {})
+    .map(([key, v]) => `${key}: tools=${v.tool_count} +${v.added.length} -${v.removed.length} ~${v.changed.length}`)
+    .join("; ");
+  console.log(`${file}  tools=${f.capture.tool_count}  hash=${f.capture.surface_hash}${variants ? `  variants: ${variants}` : ""}`);
 }
 ' "$out"

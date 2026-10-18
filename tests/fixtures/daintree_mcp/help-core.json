@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "f91badae473c430b0c62366b4e8d6222e7195809",
+    "app_commit": "f45fa04b3b614fb40ea17dc374c08a46f2b5553a",
     "app_version": "0.44.0",
     "caller_origin": "help",
     "session_origin": "help",
@@ -10,71 +10,89 @@
     "session": {
       "workspace_bound": false,
       "pane_approval": false,
-      "renderer_owned_origin": true
+      "renderer_owned_origin": true,
+      "relay": false
     },
-    "caller": "Daintree's own sidebar assistant (help session), Tool set = Core, on a machine with no Remote Host configured that does not listen as a host. Help-token bearer, origin 'help' (renderer-owned), pinned to the WebContents that minted it; no approval route.",
-    "messaging": {
+    "caller": "Daintree's own sidebar assistant (a help session) in one of this machine's own windows with a project open, Tool set = Core, on a Shell that has added a Remote Host. Help-token bearer, origin 'help' (renderer-owned), pinned to the WebContents that minted it; no approval route. The host-control runtime counts it as one of this machine's assistants in its own view, so host.list and host.call are listed from the session's start, whether or not a host exists yet; it is an assistant caller in its project, so assistant.list, assistant.start and agent.readQuota are listed, at Core as at Full.",
+    "host_control": {
       "help_session": true,
-      "machine_has_hosts": false,
-      "machine_listening_as_host": false,
-      "enrolled": false,
-      "hub_tools_offered": false,
-      "lane_tools_offered": false,
-      "lane_send_offered": false
+      "call_reachable": true,
+      "host_tools_offered": true,
+      "assistant_caller": "local",
+      "assistant_tools_offered": true,
+      "command_runner_offered": false
+    },
+    "machine": {
+      "added_remote_hosts": true,
+      "manifest_source": "view"
     },
     "captured_at": "2026-10-18",
     "mcp_protocol_version": "2025-11-25",
-    "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry, served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) configured as this caller, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "d9732a8b040ff4e2df4b4988475750a59f739ae0d8f6e74a82ea3d27ac3890bc",
-    "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest)",
-    "tool_count": 36,
-    "allowlisted_but_not_listed": [
-      {
-        "action_id": "assistant.getInbox",
-        "reason": "lane messaging not offered: no Remote Host configured and not listening as one"
-      },
-      {
-        "action_id": "assistant.reply",
-        "reason": "lane messaging not offered: no Remote Host configured and not listening as one"
-      },
-      {
-        "action_id": "assistant.sendMessage",
-        "reason": "lane send not offered: this machine does not listen as a Remote Host"
-      },
-      {
-        "action_id": "host.cancelTask",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.getTask",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.list",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.listAssistants",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.listTasks",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.readQuota",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.sendMessage",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      },
-      {
-        "action_id": "host.startAssistant",
-        "reason": "hub messaging not offered: no Remote Host configured on this Shell"
-      }
+    "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
+    "surface_hash": "c9ba0b84d67b24317701c517bf580492c5b204c7dbb49c28265f8e8ae3a07dcd",
+    "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
+    "tool_count": 41,
+    "context_gated_tools": [],
+    "notes": [
+      "tools[].daintree.reach 'caller': admitted by its caller rule rather than the tier allowlist (mayControlAssistants for assistant.list, assistant.start and agent.readQuota; mayRunProjectCommand for project.runCommand). No grant widens either."
     ],
-    "context_gated_tools": []
+    "variants": {
+      "in_a_remote_shells_view": {
+        "caller": "A help session this machine runs for a remote Shell's window (its view is a remote endpoint), Tool set = Core. The host-control runtime does not count it (isCallReachable false: a host relaying through here could reach every other), so host.list and host.call are not listed; it is still an assistant caller in its project.",
+        "host_control": {
+          "help_session": true,
+          "call_reachable": false,
+          "host_tools_offered": false,
+          "assistant_caller": "local",
+          "assistant_tools_offered": true,
+          "command_runner_offered": false
+        },
+        "machine": {
+          "added_remote_hosts": true,
+          "manifest_source": "view"
+        },
+        "tool_count": 39,
+        "surface_hash": "f1968bc6d4cdc0fd6780a093dfcbba18366526b0c2014ec1cccb311fc4463f07",
+        "added": [],
+        "removed": [
+          "host.call",
+          "host.list"
+        ],
+        "changed": []
+      },
+      "with_no_view": {
+        "caller": "This machine's own assistant running with no window (#13511), such as a host's assistant a Shell started through host.call assistant.start, Tool set = Core: help origin, no pinned view, listed from the viewless help base surface (getViewlessHelpBaseManifest). Not in a local view, so no host control; an assistant caller in its project.",
+        "host_control": {
+          "help_session": true,
+          "call_reachable": false,
+          "host_tools_offered": false,
+          "assistant_caller": "local",
+          "assistant_tools_offered": true,
+          "command_runner_offered": false
+        },
+        "machine": {
+          "added_remote_hosts": true,
+          "manifest_source": "viewless-help"
+        },
+        "tool_count": 30,
+        "surface_hash": "282269b3d69f490d89b9b522584b25c23fe110b9101631159f8c047b4456a10d",
+        "added": [],
+        "removed": [
+          "agent.launchMany",
+          "agent.listModels",
+          "diagnostics.openReview",
+          "help.displayImage",
+          "host.call",
+          "host.list",
+          "slashCommands.list",
+          "terminal.closeMany",
+          "terminal.moveToWorktree",
+          "terminal.rename",
+          "terminal.sendCommandMany"
+        ],
+        "changed": []
+      }
+    }
   },
   "tools": [
     {
@@ -231,7 +249,6 @@
                   "interpreter",
                   "mistral",
                   "kiro",
-                  "daintree-assistant",
                   "terminal",
                   "browser",
                   "dev-preview"
@@ -857,7 +874,6 @@
                   "interpreter",
                   "mistral",
                   "kiro",
-                  "daintree-assistant",
                   "terminal",
                   "browser",
                   "dev-preview"
@@ -949,6 +965,391 @@
         "band": "reversible",
         "surface_tier": "core",
         "reach": "tier"
+      }
+    },
+    {
+      "action_id": "agent.readQuota",
+      "wire_name": "agent.readQuota",
+      "description": "Read this machine's Codex account quota, as Codex reports it: how much of each rate-limit window is used and when it resets.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "codex": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "const": "ok"
+                  },
+                  "planType": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "windows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "usedPercent": {
+                          "type": "number",
+                          "description": "Percent of this window's limit used, 0-100."
+                        },
+                        "windowDurationMins": {
+                          "type": "number",
+                          "description": "The window's length in minutes; 300 is 5 hours."
+                        },
+                        "resetsAt": {
+                          "description": "When it resets, epoch ms; null when Codex didn't say.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "usedPercent",
+                        "windowDurationMins",
+                        "resetsAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Shortest window first."
+                  },
+                  "fetchedAt": {
+                    "type": "number",
+                    "description": "When it was read from Codex, epoch ms; cached up to 30 s."
+                  }
+                },
+                "required": [
+                  "status",
+                  "planType",
+                  "windows",
+                  "fetchedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "cli-missing",
+                      "timeout",
+                      "read-failed",
+                      "unsupported-response",
+                      "no-windows"
+                    ]
+                  },
+                  "fetchedAt": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason",
+                  "fetchedAt"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "codex"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Read Codex quota",
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "query",
+        "category": "agent",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "caller"
+      }
+    },
+    {
+      "action_id": "assistant.list",
+      "wire_name": "assistant.list",
+      "description": "List the other Daintree Assistants running in this project, and its vacant slots. Address one by its terminalId with the agent messaging tools; a send passes its generation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "assistants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "terminalId": {
+                  "type": "string",
+                  "description": "Its terminal: what a send, notice, read or close names."
+                },
+                "generation": {
+                  "type": "number",
+                  "description": "Its run's generation. A send passes it back; a restarted run has a new one."
+                },
+                "slot": {
+                  "type": "number"
+                },
+                "agentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "agentState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "working",
+                        "waiting",
+                        "directing",
+                        "completed",
+                        "exited"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "As last observed; not proof of what it is doing."
+                },
+                "waitingReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "prompt",
+                        "question",
+                        "approval",
+                        "error"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "attached": {
+                  "type": "boolean"
+                },
+                "startedByYou": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "terminalId",
+                "generation",
+                "slot",
+                "agentId",
+                "agentState",
+                "waitingReason",
+                "attached",
+                "startedByYou"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "vacantSlots": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Slots a start may use."
+          }
+        },
+        "required": [
+          "projectId",
+          "assistants",
+          "vacantSlots"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List assistants",
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "daintree": {
+        "kind": "query",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "caller"
+      }
+    },
+    {
+      "action_id": "assistant.start",
+      "wire_name": "assistant.start",
+      "description": "Open another Daintree Assistant in this project with no window, in a vacant slot, and return it as the assistant listing does. Not ready still means it runs; don't open another.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "description": "A vacant slot. Omit for the lowest vacant one.",
+            "type": "integer"
+          },
+          "agentId": {
+            "description": "claude, codex or copilot. Omit for this machine's default.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "assistant": {
+            "type": "object",
+            "properties": {
+              "terminalId": {
+                "type": "string",
+                "description": "Its terminal: what a send, notice, read or close names."
+              },
+              "generation": {
+                "type": "number",
+                "description": "Its run's generation. A send passes it back; a restarted run has a new one."
+              },
+              "slot": {
+                "type": "number"
+              },
+              "agentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "agentState": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "waiting",
+                      "directing",
+                      "completed",
+                      "exited"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "As last observed; not proof of what it is doing."
+              },
+              "waitingReason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "prompt",
+                      "question",
+                      "approval",
+                      "error"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "attached": {
+                "type": "boolean"
+              },
+              "startedByYou": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "terminalId",
+              "generation",
+              "slot",
+              "agentId",
+              "agentState",
+              "waitingReason",
+              "attached",
+              "startedByYou"
+            ],
+            "additionalProperties": false
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "At its prompt. False: it runs but is stopped short of one; don't start another."
+          },
+          "notReadyReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "timed-out",
+                  "agent-error"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "assistant",
+          "ready",
+          "notReadyReason"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Open another assistant",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "caller"
       }
     },
     {
@@ -1048,6 +1449,346 @@
       },
       "daintree": {
         "kind": "command",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "host.call",
+      "wire_name": "host.call",
+      "description": "Run one of a host's own Daintree tools in one of its projects and get its result, such as starting the host's assistant or sending it a prompt. Changes are refused while another machine drives that project. ambiguous: resend under its callId, which never runs twice.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostId": {
+            "type": "string",
+            "description": "A host id from the host list."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "A projectId from the host list. The call runs there."
+          },
+          "tool": {
+            "type": "string",
+            "description": "A Daintree tool on the host, by id. Search the host's own tools through this."
+          },
+          "args": {
+            "description": "The tool's own arguments.",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "callId": {
+            "description": "Resend an ambiguous call under its callId. It never runs twice.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostId",
+          "projectId",
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ambiguous",
+              "opted_out",
+              "disconnected",
+              "unsupported",
+              "policy_rejected",
+              "expired",
+              "not_found",
+              "rate_limited",
+              "too_large",
+              "conflict"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryAfterMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "callId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "isError": {
+                    "type": "boolean"
+                  },
+                  "structured": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "isError",
+                  "structured",
+                  "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "outcome",
+          "detail",
+          "retryAfterMs",
+          "callId",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Run a tool on a host",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "host.list",
+      "wire_name": "host.list",
+      "description": "List the hosts this machine's assistant may reach, as observed: connection, last load sample, agent counts, and each connected host's projects, which a call there names. Null means not measured.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hostId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "connection": {
+                  "type": "string",
+                  "enum": [
+                    "connected",
+                    "connecting",
+                    "disconnected"
+                  ]
+                },
+                "rttMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "lastSeenAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "load": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "sampledAt": {
+                          "type": "number"
+                        },
+                        "cpuPercent": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryPressure": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "warn",
+                                "critical"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "thermal": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "nominal",
+                                "fair",
+                                "serious",
+                                "critical"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "sampledAt",
+                        "cpuPercent",
+                        "memoryPressure",
+                        "thermal"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "agentsObserved": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "working": {
+                          "type": "number"
+                        },
+                        "waiting": {
+                          "type": "number"
+                        },
+                        "idle": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "working",
+                        "waiting",
+                        "idle"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "projects": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "projectId",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "control": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "hostId",
+                "name",
+                "connection",
+                "rttMs",
+                "lastSeenAt",
+                "load",
+                "agentsObserved",
+                "projects",
+                "control"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "hosts"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List hosts",
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "query",
         "category": "help",
         "danger": "safe",
         "band": "reversible",
@@ -1194,7 +1935,7 @@
       "outputSchema": null,
       "annotations": {
         "title": "List recipes",
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "idempotentHint": true,
         "destructiveHint": false,
         "openWorldHint": true
@@ -1243,8 +1984,7 @@
               "kimi",
               "interpreter",
               "mistral",
-              "kiro",
-              "daintree-assistant"
+              "kiro"
             ]
           }
         },
@@ -2112,7 +2852,7 @@
     {
       "action_id": "terminal.readLastMessageOwned",
       "wire_name": "terminal.readLastMessageOwned",
-      "description": "Read an agent's last transcript reply and unanswered tool calls, e.g. a question and its options. Agents this connection launched or was handed (right-click > Hand to orchestrator); Daintree's assistant: any in its project. Claude Code only. Not proof the agent is waiting; permission prompts are screen-only.",
+      "description": "Read an agent's last transcript reply and unanswered tool calls, e.g. a question and its options. Agents this connection launched or was handed (right-click > Hand to orchestrator); Daintree's assistant: any in its project. Claude Code only, or another assistant's screen. Not proof the agent is waiting.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2288,6 +3028,36 @@
               "reason"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "observed"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "handback",
+                  "screen"
+                ],
+                "description": "Another assistant's screen, to its handback or before one."
+              },
+              "text": {
+                "type": "string"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "status",
+              "source",
+              "text",
+              "truncated"
+            ],
+            "additionalProperties": false
           }
         ],
         "type": "object"
@@ -2404,6 +3174,10 @@
           "handback": {
             "description": "Ask the agent to end its reply with a Daintree marker, read back as `lastHandback`. Agent panes only.",
             "type": "boolean"
+          },
+          "generation": {
+            "description": "Sending to another assistant: its generation from the assistant listing.",
+            "type": "integer"
           },
           "notify": {
             "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; may be missed: poll too. Agent panes and assistants only.",
