@@ -298,7 +298,7 @@ cases:
     category: routing-trap
     note: >-
       An inventory of projects and assistants that take messages. survey-hosts: "which
-      projects have an assistant enrolled and taking messages". verify-project-placement
+      projects have an assistant running and taking messages". verify-project-placement
       must not ride along.
     messages:
       - role: user

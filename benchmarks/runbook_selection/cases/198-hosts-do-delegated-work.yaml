@@ -1,5 +1,5 @@
 # daintree.hosts.do-delegated-work: the lane's procedure for one unit of work the hub
-# delegated. The Daintree assistant on a Remote Host, enrolled as a lane, has read the
+# delegated. The Daintree assistant on a Remote Host, acting as a lane, has read the
 # hub's message (daintree.hosts.handle-hub-message) and now has to do the work on this
 # machine: a worktree on the brief's branch from its base commit, the named agent CLI
 # launched there, the folder trust dialog answered, the commit and checks verified.

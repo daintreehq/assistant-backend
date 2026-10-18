@@ -714,7 +714,7 @@ cases:
     note: >-
       A host's message arriving at the hub is the hub's to answer within the user's request; the
       app's own messaging addendum says so, and the receiving lane's envelope is not the hub's
-      ("If you are the enrolled hub, it is a host's message, not this."). Nothing to load beyond
+      ("On a Shell, a host's message is the foundation's."). Nothing to load beyond
       the messaging foundation, and never a lane's runbook.
     messages:
       - role: user

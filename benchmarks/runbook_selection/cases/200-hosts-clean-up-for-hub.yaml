@@ -1,5 +1,5 @@
 # daintree.hosts.clean-up-for-hub: the lane's side of a hub cleanup. The Daintree assistant
-# on a Remote Host, enrolled as a lane, is asked by the hub to remove what it made for a
+# on a Remote Host, acting as a lane, is asked by the hub to remove what it made for a
 # named run: exactly those panes, the worktrees that are clean and pushed (or abandoned),
 # never forced, the rest asked back as one list, a confirmation timeout reported rather
 # than retried. Recall in agents' and users' words (the issue's two requests verbatim
@@ -96,7 +96,7 @@ cases:
     category: routing-trap
     note: >-
       The lane's side of the hub's cleanup: "Use on a Remote Host's Daintree assistant
-      enrolled as a lane".
+      acting as a lane".
       daintree.hosts.recover-and-clean-up is the hub's own runbook ("Do not use on the hub
       itself").
     messages:

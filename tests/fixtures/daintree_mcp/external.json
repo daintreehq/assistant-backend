@@ -1,9 +1,9 @@
 {
   "capture": {
     "app_repo": "daintreehq/daintree",
-    "app_branch": "test/hub-assistant-messaging-live",
-    "app_commit": "0436363469c28d21e61f5ae1fd840e3e91508a77",
-    "app_version": "0.43.0",
+    "app_branch": "develop",
+    "app_commit": "f91badae473c430b0c62366b4e8d6222e7195809",
+    "app_version": "0.44.0",
     "caller_origin": "api-key",
     "session_origin": "external",
     "tier": "external",
@@ -22,10 +22,10 @@
       "lane_tools_offered": false,
       "lane_send_offered": false
     },
-    "captured_at": "2026-10-15",
+    "captured_at": "2026-10-18",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry, served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) configured as this caller, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "af5e418c7ba802de341f45208c912fe4781aad669a2a0dca98c4a252fbf8c859",
+    "surface_hash": "8746e6e1763fe62870dd6dc0005387f85fe33937550e489bd55b34a6c7442bbb",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest)",
     "tool_count": 34,
     "withheld_when_workspace_bound": [
@@ -302,7 +302,7 @@
             "type": "boolean"
           },
           "model": {
-            "description": "Model passed to the agent CLI for this launch, in its own names. No preset needed.",
+            "description": "Omit for the CLI's default; set only when the user names a model. No preset needed.",
             "type": "string"
           },
           "presetId": {
@@ -411,12 +411,19 @@
             "anyOf": [
               {
                 "type": "string",
-                "const": "missing-cli"
+                "enum": [
+                  "missing-cli",
+                  "panel-limit",
+                  "already-launching",
+                  "spawn-failed",
+                  "unavailable"
+                ]
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Null on a launch, else why not: panel-limit (see panelLimit), already-launching (retry), missing-cli (setup panel opened)."
           },
           "worktreeId": {
             "type": [
@@ -446,6 +453,47 @@
             "type": [
               "boolean",
               "null"
+            ]
+          },
+          "panelLimit": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "number"
+                  },
+                  "softWarningLimit": {
+                    "type": "number"
+                  },
+                  "confirmationLimit": {
+                    "type": "number"
+                  },
+                  "hardLimit": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "soft",
+                      "confirm",
+                      "hard"
+                    ]
+                  }
+                },
+                "required": [
+                  "count",
+                  "softWarningLimit",
+                  "confirmationLimit",
+                  "hardLimit",
+                  "tier"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "reply": {
@@ -520,6 +568,7 @@
           "branch",
           "cwd",
           "cwdOutsideWorktree",
+          "panelLimit",
           "reply"
         ],
         "additionalProperties": false
@@ -2216,10 +2265,45 @@
               ],
               "additionalProperties": false
             }
+          },
+          "panelLimit": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "number"
+              },
+              "softWarningLimit": {
+                "type": "number"
+              },
+              "confirmationLimit": {
+                "type": "number"
+              },
+              "hardLimit": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "soft",
+                  "confirm",
+                  "hard"
+                ]
+              }
+            },
+            "required": [
+              "count",
+              "softWarningLimit",
+              "confirmationLimit",
+              "hardLimit",
+              "tier"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "terminals"
+          "terminals",
+          "panelLimit"
         ],
         "additionalProperties": false
       },

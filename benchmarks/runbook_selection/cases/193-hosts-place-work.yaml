@@ -1,6 +1,6 @@
 # daintree.hosts.place-work: the hub places DIFFERENT, independent pieces of work (or one
 # piece with no host chosen) on the Remote Hosts that can take them, by load, signed-in agent
-# CLIs, allowance left and an enrolled assistant, shows the placement, then delegates each
+# CLIs, allowance left and an available assistant, shows the placement, then delegates each
 # piece. Recall cases are the issue's five requests (scrubbed) plus agent- and user-phrased
 # outcomes. Routing traps: this runbook wins against each declared or measured neighbour.
 # Reverse traps: the neighbour wins and this runbook must not ride along. The hosts
@@ -74,7 +74,7 @@ cases:
     category: single-runbook
     note: >-
       An agent's search query for the outcome. Decided by "The hub weighs each host's load,
-      the agent CLIs signed in there, allowance left and an enrolled assistant in the right
+      the agent CLIs signed in there, allowance left and an available assistant in the right
       project" and "a placement table (piece, host, project, CLI, reason)".
     messages:
       - role: user

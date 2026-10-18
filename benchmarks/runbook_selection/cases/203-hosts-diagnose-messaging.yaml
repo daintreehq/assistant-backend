@@ -1,6 +1,6 @@
 # daintree.hosts.diagnose-messaging: this Shell's hub working out why a Remote Host it can
-# see cannot have its assistant messaged or started (the tool set, the per-host switches,
-# the link, a pause, a missing or stale enrollment, a rate limit), sending nothing. Recall cases in agent and user words; traps where it
+# see cannot have its assistant messaged or started (the per-host switches, this machine's
+# or that assistant's acceptance, the link, a pause, a rate limit), sending nothing. Recall cases in agent and user words; traps where it
 # must win against daintree.diagnostics (its one declared neighbour) and against
 # daintree.hosts.handle-hub-message, daintree.hosts.start-swarm and
 # daintree.hosts.recover-and-clean-up; reverse traps where each of those, or the hosts
@@ -80,16 +80,16 @@ cases:
       required: [daintree.hosts.diagnose-messaging]
       optional: [daintree.hosts.foundation]
 
-  - id: diagnose-messaging-tier-error-not-diagnostics
+  - id: diagnose-messaging-machine-setting-not-diagnostics
     category: routing-trap
     note: >-
-      A tool refusal sounds like daintree.diagnostics ("why is this tool missing"), but it
-      is the messaging gate "this sidebar session refused as not enrolled or as Core" while the hosts are
+      A refusal naming this machine's own setting sounds like daintree.diagnostics, but it
+      is a messaging gate, "a send or start that came back opted_out", while the hosts are
       listed. Diagnostics is fenced off: "Do not use for Daintree itself misbehaving on
       this machine (daintree.diagnostics)".
     messages:
       - role: user
-        content: My sidebar session can list the hosts but every send fails with a tier error. What is blocking it?
+        content: My sidebar session can list the hosts but every send fails, saying this machine's setting is off. What is blocking it?
     expect:
       required: [daintree.hosts.diagnose-messaging]
       optional: [daintree.hosts.foundation]
@@ -100,7 +100,7 @@ cases:
       The issue's request naming two refusals the positive clause lists ("opted_out,
       paused, lane_unavailable"). The person is at this Shell, not a host's assistant
       handling the hub's message, so daintree.hosts.handle-hub-message ("Use on a Remote
-      Host's Daintree assistant enrolled as a lane") is an extra. RETRAIN OWED: the shipped selector picks handle-hub-message and
+      Host's Daintree assistant acting as a lane") is an extra. RETRAIN OWED: the shipped selector picks handle-hub-message and
       daintree.diagnostics (rank_miss); two text attempts that won it pulled lane cases.
     messages:
       - role: user
@@ -168,7 +168,7 @@ cases:
     category: routing-trap
     note: >-
       Reverse trap. A host's own assistant whose reply to the hub was refused is
-      daintree.hosts.handle-hub-message ("Use on a Remote Host's Daintree assistant enrolled
+      daintree.hosts.handle-hub-message ("Use on a Remote Host's Daintree assistant acting
       as a lane"); the hub's diagnosis does not apply.
     messages:
       - role: user

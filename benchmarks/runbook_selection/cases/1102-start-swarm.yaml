@@ -1,4 +1,4 @@
-# daintree.hosts.start-swarm: the hub readies one enrolled assistant per Remote Host in
+# daintree.hosts.start-swarm: the hub readies one assistant per Remote Host in
 # the right project before any work goes out, and reports who is ready. Recall cases are
 # the requests that asked for it (scrubbed), in users' and agents' words; traps hold its
 # boundary, both ways, with the runbooks that took these requests before it existed:
@@ -26,7 +26,7 @@ cases:
     category: single-runbook
     note: >-
       Reuse before starting, in the issue's words. Decided by "by reusing the one already
-      enrolled and starting the missing ones".
+      running and starting the missing ones".
     messages:
       - role: user
         content: Get an assistant ready on each selected server; reuse what is already there.
@@ -88,13 +88,13 @@ cases:
     category: single-runbook
     note: >-
       How Claude Code or Codex describes the task to search. Decided by "by reusing the
-      one already enrolled and starting the missing ones" and "The deliverable is a ready
+      one already running and starting the missing ones" and "The deliverable is a ready
       table (host, project, slot, agent, generation)".
     messages:
       - role: user
         content: >-
-          Get one enrolled assistant per remote host in the target project, reusing lanes
-          already enrolled for this Shell, and report each one's slot, agent and generation
+          Get one ready assistant per remote host in the target project, reusing lanes
+          already running there, and report each one's slot, agent and generation
     expect:
       required: [daintree.hosts.start-swarm]
       optional: [daintree.hosts.foundation]
@@ -122,8 +122,8 @@ cases:
         content: are my other machines connected?
       - role: assistant
         content: >-
-          Three remote hosts are connected; two have an assistant enrolled for this Shell
-          in this project.
+          Three remote hosts are connected; two have an assistant running and taking
+          messages in this project.
       - role: user
         content: who can I give work to right now
     expect:

@@ -1,9 +1,9 @@
 {
   "capture": {
     "app_repo": "daintreehq/daintree",
-    "app_branch": "test/hub-assistant-messaging-live",
-    "app_commit": "0436363469c28d21e61f5ae1fd840e3e91508a77",
-    "app_version": "0.43.0",
+    "app_branch": "develop",
+    "app_commit": "f91badae473c430b0c62366b4e8d6222e7195809",
+    "app_version": "0.44.0",
     "caller_origin": "agent-pane",
     "session_origin": "external",
     "tier": "core",
@@ -22,12 +22,12 @@
       "lane_tools_offered": false,
       "lane_send_offered": false
     },
-    "captured_at": "2026-10-15",
+    "captured_at": "2026-10-18",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry, served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) configured as this caller, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "55f93b2cf8f63f9598b520ee486b775fd4690bbfc318c9a02d808a10425cc745",
+    "surface_hash": "f35b6dd35f01add9e45ef4ce1a806d82d3a537d7cc71d84b88349f639b818cd6",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest)",
-    "tool_count": 74,
+    "tool_count": 78,
     "context_gated_tools": [
       "host.switch",
       "project.openOnHost"
@@ -278,7 +278,7 @@
             "type": "boolean"
           },
           "notify": {
-            "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; end your turn, don't poll. Agent panes and assistants only.",
+            "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; may be missed: poll too. Agent panes and assistants only.",
             "type": "boolean"
           },
           "replyLines": {
@@ -302,7 +302,7 @@
             "type": "boolean"
           },
           "model": {
-            "description": "Model passed to the agent CLI for this launch, in its own names. No preset needed.",
+            "description": "Omit for the CLI's default; set only when the user names a model. No preset needed.",
             "type": "string"
           },
           "presetId": {
@@ -411,12 +411,19 @@
             "anyOf": [
               {
                 "type": "string",
-                "const": "missing-cli"
+                "enum": [
+                  "missing-cli",
+                  "panel-limit",
+                  "already-launching",
+                  "spawn-failed",
+                  "unavailable"
+                ]
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Null on a launch, else why not: panel-limit (see panelLimit), already-launching (retry), missing-cli (setup panel opened)."
           },
           "worktreeId": {
             "type": [
@@ -446,6 +453,47 @@
             "type": [
               "boolean",
               "null"
+            ]
+          },
+          "panelLimit": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "number"
+                  },
+                  "softWarningLimit": {
+                    "type": "number"
+                  },
+                  "confirmationLimit": {
+                    "type": "number"
+                  },
+                  "hardLimit": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "soft",
+                      "confirm",
+                      "hard"
+                    ]
+                  }
+                },
+                "required": [
+                  "count",
+                  "softWarningLimit",
+                  "confirmationLimit",
+                  "hardLimit",
+                  "tier"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "reply": {
@@ -520,6 +568,7 @@
           "branch",
           "cwd",
           "cwdOutsideWorktree",
+          "panelLimit",
           "reply"
         ],
         "additionalProperties": false
@@ -693,6 +742,91 @@
         "idempotentHint": true,
         "destructiveHint": false,
         "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "query",
+        "category": "agent",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "agent.listModels",
+      "wire_name": "agent.listModels",
+      "description": "Each agent CLI's current model ids and names, to turn a model the user names into an id. With none named, launch without a model.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "description": "One agent's models; omit for every listed agent.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agentId": {
+                  "type": "string"
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "agentId",
+                "models"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "agents"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List agent models",
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "examples": [
+          {
+            "args": {
+              "agentId": "codex"
+            },
+            "description": "Find the id of a Codex model the user asked for by name"
+          }
+        ]
       },
       "daintree": {
         "kind": "query",
@@ -3030,6 +3164,40 @@
       }
     },
     {
+      "action_id": "plugin.capturePanel",
+      "wire_name": "plugin.capturePanel",
+      "description": "A PNG of one plugin panel as it renders, plus the plugin's recent console warnings and errors. Refused with no image while the panel is hidden, off screen or covered by a dialog, menu or tooltip.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "panelId": {
+            "type": "string",
+            "description": "The plugin panel to capture; focus is never assumed."
+          }
+        },
+        "required": [
+          "panelId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Capture plugin panel",
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "daintree": {
+        "kind": "query",
+        "category": "plugins",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "full",
+        "reach": "approval"
+      }
+    },
+    {
       "action_id": "plugin.diagnostics",
       "wire_name": "plugin.diagnostics",
       "description": "Report why a plugin is in its state: its recorded load or activation failure, whether it runs, and its recent host-logger lines. A refused project plugin is reported with its rejection. An unknown id fails, listing the ids that exist.",
@@ -4664,10 +4832,45 @@
               ],
               "additionalProperties": false
             }
+          },
+          "panelLimit": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "number"
+              },
+              "softWarningLimit": {
+                "type": "number"
+              },
+              "confirmationLimit": {
+                "type": "number"
+              },
+              "hardLimit": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "soft",
+                  "confirm",
+                  "hard"
+                ]
+              }
+            },
+            "required": [
+              "count",
+              "softWarningLimit",
+              "confirmationLimit",
+              "hardLimit",
+              "tier"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "terminals"
+          "terminals",
+          "panelLimit"
         ],
         "additionalProperties": false
       },
@@ -5224,7 +5427,7 @@
             "type": "boolean"
           },
           "notify": {
-            "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; end your turn, don't poll. Agent panes and assistants only.",
+            "description": "When this agent next stops, Daintree types its handback summary, else its screen, into your prompt; may be missed: poll too. Agent panes and assistants only.",
             "type": "boolean"
           },
           "replyLines": {
@@ -7115,6 +7318,100 @@
       "outputSchema": null,
       "annotations": {
         "title": "Set active worktree",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "worktree",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "full",
+        "reach": "approval"
+      }
+    },
+    {
+      "action_id": "worktree.setCustomTitle",
+      "wire_name": "worktree.setCustomTitle",
+      "description": "Names a worktree with a custom title shown in place of its issue, PR or branch headline on its card and in pickers. The computed headline stays visible beneath it. Cosmetic only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "worktreeId": {
+            "type": "string",
+            "description": "Worktree id, from the worktree list"
+          },
+          "title": {
+            "description": "Custom title, at most 80 characters after whitespace is collapsed; null or blank clears it",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "worktreeId",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Set worktree title",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "worktree",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "full",
+        "reach": "approval"
+      }
+    },
+    {
+      "action_id": "worktree.setLabelColor",
+      "wire_name": "worktree.setLabelColor",
+      "description": "Marks a worktree with a colour on its sidebar card so the user can pick it out. The same colour replaces its automatic one in panel headers and pickers. Cosmetic only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "worktreeId": {
+            "type": "string",
+            "description": "Worktree id, from the worktree list"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "teal",
+                  "blue",
+                  "violet",
+                  "pink"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Label colour; null clears it"
+          }
+        },
+        "required": [
+          "worktreeId",
+          "color"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Set worktree label colour",
         "readOnlyHint": false,
         "idempotentHint": false,
         "destructiveHint": false,

@@ -63,7 +63,7 @@ cases:
     category: single-runbook
     note: >-
       The refinement's host to project to assistant slot view, read-only. Decided by "which
-      projects have an assistant enrolled and taking messages" and "Nothing is sent, started or
+      projects have an assistant running and taking messages" and "Nothing is sent, started or
       recovered".
     messages:
       - role: user
@@ -318,7 +318,7 @@ cases:
     category: routing-trap
     note: >-
       Saying which projects have an assistant that can be messaged and which have none is "which
-      projects have an assistant enrolled and taking messages" in one read-only report, not "why
+      projects have an assistant running and taking messages" in one read-only report, not "why
       one assistant cannot be messaged (daintree.hosts.diagnose-messaging)".
     messages:
       - role: user
