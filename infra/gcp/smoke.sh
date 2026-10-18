@@ -191,13 +191,21 @@ else
   fail "MCP tools/call answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
 fi
 
-# A v0.44 client sends no host-control header and is served the inbox catalog.
+# A v0.44 client sends no host-control header and is served the inbox catalog: the
+# same canonical query, ranked over it, carrying its revision.
 STATUS="$(rpc '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"search_runbooks","arguments":{"query":"rename my terminals so I can tell the agents apart","max_results":3}}}')"
-if [ "$STATUS" = "200" ] && [ -n "$INBOX_REVISION" ]; then
-  VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$INBOX_REVISION")"
-  [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is served the inbox catalog" \
-                        || fail "a caller without Daintree-Host-Control got another catalog" "$VERDICT"
-elif [ "$STATUS" != "200" ]; then
+if [ "$STATUS" = "200" ]; then
+  VERDICT="$(check '(lambda r: r["isError"] is False and r["structuredContent"]["runbooks"] and r["structuredContent"]["runbooks"][0]["id"] == expected and r["structuredContent"]["runbooks"][0]["selected"] is True or r)(body["result"])' daintree.terminals.rename)"
+  [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is answered from a ranked catalog" \
+                        || fail "the search without Daintree-Host-Control is wrong" "$VERDICT"
+  if [ -n "$INBOX_REVISION" ]; then
+    VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$INBOX_REVISION")"
+    [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is served the inbox catalog" \
+                          || fail "a caller without Daintree-Host-Control got another catalog" "$VERDICT"
+  else
+    fail "/readyz names no inbox catalog revision"
+  fi
+else
   fail "MCP tools/call without a host model answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
 fi
 

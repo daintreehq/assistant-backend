@@ -783,6 +783,7 @@ def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
     query = "how is that going?"
     table = _table_hiding(clf, active, ACTIVE_PREFIX.format(active) + query)
     clf._tables = {None: table}
+    clf._latest = table
 
     sel = clf.select(query, [active])
     assert active in sel.reserved_ids, "fixture did not actually reserve"

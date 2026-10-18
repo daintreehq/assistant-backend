@@ -80,13 +80,14 @@ def _shared() -> list[Runbook]:
 # ---- the model header ------------------------------------------------------
 
 
-@pytest.mark.parametrize(("values", "model"), [(["1"], "control"), ([" 1 "], "control")])
+@pytest.mark.parametrize(("values", "model"), [(["1"], "control"), ([" 1\t"], "control")])
 def test_exactly_one_is_the_host_control_model(values: list[str], model: str) -> None:
     assert parse_host_model(values) == model
 
 
 @pytest.mark.parametrize(
-    "values", [[], [""], ["0"], ["2"], ["01"], ["true"], ["1, 1"], ["1", "1"], ["control"]]
+    "values",
+    [[], [""], ["0"], ["2"], ["01"], ["true"], ["1, 1"], ["1", "1"], ["control"], ["\xa01\xa0"]],
 )
 def test_anything_else_is_the_inbox_model(values: list[str]) -> None:
     """Fails closed, unlike the hosts header: an unknown value must never show a v0.44
@@ -316,7 +317,9 @@ def test_alternating_catalogs_never_rebuild_a_table() -> None:
     inbox = clf.sync(catalogs.inbox)
     for _ in range(3):
         assert clf.sync(catalogs.control) is control
+        assert clf.table is control
         assert clf.sync(catalogs.inbox) is inbox
+        assert clf.table is inbox
     assert set(control.ids) == catalogs.control.selectable_ids
     assert set(inbox.ids) == catalogs.inbox.selectable_ids
     # A runbook both catalogs share is embedded once.

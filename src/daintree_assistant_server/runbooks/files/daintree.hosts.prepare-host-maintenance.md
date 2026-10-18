@@ -19,7 +19,7 @@ The person updates or restarts the host in Settings, Hosts or at the machine; no
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"terminal.sendCommandOwned","args":{"terminalId":"<terminalId>","command":"Checkpoint before this host restarts. Let any push, PR, comment or release in flight finish (unsure: say blocked), then stop. Reply: worktree, branch, HEAD, pushed or not, uncommitted files, writes in flight.","handback":true,"notify":true}}
 ```
 
-   Add "commit and push to <run branch>" only if the person allowed it. A host's assistant running part of the run gets the same brief by its `terminalId` and `generation`: stop only the agents it launched for you, close nothing, report each. Agents not yours are reported, never sent to. End the turn.
+   Add "commit and push to <run branch>" only if the person allowed it. A host's assistant running part of the run gets the same brief by its `terminalId` and `generation` (`ASSISTANT_BUSY`: send on its `terminal.notifyWhenIdle` notice, or interrupt it first if the restart cannot wait): stop only the agents it launched for you, close nothing, report each. Agents not yours are reported, never sent to. End the turn.
 
 On notice or resume: a checkpoint is acknowledged only when that agent is idle by `terminal.getStatus` there and its writes are settled; a pushed claim is checked with `git ls-remote` on the shared remote from your shell. Anything less is unacknowledged.
 

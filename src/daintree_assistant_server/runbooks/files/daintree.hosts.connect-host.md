@@ -20,7 +20,7 @@ The person does every step in Daintree's UI (no action can) and reads you what i
 
 An added host's Details "Status": "Unreachable · …" ends in ssh's words (step 1, then Retry if offered); "Daintree isn't running in Host mode there": Set up…; "Can't connect · needs a compatible build" blocks: Check for update, or update this machine if the host is newer. Connected with a differing "Daintree build" row: aligning is optional.
 
-Verify: Status "Connected" (not "no reply since"); its projects under "Other hosts" in the project switcher with no note (a note means an older list; no rows: unverified). Picking one moves the window. `host.list` shows it `connected` with `control:true` and its `projects`.
+Verify: Status "Connected" (not "no reply since"); its projects under "Other hosts" in the project switcher with no note (a note means an older list; no rows: unverified). Picking one moves the window. `host.list` shows it `connected`; with assistant control on, `control:true` and its `projects` (off: `projects:null`, the person's choice).
 
 Leave its assistant control (Settings → Hosts, that host; on by default for an SSH host) as the person set it: `control:false` means they turned it off, and turning it on is theirs.
 

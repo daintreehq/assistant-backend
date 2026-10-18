@@ -16,7 +16,7 @@ Procedure:
    - At its prompt with its result, or exited: finished; nothing sent.
    - `working`: a stop or an urgent change, step 2. A change that can wait ("also", "afterwards"): `terminal.notifyWhenIdle` through `host.call`, note "steer: <gist>", and step 3 when it stops (`armed:false`: it already has; step 3 now).
    - `waiting` on a question: the stop or change is its answer; step 3.
-   - Host `disconnected`, or a call not `ok`: nothing reaches it; unresolved till it is back.
+   - Host `disconnected`: nothing was sent; unresolved till it is back. `ambiguous` or `expired`: as the hosts foundation says; never resend a stop or correction blind.
    - Run by the host's assistant: step 4.
 2. Interrupt each working agent once, then confirm before anything is sent:
 
@@ -26,7 +26,7 @@ Procedure:
 
    `requested` is a request, not a stop: `terminal.waitUntilIdle` (`timeoutMs:15000`), then `terminal.getStatus` with output. Stopped means the turn shows interrupted at an empty input line. Still working: unconfirmed; report it, send nothing, never interrupt again. Refused as idle: re-read the screen. Refused for its cancel key: nothing went; the person stops it in that pane.
 3. One message per agent, in one `terminal.sendCommandMany` per host project, `notify:true, handback:true`, each `submissionToken` kept. A stop: "Stop here and start nothing new. Keep all work; revert, commit and push nothing. Reply: done, half-done, uncommitted files, branch, HEAD, and any push, PR or external step done or under way." A change: what changes, in the person's words; "everything else in your task still applies"; files to re-read if it was stopped mid-edit; "First state in one line what you will now do differently, then continue." A unit not yet started gets "never start it" or the changed brief. End the turn.
-4. `RESOURCE_NOT_OWNED` (your Shell session restarted, or another session launched it), or a unit its host's assistant runs: nothing went. Brief that host's assistant (hosts foundation, Delegating) with the terminal ids and the stop or change: "Follow daintree.agents.steer-running-agent for these; keep all work; reply per agent: stopped or on the new course, branch, HEAD, uncommitted files, any external step." No assistant there, or it is refused too: unresolved; give the person the words to type in that pane on that machine.
+4. `RESOURCE_NOT_OWNED` (your Shell session restarted, or another session launched it), or a unit its host's assistant runs: nothing went. Brief that host's assistant (hosts foundation, Delegating; `ASSISTANT_BUSY` mid-turn: `terminal.interruptOwned` it, confirm it at its prompt, then send) with the terminal ids and the stop or change: "Follow daintree.agents.steer-running-agent for these; keep all work; reply per agent: stopped or on the new course, branch, HEAD, uncommitted files, any external step." No assistant there, or it is refused too: unresolved; give the person the words to type in that pane on that machine.
 
 On notice or resume: match the notice to its agent, then one `terminal.getStatus` per host over the open units. A stop: at its prompt with its reply, acknowledged; still working, unresolved. A change: its one-line statement and work on the new course, acknowledged; the old course after the correction, one restated correction with `notify`, a second miss to the person. An assistant's answer (`terminal.readLastMessageOwned`) is a claim: read those agents' screens yourself. A change's result comes later, verified as daintree.hosts.supervise-swarm does.
 

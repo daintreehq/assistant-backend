@@ -13,7 +13,7 @@ Each side, and the contract's author, is one agent you drive on its host, every 
 
 Procedure:
 1. Per side: host and project (`host.list`), its repository's remote, base branch at full SHA (`git ls-remote`), its contract copy's path; a SHA never crosses repositories. Contract: one home repository and paths (schema, examples, error cases, a compatibility test). Sides push branches: without the person's push authority, ask before the first launch.
-2. Contract: on the home host a worktree on new branch `contract/<run>` from its base SHA (`worktree.createWithRecipe`, `collisionPolicy:"error"`, then `worktree.waitUntilReady` with its `worktreeId`), one author agent there: write only those paths, commit, push `contract/<run>`, reply with the SHA. Check its scope on the remote (`git diff --name-only <base>..<SHA>`), show the person, freeze on their yes (the interface is theirs unless left to you): v1, full SHA. Versions are `contract/<run>`'s history; keep the author's terminal for amendments.
+2. Contract: on the home host (holding the base SHA: Full, `project.runCommand` `git fetch origin` there first; Core, an agent fetches first) a worktree on new branch `contract/<run>` from that SHA (`worktree.createWithRecipe`, `collisionPolicy:"error"`, then `worktree.waitUntilReady` with its `worktreeId`), one author agent there: write only those paths, commit, push `contract/<run>`, reply with the SHA. Check its scope on the remote (`git diff --name-only <base>..<SHA>`), show the person, freeze on their yes (the interface is theirs unless left to you): v1, full SHA. Versions are `contract/<run>`'s history; keep the author's terminal for amendments.
 3. Each side likewise: its worktree on `<run>/<side>` from its own base, one agent:
 
 ```json tool=host.call

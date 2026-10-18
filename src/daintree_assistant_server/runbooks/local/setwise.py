@@ -330,6 +330,10 @@ class SetwiseClassifier:
         #: catalog has not changed at all: microseconds at 38 runbooks,
         #: milliseconds at 1,000, and this sits on the first-byte path.
         self._tables: dict[str | None, RunbookTable] = {}
+        #: The table the latest ``sync`` returned, whichever path returned it: what
+        #: ``table`` (and ``select`` with no catalog) reads. Not the newest entry of
+        #: ``_tables``, whose order is retention's, which a fast-path hit leaves alone.
+        self._latest: RunbookTable | None = None
         #: Vector pairs by document digest, surviving every table replacement.
         #: See the note in ``sync``: a table evicted from ``_tables``, or a
         #: narrowed catalog synced past it, takes its vectors with it. LRU-bounded
@@ -348,6 +352,7 @@ class SetwiseClassifier:
                 # BUILD time, and the live catalog may have moved since. Keying it
                 # by None forces the first sync through the digest check.
                 self._tables = {None: table}
+                self._latest = table
 
     @property
     def candidates(self) -> int:
@@ -372,8 +377,7 @@ class SetwiseClassifier:
     @property
     def table(self) -> RunbookTable | None:
         """The table synced most recently."""
-        tables = self._tables
-        return next(reversed(tables.values())) if tables else None
+        return self._latest
 
     def _keep(self, revision: str | None, table: RunbookTable) -> None:
         """Make ``table`` the newest entry for ``revision``, evicting the oldest past
@@ -383,6 +387,7 @@ class SetwiseClassifier:
         while len(tables) > _TABLES_MAX:
             del tables[next(iter(tables))]
         self._tables = tables
+        self._latest = table
 
     # ------------------------------------------------------------------ sync
 
@@ -403,6 +408,7 @@ class SetwiseClassifier:
         if revision is not None:
             kept = self._tables.get(revision)
             if kept is not None:
+                self._latest = kept
                 return kept
 
         ids = tuple(sorted(catalog.selectable_ids))

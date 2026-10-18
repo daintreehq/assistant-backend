@@ -19,7 +19,7 @@ Procedure:
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"terminal.sendCommandMany","args":{"sends":[{"terminalId":"<terminalId>","command":"Parking for later: stop at a safe point and start nothing new. No commit or push; close no pane, remove no worktree. Reply: done, half-done, uncommitted files, branch, HEAD and whether it is pushed, open questions, the exact next step."}],"notify":true,"handback":true}}
 ```
 
-   A unit a host's assistant runs: brief that assistant the same (hosts foundation, Delegating). One not this session's: listed for the person, with the words to type in its pane. A `disconnected` host, or a call not `ok`: its units unknown, recorded as such, never parked.
+   A unit a host's assistant runs: brief that assistant the same (hosts foundation, Delegating; `ASSISTANT_BUSY`: on "stop now" `terminal.interruptOwned` it first, else send on its `terminal.notifyWhenIdle` notice). One not this session's: listed for the person, with the words to type in its pane. A `disconnected` host, or a call not `ok`: its units unknown, recorded as such, never parked.
 3. Save the record with every send and every unit unacknowledged, give the person the prompt "Resume the parked run <run> from <where>", and end the turn.
 
 On notice: copy each reply's facts into the record and save it. Parked: at its prompt with a reply giving its state. Anything else is unacknowledged and may still be working, never parked. A late notice for a unit already resumed changes nothing.

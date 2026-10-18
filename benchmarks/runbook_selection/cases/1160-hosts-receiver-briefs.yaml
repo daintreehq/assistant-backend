@@ -1,62 +1,21 @@
 # A Remote Host's own assistant receiving another assistant's brief, in the control
 # model. There are no lanes: Daintree types the brief into that assistant's prompt as an
 # orchestrator's brief ("From the Daintree Assistant on <machine>"), and the receiver
-# searches the ordinary catalog for the work it asks for, under daintree.foundation's
-# rule that the brief is a request like the user's, passed to another assistant only if
-# it says so. Each query is the receiver's search for its brief, in the client
+# searches the ordinary catalog for the work it asks for, under the rule Daintree stamps
+# on the brief and daintree.foundation repeats: do the work yourself, and delegate it only
+# if it asks you to. These are the briefs whose work is a Daintree operation or that ask
+# for delegation, so an ordinary runbook fits; a brief to change code is the receiver's to
+# do itself. Each query is the receiver's search for its brief, in the client
 # instruction's shape. No hosts procedure may load: those are the Shell's, whose
 # assistant drives hosts through host.call, and a receiver is a host, not a Shell.
 
 cases:
-  - id: receiver-implement-brief
-    category: single-runbook
-    host_model: control
-    note: >-
-      The delegated-work brief the inbox model answered with
-      daintree.hosts.do-delegated-work: one change, by a visible agent in a new worktree
-      here, the ordinary edit runbook's job.
-    messages:
-      - role: user
-        content: Fix the flaky login test on its own branch in a new worktree here and report the commit
-    expect:
-      required: [daintree.edits.spawn-visible-agent]
-      optional: [daintree.foundation]
-      forbid: [daintree.hosts.*]
-
-  - id: receiver-review-brief
-    category: single-runbook
-    host_model: control
-    note: >-
-      Review a pinned commit without changing it, as the brief asked; the inbox model's
-      daintree.hosts.review-for-hub.
-    messages:
-      - role: user
-        content: Review this branch at its exact commit for problems and change nothing
-    expect:
-      required: [daintree.review.review-change]
-      optional: [daintree.foundation]
-      forbid: [daintree.hosts.*]
-
-  - id: receiver-verify-brief
-    category: single-runbook
-    host_model: control
-    note: >-
-      Run named checks against a pinned commit here, no fixes; the inbox model's
-      daintree.hosts.verify-for-hub.
-    messages:
-      - role: user
-        content: Run lint and the unit tests on this exact commit here and report the results, no fixes
-    expect:
-      required: [daintree.ci.run-local-checks]
-      optional: [daintree.foundation]
-      forbid: [daintree.hosts.*]
-
   - id: receiver-cohort-brief
     category: single-runbook
     host_model: control
     note: >-
-      A batch the brief explicitly splits among this machine's own agents, the one case
-      where the receiver hands work on; the inbox model's daintree.hosts.run-local-cohort.
+      A batch the brief explicitly splits among this machine's own agents, so the
+      receiver delegates as it asks; the inbox model's daintree.hosts.run-local-cohort.
     messages:
       - role: user
         content: Split these four independent tickets across separate agents here, one worktree each
@@ -76,33 +35,6 @@ cases:
         content: Tell the agent already working on that task here to switch to the new API instead
     expect:
       required: [daintree.agents.steer-running-agent]
-      optional: [daintree.foundation]
-      forbid: [daintree.hosts.*]
-
-  - id: receiver-integrate-brief
-    category: single-runbook
-    host_model: control
-    note: >-
-      This machine named the integrator for pinned branches; the inbox model's
-      daintree.hosts.integrate-for-hub.
-    messages:
-      - role: user
-        content: Merge these three pinned branches into one integration branch here, testing after each merge
-    expect:
-      required: [daintree.git.integrate-agent-branches]
-      optional: [daintree.foundation]
-      forbid: [daintree.hosts.*]
-
-  - id: receiver-demo-brief
-    category: single-runbook
-    host_model: control
-    note: >-
-      Serve a pinned feature here as a demo; the inbox model's daintree.hosts.demo-for-hub.
-    messages:
-      - role: user
-        content: Get the checkout feature running here as a demo with sample data for a walkthrough
-    expect:
-      required: [daintree.workflow.prepare-feature-demo]
       optional: [daintree.foundation]
       forbid: [daintree.hosts.*]
 

@@ -118,8 +118,8 @@ RUNBOOK_BUNDLE_CEILING = 10 * 1024
 # The control catalog's hosts foundation (issue #159) comes with EVERY runbook a caller
 # with a host connected is served, not only the hosts ones, and there is no room for it
 # inside RUNBOOK_BUNDLE_CEILING (most bundles were within 20B of it). So it is bounded
-# on its own, and a bundle that carries it may be this much larger: everything else in
-# it still fits the ordinary ceiling. Written at 2.9KB.
+# on its own, and everything else in a bundle that carries it still fits the ordinary
+# ceiling. Written at 3.0KB.
 HOSTS_FOUNDATION_BODY_CEILING = 3 * 1024
 
 
@@ -162,11 +162,14 @@ def test_a_runbook_with_its_supporting_runbooks_stays_bounded(caller: CallerStat
         if runbook.id not in catalog.selectable_ids:
             continue
         bundle = [runbook, *catalog.supporting_for([runbook.id], attach=view.attach)]
-        size = sum(len(r.body.encode("utf-8")) for r in bundle)
-        ceiling = RUNBOOK_BUNDLE_CEILING
-        if caller.model == "control" and HOSTS_FOUNDATION_ID in {r.id for r in bundle}:
-            ceiling += HOSTS_FOUNDATION_BODY_CEILING
-        assert size <= ceiling, (
-            f"{runbook.id} with its supporting runbooks is {size}B for a {caller} caller, "
-            f"over {ceiling}B: {[r.id for r in bundle]}"
+        # The control hosts foundation is bounded on its own (above); everything else in
+        # the bundle still fits the ordinary ceiling.
+        rest = [
+            r for r in bundle if not (caller.model == "control" and r.id == HOSTS_FOUNDATION_ID)
+        ]
+        size = sum(len(r.body.encode("utf-8")) for r in rest)
+        assert size <= RUNBOOK_BUNDLE_CEILING, (
+            f"{runbook.id} with its supporting runbooks is {size}B for a {caller} caller "
+            f"(the control hosts foundation aside), over {RUNBOOK_BUNDLE_CEILING}B: "
+            f"{[r.id for r in bundle]}"
         )

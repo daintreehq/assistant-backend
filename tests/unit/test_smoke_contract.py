@@ -67,6 +67,7 @@ def _healthy_deployment() -> dict[str, Any]:
         "search_revision": REVISION,
         # What a caller without Daintree-Host-Control (v0.44) is served.
         "inbox_search_revision": INBOX_REVISION,
+        "inbox_search_results": None,  # None: the same ranking as the control search
         "get_is_error": False,
         "get_runbook": {"id": "daintree.terminals.rename", "instructions": "1. List them."},
         "get_supporting": [{"id": "daintree.foundation", "instructions": "Shared judgement."}],
@@ -107,7 +108,11 @@ class _Handler(BaseHTTPRequestHandler):
                     "status": d["ready"],
                     "catalog_revision": d["catalog_revision"],
                     "runbooks": d["runbooks"],
-                    "inbox_catalog_revision": d["inbox_catalog_revision"],
+                    **(
+                        {"inbox_catalog_revision": d["inbox_catalog_revision"]}
+                        if d["inbox_catalog_revision"] is not None
+                        else {}
+                    ),
                     "inbox_runbooks": d["runbooks"],
                 },
             )
@@ -155,6 +160,8 @@ class _Handler(BaseHTTPRequestHandler):
         elif method == "tools/call":
             limit = message["params"]["arguments"].get("max_results", 3)
             runbooks = d["search_results"]
+            if not control and d["inbox_search_results"] is not None:
+                runbooks = d["inbox_search_results"]
             # Honours the limit the way the real tool does, unless a mutation
             # has put more results in than any limit allows.
             if len(runbooks) <= 3:
@@ -214,7 +221,7 @@ def test_a_coherent_deployment_passes_the_whole_gate() -> None:
     result = _run_against(_healthy_deployment())
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     assert "FAIL" not in result.stdout, result.stdout
-    assert "12 passed, 0 failed" in result.stdout, result.stdout
+    assert "13 passed, 0 failed" in result.stdout, result.stdout
 
 
 def test_a_trailing_slash_on_the_url_is_not_a_second_route() -> None:
@@ -253,6 +260,8 @@ _MUTATIONS = [
     ),
     ("exact retrieval reports an error", {"get_is_error": True}),
     ("a v0.44 caller is served the control catalog", {"inbox_search_revision": REVISION}),
+    ("a v0.44 caller's search ranks nothing", {"inbox_search_results": []}),
+    ("readiness names no inbox catalog", {"inbox_catalog_revision": None}),
     (
         "a connected host-control caller is not sent the hosts foundation",
         {"get_supporting_connected": [{"id": "daintree.foundation", "instructions": "x"}]},

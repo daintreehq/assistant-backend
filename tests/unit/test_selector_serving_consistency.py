@@ -83,6 +83,7 @@ def test_a_runbook_vector_does_not_depend_on_what_it_was_synced_with() -> None:
         # Forget the shipped table and the memo so every document is ENCODED here,
         # which is the path whose batching used to leak into the vectors.
         clf._tables = {}
+        clf._latest = None
         clf._vec_memo.clear()
         return clf.sync(cat)
 

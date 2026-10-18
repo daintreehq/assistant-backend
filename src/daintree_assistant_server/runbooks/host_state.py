@@ -76,7 +76,9 @@ def parse_host_model(values: list[str]) -> HostModel:
     a value this server does not know is not evidence of a client that has
     ``host.call``.
     """
-    if len(values) == 1 and values[0].strip() == HOST_CONTROL_VERSION:
+    # HTTP's optional whitespace around a value is not part of it; nothing else is
+    # forgiven (a no-break space is an unknown value, not a padded "1").
+    if len(values) == 1 and values[0].strip(" \t") == HOST_CONTROL_VERSION:
         return "control"
     return "inbox"
 

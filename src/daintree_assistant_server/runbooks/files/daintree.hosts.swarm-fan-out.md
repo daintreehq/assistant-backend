@@ -26,7 +26,7 @@ Procedure:
 
    Keep each row's `hostId`, `projectId`, `worktreeId`, `worktreePath` and `terminalId`. End the turn once every reachable host has its launch.
 
-On notice or resume: a host's notice carries no reply. Per host with open rows, one `terminal.getStatus` through `host.call` for its terminals, `includeOutput`: the `lastHandback` for its prompt is the claim (`terminal.readLastMessageOwned` for the exact text). Rows with no notice get the same read, paced to the work. A question inside the person's scope: answer it with `terminal.sendCommandOwned` there (`notify`, `handback`); else ask them.
+On notice or resume: a host's notice carries no reply. Per host with open rows, one `terminal.getStatus` through `host.call` for its terminals, `includeOutput`: the `lastHandback` for its prompt is the claim (`terminal.readLastMessageOwned` for a Claude agent's exact text; a Codex one's: `terminal.getOutput`). Rows with no notice get the same read, paced to the work. A question inside the person's scope: answer it with `terminal.sendCommandOwned` there (`notify`, `handback`); else ask them.
 - Verify each claim. Pushed: in your shell, `git ls-remote` shows the claimed SHA on its branch; fetch it and `git diff --stat <base SHA> <SHA>`. Not pushed: at Full, `project.runCommand` in its `worktreePath` (`git log -1 --stat`, `git status --porcelain`, each check as given); at Core, one narrow follow-up send asking for exactly that, its answer marked reported.
 - End the turn while any row is working. One still working once the rest are in: open, never failed.
 

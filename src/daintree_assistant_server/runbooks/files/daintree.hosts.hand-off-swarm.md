@@ -9,7 +9,7 @@ requiredTools:
   - host.call
 hostEligibility: configured
 ---
-Ownership never moves between sessions (the hosts foundation's ownership): what the outgoing session launched on a host stays its own. The successor can read those terminals but not send to, interrupt or close them, and their notices reach only the session that armed them. So hand each unit over in a state that needs no send from the successor.
+Ownership never moves between sessions: an agent the outgoing session launched on a host stays its own. The successor can read it but not send to, interrupt or close it, and its notices reach only the session that armed them. A host's assistant is no one's: the successor sends to and interrupts it, and closes only one it started. So hand each unit over in a state that needs no send from the successor.
 
 Outgoing session:
 1. Freeze: no new launch, send or stop; tell the person. Answer only a question already pending, within scope.

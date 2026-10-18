@@ -9,12 +9,12 @@ requiredTools:
   - host.call
 hostEligibility: configured
 ---
-The Shell keeps no record of what was sent: the account is what you kept, checked against what each host shows now. An earlier session's notices never reach a later one. What an earlier session launched is readable but no longer yours to send to or close (the hosts foundation's ownership): the person, or that host's assistant, closes it.
+The Shell keeps no record of what was sent: the account is what you kept, checked against what each host shows now. An earlier session's notices never reach a later one. An agent an earlier session launched is readable but no longer yours to send to or close: the person, or that host's assistant, closes it. A host's assistant stays reachable (send, interrupt); close only one you started.
 
 Procedure:
 1. References, per unit: host, project, terminal id and title, worktree, branch, brief, last SHA or PR, from this conversation, a checkpoint, or a park or hand-over record the person names. None: say so and ask which run; match only what the person describes. Never infer a brief or acceptance from a pane title or branch name, and never rebuild a task list from the hosts.
 2. `host.list`: per host `connection`, `lastSeenAt`, `control`. Not connected: its units are unknown, not lost; give the last-seen time and move on.
-3. Per connected host and project, through `host.call`: `terminal.list` (no `owned` filter: `owned:true` lists only this session's), `worktree.list`, then one `terminal.getStatus` over the run's terminals with `includeOutput:{"lines":40}`; `terminal.readLastMessageOwned` only for an agent this session launched. From your shell, per branch: `git ls-remote origin <branch>`, `gh pr list --head <branch> --state all`.
+3. Per connected host and project, through `host.call`: `terminal.list` (no `owned` filter: `owned:true` lists only this session's), `worktree.list`, then one `terminal.getStatus` over the run's terminals with `includeOutput:{"lines":40}`; `terminal.readLastMessageOwned` only for a Claude agent this session launched. From your shell, per branch: `git ls-remote origin <branch>`, `gh pr list --head <branch> --state all`.
 4. One state per unit:
    - Finished: stopped with its handback for that brief, and its branch at a SHA on the remote; verified only as the foundation's proving a finish says.
    - Still working: leave it; following it to its end is daintree.hosts.supervise-swarm.
