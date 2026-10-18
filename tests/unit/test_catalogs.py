@@ -69,9 +69,7 @@ def _shared() -> list[Runbook]:
         _runbook("daintree.foundation", foundation=True),
         _runbook("daintree.terminals.rename"),
         _runbook("daintree.release.deploy", body="control deploy"),
-        _runbook(
-            HOSTS_FOUNDATION_ID, foundation=True, requires=("daintree.foundation",)
-        ),
+        _runbook(HOSTS_FOUNDATION_ID, foundation=True, requires=("daintree.foundation",)),
         _runbook("daintree.hosts.drive", eligibility="connected"),
         _runbook("daintree.hosts.connect", eligibility="any"),
     ]
@@ -305,7 +303,9 @@ def _artifact_present() -> bool:
     return head.exists() and head.stat().st_size > 1024
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_alternating_catalogs_never_rebuild_a_table() -> None:
     """The server alternates between the two models' catalogs request by request; one
     cached slot would rebuild the table on every alternation."""
@@ -325,8 +325,7 @@ def test_alternating_catalogs_never_rebuild_a_table() -> None:
     # A runbook both catalogs share is embedded once.
     shared = "daintree.terminals.rename"
     assert (
-        control.retrieval[control.ids.index(shared)]
-        == inbox.retrieval[inbox.ids.index(shared)]
+        control.retrieval[control.ids.index(shared)] == inbox.retrieval[inbox.ids.index(shared)]
     ).all()
     # A third catalog evicts the oldest; the newest two stay.
     narrowed = Catalog([r for r in catalogs.control.runbooks if r.id != shared])
@@ -341,7 +340,9 @@ def test_every_control_hosts_runbook_is_classified() -> None:
     are down."""
     control = load_catalogs().control
     hosts = {
-        r.id: r.meta.host_eligibility for r in control.runbooks if r.id.startswith("daintree.hosts.")
+        r.id: r.meta.host_eligibility
+        for r in control.runbooks
+        if r.id.startswith("daintree.hosts.")
     }
     assert hosts and all(v is not None for v in hosts.values())
     assert "lane" not in hosts.values()
