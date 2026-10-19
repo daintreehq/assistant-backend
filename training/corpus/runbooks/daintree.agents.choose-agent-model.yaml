@@ -36,12 +36,10 @@ positives:
   - "use the cheapest model that can still do the version bump properly"
   - "I'd like you to decide the model for this one, it's a nasty memory leak"
 boundaries:
-  - query: "small model for the renames, strongest model for the state machine rewrite"
+  - query: "the state machine rewrite is subtle and the renames are busywork; which model should each one get?"
     confusable_with: [daintree.orchestration.spike-options]
   - query: "give the easy tickets and the hard ticket different models, your call"
     confusable_with: [daintree.orchestration.spike-options]
-  - query: "claude or codex for the importer? choose one, no bake-off"
-    confusable_with: [daintree.orchestration.competition]
   - query: "which single agent should own the scheduler rewrite"
     confusable_with: [daintree.orchestration.competition]
   - query: "my claude plan is running low, so put the routine fixes on a cheaper model"

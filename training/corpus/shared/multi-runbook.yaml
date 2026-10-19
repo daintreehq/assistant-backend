@@ -1468,3 +1468,7 @@ examples:
   - query: "send the screenshot-based layout fix to whichever agent handles images best"
     expect: [daintree.edits.spawn-visible-agent, daintree.agents.choose-agent-model]
     run: runbook-2026-10-19-choose-agent-model
+  - query: "I only want one agent on the importer; you decide whether that is claude or codex"
+    expect: [daintree.edits.spawn-visible-agent, daintree.agents.choose-agent-model]
+    confusable_with: [daintree.orchestration.competition]
+    run: runbook-2026-10-19-choose-agent-model
