@@ -414,7 +414,7 @@ cases:
     note: >-
       On the receiving host the hub's read-only question is a message to answer, not a report to
       write. daintree.hosts.handle-hub-message wins by "Use on a Remote Host's Daintree assistant
-      enrolled as a lane when the hub, the assistant on the person's main machine, has messaged it";
+      acting as a lane when the hub, the assistant on the person's main machine, has messaged it";
       the hub's own report procedure must not load. At authoring this routed to the report
       (untrained, shared vocabulary): the boundary is carried by corpus rows and owed to the next
       retrain.

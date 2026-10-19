@@ -99,12 +99,11 @@ PANE_CALLERS: tuple[str, ...] = ("pane-core",)
 #: Domains whose runbooks are followed by a caller other than an agent pane.
 #:
 #: `daintree.hosts` (cross-host assistant messaging) is sidebar-only by design:
-#: the hub is the sidebar assistant on a Shell with a Remote Host configured, and
-#: an enrolled lane is the sidebar assistant on a machine listening as a host.
-#: An agent pane is never either. A hosts runbook's baseline must run on ONE of
-#: those two callers, at Tool set = Full, because the hub's sends, cancels and
-#: starts are Full-only; the hub-core and lane-core captures record what each
-#: offers at Core.
+#: the hub is any sidebar assistant on a Shell with a Remote Host configured, and
+#: a lane is the sidebar assistant on a machine listening as a host. An agent
+#: pane is never either. A hosts runbook's baseline must run on ONE of those two
+#: callers. They are checked at Tool set = Full, the widest listing; messaging
+#: itself is the same at Core, as the hub-core and lane-core captures record.
 CALLER_POLICY: dict[str, tuple[str, ...]] = {
     "daintree.hosts": ("hub-full", "lane-full"),
 }
@@ -120,6 +119,7 @@ HUB_TOOLS = frozenset(
         "host.listTasks",
         "host.cancelTask",
         "host.startAssistant",
+        "host.readQuota",
     }
 )
 LANE_TOOLS = frozenset({"assistant.getInbox", "assistant.reply", "assistant.sendMessage"})

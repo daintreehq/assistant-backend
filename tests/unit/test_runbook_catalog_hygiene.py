@@ -167,22 +167,22 @@ def test_pane_and_api_key_callers_are_never_offered_messaging() -> None:
         assert not action_ids(surface) & MESSAGING_TOOLS, surface
 
 
-def test_the_hub_reads_on_core_and_writes_on_full() -> None:
-    """The hub's sends, cancels and starts act on another machine, so the sidebar
-    assistant is offered them only at Tool set = Full: the plain sidebar captures
+def test_messaging_is_the_same_on_core_and_full() -> None:
+    """Every Daintree Assistant on a Shell with a Remote Host may message, start and
+    cancel at either Tool set, with nothing to enroll: the plain sidebar captures
     record what each tier's allowlist holds, and the hub and lane Core sessions what
-    they list. The hub's own lane receives host-initiated messages but has no hub
-    to write to; a lane on a host has no `host.*` reach."""
+    they list. The hub's own lane receives host-initiated messages but has no Shell
+    to write to; a lane on a host has no `host.*` reach. Only the window moves,
+    `host.switch` and `project.openOnHost`, stay Full."""
 
     def allowlisted_messaging(surface: str) -> set[str]:
         withheld = capture(surface)["capture"].get("allowlisted_but_not_listed", [])
         return {w["action_id"] for w in withheld} & MESSAGING_TOOLS
 
-    reads = {"host.list", "host.listAssistants", "host.getTask", "host.listTasks"}
-    writes = {"host.sendMessage", "host.cancelTask", "host.startAssistant"}
     inbox = {"assistant.getInbox", "assistant.reply"}
-    assert allowlisted_messaging("help-core") == reads | LANE_TOOLS
-    assert allowlisted_messaging("help-full") == reads | writes | LANE_TOOLS
+    window_moves = {"host.switch", "project.openOnHost"}
+    assert allowlisted_messaging("help-core") == MESSAGING_TOOLS
+    assert allowlisted_messaging("help-full") == MESSAGING_TOOLS
     # The Core sessions themselves, captured with messaging reachable and recorded
     # as what they list beyond help-core.
     hub_core = capture("hub-full")["capture"]["core_listing"]
@@ -190,10 +190,12 @@ def test_the_hub_reads_on_core_and_writes_on_full() -> None:
     for listing in (hub_core, lane_core):
         assert listing["delta_of_surface_hash"] == capture("help-core")["capture"]["surface_hash"]
         assert not listing["removed"] and not listing["changed"]
-    assert set(hub_core["added"]) == reads | inbox
+    assert set(hub_core["added"]) == HUB_TOOLS | inbox
     assert set(lane_core["added"]) == LANE_TOOLS
-    assert action_ids("hub-full") & HUB_TOOLS == reads | writes
+    assert action_ids("hub-full") & HUB_TOOLS == HUB_TOOLS
     assert action_ids("hub-full") & LANE_TOOLS == inbox
+    assert window_moves <= action_ids("hub-full")
+    assert not window_moves & (action_ids("help-core") | set(hub_core["added"]))
     assert action_ids("lane-full") & MESSAGING_TOOLS == LANE_TOOLS
 
 

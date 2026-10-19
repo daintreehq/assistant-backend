@@ -103,7 +103,7 @@ cases:
       is a person-mediated plan, not a seamless takeover.
     messages:
       - role: user
-        content: The hub on this Mac sent the work to two remote hosts. If I enroll the hub on a different Mac, can it take the run over, or does it need a person-led handover?
+        content: The hub on this Mac sent the work to two remote hosts. If I coordinate from a different Mac instead, can it take the run over, or does it need a person-led handover?
     expect:
       required: [daintree.hosts.hand-off-swarm]
       optional: [daintree.hosts.foundation, daintree.foundation]

@@ -40,8 +40,8 @@ positives:
     docs: true
   - query: >-
       Before any work is handed to a remote machine, confirm this sidebar session can
-      message hosts at all: the host tools are offered, this session is the enrolled hub,
-      and the host in question has assistant messaging allowed. Report what is missing
+      message hosts at all: the host tools are offered and the host in question has
+      assistant messaging allowed. Report what is missing
       and who has to change it.
   - query: >-
       A reply from the assistant on another machine says the fix is pushed and the tests
@@ -102,7 +102,7 @@ foundation:
     docs: true
     history:
       - "user: what can the assistant here do on my other mac?"
-      - "assistant: It can message the assistant enrolled there, and start one if you allow that for the host."
+      - "assistant: It can message the assistant running there, and start one if none is."
 
   - query: >-
       My laptop's sidebar assistant runs on the Core tool set and I'd like to keep it that
