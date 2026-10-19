@@ -96,7 +96,7 @@ cases:
         content: codex or claude for the parser rewrite? pick one for me, I don't want both
     expect:
       required: [daintree.agents.choose-agent-model]
-      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
 
   - id: choose-model-not-usage-limits
     category: routing-trap

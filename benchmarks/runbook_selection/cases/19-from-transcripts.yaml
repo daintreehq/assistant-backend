@@ -357,7 +357,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: tx-per-launch-model-and-effort
-    category: routing-trap
+    category: multi-runbook
     note: >-
       Help-assistant session 566371c8, 2026-09-29: asked to spend Codex in proportion
       to the stakes, the assistant read the empty preset lists and told the user no
@@ -368,14 +368,17 @@ cases:
       ("the CHOICE of agent CLI, model or reasoning effort ... spend Codex in proportion
       to the stakes"; check-usage-limits fences "to choose which agent, model or
       reasoning effort a task launches with, even to save budget
-      (daintree.agents.choose-agent-model)"). Spawn-visible-agent, which makes the
-      launch, may ride along. Before the chooser existed this required spawn alone.
+      (daintree.agents.choose-agent-model)"). It also asks for the launch, which
+      spawn-visible-agent owns ("It is the selection step beside the workflow that owns
+      the work"), so both are required. Before the chooser existed this required spawn
+      alone; with the shipped selector only the chooser loads (its body fetches spawn
+      with get_runbook), a miss owed to the retrain.
     messages:
       - role: user
         content: Launch Codex with a specific model and reasoning effort for each task
     expect:
-      required: [daintree.agents.choose-agent-model]
-      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
+      required: [daintree.agents.choose-agent-model, daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
 
   - id: tx-continue-agents-cut-off-by-sleep
     category: routing-trap
