@@ -363,16 +363,19 @@ cases:
       to the stakes, the assistant read the empty preset lists and told the user no
       model or effort could be set per launch; agent.launch takes both. Unsearched;
       before the fix check-usage-limits led this phrasing (0.82) and spike-options a
-      paraphrase of the user's words (0.84). Decided by spawn-visible-agent's "ONE
-      visible agent in the right worktree, on any model or effort named" and
-      check-usage-limits' fence "to choose which model or reasoning effort an agent
-      launches with, even to save budget (daintree.edits.spawn-visible-agent)".
+      paraphrase of the user's words (0.84). The agent is named but the model and
+      effort per task are left open, which daintree.agents.choose-agent-model now owns
+      ("the CHOICE of agent CLI, model or reasoning effort ... spend Codex in proportion
+      to the stakes"; check-usage-limits fences "to choose which agent, model or
+      reasoning effort a task launches with, even to save budget
+      (daintree.agents.choose-agent-model)"). Spawn-visible-agent, which makes the
+      launch, may ride along. Before the chooser existed this required spawn alone.
     messages:
       - role: user
         content: Launch Codex with a specific model and reasoning effort for each task
     expect:
-      required: [daintree.edits.spawn-visible-agent]
-      optional: [daintree.foundation]
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
 
   - id: tx-continue-agents-cut-off-by-sleep
     category: routing-trap
