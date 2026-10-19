@@ -246,3 +246,18 @@ The 87-runbook catalog was trialled live with Haiku orchestrating in an isolated
 - The trial harness and the per-runbook trial reports are kept outside the repo at
   `~/.cache/daintree-runbook-e2e/kit/` (`E2E.md` is its guide).
 
+
+---
+
+## Refresh the dated model defaults in choose-agent-model
+
+**Trigger: a major model release from Anthropic, OpenAI or Google, or a month after the
+last refresh (written 2026-10-19).** `daintree.agents.choose-agent-model` keeps its
+method durable (tiers read off `agent.listModels` names, sizing, the user's licence to
+choose) and holds a short dated list of cross-provider defaults (step 5) plus tier
+family names and list-price ratios (steps 4 and 6). Rankings turned over every two to
+six weeks through 2026, at about four notable releases a month. Re-check each default
+against current independent results (agentic coding indexes, review and web-design
+benchmarks, cost per task), update the month in step 5, and add or drop a family name
+when a CLI's listed models change. A body edit embeds nothing, so it owes no routing
+measurement and no retrain; run the unit suite for the budgets.
