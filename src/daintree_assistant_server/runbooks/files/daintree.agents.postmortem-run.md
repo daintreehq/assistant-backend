@@ -21,6 +21,8 @@ optionalTools:
 ---
 Analysis only: nothing is relaunched to "see if it happens again", reverted, rewritten or filed. You gather Daintree's side, a read-only analyst reads transcript and diff, you check its claims and judge the cause: the first divergence, not the final symptom; elapsed time is not a cause.
 
+On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+
 Procedure:
 1. Identify the run: its terminal id if still open (`terminal.list`) and its worktree (`worktree.list`). A panel the user points at ("the other panel") beats history: read each open agent panel but your own (`terminal.getOutput`) and take the one that matches. Open: one `terminal.getStatus`; `working`, or `waiting` on a `question` or `approval`: not over. Closed: `agentSessionHistory.list` with that `worktreeId` gives agent, title, branch, `savedAt`, `sessionId` (identity only; pruned: missing). Several candidates: ask.
 2. Daintree's side, by source:

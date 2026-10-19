@@ -16,6 +16,8 @@ optionalTools:
 ---
 Parking makes work safe and resumable; it closes nothing. Closing the app or a pane ends its running agents and every pending notice. The agents save their own work; you choose the set, send, check and record.
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Scope: "everyone" is every agent you launched or were handed; a named worktree is only its agents (`terminal.list` with `worktreeId`). Everything after applies to that set. Agents you neither launched nor were handed are listed for the user, never sent to.
 2. Inventory: `worktree.list`, `terminal.list` (`owned:true`), one `terminal.getStatus` with `includeOutput:{"lines":40}` over the set. Per worktree: `git -C <path> status --short` and `git -C <path> log --oneline @{u}..`. No upstream means no tracking branch, not "never pushed": remote state is unknown until `git ls-remote <remote> <branch>` says.
@@ -39,7 +41,7 @@ On notice or resume:
 - Still working: one reminder that repeats "Change no files". At the deadline, report it as still working or unconfirmed.
 - A dirty worktree with no agent: report it; a checkpoint there is an agent's job, only if the user asks.
 - A draft PR the user asked for: daintree.workflow.prep-branch-for-review, kept draft and WIP.
-6. Resume record where the user wants it, else in the WIP commit message or a file outside the repository, never an untracked file in the tree: task, worktree, branch, HEAD, uncommitted state, decisions, what was verified, the exact next step. A durable workflow's units are marked parked so a late continuation dispatches nothing. Optional panel tag: `terminal.setClientMetadata` with `terminalId` and the whole merged record as `clientMetadata` (read it first with `terminal.list` `includeClientMetadata:true`; keep existing keys).
+6. Resume record where the user wants it, else in the WIP commit message or a local file outside the repository, never an untracked file in the tree: task, worktree, branch, HEAD, uncommitted state, decisions, what was verified, the exact next step. A durable workflow's units are marked parked so a late continuation dispatches nothing. Optional panel tag: `terminal.setClientMetadata` with `terminalId` and the whole merged record as `clientMetadata` (read it first with `terminal.list` `includeClientMetadata:true`; keep existing keys).
 
 Stop and recovery: a re-run looks for an existing WIP commit and push before asking for another. A rejected push leaves the commit local: report it, never force. A declined commit leaves the tree dirty and reported, never stashed. Close nothing; a closed session can be resumed later (daintree.orchestration.status-and-resume).
 

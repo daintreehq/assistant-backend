@@ -16,6 +16,8 @@ optionalTools:
 ---
 A send is typed into the agent's input at once but never stops its turn; whether the CLI reads it mid-turn is up to the CLI. A stop, or a change that cannot wait, needs `terminal.interruptOwned` first (Escape; the conversation is kept).
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Targets: the terminal ids you hold, else `terminal.list` with `owned:true`; several plausible matches for one agent: ask. One `terminal.getStatus` over them with `includeOutput:{"lines":40}`. Classify each:
    - `working`: step 2.
@@ -35,16 +37,16 @@ Procedure:
    c. `terminal.getStatus` with `includeOutput:{"lines":30}`. Stopped means the screen shows the turn interrupted and an empty input line, not a spinner; Claude Code's "Interrupted · What should Claude do instead?" is that stop, even when it reads as `waitingReason:"question"`. `working` or a spinner: the stop is unconfirmed; report it, send no correction, never interrupt again.
    d. `git -C "<its worktree path>" status --short`. Revert nothing; name the changed files in the correction for it to re-read.
    - Refused as not mid-turn: that state reading lags, so read the screen again. Idle at an input line: step 4 (stop-only: finish). Still working: report it and send nothing. Refused because its CLI stops on Ctrl+C (Goose) or its input is locked: nothing was sent; the user stops it from its pane. Never substitute `terminal.sendKeysOwned` Escape or Ctrl+C: a stray Escape at an idle Claude prompt opens its rewind menu, and Ctrl+C can quit the CLI.
-4. One correction per agent, short and complete: what changes (the user's words); what stays (the rest of its task still applies); what to undo, only if the user said so; files to re-read; "First state in one line what you will now do differently, then continue with the rest of the task" (drop "continue" when the user wants it to stop after). Without the "rest of the task" line an agent treats the correction as its whole new task and drops its plan. Send with `notify:true, handback:true`: `terminal.sendCommandOwned` for one, `terminal.sendCommandMany` for several (one call).
+4. One correction per agent, short and complete: what changes (the user's words); what stays (the rest of its task still applies); what to undo, only if the user said so; files to re-read; "First state in one line what you will now do differently, then continue with the rest of the task" (drop "continue" when the user wants it to stop after). Without the "rest of the task" line an agent treats the correction as its whole new task and drops its plan. Send with `notify:true, handback:true`: `terminal.sendCommandOwned` for one, `terminal.sendCommandMany` for several.
 
 ```json tool=terminal.sendCommandOwned
 {"terminalId":"<agent terminal id>","command":"Correction from the user: use the existing retryWithBackoff helper instead of writing a new retry loop. Everything else in your task still applies. src/net/client.ts was left mid-edit when you were stopped: re-read it before continuing. First state in one line what you will now do differently, then continue with the rest of the task.","notify":true,"handback":true}
 ```
 
-5. Keep each `submissionToken` (delivery in doubt: as the foundation says). End the turn.
+5. Keep each `submissionToken` (delivery in doubt: as the foundation says).
 
 On notice or resume: the notice armed in step 2 carries no reply: send step 4. After the correction, judge only output that follows it: its one-line statement plus work on the new course means the steer landed; the task's result is still a claim ("it reports 15 passing"), verified as the runbook that started the work says, never relayed as fact. No statement yet is not a miss. Work that continues the old course after the correction: one restated correction naming exactly what it did against it, with `notify`; a second miss goes to the user. A question: answer it as daintree.agents.answer-waiting-agent.
 
 Stop and recovery: one interrupt, one correction and at most one restatement per agent per request. Never close, restart or relaunch an agent to change its course; a different agent taking over is daintree.agents.hand-off-task.
 
-Report back: per agent, the terminal id; interrupted or not, and how the stop was confirmed or that it is unconfirmed; changed files found; the correction's gist and delivery; its acknowledgment or the notice outcome; what will bring you back.
+Report back: per agent, the terminal id; interrupted or not, how the stop was confirmed or that it is unconfirmed; changed files found; the correction's gist and delivery; its acknowledgment or the notice outcome; what will bring you back.

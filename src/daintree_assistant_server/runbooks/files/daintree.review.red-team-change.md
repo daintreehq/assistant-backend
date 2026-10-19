@@ -14,8 +14,10 @@ optionalTools:
 ---
 Only a break you ran counts. "Potential", "could", a stack of reasoning, or a repro that fails for environment reasons is a rejected claim.
 
+On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+
 Procedure:
-1. Freeze the candidate as a SHA. Local work must be committed (a worktree starts from committed code; if it is dirty, say so and ask the author or user to commit). A GitHub PR: `git fetch origin pull/<n>/head`, and `FETCH_HEAD` must equal `gh pr view <n> --json headRefOid`; another forge: its own PR ref. Base: `git merge-base <candidate> origin/<base branch>`. Record both.
+1. Freeze the candidate as a SHA. Local work must be committed (a worktree starts from committed code; if it is dirty, say so and ask the author or user to commit). A GitHub PR: `git fetch origin pull/<n>/head`, and `FETCH_HEAD` must equal `gh pr view <n> --repo <owner/name> --json headRefOid`; another forge: its own PR ref. Base: `git merge-base <candidate> origin/<base branch>`. Record both.
 2. One worktree per attacker, never the author's, so repro files and runs never collide: `git branch redteam/<slug>-<lens> <candidate sha>` in the main checkout (this creates the branch; never check out or switch branches in the main or the author's checkout), then create its worktree with no recipe, then `worktree.waitUntilReady`.
 
 ```json tool=worktree.createWithRecipe

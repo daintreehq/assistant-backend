@@ -16,21 +16,23 @@ optionalTools:
 ---
 The held wait is what fires at the deadline: Daintree has no timer, and a foreground `sleep` is no substitute.
 
+On a host: shell steps via its command runner, or delegate; the clock is yours: a command runner is not a scheduler.
+
 Procedure:
-1. Size the box. One held wait covers up to 30 minutes (`waitSeconds` max 1800: the box plus two minutes for the agent's report). For a longer box, or a host that cannot hold a call that long, keep holding after the launch wait with `terminal.waitUntilIdle` (`timeoutMs` 60000, its cap) until the deadline, or use a host background command that exits at the deadline and re-invokes you, if your host has one. Neither possible: tell the user before launching that it is best effort: the agent is asked to stop by its own clock, nothing enforces it, and you check at their next message.
+1. Size the box. One held wait covers up to 30 minutes (`waitSeconds` max 1800: the box plus two minutes for the agent's report). For a longer box, or if you cannot hold a call that long, keep holding after the launch wait with `terminal.waitUntilIdle` (`timeoutMs` 60000, its cap) until the deadline, or use your own background command that exits at the deadline and re-invokes you, if you have one. Neither possible: tell the user before launching that it is best effort: the agent is asked to stop by its own clock, nothing enforces it, and you check at their next message.
 2. Prepare. Edits go in the worktree the user named; for a throwaway attempt while their checkout holds changes of their own, a new worktree (`worktree.createWithRecipe` with a new branch, `worktree.waitUntilReady` with its `worktreeId` until `ready`; otherwise report it, launch nothing). Baseline there: `git rev-parse HEAD` and `git status --porcelain`. Only then start the clock: `date`, and the deadline as a clock time with date and timezone. Tell the user your turn is held for the box.
-3. Launch once, with the deadline in the prompt: "You have until 14:35 (check `date`). Work in small steps that leave the tree working. At the deadline stop, even if unfinished, and reply with: what is done, what is not, what you would do next, your confidence, and any file left half-edited." `waitSeconds`: seconds to the deadline plus 120, at most 1800.
+3. Launch once, with the deadline in the prompt: "You have until 14:35 (check `date`). Work in small steps that leave the tree working. At the deadline stop, even if unfinished, and reply with: what is done, what is not, what you would do next, your confidence, and any file left half-edited." `waitSeconds`: seconds to the deadline plus 120.
 
 ```json tool=agent.launch
 {"agentId":"<agent>","name":"Timebox 20m: <task>","worktreeId":"<worktree id>","prompt":"<task, deadline, report shape>","waitForReply":true,"handback":true,"notify":true,"waitSeconds":1320}
 ```
 
-   `notify` stays on so that, if the host cuts the call short, the agent's stop still wakes you.
+   `notify` stays on so that, if your call is cut short, the agent's stop still wakes you.
 4. Read the outcome. After every return compare `date` with the deadline.
-   - A reply before the deadline: finished early, or stopped to ask. A question inside the task's scope: answer with `terminal.sendCommandOwned`, `waitForReply:true, handback:true, notify:true`, `waitSeconds` the time left plus 120. Outside it: the attempt ends there; report the question.
+   - A reply before the deadline: finished early, or stopped to ask. A question inside the task's scope: answer with `terminal.sendCommandOwned`, `waitForReply:true, handback:true, notify:true`, `waitSeconds` the time left plus 120. Outside it: the attempt ends; report the question.
    - `outcome:"timeout"` before the deadline is a wait cut short, not the box ending: keep holding as in step 1 on the same terminal; never resend the task.
    - Past the deadline: `terminal.getStatus` (`terminalIds:[<id>]`, `includeOutput:{"lines":30}`); if `agentState` is `working`, call `terminal.interruptOwned`: text typed to a busy agent is not read until its turn ends. Its `requested` is not a stop, and a refusal is not proof it stopped; confirm with `terminal.waitUntilIdle` (`timeoutMs` 20000). Stopped means `waitingReason` `prompt`; `question`, `approval` or `error` is a blocked agent to report; `trackingState` `closed` or `unknown` is gone, not idle. Still working: one more interrupt, then report that the box was not enforced; never close it.
-   - The call failed, or returned early with neither a reply nor a timeout: that is the host's limit, not the deadline. Tell the user nothing fires at the deadline now except the agent's own clock and the notice when it stops, and end your turn.
+   - The call failed, or returned early with neither a reply nor a timeout: that is a call limit, not the deadline. Tell the user nothing fires at the deadline now except the agent's own clock and the notice when it stops.
 5. The report. A reply that already holds the report's parts is the report. Otherwise, once the agent is at its prompt, one `terminal.sendCommandOwned` "Time is up. Do not continue or start anything new. Reply with: done, not done, next steps, confidence, and any half-edited file." with `waitForReply:true, handback:true, waitSeconds:300`; nothing by then: report it unavailable. A notice about the stop you caused may arrive; it is not the report.
 6. Verify the partial work yourself against the baseline: `git diff <baseline HEAD>`, `git status --porcelain` and new untracked files, setting aside what the baseline already held, and the relevant test in that worktree. An interrupt mid-edit can leave a half-applied file: name it. With the stop unconfirmed, what you saw is provisional.
 
@@ -38,4 +40,4 @@ On notice or resume (only after step 4's early return): compare the time with th
 
 Stop and recovery: one launch, at most two interrupts, one report request. Never close, relaunch or discard its changes to enforce the box; "keep going" is a send to the same terminal, with a new deadline held the same way or `notify:true` for no box.
 
-Report back: the box, its start and deadline times and when the stop was seen; finished early, stopped, stopped late, blocked or unconfirmed, and how you confirmed it; the agent's report as its claim; what you verified on disk and by test; half-edited files; the terminal and worktree left open.
+Report back: the box, its start and deadline times and when the stop was seen; finished early, stopped, stopped late, blocked or unconfirmed, and how you confirmed it; the agent's report as its claim; what you verified by diff and test; half-edited files; the terminal and worktree left open.

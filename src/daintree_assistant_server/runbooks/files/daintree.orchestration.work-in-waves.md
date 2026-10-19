@@ -18,13 +18,15 @@ optionalTools:
   - slashCommands.list
   - terminal.readLastMessageOwned
 ---
-A wave is a barrier: nothing in the next wave starts until every pull request in this one is merged. Say what will wake the run before ending a turn. Pin the repository on every read (`gh --repo`, `git -C`); a failed read is an unknown gate.
+A wave is a barrier: nothing in the next wave starts until every pull request in this one is merged. Before ending a turn, say what wakes the run. Pin the repository on every read (`gh --repo`, `git -C`); a failed read is an unknown gate.
+
+On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
 
 Procedure:
 1. The contract is the user's; restate it: waves they listed, or a drain ("until none are left") picked a wave at a time by their command or as daintree.workflow.find-issue-work does; the cap; overlap policy; each command; who fixes failing CI; teardown scope. Report a drain's picks and any overlap, never re-planning; a changed listed wave needs a yes.
 2. Before each wave re-read each issue on the forge: skip closed or in-flight ones (`worktree.list` `issueNumber`, `prNumber`), saying why; a listed one waits on its prerequisites, a pick needs them merged and no assignee. An empty pick ends a drain; a pick the re-check empties is picked again. Checkpoint each branch before its create.
-3. Commands: find each with `slashCommands.list` for its agent in the main worktree before the first launch. Send it as typed with `notify:true` and no `handback` (it would join the arguments), so re-arm `terminal.notifyWhenIdle` once it works again (a stopped one refuses: recheck paced to the work). Its finish is the end marker it documents, else its screen.
-4. The base. Neither a forge merge nor a create updates the local base: before each wave `git fetch`, confirm the last wave's merges are in `origin/<base>` and branch from it.
+3. Commands: find each with `slashCommands.list` for its agent in the main worktree before the first launch. Send it as typed with `notify:true` and no `handback` (it joins the arguments), so re-arm `terminal.notifyWhenIdle` once it works again (a stopped one refuses: recheck). Its finish is the end marker it documents, else its screen.
+4. Neither a forge merge nor a create updates the local base: before each wave `git fetch`, confirm the last wave's merges are in `origin/<base>` and branch from it.
 5. Launch the wave, one worktree per issue. A recipe the user named starts the agent (`recipe.list` gives ids, not prompts: confirm it runs this task):
 
 ```json tool=worktree.createWithRecipe
@@ -37,10 +39,10 @@ Procedure:
 8. Teardown when and as the user asked (default: landed issues, after the merge). Per worktree: agent not working, `HEAD` still the gated head, tree clean, no pane you did not open (`terminal.list` by `worktreeId`, background too); else keep it, saying why. Close the agent (`terminal.closeOwned`, confirmed by `closedIds`), then `worktree.deleteOwned`, which keeps the branch. `CONFIRMATION_TIMEOUT` is pending: say so once, retry with the user there; it holds the next wave only if asked. Then step 2.
 
 On notice or resume:
-1. A notice or scheduled check prompts a fresh `terminal.getStatus`. Over hours keep one recurring host check if you can schedule, removed at the end. Tell the user every check that never ran and how long work sat finished.
+1. A notice or scheduled check prompts a fresh `terminal.getStatus`. Over hours, if you can schedule, keep one recurring check, removed at the end. Tell the user every check that never ran and how long work sat finished.
 2. Rebuild from live state (`worktree.list`, `terminal.getStatus`, the forge) and re-arm per step 3.
 3. A new help session owns no earlier worktree: list those for the user to delete.
-4. A stopped agent: read its last reply (`terminal.readLastMessageOwned`, or its screen). Answer a question in scope, else ask the user. A working one with a stale `lastOutputChangeAt` is reported, not interrupted. Advance only on step 6's gate or step 7's proof.
+4. A stopped agent: read its last reply (`terminal.readLastMessageOwned`, or its screen). A working one with a stale `lastOutputChangeAt` is reported, not interrupted. Advance only on step 6's gate or step 7's proof.
 
 Stop and recovery: a blocked issue holds the wave until the user answers; a failed one holds the next wave unless the contract says go on. A drain halted by an unfinished merge or unlanded PRs is stuck, not drained. Teardown on cancellation is daintree.orchestration.workspace-cleanup.
 

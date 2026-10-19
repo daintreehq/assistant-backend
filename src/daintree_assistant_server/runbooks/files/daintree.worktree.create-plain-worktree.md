@@ -12,6 +12,8 @@ optionalTools:
 ---
 `worktree.createWithRecipe` with no `recipeId` is Daintree's plain creator: checkout, config copy, submodules, background setup, no terminals. It needs no confirmation turn of yours. Never substitute `git worktree add` or a shell checkout: that skips Daintree's setup, and a checkout in the main worktree moves the user's branch.
 
+On a host: call these tools on the work's machine; delegate any shell step there.
+
 1. Pick the `source` mode; fields from another mode are rejected. A new branch off the default base needs no listing first: the base defaults to the main worktree's branch and `collisionPolicy:"error"` refuses a taken name. Read `worktree.list` only for an existing branch (one already checked out in a worktree: report that worktree instead of creating another) or a base you must check.
    - New branch: `{"kind":"newBranch","branchName":…}`, plus `baseBranch` only when the user named one (the name must already be a valid ref). A remote base: `baseBranch:"origin/<b>"` plus `fromRemote:true`, which describes the base, not a reused remote branch.
    - Existing local branch: `{"kind":"existingBranch","branchName":…}` checks it out exactly as named, never suffixed, never replaced by a new branch if missing. Remote-only: offer a new local branch of that name from `origin/<name>` with `fromRemote:true`, and say so.

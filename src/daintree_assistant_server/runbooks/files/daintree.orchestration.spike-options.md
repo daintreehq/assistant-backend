@@ -17,6 +17,8 @@ optionalTools:
 ---
 Spikes are throwaway: no push, PR or merge unless the user adopts one. A spike agent's view of its own option is advocacy; your measurements are the evidence.
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Fix these before launching and state them in your reply:
    - The options, 2 to 4, genuinely different: the user's, or ones you propose and they confirm. One agent per option, never picking its own.
@@ -29,7 +31,7 @@ Procedure:
 {"source":{"kind":"newBranch","branchName":"spike/<option>","baseBranch":"<base branch>","collisionPolicy":"error"}}
 ```
 
-3. Launch one agent per option in the same turn, each its own `agent.launch`, then end the turn. The prompt: the scenario or screen verbatim; "Use <option> only; do not switch to another option"; the constraints; the time bound; "Throwaway prototype: work only in this worktree, commit on this branch, do not push or open a PR, leave no server running"; a report of at most 30 lines: what works, what fought you, workarounds, dependencies added, and the exact command and port to run or view it.
+3. Launch one agent per option in the same turn, each its own `agent.launch`. The prompt: the scenario or screen verbatim; "Use <option> only; do not switch to another option"; the constraints; the time bound; "Throwaway prototype: work only in this worktree, commit on this branch, do not push or open a PR, leave no server running"; a report of at most 30 lines: what works, what fought you, workarounds, dependencies added, and the exact command and port to run or view it.
 
 ```json tool=agent.launch
 {"agentId":"<agent id>","name":"Spike: <option>","worktreeId":"<option worktree id>","prompt":"<the brief above>","focusPolicy":"preserve","notify":true,"handback":true}
@@ -37,10 +39,10 @@ Procedure:
 
 On notice or resume:
 1. Map the terminal to its option. A question inside the brief: answer once with `terminal.sendCommandOwned` and `notify:true, handback:true`; "can I use <another option>" gets no. Anything else goes to the user.
-2. Measure that spike yourself before comparing anything; its report is not a measurement. In its worktree path: `git -C <path> status --porcelain`, `git -C <path> diff --stat <base sha>` (a committed log or build file is a finding), the manifest and lockfile diff, the scenario test run by you, size or timing where a criterion asks. A design variant is checked against the constraints only (new dependency, files outside the paths), never ranked. A spike that did not build the scenario is incomplete, not a loss.
+2. Measure that spike yourself before comparing anything. In its worktree: `git -C <path> status --porcelain`, `git -C <path> diff --stat <base sha>` (a committed log or build file is a finding), the manifest and lockfile diff, the scenario test run by you, size or timing where a criterion asks. A design variant is checked against the constraints only (new dependency, files outside the paths), never ranked. A spike that did not build the scenario is incomplete, not a loss.
 3. Once every option is measured or recorded failed:
    - Technical: a matrix of your measurements per option, each cell from a command you ran, friction notes attributed to that spike's agent, and a recommendation naming the deciding criterion and the open unknowns. A second opinion only on request: one fresh read-only reviewer, never a spike author, given the diffs under shuffled neutral labels and the criteria.
-   - Design: every variant in one identical format, unranked: direction, worktree and branch, how to view it, files changed, deviations. The user picks. Live viewing only on request: `recipe.list`, then `recipe.run` with that `recipeId` and the variant's `worktreeId`; report any `failedTerminals` and check the address loads before giving it; several worktrees fighting over one port is daintree.worktree.provision-local-environment.
+   - Design: every variant in one identical format, unranked: direction, worktree and branch, how to view it, files changed, deviations. The user picks. Live viewing only on request: `recipe.list`, then `recipe.run` with that `recipeId` and the variant's `worktreeId`; report any `failedTerminals` and check the address loads before giving it and its machine; several worktrees fighting over one port is daintree.worktree.provision-local-environment.
 4. After a pick, as the user asks: "B but with A's header" is one send to B's agent (`notify:true, handback:true`) quoting A's hunk, never your own merge. Shipping B as built: a PR through daintree.workflow.prep-branch-for-review, flagged as a prototype; then the other spikes go through daintree.orchestration.workspace-cleanup. Building it properly: daintree.orchestration.productionize-prototype.
 
 Stop and recovery: one launch per option; a failed option is reported, never quietly replaced. A spike past its bound: recheck it as the foundation says; stop it (`terminal.interruptOwned`) only if the user said to stop at the bound, then ask once for its report so far. Delete nothing unasked.

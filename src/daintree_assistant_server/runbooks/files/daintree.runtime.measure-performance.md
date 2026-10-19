@@ -16,14 +16,16 @@ optionalTools:
   - host.list
   - host.call
 ---
-Same machine, same build, alternating, many times: one timing is not a measurement. A visible agent builds and measures; you fix both sides, check the machine and recompute from its raw numbers. Across hosts, compare ratios within a host, never times between hosts.
+Same machine, same build, alternating, many times: one timing is no measurement. A visible agent builds and measures; you fix both sides, check the machine and recompute from its raw numbers. Across hosts, compare ratios within a host, never times between hosts.
+
+On a host: shell steps via its command runner, or delegate.
 
 Procedure:
 1. Sides. Candidate: the user's worktree (`worktree.list`), `HEAD`, a hash of `git diff HEAD` plus untracked files. Baseline: the revision named; "versus main": the tip SHA of `origin/<main>` after `git fetch`; "did my change help": `git merge-base HEAD <main>`. Record both SHAs and the rule.
-2. Baseline checkout, never in the candidate's worktree: reuse a clean one at that SHA, else `git branch bench/base-<short sha> <sha>`, `worktree.createWithRecipe` with that `existingBranch`, `worktree.waitUntilReady` until `ready` (`failed`, `timed-out`, `needs-approval`: stop and report).
-3. Quiet machine: `terminal.getStatus` across the project. `working` agents skew CPU, and one in a measured tree changes the code mid-run. Report them and ask whether to wait.
-4. Terms: the metric exactly as asked, the same inputs on both sides, a material threshold (the user's, else 5%, stated), a budget of runs and time.
-5. Launch one agent: the one the user named (built-in `agentId`), else `claude`, and say which. Pass `name:"Bench: <slug>"`, the baseline `worktreeId`, `notify:true, handback:true`; keep the `terminalId`. The prompt carries both paths and SHAs, the metric, threshold and budget, and these lines as written, then end the turn:
+2. Baseline checkout, never the candidate's worktree: reuse a clean one at that SHA, else `git branch bench/base-<short sha> <sha>`, `worktree.createWithRecipe` with that `existingBranch`, `worktree.waitUntilReady` until `ready` (`failed`, `timed-out`, `needs-approval`: stop, report).
+3. Quiet machine: `terminal.getStatus` across the project. `working` agents skew CPU; one in a measured tree changes the code mid-run. Report them; ask whether to wait.
+4. Terms: the metric exactly as asked, the same inputs both sides, a material threshold (the user's, else 5%, stated), a budget of runs and time.
+5. Launch one agent: the user's pick (built-in `agentId`), else `claude`, saying which. Pass `name:"Bench: <slug>"`, the baseline `worktreeId`, `notify:true, handback:true`; keep the `terminalId`. The prompt carries both paths and SHAs, the metric, threshold, budget and these lines as written:
    - "Change no tracked file. Build both identically (same dependency install: a lockfile difference is part of the change, say so; release mode; same flags), outside the timed command unless build time is the metric. Hash each side's built artifact. Unless the user says so: no new tooling, throttling or affinity changes; stay within the repository's benchmark scope and budgets."
    - "Warm up, then alternate sides in ABBA order, saving every raw observation (side, run, value) outside both trees. Size: once per side, confirmed once. Memory: at least 10 runs per side (`/usr/bin/time -l`, Linux `-v`)."
    - "HEAD and diff-plus-untracked hash of both trees before and after: any change invalidates the runs. Record OS, CPU, cores, runtime versions, load average, battery and thermal state, each with its time, before, between rounds and after."
@@ -34,8 +36,8 @@ Several hosts: pin both sides as full SHAs on the shared remote (`git ls-remote`
 On notice or resume:
 - A question inside the brief: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`.
 - The notice's numbers are a claim: report nothing until you have, yourself:
-  1. opened the raw file (a host's: the reply's pairs, or the file by `project.runCommand` at Full), recomputed each side's median, the paired deltas and the ratio, and checked run counts and alternation;
-  2. re-read both trees' `HEAD` and hash: changed means invalid; a host reports the pinned SHAs and each side's artifact hash;
+  1. opened the raw file (a host's: the reply's pairs, or the file by `project.runCommand` at Full), recomputed each side's median, the paired deltas and ratio; checked run counts and alternation;
+  2. re-read both trees' `HEAD` and hash: changed: invalid; a host reports the pinned SHAs and each side's artifact hash;
   3. `terminal.getStatus`: agents that worked during the runs are a caveat; per host, its readings with times beside `host.list` `load` by `sampledAt` (whole machine; null or old is unknown). High or changing load or heat qualifies that host: a verdict only if the whole spread is beyond the threshold;
   4. for a surprising result (large, or opposite), one more round within budget, on that host only (`terminal.sendCommandOwned`, through `host.call` for a host); end the turn.
 

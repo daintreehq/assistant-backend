@@ -15,28 +15,30 @@ optionalTools:
 ---
 Posture: read-only against production, fast, provisional. Investigators dig; you frame, pin, correlate and report. Nobody in this runbook deploys, rolls back, restarts, scales, migrates, flips a flag, edits config or writes production data; the user decides and runs mitigation.
 
+On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+
 Procedure:
-1. Frame in one exchange: the service, the symptom, when it was first seen, and the deployed revision with the last known good one. Take the revisions from the user, a read-only deploy status (`kubectl get deploy -o yaml`, a `/version` endpoint) or the release tag. Only the service and the time are worth blocking on.
-2. Pin the code to what is running: local `main` is not production. `git fetch --quiet origin`, then check first: a checkout with empty `git status --porcelain` and `git rev-parse HEAD` equal to the deployed SHA is used as it is. Otherwise `git branch incident/<short sha> <deployed sha>`, then create a worktree on it with no recipe (the one local write here; its setup may run project scripts), then `worktree.waitUntilReady`:
+1. Frame in one exchange: the service, the symptom, when first seen, the deployed and last known good revisions. Take the revisions from the user, a read-only deploy status (`kubectl get deploy -o yaml`, a `/version` endpoint) or the release tag. Only the service and the time are worth blocking on.
+2. Pin the code to what is running: local `main` is not production. `git fetch --quiet origin`, then check first: a checkout with empty `git status --porcelain` and `git rev-parse HEAD` equal to the deployed SHA is used as is. Otherwise `git branch incident/<short sha> <deployed sha>`, then create a worktree on it with no recipe (the one local write here; its setup may run project scripts), then `worktree.waitUntilReady`:
 
 ```json tool=worktree.createWithRecipe
 {"source":{"kind":"existingBranch","branchName":"incident/ba16ea7"}}
 ```
 
-   `failed` or `needs-approval` does not block reading code: say so and continue. Deployed SHA unknown: create nothing; launch in the main checkout, and every brief says the code is `main`, not production.
+   `failed` or `needs-approval` does not block reading code: say so and continue. Deployed SHA unknown: create nothing; launch in the main checkout; every brief says the code is `main`, not production.
 3. Suspect window, only with both SHAs verified: `git log --first-parent --format='%h %s' <good sha>..<deployed sha>`. PRs come from those commits (a `(#123)` suffix, `Merge pull request #123`, else `gh api repos/<owner>/<repo>/commits/<sha>/pulls --jq '.[].number'`), never from a merged-since-date search. Good SHA unknown: no window; the diff lens waits for it and is reported blocked.
-4. Investigators, one lens each, as separate `agent.launch` calls (prompts differ) in the incident worktree, distinct `name`s, `notify:true, handback:true`:
+4. Investigators, one lens each, as separate `agent.launch` calls in the incident worktree, distinct `name`s, `notify:true, handback:true`:
    - Diff: the window's changes ranked by risk (migrations, config, dependency bumps, flags, timeouts, retries, caching).
-   - Logs: first error time, error signatures and rates, through the CLI access the user already has (`gcloud logging read`, `kubectl logs`, the provider's CLI), read-only.
+   - Logs: first error time, error signatures and rates, through the user's existing CLI access (`gcloud logging read`, `kubectl logs`, the provider's CLI), read-only.
    - Code path: from the stack trace or failing endpoint to the lines that can produce it at the deployed SHA.
    Every prompt carries the service, symptom, times, both SHAs (or which is unknown), its lens, "stop and report at your first strong lead or after about 10 minutes, whichever comes first, saying what you would check next", and: "Read-only: no deploys, rollbacks, restarts, scaling, migrations, config or flag changes, no writes to production data or the repository, no posts to incident channels. Quote evidence with timestamps; never paste secrets, tokens or personal data."
-5. While they run, build the timeline yourself: last good deploy, suspect deploy, first error, spikes, config changes the user mentions. Then end the turn.
+5. While they run, build the timeline yourself: last good deploy, suspect deploy, first error, spikes, config changes the user mentions.
 
 ```json tool=agent.launch
 {"agentId":"claude","name":"Incident: logs","worktreeId":"<incident worktree id>","prompt":"<service, symptom, times, SHAs, lens, read-only line>","notify":true,"handback":true}
 ```
 
-On notice or resume: each notice is one lens's stop. Fold its evidence into the timeline and tell the user a strong lead as soon as it appears; do not wait for every lens. A suspect needs a mechanism and matching timing; timing alone is a lead, not a cause. Check a named suspect commit is in the window (`git merge-base --is-ancestor <sha> <deployed sha>`). To dig further, send that investigator its next check by `terminal.sendCommandOwned` with `notify:true, handback:true`. An investigator asking to run anything that writes or restarts: the answer is no, sent the same way, and the ask goes to the user.
+On notice or resume: each notice is one lens's stop. Fold its evidence into the timeline; tell the user a strong lead at once; do not wait for every lens. A suspect needs a mechanism and matching timing; timing alone is a lead, not a cause. Check a named suspect commit is in the window (`git merge-base --is-ancestor <sha> <deployed sha>`). To dig further, send that investigator its next check by `terminal.sendCommandOwned` with `notify:true, handback:true`. An investigator asking to run anything that writes or restarts: the answer is no, sent the same way; the ask goes to the user.
 
 Stop and recovery: one follow-up per investigator unless the user asks for another round. When every lens has reported once, or the user wants an answer now, issue the report as provisional with any missing lens marked pending. Never retry a mitigation or run one yourself. A mitigation command comes from the repo's scripts, its deploy docs or tooling the user named, never invented; a revert names the suspect commit, not the deploy tip. A revert the user orders is a change (daintree.edits.spawn-visible-agent, then a PR); a rollback runs only on the user's explicit order, via daintree.release.rollback-deployment. A post-incident write-up only if asked. Leave the incident worktree for the user.
 

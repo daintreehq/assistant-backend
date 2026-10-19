@@ -13,6 +13,8 @@ optionalTools:
 ---
 The target is an area as it stands at one revision. Reviewers do the auditing: one read-only visible agent per lens (and per sub-area when big). You scope, brief, verify and report; audit it yourself only when the user asks you to.
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Scope: the paths, the checkout (`worktree.list`; read in its `path`), and the revision (`git -C <path> rev-parse HEAD`, plus "with uncommitted changes" if dirty). Lenses are the user's words; a bare "audit" gets one question proposing two lenses. A threat model: the security reviewer's brief also asks for assets, entry points, trust boundaries and credible abuse paths, and that map goes in the report.
 2. Lens checklists (give each reviewer its one):

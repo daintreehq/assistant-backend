@@ -15,7 +15,9 @@ optionalTools:
 ---
 The app keeps no workflow ledger or record of past MCP calls. The record is your run checkpoints, live Daintree state, the closed-session journal, and git and the forge. This sweep reads and reconciles; continuing happens under the runbook that started the work.
 
-1. Find the record: open checkpoints and whatever your host verifiably shows of the earlier session. With none, say so, rebuild from live evidence, label earlier decisions unknown, and replay no write from memory.
+On a host: your checkpoints are the local record; read live state on the work's machine (these tools there, shell steps via its command runner, or delegate); own shell: `gh -R <repo>`.
+
+1. Find the record: open checkpoints and whatever your own session history verifiably shows of the earlier session. With none, say so, rebuild from live evidence, label earlier decisions unknown, and replay no write from memory.
 2. Read live state in one pass: `terminal.list`; `worktree.list` (`issueNumber`, `prNumber`, `setupState`); one `terminal.getStatus` over recorded and listed agents with `includeOutput`; branch and PR from `git -C <path>` and `gh pr list --repo <owner/repo> --head <branch>`. Offer a focused CI read (daintree.workflow.follow-up-on-issue) rather than one per unit.
 3. Reconcile each recorded unit on evidence, not its recorded status:
    - Present and working: live. A recorded notice request does not prove it is still pending (it may have fired, been cleared, or died with a relaunched pane or restarted app). Say whether anything will wake you.

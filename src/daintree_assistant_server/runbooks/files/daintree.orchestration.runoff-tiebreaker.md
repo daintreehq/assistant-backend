@@ -11,6 +11,8 @@ optionalTools:
   - terminal.list
   - terminal.closeMany
 ---
+On a host: call these tools on each terminal's machine.
+
 1. Restore the contest from this conversation (or its checkpoint): rules, scoring and missing-vote rule, entrants with terminal ids, the tied entrants, the original electorate, prior scores, anyone removed. Say which parts you reconstructed.
 2. Revalidate the electorate with one `terminal.getStatus` over every original voter. Reuse only those still live and yours or handed over. An original voter gone, unreachable or earlier removed stays explicitly absent: never replaced by a fresh agent and never counted. New voters only if the user changes the electorate.
 3. Inherit the original scoring, self-vote and missing-vote rules unless the user changes them. Default: one new short entry from each tied entrant, then every eligible voter picks among those. With the original submissions reused, or a tie between options you supplied, skip new entries.

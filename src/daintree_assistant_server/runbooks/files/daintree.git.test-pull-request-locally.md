@@ -18,6 +18,8 @@ optionalTools:
 ---
 This tries the PR; it never pushes to the PR's branch, comments on it or approves it. The worktree stays for the user. You run Daintree's tools; a reproduction goes to an agent in the PR's worktree. `<remote>` is the one whose URL is the PR's repository (`git remote -v`; `upstream` when `origin` is a fork).
 
+On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+
 Procedure:
 1. Read the PR: `gh pr view <n> --repo <owner/name> --json number,title,author,headRefName,headRefOid,baseRefName,isCrossRepository,state,files,url`. Record `headRefOid`: every result binds to it.
 2. Screen before anything executes. For an outside contributor or fork (`isCrossRepository`, or an author the user does not vouch for), know the project's setup commands, then read the PR's diff (`gh pr diff <n> --repo <r>`) of whatever they, the build or the tests execute: package manifests and lifecycle scripts (`postinstall`, `prepare`), dependency sources in lockfiles, Makefiles and build scripts, test config and fixtures that execute, `.daintree/` config. Daintree holds changed setup commands for approval, but an approved install still runs the PR's own scripts. Tell the user what running it would do; get a yes before step 3. Something suspicious stops here, with the evidence.
@@ -30,7 +32,7 @@ Procedure:
    Never `gh pr checkout` in the user's own checkout: it moves their branch. A fetch error naming the head branch: `git fetch <remote> pull/<n>/head:pr-<n>`, then create with `{"kind":"existingBranch","branchName":"pr-<n>"}`. Then `worktree.waitUntilReady` with the returned `worktreeId`, up to about ten calls (`timedOut:true`: call again), until `setupState:"ready"`. `needs-approval`: the user approves setup on the worktree card; `failed`, `unknown` or still running at your limit: report `setupState`, `stage` and `error`. Confirm `git -C <path> rev-parse HEAD` equals `headRefOid`.
 4. Run what the user asked for, in that worktree:
    - Tests or build: `project.runCheck` with a `runnerId` from `project.detectRunners` and `cwd` = the path (read `passed`; `timedOut`, `aborted` or `outputTruncated` is incomplete). Know what a runner does first: detection also lists publish and deploy scripts. A command with no runner: `terminal.new` with that `cwd` and `command`, visible to the user.
-   - "Let me click around": a Dev Preview panel in that worktree, or a project recipe (`recipe.list`): read what its terminals run and run only one that fits the request (`recipe.run` with the `worktreeId`; record `spawnedTerminalIds` and any `failedTerminals`). Never start a server through `project.runCheck`: it blocks until its timeout. Console errors there are daintree.runtime.debug-web-app.
+   - "Let me click around": a Dev Preview panel in that worktree, or a project recipe (`recipe.list`): read what its terminals run and run only one that fits the request (`recipe.run` with the `worktreeId`; record `spawnedTerminalIds` and any `failedTerminals`). On a host the server runs there: its localhost is not yours. Never start a server through `project.runCheck`: it blocks until its timeout. Console errors there are daintree.runtime.debug-web-app.
 
 ```json tool=agent.launch
 {"agentId":"dev-preview","worktreeId":"<PR worktree id>","name":"Preview #340"}

@@ -13,13 +13,15 @@ optionalTools:
 ---
 The range decides everything: notes are the commits between two refs, not "PRs merged since a date". A visible agent writes the notes; you anchor the range, brief it, and verify that every line traces to that range.
 
+On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+
 Procedure:
 1. Checkout: the `isMain` row of `worktree.list` (or the release branch's worktree). Run `git fetch --quiet --tags origin` there.
 2. Anchor the range:
    - Target: the ref the user named (a release branch, `main`, a tag already cut), resolved to a SHA with `git rev-parse`.
    - Start: the user's previous version, else from `git -C <path> tag --merged <target> --sort=-v:refname` the highest tag on the same release line, skipping a tag on the target itself and pre-release tags (`-rc`, `-beta`) unless the user wants them. Two plausible anchors, or none: ask.
    Record both tags and SHAs; they go at the top of the report.
-3. Launch one writer with `agent.launch` in that worktree (`name` "Release notes: <version>", `notify:true, handback:true`), then end the turn. The brief carries the range (tags and SHAs), the audience (users by default), the destination (reply text, a file path, or the CHANGELOG section, uncommitted) and these rules:
+3. Launch one writer with `agent.launch` in that worktree (`name` "Release notes: <version>", `notify:true, handback:true`). The brief carries the range (tags and SHAs), the audience (users by default), the destination (reply text, a file path, or the CHANGELOG section, uncommitted) and these rules:
    - "Collect with `git log --first-parent --format='%H%x09%s' <start sha>..<target sha>`. A `(#123)` suffix or `Merge pull request #123` is a lead: confirm each number with `gh pr view <n> --json number,title,body,labels,author,baseRefName`; not a PR, or merged into another branch: a plain commit. A commit with no number: `gh api repos/<owner>/<repo>/commits/<sha>/pulls --jq '.[].number'`, none back is a plain commit. Never use a date-filtered PR list to decide membership.
    - Classify from labels, conventional prefixes (`feat`, `fix`, `perf`, `feat!`) and bodies (`BREAKING CHANGE`, migration notes); unclear, read `gh pr diff <n>`. A revert and its original both in range: drop both; a revert of an earlier release: a fix line.
    - Breaking changes and required actions first, then features, fixes, performance, other. Rewrite titles as effects, not `chore(ci): …`; for users drop internal-only items (CI, refactors, tests, docs) and list them as excluded. Each line ends with its PR (`#123`) or short SHA, and the author if the repo does so. Follow the existing CHANGELOG's format exactly.
@@ -33,7 +35,7 @@ Procedure:
 On notice or resume: a notice is the writer's stop, not acceptance. A question within the brief gets one answer by `terminal.sendCommandOwned` with `notify:true, handback:true`. Verify yourself:
 - Every cited `#n` or SHA comes from the range: its number in `git -C <path> log --first-parent --format=%s <start sha>..<target sha>` or a mapping you re-ran; a doubtful one, `forge.getPR` must show `merged` and the release `baseRef`. Nothing invented, nothing from outside the range.
 - Every `BREAKING`, `!:` or migration item in the range subjects is listed first.
-- `git -C <path> status --porcelain` shows only the destination file; HEAD unchanged; `git ls-remote --tags origin <tag>` shows no tag the user did not have; a draft's URL from `gh release view <tag> --json url,isDraft`.
+- `git -C <path> status --porcelain` shows only the destination file; HEAD unchanged; `git ls-remote --tags origin <tag>` shows no tag the user did not have; a draft's URL from `gh release view <tag> -R <owner/repo> --json url,isDraft`.
 One corrective round for a gap; then report what remains.
 
 Stop and recovery: never relaunch a writer that is still working; never retry a draft release without listing first.

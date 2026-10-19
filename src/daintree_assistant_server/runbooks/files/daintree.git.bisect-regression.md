@@ -14,7 +14,9 @@ optionalTools:
   - terminal.sendCommandOwned
   - terminal.list
 ---
-Bisect moves HEAD, so it runs only in a worktree made for it, never the user's checkout or an agent's. A visible agent writes the script and runs the bisect; you fix its inputs and confirm the culprit. Only when the user asks you yourself to bisect, follow the brief in your own shell.
+Bisect moves HEAD, so it runs only in a worktree made for it, never the user's checkout or an agent's. A visible agent writes the script and runs the bisect; you fix its inputs and confirm the culprit. Only when the user asks you to bisect yourself, follow the brief.
+
+On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
 
 Procedure:
 1. The test: one behaviour the user accepts as the good/bad line: their repro, a failing test, the build, or a threshold ("median of 5 runs above 2.0 s is bad"). None exists: reproduce first (daintree.debug.reproduce-bug). A flaky symptom is voted inside the script (bad only if it fails M of N).
@@ -33,7 +35,7 @@ Procedure:
    - "Then in the worktree: `git bisect start <bad> <good>` and `git bisect run sh <absolute script path>`. At the budget, stop and report the remaining range."
    - "Confirm the culprit: 1 on it, 0 on `<culprit>^` (each parent of a merge). Save `git bisect log` to a file outside the tree, then `git bisect reset`. Edit no tracked file, fix nothing, commit or push nothing."
    - "Reply with the script path and exit mapping, the anchor runs, the bisect log path, the first bad commit or unresolved range, and skipped commits."
-6. End your turn. On the notice, your report waits until you have run the checks below yourself.
+6. End your turn.
 
 On notice or resume:
 - Still working: leave it. A question inside the brief: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`; changing the test or the anchors is the user's call.
@@ -41,7 +43,7 @@ On notice or resume:
   1. read the saved bisect log ("only skipped commits left" is a RANGE: report it as one);
   2. in the worktree only (`cd <worktree path>`; never your or the user's checkout), run the agent's script on the culprit (expect 1) and its parent (expect 0) via `git checkout --detach <sha>`, then `git checkout bisect/<slug>`; `git status` clean;
   3. read the culprit's diff and name the hunk that changes the tested value, saying what it computes differently;
-  4. looked for its PR (`gh pr list --search <sha> --state merged`); none, or no forge, is a result.
+  4. looked for its PR (`gh pr list -R <owner/repo> --search <sha> --state merged`); none, or no forge, is a result.
 - An interrupted bisect resumes with the same `git bisect run`, never a fresh start.
 
 Stop and recovery: one corrective round. A culprit failing your confirmation goes to the user with both runs; re-bisecting is their call. Reconcile with `terminal.list` and `worktree.list` before any second launch or create. Leave the worktree; removing it is daintree.orchestration.workspace-cleanup, on request.

@@ -17,6 +17,8 @@ optionalTools:
 ---
 Agents read files themselves, and every byte pasted into a prompt costs their context window, so the cheapest route that carries the context wins. `terminal.injectOwned` is the blunt one: it writes the whole of the user's ACTIVE worktree (the one selected in the app, not necessarily the agent's) as raw text into the agent's input, cannot be scoped, returns before anything is written, and reports nothing back.
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Target: a terminal you own or were handed (`terminal.list` with `owned:true`; its row gives `worktreeId`, and `worktree.list` the path). Not yours: give the user the paths and instruction, or ask for a hand-over. One `terminal.getStatus` with `includeOutput:{"lines":30}`. `working`: arm `terminal.notifyWhenIdle` (note "feed context: <what>") and end your turn; never inject into a busy agent (it stays pending and writes later, unseen). Asking a question: that comes first (daintree.agents.answer-waiting-agent).
 2. Settle what is wanted: the named files, or a feature area named by its directories (a quick `git -C "<path>" ls-files` finds them; the agent reads onward from there). Keep credentials, `.env` files and generated or vendored bulk out.
@@ -28,7 +30,7 @@ Procedure:
 {"worktreeId":"<source worktree id>","name":"auth module context","options":{"scopePaths":["src/auth","tests/auth"],"includePaths":["docs/auth.md"]}}
 ```
 
-     Check the result: `stats.noFilesMatched` or `unmatchedSelector` means fix the selection once, then stop and report what is missing; `stats.truncated` means files were dropped or cut; `stats.budgetExceeded` means the kept bundle is over the size budget; a `fileCount` short of what you selected means something is missing. Name any gap in the agent's instruction. `filePath` is temporary and pruned by age: send it now.
+     Check the result: `stats.noFilesMatched` or `unmatchedSelector` means fix the selection once, then stop and report what is missing; `stats.truncated` means files were dropped or cut; `stats.budgetExceeded` means the kept bundle is over the size budget; a `fileCount` short of what you selected means something is missing. Name any gap in the agent's instruction. `filePath` is temporary, pruned by age, and readable only on the machine that generated it (an agent elsewhere: report that): send it now.
    - Injection, only when the user asked for the WHOLE worktree injected: read `actions.getContext`; `activeWorktreeId` is what gets injected (`worktree.getCurrent` from a pane names the pane's own worktree, not this). None active: the call silently does nothing, so do not call it. A different worktree from the agent's: do not `worktree.setActive` (it moves the user's view); tell the user and offer the bundle route, or ask them to select that worktree. An instruction must follow it: use the bundle route instead, since nothing tells you when the injection finished writing. Otherwise call once with `{"terminalId":"<agent terminal id>"}`, then one `terminal.getStatus` with `includeOutput`, and report what you saw as the stage reached, not as delivered. Never inject again (a second dump doubles it); a failure shows in the app's injection error display, so ask the user what it showed.
 4. One send carries the pointer and the instruction together:
 

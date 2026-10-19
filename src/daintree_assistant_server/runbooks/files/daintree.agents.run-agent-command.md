@@ -16,6 +16,8 @@ optionalTools:
 ---
 A slash command works only typed at the CLI's idle, empty input line; mid-turn it waits or is read as chat. Names differ per CLI and per build, so list them, never recall them: a guessed name is sent as a chat message the agent then acts on. `slashCommands.list` combines Daintree's built-in catalog with command files it finds on disk; it does not ask the running CLI, so the screen is the final word on what a command did.
 
+On a host: call these tools on the agent's machine; file reads via its command runner, or delegate.
+
 Procedure:
 1. Listing only ("what commands does Codex have here?"): `slashCommands.list` with that `agentId` and the project root as `projectPath`; report `label`, `description` and `scope` as returned, and stop. No terminal needed.
 2. Resolve the terminal and its `agentId` from `terminal.list`: one you own or were handed, never your own pane. Not yours: give the user the command to type. One `terminal.getStatus` with `includeOutput:{"lines":30}`. `working`: arm `terminal.notifyWhenIdle` (note "run <command>") and end your turn. Asking a question: that comes first (daintree.agents.answer-waiting-agent).

@@ -16,7 +16,9 @@ optionalTools:
   - host.list
   - host.call
 ---
-An agent pane is offered these tools (at Core each call asks the user first unless they granted it; at Full the tier does not ask), and the sidebar assistant only at Full, on a host through `host.call` too; the sidebar at Core and API-key clients lack them: point the user to the worktree card. Every call runs the project's configured commands for real, with real cost, so the explicit-request rule below always applies. Daintree schedules nothing: a pause "at 6pm" needs a verified host mechanism (daintree.orchestration.watch-outcome), and still stops at any approval Daintree asks for.
+An agent pane is offered these tools (at Core each call asks the user first unless they granted it; at Full the tier does not ask), and the sidebar assistant only at Full, on a host through `host.call` too; the sidebar at Core and API-key clients lack them: point the user to the worktree card. Every call runs the project's configured commands for real, with real cost, so the explicit-request rule below always applies. Daintree schedules nothing: a pause "at 6pm" needs a verified scheduler of your own (daintree.orchestration.watch-outcome), and still stops at any approval Daintree asks for.
+
+On a host: call these tools on the work's machine and read its config files via its command runner, or delegate.
 
 1. Resolve ONE exact `worktreeId` from `worktree.list` and always pass it (omitted, these fall back to the focused worktree). Several match: ask.
 2. Know what runs: the effective resource config of the first valid config among `~/.daintree/projects/…`, the worktree's `.daintree/config.json`, the main checkout's. A `resources` entry (`default`, else the first) beats `resource`; project resource environments back them. Tell the user the commands; cannot tell which: use the card. Repository commands run only once approved on the worktree card; "haven't been approved" is theirs to resolve there, never a reason to copy commands into the user-level config.

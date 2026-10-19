@@ -16,8 +16,10 @@ optionalTools:
 ---
 A visible agent in that worktree proves the target and runs the operation; you pick the checkout, brief it and check its evidence. The danger is the target: a shared database breaks for every checkout on it. The requester is the user, or the assistant that briefed you. On a host: each step through `host.call` there, as the hosts foundation says, the proof included. No reply carries a connection string or secret; a backup is a host-local path.
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
-1. Resolve the checkout the requester named (`worktree.list`), the main one or yours if named. `terminal.list` with its `worktreeId`, then `terminal.getStatus`: an agent `working` there may be editing the migrations; ask before launching beside it.
+1. Resolve the checkout the requester named (`worktree.list`), the main one or yours if named. `terminal.list` with its `worktreeId`, then `terminal.getStatus`: an agent `working` there may be editing the migrations; ask first.
 2. Pin the request: target identification only ("which database will it migrate?"), or exactly one of migrate, seed, rollback (to which revision), reset, or restore (one backup: the file named, or one this runbook made, by path and time; never a guessed "latest"). Destructive steps (reset, drop, rollback, restore, a truncating seed or data-dropping migration) need the requester's explicit word even locally, and a backup unless waived. Write the expected endpoint now: head, rollback revision, clean reset, seed rows or the backup's schema version.
 3. Launch one agent: the one named, else `claude`; `name:"DB: <branch>"`, the `worktreeId`, `notify:true, handback:true`; keep the `terminalId`. The prompt carries the request, the endpoint and:
    - "Work only in <path>, in this one shell and environment; never switch runner.";
@@ -28,7 +30,7 @@ Procedure:
    - restore: "Read <backup> first: origin, engine, version, schema version. After the current-state backup, restore with the project's command naming <backup> and the proven target, shown to me redacted. Either unbound: stop.";
    - "Run the project's own command for exactly that operation; answer no data-loss prompt I have not answered; then check <endpoint> and one smoke query.";
    - "Edit no migrations, config or migrations table; commit nothing. Reply: `git rev-parse HEAD`, `git status --short`, the target (redacted) and isolation evidence, backup path, commands run, version before and after, endpoint check and smoke output, any failure and the state it left."
-   Identification only: the brief stops after the isolation proof, "run nothing that writes". End your turn.
+   Identification only: the brief stops after the isolation proof, "run nothing that writes".
 
 On notice or resume:
 - Its account is a claim. Isolation first: every other checkout's server and database compared, none equal. A stop at the proof ran no write: check its commands.

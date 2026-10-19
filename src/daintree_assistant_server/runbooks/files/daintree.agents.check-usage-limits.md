@@ -30,6 +30,8 @@ Known read-only views (September 2026 builds; revalidate every time). Send the l
 
 No known in-CLI allowance view: Cursor (its `/usage` is activity), Aider, OpenCode, Goose, Crush, Amp, Kiro, Mistral Vibe, Open Interpreter, Qwen Code. Web pages: https://claude.ai/settings/usage, https://chatgpt.com/codex/settings/usage, https://console.x.ai; otherwise the provider's account page, never an invented URL.
 
+On a host: call these tools on the agent's machine; the figures are for its login there.
+
 1. Resolve the agents with `agent.listAvailable`; say which you check and which you skip and why.
 2. Revalidate with `slashCommands.list` for that `agentId`: take a command only if its description says usage, quota, limits or status, and reject any that also mentions manage, redeem, reset, buy, purchase, upgrade, top up or billing. A known view this build no longer lists is not trusted. `slashCommands.list` unavailable or declined: send nothing and give the user the known command. Nothing qualifies: report no in-CLI allowance view. Never guess a command.
 3. Type only at an idle prompt in a terminal the user named that you own, or one you launch now with the exact `agentId`, `focusPolicy:"preserve"` and no `prompt`. Never your own pane. A fresh pane is still starting: decide nothing from it until one `terminal.waitUntilIdle`, then `terminal.getStatus` with `includeOutput`, shows its empty input line; a timeout means still starting, so read again.

@@ -15,12 +15,14 @@ optionalTools:
   - host.list
   - host.call
 ---
-The trap is a green run against the wrong code: `localhost:3000` is often another checkout's server, or this one's stale build. A visible agent in the worktree starts what it needs and runs the suite; you preflight and check its evidence. On a Remote Host: each step through `host.call`; your shell reads (`git`, `lsof`, reports) are `project.runCommand` there at Full, else the agent quotes them, unproven.
+The trap is a green run against the wrong code: `localhost:3000` is often another checkout's server, or this one's stale build. A visible agent in the worktree starts what it needs and runs the suite; you preflight and check its evidence.
+
+On a host: each step through `host.call`; your shell reads (`git`, `lsof`, reports) via its command runner (`project.runCommand`) at Full, else the agent quotes them, unproven.
 
 1. Worktree id and path from `worktree.list`; `worktree.waitUntilReady` until `ready` (`timedOut:true`: again, for a few minutes; `failed`, `timed-out`, `needs-approval`: stop and report; `unknown`: dependencies unverified). Record `HEAD` and, if dirty, a hash of `git diff HEAD` plus untracked source files (not build output). An agent `working` there (`terminal.getStatus`): ask first.
 2. Read the e2e config there (`playwright.config.*`, `cypress.config.*`): base URL, port, whether the runner starts the server, `reuseExistingServer` (it silently tests whatever listens), how the app shows its build (version route, stamp, header). Note where the runner, browser and server each run: a host's `localhost` is not the Shell's, and a Shell forward may use another local port. Server evidence comes from its machine; through a forward, the browser's machine also checks the marker via that URL.
-3. Port preflight: `lsof -nP -iTCP:<port> -sTCP:LISTEN`. Held: its directory, `lsof -a -p <pid> -d cwd`. Another checkout's or unknown: leave it alone; if the config reads the port from the environment, pick a free one and brief that URL, else stop, blocked. This worktree's own may serve an older build: use a fresh port or leave it unproven.
-4. Launch one agent: the user's named one, else `claude`. Pass `name:"E2E: <branch>"`, the `worktreeId`, `notify:true, handback:true`. The prompt carries the path, `HEAD`, the port finding, a startup deadline, the repository's test rules, and these lines as written:
+3. Port preflight (server's machine): `lsof -nP -iTCP:<port> -sTCP:LISTEN`. Held: its directory, `lsof -a -p <pid> -d cwd`. Another checkout's or unknown: leave it alone; if the config reads the port from the environment, pick a free one and brief that URL, else stop, blocked. This worktree's own may serve an older build: use a fresh port or leave it unproven.
+4. Launch one agent: the user's pick, else `claude`. Pass `name:"E2E: <branch>"`, the `worktreeId`, `notify:true, handback:true`. The prompt carries the path, `HEAD`, the port finding, a startup deadline, the repo's test rules, and these lines as written:
    - "Base URL <url on the free port>: pin it (`BASE_URL`, `--base-url`, `CYPRESS_BASE_URL`). Let the runner start its server with reuse off (`CI=1` or the config's switch), or start this worktree's dev or start command in the background on that port once `lsof` shows it free (held: stop and report). Prove it is up (`curl -sI <url>`) before the deadline, else stop and report."
    - "Once the server is up (before the first test if you start it, during the run if the runner does), save the proof outside the checkout: the listener's pid (`lsof -tiTCP:<port> -sTCP:LISTEN`), directory (this worktree), start time (`ps -o lstart= -p <pid>`) and revision: a build marker equal to `HEAD` on a clean tree, else a build you make now from this checkout with the listener started after it (a dirty tree always needs this). Never vouch for a forward or proxy URL."
    - "Never test against, stop or kill a server you did not start. Browsers, migrations and seed data only as the project's docs say, in this worktree's database only."
@@ -34,7 +36,7 @@ On notice or resume:
   1. read the reporter's output (results JSON, `playwright-report/`, else the saved output), confirming counts and failure names (traces can hold credentials: paths only);
   2. read the saved proof: the listener was this worktree's, started for this run, the revision as briefed (a marker also matching through the browser's URL). A miss rejects the run (wrong or stale server): say so, offer one rerun on a fresh port;
   3. `lsof` on the port: nothing the agent started still listens, any earlier listener still does (gone: report it);
-  4. `git status`: no code edits (artifacts are fine); `HEAD` or the dirty hash changed: stale.
+  4. `git status`: no code edits (artifacts fine); `HEAD` or the dirty hash changed: stale.
 
 Stop and recovery: one corrective round. Past the deadline, `terminal.getStatus` and act on its screen.
 

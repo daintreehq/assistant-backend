@@ -16,32 +16,33 @@ optionalTools:
   - terminal.list
   - terminal.sendCommandOwned
 ---
-One visible agent does the upgrade in its own worktree; you isolate it, brief it and check the result. What makes it an upgrade: a baseline before anything changes, the guide read not remembered, no check made green by weakening it. Only when the user asks you yourself to do it, follow the brief in your own shell.
+One visible agent does the upgrade in its own worktree; you isolate it, brief it and check the result. What makes it an upgrade: a baseline before anything changes, the guide read not remembered, no check made green by weakening it. Only when the user asks you to do it yourself, follow the brief.
+
+On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
 
 Procedure:
-1. Resolve the package, the target version and the base (the one the user named, else the default branch; `git fetch` and verify the ref). One major bump per worktree.
-2. Isolate: a new worktree off the verified base, `fromRemote:true` when the base is a remote ref; keep its `worktreeId` and path. Never the main checkout or a worktree an agent works in. An ambiguous create: reconcile with `worktree.list`, never create twice.
+1. Resolve the package, the target version and the base (the user's, else the default branch; `git fetch` and verify the ref). One major bump per worktree.
+2. Isolate: a new worktree off the verified base, `fromRemote:true` for a remote base; keep its `worktreeId` and path. Never the main checkout or a worktree an agent works in. An ambiguous create: reconcile with `worktree.list`, never create twice.
 
 ```json tool=worktree.createWithRecipe
 {"source":{"kind":"newBranch","branchName":"chore/upgrade-<package>-<version>","baseBranch":"origin/main","fromRemote":true,"collisionPolicy":"error"},"focusPolicy":"preserve"}
 ```
 
-3. Readiness: `worktree.waitUntilReady` with that `worktreeId`; a `timedOut` call is retried while setup is pending or running, at most three calls. Only `setupState:"ready"` goes on; `failed`, `timed-out`, `needs-approval` or `unknown`: report it and launch nothing.
-4. Launch one agent: the one the user named, else `claude`; `name:"Upgrade: <package> <version>"`, the `worktreeId`, `notify:true, handback:true`; keep the `terminalId`. The prompt carries package, from and to versions, the base, and:
+3. Readiness: `worktree.waitUntilReady` with that `worktreeId`; a `timedOut` call is retried while setup is pending or running, at most three calls. Only `setupState:"ready"` goes on; anything else: report it and launch nothing.
+4. Launch one agent: the user's pick, else `claude`; `name:"Upgrade: <package> <version>"`, the `worktreeId`, `notify:true, handback:true`; keep the `terminalId`. The prompt carries package, from and to versions, the base, and:
    - "Baseline before changing anything: install from the lockfile as it is (`npm ci`, `pnpm install --frozen-lockfile`, `uv sync --locked`), then build, typecheck, lint and tests. Record pass or fail per check, failing test names, and the runtime and package-manager versions. A red baseline is reported, never fixed here.";
    - "Read the release notes and migration guide from the source (`gh release view`, the upgrade guide, the CHANGELOG), list the breaking items that touch this code and cite them. Never migrate from memory.";
    - "Bump with the project's package manager so the lockfile moves with the manifest; never `--force`, `--legacy-peer-deps` or `--no-verify`. Update the companion packages its peer requirements need; stop and ask only if that takes another major bump or changes scope. A runtime or toolchain upgrade also updates its version files (`.nvmrc`, `engines`, `.python-version`, CI and container images) and shows each check ran on the new version.";
    - "Commit the bump, then the codemods alone, then each accepted fix set. Never weaken a check to go green: no skipped or deleted tests, `any`, `@ts-ignore`, `# type: ignore`, lint disables or pinning back. Change an assertion or snapshot only for a behaviour change the guide documents, and name it. About three rounds per failing area, then leave it as manual work.";
    - "Re-run the baseline checks on the final commit; each failure is new, fixed or pre-existing. A server or UI also gets started and probed.";
    - "Do not push or open a PR. Reply: versions before and after (manifest, lockfile, runtime), both matrices, guide items applied and deferred, commit SHAs, anything left uncommitted."
-5. End your turn.
 
-On notice or resume, before any report (its reply is the agent's claim), check yourself:
+On notice or resume, before any report (the reply is a claim), check yourself:
 - `git -C <path> status --short`: anything uncommitted is reported as such, never passed off as part of HEAD. `git -C <path> log --oneline <base>..HEAD`: bump, codemods and fixes as separate commits.
 - Scan `git -C <path> diff <base>...HEAD` for the bans: `ts-ignore`, `.skip`, `xit`, `: any`, removed assertions, snapshots rewritten with no guide item.
-- Re-run the checks that matter yourself: `project.runCheck` with `projectId` (`actions.getContext`), `runnerId` (`project.detectRunners`) and `cwd` the worktree path (without it the main checkout is checked). A runtime upgrade: confirm the version it ran on. A server or UI: start and probe (daintree.terminals.run-visible-command) or reload its preview (daintree.runtime.debug-web-app)
+- Re-run the checks that matter yourself: `project.runCheck` with the work's `projectId`, `runnerId` (`project.detectRunners`) and `cwd` the worktree path (without it the main checkout is checked). A runtime upgrade: confirm the version it ran on. A server or UI: start and probe (daintree.terminals.run-visible-command) or reload its preview (daintree.runtime.debug-web-app)
 - A question inside the upgrade: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`; a peer or scope decision goes to the user. A ban or a missing commit: one corrective send with the evidence.
 
 Stop and recovery: one corrective round, then report. Never recreate the worktree or reset away the codemod commit without the user; an upgrade that cannot go green stays on its branch, reported, not reverted. Push or open a PR only if asked (daintree.workflow.prep-branch-for-review).
 
-Report back: branch, worktree and the agent's terminal id; versions before and after (manifest, lockfile, runtime); baseline and after matrices with new, fixed and pre-existing failures, and which checks you re-ran; guide items applied and deferred; commits; uncommitted state; the runtime smoke result; what is left for a human.
+Report back: branch, worktree and the agent's terminal id; versions before and after (manifest, lockfile, runtime); baseline and after matrices with new, fixed and pre-existing failures; which checks you re-ran; guide items applied and deferred; commits; uncommitted state; the runtime smoke result; what is left for a human.

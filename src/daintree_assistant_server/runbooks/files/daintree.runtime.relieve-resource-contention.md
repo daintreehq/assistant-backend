@@ -17,6 +17,8 @@ optionalTools:
 ---
 You measure, attribute and run Daintree operations on what this session owns; anything else is the user's call. Never `pkill`, `killall` or `kill -9`; delete no cache, `node_modules`, build output or Docker data unasked; never stop the user's or another checkout's server. Daintree itself as the heavy process: daintree.diagnostics.
 
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Reading 1, with the time:
    - Load and memory: `uptime`; macOS `vm_stat`, `memory_pressure` and `sysctl vm.swapusage`; Linux `free -h`.
@@ -25,14 +27,14 @@ Procedure:
    Name the dominant pressure: CPU, memory and swap, disk, or process count.
 2. Attribute the top offenders. Each PID's cwd (`lsof -a -p <pid> -d cwd`; Linux `readlink /proc/<pid>/cwd`) against `worktree.list` paths, walking `ppid` up to its shell; on Linux `DAINTREE_PANE_ID` in `/proc/<pid>/environ` names the terminal. Then `terminal.list` (also `owned:true`, and `location:"background"`) and one `terminal.getStatus` with `includeOutput:{"lines":20}` over that worktree's terminals, matching the command on screen. Classify: this session's (a terminal `owned:true` returns), another agent's or the user's, a process whose panel closed, or outside Daintree (browser, Docker VM, indexer, another checkout). Screen and cwd corroborate; they do not prove.
 3. Propose in one message, least disruptive first, each with its expected effect:
-   - Throttle an owned agent: fewer test workers (its runner's own flag, such as `--maxWorkers=2`, `-n 2`, `-j 2`), stop a watch mode it started, no second build while one runs. Queued until its turn ends, it limits the next run, not the one burning CPU now.
-   - Serialize: owned agents stop and ask before their next full test or build run, and you release one at a time.
+   - Throttle an owned agent: fewer test workers (its runner's own flag, e.g. `--maxWorkers=2`, `-n 2`, `-j 2`), stop a watch mode it started, no second build while one runs. Queued until its turn ends, it limits the next run, not the one burning CPU now.
+   - Serialize: owned agents stop and ask before their next full test or build run; you release one at a time.
    - Immediate relief from a run in progress: `terminal.interruptOwned`, then confirm from its screen and re-read the process list (a test or build child can outlive the interrupt). Or pause lower-priority owned agents at their next turn.
    - Close a server this session started: `terminal.closeOwned`, only on request; its process ends about 20 s later.
-   - Anything else: its owner and what the user can do (stop it in its pane, `docker stop <name>`). An orphan: its PID, command, cwd and start time, and `kill <pid>` for the user to run; only when the user asks you to, re-read those four and send TERM once yourself.
+   - Anything else: its owner and what the user can do (stop it in its pane, `docker stop <name>`). An orphan: its PID, command, cwd and start time, and `kill <pid>` for the user to run; only when the user asks, re-read those four and send TERM once yourself.
    - Disk: the largest directories by worktree, marked regenerable (build output, caches) or not. Deleting a worktree is daintree.orchestration.workspace-cleanup.
    Throttling and serializing owned agents keep their work and need no extra yes; interrupting, pausing, closing and removal wait for the user's pick.
-4. Send the agreed changes in one `terminal.sendCommandMany` with `notify:true, handback:true`:
+4. Send the agreed changes in one `terminal.sendCommandMany`:
 
 ```json tool=terminal.sendCommandMany
 {"sends":[{"terminalId":"<agent terminal id>","command":"The machine is overloaded. Keep your task, but run tests with at most 2 workers, stop any watch process you started, and before your next full test or build run, stop and ask me. Reply in one line with what you changed."}],"notify":true,"handback":true}

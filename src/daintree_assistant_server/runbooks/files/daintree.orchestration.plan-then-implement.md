@@ -12,6 +12,8 @@ optionalTools:
   - worktree.waitUntilReady
   - terminal.getStatus
 ---
+On a host: shell steps via its command runner, or delegate.
+
 Procedure:
 1. Roles. Planner: the agent the user named, else the configured one best suited. Implementer: the planner's own terminal (it keeps its context) unless the user named a different agent. Approver: the user, unless they named a reviewer agent (never the planner) or said "you decide". Worktree: the one named or current; a new one only when asked (`worktree.createWithRecipe` with a new branch, then `worktree.waitUntilReady` with its `worktreeId`, repeated while `pending` or `running`; any other state but `ready`: report it and launch nothing). Baseline there: `git rev-parse HEAD`, `git status --porcelain` and `git diff HEAD --binary | git hash-object --stdin`.
 2. Plan, in one launch. Do not start the CLI in its own plan mode: its exit dialog is an approval only the user may answer.
@@ -21,12 +23,12 @@ Procedure:
 ```
 
    A reply marked `truncated`, or with no END PLAN, is incomplete: one send asking for it shorter, then stop and report. Re-take the baseline: any change is a boundary failure; report it and go no further without the user.
-3. Gate. Keep the plan text exactly as it came back; every later step uses that text, never your summary of it.
+3. Gate. Keep the plan text exactly as it came back; every later step uses that text, never your summary.
    - The user approves (the default): show the whole plan with its open questions and end your turn. Approval is a plain go with every open question answered; a go with questions left open is not one.
    - A named reviewer agent: one read-only launch in the same worktree with `waitForReply:true, handback:true, replyLines:200`, carrying the task, criteria and plan, never who wrote it: "Review this plan against the task. Read the code; change no files. List the required changes, numbered. End with exactly `VERDICT: APPROVE` or `VERDICT: CHANGES`." On CHANGES, send its required changes verbatim to the planner (`terminal.sendCommandOwned`, same wait), then send the revised plan and what changed to the SAME reviewer terminal. A reply with no verdict line gets one clarification, then counts as not approved; praise is not a verdict. If the user also asked to see the plan, the reviewer's approval still waits for theirs.
    - "You decide": approve only a plan that covers every criterion, stays in scope and has no open questions; otherwise ask the user.
    At most two plan revisions in the whole run, deviations included; then the user decides.
-4. Go, once per approved plan. Re-take the baseline first; if it moved since planning, tell the user what changed and settle the plan again before sending. The message: "Approved plan follows. Implement exactly this, in this worktree. If the plan proves wrong or incomplete, stop and report what and why before deviating. Run <tests>; reply with changed files and results." then the approved plan text, the user's answers, and any amendments as a numbered list. Send it to the planner's terminal with `terminal.sendCommandOwned`, or make it the `prompt` of a different implementer's `agent.launch` in the same worktree; either way with `notify:true, handback:true`. End your turn.
+4. Go, once per approved plan. Re-take the baseline first; if it moved since planning, tell the user what changed and settle the plan again before sending. The message: "Approved plan follows. Implement exactly this, in this worktree. If the plan proves wrong or incomplete, stop and report what and why before deviating. Run <tests>; reply with changed files and results." then the approved plan text, the user's answers, and any amendments as a numbered list. Send it to the planner's terminal with `terminal.sendCommandOwned`, or make it the `prompt` of a different implementer's `agent.launch` in the same worktree; either way with `notify:true, handback:true`.
 
 On notice or resume:
 1. Waiting on the user's approval: their go (questions answered) takes the current plan to step 4. A stop to report a deviation: take it to whoever approved (user, reviewer once, or you under "you decide"), then back through the gate; a revised plan approved gets its own go. A question: answer only from the approved plan and the user's answers; anything else goes to the user.

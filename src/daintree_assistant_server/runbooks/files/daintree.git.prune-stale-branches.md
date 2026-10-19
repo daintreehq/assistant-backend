@@ -10,7 +10,9 @@ optionalTools:
   - forge.listPRs
   - forge.getPR
 ---
-Git runs natively in the main checkout (`worktree.list`, `isMain`). No agent is needed: the reads and classification are yours, and each deletion or close is one command per item the user approved. Nothing is deleted or closed before the user has seen the list with full SHAs and said yes, except that a precise request ("delete my local branches merged into main") covers the branches step 3 classes MERGED (3b). An inventory-only request ("what can I delete?") ends at step 5 with recommendations.
+Git runs in the main checkout (`worktree.list`, `isMain`). No agent is needed: the reads and classification are yours, and each deletion or close is one command per item the user approved. Nothing is deleted or closed before the user has seen the list with full SHAs and said yes, except that a precise request ("delete my local branches merged into main") covers the branches step 3 classes MERGED (3b). An inventory-only request ("what can I delete?") ends at step 5 with recommendations.
+
+On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
 
 Procedure:
 1. `git fetch origin`; add `--prune` (drops remote-tracking refs deleted upstream) only when cleanup is in scope. Base: the user's, else `git symbolic-ref --short refs/remotes/origin/HEAD` (prints `origin/main`); freeze its SHA. Keep full refs, plain names (`origin/topic` is branch `topic`) and SHAs apart.
@@ -30,7 +32,7 @@ Procedure:
 5. Propose in one message, grouped, with full SHAs: merged (with the evidence), abandoned candidates (last commit, what would be lost: `git log --oneline <base SHA>..<sha>`), stale PRs (author, last update), kept and why. One question, then act on exactly the approved set. A precise request's MERGED (3b) branches need no question: delete them (step 6) in the same turn and ask only about the rest.
 6. Execute one item per command. Just before, re-read each tip, worktree use and PR state; anything changed goes back to the user.
    - Local: `git branch -d <b>` for an ancestry-merged branch. `-D` only for an individually approved squash-merged or abandoned one whose unique commits and SHA were shown.
-   - Remote, only when remote deletion was asked: `git push --force-with-lease=refs/heads/<b>:<sha> origin :refs/heads/<b>`, so a branch that moved is refused.
+   - Remote (shared by every machine), only when remote deletion was asked: `git push --force-with-lease=refs/heads/<b>:<sha> origin :refs/heads/<b>`, so a branch that moved is refused.
    - PR: `gh pr close <n> --repo <r>`; a comment only with text the user approved, `--delete-branch` only if asked.
    A refusal (checked out, not fully merged, protected, stale lease) is an answer: report it, never force past it.
 7. Read back: `git for-each-ref refs/heads`, `git ls-remote --heads origin <b>` (empty when deleted), `gh pr view <n> --repo <r> --json state`.

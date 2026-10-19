@@ -18,6 +18,8 @@ optionalTools:
 ---
 Recover observation and the task, not the work: one corrective action, then hand it to the user. Never resend the original prompt into a terminal you do not understand.
 
+On a host: call these tools on the agent's machine; delegate any shell step there.
+
 1. Evidence: what you recorded of the launch (agent, `name`, worktree, `requestedId`, time), its result, `terminal.list` (`owned:true`; `location:"trash"` or `"background"` for panels off the grid), and one `terminal.getStatus` with `includeOutput`.
 2. Name the shape, then act:
    - Launch reply lost or ambiguous: look it up by `requestedId`; a match on worktree, agent, title and recent `spawnedAt` is only a candidate, and with several ask. Nothing after a second read: unknown. Relaunch under the same identity only when a refusal proves nothing was created, or the user agrees.

@@ -18,6 +18,8 @@ optionalTools:
 ---
 You conduct: never answer the judge's questions, assess a candidate or override the verdict; doubts are observations. Forge or CI facts the judge needs come from you (`gh`, or `forge.getPR` / `forge.getCIStatus`), given as facts.
 
+On a host: call these tools on the work's machine; `gh -R <owner/repo>` from your own shell.
+
 1. Scope: topic, judge, candidates, depth and a question-round budget (default three, follow-ups included). PLAIN: the judge asks, candidates answer, the judge decides. VERIFIED ("make them prove it", "top 2"): the judge also checks candidates' concrete claims by reading the project, challenges unsupported ones, and narrows to a top 2. Default to plain and say which. With none named, choose from `agent.listAvailable` and say so.
 2. Participants: named open agents as they are, otherwise fresh launches, all read-only in one worktree. Track per candidate its terminal id, the question set last sent and its answers per set, plus the judge's pending step and any shortlist.
 3. Launch together, each with `waitForReply:true, handback:true`: the candidates (one `agent.launchMany` when kinds are distinct) with the topic and "make your case in at most 20 lines; answer the interviewer's questions; change no files", and the judge:

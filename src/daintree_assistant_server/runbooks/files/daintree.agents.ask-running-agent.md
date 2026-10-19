@@ -15,6 +15,8 @@ optionalTools:
 ---
 The point is this agent's context: never launch a fresh agent to answer instead. Asking costs it a turn, so read what it already said first.
 
+On a host: call these tools on the agent's machine.
+
 Procedure:
 1. Resolve the terminal: an id you hold, or `terminal.list`; several plausible matches: list them and ask, never pick by focus or title. Several open agents named: run this procedure for each. One `terminal.getStatus` with `includeOutput:{"lines":40}`.
 2. From the record, sending nothing, whenever the question is about something it already said or did ("what did it say last", "what did it decide", "did it run the tests"):
