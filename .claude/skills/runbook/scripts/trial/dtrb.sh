@@ -101,24 +101,24 @@ cmd_build() {
   git -C "$APP" checkout --quiet --force --detach "$sha"
   git -C "$APP" clean -fdxq -e node_modules -e 'packages/*/node_modules' -e e2e/dtrb -e playwright.dtrb.config.ts
   # node_modules: a real directory of links into the source checkout's (read only).
-  if [ ! -d "$APP/node_modules" ]; then
-    mkdir -p "$APP/node_modules/@daintreehq"
-    local entry name target nm pkg
-    for entry in "$APP_SRC"/node_modules/* "$APP_SRC"/node_modules/.bin; do
-      name="$(basename "$entry")"
-      case "$name" in .vite|.vite-temp|.cache|@daintreehq) continue ;; esac
-      ln -s "$entry" "$APP/node_modules/$name"
-    done
-    for entry in "$APP_SRC"/node_modules/@daintreehq/*; do
-      name="$(basename "$entry")"; target="$(readlink "$entry" || true)"
-      if [[ "$target" == ../../packages/* ]]; then ln -s "$target" "$APP/node_modules/@daintreehq/$name"
-      else ln -s "$entry" "$APP/node_modules/@daintreehq/$name"; fi
-    done
-    for nm in "$APP_SRC"/packages/*/node_modules; do
-      pkg="$(basename "$(dirname "$nm")")"
-      [ -d "$APP/packages/$pkg" ] && [ ! -e "$APP/packages/$pkg/node_modules" ] && ln -s "$nm" "$APP/packages/$pkg/node_modules"
-    done
-  fi
+  # Topped up on every build, so a package the checkout installed later gets its link.
+  mkdir -p "$APP/node_modules/@daintreehq"
+  local entry name target nm pkg
+  for entry in "$APP_SRC"/node_modules/* "$APP_SRC"/node_modules/.bin; do
+    name="$(basename "$entry")"
+    case "$name" in .vite|.vite-temp|.cache|@daintreehq) continue ;; esac
+    [ -e "$APP/node_modules/$name" ] || [ -L "$APP/node_modules/$name" ] || ln -s "$entry" "$APP/node_modules/$name"
+  done
+  for entry in "$APP_SRC"/node_modules/@daintreehq/*; do
+    name="$(basename "$entry")"; target="$(readlink "$entry" || true)"
+    [ -e "$APP/node_modules/@daintreehq/$name" ] || [ -L "$APP/node_modules/@daintreehq/$name" ] && continue
+    if [[ "$target" == ../../packages/* ]]; then ln -s "$target" "$APP/node_modules/@daintreehq/$name"
+    else ln -s "$entry" "$APP/node_modules/@daintreehq/$name"; fi
+  done
+  for nm in "$APP_SRC"/packages/*/node_modules; do
+    pkg="$(basename "$(dirname "$nm")")"
+    [ -d "$APP/packages/$pkg" ] && [ ! -e "$APP/packages/$pkg/node_modules" ] && [ ! -L "$APP/packages/$pkg/node_modules" ] && ln -s "$nm" "$APP/packages/$pkg/node_modules"
+  done
   say "building workspace packages, renderer and main (NODE_ENV=test) at ${sha:0:10}"
   local p
   for p in plugin-sdk svelte-source-model tour plugin-vite daintree-plugin create-daintree-plugin; do
