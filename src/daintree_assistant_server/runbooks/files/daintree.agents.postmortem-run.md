@@ -21,7 +21,7 @@ optionalTools:
 ---
 Analysis only: nothing is relaunched to "see if it happens again", reverted, rewritten or filed. You gather Daintree's side, a read-only analyst reads transcript and diff, you check its claims and judge the cause: the first divergence, not the final symptom; elapsed time is not a cause.
 
-On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
+On a host: units, briefs and sent SHAs from your records, else ask. Per host, steps 1-3 through `host.call` (history and timeline at Full only), one analyst each. From your own shell, each claim at its SHA: on the remote (`git ls-remote`), descended from its sent base (`git merge-base --is-ancestor`), its forge checks (`gh`); absent, not descended or failing: contradicted. Compare times within a host only. A `submissionToken` status shows a send written, never read; a moment no record shows is unobserved.
 
 Procedure:
 1. Identify the run: its terminal id if still open (`terminal.list`) and its worktree (`worktree.list`). A panel the user points at ("the other panel") beats history: read each open agent panel but your own (`terminal.getOutput`) and take the one that matches. Open: one `terminal.getStatus`; `working`, or `waiting` on a `question` or `approval`: not over. Closed: `agentSessionHistory.list` with that `worktreeId` gives agent, title, branch, `savedAt`, `sessionId` (identity only; pruned: missing). Several candidates: ask.
@@ -37,8 +37,6 @@ Procedure:
 ```
 
    The prompt: "Read-only: create, modify or delete nothing and run nothing that writes." Session id and agent. Transcript: Claude Code `<sessionId>.jsonl` under `$CLAUDE_CONFIG_DIR/projects` (default `~/.claude/projects`) in the dir named for its cwd (non-alphanumerics as `-`); an open panel has no session id: quote its last screen lines to match the file's last turns; Codex `*<sessionId>*` under `$CODEX_HOME/sessions` (default `~/.codex/sessions`); not found: say so. The brief verbatim. The start revision, or "unknown: attribute to this run only changes its transcript or commits establish". A report of at most 40 lines: the earliest OBSERVABLE turn departing from the brief or reality, quoted with where it sits, and any gap before it; each change as correct, wrong or unknown with the reason; checks run or skipped. "Never quote a credential."
-
-A run across Remote Hosts: units, briefs and sent SHAs from your records, else ask. Per host, steps 1-3 through `host.call` (history and timeline at Full only), one analyst each. From your shell, each claim at its SHA: on the remote (`git ls-remote`), descended from its sent base (`git merge-base --is-ancestor`), its forge checks (`gh`); absent, not descended or failing: contradicted. Compare times within a host only. A `submissionToken` status shows a send written, never read; a moment no record shows is unobserved.
 
 On notice or resume:
 1. Check the analyst's claims: each quote where it says, each diff hunk real, each label fitting the diff; drop what fails. Missing brief or earlier turns: say the first divergence cannot be established.

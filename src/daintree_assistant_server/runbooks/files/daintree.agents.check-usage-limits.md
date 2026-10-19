@@ -30,7 +30,13 @@ Known read-only views (September 2026 builds; revalidate every time). Send the l
 
 No known in-CLI allowance view: Cursor (its `/usage` is activity), Aider, OpenCode, Goose, Crush, Amp, Kiro, Mistral Vibe, Open Interpreter, Qwen Code. Web pages: https://claude.ai/settings/usage, https://chatgpt.com/codex/settings/usage, https://console.x.ai; otherwise the provider's account page, never an invented URL.
 
-On a host: call these tools on the agent's machine; the figures are for its login there.
+On a host: the hosts named, else every connected one in `host.list` (this machine too when asked), each call through `host.call` there. Codex: `agent.readQuota` (that machine's Codex account; any of its projects): `ok`: per window `usedPercent`, `windowDurationMins` (300: five-hour), `resetsAt` (epoch ms), `planType`; `unavailable`, its `reason`.
+
+```json tool=host.call surface=help-core
+{"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
+```
+
+Other CLIs, or Codex's credits: steps 1-5 there, owned tools only.
 
 1. Resolve the agents with `agent.listAvailable`; say which you check and which you skip and why.
 2. Revalidate with `slashCommands.list` for that `agentId`: take a command only if its description says usage, quota, limits or status, and reject any that also mentions manage, redeem, reset, buy, purchase, upgrade, top up or billing. A known view this build no longer lists is not trusted. `slashCommands.list` unavailable or declined: send nothing and give the user the known command. Nothing qualifies: report no in-CLI allowance view. Never guess a command.
@@ -39,13 +45,5 @@ On a host: call these tools on the agent's machine; the figures are for its logi
    - Any other startup prompt (login, approval, update): the user's. Mark that agent not checked; the others go on.
 4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; if the agent took it as a chat message, stop and never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing. Tell the user which tab or scroll key shows the figures.
 5. Read the panel with `terminal.getOutput` (`maxLines` about 80), exactly; still loading, one more read. Leave it open; close only terminals you launched, on request. A sidebar close can wait on a confirmation: on `CONFIRMATION_TIMEOUT` leave it open and say so, never retry.
-
-On a Remote Host (those named, else every connected one in `host.list`; this machine too when asked), each call through `host.call` there. Codex: `agent.readQuota` (that machine's Codex account; any of its projects): `ok`: per window `usedPercent`, `windowDurationMins` (300: five-hour), `resetsAt` (epoch ms), `planType`; `unavailable`, its `reason`.
-
-```json tool=host.call surface=help-core
-{"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
-```
-
-Other CLIs, or Codex's credits: steps 1-5 there, owned tools only.
 
 Report back, per machine and agent: remaining allowance per window as LEFT (convert USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are not an allowance); reset times exactly as shown with timezone; credits or premium requests; the source of every figure ("read from <agent>'s <command> screen", "<host>'s agent.readQuota") or "not checked: <reason>", never a figure you did not read now; every terminal you launched, with its host. Never add machines up: each may be another account, and one account on two machines is one allowance shown twice. Most headroom: the largest % left on the same CLI and window, with plan and reset; different plans are not like for like.
