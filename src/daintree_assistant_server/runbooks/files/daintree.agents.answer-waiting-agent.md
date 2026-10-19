@@ -15,6 +15,8 @@ optionalTools:
   - terminal.readLastMessageOwned
   - terminal.revealOwned
 ---
+On a host: call these tools on each agent's machine.
+
 1. Find the targets with `terminal.list`, then one `terminal.getStatus` over the candidates with `includeOutput`. Several could be the ONE meant: list them and ask; never pick by focus or title. Several asking at once: handle them in one pass, each with its own answer.
 2. Read each question from its own entry, never a merged summary (`terminal.getOutput` or, for a Claude Code pane you own, `terminal.readLastMessageOwned` for the options; only the live screen shows it is waiting now). A terminal that is not asking gets no input. Map target id to the exact question, any `QUESTION_ID` and the choices; mark one you cannot read "unreadable, not answered".
 3. Classify each:

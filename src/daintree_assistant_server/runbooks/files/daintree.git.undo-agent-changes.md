@@ -21,6 +21,8 @@ optionalTools:
 ---
 You attribute and verify with git reads; a fresh visible agent in that worktree does the reversing. The trap is a whole-tree undo (`reset --hard`, `checkout -- .`, `restore .`, `clean`, the shared `stash`): it wipes the user's work too.
 
+On a host: shell steps run there, per the hosts foundation.
+
 Procedure:
 1. The agent: its terminal (`terminal.list`; unclear: ask), worktree id and path (`worktree.list`); a closed one from `agentSessionHistory.list` (`worktreeId`, `savedAt`). Still `working` (`terminal.getStatus`): stop it first (`terminal.interruptOwned` if yours, then `terminal.waitUntilIdle` and its screen shows it stopped; not yours: ask the user to press Escape in its pane). Another agent working in that tree: ask before going on.
 2. Baseline, your reads with `git -C "<path>"`: H1 = `rev-parse HEAD`; R0 = `ls-remote origin refs/heads/<branch>`; `status --porcelain`, `diff --stat`, `diff --cached --stat`.
@@ -31,7 +33,7 @@ Procedure:
    - Unknown or mixed (a hunk both touched, a commit mixing both): list it, leave it unchanged pending a decision.
 4. Mode, from the user's words: revert commits by default. Dropping them from history only on the user's ask: the worker first writes the rewrite plan (commits removed, descendants kept, a backup ref) and runs it after the user approves; commits already on the remote also need their word to force-push. Never silently swap a revert for a drop. Say if a later commit builds on a reverted one.
 5. Proceed with what the request names; ask only about unknown items, changed scope or a rewrite.
-6. Launch a fresh agent there (never the one that made it), `notify:true, handback:true`, and end the turn:
+6. Launch a fresh agent there (never the one that made it), `notify:true, handback:true`:
 
 ```json tool=agent.launch
 {"agentId":"claude","name":"Undo: <agent> changes","worktreeId":"<worktree id>","prompt":"<brief>","notify":true,"handback":true}
@@ -41,8 +43,8 @@ Procedure:
 
 On notice or resume:
 1. An authorship or scope question goes to the user.
-2. Verify yourself: `git status` shows no operation in progress; each revert is the inverse of its original (`git show <revert>` against `git show <sha>`); `git diff --name-only <H1> HEAD` stays inside the reverted commits' files; `git diff` and `git diff --cached` differ from the worker's saved patches only by the listed hunks, by content; untracked files as before; the checks re-run (`project.detectRunners`, then `project.runCheck` with `projectId` from `actions.getContext`, that `runnerId`, `cwd` the path; read `passed`, `exitCode`, `timedOut`); the remote ref still R0.
+2. Verify yourself: `git status` shows no operation in progress; each revert is the inverse of its original (`git show <revert>` against `git show <sha>`); `git diff --name-only <H1> HEAD` stays inside the reverted commits' files; `git diff` and `git diff --cached` differ from the worker's saved patches only by the listed hunks, by content; untracked files as before; the checks re-run (`project.detectRunners`, then `project.runCheck` with the work's `projectId`, that `runnerId`, `cwd` the path; read `passed`, `exitCode`, `timedOut`); the remote ref still R0.
 
 Stop and recovery: one corrective round, then the user. Never replay a revert. The saved patches and H1 are the rescue point, restored only on the user's word.
 
-Report back: the agent and worktree; S and its source; what was reversed (revert SHAs, hunks), what was kept as the user's or another agent's, unknown items awaiting a decision; the undo agent's terminal id, final HEAD, save location, any open operation; before/after evidence, check results; R0 before and after.
+Report back: the agent and worktree; S and its source; what was reversed (revert SHAs, hunks), what was kept as the user's or another agent's, unknown items awaiting a decision; undo agent's terminal id, final HEAD, save location, any open operation; before/after evidence, check results; R0 before and after.

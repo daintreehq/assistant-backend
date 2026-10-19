@@ -15,6 +15,8 @@ optionalTools:
   - terminal.sendCommandMany
   - terminal.sendCommandOwned
 ---
+On a host: shell steps run there, per the hosts foundation.
+
 Procedure:
 1. Split. Name the two sides, the agent for each (the user's, else configured ones), and the contract: types, schema or IDL at agreed paths, with example payloads and error cases. The sides must touch disjoint files apart from the contract; if they share other files this is not a parallel split: say so and serialize.
 2. Contract branch. `worktree.createWithRecipe` with a new branch `contract/<feature>` from the user's base, `collisionPolicy:"error"` (a lost reply is found in `worktree.list`). Every worktree here gets `worktree.waitUntilReady` with its own `worktreeId`, repeated while `pending` or `running`; `failed`, `timed-out`, `needs-approval` or `unknown` blocks it: report `stage` and `error`. Launch a contract author there (the user's pick, else one side's agent) with `waitForReply:true, handback:true`: "Write only <contract paths>: <contract>, with example payloads and error cases; no implementation. Commit it locally as 'contract: <feature>'; push nothing. Reply with the files and the SHA." Check the commit touches only the contract paths. Show the contract to the user and build on it only after their yes, unless they left the interface to you; changes go back to the author. Record the SHA; keep the author's panel for amendments.

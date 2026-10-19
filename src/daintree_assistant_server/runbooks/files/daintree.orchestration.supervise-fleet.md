@@ -14,6 +14,8 @@ optionalTools:
 ---
 A synchronous, read-only sweep. A status request authorizes reading only; launching, answering, interrupting, closing, arming notices or moving the user's view each needs the user to ask.
 
+On a host: call these tools on each machine in scope, and name the machines you read.
+
 1. Scope: the agents or worktree the user named, otherwise every agent terminal from `terminal.list` (`location:"background"` only if agents live there). `fleet.getRunStatus` covers a broadcast the user ran.
 2. Read the cohort in one `terminal.getStatus` (`includeOutput: {"lines":30}`), paging past 256 ids; `terminal.readLastMessageOwned` only where the tail is not enough.
 3. Classify each from its own entry:

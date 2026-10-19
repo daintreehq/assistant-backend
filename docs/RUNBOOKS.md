@@ -123,6 +123,8 @@ has no `Use when:` or `Availability:` line; one short line for a real caller
 difference at most. A runbook that ends its turn on a notice follows this shape:
 
 ```markdown
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
+
 Procedure:
 1. Resolve and preflight.
 2. Dispatch the smallest authorized action (brief, `name`, `worktreeId`, `notify`).
@@ -166,7 +168,25 @@ It gets no empty notice or checkpoint sections.
    Add `surface=external` (or another capture name) for an example written for that
    caller; `tests/unit/test_runbook_examples.py` validates each example against its
    caller's captured schema, so an external example carrying `notify` fails.
-6. **Stay under the size budgets** (`tests/unit/test_runbook_budgets.py`). Remove
+6. **Say what happens on a host.** The Shell's assistant can follow any runbook
+   against a Remote Host, where a worktree path, a process or a transcript exists only
+   on that machine. Every runbook outside `daintree.hosts.*` carries one top-level
+   `On a host:` line before its procedure: shell steps (git, tests, files, processes)
+   run on the work's machine, per the hosts foundation (`project.runCheck` or
+   `project.runCommand` through `host.call`, else an agent there), which a control
+   caller with a host connected gets with every runbook; the forge (`gh`, naming the repository)
+   stays in your own shell, since pushed state is the same everywhere; an
+   app-tool-only runbook calls its tools on the work's machine. A shared runbook is
+   also served to v0.44, which lacks `host.call` and `project.runCommand`, so its line
+   points at the hosts foundation instead of naming them. Never write "delegate" for
+   these steps: it means handing work to the host's assistant, not the default. Beside
+   a step, say only what that line leaves wrong: a path handed to an agent on another
+   machine is not shared (put the content in the prompt); a fetch or push that moves a
+   checkout runs where that checkout is (reading the remote, `git ls-remote`, is your
+   shell's). `tests/unit/test_runbook_host_execution.py` fails a body that acts on a
+   machine without that line, or whose line lacks the route its commands need (it
+   does not read the line's sense: write it affirmatively).
+7. **Stay under the size budgets** (`tests/unit/test_runbook_budgets.py`). Remove
    duplication before adding a rule.
 
 ## Frontmatter

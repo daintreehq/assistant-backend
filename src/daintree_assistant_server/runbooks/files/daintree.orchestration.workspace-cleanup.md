@@ -19,6 +19,8 @@ optionalTools:
 ---
 A confirmation gate, not permission to tidy up. Never close on your own initiative or widen a narrow request ("close the two that failed") into a sweep. Showing evidence (`git status`, unpushed commits) is fine; judging whether the user's work is finished is not. A cleanup never passes `force`.
 
+On a host: call these tools on the work's machine; shell steps run there, per the hosts foundation.
+
 Separate actions, each needing its own request:
 - Stop observing: no notice cancel exists. Drop the targeted units' pending steps so a late notice does nothing. Nothing stops running.
 - Interrupt a turn: `terminal.interruptOwned` keeps panel and conversation.

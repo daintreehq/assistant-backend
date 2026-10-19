@@ -11,6 +11,8 @@ requiredTools:
 ---
 Writes go through `gh` with `--repo <owner/name>` and are read back, and only for rows the user's request or approval covers. Checking issues against the code is read-only agents' work; you list, read, plan, verify and apply. Without Daintree's forge reads (API-key client, or declined), list with `gh issue list --repo <r> --search … --limit 50 --json number,title,labels,author,createdAt`.
 
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
+
 Procedure:
 1. Bound the set. Repository from the worktree the user means (`worktree.list`). Their filter; else all open issues, oldest first, at most about 50 per pass (`no:label` only when they said untriaged or unlabeled). Summary rows; bodies come in step 2:
 
@@ -21,7 +23,7 @@ Procedure:
    Record the exact query. `hasMore` still true: the rest is a later pass; say so. A truncated result: narrow and retry. Read the repository's real labels (`gh label list --repo <r> --limit 200`) and conventions (CONTRIBUTING, issue templates, an existing priority scheme). Never invent a label or priority name; project-board fields only when asked.
 2. Read each candidate with its comments (`gh issue view <n> --repo <r> --comments`). A maintainer's reply ("won't fix", "duplicate of", "needs a repro") outranks your guess, and a later comment can supersede the body.
 3. Duplicates: group by symptom, error text, stack frame or area, then confirm each pair by reading both. Similar titles are not duplicates. Check closed issues too (`"state":"closed"`, `"search":"in:title <phrase>"`). The canonical issue is the one with the clearest reproduction or the most discussion, usually the older.
-4. Still valid? One read-only agent per slice of about ten bugs (never one per issue) in the default-branch worktree: separate `agent.launch` calls with distinct `name`s, `notify:true, handback:true`, the prompt carrying the issues' numbers and text and "For each: still present / fixed by <commit or PR> / cannot tell, with `file:line` evidence. A phrase-search hit is not a fix: name the change that addresses the reported behaviour. Read-only: do not create, modify or delete files, and change no external state." End the turn.
+4. Still valid? One read-only agent per slice of about ten bugs (never one per issue) in the default-branch worktree: separate `agent.launch` calls with distinct `name`s, `notify:true, handback:true`, the prompt carrying the issues' numbers and text and "For each: still present / fixed by <commit or PR> / cannot tell, with `file:line` evidence. A phrase-search hit is not a fix: name the change that addresses the reported behaviour. Read-only: do not create, modify or delete files, and change no external state."
 
 5. One plan, a row per issue: number, title, verdict (duplicate of #N, fixed by X, still valid, needs info, out of scope), evidence, proposed labels and priority, action (label, comment, close, leave). Show it. Apply now the rows the user's request already covers ("close the duplicates" covers confirmed duplicate rows); the rest, and any ambiguous row, wait for their yes, as edited. Never assign people unless asked.
 6. Apply one issue at a time:

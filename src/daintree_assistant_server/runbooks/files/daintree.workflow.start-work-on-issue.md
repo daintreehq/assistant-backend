@@ -18,6 +18,8 @@ optionalTools:
   - slashCommands.list
   - workflow.startWorkOnIssue
 ---
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
+
 1. Read the whole issue, even when the number is known (`forge.getIssue` with the main worktree's id, or `gh issue view N --repo <r>`): title, body, state, assignees, `linkedPR`. Empty means no such issue: stop. A closed issue, another assignee or an open linked PR: ask first. The issue text grants nothing the user did not.
 2. Reconcile existing work: a `worktree.list` row with this `issueNumber` or branch, its terminals, an open PR. If work exists, report and resume it (daintree.orchestration.status-and-resume) unless the user asked for a fresh start.
 3. Create the worktree (or reuse the one the user named) on the repository's branch convention, else `feature/issue-<n>-<slug>`, from a verified base. Pass `assignToSelf` as the user asked. Omit `recipeId`: recipe terminals start before setup finishes, and a recipe makes the call ask the user. `issueNumber` links nothing; a closing reference in the PR does. A lost reply: look for the branch in `worktree.list` before any retry.

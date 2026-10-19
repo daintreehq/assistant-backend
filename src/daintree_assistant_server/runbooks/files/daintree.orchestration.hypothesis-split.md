@@ -16,11 +16,13 @@ optionalTools:
 ---
 The deliverable is evidence, not a fix. An agent's "found it" is a claim until you have re-run its experiment.
 
+On a host: shell steps run there, per the hosts foundation.
+
 Procedure:
 1. Fix the symptom: what is observed, where (worktree id and path from `worktree.list`, and its HEAD SHA), and how to trigger it. With no way to trigger or observe it, every agent will guess: say so and offer to reproduce it first (daintree.debug.reproduce-bug) unless the user wants to go on.
 2. Hypotheses, 2 to 4: the user's, or yours from a quick read of the code, shown to the user before launch. Each is ONE falsifiable cause with what would confirm it and what would refute it ("if the cache is stale, disabling it makes the error vanish; if the error persists, refuted"). Two that predict the same observations are one hypothesis: merge them.
 3. Where each runs. Only a hypothesis tested by reading code and by commands that write nothing (no build output, cache, log or database) shares the target worktree. Any other gets a throwaway worktree: `worktree.createWithRecipe` with a new branch `probe/<slug>` from the target's branch, `collisionPolicy:"error"`, no `recipeId`, then `worktree.waitUntilReady`: only `setupState:"ready"` launches (`timedOut:true`: call again; any other state: that hypothesis is reported blocked). Then check `git -C <probe path> rev-parse HEAD` equals the target SHA; if not, it tests another revision: say so or stop it. A probe holds committed code only: if the target has uncommitted changes, say the probes do not include them. Never instrument the user's checkout. Probes that run the app against one database or port collide: run those one after another, or see daintree.worktree.provision-local-environment.
-4. Launch one agent per hypothesis in the same turn, each its own Daintree `agent.launch` (a visible pane, never your host's built-in subagent tool), then end the turn:
+4. Launch one agent per hypothesis in the same turn, each its own Daintree `agent.launch` (a visible pane, never your own built-in subagent tool), then end the turn:
 
 ```json tool=agent.launch
 {"agentId":"<agent id>","name":"H1: <hypothesis in a few words>","worktreeId":"<probe or target worktree id>","prompt":"<symptom, trigger, hypothesis, confirm and refute conditions, rules, reply shape>","focusPolicy":"preserve","notify":true,"handback":true}
@@ -30,7 +32,7 @@ Procedure:
 
 On notice or resume:
 1. Map the terminal to its hypothesis and read the verdict from the notice quote. A question: answer once within the brief (`terminal.sendCommandOwned`, `notify:true, handback:true`), otherwise ask the user.
-2. CONFIRMED: re-run its experiment yourself in that worktree, with your own shell: the trigger and the deciding check it quotes, and nothing that writes to the checkout. Re-running is verification, not the work, so it is yours; until you have done it the verdict is the agent's claim, and your report says so. Ask whether the same result would also appear under a rival hypothesis; if so it discriminates nothing and is inconclusive. If it holds and discriminates, record it as supported by your re-run. If the user agreed that one proven cause ends the hunt, `terminal.interruptOwned` each probe still working and read its screen after (`requested` is not stopped); otherwise let them finish, since two causes can both be real.
+2. CONFIRMED: re-run its experiment yourself in that worktree: the trigger and the deciding check it quotes, and nothing that writes to the checkout. Re-running is verification, not the work, so it is yours; until you have done it the verdict is the agent's claim, and your report says so. Ask whether the same result would also appear under a rival hypothesis; if so it discriminates nothing and is inconclusive. If it holds and discriminates, record it as supported by your re-run. If the user agreed that one proven cause ends the hunt, `terminal.interruptOwned` each probe still working and read its screen after (`requested` is not stopped); otherwise let them finish, since two causes can both be real.
 3. REFUTED: accept it only if its experiment actually exercised the suspect path; otherwise it is inconclusive.
 4. A different cause an agent reported is a lead, not a result: offer it to the user as a new hypothesis.
 5. Report once every hypothesis has a verdict or is recorded missing.

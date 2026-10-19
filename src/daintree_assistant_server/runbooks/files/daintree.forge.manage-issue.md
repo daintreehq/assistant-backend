@@ -10,7 +10,9 @@ optionalTools:
   - worktree.list
   - forge.listIssues
 ---
-Daintree only reads issues. Writes go through the host tool (`gh`) with `--repo <owner/name>` and the number, and are read back. With no permitted forge tool, give the user the drafted issue; never imply it was filed.
+Daintree only reads issues. Writes go through `gh` with `--repo <owner/name>` and the number, and are read back. With no permitted forge tool, give the user the drafted issue; never imply it was filed.
+
+On a host: call these tools on the work's machine; own shell: `gh -R <repo>`.
 
 1. Fix the repository from the worktree the user means (`worktree.list`) and use it for the duplicate check, the write and the read-back. A public write never defaults to whatever checkout is active.
 2. Build the content from the user's report and evidence you inspected; a guess about cause or severity is not issue fact. Resolve every prerequisite (label names exist, the assignee) before the first write.
@@ -26,7 +28,7 @@ Daintree only reads issues. Writes go through the host tool (`gh`) with `--repo 
 6. `gh issue edit N --repo <r> --add-label/--remove-label/--add-assignee/--remove-assignee`. Removing an absent label fails: check first. `@me` works with `gh`; elsewhere use a grounded login. A forge can silently drop an assignee: the resulting list is the answer.
 7. Read back every requested field (`gh issue view N --repo <r> --json title,body,state,labels,assignees,url`; `bypassCache:true` when re-listing). Report each as confirmed, not applied or unknown.
 
-Uncertain create: a lost or ambiguous create reply is searched for in the same repository before any retry: the exact title, closed included, `author:@me created:>=<date>`, `bypassCache:true`; confirm a match by its body. The host tool has no idempotency key.
+Uncertain create: a lost or ambiguous create reply is searched for in the same repository before any retry: the exact title, closed included, `author:@me created:>=<date>`, `bypassCache:true`; confirm a match by its body. `gh` has no idempotency key.
 
 Several issues from one discussion or findings list: list the candidates first, dedupe each against open issues (step 3), then file the clear ones the request covers one at a time and read each back by number; ask only about likely duplicates or unclear ones. After a partial failure, re-read what exists before filing the rest.
 

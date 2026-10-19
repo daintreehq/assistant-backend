@@ -22,9 +22,11 @@ optionalTools:
 ---
 The person needs to see it work and to know what is real. A prep agent makes the worktree runnable, seeds safe data and drafts the walkthrough; you start the demo, exercise what you can and hand it over. Nothing is merged, pushed or deployed, and feature code does not change during prep.
 
+On a host: shell steps run there, per the hosts foundation.
+
 Procedure:
-1. Pick the checkout: `worktree.list` (branch, linked issue or PR), then `terminal.list` and `terminal.getStatus` for agents there. Several agents' branches: the branch integrating them; none yet: ask whether to show each alone or integrate first (daintree.git.integrate-agent-branches). An agent still `working` there: `terminal.notifyWhenIdle` on it and end your turn on `armed:true`; unarmed, report the demo pending. Record `git -C <path> rev-parse HEAD` as <sha>: the demo binds to it. Never demo the main checkout by default.
-2. Launch one prep agent in that `worktreeId`, `name:"Demo prep: <feature>"`, `notify:true, handback:true`, and end your turn. The brief:
+1. Pick the checkout: `worktree.list` (branch, linked issue or PR), then `terminal.list` and `terminal.getStatus` for agents there. Several agents' branches: the branch integrating them; none yet: ask whether to show each alone or integrate first (daintree.git.integrate-agent-branches). An agent still `working` there: `terminal.notifyWhenIdle` on it; unarmed, report the demo pending. Record `git -C <path> rev-parse HEAD` as <sha>: the demo binds to it. Never demo the main checkout by default.
+2. Launch one prep agent in that `worktreeId`, `name:"Demo prep: <feature>"`, `notify:true, handback:true`. The brief:
    - "Make <feature> runnable here at <sha> with the project's own install and setup commands. Do not start the dev server.";
    - "Sample data only in this checkout's own local database: prove it is not shared with the main checkout or another worktree (compare the resolved server and database, or SQLite's real path); never staging or production. Use the project's seeders or fixtures with invented data: no real people, emails, payment details or credentials. Unproven: seed nothing and say so. Record what you seeded and how to reset it.";
    - "Change no feature code; commit and push nothing. A blocker is reported with its evidence, not fixed.";
@@ -40,10 +42,10 @@ Procedure:
 
    - A recipe whose terminals are exactly the demo's processes, no agents (`recipe.list`): `recipe.run` with the `worktreeId`; keep the spawned ids; compare what started with what it defines; never re-run a partial start.
    - CLI or API: `terminal.new` with `cwd` = the worktree path, then `terminal.sendCommandOwned` for the server or first command.
-5. A panel is not a server, and Daintree picks the preview's port: find the listener whose cwd is <path> (`lsof -nP -iTCP -sTCP:LISTEN`, then `lsof -a -p <pid> -d cwd`) and probe it, bounded (`curl --max-time 5`); none: report it unavailable, never start one yourself. Then exercise what you can: `browser.getConsoleMessages` (`terminalId` = the preview panel id, `limit:100`) for errors on load; API steps and every seeded record's page with `curl`; CLI steps in your own shell from the worktree; the seeded rows with one read query. A step needing clicks or looks is "not exercised by me" without real pixels from a host browser tool. A failing step goes to known bugs; fixing a console error is daintree.runtime.debug-web-app.
+5. A panel is not a server, and Daintree picks the preview's port: find the listener whose cwd is <path> (`lsof -nP -iTCP -sTCP:LISTEN`, then `lsof -a -p <pid> -d cwd`) and probe it, bounded (`curl --max-time 5`); none: report it unavailable, never start one yourself. Then exercise what you can: `browser.getConsoleMessages` (`terminalId` = the preview panel id, `limit:100`) for errors on load; API steps and every seeded record's page with `curl`; CLI steps from the worktree; the seeded rows with one read query. A step needing clicks or looks is "not exercised by me" without real pixels from your browser tool, which reaches a host's server only through a forward. A failing step goes to known bugs; fixing a console error is daintree.runtime.debug-web-app.
 
 On notice or resume: the prep agent's "works" is a claim until step 5 shows it. A question within scope: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`; seeding an unproven database or changing code goes to the user.
 
-Stop and recovery: one corrective round to the prep agent for a setup failure; then hand over what stands. A preview panel never sends a notice: do not end the turn waiting on it. Reconcile an ambiguous launch with `terminal.list`, never launch a second preview. Leave everything running; stop only on request.
+Stop and recovery: one corrective round to the prep agent for a setup failure; then hand over what stands. A preview panel never sends a notice: do not end the turn waiting on it. Never launch a second preview. Leave everything running; stop only on request.
 
 Report back: worktree, branch and the revision shown; how to open the demo (panel or terminal id, URL); what was seeded, where, and how to reset it; the walkthrough; works (exercised by you or claimed by the agent, kept apart), stubbed, missing, known bugs; what is running and the prep agent's terminal id.

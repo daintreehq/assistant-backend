@@ -13,6 +13,8 @@ optionalTools:
 ---
 The deliverable is the answer, not implementation work. Never promise an automatic reply you have no mechanism for.
 
+On a host: call these tools on the work's machine.
+
 1. Keep the user's question verbatim. If they said "you decide", pick one small, safe, self-contained question; do not crawl the project to invent one. A general question needs no investigation first.
 2. One question means one agent: the one named, or the configured agent best suited, in the worktree the question is about.
 3. One self-contained prompt: the exact question, context the agent cannot see, the length ("at most 30 lines, citing file:line where relevant, and say what you are unsure of"), and "Read-only: do not create, modify or delete files, and change no external state." Do not answer it yourself inside the prompt. For a long answer, raise `replyLines` (up to 200).

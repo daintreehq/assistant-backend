@@ -22,6 +22,8 @@ optionalTools:
 ---
 A code change goes to a visible agent; you brief, launch and verify. Edit it yourself only when the user asks you to.
 
+On a host: shell steps run there, per the hosts foundation.
+
 Procedure:
 1. Brief. Keep the user's words as the task, including any command or skill they named. Decide edits or read-only. Write acceptance criteria as checkable statements ("an unknown id returns 404", "nothing outside `src/auth` changed"), not a restatement; if tests cannot run here, say so in the criteria.
 2. Destination: resolve an id and path from `worktree.list`. Use a named worktree, branch or path exactly. With none named, use the checkout the work is about; "here" is your own (`DAINTREE_WORKTREE_ID` in a pane), not whatever the user has selected. Several worktrees is not ambiguity. Record the starting revision and a hash of `git diff HEAD` plus untracked files: existing changes may be the user's.

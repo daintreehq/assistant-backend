@@ -14,9 +14,11 @@ optionalTools:
 ---
 A relay ends when the message is queued, unless the user also wants the fixer's response ("tell me what changed" does). Decide that before sending.
 
+On a host: shell steps run there, per the hosts foundation.
+
 1. Resolve each role. A reviewer or fixer the user named that is not running yet: launch it (steps 4 and 6), and do not review, hash or fingerprint the target yourself. An existing one: from `terminal.list` and one `terminal.getStatus` with `includeOutput`; several plausible matches for either role: ask; never choose by agent name, focus or a generic title.
 2. An existing destination must be owned or handed over, with no dialog and no user draft. On `RESOURCE_NOT_OWNED`, ask for a hand-over or give the user the message to paste. If it is working, the message lands mid-turn: say so.
-3. An existing reviewer's review is bound to what it saw: its worktree and commit or diff, against where the fixer works now (`git` in each path; HEAD alone does not identify uncommitted work). A mismatch goes in the relay and the report.
+3. An existing reviewer's review is bound to what it saw: its worktree and commit or diff, against where the fixer works now (`git` in each path, on its machine; HEAD alone does not identify uncommitted work). A mismatch goes in the relay and the report.
 4. Get the review.
    - New reviewer: launch it once in the worktree under review. The prompt carries the target, the shape (per finding severity, `file:line`, trigger and fix; "nothing found" rather than silence; the revision inspected) and "Read-only: do not create, modify or delete files, and change no external state." Its `reply` is the review; files it changed are a boundary failure to report.
 

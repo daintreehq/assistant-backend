@@ -14,6 +14,8 @@ optionalTools:
 ---
 The deliverable is each independent answer; with no vote or verdict asked for, report the answers and skip the tally. The voters are fresh launches of the agents named, pinned or configured, never existing open terminals.
 
+On a host: call these tools on the work's machine.
+
 1. Roster from `agent.listAvailable`. Pinned means `pinned:true` (`toolbarVisible` is something else). A missing `pinned` is an unknown pin state, not "unpinned": with no entry carrying it, say the pinned subset cannot be identified and offer all configured or named agents; with some carrying it, poll the `pinned:true` ones and list the rest as excluded for unknown pin state. Never report "no pinned agents" from missing fields. Skip one not `launchable` or not ready, with the reason. If the user only asked whether you can see them, report the count and names and stop.
 2. One neutral prompt: the question and context, that the agent is polled independently and must change no files, and to answer in at most 15 lines, ending (for a vote) with a clear verdict and its two to five strongest reasons.
 3. A vote among options: option text only, equal detail, no origin or status labels, neutral labels A/B/C rotated per voter; keep each voter's label-to-option map to yourself. A tiebreak the user gave (such as a runner-up) is asked for on the same ballot. Rotated ballots differ per voter, so launch each with its own `agent.launch` in one turn; an identical prompt for distinct kinds goes in one `agent.launchMany`. Pass `waitForReply:true, handback:true`. A repeated kind starts only after the previous one, so give it `notify:true, handback:true` instead and end your turn once the others are back.

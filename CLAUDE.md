@@ -149,7 +149,10 @@ runbook, **filename stem must equal the `id`** (enforced at load). Auto-discover
 registration. `docs/RUNBOOKS.md` is the authoring guide.
 
 **Format** — YAML frontmatter + Markdown body. The body is operational prose in the house
-style: a numbered procedure (no `Use when:` or `Availability:` line; the served document
+style: an `On a host:` line naming where its steps run when the work's machine is a Remote
+Host (there, per the hosts foundation; `gh`, naming the repo, from your own shell;
+`test_runbook_host_execution.py`), then a numbered procedure (no `Use when:` or
+`Availability:` line; the served document
 already carries `when_to_use` and the tool lists), `On notice or resume:` and
 `Stop and recovery:` sections for a runbook that ends its turn on a notice, ending with a
 "Report back" line. Shared rules (caller differences, ownership, launching, batch calls,

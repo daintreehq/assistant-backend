@@ -14,7 +14,9 @@ optionalTools:
   - terminal.sendCommandOwned
   - terminal.list
 ---
-One run is not a rate, and 0 failures in N runs is "not reproduced at N", never "not flaky". A visible agent measures and, only if asked, fixes; you fix the target and check its evidence. Only when the user asks you yourself to do it, follow the brief in your own shell.
+One run is not a rate, and 0 failures in N runs is "not reproduced at N", never "not flaky". A visible agent measures and, only if asked, fixes; you fix the target and check its evidence. Only when the user asks you to do it yourself, follow the brief.
+
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Target: the test, its narrowest command and its worktree (`worktree.list`). From a CI failure, read the exact invocation, seed and worker count yourself: `gh run view <run id> --log-failed`. Record `HEAD` and a hash of `git diff HEAD` plus untracked files.
@@ -27,7 +29,7 @@ Procedure:
    - "Name the root cause (race, shared state, clock, randomness, network, order) at `file:line` from failing versus passing output."
    - Fix asked: "Fix the source where the state leaks (a polluter or shared fixture, not a cleanup in the victim): wait on observable state, inject the clock or seed, isolate the shared resource, await what was fire-and-forget. A change that only makes the failure rarer (more random bits, a wider window) is not a fix. Never sleeps, retries, rerun plugins, `flaky` markers, skips, quarantine, longer timeouts, wider tolerances or looser assertions. Gate: K consecutive passes under the failing condition, K at least three times the runs it took to see a failure and never under 30, then one full-suite run with a recorded seed. A gate failure: one new cause and one re-gate within budget, else report unverified with the rate."
    - "Commit and push nothing. Reply with failures/runs per condition, the trigger or polluter, the root cause at `file:line`, the fix and gate result, the results directory, and the tree's HEAD and diff-plus-untracked hash before and after."
-5. End your turn. On the notice, your report waits until you have run the checks below yourself.
+5. On the notice, your report waits until you have run the checks below yourself.
 
 On notice or resume:
 - A question inside the brief: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`; quarantine or a retry is the user's call.
@@ -36,9 +38,9 @@ On notice or resume:
   2. a fix: read the diff for the bans (`sleep`, retry, `.skip`, `flaky`, changed timeouts or tolerances, weakened assertions), for new limits (an id that can overflow its format) and for a failure made only rarer; a banned change is not a fix;
   3. recomputed the identity: it must match the gated one;
   4. run the narrow command about ten times in a loop under the failing condition, counting failures: any failure contradicts the gate.
-  Then report, the fix uncommitted unless the user asked for a commit.
+  Then report, the fix uncommitted unless the user asked.
 - Budget spent without a cause: report the rates as measured.
 
 Stop and recovery: one corrective round, then report. Reconcile with `terminal.list` and `worktree.list` before any second launch or create. Never skip or quarantine the test yourself.
 
-Report back: command, worktree and revision; failures/runs per condition from the logs you read; the trigger and any polluter; the root cause at `file:line`; the fix, its gate (K/K, full-suite seed) and your own re-runs, or that no fix was asked; the results directory; the agent's terminal id.
+Report back: command, worktree and revision; failures/runs per condition from the logs you read; the trigger and any polluter; root cause at `file:line`; the fix, its gate (K/K, full-suite seed) and your own re-runs, or that no fix was asked; the results directory; the agent's terminal id.

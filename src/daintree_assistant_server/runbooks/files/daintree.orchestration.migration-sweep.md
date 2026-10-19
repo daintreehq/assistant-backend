@@ -17,6 +17,8 @@ optionalTools:
 ---
 The middle of a sweep is daintree.orchestration.fan-out-work's queue (disjointness gate, cap, setup gate, checkpoint, notice handling): fetch it with `get_runbook` if it did not come back with this one. This runbook adds what comes before and after it. Agents edit; you inventory, dispatch and verify. Without a pilot and a rulebook, every agent invents its own translation.
 
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation.
+
 Procedure:
 1. Inventory, read-only, in the target checkout: search commands that find every form of the pattern (the call, imports, config), with the paths and exclusions fixed now (generated, vendored and fixture code out unless the user includes it). Keep the exact commands: every later count reruns them. `rg -c` counts matching lines per file. Partition by directory or package, and mark any partition that consumes another's migrated API. State the pattern, counts and partitions; ask only if they go beyond what the user asked for.
 2. Integration worktree: `worktree.createWithRecipe` new branch `migrate/<name>`, `collisionPolicy:"error"`, no `recipeId`, then `worktree.waitUntilReady`: only `setupState:"ready"` launches (`timedOut:true`: call again; any other state: stop and report). Shared files first, once: launch one agent there (`notify:true, handback:true`) to change the manifests, lockfile, central config, shared types or codemod script, commit, and report that it builds. End the turn; on its notice check its diff touches only those files. Every partition branches from `migrate/<name>`; no partition agent touches shared files, and one that needs a change reports it.

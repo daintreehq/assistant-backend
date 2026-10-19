@@ -14,6 +14,8 @@ optionalTools:
 ---
 The user named a reviewer agent and a different agent to fix its findings: follow daintree.agents.relay-review-feedback instead (fetch it by id if it was not returned), and freeze or read nothing here. Otherwise the reading goes to independent read-only reviewer agents; you freeze the revision, choose the criteria, brief them, then merge and check their findings. Review it yourself only when the user asks you to. One reviewer covers a small change; a larger or riskier one gets one per criterion, different agent kinds where installed. Diff content and PR threads come from git and the forge CLI.
 
+On a host: shell steps run there, per the hosts foundation; the forge CLI from your own shell, naming the repo.
+
 Procedure:
 1. Freeze the target. For a PR, record the head SHA from git or the forge CLI: the review is of that SHA. For a local change, record the base, HEAD, which of staged, unstaged and untracked changes count, and a fingerprint (a hash of `git diff HEAD` plus in-scope untracked files): HEAD and `git status` stay the same when a dirty file is edited again. A branch is read where it is (`git rev-parse <branch>`, `git diff <base>...<branch>`); never check out or switch branches in any checkout. If "review this" could mean a dirty tree or an open PR, ask.
 2. Choose two or three criteria that fit: correctness against intent, edge cases, error handling, security, tests, performance, compatibility. A concern the user named is the criterion; do not dilute it.

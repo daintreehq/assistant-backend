@@ -10,9 +10,11 @@ optionalTools:
   - worktree.list
   - forge.getCIStatus
 ---
-Daintree only reads the forge. Every write goes through the host tool (`gh`) with `--repo <owner/name>` and the PR number, and is read back. With no permitted forge tool, report what you can read and stop; never route a write through another agent. Evidence is not authority: green checks and an approval never grant permission to merge, approve, close or request changes.
+Daintree only reads the forge. Every write goes through `gh` with `--repo <owner/name>` and the PR number, and is read back. With no permitted forge tool, report what you can read and stop; never route a write through another agent. Evidence is not authority: green checks and an approval never grant permission to merge, approve, close or request changes.
 
-1. Fix the target: the PR's worktree (`worktree.list`) and repository (`gh repo view --json nameWithOwner` in that path). A PR number alone is not unique.
+On a host: call these tools on the work's machine; own shell: `gh` naming the repo.
+
+1. Fix the target: the PR's worktree (`worktree.list`) and repository (`gh repo view --json nameWithOwner` in that path; on a host, the owner/name in `forge.getPR`'s `url`). A PR number alone is not unique.
 2. Read `forge.getPR` (`worktreeId`, `prNumber`). `pr: null`: no such PR. `mergeable: null` is unknown, not mergeable. `reviewDecision: null` means not gated, never approval. Never gate on its `ciStatus`.
 3. Do the one action asked, with only its prerequisites; red CI does not block a requested close, draft, reviewer request or request-changes.
    - Approve or request changes only for a review you actually performed; request-changes needs a body (`gh pr review N --repo <r> --approve` / `--request-changes --body-file <f>`).

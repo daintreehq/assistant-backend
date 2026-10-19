@@ -16,6 +16,8 @@ optionalTools:
 ---
 Findings only: no edits, commits, pushes, approvals or comments unless asked. Per-PR reads use `gh … --repo <owner/name>`. API-key client (no forge reads, `notify` or `worktree.waitUntilReady`): list with `gh pr list`, read `setupState` from `worktree.list`, run one reviewer at a time with `waitForReply:true, handback:true`. `<remote>` is the one whose URL is `<owner/name>` (`git remote -v`; `upstream` when `origin` is a fork).
 
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
+
 Procedure:
 1. The set: the PRs the user named, else one `forge.listPRs` with their filter (`state:"open"`, `search:"-is:draft review:required"` or `"base:develop created:>=<date>"`, `perPage` up to 30); say so when `hasMore` is true. Leave bot dependency bumps out unless named. At most four reviewers at once (or the user's number); the rest follow in later rounds with no new yes.
 2. Freeze each PR: `gh pr view <n> --repo <r> --json number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,state,isCrossRepository`. Skip closed, merged and draft PRs unless named. `headRefOid` is the commit the verdict binds to.

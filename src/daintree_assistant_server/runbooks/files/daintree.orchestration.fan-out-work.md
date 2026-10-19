@@ -22,20 +22,22 @@ optionalTools:
   - terminal.closeMany
   - worktree.deleteOwned
 ---
-The queue advances only on notices (an API-key client has none: say refilling needs the user). A pane holds at most 32 pending notices, so never run a cohort beyond that. There is no watchdog for stalled units.
+The queue advances only on notices (an API-key client has none: say refilling needs the user). A pane holds at most 32 pending notices: never run a cohort beyond that. There is no watchdog for stalled units.
+
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. The set. Skip work already in flight (`worktree.list` `issueNumber`, `prNumber`). Read the issues, or split the goal into units with a checkable acceptance each. A set you derived or extended needs the user's yes.
 2. Disjointness gate. Units touching the same files, module or shared artifact (a lockfile, generated schema, single config, migration sequence) are not parallel: merge, serialize or re-split. Two units adding dependencies share the lockfile: one owns it, the other reports the dependency it needs. Report the verdict.
 3. Cap. The user's cap is the authority; never exceed it or ask again. With none, state yours and get a go-ahead above about four.
 4. Resolve every unit's first prompt before any mutation: a named command or skill is looked up for that agent in the unit's worktree and sent unchanged. No match, several, or missing arguments blocks that unit with zero submissions.
-5. Checkpoint (this run is long). Per unit: label, owned files, brief, acceptance, command chain, worktree, `requestedId`, terminal id, step, status (`pending`, `setting-up`, `dispatching`, `running`, `blocked`, `done`, `failed`, `uncertain`) and whether it holds a slot. Save `dispatching` before each launch or send.
+5. Checkpoint. Per unit: label, owned files, brief, acceptance, command chain, worktree, `requestedId`, terminal id, step, status (`pending`, `setting-up`, `dispatching`, `running`, `blocked`, `done`, `failed`, `uncertain`) and whether it holds a slot. Save `dispatching` before each launch or send.
 6. Setup gate per unit: create, wait until ready, then launch. `worktree.createWithRecipe` with a new branch, no `recipeId` (one the user named: daintree.recipe.run-or-create), `collisionPolicy:"error"`; one agent per worktree. Only `setupState:"ready"` admits a launch. A setup failure stops before launch and fails that unit; `needs-approval` waits for the user. `timedOut` leaves it `setting-up`: setup sends no notice, so with nothing running say the queue needs the user. Reconcile a lost create with `worktree.list`. `workflow.startWorkOnIssue` only when asked and the unit has no named commands: it skips this gate and may submit its own task, so read its terminal before sending.
-7. Launch every admitted unit this turn with `notify:true` and a fresh `requestedId`, then end it; `handback:true` only on your own brief (on a command it joins the arguments). The brief adds owned files, "change nothing outside this scope", what to commit or open, and a report of at most about 30 lines.
+7. Launch every admitted unit this turn with `notify:true` and a fresh `requestedId`; `handback:true` only on your own brief (on a command it joins the arguments). The brief adds owned files, "change nothing outside this scope", what to commit or open, and a report of at most about 30 lines.
 
 On notice or resume:
 1. Map each terminal to its unit by the checkpoint; one not there is not this queue's.
-2. Verify the step in that unit's worktree path (diff, commits, tests), then advance that unit only: its next command is one send with `notify:true`, never several at once. Stopped short of its finish: recheck paced to the work; re-arm `terminal.notifyWhenIdle` once it works.
+2. Verify the step in that unit's worktree (diff, commits, tests), then advance that unit only: its next command is one send, never several at once. Stopped short of its finish: recheck paced to the work; re-arm `terminal.notifyWhenIdle` once it works.
 
 ```json tool=terminal.sendCommandOwned
 {"terminalId":"<unit terminal id>","command":"<next resolved command>","notify":true}
@@ -43,7 +45,7 @@ On notice or resume:
 
    Idle, a question, a failed command or an unconfirmed submission never unlocks the next command. A failed unit stops only its own chain.
 3. Release and refill. A slot frees when the unit's last step is verified, or it is failed or blocked and no longer working. A detected PR is not a finished agent: a working agent keeps its slot. A blocked unit re-reserves a slot before it is answered. An uncertain launch keeps its slot until reconciled by `requestedId`. Refill through the gate only on these transitions. Save after each.
-4. Teardown the user asked for per unit ("then delete its worktree") waits for their condition, not a merge unless they said so. Once verified (branch pushed, tree clean), close the unit's panel in its own call (`terminal.closeMany`, confirmed by `closedIds`), never through `closeTerminals`, then `worktree.deleteOwned`, which keeps the branch. Each delete waits on the user's confirmation in Daintree. On `CONFIRMATION_TIMEOUT` mark it `delete pending`, say so once, and retry one at a time only when the user says they are there; it holds no slot unless the user made deletion the condition for the next launch. `USER_REJECTED` keeps it. Count deleted, pending and kept by a fresh `worktree.list`.
+4. Teardown the user asked for per unit ("then delete its worktree") waits for their condition, not a merge unless they said so. Once verified (branch pushed, tree clean), close the unit's panel in its own call (`terminal.closeMany`, confirmed by `closedIds`), never through `closeTerminals`, then `worktree.deleteOwned`, which keeps the branch. Each delete waits for the user to confirm in Daintree. On `CONFIRMATION_TIMEOUT` mark it `delete pending`, say so once, and retry one at a time only when the user says they are there; it holds no slot unless the user made deletion the condition for the next launch. `USER_REJECTED` keeps it. Count deleted, pending and kept by a fresh `worktree.list`.
 
 Stop and recovery: one corrective prompt per unit unless the user set another bound. A `working` unit with an old `lastOutputChangeAt` is reported possibly stalled and keeps its slot; recovering it (daintree.agents.recover-agent) needs the user. A late lockfile collision holds the later unit. Never relaunch to repair tracking. Integrating branches is daintree.git.integrate-agent-branches. On cancellation launch nothing more; closing is daintree.orchestration.workspace-cleanup.
 

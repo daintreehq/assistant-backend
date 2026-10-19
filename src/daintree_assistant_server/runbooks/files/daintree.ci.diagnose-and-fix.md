@@ -15,7 +15,9 @@ optionalTools:
   - terminal.list
   - terminal.sendCommandOwned
 ---
-You gather the evidence and verify; a visible agent in the target worktree diagnoses and fixes. You read the failure, not the source: the cause and the fix are the agent's to find, and a brief that names them skips the diagnosis. Fix it yourself only when the user asks you to. The app gives no per-check list, job log or head SHA: read those with the host forge CLI (`gh pr checks`, `gh run view --log-failed`, `gh pr view --json headRefOid`), or say which evidence you could not read. A fix written from a check's name is a guess, and "tests pass now" from the fixer is a claim.
+You gather the evidence and verify; a visible agent in the target worktree diagnoses and fixes. You read the failure, not the source: the cause and the fix are the agent's to find, and a brief that names them skips the diagnosis. Fix it yourself only when the user asks you to. The app gives no per-check list, job log or head SHA: read those with the forge CLI (`gh pr checks`, `gh run view --log-failed`, `gh pr view --json headRefOid`), or say which evidence you could not read. A fix written from a check's name is a guess, and "tests pass now" from the fixer is a claim.
+
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Fix the target: worktree id and path (`worktree.list`), then its branch, `git rev-parse HEAD` and dirtiness.
@@ -36,7 +38,7 @@ Procedure:
 
 On notice or resume:
 1. A routine question within scope: answer once with `notify:true`; test-versus-behaviour questions go to the user.
-2. "Fixed, tests pass" is the agent's claim, never your evidence: report nothing until you have, yourself, (a) read `git diff`: a diff that weakens tests or coverage unasked is not a fix, so report it and do not accept it; (b) re-run the narrow command and the broader suite (`project.runCheck` with `cwd`, or your shell); (c) recorded `HEAD` plus a hash of `git diff HEAD` with those runs; a later edit makes them stale. The fix stays uncommitted unless the user asked; a commit the agent made unasked is a breach to report, not to undo.
+2. "Fixed, tests pass" is the agent's claim, never your evidence: report nothing until you have, yourself, (a) read `git diff`: a diff that weakens tests or coverage unasked is not a fix, so report it and do not accept it; (b) re-run the narrow command and the broader suite (`project.runCheck` with `cwd`, or the shell); (c) recorded `HEAD` plus a hash of `git diff HEAD` with those runs; a later edit makes them stale. The fix stays uncommitted unless the user asked; a commit the agent made unasked is a breach to report, not to undo.
 3. CI proves the fix only after an authorized push and a completed run for that exact head SHA; until then say CI has not run on it.
 
 Stop and recovery: one corrective round per failure (the still-red evidence, `notify:true`); a second failed round goes back to the user with the evidence. Reconcile an ambiguous launch with `terminal.list`, never relaunch. Never re-run a CI job, push or quarantine on your own initiative.

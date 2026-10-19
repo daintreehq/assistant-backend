@@ -13,7 +13,9 @@ optionalTools:
   - forge.getPR
   - terminal.list
 ---
-This selects; it launches and writes nothing. Without Daintree's forge reads (API-key client, or declined), run the same query with the host tool (`gh issue list --repo <owner/name> --search …`). Always name the repository.
+This selects; it launches and writes nothing. Without Daintree's forge reads (API-key client, or declined), run the same query with `gh issue list --repo <owner/name> --search …`. Always name the repository.
+
+On a host: call these tools on the work's machine; own shell: `gh -R <repo>`.
 
 1. For new work, build the in-flight set first: `worktree.list` rows (`branch`, `issueNumber`, cached `prNumber`), the terminals in them, your checkpoints, and any tracking the user named. It covers only this Daintree install, so absence from it never proves an issue is untouched. A lookup of past issues or PRs skips this and step 4's screen.
 2. Query with the real keys. The schema is strict: `search`, `state` (`open`, `closed`, `all`; PRs also `merged`), `sort`, `direction`, `perPage` (≤100), `cursor`, `view`, `bypassCache`, `worktreeId`. `labels`, `limit`, `assignee` are rejected: filters go in `search`.

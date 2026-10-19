@@ -9,6 +9,8 @@ requiredTools:
   - terminal.sendCommandOwned
   - terminal.getStatus
 ---
+On a host: shell steps run there, per the hosts foundation.
+
 Procedure:
 1. Rules before round 1. Implementer: a terminal you own or were handed, or one you launch with the task (`notify:true, handback:true`; round 1 starts on its notice). Reviewer: the agent the user named, else a different kind from the implementer; never the implementer reviewing itself. The base the change is measured against, resolved to a SHA; the criteria; and what blocks: correctness, security, failing or missing tests, the user's named concern; style and nits never block. Round cap: the user's, default 3. A round is counted when its review request goes out.
 2. Freeze the candidate. The implementer must be stopped: `terminal.getStatus` with `terminalIds:[<implementer>]`, `includeOutput:{lines:50}`, showing it at its ordinary prompt. A question, approval, error or unknown state blocks the review: answer within scope or ask the user. The two agents never work at the same time. In its worktree take the fingerprint: `git rev-parse HEAD`, `git diff HEAD --binary | git hash-object --stdin`, and `git ls-files -o --exclude-standard | git hash-object --stdin-paths | git hash-object --stdin` for untracked files. That is revision N.
