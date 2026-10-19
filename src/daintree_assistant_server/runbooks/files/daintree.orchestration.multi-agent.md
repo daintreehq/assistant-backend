@@ -15,7 +15,7 @@ optionalTools:
 ---
 The deliverable is ONE synthesized answer, or the named residual disagreement, not a transcript. You are the only conduit: a participant's claim that it reached the others is not a relay. A native subagent never stands in for a requested visible agent.
 
-On a host: call these tools on the work's machine; check code there via its command runner, or delegate.
+On a host: call these tools on the work's machine; check code there, per the hosts foundation.
 
 1. Scope: the problem, the cohort, a round bound (default: an opening round plus up to three relay rounds), the convergence test (positions stop moving, or the user's own), and any judge the user appointed. Participants are read-only unless the user wants files changed; editors sharing one worktree must serialize anything shared (index, installs, generated files), or get separate worktrees.
 2. Cohort: identities, not kinds ("two Claudes" is two launches). Open agents the user named ARE the cohort, never replaced; new ones share one worktree. Track per participant: terminal id, status (active, dropped), and a one-line gist per round.

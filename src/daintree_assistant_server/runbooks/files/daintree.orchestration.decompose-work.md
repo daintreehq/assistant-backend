@@ -16,7 +16,7 @@ optionalTools:
 ---
 You own the source, the checks and the approval gate; a read-only planner writes the breakdown. Nothing is filed, branched or launched before the user approves the split.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Source and outcome. The spec is a file (keep its path and `git log -1 --format=%H -- <path>`; one off the planner's machine goes in verbatim), an epic or issue (`forge.getIssue`; empty: no such issue, stop), or the user's text kept verbatim. Fix the worktree it concerns (`worktree.list`). Fix the end state the user asked for: the plan only, issues filed, or agents started. Unsaid: the plan only. A count or cap they gave ("four agents") bounds the split.

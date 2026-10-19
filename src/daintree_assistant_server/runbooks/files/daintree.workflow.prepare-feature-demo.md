@@ -22,7 +22,7 @@ optionalTools:
 ---
 The person needs to see it work and to know what is real. A prep agent makes the worktree runnable, seeds safe data and drafts the walkthrough; you start the demo, exercise what you can and hand it over. Nothing is merged, pushed or deployed, and feature code does not change during prep.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Pick the checkout: `worktree.list` (branch, linked issue or PR), then `terminal.list` and `terminal.getStatus` for agents there. Several agents' branches: the branch integrating them; none yet: ask whether to show each alone or integrate first (daintree.git.integrate-agent-branches). An agent still `working` there: `terminal.notifyWhenIdle` on it; unarmed, report the demo pending. Record `git -C <path> rev-parse HEAD` as <sha>: the demo binds to it. Never demo the main checkout by default.

@@ -14,7 +14,7 @@ optionalTools:
 ---
 A rollback changes a live environment. It runs on the user's word naming the action and the environment ("roll back prod", "put the previous version back" about an evident environment). A question ("can we roll back?", "what would it take?") stops at the preview. It restores a release, nothing else.
 
-On a host: shell steps via its command runner (its accounts, not yours), or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there (its accounts, not yours), per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Bind the environment exactly (account or project, service, region or cluster, namespace). Read what serves now and what was good from the platform the project deploys to (its deploy docs or CI say which), never from git history: the revision listing with traffic and images (`gcloud run revisions list --service <svc> --region <r>`, `kubectl rollout history deployment/<d>`, `fly releases`) and the version endpoint. The target is ONE thing, resolved to revision, full SHA and image digest: the user's, else the release serving just before the bad one. Known-good needs evidence (a passed smoke or health record, or the user's word); else it is "previous deployment, health unverified". Ambiguous or never deployed: ask. Note the traffic split to restore.

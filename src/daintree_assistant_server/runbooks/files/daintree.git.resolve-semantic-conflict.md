@@ -20,7 +20,7 @@ optionalTools:
 ---
 You freeze, gather intent, put the decision to the user and verify; one integrator agent reproduces the clash, then implements the decision. You never pick a side; nothing is resolved in a source worktree.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Freeze each side: A and B to SHAs (`git rev-parse <ref>`), their worktrees from `worktree.list`, no agent `working` there (`terminal.list` with each `worktreeId`), each `git -C <path> status --porcelain` recorded. The combined tree: the existing integration worktree if both are merged there, it is clean and idle, no merge or rebase in progress; I0 = its HEAD. Otherwise create one off the base SHA and call `worktree.waitUntilReady` with the returned `worktreeId`, at most three calls, until `setupState` is `ready` before any agent works there; else report id, state, error and stop; never a second create. Record the branch and R0 = `git ls-remote origin refs/heads/<branch>`.

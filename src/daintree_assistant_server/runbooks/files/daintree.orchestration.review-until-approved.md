@@ -9,7 +9,7 @@ requiredTools:
   - terminal.sendCommandOwned
   - terminal.getStatus
 ---
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Rules before round 1. Implementer: a terminal you own or were handed, or one you launch with the task (`notify:true, handback:true`; round 1 starts on its notice). Reviewer: the agent the user named, else a different kind from the implementer; never the implementer reviewing itself. The base the change is measured against, resolved to a SHA; the criteria; and what blocks: correctness, security, failing or missing tests, the user's named concern; style and nits never block. Round cap: the user's, default 3. A round is counted when its review request goes out.

@@ -16,7 +16,7 @@ optionalTools:
 ---
 Bisect moves HEAD, so it runs only in a worktree made for it, never the user's checkout or an agent's. A visible agent writes the script and runs the bisect; you fix its inputs and confirm the culprit. Only when the user asks you to bisect yourself, follow the brief.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. The test: one behaviour the user accepts as the good/bad line: their repro, a failing test, the build, or a threshold ("median of 5 runs above 2.0 s is bad"). None exists: reproduce first (daintree.debug.reproduce-bug). A flaky symptom is voted inside the script (bad only if it fails M of N).

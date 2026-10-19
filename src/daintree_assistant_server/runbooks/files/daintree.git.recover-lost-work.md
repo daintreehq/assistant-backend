@@ -22,7 +22,7 @@ optionalTools:
 ---
 Lost objects live until git prunes them; ordinary git commands can trigger `gc --auto`: assume no safe window. Freeze, locate (your reads), restore in new worktrees.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Freeze, this turn; no git write of yours. Worktrees share objects: `terminal.list`, `terminal.getStatus` over the repository's agents, never your own pane. One you own `working`: `terminal.interruptOwned`; its screen shows it stopped. Then to all you own (handed over too) one `terminal.sendCommandMany`, `waitForReply:true, handback:true`, `waitSeconds` 120: "Pause: run no git write (commit, reset, rebase, gc, prune) until I say. Reply 'held'." Record who replied or was interrupted; silence is not frozen. Agents not yours: tell the user.

@@ -11,7 +11,7 @@ optionalTools:
 ---
 This is reading, so it stays yours: git with `git -C <path>`, no agents launched. It changes no branch, index or working tree; `git fetch` and trial merges only add objects and remote-tracking refs, so report them, and on a strict no-write request skip both and give an overlap-only assessment. Never test a merge with `git merge`, `checkout` or `switch` in any worktree: it mutates someone's tree.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Targets: exactly the set named, including branches with no worktree (`worktree.list` gives id, path, branch for those that have one); "my agents" is the worktrees with agent terminals; "these" with no antecedent: ask. Base: the user's, the PR's base, or `git symbolic-ref --short refs/remotes/origin/HEAD` (prints `origin/main`), after an optional `git fetch origin`. Freeze every target and the base to a SHA (`git rev-parse`) and use those SHAs in every command below; state the base ref, its SHA and whether it was fetched. Worktrees on two machines share no files or objects: read each on its own machine and compare the output as content; such a pair gets a trial merge only from pushed SHAs fetched into one checkout, else it is overlap-only.

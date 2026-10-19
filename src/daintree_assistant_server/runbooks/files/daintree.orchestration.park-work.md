@@ -16,7 +16,7 @@ optionalTools:
 ---
 Parking makes work safe and resumable; it closes nothing. Closing the app or a pane ends its running agents and every pending notice. The agents save their own work; you choose the set, send, check and record.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Scope: "everyone" is every agent you launched or were handed; a named worktree is only its agents (`terminal.list` with `worktreeId`). Everything after applies to that set. Agents you neither launched nor were handed are listed for the user, never sent to.

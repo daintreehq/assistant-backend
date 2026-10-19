@@ -18,7 +18,7 @@ optionalTools:
 ---
 You resolve the sources, forecast and verify; one visible agent in a new integration worktree does the merging. Git reads: `git -C <path>`; worktrees on one machine share one object store, so any SHA there merges without a fetch; a source on another machine must be pushed, then fetched.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation.
 
 Procedure:
 1. Sources: resolve each named branch or worktree to a commit (`git rev-parse <ref>`), with its worktree from `worktree.list` when it has one. A checked-out source is ready only when `git status --porcelain` there is empty and no agent in it is `working` or `waiting` (`terminal.list` with its `worktreeId`, skipping your own pane): uncommitted work never reaches a merge. Not ready: ask its agent to commit (a terminal you own) or tell the user; never commit for it. Freeze each ready source's SHA: the agent merges that, never the name, which moves. Another assistant's brief pins sources by SHA on the shared remote: `git fetch --prune origin`; a pin no `git branch -r --contains <SHA>` lists: ask back, never take the tip. Push or PR only as it authorizes.

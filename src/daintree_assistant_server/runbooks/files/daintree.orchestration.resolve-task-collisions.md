@@ -15,7 +15,7 @@ optionalTools:
 ---
 Recency, confidence and who claims more are not evidence. Letting both carry on "to compare" is a competition only the user starts. The losing work is kept: its worktree, branch and uncommitted files stay; nothing is deleted, reset, stashed or closed.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. The set: the agents the user named, else the candidates from `terminal.list` and one `terminal.getStatus` with `includeOutput:{"lines":40}`. Per agent: terminal id, worktree and branch (`worktree.list`), and its original brief from your launch record or this conversation; otherwise mark the brief unknown (its hold reply in step 4 is its understanding, not the brief). Only agents you launched or were handed receive sends; for the rest, give the user the words to type.

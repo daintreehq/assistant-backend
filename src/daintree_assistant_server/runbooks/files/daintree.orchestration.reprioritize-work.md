@@ -19,7 +19,7 @@ optionalTools:
 ---
 Reallocation, not teardown: a paused agent's worktree stays exactly as it left it; the urgent work gets its own.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. The ask: the urgent task, how many agents it gets ("two of them"), and which work gives way. Apply the user's ranking ("the docs agents", "the less important work") to the inventory; pick the smallest sufficient set; ask first only when two plausible picks differ materially.

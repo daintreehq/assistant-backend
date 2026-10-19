@@ -14,9 +14,9 @@ optionalTools:
   - host.list
   - host.call
 ---
-A visible agent in that worktree proves the target and runs the operation; you pick the checkout, brief it and check its evidence. The danger is the target: a shared database breaks for every checkout on it. The requester is the user, or the assistant that briefed you. On a host: each step through `host.call` there, as the hosts foundation says, the proof included. No reply carries a connection string or secret; a backup is a host-local path.
+A visible agent in that worktree proves the target and runs the operation; you pick the checkout, brief it and check its evidence. The danger is the target: a shared database breaks for every checkout on it. The requester is the user, or the assistant that briefed you. No reply carries a connection string or secret; a backup is a host-local path.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: each step through `host.call` there, per the hosts foundation, the proof included.
 
 Procedure:
 1. Resolve the checkout the requester named (`worktree.list`), the main one or yours if named. `terminal.list` with its `worktreeId`, then `terminal.getStatus`: an agent `working` there may be editing the migrations; ask first.

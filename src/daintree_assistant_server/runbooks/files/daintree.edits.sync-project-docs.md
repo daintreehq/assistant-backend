@@ -15,7 +15,7 @@ optionalTools:
 ---
 The code is the truth and only the docs change, unless the user says the behaviour is the bug. A writer works from the implementation, a separate reader follows the result without the code, and you check both.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Scope: the doc files (README setup, API reference, CLI usage, config reference) and the checkout they describe (`worktree.list`). The change range: the user's, else `git log -1 --format=%H -- <doc files>` to HEAD; keep `git log --oneline <range>` for the brief. One writer owns the whole named set.

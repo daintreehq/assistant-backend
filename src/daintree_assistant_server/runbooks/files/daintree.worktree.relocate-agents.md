@@ -21,7 +21,7 @@ Three separate facts: panel placement (all `terminal.moveToWorktree` changes), p
 
 Fast path: one agent you launched in this conversation, given no task yet (or idle with no edits of its own when you last saw it), has nothing to protect and needs no inventory: skip steps 1, 2 and 4. Create its NEW worktree (step 3; `baseBranch` only if you launched it off the main branch) and await `ready`, move it (step 5: a panel you launched is in no tab group unless the user grouped it, so a move that returns without error moved it alone; do not list again), then send the directory check and the user's task in one message, and tell the user about the banner (step 6), with `notify` for a long task. Verify from its reply (step 7), not a listing. An agent mid-task, with uncommitted changes, or not launched by you takes the full procedure.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 1. From `terminal.list` and `worktree.list` map each agent the user meant: terminal id, old worktree id and path, new branch and base.
 2. Protect uncommitted work: read each agent's state and `git status` in the shared tree (an idle agent with a clean tree has none). A new worktree brings no changes: an agent whose work must travel applies a patch of its own changes in the destination and leaves the source as is. Check its patch against the diff; report hunks nobody can attribute. Never reset, clean, stash or check out in the shared tree. A `working` agent is instructed only back at its prompt: arm `terminal.notifyWhenIdle` with a note naming this relocation and agent, and do steps 5 to 7 for it on the notice.

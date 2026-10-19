@@ -17,7 +17,7 @@ optionalTools:
 ---
 Spikes are throwaway: no push, PR or merge unless the user adopts one. A spike agent's view of its own option is advocacy; your measurements are the evidence.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Fix these before launching and state them in your reply:

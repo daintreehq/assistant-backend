@@ -14,7 +14,7 @@ optionalTools:
 ---
 Only a break you ran counts. "Potential", "could", a stack of reasoning, or a repro that fails for environment reasons is a rejected claim.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Freeze the candidate as a SHA. Local work must be committed (a worktree starts from committed code; if it is dirty, say so and ask the author or user to commit). A GitHub PR: `git fetch origin pull/<n>/head`, and `FETCH_HEAD` must equal `gh pr view <n> --repo <owner/name> --json headRefOid`; another forge: its own PR ref. Base: `git merge-base <candidate> origin/<base branch>`. Record both.

@@ -21,7 +21,7 @@ optionalTools:
 ---
 Keep apart, and report apart: the agent's claim; that it stopped; results you ran on a known candidate; an independent review; provider CI. The author re-confirming its own work adds nothing. `project.*`, `worktree.reviewReadiness` and `forge.*` reads raise an approval in a core pane; your shell and git need none.
 
-On a host: the candidate's identity, the tree and the checks are read on the agent's machine, via its command runner and its `project.runCheck` (the work's `projectId`), else delegate: a delegated check is that agent's claim, not your run; own shell: `gh -R <repo>`.
+On a host: the candidate's identity, the tree and the checks are read on the agent's machine, per the hosts foundation, checks by its `project.runCheck` (the work's `projectId`); one an agent there runs is its claim, not your run; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Fix the target: terminal id, worktree path, the assignment's acceptance criteria as checkable statements, and the baseline revision recorded at launch (unknown if none was; never reconstruct it from the author's account).

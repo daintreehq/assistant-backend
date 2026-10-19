@@ -14,7 +14,7 @@ optionalTools:
 ---
 You own the question, the checking and the answer; the reading goes to a read-only visible agent. Read directly only a trivial lookup (one named file, one grep), or when the user asks you to investigate yourself. Which slash commands or plugins an agent CLI offers is not a repository question: user-level ones live in home config, so an empty project search proves nothing (`slashCommands.list` reports them).
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Fix the target: the worktree named or the one the question is about (`worktree.list`); its path, branch and HEAD, and whether uncommitted changes count. Record `git status --porcelain` and a hash of `git diff HEAD` there.

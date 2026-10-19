@@ -11,7 +11,7 @@ requiredTools:
 ---
 Writes go through `gh` with `--repo <owner/name>` and are read back, and only for rows the user's request or approval covers. Checking issues against the code is read-only agents' work; you list, read, plan, verify and apply. Without Daintree's forge reads (API-key client, or declined), list with `gh issue list --repo <r> --search … --limit 50 --json number,title,labels,author,createdAt`.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Bound the set. Repository from the worktree the user means (`worktree.list`). Their filter; else all open issues, oldest first, at most about 50 per pass (`no:label` only when they said untriaged or unlabeled). Summary rows; bodies come in step 2:

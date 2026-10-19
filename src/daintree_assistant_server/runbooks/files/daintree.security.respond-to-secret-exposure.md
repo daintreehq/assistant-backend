@@ -18,7 +18,7 @@ optionalTools:
 ---
 Never write the secret anywhere: chat, briefs, commands, checkpoints, reports, `host.call` arguments. Name it by kind and variable (`STRIPE_SECRET_KEY`), at most its prefix and last four; never use or test it. Search by pattern, never the value: the provider's format (`sk_live_[0-9A-Za-z]{20,}`) ending in the known last four.
 
-On a host: each machine's shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: each machine's shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 Procedure:
 1. From the user's words: kind, variable, checkouts (`worktree.list`); the hosts and terminals your own record (this conversation, a checkpoint) shows it was sent to. A value pasted here makes this transcript a location.

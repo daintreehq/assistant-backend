@@ -19,7 +19,7 @@ optionalTools:
 ---
 The successor continues in the SAME worktree: the uncommitted work lives only there, so no other agent may be writing in it. Failures to prevent: the successor re-running dead ends, reverting deliberate choices, blaming itself for pre-existing failures, or "starting clean" with a stash or reset.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Predecessor: its `terminal.list` row (agent, `worktreeId`), path and branch from `worktree.list`, and one `terminal.getStatus` with `includeOutput:{"lines":50}`. Why: a limit or auth screen, a full context, looping, or the user's choice. Its last reply says the whole task is done: nothing to hand off; say so, launch nothing.

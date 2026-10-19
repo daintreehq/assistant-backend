@@ -14,7 +14,7 @@ optionalTools:
 ---
 A relay ends when the message is queued, unless the user also wants the fixer's response ("tell me what changed" does). Decide that before sending.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 1. Resolve each role. A reviewer or fixer the user named that is not running yet: launch it (steps 4 and 6), and do not review, hash or fingerprint the target yourself. An existing one: from `terminal.list` and one `terminal.getStatus` with `includeOutput`; several plausible matches for either role: ask; never choose by agent name, focus or a generic title.
 2. An existing destination must be owned or handed over, with no dialog and no user draft. On `RESOURCE_NOT_OWNED`, ask for a hand-over or give the user the message to paste. If it is working, the message lands mid-turn: say so.

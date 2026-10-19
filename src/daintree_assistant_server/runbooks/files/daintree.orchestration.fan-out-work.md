@@ -24,7 +24,7 @@ optionalTools:
 ---
 The queue advances only on notices (an API-key client has none: say refilling needs the user). A pane holds at most 32 pending notices: never run a cohort beyond that. There is no watchdog for stalled units.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. The set. Skip work already in flight (`worktree.list` `issueNumber`, `prNumber`). Read the issues, or split the goal into units with a checkable acceptance each. A set you derived or extended needs the user's yes.

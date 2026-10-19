@@ -14,7 +14,7 @@ optionalTools:
 ---
 Read-only throughout: agents extract, classify and cite, you check, and nothing is built, filed or fixed. Do it yourself only when the user asks.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Target: the checkout named, else the one the spec is about (`worktree.list`): its id, path, branch, `git rev-parse HEAD`, `git status --porcelain`, and whether uncommitted changes count. Source: a file (`git hash-object <path>`, which covers an edited spec), an issue (`forge.getIssue` with `worktreeId:"<that id>"`, `issueNumber:<n>`; empty means no such issue: stop; keep its URL and the body used), or the user's text verbatim. That snapshot is what is audited.

@@ -17,7 +17,7 @@ optionalTools:
 ---
 You freeze the original, plan the layers and verify; a visible agent in one new worktree builds the stack. Git reads are yours.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Freeze the original. A branch: its worktree from `worktree.list` and `git rev-parse <branch>`. A PR: `gh pr view N --repo <r> --json headRefName,headRefOid,baseRefName`. Record tip O, base B and fork point `M = git merge-base origin/<B> O`; uncommitted changes in its worktree are not in O: say so. The original is never rewritten, force-pushed, retitled or closed here.

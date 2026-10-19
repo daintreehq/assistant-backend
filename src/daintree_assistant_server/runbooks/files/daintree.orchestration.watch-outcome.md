@@ -14,7 +14,7 @@ optionalTools:
 ---
 Choose a continuation that really exists, or say plainly that none does. Deferred work is never started now. Daintree's only wake is a notice when an agent terminal stops (`notify` on a launch or send, or `terminal.notifyWhenIdle`). It has no timer, scheduler or condition watcher, and nothing runs after the app or your pane closes.
 
-On a host: call these tools on that terminal's machine; run `gh -R <repo>` and any wait or scheduled command from your own shell: a command runner is not a scheduler.
+On a host: call these tools on that terminal's machine; run `gh -R <repo>` and any wait or scheduled command from your own shell, never there.
 
 1. Name the ask: a wake when work stops (a notice); running something at a time or on a condition (scheduled execution); telling the human (a reminder: a notice types into your prompt, not the user's attention). A spawn asked for in ten minutes does not spawn now.
 2. Wake on stop. About to prompt the agent: `notify` on that launch or send. Already working: resolve the exact agent terminal (not your own pane; a plain shell never reports working) and arm with your step in the note:

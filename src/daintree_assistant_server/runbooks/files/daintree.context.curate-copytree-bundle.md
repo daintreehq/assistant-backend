@@ -25,7 +25,7 @@ optionalTools:
 ---
 Curate by reading the target worktree's files yourself; generate with Daintree's CopyTree (both endpoints ask first in a core pane; an API-key client has only the clipboard one). An installed CopyTree CLI is an alternative only if the user accepts it. This ends at the file: feeding an agent belongs to the runbook that owns it.
 
-On a host: file reads via its command runner, or delegate.
+On a host: file reads run there, per the hosts foundation.
 
 1. Resolve the worktree id and path from `worktree.list`. Only literal clipboard language ("copy it so I can paste") means `copyTree.generateAndCopyFile`, which replaces the user's clipboard (on a host, the host's); "share" or "for an agent later" means `copyTree.generate`. Choose now; never send one bundle to both.
 2. Gather evidence in the target path: entry points, implementation, types, config, callers, tests, fixtures. Confirm each candidate concerns the feature and follow references one hop out. Stop when searches stop surfacing relevant files. Note which intended paths `.copytreeignore` and `.gitignore` exclude.

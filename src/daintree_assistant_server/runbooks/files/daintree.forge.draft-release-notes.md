@@ -13,7 +13,7 @@ optionalTools:
 ---
 The range decides everything: notes are the commits between two refs, not "PRs merged since a date". A visible agent writes the notes; you anchor the range, brief it, and verify that every line traces to that range.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 Procedure:
 1. Checkout: the `isMain` row of `worktree.list` (or the release branch's worktree). Run `git fetch --quiet --tags origin` there.

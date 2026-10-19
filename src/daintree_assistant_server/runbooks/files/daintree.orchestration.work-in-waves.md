@@ -20,7 +20,7 @@ optionalTools:
 ---
 A wave is a barrier: nothing in the next wave starts until every pull request in this one is merged. Before ending a turn, say what wakes the run. Pin the repository on every read (`gh --repo`, `git -C`); a failed read is an unknown gate.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. The contract is the user's; restate it: waves they listed, or a drain ("until none are left") picked a wave at a time by their command or as daintree.workflow.find-issue-work does; the cap; overlap policy; each command; who fixes failing CI; teardown scope. Report a drain's picks and any overlap, never re-planning; a changed listed wave needs a yes.

@@ -18,7 +18,7 @@ optionalTools:
 ---
 One visible agent does the upgrade in its own worktree; you isolate it, brief it and check the result. What makes it an upgrade: a baseline before anything changes, the guide read not remembered, no check made green by weakening it. Only when the user asks you to do it yourself, follow the brief.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Resolve the package, the target version and the base (the user's, else the default branch; `git fetch` and verify the ref). One major bump per worktree.

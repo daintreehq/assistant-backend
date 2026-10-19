@@ -13,7 +13,7 @@ optionalTools:
 ---
 Read-only, and yours to do directly: it is Daintree state and git reads. One `git fetch --quiet origin` from the main checkout is allowed (it moves only remote-tracking refs, and "behind" and "merged" are wrong without it). Never run `git fetch --prune`, `git worktree prune`, pull, rebase, stash, checkout, reset or any delete here.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 1. Inventory: `worktree.list`. Skip the `isMain` row. Keep per row `id`, `path`, `branch` (null is a detached HEAD), `isActive`, `issueNumber`, `prNumber`, `setupState`, and `status`: `active` means uncommitted changes and `stale` means clean with no commit for over a week. Both are hints, not classes. Then `terminal.list` twice, with no filter and with `location:"background"` (the unfiltered call omits background panels, which still run), grouped by `worktreeId`.
 2. Git evidence, per worktree, in its own path (no approvals needed):

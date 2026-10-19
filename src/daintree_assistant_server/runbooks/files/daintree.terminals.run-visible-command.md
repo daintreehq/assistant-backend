@@ -19,7 +19,7 @@ optionalTools:
 ---
 A shell sends no Daintree notice: `notify` and `handback` are refused on a shell send, `waitForReply` never settles, an idle-notice request is rejected, and `terminal.waitUntilIdle` returns at once. You read a shell; nothing wakes you.
 
-On a host: call these tools there; probes via its command runner, or delegate.
+On a host: call these tools and run probes there, per the hosts foundation.
 
 1. Resolve destination and command. Destination: the worktree the user named (`worktree.list`: keep id and path), else the checkout you work in (match your cwd to a listed path); never whatever is active. Command: the user's words, else a `project.detectRunners` runner whose `command` you have read (it lists publish and deploy scripts too: run none unasked). Never `project.runCheck` here: it is invisible, and blocks a server until timeout.
 2. Reuse before opening. Reuse only a shell you opened in this destination (or the user pointed at there), and only when `terminal.getStatus` with `includeOutput` shows it idle at its prompt. Busy, or its directory unknown: open a new one; `terminal.moveToWorktree` never changes a shell's directory. A server to start may already run in that worktree: check `terminal.list` (`worktreeId`) before starting a second on the same port.

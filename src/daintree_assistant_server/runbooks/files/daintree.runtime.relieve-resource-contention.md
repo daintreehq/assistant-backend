@@ -17,7 +17,7 @@ optionalTools:
 ---
 You measure, attribute and run Daintree operations on what this session owns; anything else is the user's call. Never `pkill`, `killall` or `kill -9`; delete no cache, `node_modules`, build output or Docker data unasked; never stop the user's or another checkout's server. Daintree itself as the heavy process: daintree.diagnostics.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Reading 1, with the time:

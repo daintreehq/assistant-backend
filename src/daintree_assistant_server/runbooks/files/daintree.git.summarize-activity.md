@@ -15,7 +15,7 @@ optionalTools:
 ---
 Only merged PRs and commits on the base branch are shipped. An agent's handback, a closed-unmerged PR or a pushed branch is not. Nothing is posted to chat, the forge or a file unless the user asks. You read Daintree's state and verify; one visible agent compiles the git and forge history.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 Procedure:
 1. Fix the window and subject before reading anything, reading what you can rather than asking. Window: exact start and end in the user's local timezone and its offset (your own machine's, `date +%Z%z`, unless the user names another; "yesterday" on a Monday is Friday only if the user works that way; ask once only if the window itself is unclear). Subject: "me" is the forge login (`gh api user --jq .login`) plus the git author emails (`git config user.email`, and any others the user names); an unreadable login leaves the forge sections unread, reported as a gap, and never blocks the git history; "the team" is everyone, grouped by author. "The agents" is the branches of the worktrees their terminals ran in: git and the forge never name an agent, so credit one only where its worktree links it.

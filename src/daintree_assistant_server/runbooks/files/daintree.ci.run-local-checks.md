@@ -16,7 +16,7 @@ optionalTools:
 ---
 "Run the tests" authorizes running, not fixing, installing, committing or pushing. `project.runCheck` is your own Daintree operation, so you run the checks yourself. A red check is a result to report; fixing it is a new request it goes to an agent (daintree.ci.diagnose-and-fix).
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation.
 
 1. Targets from `worktree.list` (id, path, branch): the one named, the one you are in, or for "every agent's worktree" the worktrees of `terminal.list` rows that have an `agentId`. Before any check, record for each `git -C <path> rev-parse HEAD` (every result is bound to it) and, if dirty, a hash of `git diff HEAD` plus untracked files (`git ls-files -o --exclude-standard`).
 2. Readiness per worktree, `worktree.waitUntilReady` with `timeoutMs:0`: `pending` or `running` (a tree just created): wait, calling again with a timeout; `failed`, `timed-out` or `needs-approval`: skip and report it; `unknown` (created before a restart or by another host): check its dependencies are installed and mark readiness unverified. An agent `working` there (`terminal.getStatus`): the tree is moving, so ask, or test it and mark the result a moving snapshot.

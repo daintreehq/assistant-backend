@@ -21,7 +21,7 @@ A published version is permanent. An agent prepares and inspects the release fil
 
 Across hosts, one designated host per package and channel publishes (the person names it, else ask); the others only build and inspect, read-only (daintree.hosts.run-validation-matrix). Pin a full SHA from the shared remote (`git ls-remote`). Step 1's account preflight (Core: the agent's first check) through step 6 are the publisher's, each through `host.call` there as the hosts foundation says; step 5's terminal opens there (`terminal.new`: Full only, else the person runs the command there). Registry reads and the clean consumer stay in your shell. Keep a line per package and channel: host, SHA.
 
-On a host: shell steps via its command runner (its accounts, not yours), or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there (its accounts, not yours), per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Pin the request: package (and its directory), version, registry (the project's, never assumed), channel (npm dist-tag; a prerelease (`2.0.0-beta.1`) never as `latest`), and the base branch, its tip recorded now as <sha>. No version: the agent proposes one; step 4 asks. Read-only preflight: the registry and account the publisher uses (`npm config get registry`, `npm whoami`) match and may publish this package; else ask.

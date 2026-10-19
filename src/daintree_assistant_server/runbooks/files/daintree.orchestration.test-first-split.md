@@ -13,7 +13,7 @@ optionalTools:
   - worktree.waitUntilReady
   - terminal.sendCommandOwned
 ---
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Set up. Criteria as checkable statements; new test files for the author (a missing import then breaks only them); the frozen set: those paths plus the test config (`conftest.py`, `pytest.ini`, jest/vitest config, snapshot directories, coverage thresholds). The two roles are different agents: the ones the user named, otherwise two different kinds. One worktree for both: the one named, or a new one on a new branch when asked or when the named checkout may not take commits (`worktree.createWithRecipe`, then `worktree.waitUntilReady` with its `worktreeId`, repeated while `pending` or `running`; otherwise report it and stop). Baseline there: `git rev-parse HEAD` and `git status --porcelain`.

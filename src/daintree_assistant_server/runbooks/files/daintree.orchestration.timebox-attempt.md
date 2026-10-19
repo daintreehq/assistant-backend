@@ -16,7 +16,7 @@ optionalTools:
 ---
 The held wait is what fires at the deadline: Daintree has no timer, and a foreground `sleep` is no substitute.
 
-On a host: shell steps via its command runner, or delegate; the clock is yours: a command runner is not a scheduler.
+On a host: shell steps run there, per the hosts foundation; the clock is yours, never a command there.
 
 Procedure:
 1. Size the box. One held wait covers up to 30 minutes (`waitSeconds` max 1800: the box plus two minutes for the agent's report). For a longer box, or if you cannot hold a call that long, keep holding after the launch wait with `terminal.waitUntilIdle` (`timeoutMs` 60000, its cap) until the deadline, or use your own background command that exits at the deadline and re-invokes you, if you have one. Neither possible: tell the user before launching that it is best effort: the agent is asked to stop by its own clock, nothing enforces it, and you check at their next message.

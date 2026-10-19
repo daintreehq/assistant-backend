@@ -16,7 +16,7 @@ The successor continues, never restarts. Live Daintree state outranks the handof
 
 Daintree refuses to hand over a terminal while the pane that launched or holds it is open: the children become transferable only once this coordinator's pane closes (/exit alone leaves its shell holding them); worktree ownership never transfers, and notices this session armed die with it.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Freeze: no new worker launches or task sends (the step 4 successor is the one launch); answer only a child's in-scope question already pending. Tell the user.

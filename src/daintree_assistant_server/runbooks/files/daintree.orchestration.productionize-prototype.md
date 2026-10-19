@@ -15,7 +15,7 @@ optionalTools:
 ---
 The prototype is evidence, not a base to trust, and its author's view of it is advocacy. Nothing is pushed, merged or deleted unasked. Every phase ends the turn on a notice: know which phase it closes.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Pin the prototype: its branch and worktree (`worktree.list`), head SHA, `git status --porcelain` (uncommitted work: the user commits it or rules it out), its base, base SHA, `git merge-base <base> <branch>`. An agent still working in it (`terminal.getStatus`): wait or ask; never audit a moving head.

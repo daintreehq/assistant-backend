@@ -150,7 +150,7 @@ registration. `docs/RUNBOOKS.md` is the authoring guide.
 
 **Format** — YAML frontmatter + Markdown body. The body is operational prose in the house
 style: an `On a host:` line naming where its steps run when the work's machine is a Remote
-Host (command runner, `project.runCheck`, delegate; `gh`, naming the repo, from your own shell;
+Host (there, per the hosts foundation; `gh`, naming the repo, from your own shell;
 `test_runbook_host_execution.py`), then a numbered procedure (no `Use when:` or
 `Availability:` line; the served document
 already carries `when_to_use` and the tool lists), `On notice or resume:` and

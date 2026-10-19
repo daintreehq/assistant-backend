@@ -16,7 +16,7 @@ optionalTools:
 ---
 One run is not a rate, and 0 failures in N runs is "not reproduced at N", never "not flaky". A visible agent measures and, only if asked, fixes; you fix the target and check its evidence. Only when the user asks you to do it yourself, follow the brief.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Target: the test, its narrowest command and its worktree (`worktree.list`). From a CI failure, read the exact invocation, seed and worker count yourself: `gh run view <run id> --log-failed`. Record `HEAD` and a hash of `git diff HEAD` plus untracked files.

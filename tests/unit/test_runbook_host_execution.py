@@ -1,15 +1,21 @@
 """Every runbook says what its steps do when the work's machine is a Remote Host.
 
 The Shell's assistant can follow any runbook against a Remote Host, through direct host
-control (the hosts foundation: the work's machine, its command runner, delegation). A
-step written for the caller's own shell (`git -C <path>`, `lsof`, a test run, a
-transcript under `~/.claude`) names a path or a process that, on a host, exists only
-there. So every runbook carries one top-level `On a host:` line ahead of its procedure,
-and a body that acts on a machine names the routes its steps take there:
+control (the hosts foundation: the work's machine, `host.call`, `project.runCheck` or
+`project.runCommand` there, else an agent there). A step written for the caller's own
+shell (`git -C <path>`, `lsof`, a test run, a transcript under `~/.claude`) names a path
+or a process that, on a host, exists only there. So every runbook carries one top-level
+`On a host:` line ahead of its procedure, and a body that acts on a machine names the
+routes its steps take there:
 
-- checkout and machine work (git, tests, processes, files): the host's command runner,
-  `project.runCheck`, or delegation;
+- checkout and machine work (git, tests, processes, files): run there, per the hosts
+  foundation, or by name (`host.call`, `project.runCheck`, `project.runCommand`, an agent
+  there). A shared runbook is also served to v0.44, which has no `host.call` or
+  `project.runCommand`, so its line refers to the hosts foundation instead;
 - the forge (`gh`): your own shell, since pushed state is the same from every machine.
+
+"Delegate" is not a route: under direct control it means handing work to the host's
+assistant, which is not the default.
 
 Nothing here changes a caller with no hosts: the line is conditional. The check is a
 lint, claimed narrowly. It proves the line is there with the routes the body needs, not
@@ -61,7 +67,9 @@ _FORGE_COMMAND = re.compile(_COMMAND_START + r"gh(?=[ `])", re.M)
 _FORGE_WORDS = re.compile(r"`gh\b|\bforge\b")
 
 _HOST_LINE = re.compile(r"^On a host: \S[^\n]*$", re.M)
-_MACHINE_ROUTE = re.compile(r"command runner|`project\.runCheck`|\bdelegat", re.I)
+_MACHINE_ROUTE = re.compile(
+    r"\bhosts foundation\b|`host\.call`|`project\.run(?:Check|Command)`|\ban agent there\b", re.I
+)
 _FORGE_ROUTE = re.compile(r"\bown shell\b", re.I)
 # CommonMark fences: at most three spaces of indent; a backtick fence's info string
 # holds no backtick; the closing run is the same character, at least as long.
@@ -146,7 +154,8 @@ def host_problems(body: str) -> list[str]:
     if machine and not _MACHINE_ROUTE.search(route):
         problems.append(
             f"acts on a machine ({machine.group(0).strip()!r}) but its `On a host:` line "
-            "names no command runner, `project.runCheck` or delegation"
+            "names no route there (the hosts foundation, `host.call`, `project.runCheck`, "
+            "`project.runCommand` or an agent there)"
         )
     if forge and not _FORGE_ROUTE.search(route):
         problems.append("runs `gh` but its `On a host:` line does not keep it in your own shell")
@@ -172,10 +181,19 @@ def test_every_runbook_says_what_happens_on_a_host() -> None:
 
 def test_the_scanner_catches_what_it_exists_for() -> None:
     """Guard the guard against a pattern that silently matches nothing."""
-    runner = "On a host: shell steps via its command runner, or delegate.\n\n"
+    runner = "On a host: shell steps run there, per the hosts foundation.\n\n"
     forge = "On a host: own shell: `gh -R <repo>`.\n\n"
-    both = "On a host: shell steps via its command runner, or delegate; own shell: `gh`.\n\n"
+    both = "On a host: shell steps run there, per the hosts foundation; own shell: `gh`.\n\n"
     tools = "On a host: call these tools on the work's machine.\n\n"
+    named = (
+        "On a host: each step through `host.call`.\n\n",
+        "On a host: checks by its `project.runCheck`.\n\n",
+        "On a host: shell steps by `project.runCommand` (Full).\n\n",
+        "On a host: call these tools there; an agent there runs any shell step.\n\n",
+    )
+    # Routes the direct-control model does not have: delegating is handing work to the
+    # host's assistant, and "command runner" names no tool.
+    retired = "On a host: shell steps via its command runner, or delegate.\n\n"
 
     # Every way a body acts on a machine needs a machine route.
     for step in (
@@ -191,7 +209,10 @@ def test_the_scanner_catches_what_it_exists_for() -> None:
         '1. Brief: "run `npm test`".\n',
     ):
         assert host_problems(runner + step) == [], step
+        for line in named:
+            assert host_problems(line + step) == [], (line, step)
         assert host_problems(tools + step), step
+        assert host_problems(retired + step), step
     # `gh` needs the forge route wherever it is written.
     for step in ("1. Read `gh pr view <n>`.\n", "1. Run:\n\n```sh\ngh pr view 123\n```\n"):
         assert host_problems(forge + step) == [], step

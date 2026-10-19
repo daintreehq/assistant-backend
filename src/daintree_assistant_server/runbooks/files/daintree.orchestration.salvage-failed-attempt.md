@@ -19,7 +19,7 @@ optionalTools:
 ---
 You pick the subset with the user and verify; a read-only surveyor proposes it, a builder in a new worktree extracts it. The failed worktree is evidence: nothing edits, commits in, resets, stashes or deletes it.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation.
 
 Procedure:
 1. Source: the failed attempt's worktree from `worktree.list` (path, branch). No agent there `working` (`terminal.list` with its `worktreeId`); one is: it must stop first (daintree.agents.steer-running-agent). Freeze F = its HEAD and record `git -C <src> status --porcelain`, `git -C <src> diff HEAD | shasum` and a `shasum` of each untracked file: uncommitted changes are part of the attempt. Freeze B = `git rev-parse origin/<base>` as last fetched (possibly stale: say so before creating); M = `git merge-base F B`.

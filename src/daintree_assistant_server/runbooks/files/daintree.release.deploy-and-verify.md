@@ -21,7 +21,7 @@ A deploy runs only when the request names the environment (or the project's only
 
 Across hosts, one designated host per environment deploys (the person names it, else ask); the others only build and verify (daintree.hosts.run-validation-matrix), no login or deploy. The checkout, the account preflight (Core: the agent's first check), step 4's checks and the agent are the deployer's, each through `host.call` there as the hosts foundation says. Pin in your shell; read the platform from it if it can, else on the deployer. A line per environment: host, SHA, run id.
 
-On a host: shell steps via its command runner (its accounts, not yours), or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there (its accounts, not yours), per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Find the mechanism, reading only: docs, `Makefile`, `scripts/deploy*`, `infra/`, CI workflows, platform files (`fly.toml`, `cloudbuild.yaml`, k8s); `project.detectRunners` lists scripts (on a host: Full only; Core: the agent's). Note the exact command or trigger, its target (account or project, service, region, environment), how it picks the revision, how the project verifies. Two or none clear: ask.

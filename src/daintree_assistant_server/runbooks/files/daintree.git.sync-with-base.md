@@ -20,7 +20,7 @@ optionalTools:
 ---
 You bind targets, preflight and verify; a visible agent in the branch's worktree does the merge or rebase (step 4). Never merge, rebase or resolve conflicts yourself unless the user asked: however quick, it is the delegated work. Git reads: `git -C <path>`.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Bind each target in `worktree.list`: id, path and checked-out `branch` (even the main checkout; the base branch only when named). "My branches": the non-main worktrees. A PR: its worktree's `prNumber`, or `forge.getPR` for `baseRef`; with no worktree, `worktree.createWithRecipe` `{"source":{"kind":"pullRequest","pullRequestNumber":N}}`, then `worktree.waitUntilReady` with the returned `worktreeId` (at most three calls; only `ready` proceeds, else report its state).

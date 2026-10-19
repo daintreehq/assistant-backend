@@ -17,10 +17,10 @@ optionalTools:
 ---
 Worktrees isolate code, nothing else. Daintree's answer is `config.json` lifecycle commands: `setup` runs on create, `teardown` on delete. It takes the FIRST valid file, whole: user-level `~/.daintree/projects/…`, then the worktree's `.daintree/config.json`, then the main checkout's. Repository commands need the user's approval in Daintree (`needs-approval` until then, and after any change to them): unapproved setup runs nothing, and an unapproved teardown is skipped while the delete goes ahead, leaving its resources. User-level commands need none. Commands get `DAINTREE_WORKTREE_PATH`, `DAINTREE_WORKTREE_NAME`, `DAINTREE_PROJECT_ROOT` and `DAINTREE_BRANCH` when known: no host id, project id or port.
 
-Identity: a worktree id is a path on one machine, so a path or a distinct worktree name proves nothing across hosts. The host and project owning a worktree own its config, approval, setup and teardown; git carries no ignored env files, credentials, runtimes or container state to another. For a host's worktree, every step runs on that host through `host.call`, as the hosts foundation says; compare canonical endpoints across hosts, never secrets.
+Identity: a worktree id is a path on one machine, so a path or a distinct worktree name proves nothing across hosts. The host and project owning a worktree own its config, approval, setup and teardown; git carries no ignored env files, credentials, runtimes or container state to another. Compare canonical endpoints across hosts, never secrets.
 Ports are per machine: 3000 on two hosts is two ports. A database, cache, queue or bucket is its resolved endpoint: follow env files, aliases and tunnels (localhost may be a tunnel; one server may serve two hosts) to server plus database, schema or prefix, or provider plus resource id. Shared means another worktree, project or machine reaches it; unknown counts as shared.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: every step runs there through `host.call`, per the hosts foundation.
 
 Procedure:
 1. Read `worktree.list`. One worktree still needs setup/teardown configured, or a missing `.env` or dependencies fixed: a new worktree gets the main checkout's `.daintree/` and its git-ignored `.worktreeinclude` files; an install in `setup` provides the rest. Another project on the same resource: report it.

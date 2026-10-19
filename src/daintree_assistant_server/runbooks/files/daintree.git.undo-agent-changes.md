@@ -21,7 +21,7 @@ optionalTools:
 ---
 You attribute and verify with git reads; a fresh visible agent in that worktree does the reversing. The trap is a whole-tree undo (`reset --hard`, `checkout -- .`, `restore .`, `clean`, the shared `stash`): it wipes the user's work too.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. The agent: its terminal (`terminal.list`; unclear: ask), worktree id and path (`worktree.list`); a closed one from `agentSessionHistory.list` (`worktreeId`, `savedAt`). Still `working` (`terminal.getStatus`): stop it first (`terminal.interruptOwned` if yours, then `terminal.waitUntilIdle` and its screen shows it stopped; not yours: ask the user to press Escape in its pane). Another agent working in that tree: ask before going on.

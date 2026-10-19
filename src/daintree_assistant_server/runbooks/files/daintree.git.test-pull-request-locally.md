@@ -18,7 +18,7 @@ optionalTools:
 ---
 This tries the PR; it never pushes to the PR's branch, comments on it or approves it. The worktree stays for the user. You run Daintree's tools; a reproduction goes to an agent in the PR's worktree. `<remote>` is the one whose URL is the PR's repository (`git remote -v`; `upstream` when `origin` is a fork).
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Read the PR: `gh pr view <n> --repo <owner/name> --json number,title,author,headRefName,headRefOid,baseRefName,isCrossRepository,state,files,url`. Record `headRefOid`: every result binds to it.

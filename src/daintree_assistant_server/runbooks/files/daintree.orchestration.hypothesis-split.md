@@ -16,7 +16,7 @@ optionalTools:
 ---
 The deliverable is evidence, not a fix. An agent's "found it" is a claim until you have re-run its experiment.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Fix the symptom: what is observed, where (worktree id and path from `worktree.list`, and its HEAD SHA), and how to trigger it. With no way to trigger or observe it, every agent will guess: say so and offer to reproduce it first (daintree.debug.reproduce-bug) unless the user wants to go on.

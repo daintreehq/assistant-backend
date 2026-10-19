@@ -16,7 +16,7 @@ optionalTools:
 ---
 Merging and closing are public writes: only when the user asked to land or clear the PRs, through `gh` with `--repo <owner/name>`, each read back. An agent builds the batch branch; you gather, classify, brief, verify and land. Never push to a bot's branch, never hand-edit a lockfile, never merge several bot PRs in a burst: they share the lockfile and each merge makes the rest stale. `<remote>` is the one whose URL is `<owner/name>` (`git remote -v`).
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Gather: `forge.listPRs` with `"state":"open"`, `"search":"author:app/dependabot"` (Renovate: `author:app/renovate`), `"perPage":50`. Per PR: `gh pr view <n> --repo <r> --json title,body,files,headRefOid,baseRefName,mergeable` and `gh pr checks <n> --repo <r>`. From title and body: package or group, from and to versions, ecosystem, runtime or dev dependency.

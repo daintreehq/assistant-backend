@@ -17,7 +17,7 @@ optionalTools:
 ---
 Agents explore and report; they fix nothing. A bug counts only once someone other than its reporter has reproduced it.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Target: the worktree and revision under test (`worktree.list`, then `git -C <path> rev-parse HEAD`), how it runs (the CLI invocation, or the dev-server command and address), and a time bound per agent. Never point agents at production, real customer data or real external accounts unless the user said so.

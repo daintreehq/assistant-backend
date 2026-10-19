@@ -15,7 +15,7 @@ optionalTools:
 ---
 The verdict is advice; the user decides. Nothing here merges, tags, deploys or writes to the forge.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 Procedure:
 1. Pin the candidate from the remote, never a local branch: `git ls-remote origin refs/tags/<tag> 'refs/tags/<tag>^{}'` (a `^{}` line is the commit) or `refs/heads/<branch>`; a SHA the user gave is the candidate. A branch moves: say "candidate = origin/<branch> at <sha>, read at <time>" and judge only that SHA. Previous release = what last shipped on this line: the user's word, release or deploy history, else the highest non-prerelease tag below the candidate, never one on the candidate SHA. `<prev>..<sha>` is what is new. Neither defensible: ask once; range-dependent areas stay unknown.

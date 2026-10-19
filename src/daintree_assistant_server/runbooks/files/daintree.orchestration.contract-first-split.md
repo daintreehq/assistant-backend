@@ -15,7 +15,7 @@ optionalTools:
   - terminal.sendCommandMany
   - terminal.sendCommandOwned
 ---
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Split. Name the two sides, the agent for each (the user's, else configured ones), and the contract: types, schema or IDL at agreed paths, with example payloads and error cases. The sides must touch disjoint files apart from the contract; if they share other files this is not a parallel split: say so and serialize.

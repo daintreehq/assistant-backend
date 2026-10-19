@@ -22,7 +22,7 @@ optionalTools:
 ---
 A code change goes to a visible agent; you brief, launch and verify. Edit it yourself only when the user asks you to.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Brief. Keep the user's words as the task, including any command or skill they named. Decide edits or read-only. Write acceptance criteria as checkable statements ("an unknown id returns 404", "nothing outside `src/auth` changed"), not a restatement; if tests cannot run here, say so in the criteria.

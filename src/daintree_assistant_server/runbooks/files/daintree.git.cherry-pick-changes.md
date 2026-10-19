@@ -18,7 +18,7 @@ optionalTools:
 ---
 You pin the change, prepare targets and verify; an agent in each target's worktree applies it.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Pin the exact source, oldest first, after `git fetch origin` (only a pushed source reaches another machine):

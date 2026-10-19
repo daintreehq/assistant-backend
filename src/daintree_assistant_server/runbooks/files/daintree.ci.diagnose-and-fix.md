@@ -17,7 +17,7 @@ optionalTools:
 ---
 You gather the evidence and verify; a visible agent in the target worktree diagnoses and fixes. You read the failure, not the source: the cause and the fix are the agent's to find, and a brief that names them skips the diagnosis. Fix it yourself only when the user asks you to. The app gives no per-check list, job log or head SHA: read those with the forge CLI (`gh pr checks`, `gh run view --log-failed`, `gh pr view --json headRefOid`), or say which evidence you could not read. A fix written from a check's name is a guess, and "tests pass now" from the fixer is a claim.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Fix the target: worktree id and path (`worktree.list`), then its branch, `git rev-parse HEAD` and dirtiness.

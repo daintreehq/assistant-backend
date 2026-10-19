@@ -18,7 +18,7 @@ optionalTools:
 ---
 Same machine, same build, alternating, many times: one timing is no measurement. A visible agent builds and measures; you fix both sides, check the machine and recompute from its raw numbers. Across hosts, compare ratios within a host, never times between hosts.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Sides. Candidate: the user's worktree (`worktree.list`), `HEAD`, a hash of `git diff HEAD` plus untracked files. Baseline: the revision named; "versus main": the tip SHA of `origin/<main>` after `git fetch`; "did my change help": `git merge-base HEAD <main>`. Record both SHAs and the rule.

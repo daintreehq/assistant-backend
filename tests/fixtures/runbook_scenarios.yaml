@@ -578,33 +578,33 @@ scenarios:
     runbooks: [daintree.foundation]
     states: ["checkpoint locally, never on the work's host"]
 
-  - id: host-git-reads-use-its-command-runner
+  - id: host-git-reads-run-on-its-machine
     situation: The branch to sync is checked out in a Remote Host's worktree.
-    must: Run git reads and checks through the host's command runner, or delegate; `gh` from your own shell; checks target the work's project.
+    must: Run git reads and checks on the host, per the hosts foundation; `gh` from your own shell; checks target the work's project.
     must_not: Run `git -C <path>` in the caller's shell, or `project.runCheck` against the Shell's own project.
     runbooks: [daintree.git.sync-with-base]
-    states: ["On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`", "the work's `projectId`"]
+    states: ["On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`", "the work's `projectId`"]
 
-  - id: host-delegated-check-is-a-claim
+  - id: host-agent-check-is-a-claim
     situation: The agent's worktree is on a Remote Host and the caller cannot run its checks there.
-    must: Read identity, tree and checks on the agent's machine, else delegate and keep the result as that agent's claim.
-    must_not: Report a delegated check as one the caller ran.
+    must: Read identity, tree and checks on the agent's machine, else have an agent there run them and keep the result as that agent's claim.
+    must_not: Report an agent's check as one the caller ran.
     runbooks: [daintree.orchestration.verify-agent-work]
-    states: ["read on the agent's machine", "a delegated check is that agent's claim, not your run", "own shell: `gh -R <repo>`"]
+    states: ["read on the agent's machine", "one an agent there runs is its claim, not your run", "own shell: `gh -R <repo>`"]
 
   - id: host-declared-check-targets-the-works-project
     situation: A declared check must run for a worktree on a Remote Host.
     must: Run the host's `project.runCheck` with the work's project.
     must_not: Run it against the Shell's own project.
     runbooks: [daintree.ci.run-local-checks]
-    states: ["checks via its `project.runCheck`", "`project\\.runCheck` with the work's `projectId`"]
+    states: ["checks \\(`project\\.runCheck`\\) run there", "`project\\.runCheck` with the work's `projectId`"]
 
   - id: host-reviewer-gets-the-diff-not-a-path
     situation: A cross-review cohort spans machines.
-    must: Send a reviewer on another machine the diff itself; delegate a check only to a non-member.
+    must: Send a reviewer on another machine the diff itself; a check there is never run by a member.
     must_not: Hand a reviewer a path it cannot read, or let a member verify its own cohort.
     runbooks: [daintree.review.cross-review-cohort]
-    states: ["gets the diff itself, not a path", "delegate to a non-member"]
+    states: ["gets the diff itself, not a path", "never by a member"]
 
   - id: host-voter-gets-the-entry-as-content
     situation: Competition entries are in worktrees on different machines.
@@ -620,12 +620,12 @@ scenarios:
     runbooks: [daintree.orchestration.hand-off-orchestration]
     states: ["across machines, the handoff's and checkpoint's content instead"]
 
-  - id: host-runner-is-not-a-scheduler
+  - id: host-is-not-a-scheduler
     situation: The user wants to be told when work on a Remote Host finishes, later.
     must: Keep any wait or schedule in the caller's own shell; read the work on its machine.
-    must_not: Use the host's command runner as a scheduler.
+    must_not: Run a wait or schedule as a command on the host.
     runbooks: [daintree.orchestration.watch-outcome]
-    states: ["any wait or scheduled command from your own shell", "a command runner is not a scheduler"]
+    states: ["any wait or scheduled command from your own shell, never there"]
 
   - id: host-unpushed-source-is-unreachable
     situation: An agent branch to integrate lives in a worktree on another machine.

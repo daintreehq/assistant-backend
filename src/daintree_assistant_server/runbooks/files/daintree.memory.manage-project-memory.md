@@ -16,7 +16,7 @@ Durable text lives where its audience reads it; the destinations do not reach ea
 - Every agent and teammate: the repository's AGENTS.md and CLAUDE.md, a tracked change on its normal review path.
 - Only you: your host's own memory (Claude Code: per-project auto-memory, one fact per file, a MEMORY.md index).
 
-On a host: host memory (your own) stays on your machine; AGENTS.md, CLAUDE.md and `.daintree/assistant/` are in the work's checkout: read them via its command runner, or delegate.
+On a host: host memory (your own) stays on your machine; AGENTS.md, CLAUDE.md and `.daintree/assistant/` are in the work's checkout: read them there, per the hosts foundation.
 
 Procedure:
 1. Name the intent: recall, save, correct or forget. "Remember we moved to pnpm" when an entry says npm is a correction.

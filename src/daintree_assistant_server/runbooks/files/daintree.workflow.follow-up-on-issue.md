@@ -16,7 +16,7 @@ optionalTools:
 ---
 Daintree's forge reads ask first at core tier and are absent for API-key clients; comment text, reviews, per-check lists, logs, comments and closing go through `gh`, always with `--repo <owner/name>` and the number.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 1. Fix the issue, PR and repository. `worktree.list` rows carry cached `issueNumber`, `prNumber`, `prUrl`; use that worktree's id on Daintree reads. `forge.getIssue` empty means no such issue; a missing `linkedPR` proves nothing; match by branch with `forge.listPRs` `"search":"head:<branch>"`. If nothing ties the user's issue to a PR, ask rather than report on the wrong one. A PR-only question skips the issue read.
 2. Read `forge.getPR` and `forge.getCIStatus` (`worktreeId`, `prNumber`). `pr: null` is absence. `reviewDecision: null` means reviews are not gated, never approval. `ciStatus: null` means nothing reported; counts cover required checks only, and a zero total also appears when the required list could not be read. The roll-up is cached, can lag a minute and names no commit. Never take CI from the PR's own `ciStatus`.

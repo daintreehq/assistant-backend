@@ -12,7 +12,7 @@ optionalTools:
 ---
 Git runs in the main checkout (`worktree.list`, `isMain`). No agent is needed: the reads and classification are yours, and each deletion or close is one command per item the user approved. Nothing is deleted or closed before the user has seen the list with full SHAs and said yes, except that a precise request ("delete my local branches merged into main") covers the branches step 3 classes MERGED (3b). An inventory-only request ("what can I delete?") ends at step 5 with recommendations.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 Procedure:
 1. `git fetch origin`; add `--prune` (drops remote-tracking refs deleted upstream) only when cleanup is in scope. Base: the user's, else `git symbolic-ref --short refs/remotes/origin/HEAD` (prints `origin/main`); freeze its SHA. Keep full refs, plain names (`origin/topic` is branch `topic`) and SHAs apart.

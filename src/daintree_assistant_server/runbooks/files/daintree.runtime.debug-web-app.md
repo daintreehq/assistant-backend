@@ -16,7 +16,7 @@ optionalTools:
 ---
 Console and preview control ask first in a core pane; an API-key client has none. The app has no screenshot or page-interaction action: seeing the page or clicking needs a browser tool of your own or the user. You keep the preview (console reads, reload, restart, verification); a visible agent fixes the source. Fix it yourself only when the user asks you to.
 
-On a host: call these tools on the preview's machine; shell steps via its command runner, or delegate.
+On a host: call these tools on the preview's machine; shell steps run there, per the hosts foundation.
 
 1. Find the preview: `kind:"dev-preview"` in `terminal.list`; keep its `id` (the panel id) and `worktreeId`, and the worktree path. Several: take the user's target or ask. Always pass the panel id (these actions otherwise act on the focused panel). None open and the user asked you to start one: `agent.launch` with `agentId:"dev-preview"` and the `worktreeId` (no `notify`; a panel never stops). Never run the dev server via `project.runCheck`, a shell or a command runner: console capture exists only in a Dev Preview panel.
 2. Baseline before changing anything: `browser.getConsoleMessages` with the panel id and `limit:100`, no `level` filter. History survives reloads and `counts` span earlier navigations. Record the highest `navigationGeneration` and the newest `id`.

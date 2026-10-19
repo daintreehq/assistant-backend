@@ -14,7 +14,7 @@ optionalTools:
 ---
 Reviewers never get their own work and are never told whose they review. Findings reach an author only after you verify them. One review round and one fix round. Every git read, test run and check below is yours; never send one to a member to run.
 
-On a host: shell steps via its command runner, or delegate to a non-member there.
+On a host: shell steps run there, per the hosts foundation; never by a member.
 
 Procedure:
 0. Units not built yet (the user asked for the work and the swap together): build them first per daintree.orchestration.fan-out-work, each in its own new worktree and branch (`worktree.createWithRecipe` with `{"source":{"kind":"newBranch","branchName":"<unit>","baseBranch":"<base>","collisionPolicy":"error"}}`, then `worktree.waitUntilReady`) and its own Daintree `agent.launch`, never side by side in one checkout and never a native subagent; this runbook starts when they have finished.

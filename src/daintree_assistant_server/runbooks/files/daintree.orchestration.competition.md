@@ -14,7 +14,7 @@ optionalTools:
   - terminal.getStatus
   - terminal.closeMany
 ---
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 1. Fix the rules before launching: the entry task; the judge (peer vote by default; "compare them and tell me which is better" makes you the judge); the user's exact scoring rule; whether voters may pick their own entry (default no: ballots then omit it); the tie rule (the user's, if given: a runner-up rule means every ballot also asks for a different runner-up label, mapped like the vote; default: report the tie). Without an agreed judge you never score entries on merit.
 2. Entries: one fresh entrant per agent named ("Claude, Codex and Gemini" means new launches, not open terminals). Brief them with the user's task as given; entrants read the code, so do not study it first. Track per entrant: terminal id, status (active, removed, missing) and entry: its main answer, never a runner-up given for a tie rule; recover a cut one before ballots.

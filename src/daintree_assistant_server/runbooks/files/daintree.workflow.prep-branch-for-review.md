@@ -15,7 +15,7 @@ optionalTools:
 ---
 Daintree only gives read-only verdicts (both ask first at core tier); staging, committing and pushing use git in the checkout, PR writes `gh`, always with `--repo <owner/name>`. Do only the stages asked for: a readiness question stops at the assessment, a commit-only request stops after the commit, a push-only request after the push.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; own shell: `gh -R <repo>`.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 1. Bind the target worktree the user named (`worktree.list`), not your own checkout; run every git command in its path.
 2. `workflow.prepBranchForReview` (`worktreeId`) prepares and runs nothing; it reports whether checks can start. Without it, assess with git (`git status -sb`, merge or rebase in progress); if the user declined its approval, ask before assessing another way.

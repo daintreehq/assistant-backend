@@ -10,7 +10,7 @@ requiredTools:
 ---
 The plan is a checkpoint you own (located per the foundation); the app has no plan service. Each node runs through its own runbook's tools, the shell, `git` and `gh`. A saved plan executes nothing and wakes nobody: the next activation is a notice on a delegated node, a wake-up mechanism of your own you have verified, or the user.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh -R <repo>`.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
 1. Continue an open plan with the same goal rather than planning a duplicate.

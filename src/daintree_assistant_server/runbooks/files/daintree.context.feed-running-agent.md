@@ -17,7 +17,7 @@ optionalTools:
 ---
 Agents read files themselves, and every byte pasted into a prompt costs their context window, so the cheapest route that carries the context wins. `terminal.injectOwned` is the blunt one: it writes the whole of the user's ACTIVE worktree (the one selected in the app, not necessarily the agent's) as raw text into the agent's input, cannot be scoped, returns before anything is written, and reports nothing back.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Target: a terminal you own or were handed (`terminal.list` with `owned:true`; its row gives `worktreeId`, and `worktree.list` the path). Not yours: give the user the paths and instruction, or ask for a hand-over. One `terminal.getStatus` with `includeOutput:{"lines":30}`. `working`: arm `terminal.notifyWhenIdle` (note "feed context: <what>") and end your turn; never inject into a busy agent (it stays pending and writes later, unseen). Asking a question: that comes first (daintree.agents.answer-waiting-agent).

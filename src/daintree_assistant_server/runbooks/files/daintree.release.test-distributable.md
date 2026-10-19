@@ -16,7 +16,7 @@ optionalTools:
 ---
 A pass from the source checkout is not evidence here: the question is whether the packaged artifact carries what it needs. A tester agent builds and runs it; you check the artifact, its revision and one smoke yourself. Nothing is published, pushed or signed.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Pin the artifact kind (npm tarball, wheel or sdist, container image, CLI binary, desktop installer or app bundle), the revision (tag or SHA; a branch is read now and recorded as a SHA) and the flows to check (the user's, else install, first start and the one core flow).

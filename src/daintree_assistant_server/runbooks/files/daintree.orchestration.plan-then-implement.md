@@ -12,7 +12,7 @@ optionalTools:
   - worktree.waitUntilReady
   - terminal.getStatus
 ---
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Roles. Planner: the agent the user named, else the configured one best suited. Implementer: the planner's own terminal (it keeps its context) unless the user named a different agent. Approver: the user, unless they named a reviewer agent (never the planner) or said "you decide". Worktree: the one named or current; a new one only when asked (`worktree.createWithRecipe` with a new branch, then `worktree.waitUntilReady` with its `worktreeId`, repeated while `pending` or `running`; any other state but `ready`: report it and launch nothing). Baseline there: `git rev-parse HEAD`, `git status --porcelain` and `git diff HEAD --binary | git hash-object --stdin`.

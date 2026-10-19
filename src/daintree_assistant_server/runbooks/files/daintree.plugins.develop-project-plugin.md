@@ -19,7 +19,7 @@ Only the registered project root's `.daintree/plugins/` loads (`worktree.list`: 
 
 No Daintree action shows a panel. Never relaunch Daintree with debug flags or attach Playwright or a CDP client to it: a debug port exposes every terminal.
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Mode from the request:

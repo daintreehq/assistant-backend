@@ -18,7 +18,7 @@ optionalTools:
 ---
 Recover observation and the task, not the work: one corrective action, then hand it to the user. Never resend the original prompt into a terminal you do not understand.
 
-On a host: call these tools on the agent's machine; delegate any shell step there.
+On a host: call these tools on the agent's machine; an agent there runs any shell step.
 
 1. Evidence: what you recorded of the launch (agent, `name`, worktree, `requestedId`, time), its result, `terminal.list` (`owned:true`; `location:"trash"` or `"background"` for panels off the grid), and one `terminal.getStatus` with `includeOutput`.
 2. Name the shape, then act:

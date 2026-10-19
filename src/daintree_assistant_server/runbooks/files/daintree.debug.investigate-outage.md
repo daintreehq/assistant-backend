@@ -15,7 +15,7 @@ optionalTools:
 ---
 Posture: read-only against production, fast, provisional. Investigators dig; you frame, pin, correlate and report. Nobody in this runbook deploys, rolls back, restarts, scales, migrates, flips a flag, edits config or writes production data; the user decides and runs mitigation.
 
-On a host: shell steps via its command runner, or delegate; own shell: `gh` naming the repo.
+On a host: shell steps run there, per the hosts foundation; own shell: `gh` naming the repo.
 
 Procedure:
 1. Frame in one exchange: the service, the symptom, when first seen, the deployed and last known good revisions. Take the revisions from the user, a read-only deploy status (`kubectl get deploy -o yaml`, a `/version` endpoint) or the release tag. Only the service and the time are worth blocking on.

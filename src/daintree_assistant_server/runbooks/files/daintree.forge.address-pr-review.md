@@ -18,7 +18,7 @@ optionalTools:
 ---
 An agent in the PR's worktree does the fixing: the PR's own agent if it is open there and yours, else one you launch; you brief, verify and read back. Forge calls: `gh … --repo <owner/name>`. Pushing is part of the job unless the user asked for local fixes only; replies, resolutions and review requests only when asked.
 
-On a host: shell steps via its command runner and checks via its `project.runCheck`, else delegate; `gh` from your own shell.
+On a host: shell steps and checks (`project.runCheck`) run there, per the hosts foundation; `gh` from your own shell.
 
 Procedure:
 1. Bind the PR: `gh pr view <n> --repo <r> --json state,headRefName,headRefOid,baseRefName,isCrossRepository,headRepository,headRepositoryOwner,maintainerCanModify,url`. Closed or merged: stop. Push target: `headRefName` on `<headRepositoryOwner>/<headRepository>`. `<head remote>` and `<base remote>` are the remotes with those repositories' URLs (`git remote -v`), never `origin` by assumption. A fork with `maintainerCanModify:false`, or no write access: fixes stay local as commits.

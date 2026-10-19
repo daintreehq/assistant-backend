@@ -16,7 +16,7 @@ optionalTools:
 ---
 A send is typed into the agent's input at once but never stops its turn; whether the CLI reads it mid-turn is up to the CLI. A stop, or a change that cannot wait, needs `terminal.interruptOwned` first (Escape; the conversation is kept).
 
-On a host: shell steps via its command runner, or delegate.
+On a host: shell steps run there, per the hosts foundation.
 
 Procedure:
 1. Targets: the terminal ids you hold, else `terminal.list` with `owned:true`; several plausible matches for one agent: ask. One `terminal.getStatus` over them with `includeOutput:{"lines":40}`. Classify each:
