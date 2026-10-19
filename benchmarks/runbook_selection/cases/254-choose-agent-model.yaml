@@ -1,0 +1,192 @@
+# Recall and routing coverage for daintree.agents.choose-agent-model: choosing the agent
+# CLI, model and reasoning effort when the user hands that choice over. Before the runbook
+# existed these requests scattered across nine runbooks (spike-options, competition,
+# hosts.place-work, relay-review-feedback, check-usage-limits, explore.repository and
+# others), none of which owns the choice.
+#
+# Written blind for the measurement, then probed with the shipped selector; kept whether
+# or not it passes. Two pin known gaps a retrain should win back: the combined requests
+# (the owning workflow AND the chooser) currently load only one of the pair, and the
+# "thinking level" phrasing reaches the head but ranks low. Screened against every case
+# suite and the corpus (difflib <= 0.8). The owner comes from the routing text; each note
+# quotes the deciding clause.
+
+cases:
+  # --- recall ---
+
+  - id: choose-model-agent-phrased
+    category: single-runbook
+    note: >-
+      The outcome as an agent writes it: "the deliverable is, per task, the agent, model id
+      and effort picked from what is ready there".
+    messages:
+      - role: user
+        content: >-
+          Select an agent CLI, model and reasoning effort for each of three tasks of
+          different difficulty before launching them
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation]
+
+  - id: choose-model-cheap-typo-strong-race
+    category: single-runbook
+    note: >-
+      A light and a heavy task with the model left to the caller: "a cheap fast model for
+      the easy fixes and the strongest one for the hard refactor".
+    messages:
+      - role: user
+        content: >-
+          the readme typo can go on whatever's cheapest, but the race condition in the job
+          queue needs your strongest model
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
+
+  - id: choose-model-recommend-only
+    category: single-runbook
+    note: >-
+      A question with nothing launched: "or asks which one fits ... or reported as a
+      recommendation".
+    messages:
+      - role: user
+        content: >-
+          which of the agents I have installed would handle a gnarly database migration
+          best? don't start it yet
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation]
+
+  - id: choose-model-thinking-level
+    category: single-runbook
+    note: >-
+      Effort in the user's word for it: "model or reasoning effort (thinking level)". Known
+      rank_miss with the shipped selector (review-change leads); the retrain should win it.
+    messages:
+      - role: user
+        content: dial the model and thinking level up or down to match how risky each change is
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation]
+
+  # --- traps: the chooser wins over a neighbour ---
+
+  - id: choose-model-not-spike-options
+    category: routing-trap
+    note: >-
+      Different models for different tasks is a choice, not options prototyped side by
+      side: "a cheap fast model for the easy fixes and the strongest one for the hard
+      refactor"; spike-options is fenced as "each prototypes a different option
+      (daintree.orchestration.spike-options)". Before the runbook, spike-options took this
+      shape at 0.998.
+    messages:
+      - role: user
+        content: light model for the lint fixes, heavyweight model for the auth rewrite
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
+
+  - id: choose-model-not-competition
+    category: routing-trap
+    note: >-
+      One agent picked, no contest: "should Codex or Claude take this"; competition is
+      fenced as "when several agents each attempt the same task and a winner is picked
+      (daintree.orchestration.competition)".
+    messages:
+      - role: user
+        content: codex or claude for the parser rewrite? pick one for me, I don't want both
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation, daintree.edits.spawn-visible-agent]
+
+  - id: choose-model-not-usage-limits
+    category: routing-trap
+    note: >-
+      Allowance as the reason for a choice, not a request for the figures: check-usage-limits
+      fences "to choose which agent, model or reasoning effort a task launches with, even
+      to save budget (daintree.agents.choose-agent-model)".
+    messages:
+      - role: user
+        content: we're nearly out of claude this week, so pick cheaper models for the routine tasks
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation]
+
+  # --- reverse traps: the neighbour wins and the chooser must not ride along ---
+
+  - id: choose-model-reverse-named-is-spawn
+    category: routing-trap
+    note: >-
+      Nothing is left to choose: "Do not use when nothing is left to choose, the user
+      having named the agent and any model or effort ... (daintree.edits.spawn-visible-agent)".
+    messages:
+      - role: user
+        content: launch claude on opus with high effort to add pagination to the orders endpoint
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: choose-model-reverse-open-pane-is-run-agent-command
+    category: routing-trap
+    note: >-
+      An open agent's own model switch: "to switch the model of an agent that is already
+      open (daintree.agents.run-agent-command)".
+    messages:
+      - role: user
+        content: in the claude terminal that's already open, change its model to sonnet
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.foundation]
+
+  - id: choose-model-reverse-figures-are-usage-limits
+    category: routing-trap
+    note: >-
+      The allowance figures themselves: "for how much plan allowance is left
+      (daintree.agents.check-usage-limits)".
+    messages:
+      - role: user
+        content: is my opus quota going to last until the weekly reset, or am I about to hit the cap
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation]
+
+  - id: choose-model-reverse-contest-is-competition
+    category: routing-trap
+    note: >-
+      Rival entries and a verdict: "when several agents each attempt the same task and a
+      winner is picked (daintree.orchestration.competition)".
+    messages:
+      - role: user
+        content: get claude and codex to each write the csv importer and tell me whose is better
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  # --- the selection step beside the workflow that owns the work ---
+
+  - id: choose-model-with-one-change
+    category: multi-runbook
+    note: >-
+      "It is the selection step beside the workflow that owns the work": one change
+      (daintree.edits.spawn-visible-agent) with its model left to the caller. Known
+      cardinality gap with the shipped selector (the chooser alone loads; its body fetches
+      the owner with get_runbook); the retrain should load both.
+    messages:
+      - role: user
+        content: fix the off-by-one in the pagination helper and pick whichever model suits it
+    expect:
+      required: [daintree.agents.choose-agent-model, daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: choose-model-with-batch
+    category: multi-runbook
+    note: >-
+      A batch (daintree.orchestration.fan-out-work) with each unit's model left to the
+      caller: "per task, the agent, model id and effort ... added to that workflow's
+      launch". Known gap with the shipped selector (fan-out alone loads; the chooser ranks
+      second at 0.02); the retrain should load both.
+    messages:
+      - role: user
+        content: start an agent on each of these four issues, matching the model to how hard each one is
+    expect:
+      required: [daintree.orchestration.fan-out-work, daintree.agents.choose-agent-model]
+      optional: [daintree.foundation]
