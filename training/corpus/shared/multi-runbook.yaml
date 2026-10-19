@@ -1447,3 +1447,24 @@ examples:
     expect: [daintree.git.sync-with-base, daintree.worktree.audit-worktrees]
     confusable_with: [daintree.orchestration.workspace-cleanup, daintree.worktree.compare-worktrees]
     run: 2026-10-16-synthetic-audit
+  - query: "fix the timezone bug in the scheduler, and choose the model and effort for the agent yourself"
+    expect: [daintree.edits.spawn-visible-agent, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "add retries to the webhook sender with whatever model you think fits"
+    expect: [daintree.edits.spawn-visible-agent, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "put an agent on each of these five issues and pick each one's model by difficulty"
+    expect: [daintree.orchestration.fan-out-work, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "fan these tickets out to agents, cheap models for the trivial ones and the strongest for the hard one"
+    expect: [daintree.orchestration.fan-out-work, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "start work on the csv export issue and pick the right agent and model for it"
+    expect: [daintree.workflow.start-work-on-issue, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "have a reviewer from a different model family than the author check this branch"
+    expect: [daintree.review.review-change, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "send the screenshot-based layout fix to whichever agent handles images best"
+    expect: [daintree.edits.spawn-visible-agent, daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model

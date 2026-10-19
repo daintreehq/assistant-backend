@@ -433,6 +433,12 @@ boundaries:
   - query: Give each agent the identical editor brief and let each choose its own implementation, then blind-judge the independent entries and name a winner.
     confusable_with: [daintree.orchestration.spike-options]
     run: 2026-10-16-synthetic-audit
+  - query: "have codex and claude both attempt the parser rewrite and judge which is better"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "race two agents on the login bug and pick the winning fix"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: did they vote yet?
     history:

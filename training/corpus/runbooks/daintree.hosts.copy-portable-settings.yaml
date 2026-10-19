@@ -115,6 +115,9 @@ boundaries:
   - query: Show what a settings copy to the second host would change, since the plugin list there is already how I want it.
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-137
+  - query: "set the other machine's default agent to the same one I use here"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: ok now bring my settings across too
     history:

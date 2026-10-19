@@ -1213,6 +1213,18 @@ boundaries:
   - query: can you add a make target for the export command? I want the Makefile changed, not a process running.
     confusable_with: [daintree.terminals.run-visible-command]
     run: 2026-10-16-synthetic-audit
+  - query: "launch codex with the astra model to fix the date parser"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "start claude at low effort on the logging cleanup in src/log"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "put sonnet on the readme fix"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "have an agent on the haiku model rename the test helpers in utils"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: how long does one of these usually take before i should worry
     history:
