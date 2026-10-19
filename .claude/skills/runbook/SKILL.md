@@ -98,7 +98,7 @@ $ARGUMENTS
   the runbook's own behaviour; the fixtures in `tests/fixtures/daintree_mcp/`; the
   floors in `benchmarks/runbook_selection/quality.py`; anything in
   `benchmarks/runbook_selection/holdout/` (never read it either); `daintree.foundation`;
-  the selector artifact (except through `/retrain-selector` under Phase 5's rule);
+  the selector artifact (a retrain is the user's to start, never this run's);
   `requirements.lock`, CI and deploy files. A test is never edited to make a gate pass.
 - **Never** push `main` or `develop`, merge a PR, edit another repository, file
   issues, or loosen a floor.
@@ -456,9 +456,9 @@ table, every listed miss with its stage, and the `compare` output **verbatim**:
 
 Write `$W/measure.md`: every case whose loaded set moved, as an improvement, a
 neutral reorder, or a regression you name and justify; the new cases, passing or
-failing, with each failure's stage. The gate must pass and `candidate_miss` must be
-zero; when the gate was red at base, it must be no worse (Phase 1 step 5). Floors are
-never touched.
+failing, with each failure's stage. The gate must pass (or be red only as **When the
+gate is red** below allows) and `candidate_miss` must be zero; when the gate was red at
+base, it must be no worse (Phase 1 step 5). Floors are never touched.
 
 For a new case that misses, run `bench local --filter <case-id>` for its stage
 (`references/routing.md`): `candidate_miss` and `rank_miss` are text first.
@@ -473,14 +473,11 @@ corpus rows stay, the retrain is owed, the prose stops.
 - if a fence or widened text caused it, back that change out, keep the lesson in the
   report, and owe the retrain;
 - if the new runbook itself turns it red (an untrained runbook in a contested
-  neighbourhood), the PR cannot be green without a retrain: invoke
-  `/retrain-selector <new ids>` on this branch, with `<ENV>` sourced. It trains,
-  installs and gates the artifact (about an hour) and puts the old one back on a
-  failed gate. `training/retrain.sh` expects `.venv` and `.venv-train` in the
-  checkout, so in a worktree link the main checkout's first (`ln -s "$MAIN/.venv"
-  "$ROOT/.venv"; ln -s "$MAIN/.venv-train" "$ROOT/.venv-train"`, both gitignored;
-  `PYTHONPATH` keeps this tree's code first). A failed retrain gate stops the run:
-  the Blocked report with the evidence, the branch unpushed, the issue untouched.
+  neighbourhood), only a retrain makes it green, and only the user starts one (they
+  retrain once on `develop` after the batch merges): never invoke `/retrain-selector`
+  here. Deliver with `candidate_miss` still zero, every red case named with its stage,
+  and `/retrain-selector <new ids>` owed in the PR body and the report, saying which
+  cases it should win back.
 
 ## Phase 6: Trial
 

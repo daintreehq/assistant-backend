@@ -1,6 +1,6 @@
 ---
 name: retrain-selector
-description: "Retrain the local two-stage runbook selector to make new or edited runbooks route COMPETITIVELY. Not required to make a runbook selectable at all — the set-wise head has no per-runbook weights, so a runbook added to runbooks/files/ is embedded on load and reachable that turn — but a never-trained runbook loses contested requests to established neighbours (measured 4/14 vs 13/14), so a runbook sharing vocabulary with an existing one still needs data. Run when a new runbook routes badly, when the benchmark regresses, or when the user says retrain the selector."
+description: "Retrain the local two-stage runbook selector to make new or edited runbooks route COMPETITIVELY. Not required to make a runbook selectable at all — the set-wise head has no per-runbook weights, so a runbook added to runbooks/files/ is embedded on load and reachable that turn — but a never-trained runbook loses contested requests to established neighbours (measured 4/14 vs 13/14), so a runbook sharing vocabulary with an existing one still needs data. User-initiated only: run when the user asks for a retrain (normally once on develop, after a batch of runbook work merges); any other run names it as owed instead of running it."
 argument-hint: "(optional) space-separated runbook ids that are NEW, so data generation focuses there"
 allowed-tools:
   - Bash

@@ -207,10 +207,15 @@ not that a notice is delivered: only a live trial in a Daintree pane shows that.
 4. Run `pytest tests/unit` (~2 min; the runbook test files alone take ~2s). Do **not**
    narrow it with `-k`; concern-named filters silently deselect the loader tests.
 5. Run `bench local`. Its floors are a ratchet; a new runbook that drops recall elsewhere
-   is a routing problem to fix in the text or with a retrain, not a floor to loosen.
+   is a routing problem to fix in the text or a retrain to name as owed, never a floor to
+   loosen.
 
 **Retraining** is one command: `training/retrain.sh` trains, installs and gates the
-new artifact (`.claude/skills/retrain-selector` for data generation and deeper work). Retrains swing
+new artifact (`.claude/skills/retrain-selector` for data generation and deeper work). It is
+cheap, a few dollars on a rented Lambda GPU (about two hours on an A10), but **only the user
+starts one**: they merge a batch of runbook work, then retrain once on `develop`. Never retrain
+on a branch or inside a skill run, even to turn a red gate green; name it as owed
+(`/retrain-selector <ids>`) in the PR and the report, with the cases it should win back. Retrains swing
 several cases by seed, so judge a recipe over several seeds. `TODO.md` carries the
 retrain-triggered entries (reservation retention, renamed routing text, `k=64` at ~200
 runbooks, domain foundations).

@@ -166,5 +166,5 @@ broke, and cases only one side has. That output, explained, is the routing verdi
 
 It is **not** owed for a body-only change. Name it in the PR and the final report as
 `/retrain-selector <ids>`. A retrain is about an hour, swings several cases by seed,
-and is judged over seeds (`.claude/skills/retrain-selector`); the run only does one
-itself when a red gate blocks delivery and text cannot fix it (SKILL.md, Measure).
+and is judged over seeds (`.claude/skills/retrain-selector`); the run never does one
+itself: the user retrains once on `develop` after the batch merges (SKILL.md, Measure).
