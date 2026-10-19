@@ -8,6 +8,7 @@
 
 cases:
   - id: recover-and-clean-up-agent-restart
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased recovery: "after Daintree restarted ... which delegated exchanges
@@ -114,6 +115,7 @@ cases:
 
   # --- traps: this runbook wins against each declared neighbour -------------------------
   - id: recover-and-clean-up-not-status-and-resume
+    host_model: inbox
     category: routing-trap
     note: >-
       A restart while work was out on other machines: the record is each host's task
@@ -144,6 +146,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: recover-and-clean-up-not-recover-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       A delegated exchange stuck after the host's assistant restarted: "which will never
@@ -159,6 +162,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: recover-and-clean-up-not-supervise-fleet
+    host_model: inbox
     category: routing-trap
     note: >-
       After a dropped link, which delegated exchanges still need the user: "the link to a
@@ -172,6 +176,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: recover-and-clean-up-not-diagnostics
+    host_model: inbox
     category: routing-trap
     note: >-
       No update lines after a hub restart is the expected behaviour (notices go only to

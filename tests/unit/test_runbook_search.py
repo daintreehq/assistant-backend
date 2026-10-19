@@ -169,13 +169,14 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None:
-    """Issue #153's pairs: the same fan-out request with and without hosts, and a
-    lane with no hosts of its own still answered from its inbox wake line."""
-    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+    """Issue #153's pairs, in the inbox catalog a v0.44 client is served: the same
+    fan-out request with and without hosts, and a lane with no hosts of its own still
+    answered from its inbox wake line."""
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
     from daintree_assistant_server.runbooks.host_state import HostState
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    catalog = load_catalog(default_runbooks_dir())
+    catalog = load_catalogs().inbox
     clf = SetwiseClassifier(_ARTIFACT)
     clf.sync(catalog)
     fan_out = "Work these six issues in parallel, an agent on each"

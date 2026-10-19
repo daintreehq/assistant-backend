@@ -220,13 +220,13 @@ boundaries:
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-137
   - query: 'The Shell refuses my plugin''s panel while the host says it loaded; which approval is the Shell waiting for?'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-137
   - query: 'Which consent is missing for the plugin view on this computer? The host has the plugin running.'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-137
   - query: 'my plugin is running on the remote host but the shell wants a yes before it shows the panel, where do I give it'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-137
   - query: 'I copied my settings to the host and every category applied, yet one of my plugins is still not there; where is it?'
     confusable_with: [daintree.hosts.copy-portable-settings]

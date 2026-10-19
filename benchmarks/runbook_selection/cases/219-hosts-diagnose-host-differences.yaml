@@ -46,6 +46,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: diagnose-host-differences-agent-outcome
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased outcome. Decided by "each host's checkout compared with the commit", "the
@@ -152,6 +153,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: diagnose-host-differences-not-verify-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub, after its lanes tested one SHA, wants the cause of the split.
@@ -227,6 +229,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: diagnose-host-differences-reverse-verify-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane's side, testing the hub's commit: daintree.hosts.verify-for-hub wins on "the hub asks
@@ -240,6 +243,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: diagnose-host-differences-reverse-diagnose-messaging
+    host_model: inbox
     category: routing-trap
     note: >-
       A send that came back paused: daintree.hosts.diagnose-messaging wins on "cannot message or
@@ -261,3 +265,20 @@ cases:
         content: the agents' docker builds have filled the disk and this machine is barely responsive, relieve it
     expect:
       required: [daintree.runtime.relieve-resource-contention]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: diagnose-host-differences-reverse-diagnose-messaging-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of diagnose-host-differences-reverse-diagnose-messaging: the same request against
+      the control catalog. A send that came back paused: daintree.hosts.diagnose-messaging wins on "cannot
+      message or start the Daintree assistant on it"; this runbook must not ride along.'
+    messages:
+    - role: user
+      content: the send to the mac host came back paused, why can't I reach its assistant
+    expect:
+      required:
+      - daintree.hosts.survey-hosts
+      optional:
+      - daintree.hosts.foundation

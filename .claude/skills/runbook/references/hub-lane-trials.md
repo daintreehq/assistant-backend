@@ -1,5 +1,14 @@
 # Hub and lane trials: a Shell's hub and a Remote Host's lanes
 
+**The inbox model only.** Hubs, lanes and the inbox are how v0.44 drove Remote Hosts,
+and this protocol and `owed-trials.yaml` describe trials of the frozen inbox catalog
+(`runbooks/inbox/`), read against its capture in `tests/fixtures/daintree_mcp/inbox/`.
+Later builds control a host directly (`host.call`) and delegate to its assistant as to
+any agent; the control catalog's hosts runbooks are followed by the Shell's assistant
+alone and owe trials under a protocol of their own, not yet written: a Shell assistant
+driving a staged host through `host.call`, its notices relayed back, and a delegation
+to that host's assistant read back with `terminal.readLastMessageOwned`.
+
 `trials.md` stages one caller, an agent pane. Hosts runbooks are followed by two others:
 the **hub** (the sidebar assistant in a Shell's own project) and a **lane** (a host
 project's sidebar assistant, enrolled for that Shell). This file is how those trials

@@ -126,7 +126,7 @@ boundaries:
   - query: two machines got overlapping pieces from the split, they touch the same files; one of them takes the shared part
     confusable_with: [daintree.hosts.place-work]
   - query: 'my two build machines are both working on the same fix and pushing to one branch right now; stop one of them and choose who keeps it'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: two machines are both working on the login bug, work out which one keeps it
     confusable_with: [daintree.hosts.verify-project-placement]

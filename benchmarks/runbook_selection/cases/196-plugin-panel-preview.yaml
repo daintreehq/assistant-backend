@@ -143,6 +143,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: develop-project-plugin-host-lane-state-report
+    host_model: inbox
     category: single-runbook
     note: >-
       Receiver wording, from the host's own assistant. Decided by "or its exact state and
@@ -283,6 +284,7 @@ cases:
       required: [daintree.hosts.copy-portable-settings]
 
   - id: develop-project-plugin-host-reverse-messaging-consent
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse trap: an assistant on a visible host that cannot be started or messaged is
@@ -295,3 +297,21 @@ cases:
         content: I can see the server host but starting its assistant fails; which approval does the person there still owe?
     expect:
       required: [daintree.hosts.diagnose-messaging]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: develop-project-plugin-host-reverse-messaging-consent-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of develop-project-plugin-host-reverse-messaging-consent: the same request against
+      the control catalog. Reverse trap: an assistant on a visible host that cannot be started or messaged
+      is daintree.hosts.diagnose-messaging''s ("can SEE another machine from this Shell (a Remote Host listed
+      or connected here) but cannot message or start the Daintree assistant on it"); the word approval does
+      not make it a plugin question, so the plugin runbook must not ride along.'
+    messages:
+    - role: user
+      content: I can see the server host but starting its assistant fails; which approval does the person
+        there still owe?
+    expect:
+      required:
+      - daintree.hosts.survey-hosts

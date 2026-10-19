@@ -509,21 +509,17 @@ boundaries:
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
   - query: read through the commit the other machine pushed and tell me whether the approach is sound; nothing needs running
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
   - query: review the diff at that sha for bugs, I don't need the tests run
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-104
   - query: 'my coworker''s branch landed on the remote an hour ago; go through it and tell me what''s broken before I approve it'
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-99
   - query: 'second opinion on this commit before I merge it, just a list of problems, no edits'
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-99
   - query: 'give the PR a findings-only pass at its head sha on this machine, in its own worktree, before I approve it'
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-99
   - query: 'do a security review of the diff on my current branch with a reviewer agent here'
     confusable_with: [daintree.hosts.race-and-review]

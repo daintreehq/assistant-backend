@@ -11,6 +11,7 @@
 
 cases:
   - id: start-swarm-set-up-remote-hosts
+    host_model: inbox
     category: single-runbook
     note: >-
       The first request in the issue, verbatim. Decided by "a swarm SET UP across their
@@ -23,6 +24,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-reuse-what-is-there
+    host_model: inbox
     category: single-runbook
     note: >-
       Reuse before starting, in the issue's words. Decided by "by reusing the one already
@@ -35,6 +37,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-bootstrap-generations
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's lane-level phrasing; "Bootstrap" pulled it to
@@ -49,6 +52,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-every-machine-repo
+    host_model: inbox
     category: single-runbook
     note: >-
       A user's short form. Decided by "Claude Code or Codex ready on every Remote Host,
@@ -61,6 +65,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-across-the-machines
+    host_model: inbox
     category: single-runbook
     note: >-
       Before this runbook the same words selected daintree.orchestration.fan-out-work.
@@ -73,6 +78,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-which-machines-take-work
+    host_model: inbox
     category: single-runbook
     note: >-
       The who-is-ready question without starts. Decided by "or asks which machines can
@@ -85,6 +91,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-agent-outcome
+    host_model: inbox
     category: single-runbook
     note: >-
       How Claude Code or Codex describes the task to search. Decided by "by reusing the
@@ -100,6 +107,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-claude-on-other-macs
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual, naming the CLI and the machines; it went to daintree.diagnostics before.
@@ -112,6 +120,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-who-can-take-work
+    host_model: inbox
     category: continuation
     note: >-
       Bare, this is ambiguous with agents on this machine; after a turn about the remote
@@ -131,6 +140,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-not-remote-resource
+    host_model: inbox
     category: routing-trap
     note: >-
       The issue's baseline query, which selected daintree.worktree.manage-resource.
@@ -145,6 +155,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-not-worktree-environment
+    host_model: inbox
     category: routing-trap
     note: >-
       An assistant per machine, not a resource per worktree: start-swarm fences
@@ -158,6 +169,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-not-local-fan-out
+    host_model: inbox
     category: routing-trap
     note: >-
       Readiness "with no work sent", not a batch of agents: start-swarm fences "launching
@@ -170,6 +182,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: start-swarm-not-fleet-sweep
+    host_model: inbox
     category: routing-trap
     note: >-
       Hosts being readied "plus what needs the person", not "sweeping agents already
@@ -238,3 +251,167 @@ cases:
         content: open a Codex agent in this worktree and have it split the config loader into two modules
     expect:
       required: [daintree.edits.spawn-visible-agent]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: start-swarm-set-up-remote-hosts-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of start-swarm-set-up-remote-hosts: the same request against the control catalog.
+      The first request in the issue, verbatim. Decided by "a swarm SET UP across their other machines before
+      handing out work".'
+    messages:
+    - role: user
+      content: Set up a swarm for this project across my remote hosts.
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-reuse-what-is-there-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of start-swarm-reuse-what-is-there: the same request against the control catalog.
+      Reuse before starting, in the issue''s words. Decided by "by reusing the one already running and starting
+      the missing ones".'
+    messages:
+    - role: user
+      content: Get an assistant ready on each selected server; reuse what is already there.
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-every-machine-repo-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of start-swarm-every-machine-repo: the same request against the control catalog.
+      A user''s short form. Decided by "Claude Code or Codex ready on every Remote Host, other Mac or server
+      (or the ones named) in this project or repository".'
+    messages:
+    - role: user
+      content: get an assistant on every machine for this repo
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-across-the-machines-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of start-swarm-across-the-machines: the same request against the control catalog.
+      Before this runbook the same words selected daintree.orchestration.fan-out-work. Decided by "a swarm
+      SET UP across their other machines before handing out work".'
+    messages:
+    - role: user
+      content: set up a swarm on this project across the machines
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-which-machines-take-work-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of start-swarm-which-machines-take-work: the same request against the control catalog.
+      The who-is-ready question without starts. Decided by "or asks which machines can take work right now".'
+    messages:
+    - role: user
+      content: which machines can take work on this project right now
+    expect:
+      required:
+      - daintree.hosts.survey-hosts
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-claude-on-other-macs-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of start-swarm-claude-on-other-macs: the same request against the control catalog.
+      Casual, naming the CLI and the machines; it went to daintree.diagnostics before. Decided by "Claude
+      Code or Codex ready on every Remote Host, other Mac or server".'
+    messages:
+    - role: user
+      content: can u get claude going on all my other macs for this repo
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-who-can-take-work-control
+    category: continuation
+    host_model: control
+    note: 'Control twin of start-swarm-who-can-take-work: the same request against the control catalog.
+      Bare, this is ambiguous with agents on this machine; after a turn about the remote hosts it is decided
+      by "or asks which machines can take work right now".'
+    messages:
+    - role: user
+      content: are my other machines connected?
+    - role: assistant
+      content: Three remote hosts are connected; two have an assistant running and taking messages in this
+        project.
+    - role: user
+      content: who can I give work to right now
+    active:
+    - daintree.hosts.foundation
+    expect:
+      required:
+      - daintree.hosts.survey-hosts
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-not-remote-resource-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of start-swarm-not-remote-resource: the same request against the control catalog.
+      The issue''s baseline query, which selected daintree.worktree.manage-resource. start-swarm says "Do
+      not use for a worktree''s cloud devbox or remote resource (daintree.worktree.manage-resource)", and
+      manage-resource says "or readying an assistant in a project on each Remote Host (daintree.hosts.start-swarm)".'
+    messages:
+    - role: user
+      content: Set up assistants for this project across my remote hosts and tell me which are ready
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-not-worktree-environment-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of start-swarm-not-worktree-environment: the same request against the control catalog.
+      An assistant per machine, not a resource per worktree: start-swarm fences "per-worktree databases,
+      ports or setup scripts on this machine (daintree.worktree.provision-local-environment)".'
+    messages:
+    - role: user
+      content: every machine needs its own assistant in this repo before I split the work
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-not-local-fan-out-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of start-swarm-not-local-fan-out: the same request against the control catalog.
+      Readiness "with no work sent", not a batch of agents: start-swarm fences "launching parallel agents
+      on this machine (daintree.orchestration.fan-out-work)".'
+    messages:
+    - role: user
+      content: prepare the swarm one assistant per machine dont start any coding yet
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation
+  - id: start-swarm-not-fleet-sweep-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of start-swarm-not-fleet-sweep: the same request against the control catalog. Hosts
+      being readied "plus what needs the person", not "sweeping agents already running here (daintree.orchestration.supervise-fleet)".'
+    messages:
+    - role: user
+      content: Get a Codex assistant ready on each remote host for this project and list what still needs
+        me
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation

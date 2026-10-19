@@ -91,29 +91,51 @@ lone user message with nothing loaded. Results come back best first:
   (`2025-06-18`) keeps one per process, while Claude Code 2.1.283 negotiates
   `2026-07-28`, which has no sessions, so it is sent everything every time.
 
-### Host state
+### Host model and host state
 
-Daintree tells the search what Remote Host setup the caller has, so a caller is
-offered only the `daintree.hosts.*` runbooks that fit it. Two request headers, sent on
-**every** POST, from a snapshot taken when the assistant launches:
+Daintree tells the server which way it drives its Remote Hosts and what Remote Host
+setup the caller has, in request headers sent on **every** POST, from a snapshot taken
+when the assistant launches:
 
 | header | values |
 |---|---|
-| `Daintree-Hosts` | `none` (no Remote Host configured), `configured` (at least one, none connected with messaging on), `connected` (at least one connected with messaging on) |
-| `Daintree-Lane` | `reachable` when another machine's assistant can message this caller (it is a lane); omit it otherwise |
+| `Daintree-Host-Control` | `1` from a build that controls its hosts directly (`host.list`, `host.call`) and delegates to a host's assistant as to any agent. Absent (v0.44) or anything else: the inbox model v0.44 shipped |
+| `Daintree-Hosts` | `none` (no Remote Host configured), `configured` (at least one, none connected with control on), `connected` (at least one connected with control on) |
+| `Daintree-Lane` | inbox callers only: `reachable` when another machine's assistant can message this caller (it is a lane); omit it otherwise |
 
-Each hosts runbook declares the state it fits as `hostEligibility`: `connected`,
-`configured` (configured or connected, so recovery stays offered while every host is
-down), `lane` (follows `Daintree-Lane`, not the caller's own hosts) or `any`. A search
-leaves out the runbooks the reported state does not fit **before the shortlist**, so
-the rest of the catalog ranks as if they were not there.
+**The model picks the catalog.** The server holds one catalog per model, and every
+answer to a request comes from its caller's: the search, `get_runbook`,
+`supporting_runbooks` and `catalog_revision`. `Daintree-Host-Control: 1` is the
+control catalog. Anything else, a missing header included, is the inbox catalog: the
+v0.44 hosts runbooks, frozen, and the copies of each shared runbook whose text differs
+between the models. So a v0.44 client never sees `host.call`, and a later one never
+sees an inbox tool. The model fails closed to inbox, unlike the host state, because a
+value this server does not know is no evidence of a client that has `host.call`. A
+control caller's `Daintree-Lane` is not read: it has no lanes.
+
+**The host state narrows the search.** Each hosts runbook declares the state it fits
+as `hostEligibility`: `connected`, `configured` (configured or connected, so recovery
+stays offered while every host is down), `lane` (inbox only: follows `Daintree-Lane`,
+not the caller's own hosts) or `any`. A search leaves out the runbooks the reported
+state does not fit **before the shortlist**, so the rest of the catalog ranks as if
+they were not there. Missing `Daintree-Hosts`, an unknown value, or an inbox caller's
+`Daintree-Lane` other than `reachable` is an unreported caller, which is offered its
+whole catalog, never an error. `get_runbook` ignores the state: it narrows what a
+search offers, not what can be read by id.
+
+**A connected control caller works on another machine.** A control caller reporting
+`Daintree-Hosts: connected` gets `daintree.hosts.foundation` (how to work on another
+machine) in `supporting_runbooks` with every runbook it is sent in full, not only the
+hosts ones, since any task may be one whose work is on a host. It follows
+`daintree.foundation` and comes before anything the runbook `requires`, and is sent
+once per session like any supporting runbook. No other caller gets it attached; a
+hosts runbook brings it as its domain foundation for every caller.
 
 Only the coarse state leaves the machine: no host names, counts or ids. It is read
-from each request and never kept between requests (the request log records the coarse
-value as metadata). Missing `Daintree-Hosts`, an unknown value, or a
-`Daintree-Lane` other than `reachable` is an unreported caller, which is offered the
-whole catalog, never an error. `get_runbook` and `supporting_runbooks` ignore the
-state: it narrows what a search offers, not what can be read by id.
+from each request and never kept between requests (the request log records the model
+and the coarse value as metadata). The session record is by content hash, so a
+runbook the two models word differently is sent in full again if one session spans
+both.
 
 ## `get_runbook`
 
@@ -194,6 +216,6 @@ and both tools over HTTP.
 | route | |
 |---|---|
 | `GET /health`, `GET /healthz` | liveness (`/healthz` is unreachable from outside Cloud Run) |
-| `GET /readyz` | `503` until the catalog and selector artifact have loaded; then the catalog revision and the number of searchable runbooks |
+| `GET /readyz` | `503` until both catalogs and the selector artifact have loaded; then each catalog's revision and number of searchable runbooks (`catalog_revision`/`runbooks` for the control catalog, `inbox_catalog_revision`/`inbox_runbooks` for the inbox one) |
 | `GET /version` | `server_version` and the `build_sha` the release stamped |
 | `GET /` | redirect to the product page |

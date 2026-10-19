@@ -1,35 +1,30 @@
 ---
 id: daintree.hosts.foundation
-title: Talk to the assistant on another machine
-summary: The base judgment for messaging between Daintree assistants on different machines — reach a Remote Host's assistant from this Shell's hub, follow each exchange without resending, verify what comes back by reference, and leave consent to the person.
-whenToUse: 'Use when the user wants the Daintree assistant on ANOTHER MACHINE — a Remote Host this Shell reaches — asked something, handed a task or answered, its reply brought back, or wants to know how messaging between the assistants on two machines works, whether it is set up, how to switch it on, or why one is not reachable. It is the DOMAIN FOUNDATION for every daintree.hosts.* runbook: co-load it with whichever one fits, and load it ALONE only when none does. Do not use for a worktree''s cloud devbox or remote resource (daintree.worktree.manage-resource), or Daintree itself misbehaving on this machine (daintree.diagnostics).'
+title: Work on another machine
+summary: The base judgment for work on a Remote Host this Shell controls — act there through host.call, keep its references with it, run its checks there, drive it yourself or brief its assistant, and read refusals and uncertain outcomes for what they are.
+whenToUse: 'Use when the work, or part of it, is on ANOTHER MACHINE — a Remote Host this Shell controls: its projects, worktrees, terminals, agents, checks or assistant; doing something there, asking its assistant, or how controlling a host from here works and how to switch it on. It is the DOMAIN FOUNDATION for every daintree.hosts.* runbook, and comes with every runbook while a host is connected: co-load it with whichever one fits, and load it ALONE only when none does. Do not use for a worktree''s cloud devbox or remote resource (daintree.worktree.manage-resource), or Daintree itself misbehaving on this machine (daintree.diagnostics).'
 foundation: true
 risk: external
 optionalTools:
   - host.list
-  - host.listAssistants
-  - host.sendMessage
-  - host.getTask
-  - host.listTasks
-  - host.cancelTask
-  - host.startAssistant
-  - assistant.reply
+  - host.call
 requires:
   - daintree.foundation
 hostEligibility: any
 ---
-Sidebar assistants only: any assistant in this Shell's windows messages one running in a host's project (a lane), at any Tool set, nothing to enroll; hosts never reach each other, so this Shell relays. Steps are the sender's; a lane follows Daintree's messaging instructions, plus step 3 and the stops.
+A Remote Host runs its own Daintree. `host.list` gives the hosts you may reach and, while one is connected with control on, its projects; `host.call` runs one of its own tools in one of them, under its Tool set, ownership and confirmations:
 
-1. No `host.*` tools, or `NOT_ELIGIBLE`: not a sidebar assistant on a Shell with a Remote Host, or Windows. Host absent from `host.list`: "Allow assistant messaging with this host" is off. Other refusals: a switch the person turned off, the host down or too old; never bypass them.
-2. Address: `hostId`, `projectId`, `slot`, `generation` from `host.listAssistants`, each round. None running: one `host.startAssistant`, within the request. Running, `generation: null`: closed to this Shell (toggle, host setting, old host); never start beside it. Never switch their window, take a lease or displace an assistant.
-3. A lane sees your text, never `referenceTaskIds`: brief by reference (repository, branch, SHA, PR URL); hosts share remotes, not working trees. A host's paths, names, pane ids and ports stay with its `hostId`, unused here.
-4. Keep each message's `hostId`, address, `taskId`, `hostTaskId`, `contextId`, and each host's `host.listTasks` cursor.
+```json tool=host.call
+{"hostId":"<hostId>","projectId":"<projectId>","tool":"terminal.getStatus","args":{"terminalIds":["<terminalId>"]}}
+```
 
-On notice or resume: the `Daintree: delegated exchange update` line wakes only the sender and names `hostTaskId`s: match them to what you kept, else `host.listTasks` from that host's cursor; then `host.getTask` by `taskId`. Tasks are the Shell's, but one sent before this Shell restarted or by a closed run wakes nobody: reconcile the same way (cursor 0 if lost); report open ones as pending.
-- `completed`: a reply arrived, not that it is right; check the branch, SHA or PR on the shared remote.
-- `input-required`: answer within the user's request by a new `host.sendMessage` to that lane, the task in `referenceTaskIds`, or ask the person.
-- A host's message needing a decision beyond the request: the person decides; `assistant.reply` it.
+- **The work's machine.** Settle per step where it acts. A host's projects, worktrees, terminals, agents and checks are reached only through `host.call`; your own tools and shell act on this machine. Your shell is for what both share: the remote (`git ls-remote`, a fetch) and the forge (`gh`).
+- **Host references.** Paths, ids and ports in a host's results mean nothing here: keep each with its `hostId` and `projectId`, used only in a call to that host. Hand work between machines by shared reference: repository, branch, full SHA, PR URL.
+- **Checks there.** At Tool set Full, `project.runCheck` or `project.runCommand` (no TTY, never a server) through `host.call`; at Core, or for a check needing judgment, an agent there runs it.
+- **Drive or delegate.** Drive a host yourself by default: launch, brief and verify its agents as you would here, each call through `host.call`. Delegate to its assistant only when that assistant's own judgment is the point, or a large batch it should split among its agents.
+- **Delegating.** `assistant.list` there: one at its prompt (`agentState` `waiting` at a `prompt`), else one `assistant.start` (`ready:false` still runs: never start another). Send with `terminal.sendCommandOwned`: its `terminalId` and `generation`, `handback:true`, `notify:true`, the brief by reference; end the turn. `ASSISTANT_BUSY` (mid-turn, a draft in its prompt, or stopped on a question for the person there): wait or tell the person, never type over it; `ASSISTANT_RESTARTED`: list again. Its answer, by `terminal.readLastMessageOwned`, is a claim to verify.
+- **Notices.** A host's notice names the host and may never come: pair it with `terminal.getStatus` through `host.call`, paced to the work.
 
-Stop and recovery: an outcome is not a host failure; read `detail`. `taskId: null`: not sent; otherwise look it up before any resend. Uncertain start: list again; never start blindly. A cancel after delivery is a request and a pause blocks new messages: neither stops work. Rate limit: wait `retryAfterMs`.
+Outcomes: `ok` means the call ran, not that the tool succeeded: read `result.isError` and its text, where the host's own refusals arrive (`DRIVEN_ELSEWHERE`: another machine drives that project; report it, never take over). `ambiguous`: it may have run; resend only under its `callId`, which never runs twice. `expired`: check what it would have changed first; never replay an uncertain write. `disconnected`: unreachable; resend once it is back, under the `callId` if it gave one. `opted_out` (assistant control off for that host in Settings, Hosts), `policy_rejected` (that host's "Let other machines' assistants work here" off; an identity refusal says try again) and `unsupported` (its MCP server off, or an older Daintree): quote `detail`; a setting is the person's to change. `rate_limited`: wait `retryAfterMs`. `not_found`: list again.
 
-Report back: per host, outcome, `taskId`, state, `delivery` times; timings, not theories.
+Report back: per host, what ran there and how you know, its ids, what is pending and what brings it back.

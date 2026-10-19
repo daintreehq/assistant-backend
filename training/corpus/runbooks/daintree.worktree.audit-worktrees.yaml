@@ -84,13 +84,13 @@ boundaries:
     confusable_with: [daintree.git.recover-lost-work]
     run: 2026-09-28-round6
   - query: 'before the hub asks for anything, which of the worktrees on this host are merged or hold unpushed work'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'list which worktrees from the experiments could go, but don''t delete anything yet'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'the hub wants to know which of my worktrees are merged; it isn''t asking me to delete anything'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: go through my local checkouts and tell me which are fully merged and which hold commits that were never pushed
     confusable_with: [daintree.hosts.audit-host-workspaces]

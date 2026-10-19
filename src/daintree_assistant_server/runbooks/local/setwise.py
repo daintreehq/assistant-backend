@@ -219,6 +219,8 @@ def document_digest(document: str) -> str:
 #: Sized for a catalog an order of magnitude larger than today's 39 plus room for
 #: runbook-learning rewrites; at ~3 KB a pair this is single-digit megabytes.
 _VEC_MEMO_MAX = 2048
+#: Tables kept by catalog revision: one per host model's catalog.
+_TABLES_MAX = 2
 
 
 class SetwiseClassifier:
@@ -316,22 +318,28 @@ class SetwiseClassifier:
             )
 
         self._lock = threading.Lock()
-        #: (catalog revision the table was built for, table) — held as ONE tuple
-        #: so a reader gets a consistent pair. Two attributes would let a reader
-        #: land between the two writes and pair a new revision with the old
-        #: table, which is exactly the stale answer the digest check exists to
-        #: prevent. The revision is a fast path only; the digest comparison in
-        #: ``sync`` is the correctness check. It skips re-rendering and
-        #: re-hashing every runbook document on a turn where the catalog has not
-        #: changed at all: microseconds at 38 runbooks, milliseconds at 1,000, and
-        #: this sits on the first-byte path.
-        self._cached: tuple[str | None, RunbookTable] | None = None
+        #: catalog revision -> the table built for it, oldest first, at most
+        #: ``_TABLES_MAX``: the server alternates between two catalogs (one per host
+        #: model, ``catalog.load_catalogs``), and one slot would rebuild a table on
+        #: every alternation. Replaced wholesale, never mutated, so a reader gets a
+        #: consistent revision-to-table mapping from whichever dict it read; a
+        #: revision paired with another catalog's table is exactly the stale answer
+        #: the digest check exists to prevent. The revision is a fast path only;
+        #: the digest comparison in ``sync`` is the correctness check. It skips
+        #: re-rendering and re-hashing every runbook document on a turn where the
+        #: catalog has not changed at all: microseconds at 38 runbooks,
+        #: milliseconds at 1,000, and this sits on the first-byte path.
+        self._tables: dict[str | None, RunbookTable] = {}
+        #: The table the latest ``sync`` returned, whichever path returned it: what
+        #: ``table`` (and ``select`` with no catalog) reads. Not the newest entry of
+        #: ``_tables``, whose order is retention's, which a fast-path hit leaves alone.
+        self._latest: RunbookTable | None = None
         #: Vector pairs by document digest, surviving every table replacement.
-        #: See the note in ``sync``: ``_cached`` is one slot, and a profile that
-        #: syncs a NARROWED catalog evicts the rest of the catalog's vectors from
-        #: it. LRU-bounded because it is the one structure here that is not a pure
-        #: function of the live catalog — runbook learning rewrites bodies, and each
-        #: rewrite mints a digest the old one no longer matches.
+        #: See the note in ``sync``: a table evicted from ``_tables``, or a
+        #: narrowed catalog synced past it, takes its vectors with it. LRU-bounded
+        #: because it is the one structure here that is not a pure function of the
+        #: live catalogs — runbook learning rewrites bodies, and each rewrite mints
+        #: a digest the old one no longer matches.
         self._vec_memo: OrderedDict[str, tuple[np.ndarray, np.ndarray]] = OrderedDict()
         preload = directory / "vectors.npz"
         if preload.exists():
@@ -341,9 +349,10 @@ class SetwiseClassifier:
             # second or so at startup — rather than serving mixed vectors.
             if table is not None and table.precision == self._precision:
                 # No revision: the shipped table was built against the catalog at
-                # BUILD time, and the live catalog may have moved since. Pairing
-                # it with None forces the first sync through the digest check.
-                self._cached = (None, table)
+                # BUILD time, and the live catalog may have moved since. Keying it
+                # by None forces the first sync through the digest check.
+                self._tables = {None: table}
+                self._latest = table
 
     @property
     def candidates(self) -> int:
@@ -367,8 +376,18 @@ class SetwiseClassifier:
 
     @property
     def table(self) -> RunbookTable | None:
-        cached = self._cached
-        return cached[1] if cached else None
+        """The table synced most recently."""
+        return self._latest
+
+    def _keep(self, revision: str | None, table: RunbookTable) -> None:
+        """Make ``table`` the newest entry for ``revision``, evicting the oldest past
+        ``_TABLES_MAX``. Caller holds ``self._lock``."""
+        tables = {key: kept for key, kept in self._tables.items() if key != revision}
+        tables[revision] = table
+        while len(tables) > _TABLES_MAX:
+            del tables[next(iter(tables))]
+        self._tables = tables
+        self._latest = table
 
     # ------------------------------------------------------------------ sync
 
@@ -386,9 +405,11 @@ class SetwiseClassifier:
         retrains a fixed head.
         """
         revision = getattr(catalog, "revision", None)
-        cached = self._cached
-        if cached is not None and revision is not None and cached[0] == revision:
-            return cached[1]
+        if revision is not None:
+            kept = self._tables.get(revision)
+            if kept is not None:
+                self._latest = kept
+                return kept
 
         ids = tuple(sorted(catalog.selectable_ids))
         wanted = {
@@ -398,15 +419,18 @@ class SetwiseClassifier:
         digests = {sid: document_digest(doc) for sid, doc in wanted.items()}
 
         with self._lock:
-            cached = self._cached
-            current = cached[1] if cached else None
+            current = next(
+                (table for table in reversed(self._tables.values()) if table.digests == digests),
+                self.table,
+            )
             if current is not None and current.digests == digests:
                 # Same routing surface, different catalog revision — a body-only
-                # edit, which is the common runbook-learning case. Nothing to
+                # edit, which is the common runbook-learning case, or the shipped
+                # table meeting the catalog it was built from. Nothing to
                 # re-embed; just remember the new revision so the next turn takes
                 # the fast path.
                 self._remember(current)
-                self._cached = (revision, current)
+                self._keep(revision, current)
                 return current
 
             keep = current.digests if current is not None else {}
@@ -421,10 +445,10 @@ class SetwiseClassifier:
             )
             ranking = np.zeros((len(ids), self._ranking_dim(current)), dtype=np.float32)
             # Anything the CURRENT table cannot supply is looked up in the digest
-            # memo before it is sent to the encoders. `_cached` holds exactly one
-            # table, so a narrower catalog — the sub-agent profile's filtered menu
-            # — replaces it and takes the vectors for every excluded runbook with
-            # it. The memo is what makes that recoverable: measured at 39 runbooks,
+            # memo before it is sent to the encoders. `_tables` holds two tables,
+            # so a third catalog — a benchmark's narrowed menu, an edited one —
+            # evicts one and takes the vectors for every runbook only it held. The
+            # memo is what makes that recoverable: measured at 39 runbooks,
             # a single sub-agent turn used to cost the NEXT orchestrator turn
             # 5.3s of re-embedding, on the first-byte path, for a table it had
             # already built. Keyed by document digest rather than id so a
@@ -470,7 +494,7 @@ class SetwiseClassifier:
                 precision=self._precision,
             )
             self._remember(table)
-            self._cached = (revision, table)
+            self._keep(revision, table)
             return table
 
     def _remember(self, table: RunbookTable) -> None:

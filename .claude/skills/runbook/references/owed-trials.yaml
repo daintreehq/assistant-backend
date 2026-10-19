@@ -1,5 +1,7 @@
 # The owed-trial register: every hub, lane and host-pane trial a landed runbook still
 # owes, sourced from each issue's closing comment. Protocol: hub-lane-trials.md.
+# The inbox model's (v0.44) register, checked against the frozen inbox catalog: the
+# control catalog's hosts runbooks owe trials under a protocol of their own.
 # Validate offline with `dtrb.sh plan check`; print one entry with `dtrb.sh plan show <id>`.
 #
 # Per entry:

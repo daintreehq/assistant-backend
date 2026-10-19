@@ -319,7 +319,7 @@ boundaries:
     confusable_with: [daintree.review.review-pr-queue]
     run: 2026-09-28-catalog-expansion
   - query: 'find me unassigned issues I could hand to the other machines'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: "besides the ones being worked right now, which open issues are left for later?"
     confusable_with: [daintree.agents.check-usage-limits]

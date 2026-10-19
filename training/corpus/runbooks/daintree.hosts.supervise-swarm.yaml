@@ -15,7 +15,6 @@
 # supervision asked for right after the work went out. Machine names are generic.
 runbook: daintree.hosts.supervise-swarm
 run: runbook-2026-10-issue-109
-
 positives:
   - the four remote boxes all have their tasks now, stay on it until each one's done and only come to me if there's a call to make
   - keep the remote run ticking over while I'm in meetings this afternoon, answer what you can and save the real decisions for me
@@ -56,7 +55,6 @@ positives:
     history:
       - 'user: keep an eye on the remote run and verify what comes back'
       - 'assistant: Three of four hosts are still working; I will check each result as it arrives.'
-
   - pick up the delegated exchanges where they are and keep the run on the remote boxes going
   - carry on with the multi-host run from its updates, verify each finished unit and report at the end
   - an update came in on the exchanges the hub sent this morning, handle it
@@ -71,7 +69,80 @@ positives:
   - keep the linux box and both minis working as briefed and tell me only if one of them needs a decision from me
   - the mini is behind the others but still committing; don't shift its unit anywhere, keep following it till it's done
   - one machine is plodding through its unit long after the rest finished, and that's fine; stay with it and verify what it pushes
-
+  - query: the remote run is done, give me the final report with a row for each machine and what you checked yourself
+    run: runbook-2026-10-issue-120
+  - query: which of the hosts really finished the job and which ones only said they had?
+    run: runbook-2026-10-issue-120
+  - query: write up the cross-machine run for me - commits, test results, and what's still unresolved
+    run: runbook-2026-10-issue-120
+  - query: sign-off time for the schema upgrade the machines ran last night - for each one, which commit is really on origin, what was run against it, and what I still have to decide
+    run: runbook-2026-10-issue-120
+  - query: every host has either reported or gone quiet, so tell me where the whole run ended up, one row per machine
+    run: runbook-2026-10-issue-120
+  - query: I need the closing report on the multi-machine job, including the box that never replied
+    run: runbook-2026-10-issue-120
+  - query: final account of the overnight run on my other macs, please, and flag anything a host claimed that you couldn't confirm
+    run: runbook-2026-10-issue-120
+  - query: did all three machines actually push what they said they pushed? write the results up
+    run: runbook-2026-10-issue-120
+  - query: the lint cleanup went to four minis. which commits are really on origin, which test claims could you confirm, and which are only their word?
+    run: runbook-2026-10-issue-120
+  - query: the hosts have all stopped, so produce the final write-up - what landed, what failed, what is missing, and what is still running over there
+    run: runbook-2026-10-issue-120
+  - query: one of my remote machines is probably still running a dev server from that run. Can you write the final report and list everything it left behind?
+    run: runbook-2026-10-issue-120
+  - query: after the run, list the leftover panes, worktrees and servers on each machine and who should decide what happens to them, in the final report
+    run: runbook-2026-10-issue-120
+  - query: summarize the finished swarm for the team update - branch and exact commit for each host, which checks ran, and what is open
+    run: runbook-2026-10-issue-120
+  - query: audit what each host told us about its unit against what is actually on the remote and in the task records
+    run: runbook-2026-10-issue-120
+  - query: morning! the remote job finished while I slept. Can I get the full account, with the machines that never answered shown as missing?
+    run: runbook-2026-10-issue-120
+  - query: The overnight job was porting the date helpers to the new locale API on three machines. Two pushed branches I can see; the third says it did too and I cannot find it. Write me the closing report for all three without taking their word for any of it.
+    run: runbook-2026-10-issue-120
+  - query: Four hosts were each assigned a flaky-test fix. One reported green, one was never answered, one record shows it expired, and the fourth pushed nothing I can see. The person wants the end-of-run report for all four assignments with only what is confirmed on the remote.
+    run: runbook-2026-10-issue-120
+  - query: collect what each of the hosts produced into one result I can trust, and call out any report that doesn't check out
+    run: runbook-2026-10-issue-120
+  - query: the three minis are finished. which commits are real, which tests actually passed, and what did they leave open?
+    run: runbook-2026-10-issue-120
+  - query: I called off the run on the other machines an hour ago. give me the report of what each one had actually delivered by then
+    run: runbook-2026-10-issue-120
+  - query: the build box finished the cache work and says it pushed cache-v2, but the mac mini's log only says done. tell me what each really has on origin and unpushed, in one report
+    run: runbook-2026-10-issue-120
+  - query: one host said 'all tests pass' but never gave me a branch. put that in a final report of the run alongside the others
+    run: runbook-2026-10-issue-120
+  - query: 'Hey, quick one: can you produce the wrap-up for the remote run, verified, with leftovers and who owns each decision?'
+    run: runbook-2026-10-issue-120
+  - query: wrap up the cross-machine job - one table, what came back, what's proven, what's missing
+    run: runbook-2026-10-issue-120
+  - query: Which machines delivered, which failed, and which never reported? I want the final tally for the run with evidence for each.
+    run: runbook-2026-10-issue-120
+  - query: 'The migration across my machines has ended. I need a report I can forward: per host the branch, the exact commit, the checks and their results, and a list of anything still open or left running there, with no claims taken on trust.'
+    run: runbook-2026-10-issue-120
+  - query: 'Everything the hosts were doing is stopped now. Before I decide what to merge or clean up, I want the honest picture: what each unit produced, what you verified yourself, and what the hosts left lying around, all in one report.'
+    run: runbook-2026-10-issue-120
+  - query: After that run I got a message from one machine saying it finished early, and nothing at all from another. Give me the final report that treats those two honestly next to the machines that behaved.
+    run: runbook-2026-10-issue-120
+  - query: we sent the refactor to every host last night. now build the final report. a failed host still gets a row, same for one that never answered
+    run: runbook-2026-10-issue-120
+  - query: the other machines are done. what does the verified result of the whole run look like, and what's still up over there?
+    run: runbook-2026-10-issue-120
+  - query: we stopped the retry-wrapper job after a day. report on each machine - the commit on origin, which test claims held up against CI, and which servers it left up
+    run: runbook-2026-10-issue-120
+  - query: the three machines that did the upgrade all say done. go through the task records and the remote and tell me which of the three I should believe
+    run: runbook-2026-10-issue-120
+  - query: we're closing out the cross-host work. report what exists on the remote, what the hosts only claim, and which items need a decision from me
+    run: runbook-2026-10-issue-120
+  - query: did the run produce what the hosts said it did? give me the final report with unresolved work and who owns it
+    run: runbook-2026-10-issue-120
+  - query: the build box says its full test log is too big to send back and only gave me a path on its own disk. I still need the final report for the run, so get whatever summary it can give without putting that log anywhere public
+    run: runbook-2026-10-issue-120
+  - query: I can see a task record that says completed for the build box but no commit anywhere. include that in the final account
+    run: runbook-2026-10-issue-120
+  - query: wrap up Friday's migration for the team - per machine the commit that is really there, the times from the records, and who decides what happens to the half-finished branch
+    run: runbook-2026-10-issue-120
 boundaries:
   - query: every machine got the identical brief an hour ago; from here on just shepherd them to the finish and field their questions
     confusable_with: [daintree.hosts.swarm-fan-out]
@@ -95,30 +166,27 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: I'm stepping out, follow the hosts' exchanges and tell me what they each produced when I return
     confusable_with: [daintree.orchestration.watch-outcome]
-  - query: a host's assistant just sent me a blocker about the run, read it and answer it if you can
-    confusable_with: [daintree.hosts.handle-hub-message]
-  - query: on the hub, a message from the build box arrived in our inbox mid-run asking about scope
-    confusable_with: [daintree.hosts.handle-hub-message]
-  - query: the remote lanes are all mid-task, keep them going from here and verify each reply
-    confusable_with: [daintree.hosts.handle-hub-message]
+  - a host's assistant just sent me a blocker about the run, read it and answer it if you can
+  - on the hub, a message from the build box arrived in our inbox mid-run asking about scope
+  - the remote lanes are all mid-task, keep them going from here and verify each reply
   - query: no crash, no restart, the remote boxes are just still busy; stay with them until each result is checked
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: the hosts are still mid-run, keep going and tell me when one of them needs a decision
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: every host is set up and already working on its unit, stay on them until each one's in
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: the hosts already have the work, keep it moving rather than asking them anything new
     confusable_with: [daintree.hosts.ask-host-assistant]
-  - query: 'no time limit on the remote run; see it through to the end and check each host''s branch as it finishes'
+  - query: no time limit on the remote run; see it through to the end and check each host's branch as it finishes
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
-  - query: 'the hosts got the migration an hour ago with no deadline, one is still going; stay on it until they are all back'
+  - query: the hosts got the migration an hour ago with no deadline, one is still going; stay on it until they are all back
     confusable_with: [daintree.hosts.timebox-swarm]
     run: runbook-2026-10-issue-152
-  - query: 'the load across the hosts looks fine, just keep following their updates until every unit is in'
+  - query: the load across the hosts looks fine, just keep following their updates until every unit is in
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
-  - query: 'no machine is struggling, the run only needs watching until it finishes and the odd question answered'
+  - query: no machine is struggling, the run only needs watching until it finishes and the odd question answered
     confusable_with: [daintree.hosts.rebalance-load]
     run: runbook-2026-10-issue-127
   - query: keep the remote run moving and bring me only the questions the hosts cannot answer themselves, nothing has changed priority
@@ -127,7 +195,6 @@ boundaries:
   - query: one of my remote hosts has been quiet much longer than the others, check on it once and tell me where the run stands
     confusable_with: [daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-150
-
   - query: keep watching the run I just sent to the studios and tell me what each one asks
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
@@ -137,32 +204,31 @@ boundaries:
   - query: one of my remote hosts is taking far longer than the others; check on it once and tell me what it says
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
-  - query: 'the hosts are still working, stay on them until the last one is in and I''ll read the report then'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: the hosts are still working, stay on them until the last one is in and I'll read the report then
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'keep the swarm going and tell me when every host has finished; one has gone quiet'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: keep the swarm going and tell me when every host has finished; one has gone quiet
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'two machines have reported and the third is still working. keep following until all three are done and answer what they ask'
-    confusable_with: [daintree.hosts.report-swarm-results]
+  - query: two machines have reported and the third is still working. keep following until all three are done and answer what they ask
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'the three hosts are mid-task and one has gone much quieter than the others; check on it once and carry on, the lessons can wait until it is all done'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+  - query: the three hosts are mid-task and one has gone much quieter than the others; check on it once and carry on, the lessons can wait until it is all done
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
-  - query: 'stay with the units out on the remote machines until each one is verified, and relay any question one of them asks'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+  - query: stay with the units out on the remote machines until each one is verified, and relay any question one of them asks
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
-  - query: 'work is still out on the other computers. keep an eye on it and tell me when the last host is in'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+  - query: work is still out on the other computers. keep an eye on it and tell me when the last host is in
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
-
-  - query: "keep an eye on the remote hosts until their work is finished, answer what they ask and tell me when everything is in"
+  - query: keep an eye on the remote hosts until their work is finished, answer what they ask and tell me when everything is in
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
-  - query: "babysit the swarm while I'm out, only bother me for decisions"
+  - query: babysit the swarm while I'm out, only bother me for decisions
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
-  - query: "one host has been quiet far longer than the others; check on it once and keep the run moving"
+  - query: one host has been quiet far longer than the others; check on it once and keep the run moving
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
   - query: keep an eye on the hosts and tell me when they're done, I'm closing the laptop for lunch
@@ -183,6 +249,58 @@ boundaries:
     active: [daintree.hosts.place-work]
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: 2026-10-16-synthetic-audit
+  - query: all the hosts have reported on the run, write the verified final report with a row for each unit
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-120
+  - query: the run on the other machines ended, so don't wait on anything - report what each unit delivered and what is unverified
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-120
+  - query: the run is over and nothing is left to follow. I want a record I can trust of what each host really did
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: runbook-2026-10-issue-120
+  - query: the swarm finished while the hub was running, write up its results; no restart happened
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-120
+  - query: after the run, list what the hosts left behind and who decides about it, but remove nothing
+    confusable_with: [daintree.hosts.recover-and-clean-up]
+    run: runbook-2026-10-issue-120
+  - query: I stopped the remote run earlier, now I want the final report of what each host got done before it stopped
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-120
+  - query: the run was called off. report which hosts had pushed what by then, checked against the remote
+    confusable_with: [daintree.hosts.steer-swarm]
+    run: runbook-2026-10-issue-120
+  - query: the work I handed to the two remote machines is finished. one report covering both units, checked against what they pushed
+    confusable_with: [daintree.hosts.delegate-to-host]
+    run: runbook-2026-10-issue-120
+  - query: every host did its own copy of the task. give me the final report comparing what each one pushed and what was confirmed
+    confusable_with: [daintree.hosts.swarm-fan-out]
+    run: runbook-2026-10-issue-120
+  - query: all the hosts finished their branches; report what each pushed and what you verified, don't combine anything
+    confusable_with: [daintree.hosts.integrate-host-branches]
+    run: runbook-2026-10-issue-120
+  - query: write the final report of the run's results; usage left on each host is not part of it
+    confusable_with: [daintree.agents.check-usage-limits]
+    run: runbook-2026-10-issue-120
+  - query: the hosts ended the run with different results on one test. report each host's outcome per unit as claimed and as verified
+    confusable_with: [daintree.hosts.diagnose-host-differences]
+    run: runbook-2026-10-issue-120
+  - query: the hosts claimed they completed the run and I don't trust them. audit those claims against the task records and the remote
+    confusable_with: [daintree.orchestration.verify-agent-work]
+    run: runbook-2026-10-issue-120
+  - query: summarize the finished swarm unit by unit with exact commits, verified or not, rather than by date
+    confusable_with: [daintree.git.summarize-activity]
+    run: runbook-2026-10-issue-120
+  - query: don't tell me why it went wrong, just list for each host what it delivered, what failed and what is missing
+    confusable_with: [daintree.agents.postmortem-run]
+    run: runbook-2026-10-issue-120
+  - query: the run on the other machines ended, so write up its final results from the hub, the hosts' lanes only get a read-only question each
+    run: runbook-2026-10-issue-120
+  - query: all the lanes have replied to the hub, so write its final account of the run from their answers and the remote, rather than carrying out anything a lane was asked
+    run: runbook-2026-10-issue-120
+  - query: pull together what each remote host produced for the run and which ones never answered, a single roundup please
+    confusable_with: [daintree.security.respond-to-secret-exposure]
+    run: runbook-2026-10-issue-140
 followups:
   - query: ok, now keep an eye on all of them and answer what you can
     history:
@@ -229,7 +347,53 @@ followups:
     active: [daintree.hosts.delegate-to-host]
     confusable_with: [daintree.hosts.delegate-to-host]
     run: 2026-10-16-synthetic-audit
-
+  - query: ok they're all in now, write the final report with every host's commit checked
+    history:
+      - 'user: send the date helper change to all four hosts, each on its own branch'
+      - 'assistant: Sent to all four hosts. Three have replied, one is still working.'
+    run: runbook-2026-10-issue-120
+  - query: right, that's the end of it. give me the full account, including the machine that never answered
+    history:
+      - 'user: have each remote machine try the retry wrapper'
+      - 'assistant: Two hosts finished, one failed its tests, and the fourth never answered.'
+    run: runbook-2026-10-issue-120
+  - query: great. now I need the closing report on that, with leftovers and who decides what
+    history:
+      - 'user: apply the same refactor on each of the hosts, one branch apiece'
+      - 'assistant: All hosts have reported. I verified two branches on the remote; two are still unchecked.'
+    run: runbook-2026-10-issue-120
+  - query: put that into one report I can forward to the team
+    history:
+      - 'user: get the build box and the linux server to build the parser on separate branches'
+      - 'assistant: Both pushed. The build box''s checks passed; the linux server says it passed too.'
+    run: runbook-2026-10-issue-120
+  - query: and which of those claims did you actually confirm? write it all up
+    history:
+      - 'user: have every host run the full test suite on the release commit'
+      - 'assistant: The run has ended. Two hosts say all green, one says two failures, and one never answered.'
+    run: runbook-2026-10-issue-120
+  - query: perfect, final report please, and mention anything left running on any host
+    history:
+      - 'user: use the three minis to try the new build script, each on its own branch'
+      - 'assistant: The run has ended: three replies, one mentions a dev server it kept up.'
+    run: runbook-2026-10-issue-120
+  - query: thanks. what's the verified summary of the whole run?
+    history:
+      - 'user: stop everything on the other machines but keep their work'
+      - 'assistant: Stop delivered to all three hosts; two acknowledged and one is disconnected.'
+    run: runbook-2026-10-issue-120
+  - query: so what did each of them actually deliver? one report
+    history:
+      - 'user: split the five migration units across my machines'
+      - 'assistant: All five units have a reply or a final state now.'
+    run: runbook-2026-10-issue-120
+  - query: Complete the written final account, distinguish the unchecked host claim from the verified branches, and include the unit that expired.
+    history:
+      - 'user: the cross-host font-rendering experiment has ended; write up every unit'
+      - 'assistant: Two branches are verified, one host claimed completion without a matching pushed SHA, and the fourth unit expired.'
+    active: [daintree.hosts.supervise-swarm]
+    confusable_with: [daintree.hosts.supervise-swarm]
+    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: now that they're all working, keep the run moving and tell me when a decision comes up
     history:
@@ -250,12 +414,25 @@ topic_shifts:
     active: [daintree.hosts.steer-swarm]
     confusable_with: [daintree.hosts.steer-swarm]
     run: 2026-10-16-synthetic-audit
-
+  - query: now give me the final report of that run on the remote hosts, with checks confirmed
+    history:
+      - 'user: what is the difference between a worktree and a branch?'
+      - 'assistant: A branch is a line of commits; a worktree is a directory with one branch checked out.'
+    run: runbook-2026-10-issue-120
+  - query: forget that, the cross-machine run ended. write up what each host produced and what is unverified
+    history:
+      - 'user: which of my agents is using the most memory?'
+      - 'assistant: The Codex pane in the docs worktree, about 1.8 GB.'
+    run: runbook-2026-10-issue-120
+  - query: back to the swarm - it's finished, so I want the verified results report now
+    history:
+      - 'user: add a note to the readme about the new flag'
+      - 'assistant: Done and committed on the docs branch.'
+    run: runbook-2026-10-issue-120
 wakes:
   - query: 'Daintree: delegated exchange update (exchange 6127e050-374a-4fd4-8ddd-d1facd035ca9).'
     history:
       - 'user: from this hub, have the remote tower implement the export toggle and follow it to completion'
       - 'assistant: Sent one exchange to its assistant. The task is working and I will process its updates.'
     active: [daintree.hosts.delegate-to-host, daintree.hosts.survey-hosts]
-    confusable_with: [daintree.hosts.handle-hub-message]
     run: 2026-10-16-synthetic-audit

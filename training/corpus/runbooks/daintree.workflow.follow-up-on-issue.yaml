@@ -478,12 +478,8 @@ boundaries:
     confusable_with: [daintree.review.audit-spec-coverage]
     run: 2026-09-28-round6
   - query: did anyone answer on that GitHub issue? reply to them
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: reply to the maintainer's comment on the issue with what the investigation found
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: is the PR the other machine opened for the login bug green yet
     confusable_with: [daintree.hosts.ask-host-assistant]

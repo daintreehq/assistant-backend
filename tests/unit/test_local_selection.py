@@ -782,7 +782,8 @@ def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
     active = "daintree.terminals.rename"
     query = "how is that going?"
     table = _table_hiding(clf, active, ACTIVE_PREFIX.format(active) + query)
-    clf._cached = (None, table)
+    clf._tables = {None: table}
+    clf._latest = table
 
     sel = clf.select(query, [active])
     assert active in sel.reserved_ids, "fixture did not actually reserve"
@@ -966,7 +967,7 @@ def test_a_table_built_by_the_int8_retriever_is_not_adopted(tmp_path: Path) -> N
 
     shipped = _load_table(_ARTIFACT / "vectors.npz")
     assert shipped is not None and shipped.precision == "int8-ranker"
-    assert SetwiseClassifier(_ARTIFACT)._cached is not None
+    assert SetwiseClassifier(_ARTIFACT).table is not None
 
     for part in _ARTIFACT.iterdir():
         (tmp_path / part.name).symlink_to(part)
@@ -981,4 +982,4 @@ def test_a_table_built_by_the_int8_retriever_is_not_adopted(tmp_path: Path) -> N
             precision="int8",
         ),
     )
-    assert SetwiseClassifier(tmp_path)._cached is None
+    assert SetwiseClassifier(tmp_path).table is None

@@ -242,6 +242,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: open-project-on-host-reverse-start-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       Assistants readied per host. daintree.hosts.start-swarm decides it: "Claude Code or Codex ready on
@@ -300,6 +301,7 @@ cases:
       required: [daintree.git.sync-with-base]
 
   - id: open-project-on-host-reverse-survey-hosts
+    host_model: inbox
     category: routing-trap
     note: >-
       A read-only look at what the hosts hold. daintree.hosts.survey-hosts decides it: "ONE read-only
@@ -310,3 +312,6 @@ cases:
     expect:
       required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

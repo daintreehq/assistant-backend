@@ -91,7 +91,7 @@ positives:
 
 boundaries:
   - query: Set up the saved-filters demo on the build server instead of this machine and say how I reach it from here
-    confusable_with: [daintree.workflow.prepare-feature-demo, daintree.hosts.demo-for-hub]
+    confusable_with: [daintree.workflow.prepare-feature-demo]
   - query: I want to see the new reports page, but my laptop can't run it. Have the Linux host start it and tell me how to open it from my window
     confusable_with: [daintree.workflow.prepare-feature-demo]
   - query: demo of the order history screens, running on my remote machine rather than this one, and tell me how to look at it
@@ -117,18 +117,18 @@ boundaries:
   - query: send the studio machine's assistant the feature branch and have it stand the feature up for me to click through, then tell me how my Mac gets to it
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: From the Shell, ask the host's assistant for a demo of the new search at the pushed commit and walk the person through viewing it
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
   - query: The person asked me, the hub, for a demo of the settings rewrite on the build machine; brief that host and then explain how the Shell reaches it
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
   - query: I'm on the Shell and the person wants a demo hosted on a remote machine. Message the assistant there, check what it reports and tell the person the route in
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
 
   # Moved from the delegate-to-host file, where they were labelled for the hub's side of handing work.
   - query: "the Linux server should bring up the signup flow from main in a preview; have its assistant do it and tell me how I would open it on this Mac"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "get my other Mac to stand up the export feature with sample data and send me back its port"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: have the remote host serve the checkout branch as a demo and tell me how to open it from this laptop
     confusable_with: [daintree.hosts.copy-portable-settings]
@@ -156,7 +156,7 @@ followups:
       - 'user: demo the new reconciliation page on the remote Mac for me'
       - 'assistant: The host says the requested commit is serving on its port 4100; the local forwarding slot is 4102 because 4100 is occupied here.'
     active: [daintree.hosts.prepare-remote-demo, daintree.hosts.delegate-to-host]
-    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.demo-for-hub]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: 2026-10-16-synthetic-audit
 
 topic_shifts:

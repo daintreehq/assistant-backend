@@ -96,11 +96,13 @@ is checked against two sources:
 
 2. **What this repo will accept**: the captured surfaces in
    `tests/fixtures/daintree_mcp/` (`pane-core`, `pane-full`, `help-core`, `help-full`,
-   `hub-full`, `lane-full`, `external`), all from one app commit (the README names
-   it). `requiredTools`, `optionalTools`, tagged examples and any action-shaped name in
-   a body are checked against them. `requiredTools` must be on the caller's surface:
-   `pane-core`, or for `daintree.hosts.*` one of `hub-full`/`lane-full`
-   (`test_required_tools_are_on_the_callers_surface`, `CALLER_POLICY`).
+   `relayed-core`, `relayed-full`, `external`), all from one app commit (the README
+   names it). `requiredTools`, `optionalTools`, tagged examples and any action-shaped
+   name in a body are checked against them. `requiredTools` must be on the caller's
+   surface: `pane-core`, or for `daintree.hosts.*` one of `help-core`/`help-full`
+   (`test_required_tools_are_on_the_callers_surface`, `CALLER_POLICY`). The frozen
+   inbox catalog (`runbooks/inbox/`, v0.44) is checked against `inbox/` there, which
+   still has `hub-full`/`lane-full`; edit neither.
 
 When the two disagree, the capture is stale. Refreshing it is a change to every
 runbook's validation, so it is in scope only when the issue authorises it (see
@@ -117,16 +119,21 @@ and stated with its date ("September 2026 builds; revalidate").
   `terminal.sendCommandOwned`, `terminal.closeOwned`, `terminal.injectOwned`,
   `terminal.sendKeysOwned`. Its tier decides what runs without an approval.
 - **Sidebar assistant** (`help-*`): the unscoped `terminal.sendCommand`,
-  `terminal.close`, `terminal.sendKeys`. Some features are sidebar-only by design
-  (cross-host messaging, for instance).
+  `terminal.close`, `terminal.sendKeys`. Some features are sidebar-only by design:
+  only it is offered `host.list` and `host.call` (direct control of a Remote Host) and
+  `assistant.list`/`assistant.start`.
+- **What a host offers inside `host.call`** (`relayed-*`): the owned tools, agents,
+  worktrees and `assistant.*` at the caller's Tool set, and at Full the checks and
+  `project.runCommand`. Never a `host.*` tool. A `host.call` example's `tool` and
+  `args` are validated against it.
 - **API-key client** (`external`): a curated subset with **no `notify`** on
   `agent.launch` or the sends and no `terminal.notifyWhenIdle`.
-- **Hub and lane** (`hub-full`, `lane-full`): the sidebar assistant in cross-host
-  messaging. Only these are offered `host.*` and `assistant.*` messaging tools.
 
 A runbook's baseline path is the agent-pane path, except in `daintree.hosts`, whose
-baseline runs on the hub or a lane (`CALLER_POLICY`). A sidebar-only variant is one
-short line plus `optionalTools`; a pane runbook's hub branch lists `host.*` there too.
+baseline runs on the Shell's sidebar assistant (`CALLER_POLICY`). A sidebar-only
+variant is one short line plus `optionalTools`; a pane runbook's host branch lists
+`host.list`/`host.call` there too, and stays a sentence or two: a caller with a host
+connected is sent `daintree.hosts.foundation` with every runbook.
 Another domain whose *baseline* cannot run in a pane is a policy question the issue
 has to settle (the policy is a test, and tests change only with authorisation).
 

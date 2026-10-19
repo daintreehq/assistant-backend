@@ -113,7 +113,7 @@ positives:
   history:
     - 'user: are the two Remote Hosts ready to attempt the malformed-date parsing fix?'
     - 'assistant: Both have an enrolled assistant in this repository; no work has been sent.'
-  active: [daintree.hosts.start-swarm]
+  active: [daintree.hosts.delegate-to-host]
   run: 2026-10-16-synthetic-audit
 boundaries:
 - query: have each remote host try the caching idea for ten minutes, not an agent on this machine

@@ -12,11 +12,13 @@ optionalTools:
   - terminal.getStatus
   - terminal.sendCommandOwned
   - terminal.list
+  - host.list
+  - host.call
 ---
-The trap is a green run against the wrong code: `localhost:3000` is often another checkout's server, or this one's stale build. A visible agent in the worktree starts what it needs and runs the suite; you preflight and check its evidence. A hub cannot inspect a host: its lane (via daintree.hosts.delegate-to-host) runs this and returns the evidence.
+The trap is a green run against the wrong code: `localhost:3000` is often another checkout's server, or this one's stale build. A visible agent in the worktree starts what it needs and runs the suite; you preflight and check its evidence. On a Remote Host: each step through `host.call`; your shell reads (`git`, `lsof`, reports) are `project.runCommand` there at Full, else the agent quotes them, unproven.
 
 1. Worktree id and path from `worktree.list`; `worktree.waitUntilReady` until `ready` (`timedOut:true`: again, for a few minutes; `failed`, `timed-out`, `needs-approval`: stop and report; `unknown`: dependencies unverified). Record `HEAD` and, if dirty, a hash of `git diff HEAD` plus untracked source files (not build output). An agent `working` there (`terminal.getStatus`): ask first.
-2. Read the e2e config there (`playwright.config.*`, `cypress.config.*`): base URL, port, whether the runner starts the server, `reuseExistingServer` (it silently tests whatever listens), how the app shows its build (version route, stamp, header). Note where the runner, browser and server each run: a host's `localhost` is not the Shell's, and a Shell forward may use another local port. Server evidence comes from the server's machine; through a forward, the browser's machine checks the marker through that URL too.
+2. Read the e2e config there (`playwright.config.*`, `cypress.config.*`): base URL, port, whether the runner starts the server, `reuseExistingServer` (it silently tests whatever listens), how the app shows its build (version route, stamp, header). Note where the runner, browser and server each run: a host's `localhost` is not the Shell's, and a Shell forward may use another local port. Server evidence comes from its machine; through a forward, the browser's machine also checks the marker via that URL.
 3. Port preflight: `lsof -nP -iTCP:<port> -sTCP:LISTEN`. Held: its directory, `lsof -a -p <pid> -d cwd`. Another checkout's or unknown: leave it alone; if the config reads the port from the environment, pick a free one and brief that URL, else stop, blocked. This worktree's own may serve an older build: use a fresh port or leave it unproven.
 4. Launch one agent: the user's named one, else `claude`. Pass `name:"E2E: <branch>"`, the `worktreeId`, `notify:true, handback:true`. The prompt carries the path, `HEAD`, the port finding, a startup deadline, the repository's test rules, and these lines as written:
    - "Base URL <url on the free port>: pin it (`BASE_URL`, `--base-url`, `CYPRESS_BASE_URL`). Let the runner start its server with reuse off (`CI=1` or the config's switch), or start this worktree's dev or start command in the background on that port once `lsof` shows it free (held: stop and report). Prove it is up (`curl -sI <url>`) before the deadline, else stop and report."
@@ -27,13 +29,13 @@ The trap is a green run against the wrong code: `localhost:3000` is often anothe
    - "Reply with the command, where runner, browser and server ran, the base URL, the saved proof's path, counts, per failure its spec, test name, first error line and artifact paths, and anything incomplete."
 
 On notice or resume:
-- A question in the brief: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`; a shared-database migration or killing a server goes to the user.
-- End your turn after the launch. The notice's screen is the agent's claim, never your evidence: report nothing until you have, yourself:
-  1. read the reporter's output (results JSON, `playwright-report/`, else the saved run output), confirming counts and failure names (traces can hold credentials: paths only);
-  2. read the saved proof: the listener was this worktree's, started for this run, the revision as briefed (a marker also matching through the browser's URL). A miss rejects the run as a wrong or stale server, say so and offer one rerun on a fresh port;
+- A question within the brief: answer once (`terminal.sendCommandOwned`, `notify:true, handback:true`); a shared-database migration or killing a server goes to the user.
+- End your turn after the launch. The notice is the agent's claim: report nothing until you have, yourself:
+  1. read the reporter's output (results JSON, `playwright-report/`, else the saved output), confirming counts and failure names (traces can hold credentials: paths only);
+  2. read the saved proof: the listener was this worktree's, started for this run, the revision as briefed (a marker also matching through the browser's URL). A miss rejects the run (wrong or stale server): say so, offer one rerun on a fresh port;
   3. `lsof` on the port: nothing the agent started still listens, any earlier listener still does (gone: report it);
   4. `git status`: no code edits (artifacts are fine); `HEAD` or the dirty hash changed: stale.
 
 Stop and recovery: one corrective round. Past the deadline, `terminal.getStatus` and act on its screen.
 
-Report back: worktree and revision; where runner, browser and server ran; the base URL and the proof it was this checkout's server at that revision (or unproven); confirmed counts; each failure with artifact paths as host, worktree path and revision (a hub cannot open a host path: give counts, names and first errors in text); what was started and stopped; the agent's terminal id; anything incomplete; for red, offer daintree.ci.diagnose-and-fix.
+Report back: worktree and revision; where runner, browser and server ran; the base URL and the proof it was this checkout's server at that revision (or unproven); confirmed counts; each failure with artifact paths as host, worktree path and revision (a host's paths do not open here: give names and first errors); what was started and stopped; the agent's terminal id; anything incomplete; for red, offer daintree.ci.diagnose-and-fix.

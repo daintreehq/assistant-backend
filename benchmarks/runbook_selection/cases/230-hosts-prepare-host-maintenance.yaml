@@ -54,6 +54,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-host-maintenance-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       An agent's task description. Decided by "an impact report per host with its limits stated,
@@ -90,6 +91,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-host-maintenance-user-return-after-update
+    host_model: inbox
     category: continuation
     note: >-
       The return turn: the host is back and the earlier turn prepared it. Decided by "once the
@@ -181,6 +183,7 @@ cases:
 
   # ------------------------------------------------------------------ reverse traps (neighbour wins)
   - id: prepare-host-maintenance-reverse-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       The restart already happened and an exchange never came back: recover-and-clean-up's "why a
@@ -280,6 +283,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-host-maintenance-reverse-hand-off-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub session is being replaced; no host is restarting: hand-off-swarm's "the session
@@ -304,6 +308,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-host-maintenance-reverse-diagnose-messaging
+    host_model: inbox
     category: routing-trap
     note: >-
       A send refused as paused with the assistant unavailable, no restart planned:
@@ -314,3 +319,6 @@ cases:
     expect:
       required: [daintree.hosts.diagnose-messaging]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

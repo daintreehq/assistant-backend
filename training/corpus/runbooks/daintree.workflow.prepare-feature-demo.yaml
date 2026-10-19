@@ -66,16 +66,16 @@ boundaries:
   - query: Bring up the API from the agents' graphql branch in a terminal with sample data seeded and a curl walkthrough for the demo.
     confusable_with: [daintree.terminals.run-visible-command]
   - query: "I'm at this laptop, get the gallery feature running in a preview with fake albums so I can click through it"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "Prepare a demo of the quotas page for my standup, right here, with a short walkthrough"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "the agents finished the onboarding tour, set up a demo here I can show the team in ten minutes"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "Before I head into the review, get the CSV export running on this computer with made-up rows so I can try it myself"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "set up a demo of the new onboarding in the worktree the agents built it in, here on this machine"
     confusable_with: [daintree.hosts.prepare-remote-demo]

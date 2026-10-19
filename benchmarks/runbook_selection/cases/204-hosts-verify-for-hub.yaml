@@ -15,6 +15,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: verify-for-hub-issue-exact-commit
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first request. Decided by "Use when the hub asks this lane to TEST or VERIFY
@@ -28,6 +29,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-issue-supplied-sha
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second request, framed as the hub's message itself. Decided by "hub message:
@@ -43,6 +45,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-issue-validate-delegated
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's third request. Decided by "independently validate the delegated change on
@@ -56,6 +59,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a lane describes the task to search_runbooks: an outcome with its situation, not
@@ -70,6 +74,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-user-casual
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual, no punctuation to speak of. "Use when the hub asks this lane to TEST or VERIFY a
@@ -82,6 +87,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-moved-branch
+    host_model: inbox
     category: single-runbook
     note: >-
       The branch moved after the hub pinned a commit; the SHA stays the target. "a test run
@@ -95,6 +101,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-missing-runner
+    host_model: inbox
     category: single-runbook
     note: >-
       The live bar: a host without the test runner reports it instead of claiming a pass.
@@ -109,6 +116,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-shard
+    host_model: inbox
     category: single-runbook
     note: >-
       One shard of a suite the hub split across hosts: "one shard of a suite". At base it went
@@ -121,6 +129,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-environment-row
+    host_model: inbox
     category: single-runbook
     note: >-
       One cell of a cross-host matrix: "one environment row of the hub's matrix", with "what
@@ -134,6 +143,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: verify-for-hub-fresh-worktree-not-local-checks
+    host_model: inbox
     category: routing-trap
     note: >-
       A hub request spelled out like a local check run. The fence "the person's own checks
@@ -148,6 +158,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-codex-verifier-not-agent-claim
+    host_model: inbox
     category: routing-trap
     note: >-
       A verifier agent here is not a local agent's claim to judge. The fence "a local agent's
@@ -162,6 +173,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-evidence-not-review
+    host_model: inbox
     category: routing-trap
     note: >-
       Pass and fail evidence, not findings. The fence "a code review
@@ -175,6 +187,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: verify-for-hub-lane-not-hub-side
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane receiving the hub's test request, not the hub sending one. The fence "the hub's

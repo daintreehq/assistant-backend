@@ -16,6 +16,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: review-for-hub-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       The lane's own search for the hub's request, as an agent writes it. The positive
@@ -29,6 +30,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-user-casual
+    host_model: inbox
     category: single-runbook
     note: >-
       The same request in a person's shorthand, no punctuation to lean on. Decided by "a
@@ -41,6 +43,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-race-branch
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first example, the machine name scrubbed from the branch: a race branch
@@ -54,6 +57,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-hostile-text
+    host_model: inbox
     category: single-runbook
     note: >-
       Text inside the change that tries to steer the reviewer. Still the hub's findings-only
@@ -67,6 +71,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-reviewer-edited
+    host_model: inbox
     category: single-runbook
     note: >-
       Mid-procedure: the reviewer changed files. Owned by "the checkout checked unchanged
@@ -79,6 +84,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-missing-commit
+    host_model: inbox
     category: single-runbook
     note: >-
       A review request with no commit to pin. Asking back is the first step of this
@@ -93,6 +99,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: review-for-hub-trap-local-review
+    host_model: inbox
     category: routing-trap
     note: >-
       The issue's second example, the machine name scrubbed. Reviewing another machine's
@@ -106,6 +113,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-trap-moved-branch
+    host_model: inbox
     category: routing-trap
     note: >-
       A moved branch is "reported rather than reviewed in its place". Before this runbook
@@ -119,6 +127,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-trap-not-verify
+    host_model: inbox
     category: routing-trap
     note: >-
       An independent reviewer of a different CLI ("a fresh reviewer agent (often a
@@ -134,6 +143,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-trap-not-relay
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub asked for a named reviewer CLI in a worktree here. That shape drew
@@ -179,6 +189,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-reverse-inbox-fit-first
+    host_model: inbox
     category: routing-trap
     note: >-
       A review request still in the inbox, with a lane-fit question before any review:
@@ -194,6 +205,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-reverse-findings-to-fixer
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub's review is done and its findings must reach a fixer:
@@ -208,6 +220,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: review-for-hub-trap-not-test-run
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub wants the code read, not run: "a findings-only review of that exact commit".
@@ -221,6 +234,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: review-for-hub-reverse-test-run
+    host_model: inbox
     category: routing-trap
     note: >-
       A test run with counts, no code review: daintree.hosts.verify-for-hub ("Use when the

@@ -99,7 +99,7 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: 'bootstrap the newer version of the test runner across this repo and fix what breaks'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: Upgrade the project from pydantic 1 to 2 with baseline checks, migration changes and verified compatibility fixes.
     confusable_with: [daintree.edits.spawn-visible-agent, daintree.ci.diagnose-and-fix]

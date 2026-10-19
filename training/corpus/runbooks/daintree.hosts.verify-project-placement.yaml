@@ -82,7 +82,7 @@ boundaries:
   - query: have each host's assistant report its remotes and head commit, then tell me which of the projects is ours
     confusable_with: [daintree.hosts.ask-host-assistant]
   - query: find out which remote machines hold the right repository at the right commit, with no assistants started and no work sent
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: the server hasn't been used for this yet; ahead of the first job, confirm its project tracks our upstream and sits on my commit
     confusable_with: [daintree.hosts.diagnose-host-differences]
   - query: the host is connected and listing projects fine, but I can't tell whether the one in the list is ours or a fork

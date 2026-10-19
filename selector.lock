@@ -2,11 +2,11 @@
   "bucket": "gs://daintree-research-selector",
   "files": {
     "head.onnx": {
-      "sha256": "ee66d265548faa629cd7506ffaf6992ba60f92861445c90709f980cd02522089",
+      "sha256": "832d2725602faf08d957376b37d8291af8a62f6f74abdfc12133686dd0b56a2e",
       "size": 9517284
     },
     "ranking/model_int8.onnx": {
-      "sha256": "8a7e28d19cfa860b15a917af4fe1c75583376d143708437c87b699facd8c50f4",
+      "sha256": "bc6f1cdf1ed8603d187d08a3a23143f109c465e005351ea7fccfbadc265f0305",
       "size": 110088222
     },
     "ranking/tokenizer.json": {
@@ -14,7 +14,7 @@
       "size": 711649
     },
     "retriever/model.onnx": {
-      "sha256": "7c7a3c11460bbbd393f96253c8f4a76c67e3adeed215ea538fc21743ff22eb46",
+      "sha256": "daaad54f43ea4af2ddd6bf93bc05f188408e2313db4491a8182a855d186d48ab",
       "size": 90385616
     },
     "retriever/tokenizer.json": {
@@ -22,8 +22,8 @@
       "size": 711649
     },
     "vectors.npz": {
-      "sha256": "f176dd8ea0b839284a571fefc2e10026e8d559be432a0bb9e706183923400dfd",
-      "size": 774252
+      "sha256": "be616f594a6a78f99184976e4f816529a18d54ec58d3f090309fa20e15002222",
+      "size": 703524
     }
   }
 }

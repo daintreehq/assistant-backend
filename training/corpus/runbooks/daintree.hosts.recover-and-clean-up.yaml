@@ -131,22 +131,22 @@ boundaries:
   - query: should I resend the message to the host assistant that got relaunched?
     confusable_with: [daintree.hosts.foundation]
   - query: 'while I was out the Shell crashed; which of the jobs on my other machines actually came back'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: "close the usage panes the last check left open on the hosts"
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-91
   - query: 'get each remote host''s assistant to remove the panes and worktrees it made for the parser race'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'the cleanup I asked the build host to do came back with a list of unpushed worktrees, what now'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'tell the other machines to tidy up after the swarm and bring me their removed and kept lists'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'ask the linux host''s assistant to close only the panes it opened for the usage check, nothing else'
-    confusable_with: [daintree.hosts.clean-up-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-100
   - query: 'two of the machines went quiet after the hub came back; work out from the task records where each exchange stands'
     confusable_with: [daintree.hosts.swarm-fan-out]
@@ -155,10 +155,10 @@ boundaries:
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
   - query: 'Daintree restarted while three tasks were out on the hosts; which of them will never be answered now?'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: 'the link to the tower dropped overnight, rebuild where each exchange I sent it stands'
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: "the host I placed the parser ticket on went quiet after its restart, did that exchange ever finish?"
     confusable_with: [daintree.hosts.place-work]
@@ -257,34 +257,34 @@ boundaries:
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
   - query: 'after Daintree was relaunched I no longer know which of the jobs I sent my other machines are done and which are still open'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'Daintree was restarted last night while my other machines were mid-task. what became of each task I sent them?'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'have each remote host''s assistant remove the worktrees and panes it made for last night''s run'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'before the hub restarted I sent work to all my other machines. which of those tasks ever completed?'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'I gave every host a job earlier and then Daintree was relaunched on this Mac. did any of those exchanges finish?'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'my hub got replaced halfway through the run I''d given the remote machines. where does each exchange stand now?'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'daintree restarted while the other machines were mid-task; list which exchanges finished, which are still open and which nobody will answer'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: 'our app was closed overnight while two remote hosts had jobs going; which of those jobs came back, which are still pending, which will never answer'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: 'which tasks I sent to the other machines are still open, and is it safe to send any of them again'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: 'have each remote host''s assistant close the panes and worktrees this job opened there'
-    confusable_with: [daintree.hosts.postmortem-swarm]
+    confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
   - query: the fix I sent to the build box's project last night never reported back, find out where it stands and what it left behind there
     confusable_with: [daintree.hosts.verify-project-placement]

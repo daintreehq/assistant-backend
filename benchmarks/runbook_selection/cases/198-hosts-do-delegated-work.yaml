@@ -16,6 +16,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: do-delegated-work-issue-worktree-claude
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first selection case, with X filled in. Decided by the positive clause
@@ -28,6 +29,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-issue-implement-reply-sha
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second selection case, machine name scrubbed. Decided by "hub message:
@@ -41,6 +43,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a lane describes the unit to search_runbooks. Decided by the deliverable: "a new
@@ -55,6 +58,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-user-casual
+    host_model: inbox
     category: single-runbook
     note: >-
       Casual, with the main mac standing for the hub: "the hub asks THIS machine to
@@ -67,6 +71,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-half-made-worktree
+    host_model: inbox
     category: single-runbook
     note: >-
       Partial worktree creation on an earlier attempt at the unit: "a setup or launch that
@@ -80,6 +85,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-lost-launch-reply
+    host_model: inbox
     category: single-runbook
     note: >-
       A lost launch reply inside the hub's unit: "a setup or launch that half happened
@@ -96,6 +102,7 @@ cases:
 
   # ------------------------------------------------------------------ traps
   - id: do-delegated-work-not-spawn-here
+    host_model: inbox
     category: routing-trap
     note: >-
       Hub-delegated work on this host, not a request from the person at this machine.
@@ -109,6 +116,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-not-hub-side
+    host_model: inbox
     category: routing-trap
     note: >-
       This machine received the unit; it is not the hub sending one. Fence: "or for
@@ -121,6 +129,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-not-fan-out
+    host_model: inbox
     category: routing-trap
     note: >-
       One unit, not a batch. "asks THIS machine to implement, fix or build something as one
@@ -133,6 +142,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-not-hand-off
+    host_model: inbox
     category: routing-trap
     note: >-
       New work from the hub, nothing started to move. Fence: "a started task moved to
@@ -145,6 +155,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-not-envelope
+    host_model: inbox
     category: routing-trap
     note: >-
       Mid-unit, with the message long since read: the worktree is ready and the agent is
@@ -186,6 +197,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-trap-swap-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       A started unit moved to another agent: daintree.agents.hand-off-task ("a task an
@@ -198,6 +210,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: do-delegated-work-trap-read-message
+    host_model: inbox
     category: routing-trap
     note: >-
       Reading the hub's message and deciding what it wants is the envelope:
@@ -209,3 +222,6 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

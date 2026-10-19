@@ -11,6 +11,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: clean-up-for-hub-issue-close-swarm-panes
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first selection case, verbatim: the hub's order relayed in the lane's own
@@ -25,6 +26,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-issue-fizzbuzz-run
+    host_model: inbox
     category: continuation
     note: >-
       The issue's second selection case, verbatim, as the hub's message to this lane: the
@@ -45,6 +47,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased, the way a lane describes the task to search: "that run's panes closed and
@@ -61,6 +64,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-user-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       A lane's casual line about the hub's message: "when the hub, the assistant on the person's main machine, asks it to remove what it made on this machine for one of the hub's runs". The envelope may ride along.
@@ -72,6 +76,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-bare-message-read-from-inbox
+    host_model: inbox
     category: continuation
     note: >-
       The issue's opening request is the hub's own text, which says nothing of a hub. Bare,
@@ -93,6 +98,7 @@ cases:
 
   # --------------------------------------------------- traps: this runbook wins
   - id: clean-up-for-hub-not-recover-and-clean-up
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane's side of the hub's cleanup: "Use on a Remote Host's Daintree assistant
@@ -107,6 +113,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-not-workspace-cleanup
+    host_model: inbox
     category: routing-trap
     note: >-
       The order came from the hub, not from a person here: "when the hub, the assistant on the person's main machine, asks it to remove what it made on this machine for one of the hub's runs".
@@ -120,6 +127,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-not-audit-worktrees
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub ordered the removal; deciding which are safe is a step inside it ("its clean,
@@ -177,6 +185,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: clean-up-for-hub-reverse-lane-read-only
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub asking this lane a read-only question about its worktrees is not a cleanup:
@@ -193,6 +202,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: clean-up-for-hub-reverse-wrong-project
+    host_model: inbox
     category: routing-trap
     note: >-
       A cleanup the hub addressed to another project's lane is a fit question for the
@@ -206,3 +216,6 @@ cases:
     expect:
       required: [daintree.hosts.handle-hub-message]
       optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

@@ -57,6 +57,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: park-swarm-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       How a hub agent describes the task to search. Decided by "a resume record kept where the
@@ -125,6 +126,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: park-swarm-trap-not-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       After a hub restart, the request is to resume a parked run, not an account of what
@@ -179,6 +181,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: park-swarm-reverse-recover-rebuild
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: a catch-up after a restart with nothing parked. daintree.hosts.recover-and-clean-up
@@ -193,6 +196,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: park-swarm-reverse-steer-for-hub-lane
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: the lane receiving the hub's pause. daintree.hosts.steer-for-hub owns "on a Remote

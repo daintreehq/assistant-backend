@@ -81,6 +81,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: fbp-hosts-lane-request-from-hub
+    host_model: inbox
     category: single-runbook
     note: >-
       An enrolled lane relaying the hub's request about its own machine. Decided by "on this
@@ -189,6 +190,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: fbp-hosts-trap-reverse-messaging-setup
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: switching messaging on is the hosts foundation's "how to switch it on"; the

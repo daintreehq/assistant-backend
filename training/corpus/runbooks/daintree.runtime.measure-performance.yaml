@@ -112,7 +112,7 @@ boundaries:
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: 2026-09-28-round6
   - query: "benchmark whether this branch leaves more memory headroom than main does"
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-91
   - query: Same two commits, timed on every machine as a before-and-after pair per machine; tell me which commit is faster on each one
     confusable_with:
@@ -148,11 +148,11 @@ boundaries:
     run: runbook-2026-10-issue-139
   - query: Peak memory of the old and new importer on each host separately, the machines have different amounts of RAM
     confusable_with:
-    - daintree.hosts.check-usage-limits
+    - daintree.agents.check-usage-limits
     run: runbook-2026-10-issue-139
   - query: Compare the memory footprint of the previous and current build on every connected host and report it per host
     confusable_with:
-    - daintree.hosts.check-usage-limits
+    - daintree.agents.check-usage-limits
     run: runbook-2026-10-issue-139
   - query: Time the baseline against the candidate on both remote machines and tell me per machine whether it got faster
     confusable_with:

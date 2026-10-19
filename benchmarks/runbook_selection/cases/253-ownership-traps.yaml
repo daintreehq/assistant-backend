@@ -18,6 +18,7 @@ cases:
   # --- a Remote Host against the same ask on this machine ---
 
   - id: own-usage-each-other-mac
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.check-usage-limits: "agent usage checked on OTHER MACHINES". It fences the
@@ -31,6 +32,7 @@ cases:
       optional: [daintree.foundation, daintree.hosts.foundation]
 
   - id: own-usage-remote-box-most-allowance
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.check-usage-limits: "or which machine has the most usage headroom", against
@@ -43,6 +45,7 @@ cases:
       optional: [daintree.foundation, daintree.hosts.foundation]
 
   - id: own-usage-remote-hosts-before-sending
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.check-usage-limits: "how much Claude Code or Codex allowance each Remote Host
@@ -288,6 +291,7 @@ cases:
   # --- the lane's side of an exchange ---
 
   - id: own-lane-test-sha-no-fixes
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.verify-for-hub: "the hub asks this lane to TEST or VERIFY a commit ... with no
@@ -300,6 +304,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-lint-unit-test-sha
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.verify-for-hub: "hub message: verify this SHA with lint and the unit tests",
@@ -312,6 +317,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-review-request-payments
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.review-for-hub: daintree.hosts.handle-hub-message says "Do not use for ... the
@@ -324,6 +330,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-show-billing-settings
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.demo-for-hub: daintree.hosts.handle-hub-message says "Do not use for ... a demo
@@ -337,6 +344,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-serve-checkout-redesign
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.demo-for-hub, the host's own side; daintree.hosts.prepare-remote-demo fences
@@ -349,6 +357,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-hub-message-search-url
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.demo-for-hub: the message is the envelope, the demo is the work
@@ -361,6 +370,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-halt-hub-agents
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.steer-for-hub: "stop, pause or correct only the agents this lane launched for
@@ -373,6 +383,7 @@ cases:
       optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
 
   - id: own-lane-delete-hub-worktrees
+    host_model: inbox
     category: routing-trap
     note: >-
       daintree.hosts.clean-up-for-hub: "remove exactly the panes and worktrees this lane made for
@@ -512,3 +523,98 @@ cases:
     expect:
       required: [daintree.git.undo-agent-changes]
       optional: [daintree.foundation]
+
+
+  # Control twins (issue #159): the same requests against the control catalog,
+
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+
+  - id: own-usage-each-other-mac-control
+
+    category: routing-trap
+
+    host_model: control
+
+    note: 'Control twin of own-usage-each-other-mac: the same request against the control catalog. daintree.hosts.check-usage-limits:
+
+      "agent usage checked on OTHER MACHINES". It fences the local twin: "Do not use for the usage of agents
+
+      on this machine (daintree.agents.check-usage-limits)".'
+
+    messages:
+
+    - role: user
+
+      content: what's the codex quota situation across my other macs, machine by machine
+
+    expect:
+
+      required:
+
+      - daintree.agents.check-usage-limits
+
+      optional:
+
+      - daintree.foundation
+
+      - daintree.hosts.foundation
+
+  - id: own-usage-remote-box-most-allowance-control
+
+    category: routing-trap
+
+    host_model: control
+
+    note: 'Control twin of own-usage-remote-box-most-allowance: the same request against the control catalog.
+
+      daintree.hosts.check-usage-limits: "or which machine has the most usage headroom", against the local
+
+      daintree.agents.check-usage-limits.'
+
+    messages:
+
+    - role: user
+
+      content: which of my remote boxes has the most claude allowance remaining today
+
+    expect:
+
+      required:
+
+      - daintree.agents.check-usage-limits
+
+      optional:
+
+      - daintree.foundation
+
+      - daintree.hosts.foundation
+
+  - id: own-usage-remote-hosts-before-sending-control
+
+    category: routing-trap
+
+    host_model: control
+
+    note: 'Control twin of own-usage-remote-hosts-before-sending: the same request against the control catalog.
+
+      daintree.hosts.check-usage-limits: "how much Claude Code or Codex allowance each Remote Host this
+
+      Shell reaches has left", against the local daintree.agents.check-usage-limits.'
+
+    messages:
+
+    - role: user
+
+      content: check claude usage on the remote hosts before I send more work
+
+    expect:
+
+      required:
+
+      - daintree.agents.check-usage-limits
+
+      optional:
+
+      - daintree.foundation
+
+      - daintree.hosts.foundation

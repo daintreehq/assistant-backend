@@ -8,9 +8,11 @@ request carrying one gets that session's record of what it was already sent
 (``mcp_sessions.py``). The id changes what a reply repeats, never whether a
 request is served: an unknown id is adopted, and a missing one is no session.
 
-Daintree reports the caller's coarse host state in two headers on every POST
-(``runbooks/host_state.py``), and a search leaves out the host runbooks that state
-does not fit. It is read per request and never kept between them: no request depends
+Daintree names the caller's host model and coarse host state in headers on every
+POST (``runbooks/host_state.py``). The model picks the catalog the whole request is
+served from (``runbooks/catalog.py``, ``load_catalogs``), and the host state narrows
+what its search offers and whether the hosts foundation rides along with every
+runbook. Both are read per request and never kept between them: no request depends
 on another.
 
 Open by design: anyone can add this server to their agent. A search is the local
@@ -38,8 +40,13 @@ from ..runbook_mcp import (
     error_reply,
     handle_message,
 )
-from ..runbooks.host_state import HOSTS_HEADER, LANE_HEADER, parse_host_state
-from ..runbooks.local.selector import RunbookSelector
+from ..runbooks.catalog import Catalogs
+from ..runbooks.host_state import (
+    HOST_CONTROL_HEADER,
+    HOSTS_HEADER,
+    LANE_HEADER,
+    parse_caller_state,
+)
 
 router = APIRouter()
 logger = get_logger("daintree.mcp")
@@ -81,10 +88,16 @@ async def mcp_post(request: Request) -> Response:
         return _send(error_reply(None, PARSE_ERROR, "Parse error.", status=400))
 
     container = request.app.state.container
-    selector: RunbookSelector = container.selector
+    catalogs: Catalogs = container.catalogs
     sessions: SessionMemory = container.sessions
-    host_state = parse_host_state(_header(request, HOSTS_HEADER), _header(request, LANE_HEADER))
-    exclude = container.catalog.excluded_for(host_state)
+    caller = parse_caller_state(
+        request.headers.getlist(HOST_CONTROL_HEADER),
+        _header(request, HOSTS_HEADER),
+        _header(request, LANE_HEADER),
+    )
+    view = catalogs.view_for(caller)
+    selector = container.selector_for(caller.model)
+    host_state = caller.hosts
 
     reply = await handle_message(
         message,
@@ -93,9 +106,10 @@ async def mcp_post(request: Request) -> Response:
             method=_header(request, "mcp-method"),
             name=_header(request, "mcp-name"),
         ),
-        catalog=container.catalog,
-        search=lambda query, limit: selector.search(query, limit=limit, exclude=exclude),
+        catalog=view.catalog,
+        search=lambda query, limit: selector.search(query, limit=limit, exclude=view.exclude),
         delivered=(record := sessions.delivered(_header(request, "mcp-session-id"))),
+        attach=view.attach,
     )
     session_id: str | None = None
     if reply.method == "initialize" and reply.body is not None and "result" in reply.body:
@@ -108,6 +122,7 @@ async def mcp_post(request: Request) -> Response:
         rpc_method=reply.method,
         status=reply.status,
         results=reply.results,
+        host_model=caller.model,
         hosts=host_state.hosts if host_state is not None else None,
         lane_reachable=host_state.lane_reachable if host_state is not None else None,
         duration_ms=round((time.perf_counter() - started) * 1000, 1),

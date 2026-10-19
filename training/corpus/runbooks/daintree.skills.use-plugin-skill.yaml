@@ -90,10 +90,10 @@ boundaries:
     confusable_with: [daintree.memory.manage-project-memory]
     run: 2026-09-28-catalog-expansion-late
   - query: "The hub already has a unit running here and only wants to know whether the perf-review plugin skill exists on this host and what it covers."
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-136
   - query: "Before anything the hub asked for is built, find which review plugin skill this machine has and load it by its listed id."
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-136
   - query: "I'm sitting at the build machine: load the migration-review skill from this machine's own plugin list and have the agent follow it."
     confusable_with: [daintree.hosts.delegate-to-host]

@@ -17,8 +17,8 @@ from pathlib import Path
 
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.runbook_mcp import MAX_QUERY_CHARS, MAX_RESULTS_CAP
-from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
-from daintree_assistant_server.runbooks.host_state import HostState
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
+from daintree_assistant_server.runbooks.host_state import HostModel, HostState
 from daintree_assistant_server.runbooks.local.documents import fit_query, query_document
 from daintree_assistant_server.runbooks.local.paths_local import selector_artifact_dir
 from daintree_assistant_server.runbooks.local.runtime import InferencePool
@@ -51,18 +51,23 @@ def read_queries(path: Path) -> list[str]:
 
 
 def search(
-    queries: Sequence[str], *, limit: int, host_state: HostState | None = None
+    queries: Sequence[str],
+    *,
+    limit: int,
+    host_state: HostState | None = None,
+    model: HostModel = "control",
 ) -> tuple[Catalog, list[SearchResult], list[bool]]:
     """Rankings, plus whether each query had to be shrunk to fit the encoder.
 
-    ``host_state`` ranks for a caller reporting it, as the transport does from
-    its headers; ``None`` is an unreported caller, offered the whole catalog.
+    ``model`` picks the catalog, as ``Daintree-Host-Control`` does. ``host_state``
+    ranks for a caller reporting it, as the transport does from its headers;
+    ``None`` is an unreported caller, offered the whole catalog.
 
     A shrunk query is where serving and ``bench local`` part ways: search renders
     it with ``fit_query``, the benchmark with ``query_document``, and they agree
     byte for byte only when the query fits.
     """
-    catalog = load_catalog()
+    catalog = load_catalogs().for_model(model)
     classifier = SetwiseClassifier(selector_artifact_dir())
     classifier.sync(catalog)
     shrunk = []

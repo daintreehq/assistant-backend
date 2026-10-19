@@ -15,6 +15,11 @@ Run from the repo root:
 ``local`` is the release gate: it drives the shipped ONNX artifact — the
 selector the search serves — deterministically, and reports WHICH STAGE lost
 each missing runbook.
+
+The server holds a catalog per host model (``runbooks/catalog.py``,
+``load_catalogs``), and ``local`` and ``coverage`` qualify each against its own
+suite (``cases.py``, ``host_model``) unless ``--host-model`` names one. A pass on
+one never stands in for the other: a v0.44 client is served the inbox catalog.
 """
 
 from __future__ import annotations
@@ -23,43 +28,63 @@ import argparse
 import sys
 from pathlib import Path
 
-from .cases import CaseError, load_cases
+from daintree_assistant_server.runbooks.host_state import HostModel
+
+from .cases import HOST_MODELS, CaseError, load_cases
 from .coverage import print_coverage
 from .quality import print_verdict
 from .reporting import load_doc, print_compare, save_doc
 
 
+def _models(args: argparse.Namespace) -> tuple[HostModel, ...]:
+    return (args.host_model,) if args.host_model else HOST_MODELS
+
+
 def _cmd_local(args: argparse.Namespace) -> int:
-    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
 
     from .local_runner import print_categories, print_local, run_local
 
-    # The free coverage preflight: this command is the release gate, and it
-    # grades the cases that exist. A runbook nobody wrote
-    # a case for is invisible to it by construction, so a catalog with a coverage
-    # hole could be qualified by a run that never mentioned the gap. Skipped
-    # under --filter, which is already refused by the verdict.
-    catalog = load_catalog()
-    cases = load_cases(catalog, id_filter=args.filter)
-    if not args.filter:
-        rows = print_coverage(catalog, cases)
-        if not rows or not all(r.gate_ok for r in rows):
-            gaps = [r.runbook_id for r in rows if not r.gate_ok]
-            print(
-                "\nrouting coverage has gaps, so this run cannot qualify the "
-                f"catalog: {', '.join(gaps) or '<no runbooks>'}"
-            )
-            return 1
+    catalogs = load_catalogs()
+    models = _models(args)
+    if args.out and len(models) > 1:
+        print("error: --out names one file; give --host-model too", file=sys.stderr)
+        return 2
+    passed = True
+    for model in models:
+        print(f"\n==== {model} catalog ====")
+        catalog = catalogs.for_model(model)
+        # The free coverage preflight: this command is the release gate, and it
+        # grades the cases that exist. A runbook nobody wrote
+        # a case for is invisible to it by construction, so a catalog with a coverage
+        # hole could be qualified by a run that never mentioned the gap. Skipped
+        # under --filter, which is already refused by the verdict.
+        cases = load_cases(catalog, id_filter=args.filter, model=model)
+        if not args.filter:
+            rows = print_coverage(catalog, cases)
+            if not rows or not all(r.gate_ok for r in rows):
+                gaps = [r.runbook_id for r in rows if not r.gate_ok]
+                print(
+                    f"\nrouting coverage has gaps, so this run cannot qualify the {model} "
+                    f"catalog: {', '.join(gaps) or '<no runbooks>'}"
+                )
+                passed = False
+                continue
 
-    doc = run_local(
-        catalog=catalog, cases=cases, quantized=not args.fp32, id_filter=args.filter
-    )
-    print_local(doc)
-    print_categories(doc)
-    if not args.no_save:
-        path = save_doc(doc, Path(args.out) if args.out else None)
-        print(f"\nsaved: {path}")
-    return 0 if print_verdict(doc, "runbook_selection_local") else 1
+        doc = run_local(
+            catalog=catalog,
+            cases=cases,
+            quantized=not args.fp32,
+            id_filter=args.filter,
+            host_model=model,
+        )
+        print_local(doc)
+        print_categories(doc)
+        if not args.no_save:
+            path = save_doc(doc, Path(args.out) if args.out else None)
+            print(f"\nsaved: {path}")
+        passed = print_verdict(doc, "runbook_selection_local") and passed
+    return 0 if passed else 1
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
@@ -76,10 +101,16 @@ def _cmd_search(args: argparse.Namespace) -> int:
     if args.lane and args.hosts is None:
         print("error: --lane is part of a reported host state; give --hosts too", file=sys.stderr)
         return 2
+    model: HostModel = args.host_model or "control"
+    if args.lane and model != "inbox":
+        print("error: --lane is the inbox model's; give --host-model inbox", file=sys.stderr)
+        return 2
     host_state = (
         HostState(hosts=args.hosts, lane_reachable=args.lane) if args.hosts is not None else None
     )
-    catalog, results, shrunk = search(queries, limit=args.max_results, host_state=host_state)
+    catalog, results, shrunk = search(
+        queries, limit=args.max_results, host_state=host_state, model=model
+    )
     print_search(catalog, queries, results, shrunk)
     return 0 if all(hits is not None for hits in results) else 1
 
@@ -104,9 +135,10 @@ def _cmd_lint(args: argparse.Namespace) -> int:
 
 
 def _cmd_list(args: argparse.Namespace) -> int:
-    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
 
-    cases = load_cases(load_catalog(), id_filter=args.filter)
+    model: HostModel = args.host_model or "control"
+    cases = load_cases(load_catalogs().for_model(model), id_filter=args.filter, model=model)
     for case in cases:
         exp = case.required or ["<empty>"]
         print(f"{case.id:<38} [{case.category}] -> {', '.join(exp)}")
@@ -115,35 +147,42 @@ def _cmd_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_coverage(args: argparse.Namespace) -> int:
-    """Per-runbook case-coverage matrix. Exits 1 on a recall gap or a routing gap."""
-    from daintree_assistant_server.runbooks.catalog import load_catalog
+    """Per-runbook case-coverage matrix, per host model's catalog. Exits 1 on a
+    recall gap or a routing gap in either."""
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
 
-    catalog = load_catalog()
-    rows = print_coverage(catalog, load_cases(catalog))
-    # `rows and` matters: an empty catalog makes `all(...)` vacuously true, which
-    # would turn the gate into a silent pass in exactly the situation it exists for.
-    return 0 if rows and all(r.gate_ok for r in rows) else 1
+    catalogs = load_catalogs()
+    passed = True
+    for model in _models(args):
+        print(f"\n==== {model} catalog ====")
+        catalog = catalogs.for_model(model)
+        rows = print_coverage(catalog, load_cases(catalog, model=model))
+        # `rows and` matters: an empty catalog makes `all(...)` vacuously true, which
+        # would turn the gate into a silent pass in exactly the situation it exists for.
+        passed = bool(rows) and all(r.gate_ok for r in rows) and passed
+    return 0 if passed else 1
 
 
 def _cmd_pairs(args: argparse.Namespace) -> int:
     """The paired hub/lane scenarios, run on the shipped selector and reported by end.
 
-    A report, not a gate: ``bench local`` scores these cases with all the others and
-    is the verdict. This says, per scenario, which end missed, where it lost the
-    runbook, and what each caller would actually have been handed. Exit 1 when a pair
-    case fails, so a retrain-owed miss is loud rather than lost in the full run.
+    The inbox model's: a v0.44 lane is the only caller with a role. A report, not a
+    gate: ``bench local`` scores these cases with all the others and is the verdict.
+    This says, per scenario, which end missed, where it lost the runbook, and what
+    each caller would actually have been handed. Exit 1 when a pair case fails, so a
+    retrain-owed miss is loud rather than lost in the full run.
     """
-    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
 
     from .local_runner import run_local
     from .pairs import pair_cases, print_pairs
 
-    catalog = load_catalog()
-    cases = pair_cases(load_cases(catalog))
+    catalog = load_catalogs().inbox
+    cases = pair_cases(load_cases(catalog, model="inbox"))
     if not cases:
         print("no paired role cases", file=sys.stderr)
         return 2
-    doc = run_local(catalog=catalog, cases=cases, quantized=not args.fp32)
+    doc = run_local(catalog=catalog, cases=cases, quantized=not args.fp32, host_model="inbox")
     return 1 if print_pairs(doc, cases) else 0
 
 
@@ -184,6 +223,10 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _host_model_arg(parser: argparse.ArgumentParser, help_text: str) -> None:
+    parser.add_argument("--host-model", choices=HOST_MODELS, help=help_text)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="benchmarks.runbook_selection.bench")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -199,8 +242,9 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="score the fp32 graphs instead of the int8 ones that ship",
     )
-    local.add_argument("--out", help="explicit output JSON path")
+    local.add_argument("--out", help="explicit output JSON path (with --host-model)")
     local.add_argument("--no-save", action="store_true", help="do not write a results file")
+    _host_model_arg(local, "qualify one host model's catalog (default: both)")
     local.set_defaults(func=_cmd_local)
 
     search = sub.add_parser(
@@ -222,8 +266,11 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument(
         "--lane",
         action="store_true",
-        help="with --hosts: the caller is reachable by another machine's assistant",
+        help="with --hosts and --host-model inbox: the caller is reachable by another "
+        "machine's assistant",
     )
+    _host_model_arg(search, "the catalog to rank, as Daintree-Host-Control picks it "
+                    "(default: control)")
     search.set_defaults(func=_cmd_search)
 
     scale = sub.add_parser(
@@ -251,6 +298,7 @@ def main(argv: list[str] | None = None) -> int:
 
     lst = sub.add_parser("list", help="list/validate cases and variants (no API calls)")
     lst.add_argument("--filter", help="substring filter on case id/category")
+    _host_model_arg(lst, "list one host model's suite (default: control)")
     lst.set_defaults(func=_cmd_list)
 
     cov = sub.add_parser(
@@ -258,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         help="per-runbook case-coverage matrix; exit 1 if any runbook has no required case, or "
         "declares confusable neighbours with no routing trap (no API calls)",
     )
+    _host_model_arg(cov, "check one host model's catalog (default: both)")
     cov.set_defaults(func=_cmd_coverage)
 
     pairs = sub.add_parser(

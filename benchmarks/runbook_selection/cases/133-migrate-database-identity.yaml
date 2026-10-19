@@ -61,6 +61,7 @@ cases:
     optional:
     - daintree.foundation
 - id: migrate-db-hub-reseed-unknown-identity
+  host_model: inbox
   category: single-runbook
   note: 'Hub-voiced work description: "Use when the user, or the hub reaching this machine''s lane, wants a MIGRATION, SEED, ROLLBACK, DATABASE RESET".'
   messages:
@@ -72,6 +73,7 @@ cases:
     optional:
     - daintree.foundation
 - id: migrate-db-hub-migrate-then-report
+  host_model: inbox
   category: single-runbook
   note: 'Receiver wording: "or the hub reaching this machine''s lane" wants the migration applied and the schema version returned.'
   messages:
@@ -83,6 +85,7 @@ cases:
     optional:
     - daintree.foundation
 - id: migrate-db-hub-tunnel-check-before-reset
+  host_model: inbox
   category: single-runbook
   note: 'Hub-voiced with a tunnel doubt: the same "hub reaching this machine''s lane" clause; the lane runbooks for hub requests share the wording and an untrained neighbour wins it, so this one is the retrain-owed boundary.'
   messages:
@@ -105,6 +108,7 @@ cases:
     optional:
     - daintree.foundation
 - id: migrate-db-trap-hub-demo
+  host_model: inbox
   category: routing-trap
   note: 'A demo the hub asks this host to serve is not a database operation: "or for a demo the hub asks this host to prepare (use daintree.hosts.demo-for-hub)".'
   messages:
@@ -116,6 +120,7 @@ cases:
     optional:
     - daintree.foundation
 - id: migrate-db-trap-hub-note
+  host_model: inbox
   category: routing-trap
   note: 'Reading a hub message is the envelope runbook: "the hub sent me a message, read it and deal with it" (daintree.hosts.handle-hub-message); the database work comes from a second search.'
   messages:

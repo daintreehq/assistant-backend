@@ -42,6 +42,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-host-branches-issue-coordinate
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's third request, hub shorthand, quoted in the positive clause ("coordinate one host
@@ -158,6 +159,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: integrate-host-branches-not-lane
+    host_model: inbox
     category: routing-trap
     note: >-
       The hub chooses and briefs the integrator: "Use on the hub, the person's own Shell", not "on
@@ -210,6 +212,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: integrate-host-branches-trap-lane
+    host_model: inbox
     category: routing-trap
     note: >-
       This machine is the lane doing the merge: daintree.hosts.integrate-for-hub ("Use when the hub

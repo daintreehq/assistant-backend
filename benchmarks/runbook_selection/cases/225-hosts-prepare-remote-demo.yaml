@@ -230,6 +230,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: prepare-remote-demo-reverse-lane
+    host_model: inbox
     category: routing-trap
     note: >-
       A request from the hub arriving on this host is daintree.hosts.demo-for-hub ("Use on a Remote

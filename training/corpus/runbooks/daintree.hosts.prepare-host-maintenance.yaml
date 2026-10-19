@@ -153,8 +153,8 @@ topic_shifts:
     history:
       - 'user: why did the send to the build host bounce?'
       - 'assistant: Messaging is enabled again; the person now plans to update Daintree on that host.'
-    active: [daintree.hosts.diagnose-messaging]
-    confusable_with: [daintree.hosts.diagnose-messaging]
+    active: [daintree.hosts.survey-hosts]
+    confusable_with: [daintree.hosts.survey-hosts]
     run: 2026-10-16-synthetic-audit
   - query: Before restarting just the build host tonight, obtain its projects impact report and acknowledged checkpoints for all work there.
     history:

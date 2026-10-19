@@ -35,6 +35,13 @@ conversation ─────────┤                                     
   OTHER turn open behind it. It is not yet as good as a trained runbook (4/14 vs
   13/14; see "Retraining when runbooks change" below), but the catalog keeps
   working, which is the part that used to break.
+- **It trains on the control catalog and serves both.** The server holds a catalog
+  per host model (`runbooks/catalog.py`, `load_catalogs`): every training script reads
+  the control catalog (`runbooks/files/`), and the frozen inbox catalog v0.44 clients
+  are served shares its encoders, embedded the same way. Its hosts runbooks keep
+  routing text close to their control counterparts and borrow their training; the
+  v0.44-only lane runbooks are reached zero-shot. `bench local` gates each catalog on
+  its own suite, so a retrain that costs v0.44 routing fails there.
 - **Catalog size does not reach the head.** It always sees `k` (32) candidates.
   Growth costs one table row (~4.5KB) and one cosine, not a wider head.
 - **The shortlist's order is not information.** The head has no positional

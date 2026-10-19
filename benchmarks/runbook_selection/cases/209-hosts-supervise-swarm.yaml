@@ -36,6 +36,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: supervise-swarm-resume-from-notices
+    host_model: inbox
     category: single-runbook
     note: >-
       An issue request. Decided by the title, "Supervise a run on the Remote Hosts through its
@@ -77,6 +78,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: supervise-swarm-agent-phrased
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased outcome. Decided by "once this Shell's work is OUT on the Remote Hosts", "a
@@ -120,6 +122,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: supervise-swarm-update-line
+    host_model: inbox
     category: background-wake
     note: >-
       The hub's own wake line for work it sent, quoted in the positive clause: "the line
@@ -148,6 +151,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: supervise-swarm-host-message-to-hub
+    host_model: inbox
     category: single-runbook
     note: >-
       A host's own message to the hub mid-run. Decided by "a host's own message answered";
@@ -229,6 +233,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: supervise-swarm-not-handle-hub-message
+    host_model: inbox
     category: routing-trap
     note: >-
       Said on the hub about the lanes, so not daintree.hosts.handle-hub-message, which is "Use on
@@ -244,6 +249,7 @@ cases:
 
   # ------------------------------------------------------------ reverse traps
   - id: supervise-swarm-reverse-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse trap. An account of the exchanges after a restart is daintree.hosts.recover-and-clean-up
@@ -294,6 +300,7 @@ cases:
       required: [daintree.orchestration.supervise-fleet]
 
   - id: supervise-swarm-reverse-handle-hub-message
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse trap. On a lane, the hub's message is daintree.hosts.handle-hub-message ("the hub

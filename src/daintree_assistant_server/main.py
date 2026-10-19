@@ -27,7 +27,8 @@ from .observability import (
     get_logger,
     new_request_id,
 )
-from .runbooks.catalog import Catalog, default_runbooks_dir, load_catalog
+from .runbooks.catalog import Catalogs, load_catalogs
+from .runbooks.host_state import HostModel
 from .runbooks.local.paths_local import selector_artifact_dir
 from .runbooks.local.runtime import InferencePool
 from .runbooks.local.selector import LocalSelector, RunbookSelector
@@ -126,10 +127,14 @@ class Container:
     """The long-lived service components."""
 
     settings: Settings
-    catalog: Catalog
-    selector: RunbookSelector
+    catalogs: Catalogs
+    #: One search per host model's catalog, over one classifier and pool.
+    selectors: dict[HostModel, RunbookSelector]
     pool: InferencePool | None = None
     sessions: SessionMemory = field(default_factory=SessionMemory)
+
+    def selector_for(self, model: HostModel) -> RunbookSelector:
+        return self.selectors[model]
 
     def close(self) -> None:
         if self.pool is not None:
@@ -137,23 +142,33 @@ class Container:
 
 
 def build_container(settings: Settings, selector: RunbookSelector | None = None) -> Container:
-    """Load the catalog and the selector.
+    """Load both catalogs and the selector.
 
     ``selector`` is the test seam: a scripted selector skips loading the ONNX
-    artifact entirely. Production leaves it None and gets the local classifier.
+    artifact entirely, and answers for both catalogs. Production leaves it None and
+    gets the local classifier, shared by a search bound to each catalog.
     """
-    catalog = load_catalog(default_runbooks_dir())
+    catalogs = load_catalogs()
     pool: InferencePool | None = None
-    if selector is None:
-        # Constructed eagerly so a missing or LFS-pointer artifact fails
-        # readiness rather than the first request.
-        classifier = SetwiseClassifier(selector_artifact_dir())
-        # Embed the catalog now: it validates the artifact against a real catalog
-        # at startup, and the first search does not pay for the embedding.
-        classifier.sync(catalog)
-        pool = InferencePool()
-        selector = LocalSelector(classifier, pool, catalog)
-    return Container(settings=settings, catalog=catalog, selector=selector, pool=pool)
+    if selector is not None:
+        return Container(
+            settings=settings,
+            catalogs=catalogs,
+            selectors={"control": selector, "inbox": selector},
+        )
+    # Constructed eagerly so a missing or LFS-pointer artifact fails readiness
+    # rather than the first request.
+    classifier = SetwiseClassifier(selector_artifact_dir())
+    # Embed both catalogs now: it validates the artifact against real catalogs at
+    # startup, and no caller's first search pays for the embedding.
+    classifier.sync(catalogs.inbox)
+    classifier.sync(catalogs.control)
+    pool = InferencePool()
+    selectors: dict[HostModel, RunbookSelector] = {
+        "control": LocalSelector(classifier, pool, catalogs.control),
+        "inbox": LocalSelector(classifier, pool, catalogs.inbox),
+    }
+    return Container(settings=settings, catalogs=catalogs, selectors=selectors, pool=pool)
 
 
 @asynccontextmanager
@@ -167,8 +182,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info(
             "startup_ready",
             environment=settings.environment,
-            catalog_revision=container.catalog.revision,
-            runbooks=len(container.catalog),
+            catalog_revision=container.catalogs.control.revision,
+            runbooks=len(container.catalogs.control),
+            inbox_catalog_revision=container.catalogs.inbox.revision,
+            inbox_runbooks=len(container.catalogs.inbox),
         )
     except Exception as exc:  # noqa: BLE001 - readiness must not crash liveness
         app.state.container = None

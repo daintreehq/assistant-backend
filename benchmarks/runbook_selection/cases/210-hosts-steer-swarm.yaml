@@ -96,6 +96,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: steer-swarm-cancel-is-not-a-stop
+    host_model: inbox
     category: single-runbook
     note: >-
       A cancel already pressed is not evidence the workers stopped: "STOPPED, CALLED OFF or
@@ -202,6 +203,7 @@ cases:
 
   # ------------------------------------------------------------------ reverse traps
   - id: steer-swarm-trap-lane-side
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse: the receiving machine's assistant stopping the agents it launched for the hub.

@@ -162,6 +162,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: ask-host-reverse-foundation-setup
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse trap. Switching messaging on is the foundation's ("how to switch it on"), and
@@ -286,6 +287,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: ask-host-reverse-swarm-setup
+    host_model: inbox
     category: routing-trap
     note: >-
       Reverse trap. An enrolled assistant on every remote machine before work goes out is
@@ -297,3 +299,6 @@ cases:
     expect:
       required: [daintree.hosts.start-swarm]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

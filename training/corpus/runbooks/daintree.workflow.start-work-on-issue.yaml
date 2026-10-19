@@ -486,7 +486,7 @@ boundaries:
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-89
   - query: 'pick up the open login-page issue on this machine, its own worktree with claude on it'
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
     run: runbook-2026-10-issue-98
 followups:
   - query: claude, and yeah assign it to me

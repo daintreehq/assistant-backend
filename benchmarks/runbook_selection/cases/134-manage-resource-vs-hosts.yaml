@@ -59,6 +59,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: manage-resource-lane-told-to-bring-up
+    host_model: inbox
     category: single-runbook
     note: >-
       A hub's message reaching a lane that plainly asks for a worktree's devbox: "wants to
@@ -127,6 +128,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: manage-resource-trap-start-swarm
+    host_model: inbox
     category: routing-trap
     note: >-
       An assistant readied on each server is daintree.hosts.start-swarm ("Claude Code or Codex
@@ -206,6 +208,7 @@ cases:
 
   # ------------------------------------ a host exchange earlier in the conversation
   - id: manage-resource-after-host-delegation
+    host_model: inbox
     category: continuation
     note: >-
       A turn after work was handed to a Remote Host asks about the worktree's devbox:
@@ -221,3 +224,21 @@ cases:
     expect:
       required: [daintree.worktree.manage-resource]
       optional: [daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: manage-resource-trap-start-swarm-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of manage-resource-trap-start-swarm: the same request against the control catalog.
+      An assistant readied on each server is daintree.hosts.start-swarm ("Claude Code or Codex ready on
+      every Remote Host"). The ready table is not resource status, so daintree.worktree.manage-resource
+      must not be picked.'
+    messages:
+    - role: user
+      content: get an assistant ready on every remote server for this repo and tell me which ones are ready
+    expect:
+      required:
+      - daintree.hosts.delegate-to-host
+      optional:
+      - daintree.hosts.foundation

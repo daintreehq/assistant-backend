@@ -167,7 +167,7 @@ boundaries:
   - query: write the hub-to-hub handover for the cross-host run, not a checkpoint of a local plan
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: the run is already out on the hosts and only the hub assistant changes, so nothing new gets started
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: this hub conversation is nearly full, hand the cross-machine run to a fresh assistant session
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130

@@ -13,6 +13,10 @@ or a runbook id. This is surface-aware rather than a blanket ban on old spelling
 is retired, and ``terminal.sendCommand`` is real for the sidebar assistant even
 though an agent pane uses its owned twin.
 
+Each host model's catalog is read against its own generation of the captures, so
+the inbox catalog served to v0.44 clients can name only what v0.44 offered (no
+``host.call``), and the control catalog none of the inbox tools Daintree removed.
+
 The only exemption is the hidden legacy docs runbook, which is never served, by
 either tool.
 """
@@ -21,9 +25,10 @@ from __future__ import annotations
 
 import re
 
-from daintree_mcp_surfaces import known_action_ids
+import pytest
+from daintree_mcp_surfaces import MODELS, Model, known_action_ids
 
-from daintree_assistant_server.runbooks.catalog import DOCS_RUNBOOK_ID, load_catalog
+from daintree_assistant_server.runbooks.catalog import DOCS_RUNBOOK_ID, load_catalogs
 
 #: Families the retired CLI exposed and the app does not. A dotted name in one of
 #: these is always a retired construct.
@@ -50,11 +55,17 @@ _ACTION_SHAPED = re.compile(
 
 
 def _families() -> set[str]:
-    return {action.split(".", 1)[0] for action in known_action_ids()} | RETIRED_FAMILIES
+    """Every family either generation names: a name in one the other lost (the
+    inbox's `host.sendMessage` read against the control capture) is still caught."""
+    return {
+        action.split(".", 1)[0] for model in MODELS for action in known_action_ids(model)
+    } | RETIRED_FAMILIES
 
 
-def _unknown_actions(text: str, runbook_ids: set[str], namespaces: set[str]) -> set[str]:
-    known = known_action_ids()
+def _unknown_actions(
+    text: str, runbook_ids: set[str], namespaces: set[str], model: Model = "control"
+) -> set[str]:
+    known = known_action_ids(model)
     families = _families()
     found: set[str] = set()
     for family, rest in _ACTION_SHAPED.findall(text):
@@ -70,8 +81,9 @@ def _unknown_actions(text: str, runbook_ids: set[str], namespaces: set[str]) -> 
     return found
 
 
-def test_active_runbooks_name_only_real_actions() -> None:
-    catalog = load_catalog()
+@pytest.mark.parametrize("model", MODELS)
+def test_active_runbooks_name_only_real_actions(model: Model) -> None:
+    catalog = load_catalogs().for_model(model)
     runbook_ids = set(catalog.known_ids)
     namespaces = {
         ".".join(rid.split(".")[:i]) for rid in runbook_ids for i in range(1, rid.count(".") + 1)
@@ -81,7 +93,7 @@ def test_active_runbooks_name_only_real_actions() -> None:
         if runbook.id == DOCS_RUNBOOK_ID:
             continue
         text = "\n".join([runbook.summary, runbook.when_to_use, runbook.body])
-        unknown = _unknown_actions(text, runbook_ids, namespaces)
+        unknown = _unknown_actions(text, runbook_ids, namespaces, model)
         if unknown:
             offenders[runbook.id] = sorted(unknown)
     assert not offenders, (
@@ -107,13 +119,14 @@ def test_the_scanner_catches_what_it_exists_for() -> None:
     }
 
 
-def test_notice_driven_runbooks_say_how_they_resume_and_stop() -> None:
+@pytest.mark.parametrize("model", MODELS)
+def test_notice_driven_runbooks_say_how_they_resume_and_stop(model: Model) -> None:
     """A procedure that ends its turn on a Daintree notice must say what to do when
     the notice (or a resume) arrives, and where it stops — or the next activation
     has nothing to follow but the original launch."""
     arranges_notice = re.compile(r'"notify"\s*:\s*true|terminal\.notifyWhenIdle')
     missing: list[str] = []
-    for runbook in load_catalog().runbooks:
+    for runbook in load_catalogs().for_model(model).runbooks:
         if runbook.meta.foundation or runbook.id == DOCS_RUNBOOK_ID:
             continue
         if not arranges_notice.search(runbook.body):

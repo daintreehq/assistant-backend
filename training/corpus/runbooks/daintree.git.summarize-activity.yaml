@@ -74,10 +74,10 @@ boundaries:
     confusable_with: [daintree.workflow.prepare-feature-demo]
     run: 2026-09-28-round6
   - query: 'write my weekly update from what I shipped, with a commit for each line'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'what did the repo see this week? commits, PRs and what''s still in progress, for a standup'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: Write the team's October 7–11 activity update from merged PRs, reviews and remaining in-flight branches.
     confusable_with:

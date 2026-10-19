@@ -17,6 +17,7 @@
 cases:
   # ------------------------------------------------------------------ recall
   - id: postmortem-swarm-issue-exchange-timeline
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's first request. Decided by "Use on the hub when a run on the Remote Hosts is OVER
@@ -31,6 +32,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-issue-stall-or-twice
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's second request. Decided by "why it took so long, stalled or did the same work
@@ -43,6 +45,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-issue-preserve-partial
+    host_model: inbox
     category: single-runbook
     note: >-
       The issue's third request. Decided by "The deliverable is the evidence" and "salvageable
@@ -56,6 +59,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-agent-phrased-wrong-commit
+    host_model: inbox
     category: single-runbook
     note: >-
       How a hub agent describes the task: a finished run, one wrong commit, one silent host, the
@@ -72,6 +76,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-user-took-hours
+    host_model: inbox
     category: single-runbook
     note: >-
       A person's own words after a bad run. Decided by "which hosts' reports turned out wrong" and "why it
@@ -86,6 +91,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-seeded-approval-and-wrong-sha
+    host_model: inbox
     category: single-runbook
     note: >-
       The seeded failure of the live check: a person approving each host by hand and a host
@@ -102,6 +108,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-user-approval-hunch
+    host_model: inbox
     category: single-runbook
     note: >-
       A hunch-first phrasing: a person suspects slow approvals and asks the records of the
@@ -119,6 +126,7 @@ cases:
 
   # ------------------------------------------------------------------ traps: this runbook wins
   - id: postmortem-swarm-trap-not-local-agent
+    host_model: inbox
     category: routing-trap
     note: >-
       A run on remote hosts, not one agent here. Decided by "Use on the hub when a run on the
@@ -132,6 +140,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-trap-not-supervise
+    host_model: inbox
     category: routing-trap
     note: >-
       Every host has finished and nothing is to be followed. Decided by "following a run still
@@ -144,6 +153,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-trap-not-recover-account
+    host_model: inbox
     category: routing-trap
     note: >-
       Which reports were false and where the time went, not where exchanges stand. Decided by
@@ -156,6 +166,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-trap-not-messaging-gate
+    host_model: inbox
     category: routing-trap
     note: >-
       Messaging works again; the request is the account of the earlier run. Decided by "finding
@@ -168,6 +179,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-trap-not-host-differences
+    host_model: inbox
     category: routing-trap
     note: >-
       The whole run reconstructed from records and the hosts' own words, not a reproduction of one
@@ -184,6 +196,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-trap-not-outage
+    host_model: inbox
     category: routing-trap
     note: >-
       A finished run on the user's own machines, not production. Decided by "a production incident
@@ -221,6 +234,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-reverse-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       What became of work handed out before a restart stays with
@@ -234,6 +248,7 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: postmortem-swarm-reverse-messaging-gate
+    host_model: inbox
     category: routing-trap
     note: >-
       A send refused right now is a gate to name, not a run to explain. It stays with
@@ -278,3 +293,186 @@ cases:
         content: Add a standing note to the project that any brief we send the other machines has to carry the exact commit.
     expect:
       required: [daintree.memory.manage-project-memory]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: postmortem-swarm-issue-stall-or-twice-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of postmortem-swarm-issue-stall-or-twice: the same request against the control catalog.
+      The issue''s second request. Decided by "why it took so long, stalled or did the same work twice".
+      At base it selected daintree.orchestration.status-and-resume.'
+    messages:
+    - role: user
+      content: Why did the cross-host workflow stall or do the same work twice?
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-issue-preserve-partial-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of postmortem-swarm-issue-preserve-partial: the same request against the control
+      catalog. The issue''s third request. Decided by "The deliverable is the evidence" and "salvageable
+      commits and leftovers listed". At base it selected daintree.orchestration.multi-agent.'
+    messages:
+    - role: user
+      content: Produce an evidence-based swarm post-mortem, preserving partial results.
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-agent-phrased-wrong-commit-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of postmortem-swarm-agent-phrased-wrong-commit: the same request against the control
+      catalog. How a hub agent describes the task: a finished run, one wrong commit, one silent host, the
+      records and what each host said as the evidence. Decided by "each host''s claim checked by branch
+      and SHA" and "fixes each with a reproducible scenario".'
+    messages:
+    - role: user
+      content: A finished job on three remote hosts delivered a wrong commit from one and nothing from another.
+        Reconstruct what happened from their task records and what each host said, and give me fixes with
+        a way to reproduce each.
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-user-took-hours-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of postmortem-swarm-user-took-hours: the same request against the control catalog.
+      A person''s own words after a bad run. Decided by "which hosts'' reports turned out wrong" and "why
+      it took so long".'
+    messages:
+    - role: user
+      content: That run on my other machines took hours and one of them swore it pushed the fix. Work out
+        what really happened and where the time went.
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-seeded-approval-and-wrong-sha-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of postmortem-swarm-seeded-approval-and-wrong-sha: the same request against the
+      control catalog. The seeded failure of the live check: a person approving each host by hand and a
+      host reporting the wrong SHA. Decided by "whether the delay was a person approving each host by hand
+      or the machines".'
+    messages:
+    - role: user
+      content: A person had to approve each host by hand and the run sat waiting on them for hours. Now
+        that it is over, work out from the records how long each host waited and what was the machines'
+        fault.
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-user-approval-hunch-control
+    category: single-runbook
+    host_model: control
+    note: 'Control twin of postmortem-swarm-user-approval-hunch: the same request against the control catalog.
+      A hunch-first phrasing: a person suspects slow approvals and asks the records of the finished run
+      to settle it. Decided by "whether the delay was a person approving each host by hand or the machines".
+      The shipped selector sends it to daintree.hosts.steer-swarm, the untrained neighbourhood; the corpus
+      rows carry the lesson (retrain owed).'
+    messages:
+    - role: user
+      content: Did the delay on the remote machines come from someone approving each one by hand, or from
+        the machines? Check the task records of the finished run.
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-trap-not-local-agent-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of postmortem-swarm-trap-not-local-agent: the same request against the control catalog.
+      A run on remote hosts, not one agent here. Decided by "Use on the hub when a run on the Remote Hosts
+      is OVER", with "one agent on this machine (daintree.agents.postmortem-run)" carved out.'
+    messages:
+    - role: user
+      content: The run on the two remote machines ended badly. Explain it from the records, don't start
+        any of it again.
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-trap-not-supervise-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of postmortem-swarm-trap-not-supervise: the same request against the control catalog.
+      Every host has finished and nothing is to be followed. Decided by "following a run still under way
+      (daintree.hosts.supervise-swarm)" being carved out.'
+    messages:
+    - role: user
+      content: The remote hosts are done, nothing is pending. Why did the run take three times as long as
+        planned, and which host reports were false?
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-trap-not-recover-account-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of postmortem-swarm-trap-not-recover-account: the same request against the control
+      catalog. Which reports were false and where the time went, not where exchanges stand. Decided by "catching
+      up or cleaning up (daintree.hosts.recover-and-clean-up)" being carved out.'
+    messages:
+    - role: user
+      content: 'Going through the failed run on two remote hosts: which of the hosts'' reports were false,
+        and where did the time go?'
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-trap-not-outage-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of postmortem-swarm-trap-not-outage: the same request against the control catalog.
+      A finished run on the user''s own machines, not production. Decided by "a production incident (daintree.debug.investigate-outage)"
+      being carved out.'
+    messages:
+    - role: user
+      content: this isn't an outage, it's a finished run across my remote hosts that went wrong; explain
+        it
+    expect:
+      required:
+      - daintree.agents.postmortem-run
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation
+  - id: postmortem-swarm-reverse-messaging-gate-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of postmortem-swarm-reverse-messaging-gate: the same request against the control
+      catalog. A send refused right now is a gate to name, not a run to explain. It stays with daintree.hosts.diagnose-messaging
+      ("came back opted_out, paused, lane_unavailable").'
+    messages:
+    - role: user
+      content: Sending to the second machine's assistant keeps coming back paused. Which gate is that and
+        who fixes it?
+    expect:
+      required:
+      - daintree.hosts.survey-hosts
+      optional:
+      - daintree.hosts.foundation
+      - daintree.foundation

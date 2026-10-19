@@ -311,10 +311,10 @@ boundaries:
     confusable_with: [daintree.runtime.migrate-worktree-database]
     run: 2026-09-28-round6
   - query: 'every worktree needs its own local database before I split the work'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: 'give each worktree its own dev server port so they can all run at once'
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
   - query: each worktree needs node 22 and its own database before its tests can run; add a setup script that provisions that
     confusable_with: [daintree.hosts.run-validation-matrix]
@@ -347,7 +347,7 @@ boundaries:
     confusable_with: [daintree.hosts.place-work, daintree.hosts.reprioritize-swarm]
     run: runbook-2026-10-issue-132
   - query: "set the project's lifecycle commands so a worktree created on any host gets its own env; the agents come later"
-    confusable_with: [daintree.hosts.swarm-fan-out, daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.swarm-fan-out, daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-132
   - query: "give each worktree its own database on every host before we send work out"
     confusable_with: [daintree.hosts.swarm-fan-out]

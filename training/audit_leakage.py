@@ -15,7 +15,6 @@ from collections import Counter, defaultdict
 from collections.abc import Iterator
 from difflib import SequenceMatcher
 
-from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
 from training.compile_corpus import _benchmark_strings, norm
 from training.corpus_source import Example, load_examples
 
@@ -86,7 +85,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="emit training-row locations as JSON")
     args = parser.parse_args()
     examples = load_examples()
-    protected = _benchmark_strings(load_catalog(default_runbooks_dir()))
+    protected = _benchmark_strings()
     overlaps = find_overlaps(examples, protected, near=args.near)
     if args.json:
         print(json.dumps(overlaps, indent=2))

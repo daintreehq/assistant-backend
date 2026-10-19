@@ -45,6 +45,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: run-validation-matrix-agent-outcome
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent-phrased outcome. Decided by the deliverable "one matrix with a row per requested
@@ -227,6 +228,7 @@ cases:
       required: [daintree.release.assess-readiness]
 
   - id: run-validation-matrix-reverse-lane-one-row
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane's side: the hub asked this machine for one environment. daintree.hosts.verify-for-hub,
@@ -240,6 +242,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: run-validation-matrix-reverse-lane-matrix-row
+    host_model: inbox
     category: routing-trap
     note: >-
       The lane's side in matrix words: daintree.hosts.verify-for-hub, "one environment row of the

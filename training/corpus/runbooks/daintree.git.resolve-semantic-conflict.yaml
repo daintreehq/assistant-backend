@@ -60,7 +60,7 @@ boundaries:
   - query: we already merged wt-billing and wt-plans after the forecast came back clean. separately green, together annual plans get charged monthly. resolve what it should do
     confusable_with: [daintree.worktree.compare-worktrees]
   - query: 'the integration branch I built from my agents'' work has their two retry policies fighting; settle the combined behaviour and pin it with a test'
-    confusable_with: [daintree.hosts.integrate-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-107
 followups:
   - query: go with the session branch's 24h lifetime, but keep the auth branch's rotation on refresh

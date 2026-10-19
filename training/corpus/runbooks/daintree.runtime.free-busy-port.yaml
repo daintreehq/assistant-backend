@@ -156,10 +156,10 @@ boundaries:
     - daintree.hosts.delegate-to-host
     run: runbook-2026-10-issue-131
   - query: "a leftover server from yesterday is sitting on 3000 on this machine and the hub's demo needs that port; identify it before anything gets stopped"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "something here already listens on 5173 so the preview can't bind, who owns that process"
-    confusable_with: [daintree.hosts.demo-for-hub]
+    confusable_with: []
     run: runbook-2026-10-issue-108
   - query: "is the port clash coming from a listener on the remote host or from the port this Shell forwards to it?"
     confusable_with: [daintree.hosts.diagnose-host-differences]

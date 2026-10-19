@@ -131,9 +131,9 @@ boundaries:
   - query: combine what the tower and the laptop pushed into one branch, done by a remote machine rather than here
     confusable_with: [daintree.git.integrate-agent-branches]
   - query: I'm on the main Shell, not a host; choose which machine merges the hosts' commits and send it the list
-    confusable_with: [daintree.hosts.integrate-for-hub]
+    confusable_with: []
   - query: from here, have a remote host integrate the commits the other two hosts pushed, and check its result myself
-    confusable_with: [daintree.hosts.integrate-for-hub]
+    confusable_with: []
   - query: which of my machines should merge the hosts' finished branches? pick one and have it do the merge
     confusable_with: [daintree.hosts.place-work]
   - query: put the merge of the two pushed host branches on whichever machine has the most room
@@ -175,10 +175,10 @@ boundaries:
     confusable_with: [daintree.hosts.migrate-across-repositories]
     run: runbook-2026-10-issue-149
   - query: 'the minis finished their halves. one machine should assemble them on a new branch, then tell me whether everything passes'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'put the work the three hosts finished onto one integration branch on a single machine and tell me if it holds'
-    confusable_with: [daintree.hosts.report-swarm-results]
+    confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
   - query: 'The branches from my two remote machines need to be combined into one on the build host'
     confusable_with: [daintree.hosts.open-project-on-host]

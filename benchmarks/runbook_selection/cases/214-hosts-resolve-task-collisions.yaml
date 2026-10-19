@@ -36,6 +36,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: rtc-agent-lanes-same-unit
+    host_model: inbox
     category: single-runbook
     note: >-
       Agent phrasing of the hub's task. Decided by "every host's writer on that work stopped
@@ -269,6 +270,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: rtc-reverse-recover-open-exchanges
+    host_model: inbox
     category: routing-trap
     note: >-
       Which exchanges are still open, and cleaning up what they left, is recover-and-clean-up's

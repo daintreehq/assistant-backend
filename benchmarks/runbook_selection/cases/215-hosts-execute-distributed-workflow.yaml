@@ -94,6 +94,7 @@ cases:
 
   # -------------------------------------------------------------- routing traps
   - id: execute-distributed-workflow-resume-not-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       The issue's hub-restart scenario: the plan continues, the dependents are dispatched.
@@ -220,6 +221,7 @@ cases:
       optional: [daintree.foundation]
 
   - id: execute-distributed-workflow-reverse-recover
+    host_model: inbox
     category: routing-trap
     note: >-
       An account of exchanges after a restart, with no plan to continue, is

@@ -94,15 +94,15 @@ boundaries:
   - query: code review of the mini's branch, but done by a different remote host
     confusable_with: [daintree.review.review-change]
   - query: the mini wrote the cache layer; send it to whichever of my other hosts had no part in it for a review
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
   - query: I'm on the shell; have the build box review the commit the tower pushed and tell me what it finds
-    confusable_with: [daintree.hosts.review-for-hub]
+    confusable_with: []
   - query: spread the attempts over my machines, one attempt per host, and get the best one picked
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
   - query: from my shell, have two hosts race the same fix rather than one machine running both attempts
-    confusable_with: [daintree.hosts.run-local-cohort]
+    confusable_with: []
   - query: 'from the shell: have two hosts each implement the importer, then get the attempts ranked'
-    confusable_with: [daintree.hosts.do-delegated-work]
+    confusable_with: []
   - query: the tower pushed; I'd like codex over on the build box to critique that branch, and any blocking issue it flags goes back to the tower to fix
     confusable_with: [daintree.agents.relay-review-feedback]
   - query: get a second opinion from another machine on the branch the mini pushed

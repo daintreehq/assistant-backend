@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
-from .host_state import HostState, fits
+from .host_state import HOSTS_NAMESPACE, CallerState, HostModel, HostState, fits
 from .loader import RunbookLoadError, load_runbooks_dir
 from .models import Runbook
 
@@ -144,16 +145,29 @@ class Catalog:
                 )
         return closures
 
-    def supporting_for(self, runbook_ids: Sequence[str]) -> list[Runbook]:
+    def supporting_for(
+        self, runbook_ids: Sequence[str], *, attach: Sequence[str] = ()
+    ) -> list[Runbook]:
         """The instruction dependencies of ``runbook_ids``, each once, in order.
+
+        ``attach`` names runbooks this caller gets with every runbook it is served
+        in full, as if each depended on them (``CatalogView.attach``): they and
+        their own dependencies come first, so a general foundation still leads.
+        Nothing is attached to an empty ``runbook_ids``.
 
         Anything already among ``runbook_ids`` is left out: a foundation that is
         itself a search hit is not sent twice. Unknown ids contribute nothing.
         """
         primary = set(runbook_ids)
+        attached = [
+            dep
+            for extra in attach
+            if extra in self._by_id
+            for dep in (*self._supporting[extra], extra)
+        ]
         ordered: list[str] = []
         for runbook_id in runbook_ids:
-            for dep in self._supporting.get(runbook_id, ()):
+            for dep in (*attached, *self._supporting.get(runbook_id, ())):
                 if dep not in primary and dep not in ordered:
                     ordered.append(dep)
         return [self._by_id[dep] for dep in ordered]
@@ -299,5 +313,114 @@ class Catalog:
 
 
 def load_catalog(runbooks_dir: Path | None = None) -> Catalog:
-    """Load and validate the catalog from disk (the packaged runbooks by default)."""
+    """Load and validate the catalog from disk (the packaged runbooks by default).
+
+    The packaged runbooks are the CONTROL catalog, which every tool (benchmark,
+    corpus, training) reads unless it asks for the inbox one (``load_catalogs``).
+    """
     return Catalog(load_runbooks_dir(runbooks_dir or default_runbooks_dir()))
+
+
+# ---- one catalog per host model ------------------------------------------
+#
+# Daintree drives its Remote Hosts in one of two ways (``host_state.HostModel``):
+# v0.44 messages a host's assistant through an inbox, and later builds control the
+# host directly through `host.call`. Both are live while v0.44 is installed, so the
+# server holds a catalog for each and serves a caller from its own, before search,
+# exact retrieval, supporting delivery and the revision: a v0.44 client never
+# sees `host.call`, and a later one never sees an inbox tool.
+#
+# The control catalog is `files/`. The inbox catalog is that, minus the hosts
+# namespace and every runbook `inbox/` overrides, plus `inbox/`: the v0.44 copies,
+# frozen, of every hosts runbook and of each shared runbook whose text differs
+# between the models. Every other runbook is shared, and keeps improving for both.
+
+#: The control catalog's hosts foundation: how to work on another machine. A
+#: caller with a host connected gets it with every runbook it is served in full,
+#: whatever the domain, since any task may be one whose work is on a host.
+HOSTS_FOUNDATION_ID = "daintree.hosts.foundation"
+
+
+def default_inbox_dir() -> Path:
+    return Path(__file__).resolve().parent / "inbox"
+
+
+@dataclass(frozen=True)
+class CatalogView:
+    """What one caller is served from: its catalog, what its search leaves out, and
+    what it gets with every runbook delivered in full (``Catalog.supporting_for``)."""
+
+    catalog: Catalog
+    exclude: frozenset[str]
+    attach: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Catalogs:
+    """The two models' catalogs, each validated on its own."""
+
+    control: Catalog
+    inbox: Catalog
+
+    def for_model(self, model: HostModel) -> Catalog:
+        return self.control if model == "control" else self.inbox
+
+    def view_for(self, state: CallerState) -> CatalogView:
+        catalog = self.for_model(state.model)
+        attach: tuple[str, ...] = ()
+        if (
+            state.model == "control"
+            and state.hosts is not None
+            and state.hosts.hosts == "connected"
+            and HOSTS_FOUNDATION_ID in catalog
+        ):
+            attach = (HOSTS_FOUNDATION_ID,)
+        return CatalogView(
+            catalog=catalog, exclude=catalog.excluded_for(state.hosts), attach=attach
+        )
+
+
+def compose_inbox(shared: Sequence[Runbook], frozen: Sequence[Runbook]) -> list[Runbook]:
+    """The inbox catalog's runbooks: ``frozen`` in place of the shared hosts
+    namespace and of every shared runbook it names.
+
+    A frozen runbook must stand for something: a hosts runbook, or a shared one it
+    overrides. One that overrides nothing would be a v0.44-only runbook outside the
+    hosts namespace, which nothing keeps out of the control catalog's way.
+    """
+    shared_ids = {r.id for r in shared}
+    for runbook in frozen:
+        if not runbook.id.startswith(HOSTS_NAMESPACE) and runbook.id not in shared_ids:
+            raise RunbookLoadError(
+                f"inbox runbook {runbook.id!r} overrides no shared runbook and is not a "
+                "hosts runbook"
+            )
+    overridden = {r.id for r in frozen}
+    kept = [
+        r for r in shared if r.id not in overridden and not r.id.startswith(HOSTS_NAMESPACE)
+    ]
+    return [*kept, *frozen]
+
+
+def load_catalogs(runbooks_dir: Path | None = None, inbox_dir: Path | None = None) -> Catalogs:
+    """Load and validate both models' catalogs (the packaged runbooks by default).
+
+    Fails closed like any malformed runbook: a lane runbook in the control catalog
+    (it has no lanes), or one whose supporting runbooks pass the bound once the
+    hosts foundation is attached.
+    """
+    shared = load_runbooks_dir(runbooks_dir or default_runbooks_dir())
+    frozen = load_runbooks_dir(inbox_dir or default_inbox_dir())
+    control = Catalog(shared)
+    for runbook in control.runbooks:
+        if runbook.meta.host_eligibility == "lane":
+            raise RunbookLoadError(
+                f"{runbook.id!r} is a lane runbook; the control catalog has no lanes"
+            )
+        attached = control.supporting_for([runbook.id], attach=(HOSTS_FOUNDATION_ID,))
+        if len(attached) > MAX_SUPPORTING_RUNBOOKS:
+            raise RunbookLoadError(
+                f"{runbook.id!r} pulls in {len(attached)} supporting runbooks with the hosts "
+                f"foundation attached, over the bound of {MAX_SUPPORTING_RUNBOOKS}"
+            )
+    return Catalogs(control=control, inbox=Catalog(compose_inbox(shared, frozen)))

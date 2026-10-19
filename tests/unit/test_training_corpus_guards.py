@@ -14,7 +14,6 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
 from training.compile_corpus import _benchmark_strings
 from training.compile_corpus import norm as _norm
 from training.corpus_source import load_examples
@@ -24,7 +23,7 @@ CORPUS = REPO_ROOT / "training" / "data" / "selection.jsonl"
 
 
 def _benchmark_strings_cached() -> set[str]:
-    return _benchmark_strings(load_catalog(default_runbooks_dir()))
+    return _benchmark_strings()
 
 
 @pytest.mark.skipif(not CORPUS.is_file(), reason="training corpus not present")

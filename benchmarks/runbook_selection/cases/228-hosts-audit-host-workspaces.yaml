@@ -214,6 +214,7 @@ cases:
 
   # ------------------------------------------------------------------ reverse traps: the neighbour wins
   - id: audit-host-workspaces-reverse-recover-and-clean-up
+    host_model: inbox
     category: routing-trap
     note: >-
       Each host's assistant is to remove what the run made. Decided by recover-and-clean-up's "its
@@ -229,6 +230,7 @@ cases:
       optional: [daintree.hosts.clean-up-for-hub, daintree.hosts.foundation]
 
   - id: audit-host-workspaces-reverse-clean-up-for-hub
+    host_model: inbox
     category: routing-trap
     note: >-
       On a host: the hub asks this assistant to remove what it made. Decided by clean-up-for-hub's
@@ -275,6 +277,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: audit-host-workspaces-reverse-handle-hub-message
+    host_model: inbox
     category: routing-trap
     note: >-
       The wake line on a host that holds the hub's audit request. Decided by handle-hub-message's
@@ -287,6 +290,7 @@ cases:
       optional: [daintree.hosts.foundation]
 
   - id: audit-host-workspaces-reverse-lane-inventory-request
+    host_model: inbox
     category: routing-trap
     note: >-
       On a host, the hub's audit request. Decided by "its answering the hub's audit request
@@ -302,6 +306,7 @@ cases:
       optional: [daintree.worktree.audit-worktrees, daintree.hosts.foundation]
 
   - id: audit-host-workspaces-reverse-survey-hosts
+    host_model: inbox
     category: routing-trap
     note: >-
       Which hosts are up and what is open with them, not what a run left. Decided by
@@ -313,3 +318,22 @@ cases:
     expect:
       required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
+  - id: audit-host-workspaces-reverse-recover-and-clean-up-control
+    category: routing-trap
+    host_model: control
+    note: 'Control twin of audit-host-workspaces-reverse-recover-and-clean-up: the same request against
+      the control catalog. Each host''s assistant is to remove what the run made. Decided by recover-and-clean-up''s
+      "its panes (usage-check panes included), worktrees and branches, cleaned up through each host''s own
+      assistant".'
+    messages:
+    - role: user
+      content: 'Clean up after run r-42 on the remote hosts through each host''s own assistant: panes closed,
+        clean worktrees removed, a list of what stayed and why.'
+    expect:
+      required:
+      - daintree.hosts.recover-and-clean-up
+      optional:
+      - daintree.hosts.foundation

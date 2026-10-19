@@ -71,9 +71,9 @@ boundaries:
   - query: Host mode is on at the studio Mac and it is listed; the next step is getting this project onto it
     confusable_with: [daintree.hosts.connect-host]
   - query: clone this repo onto the box and open it there, getting assistants running on it can be a later step
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: that machine does not have the repo at all; get the repository onto it first
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: I only want the repository to exist on the second Mac for now, there is no task for it
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: put the project on the desk machine so I can pick the work up there myself later

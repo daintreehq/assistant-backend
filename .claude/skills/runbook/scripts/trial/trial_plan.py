@@ -1080,11 +1080,18 @@ def layout(
 # --------------------------------------------------------------------------- loading
 
 
+#: Hubs and lanes are the inbox model's (v0.44): this register and its protocol are
+#: read against the inbox catalog and the capture frozen with it. The control
+#: catalog's hosts runbooks, followed by a Shell's assistant through `host.call`, owe
+#: trials of their own that this protocol does not describe.
+MODEL = "inbox"
+
+
 def load_catalog_ids() -> tuple[frozenset[str], str]:
     sys.path.insert(0, str(REPO / "src"))
-    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalogs
 
-    catalog = load_catalog()
+    catalog = load_catalogs().for_model(MODEL)
     return frozenset(catalog.known_ids), str(catalog.revision)
 
 
@@ -1092,7 +1099,9 @@ def load_surfaces() -> dict[str, frozenset[str]]:
     sys.path.insert(0, str(REPO / "tests"))
     import daintree_mcp_surfaces as surfaces
 
-    return {name: frozenset(surfaces.action_ids(name)) for name in set(ROLE_SURFACE.values())}
+    return {
+        name: frozenset(surfaces.action_ids(name, MODEL)) for name in set(ROLE_SURFACE.values())
+    }
 
 
 def load_outputs() -> dict[str, dict[str, Any]]:
@@ -1103,7 +1112,7 @@ def load_outputs() -> dict[str, dict[str, Any]]:
     return {
         name: {
             str(tool["action_id"]): tool.get("outputSchema") or {}
-            for tool in surfaces.capture(name)["tools"]
+            for tool in surfaces.capture(name, MODEL)["tools"]
         }
         for name in set(ROLE_SURFACE.values())
     }

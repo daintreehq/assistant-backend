@@ -101,12 +101,8 @@ boundaries:
     confusable_with: [daintree.orchestration.competition]
     run: pre-split
   - query: ask the codex agent in pane 3 what it meant by its last message
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: check with the agent that wrote the migration before I touch the schema
-    confusable_with:
-    - daintree.hosts.handle-hub-message
     run: runbook-2026-10-issue-90
   - query: ask the claude terminal on this machine what it found in the server logs
     confusable_with: [daintree.hosts.ask-host-assistant]

@@ -1,0 +1,68 @@
+# A Remote Host's own assistant receiving another assistant's brief, in the control
+# model. There are no lanes: Daintree types the brief into that assistant's prompt as an
+# orchestrator's brief ("From the Daintree Assistant on <machine>"), and the receiver
+# searches the ordinary catalog for the work it asks for, under the rule Daintree stamps
+# on the brief and daintree.foundation repeats: do the work yourself, and delegate it only
+# if it asks you to. These are the briefs whose work is a Daintree operation or that ask
+# for delegation, so an ordinary runbook fits; a brief to change code is the receiver's to
+# do itself. Each query is the receiver's search for its brief, in the client
+# instruction's shape. No hosts procedure may load: those are the Shell's, whose
+# assistant drives hosts through host.call, and a receiver is a host, not a Shell.
+
+cases:
+  - id: receiver-cohort-brief
+    category: single-runbook
+    host_model: control
+    note: >-
+      A batch the brief explicitly splits among this machine's own agents, so the
+      receiver delegates as it asks; the inbox model's daintree.hosts.run-local-cohort.
+    messages:
+      - role: user
+        content: Split these four independent tickets across separate agents here, one worktree each
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.*]
+
+  - id: receiver-steer-brief
+    category: single-runbook
+    host_model: control
+    note: >-
+      Correct the agent already running here for the brief's work; the inbox model's
+      daintree.hosts.steer-for-hub.
+    messages:
+      - role: user
+        content: Tell the agent already working on that task here to switch to the new API instead
+    expect:
+      required: [daintree.agents.steer-running-agent]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.*]
+
+  - id: receiver-cleanup-brief
+    category: single-runbook
+    host_model: control
+    note: >-
+      Remove what the brief's run left here; the inbox model's
+      daintree.hosts.clean-up-for-hub.
+    messages:
+      - role: user
+        content: Close the finished panes and remove the merged worktrees that run left on this machine
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+      forbid: [daintree.hosts.*]
+
+  - id: receiver-question-brief
+    category: foundation-only
+    host_model: control
+    note: >-
+      A plain question about this machine's state, answered by reading it: the
+      foundation alone, as for any what-exists-now read. The inbox model's
+      daintree.hosts.handle-hub-message had a wake line and an envelope; now the
+      question is just the prompt.
+    messages:
+      - role: user
+        content: Which branch and commit is this project checked out on right now?
+    expect:
+      required: [daintree.foundation]
+      forbid: [daintree.hosts.*]

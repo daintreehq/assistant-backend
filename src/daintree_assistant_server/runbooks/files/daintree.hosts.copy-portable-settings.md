@@ -6,7 +6,7 @@ whenToUse: 'Use when the person wants to use COPY SETTINGS: put this machine''s 
 risk: system
 hostEligibility: configured
 ---
-The person does every step in Settings → Hosts → the host → Copy settings and reads you what it shows: no action can. It pushes THIS machine's settings to that host, once; never host to this machine or host to host. A host's assistant cannot start it.
+The person does every step in Settings → Hosts → the host → Copy settings and reads you what it shows: no action can. It pushes THIS machine's settings to that host, once; never host to this machine or host to host. No tool starts it, here or through `host.call`.
 
 1. The host must be Connected ("Connect to … to copy settings": daintree.hosts.connect-host) and new enough ("too old to receive settings": updating it there is that runbook's, the person's call).
 2. "Compared with <host>" writes nothing: how many categories a copy would change. "Too many settings … to compare": preview fewer categories. A request to compare ends at step 4 and authorises no copy.
@@ -20,6 +20,6 @@ Changed since the preview, or the link dropped: Refresh, preview and review agai
 
 Undo: "Undo last copy" on that row, the latest copy only, absent or "Can't be undone" when no record is kept. The dialog lists what goes back; anything edited on the host since stays. A newer copy replaces it. After it, or a dropped link, Refresh: a "restored" count, "Kept · Changed … since the copy" edits, "Couldn't restore" leaves still as copied. Never repeat an undo blindly.
 
-Credentials, consent, trust, project and run state and plugin installs never travel. Plugins: the host's Plugins page, one at a time; trust is per machine.
+Credentials, consent (assistant control, "Let other machines' assistants work here"), trust, project and run state and plugin installs never travel. Plugins: the host's Plugins page, one at a time; trust is per machine.
 
 Report back: host, categories ticked, the preview's changes and skips, the person's approval, the counts, restored count, kept and failed leaves.

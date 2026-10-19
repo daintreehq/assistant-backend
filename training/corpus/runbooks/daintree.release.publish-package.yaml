@@ -126,21 +126,16 @@ boundaries:
     - daintree.hosts.delegate-to-host
     run: runbook-2026-10-issue-138
   - query: 'hub message: you are the publisher for the sdk this round. build 2.1.0 from the SHA in the message, upload it, reply with the registry''s checksum'
-    confusable_with:
-    - daintree.hosts.handle-hub-message
-    - daintree.hosts.do-delegated-work
     run: runbook-2026-10-issue-138
   - query: Every host agrees the 3.0 package is ready; publish it to npm from the release host.
     confusable_with:
     - daintree.release.assess-readiness
     run: runbook-2026-10-issue-138
   - query: the hub says another machine already built and inspected 2.3.0; this host is the publisher, so upload it to the registry and report the hash
-    confusable_with:
-    - daintree.hosts.verify-for-hub
     run: runbook-2026-10-issue-138
   - query: last night's release run left the publish unconfirmed. don't review the run, look at the registry for the version that host uploaded
     confusable_with:
-    - daintree.hosts.postmortem-swarm
+    - daintree.agents.postmortem-run
     run: runbook-2026-10-issue-138
   - query: release the new sdk version 3.1.0 to npm under latest from the release host; it is a library, nothing gets deployed to any environment
     confusable_with:

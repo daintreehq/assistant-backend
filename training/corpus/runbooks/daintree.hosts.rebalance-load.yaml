@@ -88,9 +88,9 @@ boundaries:
   - query: one host in the run is out of claude usage and still has three queued units, move those three to hosts with allowance
     confusable_with: [daintree.hosts.reassign-host-work]
   - query: the codex machine is out of usage mid-swarm, don't just tell me the figures, move its waiting units to hosts with allowance left
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: use each host's usage left to shift the swarm's remaining units off the one that is nearly out
-    confusable_with: [daintree.hosts.check-usage-limits]
+    confusable_with: [daintree.agents.check-usage-limits]
   - query: don't stop the run, just have the swamped host run fewer agents and move its queued units to the quiet ones
     confusable_with: [daintree.hosts.steer-swarm]
   - query: change the swarm so the overloaded host takes on nothing new and its waiting units go elsewhere
@@ -102,7 +102,7 @@ boundaries:
   - query: the agents on the remote host are crushing its memory, lower its count and hand the overflow to other hosts
     confusable_with: [daintree.runtime.relieve-resource-contention]
   - query: which of my machines has room to take load off the overloaded one in the running swarm, then move it
-    confusable_with: [daintree.hosts.start-swarm]
+    confusable_with: [daintree.hosts.delegate-to-host]
   - query: the swarm on the remote machines is unbalanced, re-plan which host runs what so the overloaded one gets relief
     confusable_with: [daintree.orchestration.reprioritize-work]
   - query: don't park the swarm, keep it running but take the weight off the host that is struggling

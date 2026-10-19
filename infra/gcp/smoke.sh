@@ -79,13 +79,22 @@ get() {
   curl -sS -o "$WORK/body" -w '%{http_code}' --max-time 30 ${AUTH[@]+"${AUTH[@]}"} "$URL$1" 2>/dev/null || echo 000
 }
 
-# rpc JSON -> "<status>" with the body in $WORK/body
+# rpc JSON [HEADER...] -> "<status>" with the body in $WORK/body. Extra
+# arguments are request headers ("Name: value"), as Daintree sends its caller's
+# host model and host state.
 rpc() {
+  local body="$1"
+  shift
+  local extra=()
+  for header in "$@"; do extra+=(-H "$header"); done
   curl -sS -o "$WORK/body" -w '%{http_code}' --max-time 30 ${AUTH[@]+"${AUTH[@]}"} \
     -H 'Content-Type: application/json' \
     -H 'Accept: application/json, text/event-stream' \
-    -d "$1" "$MCP" 2>/dev/null || echo 000
+    ${extra[@]+"${extra[@]}"} \
+    -d "$body" "$MCP" 2>/dev/null || echo 000
 }
+# What a build that drives its hosts directly sends on every runbooks POST.
+HOST_CONTROL='Daintree-Host-Control: 1'
 
 # check PYTHON_EXPR [EXPECTED] -> prints "ok" or the reason, reading $WORK/body
 # as `body` and EXPECTED as `expected`. The expression is always a literal in
@@ -122,9 +131,11 @@ if [ "$STATUS" = "200" ]; then
   [ "$VERDICT" = "ok" ] && pass "/readyz is ready with a non-empty catalog" \
                         || fail "/readyz body is wrong" "$VERDICT"
   REVISION="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("catalog_revision",""))' "$WORK/body")"
+  INBOX_REVISION="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("inbox_catalog_revision",""))' "$WORK/body")"
 else
   fail "/readyz answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
   REVISION=""
+  INBOX_REVISION=""
 fi
 
 STATUS="$(get /version)"
@@ -160,7 +171,7 @@ fi
 
 # A real search through the shipped classifier: the one check that proves the
 # ONNX artifact loaded and ranks, rather than that the process is up.
-STATUS="$(rpc '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_runbooks","arguments":{"query":"rename my terminals so I can tell the agents apart","max_results":3}}}')"
+STATUS="$(rpc '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_runbooks","arguments":{"query":"rename my terminals so I can tell the agents apart","max_results":3}}}' "$HOST_CONTROL")"
 if [ "$STATUS" = "200" ]; then
   # Selected hits carry their procedure; neighbours are named only.
   VERDICT="$(check '(lambda r: r["isError"] is False and 1 <= len(r["structuredContent"]["runbooks"]) <= 3 and all(x.get("instructions") if x["selected"] else "instructions" not in x for x in r["structuredContent"]["runbooks"]) or r)(body["result"])')"
@@ -173,11 +184,29 @@ if [ "$STATUS" = "200" ]; then
                         || fail "search ranked the wrong runbook first" "$VERDICT"
   if [ -n "$REVISION" ]; then
     VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$REVISION")"
-    [ "$VERDICT" = "ok" ] && pass "search and /readyz agree on the catalog revision" \
+    [ "$VERDICT" = "ok" ] && pass "search and /readyz agree on the control catalog revision" \
                           || fail "search catalog_revision differs from /readyz" "$VERDICT"
   fi
 else
   fail "MCP tools/call answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
+fi
+
+# A v0.44 client sends no host-control header and is served the inbox catalog: the
+# same canonical query, ranked over it, carrying its revision.
+STATUS="$(rpc '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"search_runbooks","arguments":{"query":"rename my terminals so I can tell the agents apart","max_results":3}}}')"
+if [ "$STATUS" = "200" ]; then
+  VERDICT="$(check '(lambda r: r["isError"] is False and r["structuredContent"]["runbooks"] and r["structuredContent"]["runbooks"][0]["id"] == expected and r["structuredContent"]["runbooks"][0]["selected"] is True or r)(body["result"])' daintree.terminals.rename)"
+  [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is answered from a ranked catalog" \
+                        || fail "the search without Daintree-Host-Control is wrong" "$VERDICT"
+  if [ -n "$INBOX_REVISION" ]; then
+    VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$INBOX_REVISION")"
+    [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is served the inbox catalog" \
+                          || fail "a caller without Daintree-Host-Control got another catalog" "$VERDICT"
+  else
+    fail "/readyz names no inbox catalog revision"
+  fi
+else
+  fail "MCP tools/call without a host model answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
 fi
 
 # Exact retrieval, and the dependency delivery both tools share: a specific
@@ -189,6 +218,17 @@ if [ "$STATUS" = "200" ]; then
                         || fail "get_runbook result is wrong" "$VERDICT"
 else
   fail "MCP get_runbook answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
+fi
+
+# With a host connected, a host-control caller gets the hosts foundation with
+# every runbook, not only the hosts ones.
+STATUS="$(rpc '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_runbook","arguments":{"id":"daintree.terminals.rename"}}}' "$HOST_CONTROL" 'Daintree-Hosts: connected')"
+if [ "$STATUS" = "200" ]; then
+  VERDICT="$(check '(lambda r: r["isError"] is False and [x["id"] for x in r["structuredContent"]["supporting_runbooks"]] == ["daintree.foundation", "daintree.hosts.foundation"] or r)(body["result"])')"
+  [ "$VERDICT" = "ok" ] && pass "a connected host-control caller gets the hosts foundation with every runbook" \
+                        || fail "the hosts foundation did not come with the runbook" "$VERDICT"
+else
+  fail "MCP get_runbook with a connected host answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
 fi
 
 STATUS="$(get /v1/daintree/mcp)"
