@@ -112,6 +112,9 @@ boundaries:
   - query: 'Assign distinct prototypes for the same document editor: a block model and a plain-text model, then compare undo correctness and startup cost without merging either.'
     confusable_with: [daintree.orchestration.competition, daintree.orchestration.hypothesis-split]
     run: 2026-10-16-synthetic-audit
+  - query: "try the search feature two ways, one agent per approach, and recommend one"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: add Kysely as a third option too, same scenario
     history:

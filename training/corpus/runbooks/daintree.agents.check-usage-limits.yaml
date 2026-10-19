@@ -455,6 +455,12 @@ boundaries:
   - query: How much Claude usage does each remote machine have left?
     confusable_with: [daintree.runtime.measure-performance]
     run: runbook-2026-10-issue-139
+  - query: "which of my agents has the most allowance left right now? just the numbers"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "read me codex's remaining five hour window before I decide anything"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: now do grok
     history:

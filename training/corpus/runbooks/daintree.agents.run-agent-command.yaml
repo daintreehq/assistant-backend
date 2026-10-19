@@ -138,6 +138,12 @@ boundaries:
   - query: "which slash commands does the Codex pane on this machine offer for the repo?"
     confusable_with: [daintree.skills.use-plugin-skill]
     run: runbook-2026-10-issue-136
+  - query: "lower the effort level on the claude agent that's already running"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "use the model menu in the open gemini pane to pick flash"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: do the same for claude-3, focus on the billing tests
     history:

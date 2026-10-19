@@ -217,6 +217,12 @@ boundaries:
   - query: 'Place three distinct untouched issues on Remote Hosts by capacity: the tooltip bug, the docs typo, and the retry test. Give each issue one owner.'
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: 2026-10-16-synthetic-audit
+  - query: "which of my hosts should pick up the parser fix"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
+  - query: "send the import job to whichever machine has the most room"
+    confusable_with: [daintree.agents.choose-agent-model]
+    run: runbook-2026-10-19-choose-agent-model
 followups:
   - query: yes, go ahead with that split
     history:
