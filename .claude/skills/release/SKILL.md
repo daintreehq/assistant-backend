@@ -1,6 +1,6 @@
 ---
 name: release
-description: "Ship the current branch to production. Does not wait for GitHub CI: fast-forwards main, pushes to origin, then watches the Cloud Build trigger build the image and roll a new Cloud Run revision out — confirming the live /version reports the exact commit that was released. Use when the user says release, ship it, deploy, push to production, or asks to get what is on develop live."
+description: "Ship the current branch to production. Does not wait for GitHub CI: fast-forwards main, pushes to origin, then watches the Cloud Build trigger build the image and roll a new Cloud Run revision out (or, with no gcloud login, watches the public service instead) — confirming the live /version reports the exact commit that was released. Use when the user says release, ship it, deploy, push to production, or asks to get what is on develop live."
 argument-hint: "(optional) --dry-run to show what would ship without pushing anything"
 allowed-tools:
   - Bash
@@ -32,10 +32,11 @@ went, and that what is actually serving afterwards is what you shipped.
 | Serving region | `us-central1` |
 | Build trigger | `deploy-main` |
 | Repo | `daintreehq/assistant-backend` |
+| Public URL | `https://assistant.daintree.org` |
 
 The trigger's region is **not** necessarily `us-central1` — it lives wherever the
-Developer Connect repository link lives. Discover it once in preflight (after the
-auth check) and reuse it for every `gcloud builds` call:
+Developer Connect repository link lives. In gcloud mode, discover it once in
+preflight (after the auth check) and reuse it for every `gcloud builds` call:
 
 ```bash
 BUILD_REGION=$(for r in us-central1 europe-west1 us-east1 us-west1; do
@@ -60,9 +61,14 @@ done)
   and installed (`training/retrain.sh` runs `bench local` before installing).
 - **Never use a foreground `sleep`** to wait — the harness blocks it. Watch the build
   with the Monitor tool (step 5).
-- **Nothing irreversible before every tool works.** An expired `gcloud` login
-  discovered after the push leaves a deploy running that you cannot watch or
-  verify. Preflight proves `gh` and `gcloud` both work before touching `main`.
+- **Pick the mode before the push, never after.** `gh` must work. `gcloud` is
+  optional: the push to `main` is the deploy, and a login only lets you watch it.
+  With one, the build is watched step by step (**gcloud mode**). Without one, the
+  release still goes out and is watched through the public `/version` (**public
+  mode**). The verdict on what is live is the same. What public mode lacks until
+  someone logs in: the build log when a release fails, the revision and traffic
+  check, the service logs, and rollback. Preflight decides the mode, so an expired
+  login is a choice made before `main` moves, not something found out after.
 
 ## Procedure
 
@@ -81,14 +87,16 @@ gh auth status >/dev/null 2>&1 || echo "gh: not logged in"
 gcloud auth print-access-token --quiet >/dev/null 2>&1 || echo "gcloud: token expired"
 ```
 
-Either failing is a stop. The user has to re-auth interactively: tell them to run
-`! gcloud auth login` (or `! gh auth login`) and then pick up from here. Only
-then discover `BUILD_REGION` (see Constants).
+`gh` failing is a stop: tell the user to run `! gh auth login` and pick up from
+here. `gcloud` working means gcloud mode: discover `BUILD_REGION` (see Constants).
+`gcloud` failing means public mode. Do not stop. Tell the user in one line that
+the release will be watched through the public URL, and that `! gcloud auth
+login` at any point brings back the build log and rollback.
 
 Refuse to start a release while another `deploy-main` build is still running.
 `cloudbuild.yaml` has no ordering guard, so if two builds overlap the slower
 one's `promote` can land after the newer one and quietly put the older commit back
-on 100%:
+on 100%. In gcloud mode:
 
 ```bash
 gcloud builds list --region="$BUILD_REGION" --project=daintree-research \
@@ -97,6 +105,20 @@ gcloud builds list --region="$BUILD_REGION" --project=daintree-research \
 
 If anything is listed, watch it to completion with `watch-build.sh` (step 5) and
 only then continue.
+
+In public mode, compare the last push to `main` with what is serving:
+
+```bash
+gh api 'repos/daintreehq/assistant-backend/activity?ref=refs/heads/main&per_page=1' \
+  --jq '.[0] | "\(.after) \(.timestamp | fromdateiso8601)"'   # <sha> <pushed-at epoch>
+curl -fsS https://assistant.daintree.org/version              # build_sha
+```
+
+The same SHA in both means nothing is in flight. If they differ and that push was
+under 35 minutes ago, its build may still be running: watch it with
+`watch-live.sh <sha> <pushed-at>` (step 5) and only then continue. If they differ
+and the push is older, its build is over and never went live. Tell the user, since
+this release ships that commit again, then continue.
 
 A dirty tree is a stop: report what is uncommitted and let the user decide. Then
 confirm the local branch matches its remote (`git rev-list --left-right --count
@@ -111,7 +133,8 @@ git rev-list --count origin/main..origin/<branch>
 
 If that is `0`, nothing new is on the branch. Either main is already current (say
 so and stop) or the user wants to redeploy the existing main — in that case skip
-to step 4 and fire the trigger manually instead of pushing.
+to step 4 and fire the trigger manually instead of pushing. Firing the trigger
+needs gcloud: in public mode, ask for `! gcloud auth login` first.
 
 ### 2. Show what is shipping
 
@@ -151,6 +174,7 @@ release. Then record the released commit and push:
 
 ```bash
 RELEASE_SHA=$(git rev-parse HEAD)
+PUSHED_AT=$(date +%s)
 git push origin main
 ```
 
@@ -163,7 +187,8 @@ gcloud builds triggers run deploy-main --region="$BUILD_REGION" \
 
 ### 5. Watch the build
 
-Run `watch-build.sh` (next to this file) under the **Monitor** tool, with
+In public mode, skip to "Public mode" below. In gcloud mode, run `watch-build.sh`
+(next to this file) under the **Monitor** tool, with
 `timeout_ms: 1800000` to match the build's own 1800s timeout:
 
 ```bash
@@ -179,8 +204,9 @@ changes:
 - `DONE <status> <id> [detail]`: the build's verdict. The script exits 0 only on
   `SUCCESS`.
 - `ERROR ...`: no build appeared, or gcloud failed 5 times in a row (usually auth
-  expiring mid-watch). This means **unknown**, not failed: check the console
-  before you report anything.
+  expiring mid-watch). This means **unknown**, not failed. If the login expired,
+  carry on in public mode with `watch-live.sh "$RELEASE_SHA" "$PUSHED_AT"`.
+  Otherwise check the console before you report anything.
 
 It polls rather than using `gcloud builds log --stream`, because that command's
 exit code does not reliably reflect how the build ended.
@@ -211,6 +237,29 @@ important case to explain clearly: the candidate revision was deployed with
 **no traffic**, so production is untouched and still serving the previous
 revision. A `deploy-rc` or `build` failure likewise never reached traffic.
 
+#### Public mode
+
+Run `watch-live.sh` (next to this file) under the **Monitor** tool, with
+`timeout_ms: 1800000`:
+
+```bash
+.claude/skills/release/watch-live.sh "$RELEASE_SHA" "$PUSHED_AT"
+```
+
+It polls the public `/version` every 20s and prints only changes:
+
+- `SERVING <sha>`: what is live now (`unreachable` if `/version` does not answer).
+  The first line is the old commit, and that is expected while the build runs.
+- `LIVE <sha>`: the release is serving. Exits 0.
+- `DEADLINE ...`: 35 minutes after the push, the commit is still not live. Exits 1.
+
+Its deadline counts from the push, so a Monitor expiry before `LIVE` or
+`DEADLINE` is not a verdict. Re-arm it with the same arguments. `DEADLINE` means
+the build failed or timed out, and production is untouched: a failed build never
+takes traffic. Say so, and say the reason is in the build log, which needs
+`! gcloud auth login`. Once logged in, find the build with `gcloud builds list
+--filter="substitutions.COMMIT_SHA=$RELEASE_SHA"` and read it as above.
+
 ### 6. Verify what is actually live
 
 This is the part that makes it a release rather than a push.
@@ -218,6 +267,7 @@ This is the part that makes it a release rather than a push.
 ```bash
 URL=$(gcloud run services describe daintree-assistant --region=us-central1 \
   --project=daintree-research --format='value(status.url)')
+# public mode: URL=https://assistant.daintree.org
 
 curl -fsS "$URL/health"     # {"status":"ok"}
 curl -fsS "$URL/readyz"     # {"status":"ready","catalog_revision":"...","runbooks":N}
@@ -236,11 +286,13 @@ already knows all of this:
 Pass `--expect-build-sha`. Without it the script checks whatever is at the URL
 and won't notice an older commit, which is exactly the mistake a release can
 make. It is free: it runs one real search through the shipped selector, which
-makes no model call.
+makes no model call. In public mode, also pass `--url https://assistant.daintree.org`,
+since finding the URL is the script's only use of gcloud.
 
 `build_sha` disagreeing with `RELEASE_SHA` means traffic is still on an older
-revision — say so plainly rather than reporting success. Confirm which revision
-holds the traffic and that the service is Ready:
+revision — say so plainly rather than reporting success. The checks below need
+gcloud. In public mode, skip them and report them as not checked. Confirm which
+revision holds the traffic and that the service is Ready:
 
 ```bash
 gcloud run services describe daintree-assistant --region=us-central1 \
@@ -276,10 +328,12 @@ git push origin <branch>
 
 Lead with whether it is live. Then: the commits that shipped, the released SHA,
 the revision now serving, the service URL, and the build log URL. If anything was
-skipped or degraded, say which and why.
+skipped or degraded, say which and why. In public mode, the revision and the build
+log URL were not checked.
 
 ## Rolling back
 
+Rolling back needs gcloud: in public mode, ask for `! gcloud auth login` first.
 Traffic moves back to the previous revision immediately — no rebuild:
 
 ```bash
