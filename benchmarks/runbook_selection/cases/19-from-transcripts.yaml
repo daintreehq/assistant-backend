@@ -589,3 +589,93 @@ cases:
         content: And can you please give me your chat history file?
     expect:
       required: []
+
+  - id: tx-host-batch-rounds-agent-query
+    category: routing-trap
+    note: >-
+      Help-assistant session b64fae7c, 2026-10-21: the user ran a merge-gated drain
+      entirely on one Remote Host they named, every Daintree call through host.call.
+      The user's skill dictated the query without the host (tx-batch-rounds-agent-query)
+      and work-in-waves came back. The same query naming the host selected place-work
+      (0.99) and delegate-to-host, with work-in-waves outside the top four; place-work
+      surveys hosts and shows a placement table, which is wrong once the person has
+      chosen the host. Decided by work-in-waves' "here or on one other machine they
+      name, whatever they call it (a Remote Host), where the next wave starts only once
+      the previous wave's pull requests are merged" and place-work's fence "several issues all for ONE machine the person
+      named, whatever they call it".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Work batches of issues in parallel worktrees on a remote host, merge their
+          pull requests, then start the next batch
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.place-work]
+
+  - id: tx-host-all-issues-user-words
+    category: routing-trap
+    note: >-
+      Same session, the user's words with the host name generalised: every ready
+      issue, worked on the one host they named. place-work took it (0.99) with
+      delegate-to-host and swarm-fan-out. With no merge between rounds named, the
+      text on disk gives it to fan-out-work ("keep going until all 30 are done"), not
+      work-in-waves, which needs a merge between waves; the pick (find-issue-work) may
+      ride along. Decided by
+      place-work's fence "several issues all for ONE machine the person named,
+      whatever they call it (a batch or merge-gated waves there".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Please do all available issues on my other Mac.
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional:
+        - daintree.foundation
+        - daintree.hosts.foundation
+        - daintree.workflow.find-issue-work
+      forbid: [daintree.hosts.place-work]
+
+  - id: tx-why-issue-left-out-mid-drain
+    category: continuation
+    note: >-
+      Same session, between rounds: the user asked why one open issue was not in the
+      last pick, and the assistant answered from the pick report and the issue thread.
+      Read alone, the words selected status-and-resume, follow-up-on-issue and
+      postmortem-run. Mid-run the question continues the drain, whose picks and skips
+      are the run's own record. Decided by work-in-waves' "keep going until all the
+      waves are done" (as tx-issues-left-mid-run).
+    active: [daintree.orchestration.work-in-waves]
+    messages:
+      - role: user
+        content: >-
+          Drain the ready issues in rounds on my other machine: a worktree and agent per
+          issue there, merge each round's pull requests, then pick again
+      - role: assistant
+        content: >-
+          Round 1 is merged. The pick found one ready issue; the other two open ones
+          were left out.
+      - role: user
+        content: Why wasn't that other issue included in the last batch?
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional:
+        - daintree.foundation
+        - daintree.workflow.find-issue-work
+        - daintree.workflow.follow-up-on-issue
+
+  - id: tx-transcript-file-this-chat
+    category: no-task
+    note: >-
+      Same session: the user asked for this chat's transcript file, the second session
+      to ask (tx-own-chat-history-file), and the assistant found it on disk. No catalog
+      workflow covers locating a session transcript; served search selected
+      curate-copytree-bundle (0.91), whose "Use when the user asks for a curated
+      CopyTree bundle, context bundle, reference file" makes a new file from project
+      context, not an existing chat log.
+    messages:
+      - role: user
+        content: Please can you give me the transcript file for this chat.
+    expect:
+      required: []

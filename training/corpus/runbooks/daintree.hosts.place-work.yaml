@@ -208,6 +208,21 @@ boundaries:
   - query: "send the import job to whichever machine has the most room"
     confusable_with: [daintree.agents.choose-agent-model]
     run: runbook-2026-10-19-choose-agent-model
+  - query: "these issues don't all have to go to the mini, spread them over whichever hosts have room"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "rather than putting the whole batch on one machine, give each issue to whichever remote host can best take it"
+    confusable_with: [daintree.orchestration.work-in-waves, daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "I haven't picked machines for these six tickets: you choose a host for each by load and send them out"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "spread these tickets across my workstations, whichever has the most headroom"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "I've got three servers; put each of these issues on whichever one is least loaded"
+    confusable_with: [daintree.orchestration.fan-out-work]
+    run: transcript-2026-10-21-host-batch-drain
 followups:
   - query: yes, go ahead with that split
     history:

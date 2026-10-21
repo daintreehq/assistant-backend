@@ -670,6 +670,30 @@ boundaries:
   - query: 'Allocate three unrelated tickets to separate agents: fix search ordering, add invoice CSV export and update the mobile icon; there is no repeated migration pattern.'
     confusable_with: [daintree.orchestration.migration-sweep]
     run: 2026-10-16-synthetic-audit
+  - query: "put an agent on each of these five issues on the remote build host, a worktree each over there"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.delegate-to-host]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "on my other mac, start /work in its own worktree for every one of these issues, all at once"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "one agent per open bug on the linux host, in parallel worktrees on that machine, no more than four at a time"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "Launch one agent per independent issue on the Remote Host the user named, each in its own worktree on that host, and supervise each chain"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.delegate-to-host]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "everything on host three please: one claude per ticket in separate worktrees there, keep going until the list is done"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "spin up an agent per ticket on the beefy server, each in a fresh worktree on it"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.delegate-to-host]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "on the remote host in the office, launch these six bugs in parallel, a worktree each, no more than three running"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "the ubuntu vm should take all five issues at once, one agent and worktree per issue on it"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
 followups:
   - query: yeah all of them except the docs one
     history:

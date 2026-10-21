@@ -191,8 +191,9 @@ TOOL_DEFINITION: dict[str, Any] = {
         'user would ask for it ("ask one agent a question and bring back its '
         'answer"), not as keywords, and keep it short: no transcripts, terminal '
         "output or secrets. Keep how the user wants it done, not just the code change: "
-        "several agents, a time limit, a running agent, a review loop, a plugin skill or a "
-        "slash command decide which procedure fits. Returns up to max_results runbooks, "
+        "several agents, a time limit, a running agent, a review loop, a plugin skill, a "
+        "slash command or another machine (say remote host, whatever the user calls it) "
+        "can decide which procedure fits. Returns up to max_results runbooks, "
         "best first. `selected` is true for the runbooks the classifier judges actually "
         "fit: those carry their "
         "full procedure in `instructions`, so follow them. The rest are neighbours, "

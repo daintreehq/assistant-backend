@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 21559,
-  "compiled_sha256": "79db79af1997b1dfa72e70ae88b11040f43e8b87b642e19c607f83f9602423c9",
+  "rows": 21581,
+  "compiled_sha256": "80d2d876d07ca5d9597c0f34dfafb6b8554e3afd9b3969d5ce62055693c552c0",
   "label_space_sha256": "44e4665a5c0909c6d22f96b0ba1e5f6ef60182c47b15c53f3e63a95f66999e7b",
   "label_space_size": 140,
   "by_source": {
-    "boundary": 7105,
+    "boundary": 7127,
     "docs": 882,
     "followup": 1007,
     "foundation": 432,
@@ -106,7 +106,8 @@
     "transcript-2026-09-27-help-release": 14,
     "transcript-2026-09-29-launch-effort-cut-off-turns": 14,
     "transcript-2026-10-15-work-in-waves": 20,
-    "transcript-2026-10-16-batch-workflows": 99
+    "transcript-2026-10-16-batch-workflows": 99,
+    "transcript-2026-10-21-host-batch-drain": 22
   },
   "dropped": {},
   "adjusted": {
@@ -462,10 +463,10 @@
       "sha256": "b0bc8ced65ab753d8beae09ed185faf2637898d611b10f6033f1569fadb69b57"
     },
     "runbooks/daintree.hosts.place-work.yaml": {
-      "examples": 101,
-      "rows": 101,
+      "examples": 106,
+      "rows": 106,
       "runbook": "daintree.hosts.place-work",
-      "sha256": "765c3f5c7d6a2bc26993d7fb6d415f7214e53905faa76a16024abafb30063ee0"
+      "sha256": "c149cf1ce633e0d506ef61c4b743a7ba609f9aaebb6ee0004723f3bebc64601b"
     },
     "runbooks/daintree.hosts.prepare-host-maintenance.yaml": {
       "examples": 62,
@@ -618,10 +619,10 @@
       "sha256": "5972d88643f1b6dcf6a32f0bcb8d88e01051cdaa46981d8e17c85e9dc1fdae85"
     },
     "runbooks/daintree.orchestration.fan-out-work.yaml": {
-      "examples": 376,
-      "rows": 376,
+      "examples": 384,
+      "rows": 384,
       "runbook": "daintree.orchestration.fan-out-work",
-      "sha256": "c408e09aa440d1ac9ade30353023b9ed0b2b5adabb4eeecd844fef2f12812125"
+      "sha256": "7da387b3d15e77cd953ff92980bc1b6d49aa98a7787e37d4eafd777f5617f2d1"
     },
     "runbooks/daintree.orchestration.hand-off-orchestration.yaml": {
       "examples": 51,
@@ -744,10 +745,10 @@
       "sha256": "9acf1ef19931d0252c65ee0032a0c1496531ad893e382cbfccf99ee0ddc47e6a"
     },
     "runbooks/daintree.orchestration.work-in-waves.yaml": {
-      "examples": 99,
-      "rows": 99,
+      "examples": 108,
+      "rows": 108,
       "runbook": "daintree.orchestration.work-in-waves",
-      "sha256": "8c1cfe3a50c2eb50922793b5c66bdba5f3aad8fab989c186a75bfdc538c4a1e2"
+      "sha256": "574fbf86fd4825ce8a6f8d0f5030422a7db9397937c47edc0491512a8259eaab"
     },
     "runbooks/daintree.orchestration.workspace-cleanup.yaml": {
       "examples": 360,

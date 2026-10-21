@@ -172,6 +172,33 @@ boundaries:
   - query: wave one is 903, 905 and 906; wave two is 910. they're already planned. please run them right through, merge between waves
     confusable_with: [daintree.orchestration.decompose-work]
     run: 2026-10-16-synthetic-audit
+  - query: "run the issue rounds on the other computer: a worktree and /work agent per issue over there, merge each round's PRs before picking the next"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "drain the backlog on the linux build host: batches of issues in worktrees on it, land each batch with the merge command there, then the next batch"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "all of this happens on the mac mini, not here: pick a batch, an agent per issue in its own worktree on the mini, merge them, clean up, repeat until nothing's ready"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.delegate-to-host]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "on host gpu-01, work the ready issues in rounds and merge each round before starting another"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.delegate-to-host]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "Drive merge-gated issue waves on the one Remote Host the user named: each worktree and agent created there through host.call, the wave's PRs merged before the next wave"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "use the second instance for the whole batch run, every worktree, every agent and the merge on that machine, round after round until the issues are gone"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "on the workstation in the office, take the ready issues a round at a time: a worktree and agent each there, merge the round, then the next"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "do the merge-gated batches on the build-03 host instead of this laptop until the backlog's empty"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-21-host-batch-drain
+  - query: "my Mac Studio should run the whole drain: worktrees, agents and the merge command all on it, one batch after another"
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.delegate-to-host]
+    run: transcript-2026-10-21-host-batch-drain
 followups:
   - query: yep retry those deletes and then kick off the merge
     history:
