@@ -1,0 +1,653 @@
+cases:
+- id: restructure-signoff-model-existing
+  category: single-runbook
+  messages:
+  - role: user
+    content: The parser agent is staying in its current pane. Inspect its supported model choices, switch it to
+      a cheaper model with lower reasoning effort, and verify the new setting.
+  expect:
+    required:
+    - daintree.agents.choose-agent-model
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-model-default
+  category: single-runbook
+  messages:
+  - role: user
+    content: For the Atlas project, choose the model and thinking level that newly launched Codex agents should
+      inherit. Leave all agents already running on their present models.
+  expect:
+    required:
+    - daintree.agents.choose-agent-model
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-model-catalog
+  category: single-runbook
+  messages:
+  - role: user
+    content: Find which models this installed Claude CLI actually offers before recommending one for the design
+      agent; do not start another agent to find out.
+  expect:
+    required:
+    - daintree.agents.choose-agent-model
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-ask-existing
+  category: single-runbook
+  messages:
+  - role: user
+    content: The payments agent already has the failing fixture in context. Ask that existing agent whether its
+      patch covers refunds, wait for its answer, and bring the answer back.
+  expect:
+    required:
+    - daintree.agents.ask-running-agent
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-answer-blocked
+  category: single-runbook
+  messages:
+  - role: user
+    content: A notice says the schema worker needs the name of the compatibility column. Read its question and answer
+      legacy_customer_id in that same conversation so it can continue.
+  expect:
+    required:
+    - daintree.agents.answer-waiting-agent
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-steer-active
+  category: single-runbook
+  messages:
+  - role: user
+    content: The search agent is still implementing the first draft. Tell it that accent folding is required as
+      well, preserving its current workspace and assignment.
+  expect:
+    required:
+    - daintree.agents.steer-running-agent
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-agent-recovery
+  category: single-runbook
+  messages:
+  - role: user
+    content: The formatter worker disappeared during a restart. Establish what survived and resume its existing
+      assignment safely; do not assume its half-written files are complete.
+  expect:
+    required:
+    - daintree.agents.recover-agent
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-handover-agent
+  category: single-runbook
+  messages:
+  - role: user
+    content: Replace the nearly full-context implementation agent with a fresh one in the same checkout. Transfer
+      its verified progress, unfinished edits and next checks before retiring the old agent.
+  expect:
+    required:
+    - daintree.agents.hand-off-task
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-relay-review
+  category: single-runbook
+  messages:
+  - role: user
+    content: Send the review agent’s concrete findings to the implementation agent that owns the patch, have that
+      agent fix them, and verify the follow-up without editing the patch yourself.
+  expect:
+    required:
+    - daintree.agents.relay-review-feedback
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-poll-different
+  category: single-runbook
+  messages:
+  - role: user
+    content: Ask the four pinned architecture agents the same question about the migration risk. Keep their answers
+      separately attributed and compare their disagreements.
+  expect:
+    required:
+    - daintree.agents.poll-pinned-agents
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-status
+  category: single-runbook
+  messages:
+  - role: user
+    content: 'Make one dated inventory of the configured build machines: their connection, observed load, open projects,
+      existing assistants and anything waiting for my decision. Start no work.'
+  expect:
+    required:
+    - daintree.hosts.survey-hosts
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-refusal
+  category: single-runbook
+  messages:
+  - role: user
+    content: A host.call read returned opted_out. Inspect the known host’s control state and report exactly which
+      person-controlled switch blocks access, without trying another route.
+  expect:
+    required:
+    - daintree.hosts.survey-hosts
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-question
+  category: single-runbook
+  messages:
+  - role: user
+    content: Ask the assistant already open on the render machine whether its dependency upgrade is ready, then
+      relay its own reply. Do not create a replacement worker.
+  expect:
+    required:
+    - daintree.hosts.ask-host-assistant
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-placement
+  category: single-runbook
+  messages:
+  - role: user
+    content: Choose a suitable remote machine for a new indexing task by checking project availability and current
+      capacity. I only want the placement decision; launch nothing yet.
+  expect:
+    required:
+    - daintree.hosts.place-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-prepare
+  category: single-runbook
+  messages:
+  - role: user
+    content: Get an assistant ready in the Beacon repository on the connected Linux tower. If none exists, start
+      one in an available slot and verify readiness; there is no task prompt to send yet.
+  expect:
+    required:
+    - daintree.hosts.delegate-to-host
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-monitor
+  category: single-runbook
+  messages:
+  - role: user
+    content: Keep the workers already running on my other computers moving until their current assignments finish.
+      Reconcile notices, handle their questions and verify each claimed result across turns.
+  expect:
+    required:
+    - daintree.hosts.supervise-swarm
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-park
+  category: single-runbook
+  messages:
+  - role: user
+    content: I need the remote build machines for a presentation. Bring the current cross-host run to safe stopping
+      points and preserve a separate resume record for every unfinished assignment.
+  expect:
+    required:
+    - daintree.hosts.park-swarm
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-rebalance
+  category: single-runbook
+  messages:
+  - role: user
+    content: The remote renderer is overheating while another machine is quiet. Redistribute the existing assignments
+      with checkpoints and ownership checks; this is not a new batch of work.
+  expect:
+    required:
+    - daintree.hosts.rebalance-load
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-contract
+  category: single-runbook
+  messages:
+  - role: user
+    content: The wire-format change spans the service repository on the tower and the client repository on the mini.
+      Agree a versioned contract first, then coordinate both implementations against that contract.
+  expect:
+    required:
+    - daintree.hosts.coordinate-contract-change
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-proof
+  category: single-runbook
+  messages:
+  - role: user
+    content: Before a tool runs in the remote repository, prove that the project id and checkout on that host identify
+      the intended Nimbus workspace. Report evidence, not just a matching directory name.
+  expect:
+    required:
+    - daintree.hosts.verify-project-placement
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-host-connect
+  category: single-runbook
+  messages:
+  - role: user
+    content: Help add the lab workstation to Remote Hosts on this computer and verify its connection and project
+      list. Do not start an assistant or enable anything unrelated.
+  expect:
+    required:
+    - daintree.hosts.connect-host
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-fanout
+  category: single-runbook
+  messages:
+  - role: user
+    content: Use separate visible workers in this project to implement the three independent dashboard cards concurrently,
+      then bring their changes back together and verify the combined result.
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-wave
+  category: single-runbook
+  messages:
+  - role: user
+    content: Schedule the existing issue backlog in dependency-respecting waves of at most three local workers,
+      checking each wave before admitting the next one.
+  expect:
+    required:
+    - daintree.orchestration.work-in-waves
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-watch
+  category: single-runbook
+  messages:
+  - role: user
+    content: Watch the deployment I already started and wake me only when its acceptance checks pass or it needs
+      intervention. Keep responsibility for the later check after this turn ends.
+  expect:
+    required:
+    - daintree.orchestration.watch-outcome
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-isolate
+  category: single-runbook
+  messages:
+  - role: user
+    content: Build two disposable implementations of the parser strategy on isolated branches, measure both against
+      the agreed criteria, and recommend which prototype to keep.
+  expect:
+    required:
+    - daintree.orchestration.spike-options
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-test-first
+  category: single-runbook
+  messages:
+  - role: user
+    content: Have one agent express the acceptance requirements as failing tests and a different agent implement
+      the change against that test contract. Keep their responsibilities separate.
+  expect:
+    required:
+    - daintree.orchestration.test-first-split
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-hypotheses
+  category: single-runbook
+  messages:
+  - role: user
+    content: Give three investigators distinct plausible causes of the same intermittent corruption bug. Each must
+      test its hypothesis and report evidence before we choose a fix.
+  expect:
+    required:
+    - daintree.orchestration.hypothesis-split
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-review-loop
+  category: single-runbook
+  messages:
+  - role: user
+    content: Run an independent review-and-fix loop on this patch until the reviewer has no blocking findings, verifying
+      fixes rather than treating the implementer’s claim as approval.
+  expect:
+    required:
+    - daintree.orchestration.review-until-approved
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-cleanup
+  category: single-runbook
+  messages:
+  - role: user
+    content: Inspect the local project for abandoned agent panes, obsolete worktrees and leftover development processes,
+      then clean up only the ones proved safe to remove.
+  expect:
+    required:
+    - daintree.orchestration.workspace-cleanup
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-local-usage
+  category: single-runbook
+  messages:
+  - role: user
+    content: Read the current agents’ remaining usage allowance and reset windows before we decide whether to launch
+      more work. Machine heat and memory are not the question.
+  expect:
+    required:
+    - daintree.agents.check-usage-limits
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-git-base
+  category: single-runbook
+  messages:
+  - role: user
+    content: Bring this feature checkout up to date with its upstream base while preserving its unfinished changes,
+      resolve the resulting conflicts and verify the checkout afterward.
+  expect:
+    required:
+    - daintree.git.sync-with-base
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-git-lost
+  category: single-runbook
+  messages:
+  - role: user
+    content: Yesterday’s implementation commits vanished after a reset. Locate the lost work using repository evidence
+      and recover it onto a safe branch without discarding today’s files.
+  expect:
+    required:
+    - daintree.git.recover-lost-work
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-git-bisect
+  category: single-runbook
+  messages:
+  - role: user
+    content: The same check passed at the release tag and now fails on develop. Find the first bad commit with a
+      reproducible bisect predicate and leave a clear recovery path.
+  expect:
+    required:
+    - daintree.git.bisect-regression
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-git-prune
+  category: single-runbook
+  messages:
+  - role: user
+    content: Audit the local branches whose pull requests have landed. Remove only the branches that are demonstrably
+      merged and unused by any worktree.
+  expect:
+    required:
+    - daintree.git.prune-stale-branches
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-forge-review
+  category: single-runbook
+  messages:
+  - role: user
+    content: Work through the unresolved reviewer threads on the open pull request, delegate the required code changes
+      and verify each thread’s resolution before replying.
+  expect:
+    required:
+    - daintree.forge.address-pr-review
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-forge-land
+  category: single-runbook
+  messages:
+  - role: user
+    content: The pull request is approved. Check its current merge conditions and land it through the repository’s
+      normal merge path, then verify what reached the target branch.
+  expect:
+    required:
+    - daintree.forge.land-pull-request
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-forge-issues
+  category: single-runbook
+  messages:
+  - role: user
+    content: Create a tracked issue for the export crash with reproduction steps, acceptance criteria and the right
+      project metadata. No implementation work should start yet.
+  expect:
+    required:
+    - daintree.forge.manage-issue
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-workflow-start
+  category: single-runbook
+  messages:
+  - role: user
+    content: 'Take issue 731 from the tracker into implementation: establish its scope and acceptance criteria,
+      arrange the right checkout and visible worker, and begin the work with that context.'
+  expect:
+    required:
+    - daintree.workflow.start-work-on-issue
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-worktree-move
+  category: single-runbook
+  messages:
+  - role: user
+    content: The two live agents are sharing a checkout. Put each ongoing assignment in its own named worktree and
+      make sure both agents continue in their new locations.
+  expect:
+    required:
+    - daintree.worktree.relocate-agents
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-worktree-resource
+  category: single-runbook
+  messages:
+  - role: user
+    content: The branch’s rented development resource is no longer needed for tonight. Pause it through Daintree,
+      verify its resulting state and report anything still billable.
+  expect:
+    required:
+    - daintree.worktree.manage-resource
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-runtime-port
+  category: single-runbook
+  messages:
+  - role: user
+    content: Port 6182 is occupied and prevents this project’s preview from starting. Identify who owns the listener
+      and whether it is a managed forward before freeing it safely.
+  expect:
+    required:
+    - daintree.runtime.free-busy-port
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-runtime-debug
+  category: single-runbook
+  messages:
+  - role: user
+    content: The local preview loads but the settings form throws when Save is pressed. Investigate the running
+      web app with browser evidence and have the responsible worker fix and verify it.
+  expect:
+    required:
+    - daintree.runtime.debug-web-app
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-ci-diagnose
+  category: single-runbook
+  messages:
+  - role: user
+    content: The latest pull-request pipeline failed. Read the failing job’s evidence, reproduce the actual failure
+      in the right checkout and drive a verified fix.
+  expect:
+    required:
+    - daintree.ci.diagnose-and-fix
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-ci-flaky
+  category: single-runbook
+  messages:
+  - role: user
+    content: One test alternates between red and green without code changes. Investigate its nondeterminism with
+      repeated, attributable evidence and fix the cause rather than merely rerunning CI.
+  expect:
+    required:
+    - daintree.ci.hunt-flaky-test
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-security-secret
+  category: single-runbook
+  messages:
+  - role: user
+    content: A worker pasted a real service credential into a committed fixture. Contain the exposure, involve the
+      credential owner and coordinate removal and verified remediation without repeating the secret.
+  expect:
+    required:
+    - daintree.security.respond-to-secret-exposure
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-release-ready
+  category: single-runbook
+  messages:
+  - role: user
+    content: Give a go-or-no-go report for releasing this branch using current checks, outstanding risk and acceptance
+      evidence. I am asking for a readiness decision, not a deployment.
+  expect:
+    required:
+    - daintree.release.assess-readiness
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-release-rollback
+  category: single-runbook
+  messages:
+  - role: user
+    content: The release already serving production has broken sign-in. Restore the last known good deployment through
+      the supported rollback path and verify recovery before attempting a forward fix.
+  expect:
+    required:
+    - daintree.release.rollback-deployment
+    optional:
+    - daintree.foundation
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-no-task-received
+  category: no-task
+  messages:
+  - role: user
+    content: I have received your report and will read it after lunch. There is no further action to take.
+  expect:
+    required: []
+    optional: []
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-no-task-ack
+  category: no-task
+  messages:
+  - role: user
+    content: Understood. That answers my question; leave the workspace as it is.
+  expect:
+    required: []
+    optional: []
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.
+- id: restructure-signoff-no-task-chatter
+  category: no-task
+  messages:
+  - role: user
+    content: The weather here finally cleared up this afternoon. I was just making conversation.
+  expect:
+    required: []
+    optional: []
+  note: Authored from current runbook boundaries before evaluating the retrained candidate; kept regardless of its
+    result.

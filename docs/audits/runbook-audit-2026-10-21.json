@@ -138,7 +138,9 @@
       },
       "passed": true
     },
-    "loaded_set_changes": 68
+    "loaded_set_changes": 54,
+    "ordered_selection_changes": 68,
+    "platform_note": "Initial Mac measurements mixed a Linux-built locked cache with Mac query embeddings. Linux cached/rebuilt equivalence is recorded under follow_up."
   },
   "integrity": {
     "original_cases": 2147,
@@ -173,5 +175,46 @@
     "backend_coverage_floor_percent": 90.0,
     "staged_manifest_locked_files": 6,
     "committed_lock_restored_after_verification": true
+  },
+  "follow_up": {
+    "training_status": {
+      "explicitly_authorized": false,
+      "candidate_training_and_export_completed": true,
+      "qualification_completed": false,
+      "model_work_stopped": true,
+      "gpu_status": "terminated",
+      "candidate_installed": false,
+      "artifact_published": false,
+      "deployed": false,
+      "installed_artifact_and_lock_unchanged": true,
+      "future_training": "Deferred until explicitly requested after the intended batch of changes merges"
+    },
+    "cause": "Architecture-dependent dynamic-int8 kernels; no production-architecture rebuild regression",
+    "runtime_identity_in_cache": true,
+    "linux_baseline": {
+      "cases": 1730,
+      "cached_recall": 1683,
+      "rebuilt_recall": 1683,
+      "selected_sets_identical": true,
+      "matching_ranking_documents": 138,
+      "max_relative_l2": 0.0
+    },
+    "corpus_rows": 21559,
+    "additional_retired_rows": 27,
+    "total_retired_rows": 256,
+    "signoff_cases": 50,
+    "signoff_training_overlaps": 0,
+    "signoff_prior_evaluation_overlaps": 0,
+    "preselected_seed": 41,
+    "baseline_signoff": {
+      "mac_recall": 46,
+      "linux_recall": 46,
+      "cases": 50
+    },
+    "publication_authentication": "Application-default credentials verified for model bucket",
+    "http_smoke_preflight_passed": 13,
+    "runtime_cache_tests_passed": 8,
+    "backend_preflight_tests": 820,
+    "backend_preflight_coverage_percent": 96.14
   }
 }

@@ -17,6 +17,7 @@ from daintree_assistant_server.runbooks.local.setwise import (
     _load_table,
     document_digest,
     encoder_fingerprint,
+    encoder_runtime,
 )
 from training.corpus_source import load_examples
 from training.protocol import retired_inbox_reason
@@ -91,6 +92,9 @@ def audit(*, index: Path | None = None) -> dict[str, object]:
             "path": str(cache_path),
             "expected_encoder_fingerprint": expected,
             "cached_encoder_fingerprint": table.encoder_fingerprint if table else None,
+            "expected_runtime": encoder_runtime(),
+            "cached_runtime": table.runtime if table else None,
+            "runtime_matches": table is not None and table.runtime == encoder_runtime(),
             "encoder_matches": table is not None and table.encoder_fingerprint == expected,
             "documents_match": table is not None and table.digests == digests,
             "rows": len(table.ids) if table else 0,

@@ -1,12 +1,7 @@
-# The caller's reported host state (`host_state`, sent by Daintree as the Daintree-Hosts
-# and Daintree-Lane headers). A search leaves out the daintree.hosts.* runbooks the state
-# does not fit, before the shortlist, so the rest of the catalog ranks as if they were not
-# there. Every message here is an existing case's, verbatim, so the unreported twin of
-# each pair is already in the suite and the corpus contamination gate is unchanged.
-#
-# Pairs: the same fan-out request with no hosts and with a connected host; a lane's inbox
-# wake line on a machine with no hosts of its own; and one case per eligibility class that
-# must stay reachable in the state it was declared for (connected, configured, any).
+# The caller reports its current host state through Daintree-Hosts. Search removes
+# ineligible daintree.hosts.* runbooks before retrieval. Old lane headers do not
+# affect this state. Retained cases cover none/configured/connected eligibility;
+# historical inbox-role cases live under archive/inbox-v0.44/cases/.
 
 cases:
   - id: host-state-fanout-no-hosts

@@ -952,10 +952,13 @@ def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_cache_with_wrong_precision_or_encoder_is_not_adopted(tmp_path: Path) -> None:
+def test_cache_with_wrong_precision_encoder_or_runtime_is_not_adopted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from dataclasses import replace
 
     from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.local import setwise
     from daintree_assistant_server.runbooks.local.setwise import save_table
 
     classifier = SetwiseClassifier(_ARTIFACT)
@@ -966,6 +969,9 @@ def test_cache_with_wrong_precision_or_encoder_is_not_adopted(tmp_path: Path) ->
     cache = tmp_path / "vectors.npz"
     save_table(cache, fresh)
     assert SetwiseClassifier(tmp_path).table is not None
+    with monkeypatch.context() as changed:
+        changed.setattr(setwise.platform, "machine", lambda: "a different CPU architecture")
+        assert SetwiseClassifier(tmp_path).table is None
     for bad in (
         replace(fresh, precision="int8"),
         replace(fresh, encoder_fingerprint="a different encoder"),

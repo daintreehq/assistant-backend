@@ -9,12 +9,7 @@ positives:
     docs: true
   - query: Find out what the person must allow before the hub may start an assistant on a host
     docs: true
-  - Set up assistant messaging between this Shell and a remote host that was just added
   - query: Describe how a host assistant's reply comes back to the hub and how to read it
-    docs: true
-  - query: Explain why an agent in a Daintree pane cannot use the host messaging tools
-    docs: true
-  - query: Clarify which cross-host messaging tools need the Full tool set and which work at Core
     docs: true
   - query: Explain what pausing messages between machines stops and what keeps working
     docs: true
@@ -23,11 +18,6 @@ positives:
   - query: Explain what completed means on a message the hub sent to another machine
     docs: true
 
-  - query: >-
-      Before any work is handed to a remote machine, confirm this sidebar session can
-      message hosts at all: the host tools are offered and the host in question has
-      assistant messaging allowed. Report what is missing
-      and who has to change it.
   - query: >-
       A reply from the assistant on another machine says the fix is pushed and the tests
       pass. The other machine's working tree cannot be seen from here. Explain what the hub
@@ -44,8 +34,6 @@ foundation:
     docs: true
   - query: is it possible for daintree's assistant to hand things off to the assistant on another computer
     docs: true
-  - query: what does accept messages from other machines actually do
-    docs: true
   - query: do I need the full tool set to message assistants on other hosts
     docs: true
   - query: can a claude agent in one of my panes message the assistant on another host
@@ -57,7 +45,6 @@ foundation:
   - hook up the assistant on my desktop to the one on my laptop
   - query: does the assistant on the remote machine act on the hub's messages without asking me
     docs: true
-  - turn on cross machine assistant messaging
   - query: which settings decide whether this shell can message the assistants on its hosts
     docs: true
   - query: can my two remote hosts talk to each other directly or does it all go through this machine
@@ -122,9 +109,6 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
     docs: true
     run: runbook-2026-10-issue-95
-  - query: "is assistant messaging with my other mac switched on at all?"
-    confusable_with: [daintree.hosts.recover-and-clean-up]
-    run: runbook-2026-10-issue-95
   - query: "how does a host's reply get back to the hub, in general?"
     confusable_with: [daintree.hosts.recover-and-clean-up]
     docs: true
@@ -170,9 +154,6 @@ boundaries:
   - query: 'what''s the difference between allowing messaging with a host and letting the assistant start assistants there'
     confusable_with: [daintree.hosts.survey-hosts]
     docs: true
-    run: runbook-2026-10-issue-103
-  - query: 'set up assistant messaging with the mac studio I just added as a host'
-    confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
   - query: "how does messaging between the assistants on two of my machines work, and how do I switch it on?"
     confusable_with: [daintree.hosts.survey-hosts]

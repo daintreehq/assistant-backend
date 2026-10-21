@@ -78,11 +78,6 @@ topic_shifts:
     history:
       - "user: summarise what the remote hosts finished yesterday"
       - "assistant: Two of three tasks finished and verified; the third is still running."
-  - query: new priority, the security patch has to go first. pause what the other machines are doing for it
-    history:
-      - "user: how do I switch on messaging with a host?"
-      - "assistant: Turn on Allow assistant messaging with this host in the host's settings."
-
 boundaries:
   - query: an urgent bug came in while my remote hosts are busy with the migration run, the local agents on this laptop are fine, make room on the other machines
     confusable_with: [daintree.orchestration.reprioritize-work]

@@ -32,13 +32,7 @@ positives:
   - morning! can you tell me how my other machines are doing and if anything is open with them
   - thanks, now can you show me where all the hosts stand
   - 'quick one, no rush: which of my remote machines are connected and what do they have going'
-  - query: Report which messaging gate blocks the hub from the assistant on the second Mac; the host is connected and the project is listed, but no assistant there carries a generation
-    run: runbook-2026-10-issue-103
   - query: Messages to one host began coming back opted_out right after the person edited that host's SSH target; explain why and what has to be switched on again
-    run: runbook-2026-10-issue-103
-  - query: Diagnose why a remote assistant has a generation but available false while this Shell is not paused
-    run: runbook-2026-10-issue-103
-  - query: the hub says my old laptop doesn't support assistant messaging
     run: runbook-2026-10-issue-103
   - query: it says unsupported when I try to message the imac host
     run: runbook-2026-10-issue-103
@@ -64,11 +58,7 @@ positives:
     run: runbook-2026-10-issue-103
   - query: sorry to bug you again, the laptop host keeps refusing messages from here, which gate is it this time
     run: runbook-2026-10-issue-103
-  - query: sends to the build box come back conflict; is that a messaging gate or something about that one message?
-    run: runbook-2026-10-issue-103
   - query: the old intel mac host answers unsupported to every send while my other hosts work fine; what's different about it?
-    run: runbook-2026-10-issue-103
-  - query: pause is off on this machine but the build box's assistant still reads available false; is it paused over there or just stopped?
     run: runbook-2026-10-issue-103
   - query: the hub can't message the laptop's assistant, and the laptop's own window says another machine turned messages on for it; what does that mean for my hub?
     run: runbook-2026-10-issue-103
@@ -94,11 +84,6 @@ positives:
     history:
       - 'user: ask the studio what it thinks of the PR'
       - 'assistant: The studio''s assistant is listed with no generation for this Shell, so I couldn''t message it.'
-    run: runbook-2026-10-issue-103
-  - query: check why, and don't try it again yet
-    history:
-      - 'user: send the docs task to the mini'
-      - 'assistant: The send came back paused; nothing was sent.'
     run: runbook-2026-10-issue-103
 boundaries:
   - query: any of the remote machines offline? and give me the agent count on each
@@ -219,9 +204,6 @@ boundaries:
   - query: my usage check to the hosts came back rate_limited on two of them, is that the agents' allowance or the message limit
     confusable_with: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-103
-  - query: A send to the Linux tower returned disconnected while host.list shows it connecting; separate the link problem from any messaging setting
-    confusable_with: [daintree.hosts.connect-host]
-    run: runbook-2026-10-issue-103
   - query: the mini connects fine now and its projects show up here, but the hub still can't message its assistant
     confusable_with: [daintree.hosts.connect-host]
     run: runbook-2026-10-issue-103
@@ -261,15 +243,9 @@ boundaries:
   - query: why is every assistant on my remote host marked unavailable
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-103
-  - query: I've got the Mac mini added under Remote Hosts and it shows connected, but when I ask the assistant here to message the one on the mini it comes back opted_out. I haven't changed any messaging settings yet. What is off, and on which machine?
-    confusable_with: [daintree.hosts.foundation]
-    run: runbook-2026-10-issue-103
   - query: Explain why a host's assistant is listed with no generation and cannot be messaged
     confusable_with: [daintree.hosts.foundation]
     docs: true
-    run: runbook-2026-10-issue-103
-  - query: Resolve a NOT_ELIGIBLE refusal from the host messaging tools
-    confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-103
   - query: Interpret an opted_out result from a send to a remote host and say how the person fixes it
     confusable_with: [daintree.hosts.foundation]
@@ -338,18 +314,6 @@ followups:
     history:
       - 'user: send the docs fix to the build box'
       - 'assistant: The send came back policy_rejected; nothing was sent.'
-    run: runbook-2026-10-issue-103
-  - query: where do I change that
-    history:
-      - 'user: message the assistant on the build machine'
-      - 'assistant: The send came back opted_out: this machine''s "Accept messages from other machines" setting is off.'
-    docs: true
-    run: runbook-2026-10-issue-103
-  - query: which setting is that exactly
-    history:
-      - 'user: ask the laptop''s assistant something for me'
-      - 'assistant: The send came back opted_out: assistant messaging is turned off for that host in this Shell''s host settings.'
-    docs: true
     run: runbook-2026-10-issue-103
   - query: how do I give it one
     history:

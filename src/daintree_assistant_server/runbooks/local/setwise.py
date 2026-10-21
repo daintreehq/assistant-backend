@@ -81,6 +81,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import platform
 import threading
 import time
 from collections import OrderedDict
@@ -206,6 +207,8 @@ class RunbookTable:
     precision: str
     # Precision alone cannot distinguish two retrained encoders of the same type.
     encoder_fingerprint: str = ""
+    #: Recorded separately so an audit can explain a cross-runtime cache miss.
+    runtime: dict[str, str] = field(default_factory=dict)
 
 
 def _since(started: float) -> float:
@@ -217,8 +220,29 @@ def document_digest(document: str) -> str:
     return hashlib.sha256(document.encode()).hexdigest()
 
 
+def encoder_runtime() -> dict[str, str]:
+    return {
+        "onnxruntime": ort.__version__,
+        "system": platform.system(),
+        "machine": platform.machine(),
+    }
+
+
 def encoder_fingerprint(directory: Path, *, quantized: bool, doc_max: int, variant: str) -> str:
-    digest = hashlib.sha256(f"{doc_max}:{variant}".encode())
+    # Dynamic int8 kernels differ across CPU architectures. A Linux x86 cache
+    # reused on Apple Silicon differed by ~15% relative L2 from a cold rebuild
+    # with identical graph/tokenizer bytes. Runtime identity belongs beside the
+    # weights: a cache must match the function that will refresh it locally.
+    contract = {
+        "format": 1,
+        "doc_max": doc_max,
+        "variant": variant,
+        "runtime": encoder_runtime(),
+        "optimization": "ORT_ENABLE_ALL",
+        "intra_op_threads": 1,
+        "inter_op_threads": 1,
+    }
+    digest = hashlib.sha256(json.dumps(contract, sort_keys=True).encode())
     files = (
         "retriever/model.onnx",
         "retriever/tokenizer.json",
@@ -274,6 +298,7 @@ class SetwiseClassifier:
         #: fp32 in both modes. It is not plain "int8": a table stamped that was
         #: built with an int8 retriever, and must re-embed rather than be reused.
         self._precision = "int8-ranker" if quantized else "fp32"
+        self._encoder_runtime = encoder_runtime()
         self._encoder_fingerprint = encoder_fingerprint(
             directory, quantized=quantized, doc_max=self._doc_max, variant=self._doc_variant
         )
@@ -503,6 +528,7 @@ class SetwiseClassifier:
                 digests=digests,
                 precision=self._precision,
                 encoder_fingerprint=self._encoder_fingerprint,
+                runtime=self._encoder_runtime,
             )
             self._remember(table)
             self._keep(revision, table)
@@ -984,6 +1010,7 @@ def _load_table(path: Path) -> RunbookTable | None:
         encoder_fingerprint=str(data["encoder_fingerprint"])
         if "encoder_fingerprint" in data
         else "",
+        runtime=json.loads(str(data["runtime"])) if "runtime" in data else {},
     )
 
 
@@ -996,4 +1023,5 @@ def save_table(path: Path, table: RunbookTable) -> None:
         ranking=table.ranking,
         precision=np.array(table.precision),
         encoder_fingerprint=np.array(table.encoder_fingerprint),
+        runtime=np.array(json.dumps(table.runtime, sort_keys=True)),
     )

@@ -16,6 +16,14 @@ _INBOX_ROLES = re.compile(
     r"\blanes?\b|\bexchanges?\b|\benroll(?:ed|ing|ment)?\b", re.IGNORECASE
 )
 _HOST_CONTEXT = re.compile(r"\b(?:remote|hosts?|hub|inbox)\b", re.IGNORECASE)
+_RETIRED_MESSAGING = re.compile(
+    r"\bassistant messaging\b|\bhost messaging\b|\bmessaging (?:gate|settings?)\b|"
+    r"\baccept messages from other machines\b|"
+    r"\bavailable\s*[:=]?\s*(?:false|true)\b|\binbox (?:read|fetch)\b|"
+    r"\bsend came back paused\b|\bpause is off on this machine\b|"
+    r"\bthis Shell is not paused\b",
+    re.IGNORECASE,
+)
 
 
 def retired_inbox_reason(
@@ -27,6 +35,8 @@ def retired_inbox_reason(
     host_context = any(r.startswith("daintree.hosts.") for r in runbook_ids)
     if (host_context or _HOST_CONTEXT.search(text)) and _INBOX_ROLES.search(text):
         return "retired host lane, enrollment or exchange model"
+    if (host_context or _HOST_CONTEXT.search(text)) and _RETIRED_MESSAGING.search(text):
+        return "retired host assistant messaging settings or state"
     if re.search(r"\bhub\b", text, re.IGNORECASE) and re.search(
         r"\b(?:our|its|the) inbox\b", text, re.IGNORECASE
     ):

@@ -1,37 +1,11 @@
-# Paired hub/lane scenarios: one piece of work seen from both ends, with a wrong-role trap each.
+# Current local-versus-Remote-Host execution checks. The filename, case ids and
+# notes retain their historical cohort names for comparisons. The retired paired
+# inbox roles and their cases are archived under archive/inbox-v0.44/cases/.
 #
-# The hub end is the person's own request, worded as the app tells the assistant to search
-# (one sentence, 8-15 words, specifics left out). The lane end is the receiving assistant's
-# search for the work after it has read the hub's brief; the brief is carried beside the case
-# (`brief`) and the query is drawn from its objective. Neither query names a runbook id: a
-# search that is handed the id proves nothing about discovery.
-#
-# A case with `scenario` and `role` fails when it loads a runbook its caller cannot execute (a
-# lane handed a hub baseline, the hub handed a lane's), on top of the usual recall check. The
-# traps are the person asking on the machine itself (a local runbook owns it, and the hub and
-# lane runbooks must stay out), a question rather than work, the lane's bare wake line, and a
-# role the caller does not hold. `bench pairs` reports each end with what it loaded.
-#
-# Where a case misses on the shipped selector the note says where and why; none of these cases
-# bends a runbook's text, and the misses are owed to the user's one retrain.
-#
-# The cohort scenario pairs the hub's placement of several pieces with the lane that receives
-# several at once. Placement sends one message per piece, so no hub runbook yet produces the
-# several-pieces message the lane's runbook is written for: that end is retrieval only, and the
-# missing sender is pinned in tests/unit/test_paired_roles.py (HUB_NAMES_NO_RECEIVER).
-
-# Every procedure a lane follows for a hub's work. A lane case whose right answer is the
-# envelope alone (a wake line, a plain question, a role the lane does not hold) forbids all of
-# them: none can be chosen before the message has been read, or when it asks for no work.
-x-lane-work-procedures: &lane_work
-  - daintree.hosts.do-delegated-work
-  - daintree.hosts.verify-for-hub
-  - daintree.hosts.review-for-hub
-  - daintree.hosts.run-local-cohort
-  - daintree.hosts.steer-for-hub
-  - daintree.hosts.integrate-for-hub
-  - daintree.hosts.demo-for-hub
-  - daintree.hosts.clean-up-for-hub
+# A host assistant follows the ordinary catalog. A request for work on the
+# caller's own machine must not load a Remote Host orchestration procedure.
+# These are current routing boundaries, with no inbox role planner or paired-role
+# benchmark command.
 
 cases:
   # ------------------------------------------------------------------ implement

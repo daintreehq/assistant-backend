@@ -14,13 +14,11 @@ positives:
   - Find out why the Remote Host added this morning can't connect and needs a compatible build, and get the two machines onto the same Daintree
   - The Linux host's install plan ends with a sudo command; tell the person exactly what they run on the host and what to press after
   - Onboard the user's second Mac as a remote host; they use an SSH agent from their password manager and want nothing about their keys changed
-  - Confirm a just-added Remote Host is connected and that its project list is current, without enabling assistant messaging
   - Add an arm64 Linux mini PC to Daintree as a host and check it is a platform Daintree ships for
   - The person's host got a new hostname; change its SSH target in Daintree and tell them which permissions that resets
   - A Mac that was added as a host went unreachable after its user logged out; work out what Host mode needs on that machine
   - First time using Remote Hosts on this Shell; take the person from an empty Hosts page to a connected host
   - The host check could not resolve the machine's name on the home network; guide the person to try its .local name
-  - Report what is ready on a newly connected host before the person decides whether to allow assistant messaging with it
   - Help connect a cloud VM the user rents, reachable over their tailnet, to Daintree as a Remote Host
   - Get the spare Mac in the studio running Daintree in Host mode so this laptop can open projects on it
   - The person clicked Skip at the Enable step and now the host shows not connected; finish turning on Host mode there
@@ -57,12 +55,6 @@ positives:
     docs: true
   - query: the host install wants me to run a sudo command on the server, is that expected
     docs: true
-  - query: add my desktop as a remote host, and tell me whether that switches on assistant messaging with it
-  - query: >-
-      I've got a Linux workstation under my desk that I want to use from my MacBook in
-      Daintree. I can ssh into it fine from a terminal. I'd like its projects to show up
-      here, but I don't want any assistant messaging or anything starting by itself yet.
-      Can you walk me through it?
   - query: >-
       The user added a host yesterday and today Settings shows it unreachable, with ssh
       reporting a publickey permission denial. They rotated their SSH key last week. Help

@@ -31,6 +31,7 @@ def refresh(artifact: Path, output: Path) -> dict[str, object]:
         "routing_revision": routing_revision(catalog),
         "runbooks": len(table.ids),
         "encoder_fingerprint": table.encoder_fingerprint,
+        "runtime": table.runtime,
         "output": str(output),
         "weights_changed": False,
     }

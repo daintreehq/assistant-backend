@@ -92,6 +92,13 @@ get the same bytes.
 
 ## Pipeline
 
+Training and export run on a temporary Lambda CUDA GPU; follow
+[the retrain workflow](../.claude/skills/retrain-selector/SKILL.md) for setup and
+cleanup. Never run the trainers on the user's Mac or a Studio. Index refresh,
+compilation and evaluation can run locally.
+Training starts only on an explicit user request, normally after the intended
+batch of changes has merged; routine audit and commit work does not start it.
+
 ```bash
 # 1. Generate synthetic data (Workflow agents; see .claude/skills/retrain-selector
 #    for prompts + schemas). Journals land under the session's workflows dir.

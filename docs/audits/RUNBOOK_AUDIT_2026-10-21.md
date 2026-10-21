@@ -42,7 +42,7 @@ The service supplies instructions, not workspace access. Runbook metadata does n
 | Headerless clients received inbox instructions | Every client receives the current catalog; host state only narrows search |
 | Lane eligibility remained part of the current schema | Current eligibility is `any`, `configured` or `connected`; malformed and repeated host-state headers are unreported |
 | Old routing and validation obligations followed the inbox catalog | 417 inbox-only cases archived; active benchmark retains the same 1,730 case objects |
-| Training sources still taught lane enrollment, exchange records and removed APIs | 229 examples quarantined with origin, section, defaults and reason; compiler rejects reintroduction |
+| Training sources still taught lane enrollment, exchange records and removed APIs | 256 examples quarantined with origin, section, defaults and reason, including 27 found in follow-up; compiler rejects reintroduction |
 | Retiring cases could accidentally permit evaluation leakage | Active, holdout and archived case text remains protected, including history and turn context, without loading an old catalog |
 | Embedding caches identified precision but not the encoder | Cache identity now includes encoder graphs, tokenizer files, document cap and rendering variant; precision is checked separately |
 | Re-embedding was entangled with the training/export workflow | `training.refresh_index` builds a derived cache using the runtime stack; `training.audit_catalog` reports drift |
@@ -83,11 +83,11 @@ The document cap is now a practical constraint: median routing-document length i
 
 ## What re-embedding revealed
 
-The original cache has no encoder fingerprint. For 138 documents whose text digest still matches, fresh ranking embeddings differ from the stored vectors by a median relative L2 of about **15.2%**, reaching **22.3%**. Retrieval-vector differences are below `8e-7` L2. This is substantial ranking-side drift, not a folder-name effect. Without historical encoder provenance the audit cannot establish which encoder or generation path produced those old vectors.
+The initial Mac comparison found that the original cache has no encoder fingerprint. For 138 documents whose text digest still matches, ranking embeddings rebuilt on Apple Silicon differ from the stored vectors by a median relative L2 of about **15.2%**, reaching **22.3%**. Retrieval-vector differences are below `8e-7` L2. Follow-up on Linux x86 established the cause: all 138 fresh ranking vectors match the old cache exactly. The dynamic-int8 inference kernels differ across architectures; this was not evidence of mismatched model weights. Cache identity now includes ONNX Runtime version, operating system, CPU architecture and the session optimization/threading contract as well as encoder/tokenizer bytes and rendering settings.
 
 The new cache is rebuilt through the serving implementation, one document per encoder call. Loading that rebuilt cache and rebuilding it cold produce identical selected sets on all 1,730 active cases. The cache is keyed to the actual encoder/tokenizer bytes and rendering settings, so a future retrain cannot silently borrow vectors from another encoder of the same precision.
 
-| Measurement | Original locked cache | Rebuilt cache |
+| Initial Mac measurement | Linux-built locked cache | Mac-rebuilt cache |
 |---|---:|---:|
 | Recall-pass | 1,684 / 1,730 (97.34%) | 1,675 / 1,730 (96.82%) |
 | Strict set match | 1,564 / 1,730 (90.40%) | 1,565 / 1,730 (90.46%) |
@@ -96,7 +96,7 @@ The new cache is rebuilt through the serving implementation, one document per en
 | Docs classification | 30 / 31 | 30 / 31 |
 | Existing quality gate | Pass | Pass |
 
-Fifty-four selected sets change; one recall failure is repaired and ten are introduced. No benchmark expectation or gate threshold was changed to achieve these results. A passing gate does not erase that recall cost. The comparison is saved in the audit snapshot so it can be weighed in the next model evaluation.
+Fifty-four selected sets change in that cross-platform Mac comparison; one recall failure is repaired and ten are introduced. On Linux, the original cache and a fresh rebuild both pass recall on **1,683 / 1,730**, with **identical selected sets on every case**. Thus the reported nine-case cost did not reproduce on the production architecture. Mac and Linux results must be reported separately, and a cache from another inference runtime is rebuilt locally. No benchmark expectation or gate threshold was changed.
 
 ## Training decision
 
@@ -106,11 +106,11 @@ There is evidence for a future controlled ranking/data refresh:
 
 - The artifact's training labels cover 139 of the current 140 procedures. `daintree.agents.choose-agent-model` is the new label; it already passes 8 of its 10 required cases zero-shot, leaving two concrete misses.
 - Its recorded training routing revision differs from the current one. Existing labels therefore do not establish that current routing text was present at training time.
-- The curated corpus now has 21,586 rows after removing 229 obsolete-protocol examples. Removing source rows does not remove any lesson already learned by historical weights.
+- The curated corpus now has 21,559 rows after removing 256 obsolete-protocol examples and one evaluation near-collision. Removing source rows does not remove any lesson already learned by historical weights.
 - The existing weights have no corpus fingerprint. Their precise relationship to today's curated data is unknown; that provenance cannot honestly be reconstructed by stamping the current hash onto them.
 - Remaining misses are predominantly ranking and admission/cardinality failures. They do not justify changing a retriever that currently supplies all required candidates.
 
-Keep the locked weights as the comparison baseline. Train a candidate against the cleaned corpus, preserve the retriever/head pairing, export through the same cache implementation and evaluate both current routing and an independently authored signoff set. If both stages are retrained, train retrieval first and freeze it before training the set-wise head. Do not remove the active-state features or docs head incidentally: production search uses a bare query, but the existing weights, corpus and evaluation machinery still share those contracts.
+Keep the locked weights as the comparison baseline. The user wants further changes merged before retraining; training remains deferred until explicitly requested. For that future run, train a candidate against the cleaned corpus, preserve the retriever/head pairing, export through the same cache implementation and evaluate both current routing and an independently authored signoff set. If both stages are retrained, train retrieval first and freeze it before training the set-wise head. Do not remove the active-state features or docs head incidentally: production search uses a bare query, but the existing weights, corpus and evaluation machinery still share those contracts.
 
 The complete exact/near leakage scan also found one existing usage-query near-collision
 (similarity 0.811321) against protected evaluation text. That training row is quarantined
@@ -119,30 +119,24 @@ The final scan reports no exact or near overlaps above the existing 0.8 threshol
 Obsolete host-generation briefs in curated YAML headers now point to the current
 procedure instead of teaching retired lane and exchange mechanics.
 
-No model training was launched during this restructure. The completed operation was re-embedding with unchanged weights, followed by measurement.
+The initial restructure re-embedded unchanged weights. During follow-up, the assistant incorrectly treated the general completion request as authorization to retrain. Training and export finished with the unchanged recipe and seed 41, but model work was stopped when the user objected. The rented GPU is confirmed terminated. That candidate was never installed, published or deployed and did not change the committed model lock. It is not a qualified release artifact.
+
+An additional 27 examples describing retired messaging settings or state were archived, leaving **21,559 rows**; the routing digest was refreshed to all 140 current procedures. The new 50-case signoff set was authored and frozen before candidate scoring, with no exact or near overlap above 0.8 against training or prior evaluation inputs. Its predeclared acceptance conditions are recorded alongside it. The unchanged model passes 46/50 on both Mac and Linux. No candidate result is claimed by this audit.
 
 ## Remaining operational limits
 
 - Host-state headers describe the snapshot taken when the help session launches. The server reads them per request, but the CLI's configured snapshot can become stale until provisioning runs again. This audit documents that behavior rather than pretending search has live host state.
 - Notices can be missed. Status reconciliation remains necessary, and neither a stop heuristic nor an agent's handback proves successful work.
 - Current search submits a bare task, while historical training and evaluation also exercise active sets, conversation history and the docs head. Simplifying those learned contracts requires its own training and evaluation decision.
-- Existing aggregate routing thresholds permit more regression than the nine recall cases measured here. Review the before/after evidence as well as the passing gate; thresholds were not relaxed.
+- Existing aggregate routing thresholds can permit individual regressions. Review comparisons on the same inference runtime as well as the passing gate; thresholds were not relaxed.
 
 ## Verification and release state
 
 The archive integrity check reconstructs all **2,147 original case objects** from Git and compares them with the active/archive union. No id, message, history, expectation or other case value changed. All **69 frozen override files** also match their original bytes. Raw journals remain unchanged.
 
-The app surface capture passed its capture test and **190 host-control contract tests**. Daintree's help-session runbook wiring passed **17 tests**. Backend verification covers catalog loading, dependencies, examples against both outer and relayed schemas, ownership/caller constraints, corpus compilation, cache identity, transport, readiness and deployment smoke behavior. An isolated wheel contains exactly 140 current Markdown procedures, contains no old `files/` or `inbox/` catalog, and loads independently of the checkout. The final staged-artifact backend run passed **818 tests with 96.13% coverage**, above the unchanged 90% floor. Lint, strict source type checking, corpus reproducibility, exact/near leakage screening and shell syntax checks also pass. The installed original cache and committed lock were restored after staged-artifact verification.
+The app surface capture passed its capture test and **190 host-control contract tests**. Daintree's help-session runbook wiring passed **17 tests**. Backend verification covers catalog loading, dependencies, examples against both outer and relayed schemas, ownership/caller constraints, corpus compilation, cache identity, transport, readiness and deployment smoke behavior. An isolated wheel contains exactly 140 current Markdown procedures, contains no old `files/` or `inbox/` catalog, and loads independently of the checkout. The initial staged-artifact backend run passed **818 tests with 96.13% coverage**. Follow-up verification of the final code and original weights in an isolated worktree passed **820 tests with 96.14% coverage**, above the unchanged 90% floor. The isolated worktree used a matching, locally rebuilt cache and temporary lock; the primary checkout retained its original artifact and lock throughout follow-up. A local HTTP server passed **13 smoke checks**, including readiness, version, MCP initialization, search, get, and headerless/app-configured catalog consistency. Lint, strict source type checking, corpus reproducibility, exact/near leakage screening and shell syntax checks also pass.
 
-The rebuilt cache is at `.tmp/runbook-audit/vectors.npz`, with a staged artifact and candidate lock beside it. Only `vectors.npz` differs in that candidate lock; encoder and head binaries are unchanged. Publishing was attempted, but Google Cloud rejected token refresh because interactive reauthentication is required. **The committed `selector.lock` and installed locked artifact remain unchanged.** Nothing was deployed or pushed. With this code, an old unstamped cache is ignored and the current catalog is embedded at startup, so correctness does not depend on publishing the new cache first.
-
-After `gcloud auth login`, the prepared artifact can be published with:
-
-```bash
-python3 training/selector_store.py --dir .tmp/runbook-audit/artifact publish
-```
-
-Install the same staged `vectors.npz` into the local artifact directory after successful publication so local files agree with the updated lock, then run `python3 training/selector_store.py verify`. Commit the matching lock with the code. Deployment remains a separate release step.
+**The committed `selector.lock` and installed locked artifact remain unchanged**, and artifact verification passes. Nothing was deployed or pushed by this work. An initial cache publication attempt failed because the CLI login needed reauthentication; follow-up verified application-default credentials, but no artifact was published. With this code, an unstamped cache or one from a different inference runtime is ignored and the current catalog is embedded at startup. Correctness does not depend on publishing a rebuilt cache first. Scratch caches made before the runtime-identity fix must be regenerated before any future publication; a Mac-generated cache must not be treated as a warm Linux cache. Model publication and deployment remain deferred.
 
 For a fresh audit or re-embed:
 

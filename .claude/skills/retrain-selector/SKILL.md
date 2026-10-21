@@ -14,6 +14,10 @@ allowed-tools:
 
 # Retrain the local runbook selector
 
+Start this workflow only when the user explicitly asks to retrain. Requests to
+fix, finish, test or commit work, or an observation that retraining will be
+needed later, do not authorize training or renting a GPU.
+
 ## The normal cycle: add runbooks → retrain → release
 
 1. Add or edit runbooks, cases and training rows (step 1-2 below for generating rows).
@@ -47,12 +51,12 @@ terminate the instance.**
   alternative (an M1 Max needs ~6 h). If the instance fails, fix that or ask.
 - Commit once at the end, not per edit: skill and docs changes ride in one commit.
 
-The key is in the environment as `LAMBDA_LABS_API_KEY` (HTTP basic auth, key as the username;
+The key is in the environment as `LAMBDA_LABS_API_KEY` (Bearer authentication;
 never print it). The registered SSH key "Greg Mac Studio ed25519" is this machine's
 `~/.ssh/id_ed25519`.
 
 ```bash
-L=https://cloud.lambdalabs.com/api/v1; A=(-s -u "$LAMBDA_LABS_API_KEY:")
+L=https://cloud.lambda.ai/api/v1; A=(-fsS -H "Authorization: Bearer $LAMBDA_LABS_API_KEY")
 curl "${A[@]}" $L/instance-types      # prices; "regions_with_capacity_available" says what is free
 curl "${A[@]}" -X POST $L/instance-operations/launch -H 'Content-Type: application/json' \
   -d '{"region_name":"us-east-1","instance_type_name":"gpu_1x_a10",

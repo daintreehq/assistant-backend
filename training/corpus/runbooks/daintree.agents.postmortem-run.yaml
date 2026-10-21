@@ -293,11 +293,6 @@ followups:
       - 'user: why did the run on the remote hosts take so long?'
       - 'assistant: Host B sat on its task for about two hours between its inbox being read and its answer; host A answered in minutes. The records show the times but not what host B was doing.'
     run: runbook-2026-10-issue-121
-  - query: what was that host doing during the long gap? don't send it the work again
-    history:
-      - 'user: do a post-mortem of the failed run across my remote hosts'
-      - 'assistant: One unit shows a two-hour gap between the inbox fetch and the reply; the records do not say why.'
-    run: runbook-2026-10-issue-121
   - query: so was the wrong commit its fault or ours? show me the message we sent
     history:
       - 'user: post-mortem on the remote hosts'' failed rollout'
@@ -308,13 +303,6 @@ followups:
       - 'user: why did the run on the other machines go wrong?'
       - 'assistant: First divergence: the brief named a branch without a SHA, so host B built an older commit. Second, a long gap on host A.'
     run: runbook-2026-10-issue-121
-  - query: Leave the reason for the unobserved hour unknown, and show the first divergence actually supported by the message and artifact timeline.
-    history:
-      - 'user: explain why the ended run on the remote machines stalled'
-      - 'assistant: There is an hour between inbox read and the host answer, with no observation inside it; later the host reported a commit built from an unapproved base.'
-    active: [daintree.agents.postmortem-run, daintree.hosts.supervise-swarm]
-    confusable_with: [daintree.hosts.supervise-swarm]
-    run: 2026-10-16-synthetic-audit
 topic_shifts:
   - query: it's finished now and it clearly went wrong — why did it go off the rails, and how do we stop that next time?
     history:

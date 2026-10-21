@@ -49,8 +49,6 @@ positives:
     run: runbook-2026-10-issue-102
   - query: Some of the user's hosts kept their assistants in this project from last week's run and others were rebooted since; they want every host to have one again without doubling up
     run: runbook-2026-10-issue-102
-  - query: The user switched on assistant messaging for four hosts this morning but may not have allowed starts on all of them; they want assistants in this repository wherever possible and a list of the hosts still waiting on them
-    run: runbook-2026-10-issue-102
   - query: A replacement Mac mini joined as a host yesterday and has nothing on it yet; the user wants it holding a Claude Code assistant in this project like the other hosts
     run: runbook-2026-10-issue-102
   - query: Before a multi-machine run of the database migration, the user wants an assistant sitting in this repository on each remote host, and only then will they decide who gets which part

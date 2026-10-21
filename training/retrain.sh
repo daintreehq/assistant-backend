@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Retrain the selector on the current corpus and install it — one command.
 #
-#   training/retrain.sh            # ~1 h on Apple silicon (MPS)
+#   RETRIEVER_ARGS=--grad-checkpoint EXPORT_ONLY=1 training/retrain.sh
+# Run on a temporary Lambda CUDA GPU; never on the user's Mac or a Studio.
 #
 # Compiles the corpus, trains stage 1 (retriever) and stage 2 (set-wise head, seed 41),
 # exports the two-stage artifact, installs it over the shipped one, and runs the routing
 # gate (`bench local`). If the gate fails, the previous artifact is restored and the
 # script exits non-zero. On success: commit, push, /release.
 #
-# On a remote machine (CLAUDE.md, "Training on a remote machine"): `RETRIEVER_ARGS=--grad-checkpoint
+# On the GPU (.claude/skills/retrain-selector/SKILL.md): `RETRIEVER_ARGS=--grad-checkpoint
 # EXPORT_ONLY=1 training/retrain.sh` trains and exports into .tmp/retrain/artifact and stops; the
 # install and the gate run on the machine that has the dev venv.
 set -euo pipefail
@@ -19,6 +20,11 @@ ART=src/daintree_assistant_server/runbooks/local/artifacts/selector
 WORK=.tmp/retrain
 export HF_HUB_DISABLE_PROGRESS_BARS=1 TQDM_DISABLE=1
 mkdir -p "$WORK"
+
+if ! "$PY" -c 'import torch; raise SystemExit(0 if torch.cuda.is_available() else 1)'; then
+  echo "Retraining requires a CUDA GPU. Use the temporary Lambda workflow; do not train on this Mac or a Studio." >&2
+  exit 1
+fi
 
 echo "== compile corpus"
 $PY -m training.compile_corpus | tail -1
