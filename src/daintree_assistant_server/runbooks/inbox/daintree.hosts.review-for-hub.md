@@ -38,6 +38,6 @@ After daintree.hosts.handle-hub-message has fitted it. Findings only; nobody cha
 
 On notice or resume, given findings: pin check again; a change is unexpected (the reviewer's only on evidence), not review; leave it. A cut or crashed review is partial. Reply `completed`: the SHA it read, any moved tip, reviewer CLI and pane id, worktree path, pin check, then its findings as unverified, unfixed claims.
 
-Stop and recovery: one worktree and reviewer per request; never fix, or review another commit in the SHA's place; commits, pushes or forge comments only if the brief asks. Worktree and pane stay for cleanup.
+Stop and recovery: one worktree and reviewer per request; never fix, or review another commit in the SHA's place; commits, pushes or forge comments only if the brief asks. Close the reviewer once replied; the worktree stays.
 
 Report back: the reply and its result.

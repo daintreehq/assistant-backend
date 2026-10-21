@@ -27,6 +27,6 @@ On notice or resume: a host's notice carries no reply: read `terminal.getStatus`
 - Missing evidence: one narrow follow-up (`terminal.sendCommandOwned` there, or one read-only `project.runCommand`), never a re-run. A failure is that environment's finding: never re-run, fix or change tests.
 - A settled row frees its host: start its next.
 
-Stop and recovery: one run per row; a re-run or another SHA is a new request. A row still running stays open; an `expired` call may still be running there: read its terminal or output first. Queue lost: report it, start no more. Worktrees and panels stay until the person asks (`terminal.closeOwned`, `worktree.deleteOwned` there).
+Stop and recovery: one run per row; a re-run or another SHA is a new request. A row still running stays open; an `expired` call may still be running there: read its terminal or output first. Queue lost: report it, start no more. A passed row's agent closes once the row settles (`terminal.closeOwned` there); a failed or incomplete one stays. Worktrees stay until the person asks (`worktree.deleteOwned` there).
 
 Report back: one matrix, every requested row: environment, host, SHA tested, per check command and result, state (passed, failed, incomplete, unavailable, open), what you ran vs what an agent reported. It passes only if every row passed; else partial. No fix, publish or readiness verdict.

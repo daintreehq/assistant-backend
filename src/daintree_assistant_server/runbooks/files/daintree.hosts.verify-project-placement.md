@@ -27,6 +27,6 @@ Procedure:
    - Dirty or not set up: findings, not failures.
    - Verdict, bound to the project and root that answered: match, match needing a sync, fork, different repository, unverified. Two matches on a host, a root other than expected, or none: the person chooses.
 
-Stop and recovery: one read per candidate; a timed-out or refused read is unverified, read again only on the person's word. Fetch, reset, clone, setup or a start is a separate step the person authorises. A read-only agent you launched stays open until they ask.
+Stop and recovery: one read per candidate; a timed-out or refused read is unverified, read again only on the person's word. Fetch, reset, clone, setup or a start is a separate step the person authorises. Close a read-only agent you launched once it has replied and been read (`terminal.closeOwned` there); a timed-out one stays.
 
 Report back: per host and candidate: project, root, remotes and HEAD seen, clean or dirty, setup, how it was read (command, or agent and `terminalId`), verdict; choices left open.

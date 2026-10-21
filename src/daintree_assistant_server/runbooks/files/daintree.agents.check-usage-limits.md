@@ -15,6 +15,7 @@ optionalTools:
   - slashCommands.list
   - terminal.waitUntilIdle
   - terminal.closeOwned
+  - terminal.closeMany
   - host.list
   - host.call
 ---
@@ -36,14 +37,15 @@ On a host: the hosts named, else every connected one in `host.list` (this machin
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
 ```
 
-Other CLIs, or Codex's credits: steps 1-5 there, owned tools only.
+Other CLIs, or Codex's credits: steps 1-6 there, owned tools only.
 
 1. Resolve the agents with `agent.listAvailable`; say which you check and which you skip and why.
 2. Revalidate with `slashCommands.list` for that `agentId`: take a command only if its description says usage, quota, limits or status, and reject any that also mentions manage, redeem, reset, buy, purchase, upgrade, top up or billing. A known view this build no longer lists is not trusted. `slashCommands.list` unavailable or declined: send nothing and give the user the known command. Nothing qualifies: report no in-CLI allowance view. Never guess a command.
 3. Type only at an idle prompt in a terminal the user named that you own, or one you launch now with the exact `agentId`, `focusPolicy:"preserve"` and no `prompt`. Never your own pane. A fresh pane is still starting: decide nothing from it until one `terminal.waitUntilIdle`, then `terminal.getStatus` with `includeOutput`, shows its empty input line; a timeout means still starting, so read again.
    - Folder-trust dialog on a pane you just launched: the foundation's trust rule applies, since the user asked for this check here. Answer it with `terminal.sendKeysOwned` (sidebar: `terminal.sendKeys`) `choose:"<the trust label shown>"` (Claude Code: "Yes, I trust this folder"), wait for the input line again, and report that you trusted it. Never stop the check over it.
    - Any other startup prompt (login, approval, update): the user's. Mark that agent not checked; the others go on.
-4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; if the agent took it as a chat message, stop and never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing. Tell the user which tab or scroll key shows the figures.
-5. Read the panel with `terminal.getOutput` (`maxLines` about 80), exactly; still loading, one more read. Leave it open; close only terminals you launched, on request. A sidebar close can wait on a confirmation: on `CONFIRMATION_TIMEOUT` leave it open and say so, never retry.
+4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; if the agent took it as a chat message, stop and never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing.
+5. Read the panel with `terminal.getOutput` (`maxLines` about 80), exactly; still loading, one more read.
+6. Close every terminal you launched for this check, one `terminal.closeMany` per machine, except one at a startup prompt or unread, left for the user. A sidebar close awaiting confirmation (`CONFIRMATION_TIMEOUT`): leave it open, say so, never retry.
 
-Report back, per machine and agent: remaining allowance per window as LEFT (convert USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are not an allowance); reset times exactly as shown with timezone; credits or premium requests; the source of every figure ("read from <agent>'s <command> screen", "<host>'s agent.readQuota") or "not checked: <reason>", never a figure you did not read now; every terminal you launched, with its host. Never add machines up: each may be another account, and one account on two machines is one allowance shown twice. Most headroom: the largest % left on the same CLI and window, with plan and reset; different plans are not like for like.
+Report back, per machine and agent: remaining allowance per window as LEFT (convert USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are not an allowance); reset times exactly as shown with timezone; credits or premium requests; the source of every figure ("read from <agent>'s <command> screen", "<host>'s agent.readQuota") or "not checked: <reason>", never a figure you did not read now; every terminal you launched, with its host, closed or kept and why. Never add machines up: each may be another account, and one account on two machines is one allowance shown twice. Most headroom: the largest % left on the same CLI and window, with plan and reset; different plans are not like for like.

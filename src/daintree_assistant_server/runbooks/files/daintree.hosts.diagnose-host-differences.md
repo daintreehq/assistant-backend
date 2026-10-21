@@ -32,6 +32,6 @@ Steps 3 to 5, at Tool set Full: `project.runCommand` with `cwd` the worktree pat
 
 On notice or resume: an agent's figures are claims: its HEAD against the pin, its exit code against its screen (`terminal.getStatus` with `includeOutput` there). A missing field: one narrow `terminal.sendCommandOwned` to it, `notify:true`.
 
-Stop and recovery: one run per host per round; another SHA or an unasked re-run is a new request. Worktrees and agents made here stay, named in the report.
+Stop and recovery: one run per host per round; another SHA or an unasked re-run is a new request. Once compared, close the agents made here (`terminal.closeOwned` there), keeping the failing host's and any still running; worktrees made here stay, named in the report.
 
 Report back: SHA, command; per host, attributed (read by you, or claimed by its agent): checkout, run, fingerprint; differences ranked with their evidence; a correction proposed, unapplied; what was left on each host.

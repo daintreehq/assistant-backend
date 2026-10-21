@@ -19,7 +19,7 @@ Findings only: no edits, commits, pushes, approvals or comments unless asked. Pe
 On a host: shell steps run there, per the hosts foundation; own shell: `gh -R <repo>`.
 
 Procedure:
-1. The set: the PRs the user named, else one `forge.listPRs` with their filter (`state:"open"`, `search:"-is:draft review:required"` or `"base:develop created:>=<date>"`, `perPage` up to 30); say so when `hasMore` is true. Leave bot dependency bumps out unless named. At most four reviewers at once (or the user's number); the rest follow in later rounds with no new yes.
+1. The set: the PRs the user named, else one `forge.listPRs` with their filter (`state:"open"`, `search:"-is:draft review:required"` or `"base:develop created:>=<date>"`, `perPage` up to 30); `hasMore`: say so. Leave bot dependency bumps out unless named. At most four reviewers at once (or the user's number); the rest follow in later rounds with no new yes.
 2. Freeze each PR: `gh pr view <n> --repo <r> --json number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,state,isCrossRepository`. Skip closed, merged and draft PRs unless named. `headRefOid` is the commit the verdict binds to.
 3. One worktree per PR. Reuse a `worktree.list` row whose `prNumber` matches only when clean and `git -C <path> rev-parse HEAD` equals `headRefOid`; one that differs: leave it untouched, go diff-only. Else create with `{"source":{"kind":"pullRequest","pullRequestNumber":<n>}}` and call `worktree.waitUntilReady` on its `worktreeId` (`timedOut:true`: call again) until `setupState:"ready"` (`needs-approval`: the user approves it in Daintree; `failed`: "cannot assess"). A fetch error naming the head branch: `git fetch <remote> pull/<n>/head:pr-<n>`, then create with `existingBranch` `pr-<n>`. Then `git -C <path> fetch <remote> <base>`; HEAD must equal `headRefOid`.
    Outside contributor or fork (`isCrossRepository`, or an author the user does not vouch for): creating its worktree runs the project's setup commands, often an install, on their code. Say so; without the user's yes, go diff-only.
@@ -40,6 +40,6 @@ On notice or resume:
 
 Posting, only when asked: one `gh pr review <n> --repo <r> --comment --body-file <f>` per PR with checked findings, read back with `gh pr view <n> --repo <r> --json reviews`. Approve or request changes is daintree.forge.land-pull-request.
 
-Stop and recovery: one recap request (`terminal.sendCommandOwned`) per cut or missing reply, then "cannot assess". An ambiguous launch is reconciled by `requestedId` in `terminal.list`, never relaunched. Worktrees and reviewer panels stay until the user asks (daintree.orchestration.workspace-cleanup).
+Stop and recovery: one recap request (`terminal.sendCommandOwned`) per cut or missing reply, then "cannot assess". An ambiguous launch is reconciled by `requestedId` in `terminal.list`, never relaunched. Close a reviewer once its verdict is checked; worktrees stay until asked (daintree.orchestration.workspace-cleanup).
 
 Report back: per PR its number, title, author, head reviewed and whether it moved, verdict, top findings with `file:line`, CI for that head, and what was not assessed; reviewer terminal and worktree ids; PRs skipped and why; whether the listing was capped; anything posted, as read back.

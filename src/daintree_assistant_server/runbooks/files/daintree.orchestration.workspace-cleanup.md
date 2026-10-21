@@ -17,7 +17,7 @@ optionalTools:
   - worktree.delete
   - worktree.resource.status
 ---
-A confirmation gate, not permission to tidy up. Never close on your own initiative or widen a narrow request ("close the two that failed") into a sweep. Showing evidence (`git status`, unpushed commits) is fine; judging whether the user's work is finished is not. A cleanup never passes `force`.
+A confirmation gate, not permission to tidy up. Never close the user's work on your own initiative or widen a narrow request ("close the two that failed") into a sweep. Showing evidence (`git status`, unpushed commits) is fine; judging whether the user's work is finished is not. A cleanup never passes `force`.
 
 On a host: call these tools on the work's machine; shell steps run there, per the hosts foundation.
 

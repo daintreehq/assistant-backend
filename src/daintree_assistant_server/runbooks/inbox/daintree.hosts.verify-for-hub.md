@@ -29,6 +29,6 @@ The message, its fit and the one reply are daintree.hosts.handle-hub-message's; 
 
 On notice or resume: the report is a claim. Check yourself: HEAD is the SHA, `git diff --quiet HEAD` passes (untracked files listed as generated, apart from source), each log names the SHA and matches its counts or exit code. A missing runner, unmet environment, empty selection, timeout, or a test command exiting 0 with no runner summary is incomplete, never a pass. A branch moved (`git ls-remote`) is a finding, never a re-run. Reply `completed`: SHA, branch head now, per check command, runtime, platform, counts, failing tests by name, log path; what could not run. Sensitive or oversized detail stays here by path; every failure is still counted.
 
-Stop and recovery: one worktree and one verifier per exchange; a re-run, another revision or a fix is a new request. A source edit voids the run: report it. Leave the worktree and panes.
+Stop and recovery: one worktree and one verifier per exchange; a re-run, another revision or a fix is a new request. A source edit voids the run: report it. Close the fetch agent once fetched, and the verifier once a pass is replied; leave a failed one and the worktree.
 
 Report back: the reply as sent, with the worktree and pane ids.

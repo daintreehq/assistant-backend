@@ -9,7 +9,7 @@ requiredTools:
   - host.call
 hostEligibility: connected
 ---
-Read-only on every host: nothing is closed, removed, stopped, fetched there or pushed. Every read below is a `host.call` to that host and project unless it says your shell.
+Read-only on every host: nothing is removed, stopped, fetched there or pushed, and nothing closed but your own audit agents. Every read below is a `host.call` to that host and project unless it says your shell.
 
 1. The run's items per host and project, from the plan and ids you kept: worktree id, branch, terminal id, port, each with its `hostId` and `projectId`. Match only by those; anything that merely resembles one is another owner's: counted, unjudged. No record of an item: unknown, never the run's.
 2. Coverage: `host.list`. A host not `connected` or `control:false`, a project missing from its `projects`, or a call that is not `ok` is a gap, never "nothing there".
@@ -26,6 +26,6 @@ Read-only on every host: nothing is closed, removed, stopped, fetched there or p
 
 On notice or resume: a Core agent's facts are claims; check what is cheap (a pushed claim by `git ls-remote`, a terminal by `terminal.getStatus` there); a missing field gets one narrow `terminal.sendCommandOwned` to that agent. Unchecked stays a claim.
 
-Stop and recovery: one read pass per project, one agent per Core project; a lost or empty read is a gap, never retried into a guess. The audit agents stay open: name them; close on request. Cleanup the person authorises is daintree.hosts.recover-and-clean-up, which reads again first.
+Stop and recovery: one read pass per project, one agent per Core project; a lost or empty read is a gap, never retried into a guess. Close each audit agent there once its facts are checked (`terminal.closeOwned`); one that will not close: name it. Cleanup the person authorises is daintree.hosts.recover-and-clean-up, which reads again first.
 
-Report back: per host and project, each item with class, reasons and the decision it needs; coverage gaps; other owners' items counted; what you read yourself apart from what an agent there claimed; agents left open there.
+Report back: per host and project, each item with class, reasons and the decision it needs; coverage gaps; other owners' items counted; what you read yourself apart from what an agent there claimed; audit agents closed or left open there.

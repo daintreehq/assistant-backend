@@ -44,6 +44,6 @@ On notice or resume:
 3. Salvage from the diff: correct, wrong, unknown; a check you run writes nothing beyond build output there, else the change stays unverified. Revert nothing unasked.
 4. Prevention: one to three changes with exact text, each with a scenario reproducing it: a brief line, an AGENTS.md (Codex) or CLAUDE.md (Claude Code) rule, a test, a memory entry (through daintree.memory.manage-project-memory), each applied only on the user's yes.
 
-Stop and recovery: one analyst (per host, across hosts), at most one follow-up send (`terminal.sendCommandOwned`, `notify:true, handback:true`); one that fails or finds no transcript is reported, never relaunched. Close its panel only on request.
+Stop and recovery: one analyst (per host, across hosts), at most one follow-up send (`terminal.sendCommandOwned`, `notify:true, handback:true`); one that fails or finds no transcript is reported, never relaunched. Close the analyst once you report.
 
 Report back: the run (agent, terminal or session id, worktree, branch, host); each analyst's terminal id; the timeline to the first divergence with quoted evidence, sources and unobserved moments; the cause class and why; claims verified or contradicted; changes as salvageable, wrong or unknown, and how checked; prevention with exact text; what could not be read (pruned session, missing transcript).

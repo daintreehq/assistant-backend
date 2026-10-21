@@ -15,6 +15,7 @@ optionalTools:
   - slashCommands.list
   - terminal.waitUntilIdle
   - terminal.closeOwned
+  - terminal.closeMany
 ---
 The figures exist only in each CLI's own account view; asked in prose, a model guesses. Run the read-only usage command at the agent's own prompt and read the screen. A usage panel is not a turn: it gives no handback and may never stop, so read the screen rather than waiting for a reply.
 
@@ -33,7 +34,8 @@ No known in-CLI allowance view: Cursor (its `/usage` is activity), Aider, OpenCo
 3. Type only at an idle prompt in a terminal the user named that you own, or one you launch now with the exact `agentId`, `focusPolicy:"preserve"` and no `prompt`. Never your own pane. A fresh pane is still starting: decide nothing from it until one `terminal.waitUntilIdle`, then `terminal.getStatus` with `includeOutput`, shows its empty input line; a timeout means still starting, so read again.
    - Folder-trust dialog on a pane you just launched: the foundation's trust rule applies, since the user asked for this check here. Answer it with `terminal.sendKeysOwned` (sidebar: `terminal.sendKeys`) `choose:"<the trust label shown>"` (Claude Code: "Yes, I trust this folder"), wait for the input line again, and report that you trusted it. Never stop the check over it.
    - Any other startup prompt (login, approval, update): the user's. Mark that agent not checked; the others go on.
-4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; if the agent took it as a chat message, stop and never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing. Tell the user which tab or scroll key shows the figures.
-5. Read the panel with `terminal.getOutput` (`maxLines` about 80), exactly; still loading, one more read. Leave it open; close only terminals you launched, on request. A sidebar close can wait on a confirmation: on `CONFIRMATION_TIMEOUT` leave it open and say so, never retry.
+4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; if the agent took it as a chat message, stop and never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing.
+5. Read the panel with `terminal.getOutput` (`maxLines` about 80), exactly; still loading, one more read.
+6. Close every terminal you launched for this check in one `terminal.closeMany`, except one at a startup prompt or unread, left for the user. A sidebar close awaiting confirmation (`CONFIRMATION_TIMEOUT`): leave it open, say so, never retry.
 
-Report back, per agent: remaining allowance per window as LEFT (convert USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are not an allowance); reset times exactly as shown with timezone; credits or premium requests; the source of every figure ("read from <agent>'s <command> screen") or "not checked: <reason>", never a figure you did not read now; every terminal you launched.
+Report back, per agent: remaining allowance per window as LEFT (convert USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are not an allowance); reset times exactly as shown with timezone; credits or premium requests; the source of every figure ("read from <agent>'s <command> screen") or "not checked: <reason>", never a figure you did not read now; every terminal you launched, closed or kept and why.

@@ -178,7 +178,7 @@ scenarios:
     must: Keep state in the conversation; for a long run use the scratch folder first.
     must_not: Write a checkpoint into the user's repository from the sidebar.
     runbooks: [daintree.foundation]
-    states: ["For one or two rounds your conversation is the record", "DAINTREE_ASSISTANT_SCRATCH_DIR", "never writes into the user's repository", "git rev-parse --git-path info/exclude"]
+    states: ["For one or two rounds your conversation is the record", "DAINTREE_ASSISTANT_SCRATCH_DIR", "outside the user's repository", "git rev-parse --git-path info/exclude"]
 
   - id: same-kind-launches-are-distinct
     situation: Two participants of the same agent kind are launched for one task.
@@ -481,6 +481,20 @@ scenarios:
     must_not: Change billing.
     runbooks: [daintree.agents.check-usage-limits]
     states: ["billing"]
+
+  - id: one-off-terminals-are-closed
+    situation: The caller launched agents only to read their usage screens, and has read them.
+    must: Close the terminals it launched for the check, keeping one at a startup prompt or unread, and say which.
+    must_not: Leave them open for the user to clean up, or close one the user may continue in.
+    runbooks: [daintree.foundation, daintree.agents.check-usage-limits]
+    states: ["close yours once done, unless the user may continue in it", "Close every terminal you launched for this check", "except one at a startup prompt or unread", "closed or kept and why"]
+
+  - id: poll-voters-kept-for-runoff
+    situation: A poll has its answers in, but a tie is open or a voter is still running or waiting on a question.
+    must: Close the poll's terminals only once no runoff is pending, keeping any voter still running or stopped on a question or approval.
+    must_not: Close the voters a runoff would reuse, or one mid-answer.
+    runbooks: [daintree.agents.poll-pinned-agents]
+    states: ["no tie is left for a runoff", "keeping any still running or stopped on a question or approval"]
 
   - id: watch-scheduling-without-mechanism
     situation: The user wants something done at 6pm and no scheduler exists.

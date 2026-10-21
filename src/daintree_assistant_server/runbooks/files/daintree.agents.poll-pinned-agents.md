@@ -29,6 +29,6 @@ A plain question to distinct kinds:
 5. Translate each label through that voter's own map. An answer still missing after the foundation's recheck, ambiguous, off-ballot or unreadable is excluded, never counted against the majority, and no vote is made up for it. A voter at any question, approval or error other than the launch-directory trust dialog is excluded with the reason.
 6. Tally once every voter has answered or been excluded. A tie: apply the tiebreak the user already gave before reporting; ask only when none was given or it still ties. A later answer is a marked provisional update, never a silent change to a result already given.
 
-If the user flags bias, rerun from scratch with fresh voters; never mix biased and corrected votes. Close only this poll's terminals, only on request.
+If the user flags bias, rerun from scratch with fresh voters; never mix biased and corrected votes. Once every voter is in or excluded and no tie is left for a runoff, close this poll's terminals in one `terminal.closeMany`, keeping any still running or stopped on a question or approval.
 
-Report back: each agent's answer, attributed; requested, launched, answered and excluded counts with reasons; for a vote, the tally over answered voters, the majority verdict with dissent, the mapped options and a synthesized recommendation; anyone still running.
+Report back: each agent's answer, attributed; requested, launched, answered and excluded counts with reasons; for a vote, the tally over answered voters, the majority verdict with dissent, the mapped options and a synthesized recommendation; anyone still running; terminals closed.

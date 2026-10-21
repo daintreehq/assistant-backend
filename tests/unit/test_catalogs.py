@@ -255,7 +255,7 @@ def test_host_state_narrows_the_search_within_the_callers_catalog() -> None:
 #: inbox catalog is what every v0.44 client is served, frozen at the post-#161
 #: catalog (revision ``sha256:f863c7a9…`` when it was split off). Change a file
 #: there only to fix something wrong for v0.44 clients, and update this with it.
-INBOX_DIGEST = "sha256:b9eba7fd8cd72c0fe0bd94c29dfde2c832e17ff036413d0cb0f28b31a79432a7"
+INBOX_DIGEST = "sha256:5d8d25c1d3850510356ea1a0bf2e934fdd6288ef2720e8a9eaffd3a966a914ac"
 
 
 def _inbox_digest(directory: Path) -> str:
