@@ -156,19 +156,6 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   # ------------------------------------------------------------------ reverse: the neighbour wins
-  - id: shard-test-suite-reverse-lane-shard
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      This machine is the lane running one shard the hub assigned. daintree.hosts.verify-for-hub
-      owns it ("one shard of a suite"); the hub's split must not ride along.
-    messages:
-      - role: user
-        content: the hub assigned this machine the second of three test shards at commit 4b7e; run only that part in a clean worktree and send the counts back
-    expect:
-      required: [daintree.hosts.verify-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
-
   - id: shard-test-suite-reverse-swarm-tests
     category: routing-trap
     note: >-

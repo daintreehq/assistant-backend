@@ -1,16 +1,6 @@
-# daintree.hosts.run-validation-matrix: from this Shell's hub, one exact commit put through the
-# same checks under each environment the person asks for (OS, architecture, runtime versions) on
-# the Remote Hosts able to meet it, one matrix back with a row per environment: passed, failed,
-# incomplete or unavailable.
-#
-# Positives are invented situations in agent and user words, short and long, some with a social
-# lead-in or an earlier turn; explanation questions carry docs: true. Boundaries are requests this
-# runbook wins against a neighbour whose vocabulary they share: the same change built on every host
-# (swarm-fan-out), a lane testing its one row (verify-for-hub), checks on this machine
-# (run-local-checks), a ship verdict (assess-readiness), different pieces spread over hosts
-# (place-work), one host (delegate-to-host), and the local runbooks the starting sweep picked
-# (test-distributable, run-e2e-suite, provision-local-environment). Followups and topic shifts are
-# the matrix as a second turn. Machine names are generic.
+# daintree.hosts.run-validation-matrix: Run a cross-host validation matrix for one commit
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.run-validation-matrix.md
+
 runbook: daintree.hosts.run-validation-matrix
 run: runbook-2026-10-issue-117
 
@@ -73,8 +63,6 @@ boundaries:
   - query: Have each Remote Host run identical check commands against one release commit and return a per-platform matrix rather than building anything
     confusable_with: [daintree.hosts.swarm-fan-out]
   - query: send the linux host and the mac host the commit to verify, each under its own python, and collect a row per environment
-    confusable_with: []
-  - query: From the hub, ask the host lanes to test this SHA under the listed runtimes and assemble their results into one matrix
     confusable_with: []
   - query: i'm on the main machine, have the remote assistants each verify the RC in their own environment and give me the grid
     confusable_with: []
@@ -181,10 +169,6 @@ followups:
       - 'assistant: Both rows passed: 3.11 on the Linux host, 3.12 on the Mac host, at the same SHA.'
 
 topic_shifts:
-  - query: then use them to test v1.9.0 on every OS and runtime they have
-    history:
-      - 'user: is every host enrolled in this repo?'
-      - 'assistant: The Linux server, the arm Mac and the Intel Mac each have an assistant in this repository.'
   - query: good, now have them run the tests for this commit under python 3.11 and 3.12, a row per environment
     history:
       - 'user: how much allowance does each host have left?'
@@ -197,13 +181,6 @@ topic_shifts:
     history:
       - 'user: have every host build the parser on its own branch'
       - 'assistant: All three hosts replied with verified branches and SHAs.'
-  - query: All host assistants are enrolled now. Test the pinned release SHA on Linux x64 and macOS arm64 without changing it, with a result row for each environment.
-    history:
-      - 'user: ready the hosts for the repository'
-      - 'assistant: The Linux and Mac hosts each have an enrolled assistant with a current generation.'
-    active: [daintree.hosts.delegate-to-host]
-    confusable_with: [daintree.hosts.delegate-to-host]
-    run: 2026-10-16-synthetic-audit
   - query: Use the new patched revision for a fresh Linux and macOS validation matrix. There are no results for it yet; run checks only.
     history:
       - 'user: why did the previous commit differ between hosts?'

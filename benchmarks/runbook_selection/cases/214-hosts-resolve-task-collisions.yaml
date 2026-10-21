@@ -35,22 +35,6 @@ cases:
       required: [daintree.hosts.resolve-task-collisions]
       optional: [daintree.hosts.foundation]
 
-  - id: rtc-agent-lanes-same-unit
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      Agent phrasing of the hub's task. Decided by "every host's writer on that work stopped
-      with an acknowledgement, each side's pushed SHA verified and its unpushed work
-      accounted for, one owner chosen".
-    messages:
-      - role: user
-        content: >-
-          Two remote host lanes are implementing the same unit on different branches; stop
-          the duplicate writer, compare their pushed SHAs and unpushed edits, and keep one owner
-    expect:
-      required: [daintree.hosts.resolve-task-collisions]
-      optional: [daintree.hosts.foundation]
-
   - id: rtc-user-sent-to-both
     category: single-runbook
     note: >-
@@ -267,19 +251,4 @@ cases:
         content: the two other hosts both finished their parts; get the build box to combine the pushed branches and tell me whether the tests pass
     expect:
       required: [daintree.hosts.integrate-host-branches]
-      optional: [daintree.hosts.foundation]
-
-  - id: rtc-reverse-recover-open-exchanges
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Which exchanges are still open, and cleaning up what they left, is recover-and-clean-up's
-      "which delegated exchanges finished, which are still open" and "what a run left on the
-      Remote Hosts ... cleaned up through each host's own assistant"; the collisions runbook
-      must not ride along.
-    messages:
-      - role: user
-        content: which of the exchanges I sent to my other machines are still open, and clean up what they left behind
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
       optional: [daintree.hosts.foundation]

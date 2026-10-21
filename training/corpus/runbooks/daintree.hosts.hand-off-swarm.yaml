@@ -1,27 +1,12 @@
-# daintree.hosts.hand-off-swarm: coordination of a run already out on the Remote Hosts passing from
-# one hub session to another on the same Shell (Claude Code to Codex and back).
-# The outgoing hub freezes, answers its inbox and writes a hand-over where the person chooses; the
-# person switches the hub (nothing moves it for them); the successor rebuilds every exchange from the
-# Shell's task records, resends nothing and supervises on. Another Shell's hub cannot take the run
-# over: it gets a person-led plan.
-#
-# Rows: swaps and take-overs in people's own words and as hub agents describe them, with the
-# situations the procedure handles (a usage limit or a full context forcing the change, a host
-# waiting on a question, a hand-over file the successor is pointed at, a different Mac asking to
-# take over); followups from either session; and boundaries against holding a run to resume later
-# (daintree.hosts.park-swarm), an account of a run after a restart (daintree.hosts.recover-and-clean-up),
-# following a run its own hub sent (daintree.hosts.supervise-swarm), a coordinator pane's agents on
-# this machine (daintree.orchestration.hand-off-orchestration), one agent's task moving to another
-# CLI (daintree.agents.hand-off-task), a local durable plan
-# (daintree.orchestration.execute-durable-workflow) and sending a new run (daintree.hosts.start-swarm),
-# each with reverse rows in that neighbour's file.
+# daintree.hosts.hand-off-swarm: Hand a run on the Remote Hosts to a replacement session
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.hand-off-swarm.md
+
 runbook: daintree.hosts.hand-off-swarm
 run: runbook-2026-10-issue-112
 
 positives:
   - swap the hub to codex, the other machines are still mid-task, keep track of all of it
   - my claude session is nearly out of context. let a fresh one take over the run on the other machines
-  - 'Hub task: freeze new dispatch, record every outstanding task on the Remote Hosts with its lane, task id and open question, and write the hand-over a replacement hub session can read.'
   - I'm switching the sidebar assistant from codex back to claude. The remote work is halfway done; how do we change over without redoing anything?
   - new hub here. The last session left notes about what's running on the two studios in ~/swarm-notes.md, pick the run up from there
   - The usage limit on this Claude session is nearly gone but three remote hosts are still building. Move the coordination to Codex without resending a thing.
@@ -42,11 +27,6 @@ positives:
   - Hey, quick one. I'm going to change which assistant runs the sidebar, so please hand the remote swarm over cleanly.
   - thanks, that's all for this session. Hand the swarm to whoever I open next and tell me how to switch.
   - 'Search task: how to move coordination of an in-flight cross-host run to a replacement hub assistant on the same Shell when the agent CLI changes, without losing task state.'
-  - >-
-    The hub (Claude Code) has about five percent of its context left. Three Remote Hosts have open
-    tasks and one of them is waiting on a decision from the person. Hand the run to a fresh hub
-    session: capture task ids, lane generations and cursors, write the hand-over where the person
-    chooses, and tell the person how to switch.
   - My work laptop's hub started this run but I'd like my desktop to finish it. Can the desktop's hub take it over? The remote hosts are mid-task.
   - If I open the sidebar on a second Mac, can it continue the tasks the first Mac's hub sent to the remote hosts?
   - "i'm the new sidebar session. the last one's note says the remote tasks are listed in ~/handover.txt. read it, reconcile it with what the hosts report, and continue"
@@ -101,10 +81,6 @@ followups:
     history:
       - "user: hand the swarm over"
       - "assistant: Hand-over saved to ~/notes/swarm-handover.md. Switch the assistant, then tell the new session to take over the run from that file."
-  - query: include the second host's open question in it too
-    history:
-      - "user: write the hand-over for the next hub"
-      - "assistant: Written for host one: task, lane, state and the question it asked."
   - query: go ahead, take over
     history:
       - "user: I changed the sidebar to Codex. Claude started the run."
@@ -113,14 +89,6 @@ followups:
     history:
       - "user: swap the hub to claude and keep the run going"
       - "assistant: Understood. I'll freeze new sends and write the hand-over."
-  - query: I am the replacement Codex session. Use the handover to reconcile the existing remote exchanges and continue them without sending the units again.
-    history:
-      - 'user: switch the live remote swarm from the Claude hub to a new Codex hub'
-      - 'assistant: The outgoing hub froze new sends and saved the handover, including the unanswered host question.'
-    active: [daintree.hosts.hand-off-swarm, daintree.hosts.supervise-swarm]
-    confusable_with: [daintree.hosts.recover-and-clean-up]
-    run: 2026-10-16-synthetic-audit
-
 topic_shifts:
   - query: forget the failing lint job, swap the hub to codex and hand over the remote run
     history:
@@ -140,8 +108,6 @@ boundaries:
     confusable_with: [daintree.hosts.park-swarm, daintree.hosts.steer-swarm]
   - query: my next session is a different CLI and the remote run continues meanwhile, give it a record to continue from
     confusable_with: [daintree.hosts.park-swarm]
-  - query: I'm replacing the hub on purpose; write the hand-over for the next session, I don't need an account of the exchanges
-    confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: the old hub is being swapped for Codex now, leave Codex what it needs to keep the remote run going
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: new hub, with the previous one's hand-over file to read. Continue the run

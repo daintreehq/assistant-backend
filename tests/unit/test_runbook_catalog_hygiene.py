@@ -12,10 +12,8 @@ actually lists to each kind of caller, captured from one app commit (its README 
 which, and how to refresh). The names in frontmatter are action ids, which are also
 the wire names the app lists.
 
-Each host model's catalog is checked against its own generation of those captures
-(``daintree_mcp_surfaces.GENERATIONS``): the control catalog against the current app,
-the inbox catalog against the v0.44.0 capture frozen with it. A runbook both share is
-checked against both, so it cannot name a tool a v0.44 client lacks.
+Every current runbook is checked against the current app capture. Archived inbox
+procedures are never admitted through this contract.
 """
 
 from __future__ import annotations
@@ -26,8 +24,6 @@ import pytest
 from daintree_mcp_surfaces import (
     CALLER_POLICY_BY_MODEL,
     HOST_CONTROL_TOOLS,
-    HUB_TOOLS,
-    LANE_TOOLS,
     MESSAGING_TOOLS,
     MODELS,
     PANE_CALLERS,
@@ -41,7 +37,7 @@ from daintree_mcp_surfaces import (
     rebuild_delta,
 )
 
-from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
 from daintree_assistant_server.runbooks.local.documents import (
     runbook_document,
     split_when_to_use,
@@ -49,7 +45,7 @@ from daintree_assistant_server.runbooks.local.documents import (
 
 
 def _catalog(model: Model) -> Catalog:
-    return load_catalogs().for_model(model)
+    return load_catalog()
 
 
 @pytest.mark.parametrize("model", MODELS)
@@ -66,13 +62,6 @@ def test_the_captures_are_one_app_build_and_not_truncated(model: Model) -> None:
     assert len(commits) == 1, f"the surface captures come from different app builds: {commits}"
     # Every API-key tool is also a pane tool; external is curated, not different.
     assert action_ids("external", model) <= action_ids("pane-core", model)
-
-
-def test_the_two_generations_are_different_builds() -> None:
-    """The inbox capture is frozen with the inbox catalog; the control one moves on."""
-    control = capture("pane-core", "control")["capture"]["app_commit"]
-    inbox = capture("pane-core", "inbox")["capture"]["app_commit"]
-    assert control != inbox
 
 
 @pytest.mark.parametrize("model", MODELS)
@@ -103,8 +92,7 @@ def test_required_tools_are_on_the_callers_surface(model: Model) -> None:
 
     `daintree.hosts` is the one sidebar-only domain: an agent pane is never offered
     `host.*`. A hosts runbook's whole baseline must be offered to ONE of its callers:
-    the Shell's assistant at either Tool set in the control model; the hub
-    (`hub-full`) or an enrolled lane (`lane-full`) in the inbox model.
+    the Shell's assistant at either Tool set.
     """
     violations = [
         violation
@@ -118,9 +106,8 @@ def test_required_tools_are_on_the_callers_surface(model: Model) -> None:
 def test_supporting_runbooks_run_on_the_same_caller(model: Model) -> None:
     """A runbook is delivered with its domain foundation and its `requires`, and the
     caller follows all of them, so the bundle's baselines together must still run on
-    one of this runbook's callers. Otherwise a pane runbook could pull in hub-only
-    instructions through `requires`, or a lane runbook inherit a hub-only foundation
-    baseline. The control hosts foundation, which a connected caller gets with every
+    one of this runbook's callers. A pane runbook must not pull sidebar-only
+    instructions into its baseline through `requires`. The control hosts foundation, which a connected caller gets with every
     runbook, therefore requires nothing at all: a pane follows it too."""
     catalog = _catalog(model)
     violations = []
@@ -130,12 +117,8 @@ def test_supporting_runbooks_run_on_the_same_caller(model: Model) -> None:
         if violation := baseline_violation(runbook.id, required, model):
             violations.append(violation)
     assert not violations, f"bundles no single caller can follow: {violations}"
-    hosts_foundation = load_catalogs().control.get("daintree.hosts.foundation")
+    hosts_foundation = load_catalog().get("daintree.hosts.foundation")
     assert hosts_foundation is not None and not hosts_foundation.meta.required_tools
-    # What this catches: a hub-only requirement reaching a lane or a pane bundle.
-    assert baseline_violation(
-        "daintree.hosts.example", ["assistant.sendMessage", "host.list"], "inbox"
-    )
     assert baseline_violation("daintree.release.example", ["terminal.list", "host.list"])
 
 
@@ -144,7 +127,6 @@ def test_the_caller_policy_names_one_sidebar_only_domain() -> None:
     assert PANE_CALLERS == ("pane-core",)
     assert CALLER_POLICY_BY_MODEL == {
         "control": {"daintree.hosts": ("help-core", "help-full")},
-        "inbox": {"daintree.hosts": ("hub-full", "lane-full")},
     }
 
 
@@ -173,7 +155,7 @@ def test_metadata_cannot_make_a_runbook_a_hosts_runbook() -> None:
 
     off_caller = [
         f"{runbook.id}: {tool}"
-        for runbook in load_catalogs().control.runbooks
+        for runbook in load_catalog().runbooks
         if baseline_callers(runbook.id) != PANE_CALLERS
         for tool in runbook.meta.optional_tools
         if not any(tool in action_ids(caller) for caller in baseline_callers(runbook.id))
@@ -214,113 +196,15 @@ def test_a_host_call_reaches_the_relayed_surface_of_its_own_tier() -> None:
     assert call["inputSchema"]["required"] == ["hostId", "projectId", "tool"]
 
 
-def test_metadata_cannot_make_a_runbook_a_hub_or_lane_runbook() -> None:
-    """Declaring hub or lane tools never moves a runbook off the pane check: outside
-    `daintree.hosts` they can only ever be `optionalTools`, the sidebar hub variant
-    of a pane runbook (like the unscoped send). And a hosts runbook's baseline cannot
-    borrow a pane's owned tools, or span the hub and a lane."""
-    inbox: Model = "inbox"
-    for tool in sorted(MESSAGING_TOOLS):
-        assert baseline_violation("daintree.release.ask-a-host", [tool], inbox) is not None, tool
-    hosts = "daintree.hosts.example"
-    assert baseline_violation(hosts, ["host.list", "host.sendMessage"], inbox) is None
-    assert baseline_violation(hosts, ["host.list", "project.openOnHost"], inbox) is None
-    assert baseline_violation(hosts, sorted(LANE_TOOLS), inbox) is None
-    assert baseline_violation(hosts, ["assistant.reply", "terminal.sendKeys"], inbox) is None
-    assert baseline_violation(hosts, ["terminal.sendCommandOwned"], inbox) is not None
-    assert baseline_violation(hosts, ["host.sendMessage", "assistant.sendMessage"], inbox)
-    assert baseline_violation(hosts, ["host.listAssistants", "assistant.sendMessage"], inbox)
-
-    off_caller = [
-        f"{runbook.id}: {tool}"
-        for runbook in load_catalogs().inbox.runbooks
-        if baseline_callers(runbook.id, inbox) != PANE_CALLERS
-        for tool in runbook.meta.optional_tools
-        if not any(
-            tool in action_ids(caller, inbox) for caller in baseline_callers(runbook.id, inbox)
-        )
-    ]
-    assert not off_caller, f"optional tools no caller of the runbook is offered: {off_caller}"
-
-
-# ---- the inbox model, frozen with the v0.44.0 capture -------------------------
-
-
-def test_pane_and_api_key_callers_are_never_offered_messaging() -> None:
-    """Captured where messaging is live both ways (a Shell with a host that also
-    listens as one), an agent pane and an API-key client are still offered none of
-    it: they are not sidebar-assistant sessions. Nor is the ordinary sidebar
-    assistant on a machine with no host and no listener."""
-    for surface in ("pane-core", "pane-full", "external"):
-        recorded = capture(surface, "inbox")["capture"]["messaging"]
-        assert recorded["machine_has_hosts"] and recorded["machine_listening_as_host"]
-        assert not recorded["help_session"]
-        assert not action_ids(surface, "inbox") & MESSAGING_TOOLS, surface
-    for surface in ("help-core", "help-full"):
-        assert not action_ids(surface, "inbox") & MESSAGING_TOOLS, surface
-
-
-def test_messaging_is_the_same_on_core_and_full() -> None:
-    """Every Daintree Assistant on a Shell with a Remote Host may message, start and
-    cancel at either Tool set, with nothing to enroll: the plain sidebar captures
-    record what each tier's allowlist holds, and the hub and lane Core sessions what
-    they list. The hub's own lane receives host-initiated messages but has no Shell
-    to write to; a lane on a host has no `host.*` reach. Only the window moves,
-    `host.switch` and `project.openOnHost`, stay Full."""
-
-    def ids(surface: str) -> set[str]:
-        return action_ids(surface, "inbox")
-
-    def allowlisted_messaging(surface: str) -> set[str]:
-        withheld = capture(surface, "inbox")["capture"].get("allowlisted_but_not_listed", [])
-        return {w["action_id"] for w in withheld} & MESSAGING_TOOLS
-
-    inbox = {"assistant.getInbox", "assistant.reply"}
-    window_moves = {"host.switch", "project.openOnHost"}
-    assert allowlisted_messaging("help-core") == MESSAGING_TOOLS
-    assert allowlisted_messaging("help-full") == MESSAGING_TOOLS
-    # The Core sessions themselves, captured with messaging reachable and recorded
-    # as what they list beyond help-core.
-    hub_core = capture("hub-full", "inbox")["capture"]["core_listing"]
-    lane_core = capture("lane-full", "inbox")["capture"]["core_listing"]
-    help_core_hash = capture("help-core", "inbox")["capture"]["surface_hash"]
-    for listing in (hub_core, lane_core):
-        assert listing["delta_of_surface_hash"] == help_core_hash
-        assert not listing["removed"] and not listing["changed"]
-    assert set(hub_core["added"]) == HUB_TOOLS | inbox
-    assert set(lane_core["added"]) == LANE_TOOLS
-    assert ids("hub-full") & HUB_TOOLS == HUB_TOOLS
-    assert ids("hub-full") & LANE_TOOLS == inbox
-    assert window_moves <= ids("hub-full")
-    assert not window_moves & (ids("help-core") | set(hub_core["added"]))
-    assert ids("lane-full") & MESSAGING_TOOLS == LANE_TOOLS
-
-
-def test_hub_and_lane_surfaces_are_the_sidebar_plus_messaging() -> None:
-    """Stored as deltas against the sidebar surface of the same tier, from the same
-    capture. Rebuilt, each matches the tool count the app listed, and differs from
-    its base only by what the machine adds: messaging, and the host-gated actions a
-    Shell with a Remote Host shows."""
-    host_gated = {"host.switch", "project.openOnHost"}
-    for surface in ("hub-full", "lane-full"):
-        recorded = capture(surface, "inbox")["capture"]
-        base = recorded["delta_of"]
-        assert capture(base, "inbox")["capture"]["tier"] == recorded["tier"], surface
-        assert (
-            capture(base, "inbox")["capture"]["surface_hash"] == recorded["delta_of_surface_hash"]
-        )
-        assert len(capture(surface, "inbox")["tools"]) == recorded["tool_count"], surface
-        assert action_ids(base, "inbox") <= action_ids(surface, "inbox"), surface
-        added = action_ids(surface, "inbox") - action_ids(base, "inbox")
-        assert added <= MESSAGING_TOOLS | host_gated, surface
-
-
 def test_a_delta_that_does_not_apply_is_refused() -> None:
     """The rebuild refuses any delta it cannot apply exactly, so a hand edit to a
     delta file cannot drop or duplicate part of a surface unnoticed."""
     base = [{"action_id": "a.one"}, {"action_id": "a.two"}]
-    ok = {"added": [{"action_id": "b.new"}], "changed": [{"action_id": "a.two", "x": 1}],
-          "removed": ["a.one"]}
+    ok = {
+        "added": [{"action_id": "b.new"}],
+        "changed": [{"action_id": "a.two", "x": 1}],
+        "removed": ["a.one"],
+    }
     assert [t["action_id"] for t in rebuild_delta(base, ok)] == ["a.two", "b.new"]
     bad = [
         {"added": [], "changed": [{"action_id": "z.gone"}], "removed": []},
@@ -372,7 +256,9 @@ _DOTTED = re.compile(r"\bdaintree(?:\.[a-z0-9][a-z0-9_-]*)+\b")
 #: and reported zero once those were fixed — while ten more carve-outs said
 #: "use poll-pinned-agents" in a spelling it could not see. A check that
 #: recognises one wording measures that wording, not the property.
-_DEFERRAL = re.compile(r"\buse\s+(?:the\s+)?([a-z0-9][a-z0-9 ./_-]{2,60}?)(?=[,.;)]|\s+runbook\b|$)")
+_DEFERRAL = re.compile(
+    r"\buse\s+(?:the\s+)?([a-z0-9][a-z0-9 ./_-]{2,60}?)(?=[,.;)]|\s+runbook\b|$)"
+)
 
 #: Carve-out targets that are not a fully-qualified id. ZERO, and it stays there.
 #:
@@ -417,14 +303,13 @@ def test_every_dotted_reference_in_a_whenToUse_resolves(model: Model) -> None:
                 continue
             dangling.append(f"{runbook.id} -> {ref}")
     assert not dangling, (
-        "whenToUse references that resolve to no runbook, namespace or tool: "
-        + ", ".join(dangling)
+        "whenToUse references that resolve to no runbook, namespace or tool: " + ", ".join(dangling)
     )
 
 
 @pytest.mark.parametrize("model", MODELS)
 def test_every_carve_out_defers_to_a_fully_qualified_id(model: Model) -> None:
-    """"use competition" is invisible to the routing-trap gate; "use
+    """ "use competition" is invisible to the routing-trap gate; "use
     daintree.orchestration.competition" is not.
 
     ``bench coverage`` parses declared neighbours by scanning a whenToUse for

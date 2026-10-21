@@ -1,0 +1,48 @@
+# daintree.hosts.foundation: the domain foundation for cross-host assistant messaging
+# (this Shell's hub reaching the assistant on a Remote Host). Until the specific
+# daintree.hosts.* runbooks land it owns every hosts request; these cases pin the
+# requests it keeps once they do: how messaging works, switching it on, and why another
+# machine's assistant cannot be reached. Traps hold its boundary with
+# daintree.diagnostics (Daintree's own health on this machine) and
+# daintree.worktree.manage-resource (a worktree's cloud devbox), both ways.
+
+cases:
+  - id: hosts-foundation-switch-on-messaging
+    host_model: inbox
+    category: foundation-only
+    note: >-
+      Setting messaging up between two machines, in the user's words: "how to switch it
+      on". No specific hosts runbook owns enablement; the foundation carries the consent
+      settings and who turns them on.
+    messages:
+      - role: user
+        content: Get my laptop's Daintree assistant and the one on my Mac mini able to message each other.
+    expect:
+      required: [daintree.hosts.foundation]
+
+  - id: hosts-foundation-unreachable-not-diagnostics
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Another machine's assistant that cannot be reached is a messaging question
+      ("why one is not reachable"), not "Daintree itself misbehaving on this machine",
+      which the foundation fences off as daintree.diagnostics. The answer is the enrollment and consent path, so
+      diagnostics riding along is an extra.
+    messages:
+      - role: user
+        content: why can't my hub reach the assistant on the second machine
+    expect:
+      required: [daintree.hosts.foundation]
+
+  - id: hosts-foundation-ready-to-receive-not-devbox
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Whether another machine's assistant is set up to receive the hub's messages is
+      messaging enrollment ("whether it is set up"), not a worktree's remote resource,
+      which the foundation fences off as daintree.worktree.manage-resource.
+    messages:
+      - role: user
+        content: check whether the build machine's Daintree assistant is set up to receive messages from my hub
+    expect:
+      required: [daintree.hosts.foundation]

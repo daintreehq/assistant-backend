@@ -262,21 +262,6 @@ cases:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation]
 
-  - id: coordinate-dev-services-reverse-demo-for-hub
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The lane's own side: the hub asked THIS host to serve one service with sample data. Decided
-      by the neighbour's "when the hub asks THIS machine to prepare a DEMO of a feature".
-    messages:
-      - role: user
-        content: >-
-          Hub message: start the orders API here with sample data and reply with the port and the
-          commit you are serving.
-    expect:
-      required: [daintree.hosts.demo-for-hub]
-      optional: [daintree.hosts.foundation]
-
   - id: coordinate-dev-services-reverse-free-busy-port
     category: routing-trap
     note: >-

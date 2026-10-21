@@ -1,17 +1,6 @@
-# daintree.hosts.shard-test-suite: the hub's side of one test suite split between Remote Hosts.
-# This Shell's hub pins one commit, asks each host's assistant what its runner collects and
-# supports, hands each host a disjoint shard, and merges the shard reports into one result
-# checked against the suite's own test list (missing, empty, duplicate and retried shards,
-# timeouts and skips named).
-#
-# Rows: hub agents' task descriptions and people's own words, short and long, with social
-# lead-ins and how-to questions; follow-ups inside a sharded run (after discovery, an empty
-# shard, a host that dropped, a duplicate); topic shifts from host checks; and boundaries
-# against the same work on every host (daintree.hosts.swarm-fan-out), different pieces placed
-# per host (daintree.hosts.place-work), checks on this machine (daintree.ci.run-local-checks),
-# the lane running its one shard (daintree.hosts.verify-for-hub), local agents splitting work
-# (daintree.orchestration.fan-out-work) and hosts' branches combined
-# (daintree.hosts.integrate-host-branches), each with reverse rows in that neighbour's file.
+# daintree.hosts.shard-test-suite: Split one test suite into shards across the remote hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.shard-test-suite.md
+
 runbook: daintree.hosts.shard-test-suite
 run: runbook-2026-10-issue-118
 
@@ -19,7 +8,6 @@ positives:
   - Split the API package's test suite across the connected remote hosts at the current main SHA and return one merged result with per-host counts
   - Run the pytest suite as four shards on the remote hosts at a pinned commit, then verify the shard reports cover every collected test exactly once
   - Distribute the Playwright tests across the hosts this Shell reaches, one shard each, and merge the JUnit results into a single pass/fail verdict
-  - 'Hub task: partition the integration tests over the available host lanes at commit 3e9f0c2, collect each lane''s selection and counts, and flag any shard that came back empty'
   - Coordinate a sharded test run across remote machines for the monorepo's unit tests; the person wants proof that no test was skipped silently or run twice
   - Use the remote hosts to parallelise the slow end-to-end suite at the release candidate commit, one shard per machine, combined report with failures by name
   - Fan the vitest suite out across the hosts as disjoint shards at one SHA and reconcile the results against the full test list
@@ -27,13 +15,11 @@ positives:
   - Get the go test packages split between the remote hosts, each host a disjoint set of packages at the same commit, then one merged report
   - Split the RSpec files between the three connected hosts at the pinned SHA and merge the results; the runner has no shard flag, so hand out file lists
   - Run the backend suite split across hosts and check that the per-host test id lists union to the collected list with no overlap
-  - Parallelise the regression suite over every host lane at commit a51d77e and produce a single report that counts skipped tests separately
   - The person wants the jest suite at main split over their machines; first find out what the runner supports on each host, then assign shards
   - QA handed us a manifest of 640 regression test ids for this release; hand them out across the hosts and confirm every one came back
   - the payments suite has to pass on the release commit before Friday; use the hosts to run it in parts and show me any test that never reported
   - Split the slow contract tests between the mini and the tower at the head of main and give one verdict covering all of them
   - Shard the data pipeline tests across the remote hosts with a run id, a fixed timeout and the same environment on every host; report one combined outcome
-  - Send each host lane one shard of the unit suite at the pinned SHA and keep the plan so the results can be merged when the replies come in
   - our test suite takes almost an hour, can my other macs each run part of it
   - split the tests over the linux box and the mini so they finish quicker
   - can you shard the jest tests across my machines and tell me if everything passed
@@ -137,8 +123,6 @@ boundaries:
     confusable_with: [daintree.ci.run-local-checks]
   - query: pytest is slow here; shard it over the other machines and give me the overall pass or fail
     confusable_with: [daintree.ci.run-local-checks]
-  - query: from this Shell, give each host lane its shard of the suite and merge the replies
-    confusable_with: []
   - query: the hub should hand out the test shards and check the union, not run one itself
     confusable_with: []
   - query: split the one test suite's files across the remote hosts to run, not a batch of local agents

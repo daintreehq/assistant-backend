@@ -1709,20 +1709,6 @@ examples:
     active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
     confusable_with: [daintree.hosts.coordinate-contract-change]
     run: 2026-10-16-synthetic-audit
-  - query: can I hand a task from Claude to Codex in Daintree?
-    history:
-      - 'user: Prepare a demonstration on the mini.'
-      - 'assistant: The mini lane is collecting its local launch evidence.'
-    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.prepare-remote-demo]
-    run: 2026-10-16-synthetic-audit
-  - query: what's the difference between a global recipe and a project recipe?
-    history:
-      - 'user: Move pending work away from the overloaded tower.'
-      - 'assistant: I have a placement proposal and am checking which lanes are free.'
-    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.rebalance-load]
-    run: 2026-10-16-synthetic-audit
   - query: whats the cli actually called
     history:
       - 'user: Work through these nine tickets with two agents at a time.'
@@ -1841,34 +1827,6 @@ examples:
       - 'assistant: The settings preview is available; nothing has been copied yet.'
     active: [daintree.hosts.copy-portable-settings, daintree.hosts.foundation]
     confusable_with: [daintree.hosts.copy-portable-settings]
-    run: 2026-10-16-synthetic-audit
-  - query: why do i keep getting confirmation prompts
-    history:
-      - 'user: Prepare the tower for its system update.'
-      - 'assistant: The tower lane has been asked to reach a safe stopping point.'
-    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.prepare-host-maintenance]
-    run: 2026-10-16-synthetic-audit
-  - query: what happens when i hit the rate limit in this app
-    history:
-      - 'user: Agree on the service interface before remote implementation.'
-      - 'assistant: The host lanes are checking the proposed request schema.'
-    active: [daintree.hosts.coordinate-contract-change, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.coordinate-contract-change]
-    run: 2026-10-16-synthetic-audit
-  - query: where's the setting that controls which agent daintree launches by default?
-    history:
-      - 'user: Prepare a demonstration on the mini.'
-      - 'assistant: The mini lane is collecting its local launch evidence.'
-    active: [daintree.hosts.prepare-remote-demo, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.prepare-remote-demo]
-    run: 2026-10-16-synthetic-audit
-  - query: what does Copy tree context do, and how big can the output get?
-    history:
-      - 'user: Move pending work away from the overloaded tower.'
-      - 'assistant: I have a placement proposal and am checking which lanes are free.'
-    active: [daintree.hosts.rebalance-load, daintree.hosts.foundation]
-    confusable_with: [daintree.hosts.rebalance-load]
     run: 2026-10-16-synthetic-audit
   - query: does Daintree give each worktree its own port automatically?
     history:

@@ -1,0 +1,95 @@
+# daintree.hosts.audit-host-workspaces: the hub's read-only inventory of what one run left on its
+# Remote Hosts. Each host's own assistant inventories its own project (the local worktree audit
+# plus listeners, panes and retained resources), the hub classes every item safe, unsafe or unknown
+# from the evidence, names the hosts and projects it could not observe, and removes nothing.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, an
+# uncommitted-and-unpushed question per host, a coverage-gap question and a running-server
+# question. Traps: this runbook wins against performing a run's cleanup
+# (daintree.hosts.recover-and-clean-up), a lane's own removal (daintree.hosts.clean-up-for-hub),
+# the local audit (daintree.worktree.audit-worktrees), local teardown
+# (daintree.orchestration.workspace-cleanup) and a why-do-hosts-differ diagnosis
+# (daintree.hosts.diagnose-host-differences). Reverse traps: each of those wins its own request and
+# this runbook must not ride along, plus the inbox wake on a host (daintree.hosts.handle-hub-message).
+#
+# Lane receivers: on the receiving host the hub's audit request is read through
+# daintree.hosts.handle-hub-message and carried out with daintree.worktree.audit-worktrees, which
+# the hub's brief names. The last case pins that search agrees; a lane-worded request shares
+# the audit vocabulary and the hub runbook is untrained, so it is carried by corpus rows.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: audit-host-workspaces-reverse-recover-and-clean-up
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Each host's assistant is to remove what the run made. Decided by recover-and-clean-up's "its
+      panes (usage-check panes included), worktrees and branches, cleaned up through each host's
+      own assistant".
+    messages:
+      - role: user
+        content: >-
+          Clean up after run r-42 on the remote hosts through each host's own assistant: panes
+          closed, clean worktrees removed, a list of what stayed and why.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.clean-up-for-hub, daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-clean-up-for-hub
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      On a host: the hub asks this assistant to remove what it made. Decided by clean-up-for-hub's
+      "asks it to remove what it made on this machine for one of the hub's runs".
+    messages:
+      - role: user
+        content: The hub asked me to tidy up the worktrees I made for its parser job and tell it what I kept.
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-handle-hub-message
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The wake line on a host that holds the hub's audit request. Decided by handle-hub-message's
+      "the inbox wake line".
+    messages:
+      - role: user
+        content: "Daintree: assistant inbox has a new message (exchange 7c1). Read it with assistant.getInbox."
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-lane-inventory-request
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      On a host, the hub's audit request. Decided by "its answering the hub's audit request
+      (daintree.hosts.handle-hub-message)"; this lane reads the hub's message and carries the
+      inventory out with the local audit. Untrained: carried by corpus rows (retrain owed).
+    messages:
+      - role: user
+        content: >-
+          The hub asked me to list the worktrees and dev servers I made for its run and say which
+          are safe to remove. Don't remove anything, just report back.
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.worktree.audit-worktrees, daintree.hosts.foundation]
+
+  - id: audit-host-workspaces-reverse-survey-hosts
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Which hosts are up and what is open with them, not what a run left. Decided by
+      survey-hosts' "whether the Remote Hosts are connected, how busy each is, which projects have
+      an assistant running and taking messages, which exchanges with them are still open".
+    messages:
+      - role: user
+        content: "Show me the state of the other hosts: who is connected, who is loaded, which exchanges are open"
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

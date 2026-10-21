@@ -1,0 +1,90 @@
+# daintree.hosts.prepare-host-maintenance: the hub readying a Remote Host for a planned update,
+# restart or reboot. Before: an impact report per host (projects, lanes, open exchanges, and what
+# the hub cannot see), each enrolled lane's acknowledged checkpoint (branch, SHA, pushed or not,
+# uncommitted files, writes in flight). After the person has restarted it: projects, lanes and
+# exchanges reconciled before anything more is sent. The person does the update.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, a "stop
+# sending and checkpoint" line, and the return turn. Traps: this runbook wins against catching up
+# after a restart already behind us (daintree.hosts.recover-and-clean-up), putting a run on hold
+# (daintree.hosts.park-swarm), stopping or changing a run (daintree.hosts.steer-swarm), a read of
+# the hosts (daintree.hosts.survey-hosts), adding a host (daintree.hosts.connect-host) and Daintree
+# misbehaving here (daintree.diagnostics); reverse traps, where each neighbour keeps its own
+# request and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: prepare-host-maintenance-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      An agent's task description. Decided by "an impact report per host with its limits stated,
+      each enrolled lane's acknowledged checkpoint".
+    messages:
+      - role: user
+        content: The user will restart Daintree on a Remote Host tonight for an update. Report which projects, enrolled assistants and open exchanges it will interrupt, what the hub cannot observe, and have each lane checkpoint its work first.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-user-return-after-update
+    host_model: inbox
+    category: continuation
+    note: >-
+      The return turn: the host is back and the earlier turn prepared it. Decided by "once the
+      host is back, reconcile it" and "a reconciliation of projects, lanes and exchanges before anything more is
+      sent".
+    messages:
+      - role: user
+        content: Get the mac mini ready for a Daintree update.
+      - role: assistant
+        content: Both lanes on the mini stopped at a safe point and pushed their branches. Tell me once the update is done and the mini is back.
+      - role: user
+        content: It's back, the update finished.
+    expect:
+      required: [daintree.hosts.prepare-host-maintenance]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps (this runbook wins)
+  - id: prepare-host-maintenance-reverse-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The restart already happened and an exchange never came back: recover-and-clean-up's "why a
+      task sent to a Remote Host never came back, usually after Daintree restarted". Nothing is
+      being prepared.
+    messages:
+      - role: user
+        content: the hub task from the last session is still open on the studio machine, did it survive the restart? I never got a reply
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-hand-off-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub session is being replaced; no host is restarting: hand-off-swarm's "the session
+      coordinating a run ALREADY OUT on the Remote Hosts is being REPLACED BY ANOTHER SESSION NOW".
+    messages:
+      - role: user
+        content: My hub session is nearly out of room. A fresh assistant session has to take over the swarm on the other machines, so write the hand-over first.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: prepare-host-maintenance-reverse-diagnose-messaging
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A send refused as paused with the assistant unavailable, no restart planned:
+      diagnose-messaging's "a send or start that came back opted_out, paused, lane_unavailable".
+    messages:
+      - role: user
+        content: The hub's send to the mini comes back paused and its assistant shows unavailable. Which switch is it?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

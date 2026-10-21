@@ -1,0 +1,47 @@
+# daintree.hosts.migrate-across-repositories: the hub's side of one mechanical change carried
+# through the repositories the person selected on their Remote Hosts. Each repository is counted
+# once however many hosts clone it; lanes' visible agents inventory it with recorded searches, a
+# pilot fixes the rulebook, each repository's units are integrated on their own, and the searches
+# are rerun on each integrated commit, one row per repository.
+#
+# Recall: the issue's three requests, an agent-phrased and a user-phrased campaign, and a second
+# turn answering a form the rulebook lacked. Traps where this runbook wins over each declared
+# neighbour: one codebase on this machine (daintree.orchestration.migration-sweep), the same work
+# on every host (daintree.hosts.swarm-fan-out), independent pieces placed by load
+# (daintree.hosts.place-work), a dependent plan (daintree.hosts.execute-distributed-workflow) and
+# combining finished branches (daintree.hosts.integrate-host-branches). Reverse traps where that
+# neighbour wins and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: migrate-across-repositories-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How the hub describes the campaign to search: "one row per selected repository, counted once
+      however many hosts hold a clone", with a pilot and residuals per repository.
+    messages:
+      - role: user
+        content: 'Hub task: carry one codemod through the four repositories the person selected on the Remote Hosts, each repository once even where two hosts clone it, with a pilot first and residual matches reported per repository.'
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: migrate-across-repositories-new-form-answered
+    host_model: inbox
+    category: continuation
+    note: >-
+      Second turn: the person settles a form the rulebook lacked and the campaign carries on, "a
+      pilot whose rulebook every host follows and only the person amends".
+    messages:
+      - role: user
+        content: replace the legacy logging calls in the api and billing repos, both on my other machines
+      - role: assistant
+        content: The billing repository's lane reported a logging call made through a wrapper that the rules do not cover. I have held the units not sent yet.
+      - role: user
+        content: rewrite those through the new logger too, add that to the rules, and carry on with both repos
+    expect:
+      required: [daintree.hosts.migrate-across-repositories]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps

@@ -138,7 +138,9 @@ def test_the_scripted_seam_matches_the_search_signature() -> None:
     assert inspect.signature(ScriptedSelector.search) == protocol
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_shipped_search_finds_the_obvious_runbook() -> None:
     from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
@@ -167,31 +169,25 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
     assert scores == sorted(scores, reverse=True)
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None:
-    """Issue #153's pairs, in the inbox catalog a v0.44 client is served: the same
-    fan-out request with and without hosts, and a lane with no hosts of its own still
-    answered from its inbox wake line."""
-    from daintree_assistant_server.runbooks.catalog import load_catalogs
+    """Host eligibility is applied before the current catalog is ranked."""
+    from daintree_assistant_server.runbooks.catalog import load_catalog
     from daintree_assistant_server.runbooks.host_state import HostState
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    catalog = load_catalogs().inbox
+    catalog = load_catalog()
     clf = SetwiseClassifier(_ARTIFACT)
     clf.sync(catalog)
     fan_out = "Work these six issues in parallel, an agent on each"
-    wake = (
-        "Daintree: assistant inbox has a new message (exchange "
-        "6a2d9f14-0b7e-4c53-8e21-c4f07b9a3d58). Read it with assistant.getInbox."
-    )
 
     async def go(query: str, state: HostState | None) -> Any:
         pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=30.0)
         try:
             selector = LocalSelector(clf, pool, catalog)
-            return await selector.search(
-                query, limit=10, exclude=catalog.excluded_for(state)
-            )
+            return await selector.search(query, limit=10, exclude=catalog.excluded_for(state))
         finally:
             pool.close()
 
@@ -200,10 +196,6 @@ def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None
     assert no_hosts[0].runbook_id == "daintree.orchestration.fan-out-work"
     assert no_hosts[0].selected
     assert not {h.runbook_id for h in no_hosts} & catalog.excluded_for(HostState("none"))
-
-    lane = asyncio.run(go(wake, HostState("none", lane_reachable=True)))
-    assert lane[0].runbook_id == "daintree.hosts.handle-hub-message"
-    assert lane[0].selected
 
 
 def test_a_query_the_tokenizer_rejects_is_a_failed_search_not_a_crash() -> None:

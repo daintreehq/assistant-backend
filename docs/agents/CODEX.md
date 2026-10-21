@@ -148,7 +148,7 @@ say that it needs the user.
 
 ## Source notes
 
-- Project: [common contract](../../src/daintree_assistant_server/runbooks/files/daintree.foundation.md),
+- Project: [common contract](../../src/daintree_assistant_server/runbooks/catalog/core/daintree.foundation.md),
   [host setup](DAINTREE_RUNBOOK_CLIENT.md), [runbook MCP contract](../MCP.md),
   [runbook authoring](../RUNBOOKS.md),
   [captured Daintree MCP surfaces](../../tests/fixtures/daintree_mcp/README.md).

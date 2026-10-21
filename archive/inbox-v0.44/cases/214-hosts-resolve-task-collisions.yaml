@@ -1,0 +1,43 @@
+# daintree.hosts.resolve-task-collisions: the hub finds work it sent to its Remote Hosts
+# overlapping by accident (the same issue on two machines, two hosts pushing one branch,
+# units that contradict) and settles one owner without losing either attempt. The cases
+# pin the three requests its issue names, an agent-phrased and a user-phrased request, and
+# the unpushed-edits situation; the traps hold its boundary both ways with
+# daintree.orchestration.resolve-task-collisions (agents on this machine),
+# daintree.hosts.race-and-review (attempts the person asked for),
+# daintree.hosts.reassign-host-work (a unit moved off a host that could not finish it),
+# daintree.hosts.steer-swarm (a stop with no overlap to settle),
+# daintree.hosts.integrate-host-branches (combining finished branches) and
+# daintree.hosts.recover-and-clean-up (an account of exchanges, cleanup).
+
+cases:
+  - id: rtc-agent-lanes-same-unit
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Agent phrasing of the hub's task. Decided by "every host's writer on that work stopped
+      with an acknowledgement, each side's pushed SHA verified and its unpushed work
+      accounted for, one owner chosen".
+    messages:
+      - role: user
+        content: >-
+          Two remote host lanes are implementing the same unit on different branches; stop
+          the duplicate writer, compare their pushed SHAs and unpushed edits, and keep one owner
+    expect:
+      required: [daintree.hosts.resolve-task-collisions]
+      optional: [daintree.hosts.foundation]
+
+  - id: rtc-reverse-recover-open-exchanges
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Which exchanges are still open, and cleaning up what they left, is recover-and-clean-up's
+      "which delegated exchanges finished, which are still open" and "what a run left on the
+      Remote Hosts ... cleaned up through each host's own assistant"; the collisions runbook
+      must not ride along.
+    messages:
+      - role: user
+        content: which of the exchanges I sent to my other machines are still open, and clean up what they left behind
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]

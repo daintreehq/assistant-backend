@@ -7,23 +7,6 @@
 # local runbook and this one must not ride along.
 
 cases:
-  - id: recover-and-clean-up-agent-restart
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      Agent-phrased recovery: "after Daintree restarted ... which delegated exchanges
-      finished, which are still open, which will never be answered" and "a per-host
-      account of every exchange from the records".
-    messages:
-      - role: user
-        content: >-
-          After the Shell restarted, reconcile every exchange this hub sent to the Remote
-          Hosts from each host's task records and report which finished, which are still
-          open and which will never be answered
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
   - id: recover-and-clean-up-agent-cleanup
     category: single-runbook
     note: >-
@@ -114,23 +97,6 @@ cases:
       optional: [daintree.hosts.foundation]
 
   # --- traps: this runbook wins against each declared neighbour -------------------------
-  - id: recover-and-clean-up-not-status-and-resume
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A restart while work was out on other machines: the record is each host's task
-      list, not this machine's terminals ("after Daintree restarted ... which delegated
-      exchanges finished"). daintree.orchestration.status-and-resume is fenced "catching
-      up on local work".
-    messages:
-      - role: user
-        content: >-
-          Daintree restarted while the remote hosts were still working on what I
-          delegated; which of those exchanges finished?
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
   - id: recover-and-clean-up-not-workspace-cleanup
     category: routing-trap
     note: >-
@@ -145,51 +111,6 @@ cases:
       required: [daintree.hosts.recover-and-clean-up]
       optional: [daintree.hosts.foundation]
 
-  - id: recover-and-clean-up-not-recover-agent
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A delegated exchange stuck after the host's assistant restarted: "which will never
-      be answered, and whether to send one again". Not a broken local agent
-      (daintree.agents.recover-agent is fenced "a broken or hung local agent").
-    messages:
-      - role: user
-        content: >-
-          the exchange I delegated to the second host is stuck since its assistant was
-          restarted; does it need sending again?
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
-  - id: recover-and-clean-up-not-supervise-fleet
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      After a dropped link, which delegated exchanges still need the user: "the link to a
-      Remote Host dropped ... which are still open". Not the local fleet
-      (daintree.orchestration.supervise-fleet is fenced "triaging the local fleet").
-    messages:
-      - role: user
-        content: the link to the Remote Hosts dropped for an hour; which delegated exchanges still need me?
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
-  - id: recover-and-clean-up-not-diagnostics
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      No update lines after a hub restart is the expected behaviour (notices go only to
-      the hub that sent), so the answer is the records, not a health check:
-      daintree.diagnostics is fenced "Daintree itself misbehaving on this machine".
-    messages:
-      - role: user
-        content: the hub restarted and no update lines have come for the exchanges it sent to the hosts earlier
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
-  # --- reverse traps: the same words about this machine stay local ----------------------
   - id: recover-and-clean-up-reverse-local-restart
     category: routing-trap
     note: >-

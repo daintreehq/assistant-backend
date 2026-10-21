@@ -25,11 +25,7 @@ async def healthz() -> dict[str, str]:
 
 @router.get("/readyz")
 async def readyz(request: Request) -> JSONResponse:
-    """Readiness: both catalogs loaded and the selector artifact validated.
-
-    ``catalog_revision`` is the control catalog's, which a build sending
-    ``Daintree-Host-Control: 1`` is served; ``inbox_catalog_revision`` is what a
-    v0.44 client is served (``runbooks/catalog.py``, ``load_catalogs``)."""
+    """Readiness: the current catalog and selector artifact validated."""
     if not request.app.state.ready:
         body: dict[str, object] = {"status": "not_ready"}
         error = request.app.state.ready_error
@@ -38,15 +34,13 @@ async def readyz(request: Request) -> JSONResponse:
             # they stay in the log, which already records them.
             body["error"] = "startup" if request.app.state.settings.is_hardened else error
         return JSONResponse(status_code=503, content=body)
-    catalogs = request.app.state.container.catalogs
+    catalog = request.app.state.container.catalog
     return JSONResponse(
         status_code=200,
         content={
             "status": "ready",
-            "catalog_revision": catalogs.control.revision,
-            "runbooks": len(catalogs.control.selectable_ids),
-            "inbox_catalog_revision": catalogs.inbox.revision,
-            "inbox_runbooks": len(catalogs.inbox.selectable_ids),
+            "catalog_revision": catalog.revision,
+            "runbooks": len(catalog.selectable_ids),
         },
     )
 

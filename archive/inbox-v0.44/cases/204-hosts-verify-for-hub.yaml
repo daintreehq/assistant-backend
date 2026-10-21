@@ -1,0 +1,203 @@
+# daintree.hosts.verify-for-hub: a lane's verification of one revision for the hub. The
+# Daintree assistant on a Remote Host, enrolled for one Shell's hub, is asked to test an exact
+# commit (or a branch, pinned to its head) without changing it, and to return evidence.
+#
+# Recall: the issue's own three requests, an agent-phrased and a user-phrased description,
+# and one case per situation the procedure has to get right (a moved branch, a missing
+# runner, one shard, one environment row). Traps: against the local owners of nearby
+# deliverables (daintree.ci.run-local-checks for the person's own checks,
+# daintree.orchestration.verify-agent-work for a local agent's result,
+# daintree.review.review-change for findings) and the hub's own side
+# (daintree.hosts.delegate-to-host), each with a reverse case where the neighbour wins. The
+# envelope (daintree.hosts.handle-hub-message) is optional wherever a hub request is the
+# frame: the lane holds it for the reply.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: verify-for-hub-issue-exact-commit
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "Use when the hub asks this lane to TEST or VERIFY
+      a commit or branch here and report the results, with no fixes". At base it went to the
+      envelope (0.99) with daintree.orchestration.verify-agent-work riding along.
+    messages:
+      - role: user
+        content: The hub asked me to run checks on this exact commit without changing code.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-issue-supplied-sha
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's second request, framed as the hub's message itself. Decided by "hub message:
+      verify this SHA with lint and the unit tests"; the envelope may ride along. The shipped
+      selector still gives it to the envelope alone (rank_miss, 0.11): a leading hub-message
+      label and the word reply are the envelope's trained vocabulary, and two text attempts that pulled it
+      over also pulled reply-only requests. Retrain owed.
+    messages:
+      - role: user
+        content: "Hub message: verify this branch at the supplied SHA and reply with the actual test results."
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-issue-validate-delegated
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "independently validate the delegated change on
+      this host". daintree.edits.spawn-visible-agent still rides along ("delegated" reads as
+      handing work to an agent); at base it took the request outright.
+    messages:
+      - role: user
+        content: Independently validate a delegated artifact on this host.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How a lane describes the task to search_runbooks: an outcome with its situation, not
+      the procedure. Decided by "Use when the hub asks this lane to TEST or VERIFY a commit or
+      branch here and report the results, with no fixes" and "what could not run marked
+      incomplete".
+    messages:
+      - role: user
+        content: Run the hub-requested integration tests for commit 5e8a1f0 of the scheduler on this host and report the results, including anything that cannot run here.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-user-casual
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Casual, no punctuation to speak of. "Use when the hub asks this lane to TEST or VERIFY a
+      commit or branch here and report the results, with no fixes".
+    messages:
+      - role: user
+        content: hub wants its sha tested on this box, results only, no fixes
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-moved-branch
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The branch moved after the hub pinned a commit; the SHA stays the target. "a test run
+      bound to that exact SHA". The body owns the rule (a moved branch is a finding, never a
+      re-run).
+    messages:
+      - role: user
+        content: The hub's branch moved on after it sent me the SHA; test the commit it named, not the new head.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-missing-runner
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The live bar: a host without the test runner reports it instead of claiming a pass.
+      Decided by "what could not run marked incomplete". daintree.ci.run-local-checks still
+      rides along (it took the request outright at base, 0.997); the corpus boundary rows
+      carry the rest to the retrain.
+    messages:
+      - role: user
+        content: Run the tests on the commit the hub named; pytest isn't installed on this machine
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-shard
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      One shard of a suite the hub split across hosts: "one shard of a suite". At base it went
+      to daintree.ci.run-local-checks (0.99).
+    messages:
+      - role: user
+        content: The hub sent shard 3 of 4 of the test suite for commit 9e1f; run just that shard here and report the results
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-environment-row
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      One cell of a cross-host matrix: "one environment row of the hub's matrix", with "what
+      could not run marked incomplete" for what this machine cannot meet.
+    messages:
+      - role: user
+        content: The hub's matrix row for this machine is Node 18 on Linux; check its commit under exactly that and say what could not run.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps
+  - id: verify-for-hub-fresh-worktree-not-local-checks
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A hub request spelled out like a local check run. The fence "the person's own checks
+      here (daintree.ci.run-local-checks)" keeps the neighbour out; the request is the hub's
+      ("Use when the hub asks this lane to TEST or VERIFY a commit"). At base
+      daintree.ci.run-local-checks took it (0.999).
+    messages:
+      - role: user
+        content: On the hub's request, check out commit 4f9a2c1 of the payments branch in a fresh worktree, run the unit tests and lint without fixing anything, and reply with pass/fail counts and the exact commands
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-codex-verifier-not-agent-claim
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A verifier agent here is not a local agent's claim to judge. The fence "a local agent's
+      result (daintree.orchestration.verify-agent-work)" keeps the neighbour out; "a visible
+      verifier agent running only the requested checks" decides it. At base
+      daintree.orchestration.verify-agent-work took it (0.98).
+    messages:
+      - role: user
+        content: Verify the hub's commit with Codex as the verifier agent and report what could not run
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-evidence-not-review
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Pass and fail evidence, not findings. The fence "a code review
+      (daintree.review.review-change)" keeps the neighbour out; "each command's platform and
+      pass, fail and skip counts" decides it.
+    messages:
+      - role: user
+        content: The hub wants pass and fail evidence for its commit from this host, not a code review.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: verify-for-hub-lane-not-hub-side
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The lane receiving the hub's test request, not the hub sending one. The fence "the hub's
+      own side (daintree.hosts.delegate-to-host)" keeps the neighbour out; "Use when the hub
+      asks this lane to TEST or VERIFY a commit or branch here" decides it.
+    messages:
+      - role: user
+        content: "I'm the lane here: the hub sent over a commit for this machine to test, so run it and answer."
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps

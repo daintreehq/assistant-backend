@@ -19,7 +19,6 @@ worktree included):
 | `harness/playwright.dtrb.config.ts` | its config (one worker, no retries) |
 | `summarise.py` | finds a trial's transcript(s) and prints what happened; also reads any Claude Code or Codex JSONL (`--transcript <file>`) |
 | `mcp_call.py` | calls the isolated app's MCP with its API key (the `external` surface), for inspection |
-| `trial_plan.py` | offline planning for hub and lane trials (`dtrb.sh plan`): checks the owed-trial register, prints runsheets and a staged run's layout; launches nothing |
 
 ```bash
 T="$ROOT/.claude/skills/runbook/scripts/trial"
@@ -228,13 +227,10 @@ and stays inside the size budgets.
   exercised by the app's own harness (`npm run test:e2e:assistant` in `$APP_REPO`,
   with `DAINTREE_RUNBOOKS_MCP_URL` pointing at the runbook server). It builds into the
   user's checkout, so run it only with the user's say-so.
-- **Hubs and lanes** (the frozen inbox catalog's `hub-full` and `lane-full` callers,
-  Remote Hosts, other machines, real accounts) follow `references/hub-lane-trials.md`:
-  a staged Shell and host on one Mac, or person-assisted runs on the real fleet. The
-  control catalog's hosts runbooks (a Shell's assistant driving hosts through
-  `host.call`) have no trial protocol yet: record each such run as owed. A hosts runbook's run
-  that cannot happen yet is an entry in `references/owed-trials.yaml` (checked by
-  `dtrb.sh plan check`), as well as in `$W/trials/owed.md`.
+- **Remote Host procedures** follow `references/host-control-trials.md`. The pane
+  harness cannot prove help-to-relay behavior; record the exact outstanding live
+  scenario in `$W/trials/owed.md`. Frozen inbox trial plans are archived and cannot
+  stand in for evidence about current host control.
 - **Headless runs are not trials.** `claude -p` or `codex exec` outside a pane cannot
   receive notices; use them only for routing questions, and `bench search` is better
   for those.

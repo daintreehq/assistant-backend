@@ -1,12 +1,6 @@
-# daintree.hosts.copy-portable-settings: the person compares this machine's Daintree settings
-# with a connected Remote Host and copies chosen categories there once through Settings → Hosts
-# → the host → Copy settings, checks the applied and skipped counts, or undoes the last copy.
-#
-# Boundaries are the words this shares with adding a host (connect-host), durable instructions
-# (project memory), plugin work, why one machine behaves differently from another (diagnose
-# host differences), taking back a run's code (undo-swarm-changes), the host status report
-# (survey-hosts), and the "agent" and "build server" vocabulary of usage limits and per-worktree
-# environments. Reverse rows live in those runbooks' files.
+# daintree.hosts.copy-portable-settings: Copy this machine's portable settings to a Remote Host
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.copy-portable-settings.md
+
 runbook: daintree.hosts.copy-portable-settings
 run: runbook-2026-10-issue-129
 positives:

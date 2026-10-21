@@ -1,22 +1,13 @@
-# daintree.hosts.recover-and-clean-up: the hub picking up after a Shell restart, a new
-# hub session or a dropped link from each Remote Host's task records, and cleaning up
-# after a named run through each host's own assistant.
-#
-# Boundaries are the same words about the work on OTHER machines that the local
-# runbooks (status-and-resume, workspace-cleanup, recover-agent, supervise-fleet,
-# diagnostics) own for this machine, and the hosts foundation owns for setup and
-# reachability. Reverse rows live in those runbooks' files.
+# daintree.hosts.recover-and-clean-up: Recover and clean up a run across Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.recover-and-clean-up.md
+
 runbook: daintree.hosts.recover-and-clean-up
 run: runbook-2026-10-issue-95
 
 positives:
-  - The Shell crashed an hour ago and came back; nothing has been heard from the hosts since. Find out where the delegated exchanges stand
   - Daintree restarted while five tasks were out on the other hosts; which of them still have someone working on them
-  - The Shell was offline for most of the night with four hosts mid-task; find out which of those exchanges completed and which are still out
-  - One of the remote hosts rebooted during the night; which of the exchanges I had open there are now dead
   - Determine whether the migration task sent to the second host is still being worked on, given its assistant now lists with no generation
   - After the network link to the hosts was down for a while, check each host's task records and report what moved during the outage
-  - This is a fresh hub session; recover what the previous hub delegated to the Remote Hosts and report each exchange's state and delivery times
   - Two of the jobs on the remote machines feel like they've been running forever; tell me how long each has actually been open and whether anyone is still on it
   - A host's assistant replied that its Daintree tools fail with SESSION_BINDING_GONE; work out what that means for its open task and what the person has to do
   - Check whether the lint task delegated to the linux host is in progress or orphaned now that its assistant was restarted
@@ -33,7 +24,6 @@ positives:
   - the host assistant got relaunched mid-job. send the job again to whatever assistant is there now
   - did anything I farmed out to the other machines get stuck while the link was down
   - new sidebar session, the old one had handed out work to my other machines, where is all that at
-  - every remote lane shows unavailable since I got back, what happened to the work I sent them
   - Have each host's assistant close the agent panes and delete the clean worktrees it created for the pagination experiment, keeping anything unpushed for the user to decide
   - Yesterday's benchmark run on the remote machines left terminals open everywhere; close them through each host's assistant and tell me what's left
   - The parallel refactor across the hosts is merged; get rid of what it left on each machine, but I don't want any branch touched
@@ -50,10 +40,7 @@ positives:
   - remove the leftover agent panes from the fan-out on each remote host and tell me what's still there
   - sorry to bug you again, but can you see whether the build host ever answered the question it asked before the app restarted
   - query: Before I sign off, make sure nothing I sent to the other machines is silently stuck since this morning's restart
-  - query: The relaunched assistant on the second host never answered the old task, and I want it redone. Send it again there, pointing back at the original exchange, and tell me when it replies
-
   - query: I left four jobs running on the other Macs before my flight. The hub here was restarted by an update while I was gone, so it has no memory of them. Tell me which finished, which are still going, and which I need to deal with.
-  - query: "Observed: the build host lists its project's first assistant with no generation, and the exchange sent there this morning still reads working. Decide whether that task can still be answered and what the user should do about it"
   - query: The swarm on the remote hosts is done and merged. Each machine still has two or three agent panes and a worktree for it. Clear those up through each host's assistant; one of them has a commit I never pushed, so check with me before anything with unpushed work goes.
   - query: I'm watching the second host's window now. Last time the worktree removal there timed out because nobody was around to approve it, so try that one again.
 
@@ -62,16 +49,6 @@ followups:
     history:
       - "user: send the flaky-test fix to all four hosts"
       - "assistant: Sent to the four hosts' assistants; I'll report as their update lines arrive."
-    active: [daintree.hosts.foundation]
-  - query: daintree restarted in between, where is that at now?
-    history:
-      - "user: hand the schema migration to the assistant on the database host"
-      - "assistant: Sent; the exchange is open on that host."
-    active: [daintree.hosts.foundation]
-  - query: that open one, is its assistant still there or do we need to send it again?
-    history:
-      - "user: what's happening across my hosts?"
-      - "assistant: Three hosts connected; one exchange to the second host has been open for three hours."
     active: [daintree.hosts.foundation]
   - query: great, now get rid of those panes on all of them
     history:
@@ -82,11 +59,6 @@ followups:
     history:
       - "user: the parser race is over, have the hosts tidy their worktrees"
       - "assistant: Two hosts finished. The third asks whether to delete a worktree with two unpushed commits."
-    active: [daintree.hosts.recover-and-clean-up]
-  - query: send that one again then
-    history:
-      - "user: did the remote hosts get through their work while I was at lunch?"
-      - "assistant: Two exchanges completed; one will not be answered, because its assistant was relaunched."
     active: [daintree.hosts.recover-and-clean-up]
   - query: the app just restarted, don't wait for the notice, find out yourself
     history:
@@ -103,8 +75,6 @@ boundaries:
   - query: what happened with the jobs I gave the remote hosts while daintree was down
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: catch me up on the other machines, I've been out all afternoon
-    confusable_with: [daintree.orchestration.status-and-resume]
-  - query: resume where the hub left off with the exchanges to the hosts after the crash
     confusable_with: [daintree.orchestration.status-and-resume]
   - query: clean up the panes and worktrees on the remote macs from the experiment
     confusable_with: [daintree.orchestration.workspace-cleanup]
@@ -126,8 +96,6 @@ boundaries:
     confusable_with: [daintree.diagnostics]
   - query: the remote host's task never came back after daintree restarted, is something broken
     confusable_with: [daintree.diagnostics]
-  - query: the exchange to the host is still open after the restart, is its assistant gone?
-    confusable_with: [daintree.hosts.foundation]
   - query: should I resend the message to the host assistant that got relaunched?
     confusable_with: [daintree.hosts.foundation]
   - query: 'while I was out the Shell crashed; which of the jobs on my other machines actually came back'
@@ -148,27 +116,15 @@ boundaries:
   - query: 'ask the linux host''s assistant to close only the panes it opened for the usage check, nothing else'
     confusable_with: []
     run: runbook-2026-10-issue-100
-  - query: 'two of the machines went quiet after the hub came back; work out from the task records where each exchange stands'
-    confusable_with: [daintree.hosts.swarm-fan-out]
-    run: runbook-2026-10-issue-92
   - query: 'clean up the panes and worktrees the last run across the hosts left behind on each machine'
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
   - query: 'Daintree restarted while three tasks were out on the hosts; which of them will never be answered now?'
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-103
-  - query: 'the link to the tower dropped overnight, rebuild where each exchange I sent it stands'
-    confusable_with: [daintree.hosts.survey-hosts]
-    run: runbook-2026-10-issue-103
-  - query: "the host I placed the parser ticket on went quiet after its restart, did that exchange ever finish?"
-    confusable_with: [daintree.hosts.place-work]
-    run: runbook-2026-10-issue-93
   - query: "one of the hosts I split the batch across dropped off; which of its pieces are still open?"
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93
-  - query: 'Daintree restarted while the tower was merging the hosts'' branches; which of the exchanges I sent are still open?'
-    confusable_with: [daintree.hosts.integrate-host-branches]
-    run: runbook-2026-10-issue-116
   - query: 'After the hub came back up, give me a per-host account of everything I''d sent out: answered, still pending, or lost.'
     confusable_with: [daintree.hosts.steer-swarm]
     run: runbook-2026-10-issue-110
@@ -184,21 +140,9 @@ boundaries:
   - query: 'the mini''s assistant restarted and lost the docs task; send it to the mini again once its assistant is back'
     confusable_with: [daintree.hosts.reassign-host-work]
     run: runbook-2026-10-issue-113
-  - query: 'the link to the hosts came back after an hour; what did each delegated exchange do while it was down? don''t move anything'
-    confusable_with: [daintree.hosts.reassign-host-work]
-    run: runbook-2026-10-issue-113
-  - query: what happened on my other machines while Daintree was down? just tell me which exchanges finished
-    confusable_with: [daintree.hosts.execute-distributed-workflow]
-    run: runbook-2026-10-issue-115
-  - query: Daintree came back up an hour ago; list the remote exchanges that finished, the ones still open and the ones nobody will answer
-    confusable_with: [daintree.hosts.execute-distributed-workflow]
-    run: runbook-2026-10-issue-115
   - query: clean up the panes and worktrees the staged plan left on the remote hosts
     confusable_with: [daintree.hosts.execute-distributed-workflow]
     run: runbook-2026-10-issue-115
-  - query: 'the hub restarted overnight; tell me where each exchange with the hosts stands, I''m not resuming anything yet'
-    confusable_with: [daintree.hosts.park-swarm]
-    run: runbook-2026-10-issue-111
   - query: 'we''re abandoning the parked remote run; have each host remove what it made for it'
     confusable_with: [daintree.hosts.park-swarm]
     run: runbook-2026-10-issue-111
@@ -226,16 +170,10 @@ boundaries:
   - query: "I restarted the app, what is the state of everything I sent to my other machines?"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
-  - query: "one exchange to the mini never came back, find out what happened and whether to send it again"
-    confusable_with: [daintree.hosts.resolve-task-collisions]
-    run: runbook-2026-10-issue-114
   - query: "clean up the worktrees and panes the last run left on the remote hosts"
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: runbook-2026-10-issue-114
   - query: Daintree restarted while I was away. What happened to the tasks I sent to my remote hosts, and which never came back?
-    confusable_with: [daintree.hosts.hand-off-swarm]
-    run: runbook-2026-10-issue-112
-  - query: The assistant is the same as before. Give me an account of every exchange with the hosts after the link dropped, and say which I should send again
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
   - query: after the update Daintree restarted; check each host's task records and tell me which are finished and which are still open
@@ -268,15 +206,6 @@ boundaries:
   - query: 'before the hub restarted I sent work to all my other machines. which of those tasks ever completed?'
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-120
-  - query: 'I gave every host a job earlier and then Daintree was relaunched on this Mac. did any of those exchanges finish?'
-    confusable_with: [daintree.hosts.supervise-swarm]
-    run: runbook-2026-10-issue-120
-  - query: 'my hub got replaced halfway through the run I''d given the remote machines. where does each exchange stand now?'
-    confusable_with: [daintree.hosts.supervise-swarm]
-    run: runbook-2026-10-issue-120
-  - query: 'daintree restarted while the other machines were mid-task; list which exchanges finished, which are still open and which nobody will answer'
-    confusable_with: [daintree.agents.postmortem-run]
-    run: runbook-2026-10-issue-121
   - query: 'our app was closed overnight while two remote hosts had jobs going; which of those jobs came back, which are still pending, which will never answer'
     confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
@@ -301,9 +230,6 @@ boundaries:
   - query: 'I went through the leftovers already: the two clean, pushed worktrees on the build box can go. Have its assistant remove them.'
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: runbook-2026-10-issue-128
-  - query: after the restart, tell me where each exchange with the hosts stands, and clean up what that run left through their assistants
-    confusable_with: [daintree.hosts.audit-host-workspaces]
-    run: runbook-2026-10-issue-128
   - query: the host app restarted by itself overnight and I never prepared for it. Which of the tasks I sent are still open?
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
@@ -311,9 +237,6 @@ boundaries:
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
   - query: the mac mini lost power at lunch. What happened to the delegated work on it?
-    confusable_with: [daintree.hosts.prepare-host-maintenance]
-    run: runbook-2026-10-issue-130
-  - query: work out which exchanges with the host will never be answered after the restart nobody planned
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     run: runbook-2026-10-issue-130
   - query: "Daintree was relaunched and I cannot tell how the oauth-refresh work I handed to the remote hosts is doing"

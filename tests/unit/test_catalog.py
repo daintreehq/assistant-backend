@@ -30,7 +30,12 @@ body two
 
 
 def _catalog() -> Catalog:
-    return Catalog([parse_runbook(RUNBOOK_A, expected_id="a.one"), parse_runbook(RUNBOOK_B, expected_id="b.two")])
+    return Catalog(
+        [
+            parse_runbook(RUNBOOK_A, expected_id="a.one"),
+            parse_runbook(RUNBOOK_B, expected_id="b.two"),
+        ]
+    )
 
 
 def _runbook(runbook_id: str, *, foundation: bool = False) -> Runbook:
@@ -47,7 +52,7 @@ def test_real_catalog_loads_all_packaged_files() -> None:
     catalog = load_catalog()
     # Every packaged runbook file loads (no runbook silently dropped), whatever the
     # count — robust to the catalog growing as runbook learning writes new runbooks.
-    packaged = list(default_runbooks_dir().glob("*.md"))
+    packaged = list(default_runbooks_dir().rglob("*.md"))
     assert packaged, "no packaged runbook files found"
     assert len(catalog) == len(packaged)
     assert catalog.revision.startswith("sha256:")

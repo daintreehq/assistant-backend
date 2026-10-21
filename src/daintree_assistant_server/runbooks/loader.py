@@ -72,9 +72,7 @@ def parse_runbook(text: str, *, expected_id: str | None = None) -> Runbook:
         raise RunbookLoadError(f"invalid runbook metadata: {exc}") from exc
 
     if expected_id is not None and meta.id != expected_id:
-        raise RunbookLoadError(
-            f"runbook id {meta.id!r} does not match filename id {expected_id!r}"
-        )
+        raise RunbookLoadError(f"runbook id {meta.id!r} does not match filename id {expected_id!r}")
 
     # The hash is derived inside Runbook.__post_init__ — see models.py. It used to
     # be computed here and passed in, which left `dataclasses.replace` able to
@@ -97,10 +95,16 @@ def load_runbook_file(path: Path) -> Runbook:
 
 
 def load_runbooks_dir(directory: Path) -> list[Runbook]:
-    """Load every ``*.md`` runbook in a directory, sorted by id."""
+    """Load a catalog tree, sorted by id, independent of domain directories.
+
+    Only runbook files belong under this root. Keeping archived generations
+    outside it prevents a recursive load from reviving retired procedures.
+    """
     if not directory.is_dir():
         raise RunbookLoadError(f"runbooks directory not found: {directory}")
     runbooks: list[Runbook] = []
-    for path in sorted(directory.glob("*.md")):
+    for path in sorted(directory.rglob("*.md")):
         runbooks.append(load_runbook_file(path))
+    if not runbooks:
+        raise RunbookLoadError(f"runbooks directory is empty: {directory}")
     return sorted(runbooks, key=lambda s: s.id)

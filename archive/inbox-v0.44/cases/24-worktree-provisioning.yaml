@@ -1,0 +1,27 @@
+# Recall and routing coverage for worktree local-environment provisioning, which
+# landed in the catalog with none. Until this file existed the selector could have
+# missed daintree.worktree.provision-local-environment on every conversation in the
+# world and the suite would still have reported a clean run.
+#
+# The user text here deliberately avoids the runbook's own trigger phrases: echoing
+# them would measure keyword overlap rather than routing. Each ground truth is
+# decidable from the whenToUse text on disk.
+
+cases:
+  # Provisioning: several worktrees, one runnable environment underneath them. Landed with no coverage,
+  # so until these existed the selector could have missed it on every conversation.
+  - id: provision-hosts-lane-no-setup-config
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A lane's own project with no lifecycle config yet. Decided by "configuring the project's
+      worktree lifecycle scripts themselves" and "give every worktree its own URL" style per-worktree
+      resources.
+    messages:
+      - role: user
+        content: >-
+          a lane here should get its worktree its own port and database; the project has no setup
+          config yet
+    expect:
+      required: [daintree.worktree.provision-local-environment]
+      optional: [daintree.foundation]

@@ -1,0 +1,205 @@
+# daintree.hosts.check-usage-limits: the hub's side of a usage check across machines.
+# This Shell's hub asks each Remote Host's assistant to read its own agent CLI usage
+# screen and brings back one attributed table, never added together. The host side is
+# daintree.agents.check-usage-limits, which owns a usage check on THIS machine.
+#
+# Before the hosts runbook existed every one of these requests went to
+# daintree.agents.check-usage-limits at 1.00, which reads a screen here and has no way
+# to reach another machine. Cases pin recall (agent- and user-phrased), a trap each way
+# against the local runbook, a trap against the runtime runbooks that took "headroom",
+# and the follow-up turn after a table.
+#
+# The two named-host cases use invented host names: the selector has no way to know
+# a bare name is another machine until it is trained on rows that say so. They are
+# kept as honest measurement, owed to the next retrain.
+
+cases:
+  - id: hosts-check-usage-agent-phrased
+    host_model: inbox
+    category: host-query
+    note: >-
+      Agent-phrased, the way a hub describes the task to search_runbooks. The positive
+      clause claims it: "figures each host's assistant read off that machine's own usage
+      screen", as "one table".
+    messages:
+      - role: user
+        content: >-
+          Have the assistant on each Remote Host read its agent CLI's usage screen and
+          return allowance left and reset times as one table
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-codex-quota-remote-machines
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      User-phrased: which remote machine has the most Codex left before its reset. The
+      whenToUse names "which machine has the most usage headroom" on "OTHER MACHINES",
+      "reported host by host".
+    messages:
+      - role: user
+        content: Which of the remote machines has the most Codex quota left before its weekly reset?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-not-local-panel
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The bait is daintree.agents.check-usage-limits: a Codex usage panel read exactly as
+      printed is its whole procedure. But the panel is on every remote host and only that
+      host's assistant can read it: "figures each host's assistant read off that machine's
+      own usage screen", and its fence "Do not use for the usage of agents on this machine
+      (daintree.agents.check-usage-limits)". The local runbook is excluded.
+    messages:
+      - role: user
+        content: >-
+          Ask every remote host's Daintree assistant to check its Codex usage panel and
+          report the percentages exactly as printed
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-claude-headroom-not-runtime
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The word headroom on a machine baited daintree.runtime.measure-performance and
+      daintree.runtime.relieve-resource-contention (CPU and memory) before this runbook
+      existed. Claude headroom is plan allowance: "which machine has the most usage
+      headroom". Both runtime runbooks are excluded.
+    messages:
+      - role: user
+        content: Which machine has the most Claude headroom?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-two-named-hosts
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Two hosts by bare name, the commonest shape of the request: "how much Claude Code or
+      Codex allowance each Remote Host this Shell reaches has left, on one host, several
+      or all of them". Nothing in the query itself says they are other machines, so the
+      untrained selector gives it to the local runbook; owed to the retrain.
+    messages:
+      - role: user
+        content: Check the Claude Code usage available on build-1 and build-2.
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-one-named-host-codex
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      One host by bare name, Codex: "each Remote Host this Shell reaches".
+      Same gap as the two-host case: owed to the retrain.
+    messages:
+      - role: user
+        content: How much Codex is left on mini-3?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-followup-most-headroom
+    host_model: inbox
+    category: continuation
+    note: >-
+      After the table, asking which machine has the most headroom is a question about the
+      figures just gathered across hosts: "which machine has the most usage headroom",
+      answered from the table, not a machine-load question.
+    active: [daintree.hosts.check-usage-limits, daintree.hosts.foundation, daintree.foundation]
+    messages:
+      - role: user
+        content: Check the Claude Code and Codex usage on my remote hosts.
+      - role: assistant
+        content: >-
+          Both hosts replied. The first shows Claude Code at 41% of the weekly limit used,
+          resetting Monday 09:00; the second has Codex at 63% of its weekly limit left,
+          resetting Thursday 14:00. They are separate accounts.
+      - role: user
+        content: Which machine has the most headroom?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-hub-asks-not-lane-handler
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub asking another machine's assistant for its usage is this runbook's
+      "figures each host's assistant read off that machine's own usage screen", not the
+      lane's side, which its fence leaves out: "a host's own assistant answering such a
+      request from the hub (daintree.hosts.handle-hub-message)". handle-hub-message is
+      excluded. The untrained selector gives it to handle-hub-message (0.99); owed to the
+      retrain.
+    messages:
+      - role: user
+        content: have the build box's assistant read its codex usage and send it back
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-handle-hub-message-usage-not-hosts-check
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap, on the host. The hub's usage request arriving at this machine's
+      assistant is daintree.hosts.handle-hub-message ("the hub sent me a message, read it
+      and deal with it"), with the local usage check as the work; the hub-side runbook is
+      fenced off it: "a host's own assistant answering such a request from the hub".
+      daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: the hub wants this machine's codex usage, read it and reply with the figures
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.agents.check-usage-limits, daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-check-usage-not-foundation-alone
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Messaging the assistant on each other machine is the hosts foundation's subject, but
+      it is the domain foundation, to "co-load it with whichever one fits, and load it
+      ALONE only when none does". Here one fits: the usage figures are "figures each host's
+      assistant read off that machine's own usage screen". The foundation alone would be
+      a miss; beside this runbook it may ride along.
+    messages:
+      - role: user
+        content: Get the Daintree assistant on each of my other machines to report its Codex usage back to me
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-foundation-usage-opted-out-not-check
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap. The usage request is only the occasion; what is asked is the setting
+      that lets the hub message that machine, the foundation's "how to switch it on". No
+      usage is to be read, so daintree.hosts.check-usage-limits is excluded.
+    messages:
+      - role: user
+        content: The usage request to my second Mac came back opted_out. What do I switch on so the hub can message it?
+    expect:
+      required: [daintree.hosts.foundation]
+
+  - id: hosts-check-usage-not-ask-host
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The bait is daintree.hosts.ask-host-assistant, "ONE QUESTION answered by the Daintree
+      assistant on ANOTHER MACHINE". But what comes back is not that assistant's answer:
+      it is "figures each host's assistant read off that machine's own usage screen".
+      ask-host-assistant is excluded.
+    messages:
+      - role: user
+        content: ask the assistant on my laptop host to read me its Claude Code usage
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]

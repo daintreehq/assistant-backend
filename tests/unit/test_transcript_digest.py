@@ -195,7 +195,7 @@ def _search_list(td: ModuleType, path: str) -> list[Any]:
 
 def _real_body() -> str:
     body = Path(__file__).resolve().parents[2] / (
-        "src/daintree_assistant_server/runbooks/files/daintree.terminals.rename.md"
+        "src/daintree_assistant_server/runbooks/catalog/terminals/daintree.terminals.rename.md"
     )
     return body.read_text()
 

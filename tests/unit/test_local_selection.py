@@ -952,34 +952,24 @@ def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_table_built_by_the_int8_retriever_is_not_adopted(tmp_path: Path) -> None:
-    """The retriever became fp32 on 2026-09-28; a table stamped plain "int8" predates it.
+def test_cache_with_wrong_precision_or_encoder_is_not_adopted(tmp_path: Path) -> None:
+    from dataclasses import replace
 
-    Its retrieval vectors came from the int8 retriever, so reusing them against fp32
-    queries would compare two different functions with no error anywhere. The stamp
-    is what refuses it; the shipped table, stamped by the current export, is adopted.
-    """
-    from daintree_assistant_server.runbooks.local.setwise import (
-        RunbookTable,
-        _load_table,
-        save_table,
-    )
+    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.local.setwise import save_table
 
-    shipped = _load_table(_ARTIFACT / "vectors.npz")
-    assert shipped is not None and shipped.precision == "int8-ranker"
-    assert SetwiseClassifier(_ARTIFACT).table is not None
-
+    classifier = SetwiseClassifier(_ARTIFACT)
+    fresh = classifier.sync(load_catalog())
     for part in _ARTIFACT.iterdir():
-        (tmp_path / part.name).symlink_to(part)
-    (tmp_path / "vectors.npz").unlink()
-    save_table(
-        tmp_path / "vectors.npz",
-        RunbookTable(
-            ids=shipped.ids,
-            retrieval=shipped.retrieval,
-            ranking=shipped.ranking,
-            digests=shipped.digests,
-            precision="int8",
-        ),
-    )
-    assert SetwiseClassifier(tmp_path).table is None
+        if part.name != "vectors.npz":
+            (tmp_path / part.name).symlink_to(part)
+    cache = tmp_path / "vectors.npz"
+    save_table(cache, fresh)
+    assert SetwiseClassifier(tmp_path).table is not None
+    for bad in (
+        replace(fresh, precision="int8"),
+        replace(fresh, encoder_fingerprint="a different encoder"),
+        replace(fresh, encoder_fingerprint=""),
+    ):
+        save_table(cache, bad)
+        assert SetwiseClassifier(tmp_path).table is None

@@ -1,0 +1,41 @@
+# daintree.hosts.execute-distributed-workflow: the hub carries a PLAN of dependent units across
+# Remote Hosts and their repositories to the end, sending a dependent only once its
+# predecessors' exact commits are verified on the shared remote, keeping failed and blocked
+# units visible, and resuming the plan after a hub restart. Recall cases are the issue's three
+# requests plus agent- and user-phrased plans, a blocked predecessor and a restart mid-plan.
+# Routing traps: this runbook wins against each declared neighbour (one unit or one relay,
+# independent placement, the same work everywhere, finished branches combined, a plan on this
+# machine, an account after a restart). Reverse traps: the neighbour wins and this runbook
+# must not ride along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: execute-distributed-workflow-resume-not-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The issue's hub-restart scenario: the plan continues, the dependents are dispatched.
+      Decided by "the whole graph carried through stage by stage"; recover-and-clean-up is
+      fenced as "only an account of where exchanges stand after a restart".
+    messages:
+      - role: user
+        content: >-
+          Resume the multi-host plan: the API unit completed before the hub went down, so the
+          client units can go now if its commit checks out
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  - id: execute-distributed-workflow-reverse-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      An account of exchanges after a restart, with no plan to continue, is
+      recover-and-clean-up's: "which delegated exchanges finished, which are still open, which
+      will never be answered".
+    messages:
+      - role: user
+        content: Since the restart, which of the exchanges with my remote hosts finished and which will never be answered?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]

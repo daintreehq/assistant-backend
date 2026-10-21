@@ -1,0 +1,37 @@
+# daintree.hosts.copy-portable-settings: the person compares this machine's Daintree settings
+# with a connected Remote Host, copies chosen categories there once through Settings → Hosts →
+# the host → Copy settings, checks the applied and skipped counts, or undoes the last copy.
+# Recall cases in agent and user words (the issue's three requests among them), a routing trap
+# per declared neighbour where this runbook wins (daintree.hosts.connect-host,
+# daintree.memory.manage-project-memory, daintree.plugins.develop-project-plugin,
+# daintree.hosts.diagnose-host-differences, daintree.hosts.undo-swarm-changes,
+# daintree.hosts.survey-hosts), and reverse traps where the neighbour wins and this one must
+# not ride along. The hosts foundation may ride along (optional).
+
+cases:
+- id: copy-portable-settings-reverse-survey-hosts
+  host_model: inbox
+  category: routing-trap
+  note: 'A host-by-host status report. The neighbour''s text: "The deliverable is ONE read-only report,
+    host by host".'
+  messages:
+  - role: user
+    content: 'Give me a read-only report on each Remote Host: its connection, load and open exchanges.'
+  expect:
+    required:
+    - daintree.hosts.survey-hosts
+    optional:
+    - daintree.hosts.foundation
+- id: copy-portable-settings-reverse-start-swarm
+  host_model: inbox
+  category: routing-trap
+  note: 'Readying assistants on hosts. The neighbour''s text: "Use when the user wants a swarm SET UP
+    across their other machines before handing out work".'
+  messages:
+  - role: user
+    content: Bootstrap an assistant for this project on each of my remote hosts and report which are ready.
+  expect:
+    required:
+    - daintree.hosts.start-swarm
+    optional:
+    - daintree.hosts.foundation

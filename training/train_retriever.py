@@ -89,7 +89,7 @@ from daintree_assistant_server.runbooks.local.documents import (  # noqa: E402
 from training.common import (  # noqa: E402
     build_query,
     canonical_active,
-    corpus_rows,
+    corpus_snapshot,
     device,
     stable_split,
 )
@@ -197,7 +197,7 @@ def main() -> int:
     ]
     print(f"catalog: {len(labels)} selectable runbooks")
 
-    rows = corpus_rows(Path(args.data))
+    rows, training_corpus = corpus_snapshot(Path(args.data))
     if args.canonical_active:
         rows = [
             {**r, "active_ids": canonical_active(r.get("active_ids") or [], catalog)}
@@ -440,6 +440,7 @@ def main() -> int:
         json.dumps(
             {
                 "base_model": args.base_model,
+                "training_corpus": training_corpus,
                 "max_length": args.max_length,
                 "doc_max_length": args.doc_max_length,
                 "hidden_size": model.config.hidden_size,

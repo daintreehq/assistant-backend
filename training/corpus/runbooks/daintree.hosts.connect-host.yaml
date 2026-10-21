@@ -1,13 +1,6 @@
-# daintree.hosts.connect-host: the person adds another Mac or Linux machine to Daintree as a
-# Remote Host through Settings → Hosts (the SSH check, an exact-build install or update, Host
-# mode and start at login), or gets an added host that will not connect working again, and
-# hears what is ready before any assistant messaging or assistant start is switched on.
-#
-# Boundaries are the words this shares with Daintree's own health on this machine
-# (diagnostics), a worktree's cloud devbox (manage-resource), messaging on a host that is
-# already added (the hosts foundation), work handed to a connected host (delegate-to-host),
-# and the "set up / onboarding" and "check failed" vocabulary that recipes and CI failures
-# use. Reverse rows live in those runbooks' files.
+# daintree.hosts.connect-host: Add another machine to Daintree as a Remote Host
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.connect-host.md
+
 runbook: daintree.hosts.connect-host
 run: runbook-2026-10-issue-122
 

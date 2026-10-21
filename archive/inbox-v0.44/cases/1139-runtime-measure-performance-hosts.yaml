@@ -1,0 +1,26 @@
+# daintree.runtime.measure-performance, measured per host.
+#
+# The runbook now covers the same baseline/candidate pair on several Remote Hosts: each
+# host times both revisions itself and per-host ratios come before any fleet summary.
+# Recall cases are phrased the ways a person or an agent asks for it (including the
+# receiving machine's own voice); the traps pin the five declared hosts neighbours both
+# ways: forward (this runbook wins) and reverse (the neighbour wins and this must not
+# ride along).
+
+cases:
+  # --- recall ---------------------------------------------------------------------
+  - id: perf-hosts-reverse-check-usage-limits
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Agent allowance left per machine. Decided by check-usage-limits's "how much Claude
+      Code or Codex allowance each Remote Host this Shell reaches has left".
+    messages:
+      - role: user
+        content: Which of my machines has the most Claude usage left?
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

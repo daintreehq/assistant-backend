@@ -2478,13 +2478,6 @@ examples:
     confusable_with: [daintree.hosts.prepare-host-maintenance]
     empty_kind: off_domain
     run: 2026-10-16-synthetic-audit
-  - query: how do ansi escape codes work
-    history:
-      - 'user: Agree on the service interface before remote implementation.'
-      - 'assistant: The host lanes are checking the proposed request schema.'
-    confusable_with: [daintree.hosts.coordinate-contract-change]
-    empty_kind: off_domain
-    run: 2026-10-16-synthetic-audit
   - query: what does a language server actually do
     history:
       - 'user: Prepare a demonstration on the mini.'
@@ -2616,13 +2609,6 @@ examples:
       - 'user: Prepare the tower for its system update.'
       - 'assistant: The tower lane has been asked to reach a safe stopping point.'
     confusable_with: [daintree.hosts.prepare-host-maintenance]
-    empty_kind: off_domain
-    run: 2026-10-16-synthetic-audit
-  - query: whats the difference between a fork and a branch
-    history:
-      - 'user: Agree on the service interface before remote implementation.'
-      - 'assistant: The host lanes are checking the proposed request schema.'
-    confusable_with: [daintree.hosts.coordinate-contract-change]
     empty_kind: off_domain
     run: 2026-10-16-synthetic-audit
   - query: whats the score in the arsenal game

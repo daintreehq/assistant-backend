@@ -16,8 +16,7 @@ and its ``tool`` and ``args`` against what the host offers inside the call, the
 relayed surface of the same Tool set. So a Core example cannot name the Full-only
 command runner on a host, and an inner argument a relay does not take fails here.
 
-Each host model's catalog is read against its own generation of the captures: the
-inbox catalog's examples against the frozen v0.44.0 surfaces.
+Every current example is read against the current app captures.
 
 The surfaces differ at the property level, which is the point of validating per
 caller: an API-key ``external`` client is not offered ``notify`` at all, so an
@@ -43,17 +42,17 @@ from daintree_mcp_surfaces import (
 )
 from jsonschema import Draft202012Validator
 
-from daintree_assistant_server.runbooks.catalog import load_catalogs
+from daintree_assistant_server.runbooks.catalog import load_catalog
 
 EXAMPLE = re.compile(r"^```json tool=([\w.]+)(?: surface=([\w-]+))?\n(.*?)\n```$", re.M | re.S)
 
 
 def _examples() -> list[tuple[Model, str, str, str | None, str]]:
-    catalogs = load_catalogs()
+    catalog = load_catalog()
     return [
         (model, runbook.id, tool, surface or None, text)
         for model in MODELS
-        for runbook in catalogs.for_model(model).runbooks
+        for runbook in catalog.runbooks
         for tool, surface, text in EXAMPLE.findall(runbook.body)
     ]
 
@@ -63,9 +62,9 @@ _EXAMPLES = _examples()
 
 def test_tagged_examples_are_present_and_well_formed() -> None:
     assert _EXAMPLES, "No executable runbook examples were collected"
-    catalogs = load_catalogs()
-    for model in MODELS:
-        for runbook in catalogs.for_model(model).runbooks:
+    catalog = load_catalog()
+    for _model in MODELS:
+        for runbook in catalog.runbooks:
             declared = re.findall(r"^```[^\n]*tool=[^\n]*$", runbook.body, re.M)
             parsed = EXAMPLE.findall(runbook.body)
             assert len(declared) == len(parsed), f"Malformed example fence in {runbook.id}"
@@ -120,8 +119,7 @@ def test_example_matches_the_callers_captured_schema(
 
 
 def test_untagged_examples_follow_the_caller_policy() -> None:
-    """Negative checks: a pane runbook's untagged hub or lane call resolves to no
-    surface, and a hosts runbook's untagged pane-only call resolves to none either."""
+    """Retired tools resolve nowhere; hosts examples never borrow the pane surface."""
 
     def resolves(runbook_id: str, tool: str, model: Model) -> bool:
         return any(
@@ -129,12 +127,8 @@ def test_untagged_examples_follow_the_caller_policy() -> None:
         )
 
     for tool in ("host.sendMessage", "assistant.sendMessage", "assistant.getInbox"):
-        assert not resolves("daintree.release.example", tool, "inbox"), tool
-    assert resolves("daintree.release.example", "terminal.sendCommand", "inbox")
-    assert not resolves("daintree.hosts.example", "terminal.sendCommandOwned", "inbox")
-    assert resolves("daintree.hosts.example", "host.sendMessage", "inbox")
-    assert resolves("daintree.hosts.example", "assistant.sendMessage", "inbox")
-
+        assert not resolves("daintree.release.example", tool, "control"), tool
+    assert resolves("daintree.release.example", "terminal.sendCommand", "control")
     # Control: a hosts runbook is the Shell's assistant's; the relay is only ever
     # reached inside host.call, never as an untagged example's surface.
     assert resolves("daintree.hosts.example", "host.call", "control")

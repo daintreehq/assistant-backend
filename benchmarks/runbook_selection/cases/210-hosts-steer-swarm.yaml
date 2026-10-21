@@ -95,20 +95,6 @@ cases:
       required: [daintree.hosts.steer-swarm]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: steer-swarm-cancel-is-not-a-stop
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      A cancel already pressed is not evidence the workers stopped: "STOPPED, CALLED OFF or
-      CHANGED while it is under way" and "each worker's state as its answer gives it". At base
-      a similar line went to daintree.agents.recover-agent.
-    messages:
-      - role: user
-        content: I hit cancel on the remote exchanges an hour ago, did the agents on those machines actually stop? Find out and stop any that didn't.
-    expect:
-      required: [daintree.hosts.steer-swarm]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
   - id: steer-swarm-one-host-of-several
     category: single-runbook
     note: >-
@@ -202,21 +188,6 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   # ------------------------------------------------------------------ reverse traps
-  - id: steer-swarm-trap-lane-side
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse: the receiving machine's assistant stopping the agents it launched for the hub.
-      steer-for-hub owns "Use on a Remote Host's lane to STOP, PAUSE or CHANGE the work of the
-      AGENTS it launched for one of the hub's runs"; this runbook fences "on the receiving
-      machine itself (daintree.hosts.steer-for-hub)".
-    messages:
-      - role: user
-        content: The hub called off its run; halt the two agents I launched for it on this machine and tell the hub where each one got to.
-    expect:
-      required: [daintree.hosts.steer-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
-
   - id: steer-swarm-trap-catch-up
     category: routing-trap
     note: >-

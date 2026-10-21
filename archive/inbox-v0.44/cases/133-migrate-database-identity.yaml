@@ -1,0 +1,67 @@
+# Improvement to daintree.runtime.migrate-worktree-database: the database a worktree
+# points at is proven to be its own on the machine that runs the operation, whoever
+# asks (the person, or the hub through this host's lane), and a loopback address is
+# never taken as ownership. Recall cases in agent, casual and hub-voiced wording, and
+# traps against the neighbours the routing text fences.
+
+cases:
+- id: migrate-db-hub-reseed-unknown-identity
+  host_model: inbox
+  category: single-runbook
+  note: 'Hub-voiced work description: "Use when the user, or the hub reaching this machine''s lane, wants a MIGRATION, SEED, ROLLBACK, DATABASE RESET".'
+  messages:
+  - role: user
+    content: The hub wants the test database in the feature worktree on this host reseeded; localhost:5432 here is an ssh tunnel to a shared box, so work out which database a reset would actually hit before touching it
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: migrate-db-hub-migrate-then-report
+  host_model: inbox
+  category: single-runbook
+  note: 'Receiver wording: "or the hub reaching this machine''s lane" wants the migration applied and the schema version returned.'
+  messages:
+  - role: user
+    content: 'Hub message: apply the pending migrations to the database of the worktree on branch run-4/unit-2 and reply with the schema version before and after'
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: migrate-db-hub-tunnel-check-before-reset
+  host_model: inbox
+  category: single-runbook
+  note: 'Hub-voiced with a tunnel doubt: the same "hub reaching this machine''s lane" clause; the lane runbooks for hub requests share the wording and an untrained neighbour wins it, so this one is the retrain-owed boundary.'
+  messages:
+  - role: user
+    content: Hub asked this host to apply the pending migrations on the feature worktree; the db host in the env file is 127.0.0.1 but it may be an ssh tunnel to staging, check before resetting anything
+  expect:
+    required:
+    - daintree.runtime.migrate-worktree-database
+    optional:
+    - daintree.foundation
+- id: migrate-db-trap-hub-demo
+  host_model: inbox
+  category: routing-trap
+  note: 'A demo the hub asks this host to serve is not a database operation: "or for a demo the hub asks this host to prepare (use daintree.hosts.demo-for-hub)".'
+  messages:
+  - role: user
+    content: The hub wants the branch demo/pricing served on this host with sample data so the person can click through it; reply with the port.
+  expect:
+    required:
+    - daintree.hosts.demo-for-hub
+    optional:
+    - daintree.foundation
+- id: migrate-db-trap-hub-note
+  host_model: inbox
+  category: routing-trap
+  note: 'Reading a hub message is the envelope runbook: "the hub sent me a message, read it and deal with it" (daintree.hosts.handle-hub-message); the database work comes from a second search.'
+  messages:
+  - role: user
+    content: The hub sent me a note about the database on this machine, read it and tell me what it asks
+  expect:
+    required:
+    - daintree.hosts.handle-hub-message
+    optional:
+    - daintree.foundation

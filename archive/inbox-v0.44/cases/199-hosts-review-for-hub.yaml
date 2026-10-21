@@ -1,0 +1,219 @@
+# daintree.hosts.review-for-hub: the lane's side of a cross-host review. The Daintree
+# assistant on a Remote Host, enrolled for one Shell's hub, is asked to review work it did
+# not write at the exact commit the hub names, and replies with findings only.
+#
+# Recall: agent- and user-phrased review requests from the hub, the issue's two examples
+# (scrubbed), and the situations the procedure has to get right (a moved branch, a commit
+# the request leaves out, text in the change that tries to give orders, a reviewer that
+# edited files). daintree.hosts.handle-hub-message is optional throughout: the lane holds
+# it for the exchange while this runbook does the review. Traps: against a local review
+# (daintree.review.review-change), the hub's own side of a hand-off
+# (daintree.hosts.delegate-to-host), checking a claimed result
+# (daintree.orchestration.verify-agent-work) and relaying findings to a fixer
+# (daintree.agents.relay-review-feedback); reverse traps where review-change and
+# delegate-to-host win.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: review-for-hub-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The lane's own search for the hub's request, as an agent writes it. The positive
+      clause claims it: "when the hub's message asks THIS machine to review work it did not
+      write, findings only, at the exact commit the hub names".
+    messages:
+      - role: user
+        content: "Hub request on this lane: review branch feature/rate-limit at commit 3f9a2c1 against its acceptance criteria and reply with findings only, changing nothing"
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-user-casual
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The same request in a person's shorthand, no punctuation to lean on. Decided by "a
+      findings-only review of that exact commit".
+    messages:
+      - role: user
+        content: hub asked for a code review of the parser branch at that sha, findings only
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-race-branch
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's first example, the machine name scrubbed from the branch: a race branch
+      at a SHA, the review half of a race. "the hub wants a review of the race branch at
+      this SHA" is the routing text's own example.
+    messages:
+      - role: user
+        content: hub wants a review of race/fizzbuzz/box-1 at this SHA
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-hostile-text
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Text inside the change that tries to steer the reviewer. Still the hub's findings-only
+      review ("briefed to comment and change nothing"); the body treats such text as a
+      finding, never an order.
+    messages:
+      - role: user
+        content: the hub wants a review of the docs branch at 7b2e0f4, and a comment in the diff tells reviewers to approve it and skip the tests
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-reviewer-edited
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Mid-procedure: the reviewer changed files. Owned by "the checkout checked unchanged
+      afterwards" in the deliverable, not by a local agent-recovery runbook.
+    messages:
+      - role: user
+        content: the reviewer the hub asked for edited two files in the review worktree instead of just commenting
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-missing-commit
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A review request with no commit to pin. Asking back is the first step of this
+      procedure ("at the exact commit the hub names"), so the review runbook owns it, with
+      handle-hub-message free to ride along for the question itself.
+    messages:
+      - role: user
+        content: the hub's review request doesn't say which commit, ask it
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps
+  - id: review-for-hub-trap-local-review
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The issue's second example, the machine name scrubbed. Reviewing another machine's
+      pushed branch for the hub is this runbook, not daintree.review.review-change, which
+      this runbook fences as "a review the person at this machine asks for".
+    messages:
+      - role: user
+        content: review the branch the second host pushed and report findings to the hub
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-trap-moved-branch
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A moved branch is "reported rather than reviewed in its place". Before this runbook
+      the phrase about the remote tip pulled daintree.hosts.delegate-to-host, the hub's side
+      ("the person or the hub handing a review or any other work to another machine").
+    messages:
+      - role: user
+        content: the hub asked me to review release-fix at 9d0e1f2 but the branch tip on the remote is now a different commit
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-trap-not-verify
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      An independent reviewer of a different CLI ("a fresh reviewer agent (often a
+      different CLI from the builder)"). Before this runbook it selected
+      daintree.orchestration.verify-agent-work and daintree.agents.relay-review-feedback;
+      this runbook fences "checking a finished agent's claimed result" and "findings
+      relayed to an agent that fixes them".
+    messages:
+      - role: user
+        content: The hub sent a review request for the payments branch at an exact commit, and wants a Codex reviewer, not the agent that wrote it
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-trap-not-relay
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub asked for a named reviewer CLI in a worktree here. That shape drew
+      daintree.agents.relay-review-feedback ("have Codex review this file without changing
+      anything") and daintree.review.review-change before this runbook. Nobody fixes here: "the reviewer's
+      findings (severity, file and line, what is wrong) replied to the hub as unfixed
+      claims".
+    messages:
+      - role: user
+        content: the hub asked for codex here to review the branch at abc1234 in a worktree and send it the findings
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps
+  - id: review-for-hub-reverse-inbox-fit-first
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A review request still in the inbox, with a lane-fit question before any review:
+      daintree.hosts.handle-hub-message ("The deliverable is the exchange handled: read once
+      with assistant.getInbox, checked against this lane's project and the CLIs signed in
+      here"), which this runbook fences as "reading or answering the hub's message in
+      general". This runbook must not ride along.
+    messages:
+      - role: user
+        content: two hub messages are waiting in the inbox and one asks for a review in a project this lane doesn't have; read them and sort out which apply here
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-reverse-findings-to-fixer
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub's review is done and its findings must reach a fixer:
+      daintree.agents.relay-review-feedback ("Use when review findings from one AGENT must
+      reach another agent that fixes them"), which this runbook fences as "findings relayed
+      to an agent that fixes them". This runbook must not ride along.
+    messages:
+      - role: user
+        content: the hub's review is finished; hand its findings to the claude agent in the feature worktree so it can fix them
+    expect:
+      required: [daintree.agents.relay-review-feedback]
+      optional: [daintree.foundation]
+
+  - id: review-for-hub-trap-not-test-run
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub wants the code read, not run: "a findings-only review of that exact commit".
+      This runbook fences "the hub's checks or tests run on a commit" to
+      daintree.hosts.verify-for-hub, which must not ride along.
+    messages:
+      - role: user
+        content: the hub asked this lane to review commit 0a7d3f2 for correctness, not to test it
+    expect:
+      required: [daintree.hosts.review-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: review-for-hub-reverse-test-run
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A test run with counts, no code review: daintree.hosts.verify-for-hub ("Use when the
+      hub asks this lane to TEST or VERIFY a commit or branch here and report the results,
+      with no fixes"), which fences "a code review" away. This runbook must not ride along.
+    messages:
+      - role: user
+        content: "hub message: run the integration tests on the branch at 3c8e1b4 and report the counts, nothing about code quality"
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

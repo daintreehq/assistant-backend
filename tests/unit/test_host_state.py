@@ -13,10 +13,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
 from daintree_assistant_server.runbooks.host_state import (
     HOST_ELIGIBILITY,
-    HostEligibility,
     HostState,
     fits,
     parse_host_state,
@@ -28,11 +27,7 @@ _ARTIFACT = (
     / "src/daintree_assistant_server/runbooks/local/artifacts/selector"
 )
 
-_ALL_STATES = [
-    HostState(hosts=hosts, lane_reachable=lane)  # type: ignore[arg-type]
-    for hosts in ("none", "configured", "connected")
-    for lane in (False, True)
-]
+_ALL_STATES = [HostState(hosts=h) for h in ("none", "configured", "connected")]
 
 
 def _artifact_present() -> bool:
@@ -43,61 +38,32 @@ def _artifact_present() -> bool:
 
 @pytest.fixture(scope="module")
 def catalog() -> Catalog:
-    """The inbox catalog: the one v0.44 clients, the only callers with lanes, are
-    served. The control catalog's hosts runbooks are checked in ``test_catalogs.py``."""
-    return load_catalogs().inbox
+    """The current direct-control catalog."""
+    return load_catalog()
 
 
 # ---- the header contract ------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("hosts", "lane", "expected"),
-    [
-        ("none", None, HostState("none")),
-        ("configured", None, HostState("configured")),
-        ("connected", None, HostState("connected")),
-        ("connected", "reachable", HostState("connected", lane_reachable=True)),
-        (" Connected ", " REACHABLE ", HostState("connected", lane_reachable=True)),
-        ("none", "reachable", HostState("none", lane_reachable=True)),
-    ],
-)
-def test_a_recognised_snapshot_is_reported(
-    hosts: str, lane: str | None, expected: HostState
-) -> None:
-    assert parse_host_state(hosts, lane) == expected
+@pytest.mark.parametrize("hosts", ["none", "configured", "connected", " Connected "])
+def test_recognised_snapshot_is_reported(hosts: str) -> None:
+    assert parse_host_state(hosts) == HostState(hosts.strip().lower())
 
 
-@pytest.mark.parametrize(
-    ("hosts", "lane"),
-    [
-        (None, None),
-        (None, "reachable"),  # lane alone is no snapshot: Daintree always sends hosts
-        ("", None),
-        ("some", None),
-        ("connected, none", None),
-        ("connected", ""),
-        ("connected", "yes"),
-    ],
-)
-def test_a_missing_or_malformed_snapshot_is_unreported_not_an_error(
-    hosts: str | None, lane: str | None
-) -> None:
-    """Unreported filters nothing, so an unknown value never reads as a definite no."""
-    assert parse_host_state(hosts, lane) is None
+@pytest.mark.parametrize("hosts", [None, "", "some", "connected, none"])
+def test_missing_or_malformed_snapshot_is_unreported(hosts: str | None) -> None:
+    assert parse_host_state(hosts) is None
 
 
 def test_eligibility_against_every_reported_state() -> None:
-    expected: dict[HostEligibility, set[tuple[str, bool]]] = {
-        "any": {(s.hosts, s.lane_reachable) for s in _ALL_STATES},
-        "configured": {(h, lane) for h in ("configured", "connected") for lane in (False, True)},
-        "connected": {("connected", False), ("connected", True)},
-        "lane": {(h, True) for h in ("none", "configured", "connected")},
+    expected = {
+        "any": {"none", "configured", "connected"},
+        "configured": {"configured", "connected"},
+        "connected": {"connected"},
     }
     assert set(expected) == HOST_ELIGIBILITY
     for eligibility, fitting in expected.items():
-        got = {(s.hosts, s.lane_reachable) for s in _ALL_STATES if fits(eligibility, s)}
-        assert got == fitting, eligibility
+        assert {s.hosts for s in _ALL_STATES if fits(eligibility, s)} == fitting
 
 
 # ---- the frontmatter rule -------------------------------------------------
@@ -112,7 +78,10 @@ def _meta(**fields: object) -> RunbookMeta:
 def test_a_hosts_runbook_must_declare_its_eligibility() -> None:
     with pytest.raises(ValidationError, match="must declare hostEligibility"):
         _meta(id="daintree.hosts.new-thing")
-    assert _meta(id="daintree.hosts.new-thing", hostEligibility="lane").host_eligibility == "lane"
+    assert (
+        _meta(id="daintree.hosts.new-thing", hostEligibility="connected").host_eligibility
+        == "connected"
+    )
 
 
 def test_no_runbook_outside_the_hosts_namespace_may_declare_one() -> None:
@@ -133,21 +102,7 @@ def test_every_packaged_hosts_runbook_is_classified(catalog: Catalog) -> None:
         if r.id.startswith("daintree.hosts.")
     }
     assert hosts and all(v is not None for v in hosts.values())
-    # The issue's lane group, exactly: the runbooks a Remote Host's own assistant runs.
-    assert {rid for rid, v in hosts.items() if v == "lane"} == {
-        f"daintree.hosts.{leaf}"
-        for leaf in (
-            "handle-hub-message",
-            "do-delegated-work",
-            "run-local-cohort",
-            "review-for-hub",
-            "demo-for-hub",
-            "verify-for-hub",
-            "steer-for-hub",
-            "integrate-for-hub",
-            "clean-up-for-hub",
-        )
-    }
+    assert "lane" not in hosts.values()
     # Adding the first host, and the domain's base judgment, fit a caller with none.
     assert {rid for rid, v in hosts.items() if v == "any"} == {
         "daintree.hosts.connect-host",
@@ -159,7 +114,7 @@ def test_every_packaged_hosts_runbook_is_classified(catalog: Catalog) -> None:
         "recover-and-clean-up",
         "park-swarm",
         "undo-swarm-changes",
-        "diagnose-messaging",
+        "survey-hosts",
         "copy-portable-settings",
         "open-project-on-host",
     ):
@@ -184,7 +139,7 @@ def test_only_hosts_runbooks_that_do_not_fit_are_excluded(
         assert (runbook.id in excluded) == should, runbook.id
     # A view per request: the catalog's own selectable set never narrows.
     assert excluded <= catalog.selectable_ids
-    assert len(catalog.selectable_ids) == len(catalog) - 1
+    assert len(catalog.selectable_ids) == len(catalog)
 
 
 def test_a_caller_with_no_hosts_and_no_lane_keeps_only_setup(catalog: Catalog) -> None:
@@ -211,10 +166,8 @@ def _case(**fields: object) -> dict[str, object]:
 def test_a_case_carries_its_state_and_the_exclusion_it_implies(catalog: Catalog) -> None:
     from benchmarks.runbook_selection.cases import _build_case
 
-    case = _build_case(
-        _case(host_model="inbox", host_state={"hosts": "none", "lane": "reachable"}), "f", catalog
-    )
-    assert case.host_state == HostState("none", lane_reachable=True)
+    case = _build_case(_case(host_state={"hosts": "none"}), "f", catalog)
+    assert case.host_state == HostState("none")
     assert case.exclude == catalog.excluded_for(case.host_state)
     unreported = _build_case(_case(), "f", catalog)
     assert unreported.host_state is None and unreported.exclude == frozenset()
@@ -222,8 +175,13 @@ def test_a_case_carries_its_state_and_the_exclusion_it_implies(catalog: Catalog)
 
 @pytest.mark.parametrize(
     "host_state",
-    [{"hosts": "nope"}, {"hosts": "none", "lane": "yes"}, {"lane": "reachable"}, "none",
-     {"hosts": "none", "extra": 1}],
+    [
+        {"hosts": "nope"},
+        {"hosts": "none", "lane": "yes"},
+        {"lane": "reachable"},
+        "none",
+        {"hosts": "none", "extra": 1},
+    ],
 )
 def test_a_malformed_case_state_fails_loudly(catalog: Catalog, host_state: object) -> None:
     """Strict, unlike the transport: a case's state is authored, and a typo that read
@@ -234,10 +192,10 @@ def test_a_malformed_case_state_fails_loudly(catalog: Catalog, host_state: objec
         _build_case(_case(host_state=host_state), "f", catalog)
 
 
-def test_a_reachable_lane_is_the_inbox_models(catalog: Catalog) -> None:
+def test_retired_lane_state_is_refused_in_cases(catalog: Catalog) -> None:
     from benchmarks.runbook_selection.cases import CaseError, _build_case
 
-    with pytest.raises(CaseError, match="inbox model's"):
+    with pytest.raises(CaseError, match="host_state"):
         _build_case(_case(host_state={"hosts": "none", "lane": "reachable"}), "f", catalog)
 
 
@@ -259,7 +217,9 @@ def test_a_case_may_not_expect_what_its_state_leaves_out(catalog: Catalog) -> No
 # ---- the selector, against the shipped artifact ------------------------------
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_excluded_runbooks_free_their_shortlist_slots_for_eligible_ones(
     catalog: Catalog,
 ) -> None:
@@ -285,7 +245,9 @@ def test_excluded_runbooks_free_their_shortlist_slots_for_eligible_ones(
     assert clf.select(query, [], catalog=catalog, exclude=frozenset()).ranked == whole.ranked
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(catalog: Catalog) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
@@ -299,7 +261,9 @@ def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(catalog: Catalo
     assert active not in sel.runbook_ids and active not in sel.reserved_ids
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
@@ -309,7 +273,9 @@ def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> No
     assert sel.runbook_ids == [] and sel.ranked == ()
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
+@pytest.mark.skipif(
+    not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
+)
 def test_the_docs_pass_builds_its_own_ballot_under_the_same_exclusion(
     catalog: Catalog,
 ) -> None:

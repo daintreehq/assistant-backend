@@ -1,17 +1,6 @@
-# daintree.hosts.place-work: the hub places DIFFERENT, independent pieces of work (or one piece
-# with no host chosen) on the Remote Hosts that can take them, weighing each host's load, the
-# agent CLIs signed in there, allowance left and an enrolled assistant in the right project,
-# shows the placement table, then delegates each piece and verifies one row per piece.
-#
-# Positives are invented situations in agent and user words, short and long, some with a
-# social lead-in, a constraint or an earlier turn; a few how-to questions carry docs. Boundaries
-# are requests this runbook wins against a neighbour whose vocabulary they share: the same work
-# everywhere (swarm-fan-out), a host already named (delegate-to-host), a usage table
-# (check-usage-limits), readiness with no work (start-swarm), local agents (fan-out-work),
-# breaking a spec down (decompose-work), this machine's load (relieve-resource-contention), a
-# work already sent (recover-and-clean-up). Followups and topic
-# shifts are placement as a second turn after a usage check, a readiness turn or a survey.
-# Machine names are generic.
+# daintree.hosts.place-work: Place independent work on the remote hosts that can take it
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.place-work.md
+
 runbook: daintree.hosts.place-work
 run: runbook-2026-10-issue-93
 
@@ -19,7 +8,6 @@ positives:
   - got a pile of five unrelated tickets and three other macs, work out which machine takes which and send them out
   - the linux box is pegged on a build, so put these bug fixes on whichever of the other hosts are quiet
   - can you hand these issues out across my remote machines but keep the claude ones off the hosts that only have codex
-  - Assign each of the six open milestone issues to a Remote Host with an enrolled assistant in this repository, preferring hosts with low memory pressure, and report where each went
   - Place four independent bug fixes on Remote Hosts by CPU load and remaining Codex allowance; show the proposed host per bug before sending
   - pick a host for the dark mode ticket, I don't care which one as long as it isn't swamped
   - whichever machine is least busy right now should take the flaky export test fix
@@ -43,7 +31,6 @@ positives:
   - hand out these unrelated chores to the hosts, one apiece if they can take it
   - I have five feature flags to remove and none depends on another, put them on my remote machines by how busy each is
   - User's laptop is busy, so the three backlog tickets should run on the remote Macs instead, Codex work only where Codex is signed in, with a table of where each landed
-  - Pick the least-loaded Remote Host that has this repository and a Claude Code lane for one bug fix, then delegate it
   - Two remote hosts are connected and one is nearly out of Claude allowance for the week; spread the four pending bug fixes so neither runs dry
   - honestly no idea which host should do the cache invalidation fix, you pick and send it
   - put the remaining tickets on whatever hosts are free; the mini is out, it's running the nightly
@@ -95,8 +82,6 @@ boundaries:
   - query: use the hosts' remaining weekly usage to divide up these three issues
     confusable_with: [daintree.agents.check-usage-limits]
   - query: which of my machines can take work right now? put these four tickets on those
-    confusable_with: [daintree.hosts.delegate-to-host]
-  - query: the lanes are already enrolled on every host, so just decide who takes each of these bugs and send them
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: get the six issues onto the hosts, wherever an assistant is ready and the load is low
     confusable_with: [daintree.hosts.delegate-to-host]

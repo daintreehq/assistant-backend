@@ -27,8 +27,7 @@ from .observability import (
     get_logger,
     new_request_id,
 )
-from .runbooks.catalog import Catalogs, load_catalogs
-from .runbooks.host_state import HostModel
+from .runbooks.catalog import Catalog, load_catalog
 from .runbooks.local.paths_local import selector_artifact_dir
 from .runbooks.local.runtime import InferencePool
 from .runbooks.local.selector import LocalSelector, RunbookSelector
@@ -106,9 +105,7 @@ class BodySizeLimitMiddleware:
 # An inbound X-Request-Id is adopted only when it is short and plain: it is a
 # caller-controlled string copied into every log line for the request.
 _MAX_REQUEST_ID_LENGTH = 128
-_REQUEST_ID_SAFE = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
-)
+_REQUEST_ID_SAFE = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
 
 
 def _safe_request_id(inbound: str | None) -> str:
@@ -127,14 +124,10 @@ class Container:
     """The long-lived service components."""
 
     settings: Settings
-    catalogs: Catalogs
-    #: One search per host model's catalog, over one classifier and pool.
-    selectors: dict[HostModel, RunbookSelector]
+    catalog: Catalog
+    selector: RunbookSelector
     pool: InferencePool | None = None
     sessions: SessionMemory = field(default_factory=SessionMemory)
-
-    def selector_for(self, model: HostModel) -> RunbookSelector:
-        return self.selectors[model]
 
     def close(self) -> None:
         if self.pool is not None:
@@ -142,33 +135,19 @@ class Container:
 
 
 def build_container(settings: Settings, selector: RunbookSelector | None = None) -> Container:
-    """Load both catalogs and the selector.
-
-    ``selector`` is the test seam: a scripted selector skips loading the ONNX
-    artifact entirely, and answers for both catalogs. Production leaves it None and
-    gets the local classifier, shared by a search bound to each catalog.
-    """
-    catalogs = load_catalogs()
-    pool: InferencePool | None = None
+    """Load the current catalog and eagerly validate the shipped selector."""
+    catalog = load_catalog()
     if selector is not None:
-        return Container(
-            settings=settings,
-            catalogs=catalogs,
-            selectors={"control": selector, "inbox": selector},
-        )
-    # Constructed eagerly so a missing or LFS-pointer artifact fails readiness
-    # rather than the first request.
+        return Container(settings=settings, catalog=catalog, selector=selector)
     classifier = SetwiseClassifier(selector_artifact_dir())
-    # Embed both catalogs now: it validates the artifact against real catalogs at
-    # startup, and no caller's first search pays for the embedding.
-    classifier.sync(catalogs.inbox)
-    classifier.sync(catalogs.control)
+    classifier.sync(catalog)
     pool = InferencePool()
-    selectors: dict[HostModel, RunbookSelector] = {
-        "control": LocalSelector(classifier, pool, catalogs.control),
-        "inbox": LocalSelector(classifier, pool, catalogs.inbox),
-    }
-    return Container(settings=settings, catalogs=catalogs, selectors=selectors, pool=pool)
+    return Container(
+        settings=settings,
+        catalog=catalog,
+        selector=LocalSelector(classifier, pool, catalog),
+        pool=pool,
+    )
 
 
 @asynccontextmanager
@@ -182,10 +161,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info(
             "startup_ready",
             environment=settings.environment,
-            catalog_revision=container.catalogs.control.revision,
-            runbooks=len(container.catalogs.control),
-            inbox_catalog_revision=container.catalogs.inbox.revision,
-            inbox_runbooks=len(container.catalogs.inbox),
+            catalog_revision=container.catalog.revision,
+            runbooks=len(container.catalog),
         )
     except Exception as exc:  # noqa: BLE001 - readiness must not crash liveness
         app.state.container = None

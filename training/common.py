@@ -10,6 +10,7 @@ silently degrades accuracy without producing an error anywhere.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Callable
@@ -83,9 +84,14 @@ def build_query(row: dict[str, object], *, fits: Callable[[str], bool] | None = 
 
 def corpus_rows(path: Path) -> list[dict]:
     """Load a jsonl corpus, skipping blank lines."""
-    return [
-        json.loads(line) for line in path.read_text().splitlines() if line.strip()
-    ]
+    return corpus_snapshot(path)[0]
+
+
+def corpus_snapshot(path: Path) -> tuple[list[dict], dict[str, object]]:
+    """Rows and provenance from the same read, captured before training starts."""
+    raw = path.read_bytes()
+    rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
+    return rows, {"sha256": hashlib.sha256(raw).hexdigest(), "rows": len(rows)}
 
 
 def device() -> str:
@@ -121,17 +127,17 @@ def stable_split(rows: list[dict], val_fraction: float) -> tuple[list[dict], lis
     for r in rows:
         # Reuse serving's latest-turn normalisation (e.g. bare countdowns),
         # then ignore casing, punctuation and whitespace as the deduper does.
-        key = " ".join(re.sub(
-            r"[^a-z0-9]+", " ", render_training_query(str(r.get("query", ""))).lower()
-        ).split())
+        key = " ".join(
+            re.sub(
+                r"[^a-z0-9]+", " ", render_training_query(str(r.get("query", ""))).lower()
+            ).split()
+        )
         bucket = int(hashlib.sha1(key.encode()).hexdigest()[:8], 16) % 10_000
         (val if bucket < cut else train).append(r)
     return train, val
 
 
-def canonical_active(
-    active_ids: list[str], catalog: object, max_active: int = 3
-) -> list[str]:
+def canonical_active(active_ids: list[str], catalog: object, max_active: int = 3) -> list[str]:
     """An active set as the SERVER would have left it: every specific paired
     with its domain foundation, admitted as atomic units under the cap.
 

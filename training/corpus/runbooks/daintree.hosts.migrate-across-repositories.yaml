@@ -1,19 +1,6 @@
-# daintree.hosts.migrate-across-repositories: one mechanical change carried through the
-# repositories the person selected, from this Shell's hub, each repository counted once however
-# many Remote Hosts hold a clone. Lanes' visible agents inventory with recorded searches, a pilot
-# fixes the rulebook every host follows, a form nobody listed holds dispatch until the person
-# amends the rulebook, each repository's units are integrated on their own, and the searches are
-# rerun on each integrated commit, one row per repository.
-#
-# Rows: campaign requests in agents' task descriptions and people's own words (codemods, library
-# and API swaps, config and lint rollouts over several repositories on the hosts, duplicate
-# clones, an unreachable repository, a new form found mid-run, residual counts per repository,
-# push authority); followups after a survey or a pilot; docs questions; and boundaries against
-# one codebase on this machine (daintree.orchestration.migration-sweep), the same work on every
-# host (daintree.hosts.swarm-fan-out), independent pieces placed by load
-# (daintree.hosts.place-work), a dependent plan (daintree.hosts.execute-distributed-workflow) and
-# combining finished branches (daintree.hosts.integrate-host-branches), each with reverse rows
-# in that neighbour's file.
+# daintree.hosts.migrate-across-repositories: Run one mechanical migration across repositories on the Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.migrate-across-repositories.md
+
 runbook: daintree.hosts.migrate-across-repositories
 run: runbook-2026-10-issue-149
 
@@ -31,7 +18,6 @@ positives:
   - switch the yaml config loader to the toml one across the infra repos on the studios, a pilot in the smallest one, then the rest
   - get every selected repo on my hosts off the old assert library and onto node:assert, and give me the leftover matches for each repo
   - the same mechanical rename in six repos spread over three machines, don't run it twice where a repo is on two machines
-  - 'Hub agent: migrate the selected repositories from request to fetch through their hosts'' lanes. Each repository keeps its own base branch and lockfile. Pilot one partition, then dispatch by the frozen rulebook.'
   - push the lodash removal through the three ui repos on the remote hosts, one owner per folder, no PRs, I'll look at the branches
   - morning! could the other machines take the enum-to-union refactor through our two typescript repos, pilot first?
   - can you sweep the deprecated api calls out of all the client repos on my hosts and tell me per repo what's left
@@ -102,10 +88,6 @@ followups:
     history:
       - 'user: swap the date library across our four repos on the hosts, pilot first'
       - 'assistant: The pilot changed eight files in the web repo; before and after for both call shapes are in the rules, and its tests pass.'
-  - query: yes, handle the new form that way and carry on with the remaining repos
-    history:
-      - 'user: replace the deprecated sdk calls in the three repos on my machines'
-      - 'assistant: The worker repo''s lane reported a call shape the rules do not cover, a chained call through a wrapper. I have held the units not sent yet.'
   - query: 'good, finish the migration for every repo: integrate each one separately and give me the leftover counts from rerunning the searches on each result'
     history:
       - 'user: run the import rename across the selected repos on the hosts'

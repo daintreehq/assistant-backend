@@ -1,0 +1,178 @@
+# daintree.hosts.clean-up-for-hub: the lane's side of a hub cleanup. The Daintree assistant
+# on a Remote Host, acting as a lane, is asked by the hub to remove what it made for a
+# named run: exactly those panes, the worktrees that are clean and pushed (or abandoned),
+# never forced, the rest asked back as one list, a confirmation timeout reported rather
+# than retried. Recall in agents' and users' words (the issue's two requests verbatim
+# among them), and the issue's bare hub message once it has been read from the inbox. One
+# trap per declared neighbour where this runbook wins because the hub asked this machine;
+# and the reverse traps, where the hub itself asking its hosts, or the person on their own
+# machine, keeps the neighbour and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: clean-up-for-hub-issue-close-swarm-panes
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's first selection case, verbatim: the hub's order relayed in the lane's own
+      words. Decided by "when the hub, the assistant on the person's main machine, asks it to remove what it made on this machine for one of the hub's runs". Before this runbook it went to
+      daintree.hosts.handle-hub-message, the envelope, which hands the work to the runbook
+      that owns it.
+    messages:
+      - role: user
+        content: hub says close the swarm panes
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-issue-fizzbuzz-run
+    host_model: inbox
+    category: continuation
+    note: >-
+      The issue's second selection case, verbatim, as the hub's message to this lane: the
+      history establishes that the request comes from the hub and is addressed to this
+      lane about its own run here. Decided by "when the hub, the assistant on the person's
+      main machine, asks it to remove what it made on this machine for one of the hub's
+      runs". daintree.orchestration.workspace-cleanup is "for the person tearing down panes
+      and worktrees on their own machine", which this is not.
+    messages:
+      - role: user
+        content: Read the hub's latest message and tell me what it wants from this machine.
+      - role: assistant
+        content: "It's the hub asking this lane to clean up after its fizzbuzz run here. Its exact text:"
+      - role: user
+        content: clean up what you made for the fizzbuzz run and report back
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Agent-phrased, the way a lane describes the task to search: "that run's panes closed and
+      its clean, pushed or abandoned worktrees removed here, nothing else touched" and "one
+      input-required list of what would be lost".
+    messages:
+      - role: user
+        content: >-
+          As this host's lane, remove the panes and worktrees I created for the hub's named
+          run, ask the hub once about anything unpushed or dirty, and reply with what was
+          removed and kept
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-user-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A lane's casual line about the hub's message: "when the hub, the assistant on the person's main machine, asks it to remove what it made on this machine for one of the hub's runs". The envelope may ride along.
+    messages:
+      - role: user
+        content: "the hub messaged this lane: drop the panes and worktree you set up for the image-resize job"
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-bare-message-read-from-inbox
+    host_model: inbox
+    category: continuation
+    note: >-
+      The issue's opening request is the hub's own text, which says nothing of a hub. Bare,
+      it is the person's cleanup on their own machine
+      (daintree.orchestration.workspace-cleanup); once the lane has read it from the inbox as
+      the hub's message it is "when the hub, the assistant on the person's main machine, asks it to remove what it made on this machine for one of the hub's runs". Untrained, the envelope
+      daintree.hosts.handle-hub-message keeps the bare follow-up (rank_miss, p=0.33):
+      retrain owed.
+    messages:
+      - role: user
+        content: There's something new from the hub in the inbox, read it.
+      - role: assistant
+        content: "It's from the hub: close the panes and worktrees you made for the fizzbuzz swarm."
+      - role: user
+        content: Fine, deal with it then.
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # --------------------------------------------------- traps: this runbook wins
+  - id: clean-up-for-hub-not-recover-and-clean-up
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The lane's side of the hub's cleanup: "Use on a Remote Host's Daintree assistant
+      acting as a lane".
+      daintree.hosts.recover-and-clean-up is the hub's own runbook ("Do not use on the hub
+      itself").
+    messages:
+      - role: user
+        content: I'm the assistant on this build box; the hub just asked me to get rid of the panes I opened for its benchmark run
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-not-workspace-cleanup
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The order came from the hub, not from a person here: "when the hub, the assistant on the person's main machine, asks it to remove what it made on this machine for one of the hub's runs".
+      daintree.orchestration.workspace-cleanup is "for the person tearing down panes and
+      worktrees on their own machine".
+    messages:
+      - role: user
+        content: "hub's request on this host: shut the agent panes I launched for its race and remove my clean worktrees"
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-not-audit-worktrees
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub ordered the removal; deciding which are safe is a step inside it ("its clean,
+      pushed or abandoned worktrees removed here"), not "a read-only verdict on which
+      worktrees could go (daintree.worktree.audit-worktrees)".
+    messages:
+      - role: user
+        content: hub says take down whichever of my worktrees from the race are safe to delete and tell it what's left
+    expect:
+      required: [daintree.hosts.clean-up-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------- reverse traps: the neighbour keeps it
+  - id: clean-up-for-hub-reverse-lane-read-only
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub asking this lane a read-only question about its worktrees is not a cleanup:
+      the work is daintree.worktree.audit-worktrees ("which of these are already merged?",
+      "nothing is deleted"), with daintree.hosts.handle-hub-message for the exchange; this
+      runbook is not "for a read-only verdict on which worktrees could go".
+      Untrained, this runbook takes it (rank_miss for audit-worktrees): retrain owed, with
+      reverse rows in audit-worktrees' file.
+    messages:
+      - role: user
+        content: the hub wants to hear which worktrees here are already merged into main, and says to leave all of them in place
+    expect:
+      required: [daintree.worktree.audit-worktrees]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: clean-up-for-hub-reverse-wrong-project
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A cleanup the hub addressed to another project's lane is a fit question for the
+      envelope, daintree.hosts.handle-hub-message ("checked against this lane's project and
+      the CLIs signed in here", "ask the hub what it meant"); this runbook only removes
+      "what it made on this machine for one of the hub's runs", and there is nothing of this
+      lane's to remove.
+    messages:
+      - role: user
+        content: this lane belongs to the api project but the hub's request is about the frontend project's leftovers; send it back as a question
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

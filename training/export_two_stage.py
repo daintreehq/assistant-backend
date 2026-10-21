@@ -44,9 +44,7 @@ from training.setwise_model import (  # noqa: E402
 )
 
 MODELS = ROOT / "training" / "models"
-ARTIFACTS = (
-    ROOT / "src" / "daintree_assistant_server" / "runbooks" / "local" / "artifacts"
-)
+ARTIFACTS = ROOT / "src" / "daintree_assistant_server" / "runbooks" / "local" / "artifacts"
 
 
 def _export_encoder(
@@ -229,9 +227,7 @@ def main() -> int:
 
     with torch.no_grad():
         ref_runbook, ref_docs, ref_card = head(*sample)
-    got = ort.InferenceSession(
-        str(out / "head.onnx"), providers=["CPUExecutionProvider"]
-    ).run(
+    got = ort.InferenceSession(str(out / "head.onnx"), providers=["CPUExecutionProvider"]).run(
         None,
         {
             "query": sample[0].numpy(),
@@ -253,6 +249,7 @@ def main() -> int:
             {
                 **{k2: v for k2, v in meta.items() if k2 != "retriever"},
                 "retriever_base_model": r_meta["base_model"],
+                "retriever_training_corpus": r_meta.get("training_corpus"),
                 "retriever_max_length": r_meta["max_length"],
                 "retriever_hidden_size": r_meta["hidden_size"],
             },

@@ -113,33 +113,6 @@ cases:
       optional: [daintree.hosts.foundation]
 
   # ------------------------------------------------------------ routing traps
-  - id: reassign-host-work-not-recover-and-clean-up
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Not an account of open exchanges: the unit is to MOVE. Fence: "Do not use for
-      where delegated exchanges stand with nothing moved, a resend to the same host,
-      or cleanup (daintree.hosts.recover-and-clean-up)".
-    messages:
-      - role: user
-        content: the link to the build box is gone for the day; rather than an account of its open exchanges, get its half-finished unit onto another machine
-    expect:
-      required: [daintree.hosts.reassign-host-work]
-      optional: [daintree.hosts.foundation]
-
-  - id: reassign-host-work-not-place-work
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A placed piece that stalled is moved, not placed afresh. Fence: "first placement
-      of new pieces (daintree.hosts.place-work)".
-    messages:
-      - role: user
-        content: the piece the hub placed on the second host stopped moving; give that piece to a different host, carrying over what it pushed
-    expect:
-      required: [daintree.hosts.reassign-host-work]
-      optional: [daintree.hosts.foundation]
-
   - id: reassign-host-work-not-delegate-to-host
     category: routing-trap
     note: >-
@@ -180,20 +153,6 @@ cases:
       optional: [daintree.hosts.foundation]
 
   # ------------------------------------------------------------ reverse traps
-  - id: reassign-host-work-reverse-recover-and-clean-up
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Status only, nothing moved: recover-and-clean-up's "where things stand with the
-      work handed to another machine" and "the link to a Remote Host dropped". This
-      runbook's fence: "where delegated exchanges stand with nothing moved".
-    messages:
-      - role: user
-        content: the link to my remote hosts dropped for twenty minutes; just tell me which delegated exchanges are still open
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
   - id: reassign-host-work-reverse-place-work
     category: routing-trap
     note: >-
@@ -232,18 +191,3 @@ cases:
         content: codex stopped on its weekly limit in the pane beside me; let gemini take over its half-done task right there in that checkout
     expect:
       required: [daintree.agents.hand-off-task]
-
-  - id: reassign-host-work-reverse-steer-for-hub
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The lane's side: steer-for-hub's "Use on a Remote Host's lane to STOP, PAUSE or
-      CHANGE the work of the AGENTS it launched for one of the hub's runs". This
-      runbook is the sender's side: "a piece of work ALREADY SENT to one Remote Host
-      has to MOVE TO A DIFFERENT MACHINE".
-    messages:
-      - role: user
-        content: I'm the assistant on this host; the hub says it is moving its unit elsewhere, so stop the agent I launched for it and keep its changes
-    expect:
-      required: [daintree.hosts.steer-for-hub]
-      optional: [daintree.hosts.foundation]

@@ -37,7 +37,7 @@ _SMOKE = _ROOT / "infra" / "gcp" / "smoke.sh"
 
 BUILD_SHA = "4f1c9ae0deadbeef4f1c9ae0deadbeef4f1c9ae0"
 REVISION = "sha256:" + "ab" * 32
-INBOX_REVISION = "sha256:" + "cd" * 32
+OTHER_REVISION = "sha256:" + "cd" * 32
 
 
 def _healthy_deployment() -> dict[str, Any]:
@@ -50,7 +50,6 @@ def _healthy_deployment() -> dict[str, Any]:
         "ready": "ready",
         "runbooks": 40,
         "catalog_revision": REVISION,
-        "inbox_catalog_revision": INBOX_REVISION,
         "version_status": 200,
         "build_sha": BUILD_SHA,
         "protocol_version": "2025-06-18",
@@ -65,9 +64,9 @@ def _healthy_deployment() -> dict[str, Any]:
             {"id": "daintree.foundation", "selected": False},
         ],
         "search_revision": REVISION,
-        # What a caller without Daintree-Host-Control (v0.44) is served.
-        "inbox_search_revision": INBOX_REVISION,
-        "inbox_search_results": None,  # None: the same ranking as the control search
+        # A manually configured client gets the same current catalog.
+        "headerless_search_revision": REVISION,
+        "headerless_search_results": None,  # None: the same ranking as the control search
         "get_is_error": False,
         "get_runbook": {"id": "daintree.terminals.rename", "instructions": "1. List them."},
         "get_supporting": [{"id": "daintree.foundation", "instructions": "Shared judgement."}],
@@ -108,12 +107,6 @@ class _Handler(BaseHTTPRequestHandler):
                     "status": d["ready"],
                     "catalog_revision": d["catalog_revision"],
                     "runbooks": d["runbooks"],
-                    **(
-                        {"inbox_catalog_revision": d["inbox_catalog_revision"]}
-                        if d["inbox_catalog_revision"] is not None
-                        else {}
-                    ),
-                    "inbox_runbooks": d["runbooks"],
                 },
             )
         elif path == "/version":
@@ -136,8 +129,8 @@ class _Handler(BaseHTTPRequestHandler):
             return
         method = message.get("method")
         control = (self.headers.get("Daintree-Host-Control") or "").strip() == "1"
-        connected = control and (self.headers.get("Daintree-Hosts") or "").strip() == "connected"
-        revision = d["search_revision"] if control else d["inbox_search_revision"]
+        connected = (self.headers.get("Daintree-Hosts") or "").strip() == "connected"
+        revision = d["search_revision"] if control else d["headerless_search_revision"]
         if method == "initialize":
             result: dict[str, Any] = {
                 "protocolVersion": d["protocol_version"],
@@ -150,7 +143,9 @@ class _Handler(BaseHTTPRequestHandler):
             structured = {
                 "catalog_revision": revision,
                 "runbook": d["get_runbook"],
-                "supporting_runbooks": d["get_supporting_connected" if connected else "get_supporting"],
+                "supporting_runbooks": d[
+                    "get_supporting_connected" if connected else "get_supporting"
+                ],
             }
             result = {
                 "content": [{"type": "text", "text": json.dumps(structured)}],
@@ -160,8 +155,8 @@ class _Handler(BaseHTTPRequestHandler):
         elif method == "tools/call":
             limit = message["params"]["arguments"].get("max_results", 3)
             runbooks = d["search_results"]
-            if not control and d["inbox_search_results"] is not None:
-                runbooks = d["inbox_search_results"]
+            if not control and d["headerless_search_results"] is not None:
+                runbooks = d["headerless_search_results"]
             # Honours the limit the way the real tool does, unless a mutation
             # has put more results in than any limit allows.
             if len(runbooks) <= 3:
@@ -173,8 +168,14 @@ class _Handler(BaseHTTPRequestHandler):
                 "isError": d["search_is_error"],
             }
         else:
-            self._send(200, {"jsonrpc": "2.0", "id": message.get("id"),
-                             "error": {"code": -32601, "message": "Method not found"}})
+            self._send(
+                200,
+                {
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "error": {"code": -32601, "message": "Method not found"},
+                },
+            )
             return
         self._send(200, {"jsonrpc": "2.0", "id": message.get("id"), "result": result})
 
@@ -203,9 +204,7 @@ def _run(*args: str, path: str | None = None) -> subprocess.CompletedProcess[str
     )
 
 
-def _run_against(
-    deployment: dict[str, Any], *extra: str
-) -> subprocess.CompletedProcess[str]:
+def _run_against(deployment: dict[str, Any], *extra: str) -> subprocess.CompletedProcess[str]:
     """The real script against a live fixture, with the release's expectation.
 
     `--expect-build-sha` is what `cloudbuild.yaml`'s smoke step passes, so it is
@@ -259,9 +258,12 @@ _MUTATIONS = [
         {"tools": ["search_runbooks", "get_runbook", "load_runbook"]},
     ),
     ("exact retrieval reports an error", {"get_is_error": True}),
-    ("a v0.44 caller is served the control catalog", {"inbox_search_revision": REVISION}),
-    ("a v0.44 caller's search ranks nothing", {"inbox_search_results": []}),
-    ("readiness names no inbox catalog", {"inbox_catalog_revision": None}),
+    (
+        "a headerless caller is served another catalog",
+        {"headerless_search_revision": OTHER_REVISION},
+    ),
+    ("a headerless caller's search ranks nothing", {"headerless_search_results": []}),
+    ("readiness names no catalog", {"catalog_revision": None}),
     (
         "a connected host-control caller is not sent the hosts foundation",
         {"get_supporting_connected": [{"id": "daintree.foundation", "instructions": "x"}]},
@@ -308,9 +310,7 @@ _MUTATIONS = [
     ),
     (
         "the right runbook ranks first but would not be loaded",
-        {
-            "search_results": [{"id": "daintree.terminals.rename", "selected": False}]
-        },
+        {"search_results": [{"id": "daintree.terminals.rename", "selected": False}]},
     ),
     ("search and readiness disagree on the catalog", {"search_revision": "sha256:other"}),
     ("the endpoint grew a session GET", {"mcp_get_status": 200}),
@@ -335,7 +335,10 @@ def test_a_response_value_is_compared_as_data_never_run_as_code(tmp_path: Path) 
     (or Cloud Build's) credentials."""
     marker = tmp_path / "pwned"
     payload = f"x' or __import__('pathlib').Path({str(marker)!r}).touch() or '"
-    deployment = {**_healthy_deployment(), "catalog_revision": payload, "search_revision": payload}
+    deployment = {
+        **_healthy_deployment(), "catalog_revision": payload, "search_revision": payload,
+        "headerless_search_revision": payload,
+    }
     result = _run_against(deployment)
     assert not marker.exists(), result.stdout
     assert result.returncode == 0, result.stdout
@@ -372,9 +375,7 @@ def test_the_identity_token_rides_every_request(tmp_path: Path) -> None:
         'case "$*" in *"print-identity-token"*) echo tok-under-test ;; esac\n',
     )
     with _serve(_healthy_deployment()) as (url, seen):
-        result = _run(
-            "--url", url, "--expect-build-sha", BUILD_SHA, "--identity-token", path=path
-        )
+        result = _run("--url", url, "--expect-build-sha", BUILD_SHA, "--identity-token", path=path)
     assert result.returncode == 0, result.stdout + result.stderr
     assert seen, "the fixture saw no requests"
     assert set(seen) == {"Bearer tok-under-test"}, seen
@@ -422,9 +423,7 @@ def test_a_discovered_url_is_smoked(tmp_path: Path) -> None:
         pytest.param(["https://assistant.daintree.org"], id="a_positional_url"),
     ],
 )
-def test_the_smoke_refuses_an_argument_it_cannot_honour(
-    args: list[str], tmp_path: Path
-) -> None:
+def test_the_smoke_refuses_an_argument_it_cannot_honour(args: list[str], tmp_path: Path) -> None:
     """Exit 2, before any request.
 
     A BLANK value is the case worth executing rather than grepping. The natural

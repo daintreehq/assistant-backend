@@ -215,21 +215,6 @@ cases:
       required: [daintree.hosts.rebalance-load]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: perf-hosts-reverse-check-usage-limits
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Agent allowance left per machine. Decided by check-usage-limits's "how much Claude
-      Code or Codex allowance each Remote Host this Shell reaches has left".
-    messages:
-      - role: user
-        content: Which of my machines has the most Claude usage left?
-    expect:
-      required: [daintree.hosts.check-usage-limits]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
-  # Control twins (issue #159): the same requests against the control catalog,
-  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
   - id: perf-hosts-reverse-check-usage-limits-control
     category: routing-trap
     host_model: control

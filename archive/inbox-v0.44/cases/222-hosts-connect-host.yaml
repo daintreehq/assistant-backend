@@ -1,0 +1,49 @@
+# daintree.hosts.connect-host: the person adds another Mac or Linux machine to Daintree as a
+# Remote Host through Settings → Hosts (SSH check, exact-build install or update, Host mode),
+# or gets an added host that will not connect working again, with messaging and
+# assistant-start consent left as they chose. Recall cases in agent and user words (the
+# issue's three requests among them), a routing trap per declared neighbour where this
+# runbook wins, and reverse traps where the neighbour wins and this one must not ride along:
+# the hosts foundation (messaging on a host already added), daintree.diagnostics (Daintree's
+# own health here), daintree.worktree.manage-resource (a worktree's cloud devbox),
+# daintree.hosts.delegate-to-host (work for a connected host), daintree.hosts.start-swarm
+# (assistants readied on hosts already added) and a dev server, which is
+# daintree.terminals.run-visible-command. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: connect-host-onboard-before-messaging
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Onboarding a host and reporting readiness before messaging is this runbook's
+      deliverable: "first-host onboarding" and "The deliverable is the host saved and
+      connected, its projects listed here, and messaging and assistant-start consent left as
+      the person chose". A Remote Host is not "a worktree's cloud devbox or remote resource
+      (daintree.worktree.manage-resource)", which must not ride along; the hosts foundation
+      may, as the domain foundation.
+    messages:
+      - role: user
+        content: Onboard the first Remote Host on this Shell through Settings and report what is ready before messaging is enabled
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: connect-host-reverse-ready-lanes-is-start-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap. The hosts are already added; an assistant ready on each before work goes
+      out is start-swarm's ("Claude Code or Codex ready on every Remote Host" and
+      "bootstrapping each host's assistant lane"). Nothing is added as a host, so this
+      runbook ("ANOTHER MAC OR LINUX MACHINE added to Daintree as a Remote Host") must not
+      ride along.
+    messages:
+      - role: user
+        content: all three machines are already hosts here; line up one claude assistant on each for this repo, no work yet
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

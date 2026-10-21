@@ -1,14 +1,6 @@
-# daintree.hosts.swarm-fan-out: the hub sends the SAME work to the assistant on every chosen
-# Remote Host at once, each on its own run branch, ends the turn, and brings back one table
-# with a row per host, each result verified by artifact and any host still open named as open.
-#
-# Positives are invented situations in agent and user words, short and long, some with a
-# social lead-in or an earlier turn. Boundaries are requests this runbook wins against a
-# neighbour whose vocabulary they share: one host (delegate), readiness only (start-swarm), a
-# per-host table of usage (check-usage-limits), a question (ask-host-assistant), work already
-# sent (recover-and-clean-up), the lane's side (handle-hub-message), and local fan-out,
-# competition and the generic local runbooks the starting sweep picked. Topic shifts are the
-# work going out after a readiness or usage turn. Machine names are generic.
+# daintree.hosts.swarm-fan-out: Send the same work to every remote host
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.swarm-fan-out.md
+
 runbook: daintree.hosts.swarm-fan-out
 run: runbook-2026-10-issue-92
 
@@ -38,7 +30,6 @@ positives:
   - Each connected Remote Host's assistant should take the same cursor-based listing change on its own branch; the user wants the per-host branch, commit and test outcome once all replies are in
   - The user wants the null-check fix tried on all four Remote Hosts at once and every reported commit confirmed before anyone calls it done
   - Three named remote hosts should each build the webhook retry change, Claude Code on two and Codex on the third, with a row per host at the end
-  - The person wants the same caching experiment run by the assistant on each enrolled host in this project, with each host's branch and results gathered as they come in
   - Have each Remote Host's assistant build the same markdown preview prototype on its own branch and check every reported SHA on the shared remote
   - The user wants every remote machine to attempt the same router refactor independently and see the branches and checks each one reports in a table
   - Put the cron parser task on every Remote Host's assistant, a branch per host, and report which hosts answered, which are still open, and what each verified
@@ -67,11 +58,6 @@ positives:
       commit for each one.
   - do the timezone bug on every machine, but codex on the ones without a claude login, and nothing gets pushed
   - 'you''re a star. alright, same spike on all three hosts now: swap the json parser for orjson, a branch per host'
-  - query: >-
-      Three hosts are connected and each has an enrolled lane in the web project. The person
-      wants the same accessibility fix applied on each so they can look at the diffs later:
-      every host gets its own branch from the current main commit, no pushing, and the report
-      says which hosts finished, with commit and test output per host.
   - I want the minis to all implement the feature flag, a branch apiece, commits back to me
   - run the formatter fix on all my remote hosts and bring back each machine's commit
   - thanks for setting that up! now get every host to write the url shortener exercise on its own branch
@@ -93,11 +79,6 @@ boundaries:
   - query: Send the same bug fix brief to all three remote hosts' assistants instead of one, and verify each commit
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: the assistants are ready on every host, now hand them all the same task, the webhook signature check
-    confusable_with: [daintree.hosts.delegate-to-host]
-  - query: good, then the logging refactor goes to all three, separate branches
-    history:
-      - 'user: are the assistants up on the other boxes?'
-      - 'assistant: Yes, all three hosts have an assistant enrolled in this project.'
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: have every host run the code generator and report back a table of the commits, one row per machine
     confusable_with: [daintree.agents.check-usage-limits]
@@ -123,12 +104,8 @@ boundaries:
     confusable_with: [daintree.orchestration.competition]
   - query: from my desk mac, get the remote boxes' assistants all building the docs site generator and let me know what each comes back with
     confusable_with: []
-  - query: from the Shell I'm on, broadcast the dependency bump to every enrolled lane and list what each one committed
-    confusable_with: []
   - query: swarm the remote hosts with this task, the same brief for each machine
     confusable_with: [daintree.orchestration.multi-agent]
-  - query: I want the importer written on all of my remote boxes, each lane making its own worktree, and the commits listed for me
-    confusable_with: []
   - query: "split the same job across every remote host, each one doing all of it on its own branch"
     confusable_with: [daintree.hosts.place-work]
     run: runbook-2026-10-issue-93

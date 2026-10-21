@@ -80,19 +80,6 @@ cases:
       required: [daintree.runtime.free-busy-port]
       optional: [daintree.foundation]
 
-  - id: fbp-hosts-lane-request-from-hub
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      An enrolled lane relaying the hub's request about its own machine. Decided by "on this
-      machine or a Remote Host" and "who holds the port and on which machine".
-    messages:
-      - role: user
-        content: The hub asked me to find what is holding port 3000 on this machine so the worktree server can start
-    expect:
-      required: [daintree.runtime.free-busy-port]
-      optional: [daintree.foundation]
-
   - id: fbp-hosts-remote-vs-local-same-number
     category: single-runbook
     note: >-
@@ -187,20 +174,6 @@ cases:
         content: the host's server answers on its own machine, but the port this laptop forwards to it is busy here; who holds it?
     expect:
       required: [daintree.runtime.free-busy-port]
-      optional: [daintree.foundation]
-
-  - id: fbp-hosts-trap-reverse-messaging-setup
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse: switching messaging on is the hosts foundation's "how to switch it on"; the
-      ports are only what the person means to ask about later, so free-busy-port must not ride
-      along.
-    messages:
-      - role: user
-        content: messaging with the other Mac's assistant is switched off; how do I turn it on so I can ask it about its ports?
-    expect:
-      required: [daintree.hosts.foundation]
       optional: [daintree.foundation]
 
   - id: fbp-hosts-trap-bare-port-not-issue

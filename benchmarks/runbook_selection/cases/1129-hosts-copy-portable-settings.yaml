@@ -221,19 +221,6 @@ cases:
     - daintree.hosts.diagnose-host-differences
     optional:
     - daintree.hosts.foundation
-- id: copy-portable-settings-reverse-survey-hosts
-  host_model: inbox
-  category: routing-trap
-  note: 'A host-by-host status report. The neighbour''s text: "The deliverable is ONE read-only report,
-    host by host".'
-  messages:
-  - role: user
-    content: 'Give me a read-only report on each Remote Host: its connection, load and open exchanges.'
-  expect:
-    required:
-    - daintree.hosts.survey-hosts
-    optional:
-    - daintree.hosts.foundation
 - id: copy-portable-settings-reverse-project-memory
   category: routing-trap
   note: 'A durable rule for the host''s assistant. The neighbour''s text: "Use when the user wants something
@@ -263,19 +250,6 @@ cases:
   expect:
     required:
     - daintree.hosts.undo-swarm-changes
-    optional:
-    - daintree.hosts.foundation
-- id: copy-portable-settings-reverse-start-swarm
-  host_model: inbox
-  category: routing-trap
-  note: 'Readying assistants on hosts. The neighbour''s text: "Use when the user wants a swarm SET UP
-    across their other machines before handing out work".'
-  messages:
-  - role: user
-    content: Bootstrap an assistant for this project on each of my remote hosts and report which are ready.
-  expect:
-    required:
-    - daintree.hosts.start-swarm
     optional:
     - daintree.hosts.foundation
 - id: copy-portable-settings-match-host-defaults

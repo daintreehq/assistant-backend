@@ -56,8 +56,6 @@ positives:
     run: runbook-2026-10-issue-138
   - query: 'morning! quick one: the other machines are done testing, now just the release host should deploy v2.2.1 to staging and tell me what''s live'
     run: runbook-2026-10-issue-138
-  - query: The inbox exchange asks this lane to deploy a pinned SHA to the staging environment and report what is serving. The lane's cloud login may belong to another project than the one the hub named; check before deploying, and ask back if it differs.
-    run: runbook-2026-10-issue-138
   - query: make sure only one host ever runs the production deploy for this release, the rest just build and verify
     run: runbook-2026-10-issue-138
   - query: Production deploy of 8c2d1ab from the designated host please. It has to be the one machine with the production login; the other two just finished verifying and must not deploy.

@@ -1,0 +1,45 @@
+# daintree.hosts.steer-swarm: the hub stopping or correcting a run it already sent to one or
+# several Remote Hosts. Messages no host has read are withdrawn; each host that has read its
+# task gets a scoped stop or correction for its own assistant to carry out; every host is
+# reported as acknowledged, already finished, unresolved or disconnected from its assistant's
+# answer, never from a canceled record.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, and
+# one case per situation the procedure has to get right (a host offline, a cancel already
+# pressed, one host of several, a correction to one host). Traps: this runbook wins against the
+# receiving machine's own steering (daintree.hosts.steer-for-hub), local steering
+# (daintree.agents.steer-running-agent), local parking (daintree.orchestration.park-work),
+# sending work (daintree.hosts.delegate-to-host, daintree.hosts.swarm-fan-out) and catching up
+# or cleaning up (daintree.hosts.recover-and-clean-up); and the reverse traps, where each
+# neighbour keeps its own request and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: steer-swarm-cancel-is-not-a-stop
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A cancel already pressed is not evidence the workers stopped: "STOPPED, CALLED OFF or
+      CHANGED while it is under way" and "each worker's state as its answer gives it". At base
+      a similar line went to daintree.agents.recover-agent.
+    messages:
+      - role: user
+        content: I hit cancel on the remote exchanges an hour ago, did the agents on those machines actually stop? Find out and stop any that didn't.
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: steer-swarm-trap-lane-side
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse: the receiving machine's assistant stopping the agents it launched for the hub.
+      steer-for-hub owns "Use on a Remote Host's lane to STOP, PAUSE or CHANGE the work of the
+      AGENTS it launched for one of the hub's runs"; this runbook fences "on the receiving
+      machine itself (daintree.hosts.steer-for-hub)".
+    messages:
+      - role: user
+        content: The hub called off its run; halt the two agents I launched for it on this machine and tell the hub where each one got to.
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

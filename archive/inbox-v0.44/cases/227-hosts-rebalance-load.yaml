@@ -1,0 +1,37 @@
+# daintree.hosts.rebalance-load: the hub relieves pressure across a swarm ALREADY RUNNING on
+# the Remote Hosts. One host is overloaded (swapping, hot, pegged, too many agents) or
+# unavailable, or its agent CLI is out of allowance: its own assistant runs fewer agents and
+# holds what it has not started, and only that unstarted work moves to hosts with room, with a
+# reading before and after. Recall cases are the issue's three requests plus agent- and
+# user-phrased outcomes and an unavailable host. Routing traps: this runbook wins against each
+# declared neighbour. Reverse traps: the neighbour wins and this runbook must not ride along.
+# The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: rebalance-load-unavailable-host
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The unavailable-host scenario. Decided by "a host dropped out mid-run" and "only that
+      unstarted work placed on hosts with room".
+    messages:
+      - role: user
+        content: one of the swarm hosts went offline; several units the hub had queued for it were never sent, spread those across the remaining hosts
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------- routing traps
+  - id: check-usage-limits-not-rebalance-load
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A usage read with nothing moved. check-usage-limits's "how much Claude Code or Codex
+      allowance each Remote Host this Shell reaches has left".
+    messages:
+      - role: user
+        content: For the swarm hosts, read off what each one's Codex usage screen says right now, one row per machine.
+    expect:
+      required: [daintree.hosts.check-usage-limits]
+      optional: [daintree.hosts.foundation]

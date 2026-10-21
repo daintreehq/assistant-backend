@@ -1,20 +1,6 @@
-# daintree.hosts.park-swarm: the hub parking a run on the Remote Hosts for later and resuming it.
-# Each host's own assistant stops its agents with their work left in place; the hub keeps a
-# resume record (per host and unit: lane, ids, branch, HEAD, pushed or not, uncommitted files,
-# panes, open questions, what must not be redone, which hosts never acknowledged) where the
-# person chooses, and a later hub session resumes the run from fresh host task records with no
-# second agent on any unit.
-#
-# Rows: park and resume requests in people's own words and as hub agents describe them, with
-# the situations the procedure handles (a host that never answers, the hub or a host restarting
-# while parked, a record kept in the person's notes, a resume after days away); followups after
-# the run's state has been read; and boundaries against stopping or changing a run with no
-# comeback (daintree.hosts.steer-swarm), parking agents on this machine
-# (daintree.orchestration.park-work), catching up after a restart
-# (daintree.hosts.recover-and-clean-up), the receiving machine stopping its own agents
-# (daintree.hosts.steer-for-hub), a local durable plan
-# (daintree.orchestration.execute-durable-workflow) and a worktree's remote resource
-# (daintree.worktree.manage-resource), each with reverse rows in that neighbour's file.
+# daintree.hosts.park-swarm: Park a run on the Remote Hosts for later and resume it
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.park-swarm.md
+
 runbook: daintree.hosts.park-swarm
 run: runbook-2026-10-issue-111
 
@@ -23,11 +9,9 @@ positives:
   - hold the swarm where it is till monday
   - put the distributed refactor on my other machines to bed for tonight, we carry on tomorrow
   - I'm off for two weeks. Put everything the other machines are working on on hold and leave me a record I can hand back to you when I return.
-  - 'Hub task: suspend the multi-host migration at a safe point on each Remote Host, capture per host the lane, branch, commit and uncommitted files, and leave a resume record that survives a Daintree restart.'
   - The mac mini and the linux box are both halfway through the refactor and I have to power this machine down for a hardware swap. Freeze their work and tell me how to restart it afterwards.
   - Before tonight's power maintenance, park the cross-machine test sweep so nothing is lost and we can continue tomorrow.
   - can we pause the remote agents over the weekend? keep their branches and whatever is uncommitted, I want to carry on next week
-  - 'Agent task: put the fan-out on both remote hosts on hold with a per-host checkpoint (lane, branch, SHA, pushed or not, dirty files) and list the hosts that did not confirm.'
   - park the run on the other boxes. one of them might be asleep, mark it as unconfirmed instead of parked
   - write me a resume record for the parallel run on my servers and get each of them to stop where it is
   - Pausing the three-host build until morning. Record where each machine is so you can pick it back up even if Daintree restarts.
@@ -37,7 +21,6 @@ positives:
   - thanks for all the help today! one last thing, park the work on my other machines so we can resume in the morning
   - I need to stop the remote experiment for now without losing it. Leave a record of each host's progress for when I come back.
   - The hub is about to install an update and restart. Checkpoint the run on the remote hosts first so we can carry on afterwards.
-  - 'Task: park in-flight remote-host work across two hosts with resumable checkpoints. Record the goal, allowed writes, lane addresses, task ids, cursors, branches and SHAs, open questions and a do-not-repeat list.'
   - park the swarm and tell me which machines didn't answer
   - stop my remote agents for the evening but leave their worktrees and panes so we can resume tomorrow
   - get every host to a checkpoint and give me a resume prompt I can paste in tomorrow
@@ -53,22 +36,12 @@ positives:
   - Snapshot the state of the run on my Remote Hosts and put it on hold. I want the resume file in my notes folder, not in the repo.
   - shelve the cross-host benchmark run until the new hardware arrives, with enough notes to restart it
   - park everything the hosts are doing for the holiday break, nothing deleted, nothing pushed
-  - >-
-    Hub: the person is leaving for the weekend. Bring each lane's agents in the current run to a
-    stop with their work in place, gather every host's branch, HEAD and uncommitted files, mark
-    any host that does not confirm, and save a record outside the repository that a new hub
-    session can resume from.
   - Daintree crashed overnight. Resume the run I parked on the remote hosts yesterday; the resume notes are in my notes folder.
   - pick the parked swarm back up
   - the remote run we put on hold on friday, start it again from where each machine stopped, and don't start a second agent anywhere
   - "Resume a parked cross-host run from its saved record after a hub restart: re-read the hosts' task records, check each branch and commit on the remote, then send each host its continuation."
   - continue the swarm I paused last night
   - one of the hosts rebooted while the run was parked. resume everything, but check that machine's work is still there first
-  - >-
-    The hub restarted after an OS update. A two-host run was parked yesterday and its record is
-    saved in the person's notes; the earlier exchanges will not wake us. Rebuild state from the
-    hosts' task records and the record, verify branches on the remote, and resume each host
-    without duplicating agents.
   - Good morning! Let's get the cross-machine refactor going again from where we parked it.
   - resume the parked remote run, but the host that never confirmed the pause comes first, find out if it's still working
   - unpause the work on my other machines from the checkpoint we made before the weekend
@@ -165,8 +138,6 @@ boundaries:
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: as the hub, have every host pause the agents it launched for the run and report back, so we can resume later
     confusable_with: []
-  - query: tell the lanes to stop their agents at a safe point tonight and record what each has, we continue tomorrow
-    confusable_with: [daintree.orchestration.park-work]
   - query: make a restart-proof checkpoint of the multi-machine run and pause it
     confusable_with: [daintree.orchestration.execute-durable-workflow]
   - query: keep the remote run's state in a record I can resume from after the hub restarts, and put it on hold now

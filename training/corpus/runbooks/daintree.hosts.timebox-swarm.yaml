@@ -1,17 +1,6 @@
-# daintree.hosts.timebox-swarm: the hub giving its Remote Hosts a fixed time on a task. Each
-# host's assistant enforces its own deadline on its own machine; the hub sends one bounded brief
-# per host, ends its turn and reports a row per host at the bound with that host's times and
-# partial work: finished early, stopped by the deadline, stopped late, blocked, unconfirmed.
-#
-# Rows: bounded attempts on one or several hosts in people's own words and as hub agents
-# describe them (short and long, with a social lead-in, with history), pre-launch "can they
-# enforce it" requests, explanation questions with docs: true; boundaries against a local time
-# box (daintree.orchestration.timebox-attempt), unbounded sends (daintree.hosts.swarm-fan-out,
-# daintree.hosts.delegate-to-host), stopping a run already sent (daintree.hosts.steer-swarm),
-# deferred starts (daintree.orchestration.watch-outcome), following an unbounded run
-# (daintree.hosts.supervise-swarm), parking (daintree.hosts.park-swarm)
-# and catching up (daintree.hosts.recover-and-clean-up), each with reverse rows in that
-# neighbour's file; followups at the bound.
+# daintree.hosts.timebox-swarm: Give the Remote Hosts a fixed time on a task, then collect how far each got
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.timebox-swarm.md
+
 runbook: daintree.hosts.timebox-swarm
 run: runbook-2026-10-issue-152
 positives:
@@ -109,12 +98,6 @@ positives:
     it up for a 15 minute try at the bug', docs: true}
 - {query: 'how does a time limit work when I send work to my remote hosts? give them twenty minutes
     on the export fix', docs: true}
-- query: ok, give them twenty minutes at it and then stop them
-  history:
-    - 'user: are the two Remote Hosts ready to attempt the malformed-date parsing fix?'
-    - 'assistant: Both have an enrolled assistant in this repository; no work has been sent.'
-  active: [daintree.hosts.delegate-to-host]
-  run: 2026-10-16-synthetic-audit
 boundaries:
 - query: have each remote host try the caching idea for ten minutes, not an agent on this machine
   confusable_with: [daintree.orchestration.timebox-attempt]

@@ -1,0 +1,209 @@
+# daintree.hosts.integrate-for-hub: a Remote Host's lane chosen by the hub as integrator. It
+# merges the exact commits the hub pinned from other hosts' and units' branches, in the hub's
+# order, into one new integration branch here through a visible integrator agent, hands a
+# conflict or a missing commit back to the hub, and replies with the resulting SHA.
+#
+# Recall: the issue's three requests, an agent-phrased outcome, and the situations the
+# procedure has to get right (a source branch that moved past its pin, a conflict the brief
+# gives no rule for). Traps where this runbook wins over a declared neighbour: one new unit
+# (daintree.hosts.do-delegated-work), a test run (daintree.hosts.verify-for-hub), the person's
+# own local merge (daintree.git.integrate-agent-branches) and the hub's side
+# (daintree.hosts.integrate-host-branches); the envelope (daintree.hosts.handle-hub-message) may ride
+# along, as with every receiver task. Reverse traps where a close neighbour wins and this
+# runbook must not ride along: local integration, one unit, a test-only run, and a question
+# back to the hub.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: integrate-for-hub-issue-exact-commits
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's first request. The positive clause quotes it ("integrate these exact commits
+      from the other hosts"). Before this runbook it selected
+      daintree.hosts.handle-hub-message with daintree.hosts.verify-for-hub.
+    messages:
+      - role: user
+        content: The hub asked me to integrate these exact commits from the other hosts.
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-issue-recorded-shas
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's second request, quoted in the positive clause ("combine the named swarm
+      branches at their recorded SHAs"). Before this runbook it selected the local
+      daintree.git.integrate-agent-branches.
+    messages:
+      - role: user
+        content: "Hub message: combine the named swarm branches at their recorded SHAs."
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-issue-remote-artifacts
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's third request, receiver shorthand, quoted in the positive clause ("integrate
+      remote artifacts in this lane's project"). Before this runbook it selected
+      daintree.hosts.delegate-to-host, daintree.edits.spawn-visible-agent and
+      daintree.hosts.do-delegated-work; those two still ride along on the shipped selector
+      (retrain owed).
+    messages:
+      - role: user
+        content: "Receiver: integrate remote artifacts in the lane's own project."
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How a lane describes the task to search. "a visible integrator agent merges each pinned
+      commit (never a branch's newer tip) one at a time with checks after each".
+    messages:
+      - role: user
+        content: Integrate the commits the hub pinned from three hosts' unit branches into a new integration branch on this lane, checking after each merge, and reply with the resulting SHA
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-moved-source
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A source branch moved after the hub pinned it: "merges each pinned commit (never a
+      branch's newer tip)".
+    messages:
+      - role: user
+        content: The hub pinned the cache unit at its commit but that host pushed again afterwards; integrate the pinned one and tell the hub the branch moved.
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-conflict-escalated
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A conflict between the hub's inputs with no rule in the brief: "a merge conflict the brief
+      does not settle or an acceptance clash goes back as a question, never resolved by
+      guessing". The shipped
+      selector also loads daintree.git.resolve-semantic-conflict, which would settle the clash
+      here; a fence there raised it on this request instead (measured twice), so the boundary
+      is left to corpus rows and the retrain.
+    messages:
+      - role: user
+        content: Two of the hub's pinned inputs conflict when merged into the integration branch, and the brief gives no rule for it; ask the hub.
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps: this runbook wins
+  - id: integrate-for-hub-handles-the-integration
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub's message names the integration, so the work's owner is required and the
+      envelope may ride for the reply; the local owner and the one-unit runbook must not.
+      Decided by "Use when the hub has chosen this lane as its integrator".
+    messages:
+      - role: user
+        content: The hub's message lists the unit commits to combine here; handle the integration it asks for and answer with the merged head.
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-not-one-unit
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Nothing new to build: finished units merged together, not "a unit built from scratch
+      (daintree.hosts.do-delegated-work)".
+    messages:
+      - role: user
+        content: "Nothing to implement: the hub only wants the units other hosts already finished merged together into one integration branch here."
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-not-verify
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Merging comes first, so this is not "checks alone (daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: "Not a test-only request: the hub wants its pinned commits merged into one branch here before anything is run."
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-not-local
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub asks, not the person here: not "the person's own local merge
+      (daintree.git.integrate-agent-branches)".
+    messages:
+      - role: user
+        content: "It's the hub asking, not me: merge the branches the other machines pushed, at the hashes in its message."
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-not-hub-side
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      This machine is the lane doing the integration, not "the hub's side
+      (daintree.hosts.integrate-host-branches)".
+    messages:
+      - role: user
+        content: I'm the lane the hub chose to integrate on; merge the commits it listed and report back.
+    expect:
+      required: [daintree.hosts.integrate-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps: the neighbour wins
+  - id: integrate-for-hub-trap-one-unit
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      One new unit to build: daintree.hosts.do-delegated-work ("when the hub asks THIS machine
+      to implement, fix or build something as one unit of work").
+    messages:
+      - role: user
+        content: The hub's unit for this host is a new audit log endpoint written from scratch on its branch, then the commit back.
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-trap-verify
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      An already-merged commit to test, nothing combined here: daintree.hosts.verify-for-hub
+      ("when the hub asks this lane to TEST or VERIFY a commit or branch here").
+    messages:
+      - role: user
+        content: The hub wants the merged release commit another host produced put through the test suite here, nothing combined on this machine.
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: integrate-for-hub-trap-question-back
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub's message is unclear, so the deliverable is a question back, not an integration:
+      daintree.hosts.handle-hub-message ("ask the hub what it meant").
+    messages:
+      - role: user
+        content: The hub's message is unclear about which repository it wants combined; ask it back before doing anything.
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]

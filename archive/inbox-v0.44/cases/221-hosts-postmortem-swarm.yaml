@@ -1,0 +1,237 @@
+# daintree.hosts.postmortem-swarm: the hub explaining WHY a finished run on the Remote Hosts went
+# wrong or disappointed. It rebuilds a per-unit timeline from the exchange records (the hosts' own
+# clocks, unobserved moments marked), checks each host's claim by branch and SHA, names the first
+# evidenced divergence and the causes by class, and proposes fixes with a way to reproduce each. It
+# resends, restarts, cancels, cleans up and files nothing.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, and the
+# seeded failure the live check uses (a person's slow approval beside a wrong-SHA report), plus one
+# hunch-first phrasing the shipped selector does not yet carry (retrain owed). Traps: this runbook
+# wins against a post-mortem of one local agent (daintree.agents.postmortem-run), following a run
+# (daintree.hosts.supervise-swarm), catching up (daintree.hosts.recover-and-clean-up), a messaging
+# gate (daintree.hosts.diagnose-messaging), the same code differing between hosts
+# (daintree.hosts.diagnose-host-differences) and a production incident
+# (daintree.debug.investigate-outage); and the reverse traps, where each neighbour keeps its own
+# request and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: postmortem-swarm-issue-exchange-timeline
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "Use on the hub when a run on the Remote Hosts is OVER
+      and went badly, and the person wants the post-mortem". At base it selected
+      daintree.debug.investigate-outage, daintree.agents.postmortem-run and
+      daintree.hosts.supervise-swarm.
+    messages:
+      - role: user
+        content: Investigate a failed swarm run from the exchange timeline and artifact evidence
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-issue-stall-or-twice
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "why it took so long, stalled or did the same work
+      twice". At base it selected daintree.orchestration.status-and-resume.
+    messages:
+      - role: user
+        content: Why did the cross-host workflow stall or do the same work twice?
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-issue-preserve-partial
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "The deliverable is the evidence" and "salvageable
+      commits and leftovers listed". At base it selected
+      daintree.orchestration.multi-agent.
+    messages:
+      - role: user
+        content: Produce an evidence-based swarm post-mortem, preserving partial results.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-agent-phrased-wrong-commit
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How a hub agent describes the task: a finished run, one wrong commit, one silent host, the
+      records and what each host said as the evidence. Decided by "each host's claim checked by
+      branch and SHA" and "fixes each with a reproducible scenario".
+    messages:
+      - role: user
+        content: >-
+          A finished job on three remote hosts delivered a wrong commit from one and nothing from
+          another. Reconstruct what happened from their task records and what each host said, and
+          give me fixes with a way to reproduce each.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-user-took-hours
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A person's own words after a bad run. Decided by "which hosts' reports turned out wrong" and "why it
+      took so long".
+    messages:
+      - role: user
+        content: >-
+          That run on my other machines took hours and one of them swore it pushed the fix. Work
+          out what really happened and where the time went.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-seeded-approval-and-wrong-sha
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The seeded failure of the live check: a person approving each host by hand and a host
+      reporting the wrong SHA. Decided by "whether the delay was a person approving each host by
+      hand or the machines".
+    messages:
+      - role: user
+        content: >-
+          A person had to approve each host by hand and the run sat waiting on them for hours. Now
+          that it is over, work out from the records how long each host waited and what was the
+          machines' fault.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-user-approval-hunch
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A hunch-first phrasing: a person suspects slow approvals and asks the records of the
+      finished run to settle it. Decided by "whether the delay was a person approving each
+      host by hand or the machines". The shipped selector sends it to daintree.hosts.steer-swarm,
+      the untrained neighbourhood; the corpus rows carry the lesson (retrain owed).
+    messages:
+      - role: user
+        content: >-
+          Did the delay on the remote machines come from someone approving each one by hand, or
+          from the machines? Check the task records of the finished run.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps: this runbook wins
+  - id: postmortem-swarm-trap-not-local-agent
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A run on remote hosts, not one agent here. Decided by "Use on the hub when a run on the
+      Remote Hosts is OVER", with "one agent on this machine (daintree.agents.postmortem-run)"
+      carved out.
+    messages:
+      - role: user
+        content: The run on the two remote machines ended badly. Explain it from the records, don't start any of it again.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-trap-not-supervise
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Every host has finished and nothing is to be followed. Decided by "following a run still
+      under way (daintree.hosts.supervise-swarm)" being carved out.
+    messages:
+      - role: user
+        content: The remote hosts are done, nothing is pending. Why did the run take three times as long as planned, and which host reports were false?
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-trap-not-recover-account
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Which reports were false and where the time went, not where exchanges stand. Decided by
+      "catching up or cleaning up (daintree.hosts.recover-and-clean-up)" being carved out.
+    messages:
+      - role: user
+        content: "Going through the failed run on two remote hosts: which of the hosts' reports were false, and where did the time go?"
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-trap-not-messaging-gate
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Messaging works again; the request is the account of the earlier run. Decided by "finding
+      which gate blocks messaging now (daintree.hosts.diagnose-messaging)" being carved out.
+    messages:
+      - role: user
+        content: Messaging is working again. I want a proper account of why the earlier run across the remote hosts failed, with the evidence.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-trap-not-host-differences
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The whole run reconstructed from records and the hosts' own words, not a reproduction of one
+      commit's behaviour. Decided by "reproducing why the same code behaves differently on two
+      hosts (daintree.hosts.diagnose-host-differences)" being carved out.
+    messages:
+      - role: user
+        content: >-
+          The run across the remote machines is finished and went wrong. This is not about whether
+          the same code behaves differently on two of them; trace where the exchange went wrong, who
+          claimed what, and the times.
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-trap-not-outage
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A finished run on the user's own machines, not production. Decided by "a production incident
+      (daintree.debug.investigate-outage)" being carved out.
+    messages:
+      - role: user
+        content: this isn't an outage, it's a finished run across my remote hosts that went wrong; explain it
+    expect:
+      required: [daintree.hosts.postmortem-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps: the neighbour wins
+  - id: postmortem-swarm-reverse-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      What became of work handed out before a restart stays with
+      daintree.hosts.recover-and-clean-up, which answers "where things stand with the work handed
+      to another machine"; no why is asked for.
+    messages:
+      - role: user
+        content: The hub restarted overnight. What happened to the work I handed the remote hosts, did any of it finish?
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: postmortem-swarm-reverse-messaging-gate
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A send refused right now is a gate to name, not a run to explain. It stays with
+      daintree.hosts.diagnose-messaging ("came back opted_out, paused, lane_unavailable").
+    messages:
+      - role: user
+        content: Sending to the second machine's assistant keeps coming back paused. Which gate is that and who fixes it?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation, daintree.foundation]

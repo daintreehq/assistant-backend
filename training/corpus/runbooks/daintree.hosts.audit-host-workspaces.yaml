@@ -1,18 +1,5 @@
-# daintree.hosts.audit-host-workspaces: the hub's read-only inventory of what one run left on its
-# Remote Hosts. Each host's own assistant inventories its own project (the local worktree audit plus
-# listeners and any configured remote resource), the hub classes every item safe, unsafe or unknown
-# from the evidence, names the hosts and projects it could not observe, and removes nothing.
-#
-# Rows: audit requests in people's own words and as hub agents describe them, with the situations the
-# procedure handles (dirty and unpushed work, a squash-merged branch, a server still listening, a
-# same-named worktree that belongs to someone else, a closed task, a host that could not be reached,
-# a retained cloud resource); followups after a run finished or after an earlier audit had gaps; and
-# boundaries against performing the cleanup (daintree.hosts.recover-and-clean-up), a lane's own
-# removal (daintree.hosts.clean-up-for-hub), the local audit (daintree.worktree.audit-worktrees),
-# local teardown (daintree.orchestration.workspace-cleanup), a why-do-hosts-differ diagnosis
-# (daintree.hosts.diagnose-host-differences) and catching up on earlier sessions
-# (daintree.orchestration.status-and-resume), each with reverse rows in that neighbour's file.
-# Lane-side rows (a host asked by the hub for the inventory) live in daintree.hosts.handle-hub-message.yaml.
+# daintree.hosts.audit-host-workspaces: Audit what a run left on the Remote Hosts, read-only
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.audit-host-workspaces.md
 
 runbook: daintree.hosts.audit-host-workspaces
 run: runbook-2026-10-issue-128
@@ -50,7 +37,6 @@ positives:
   - query: I think a server the run started is still up on the second machine. Find out, and tell me which worktree it belongs to, without stopping it.
   - query: can you tell me, per machine, what the parallel job created that is still there and whether any of it has unsaved work? I'm deciding tomorrow what to remove
   - query: The hosts' assistants did a lot of work for the run and I lost track. What did they leave in their projects, and what can't be judged without asking someone?
-  - query: 'Orchestrator note: the person wants the leftovers of run lint-sweep-3 on the Remote Hosts reviewed before anyone cleans anything. Have each enrolled host assistant report what it sees for the run, class the items by how risky removal is, and state the hosts that did not answer.'
   - query: Sort what the swarm left on my remote machines into things in use, things holding unpushed work, things that look finished and things you can't verify.
   - query: 'thanks! last thing on the swarm: an overview of the workspaces it left across the hosts, nothing removed, with who owns what'
   - query: now list what it left on them, read-only
@@ -161,10 +147,3 @@ boundaries:
     run: runbook-2026-10-issue-140
 
 topic_shifts:
-  - query: Now inventory the worktrees and listeners that run left on each Remote Host, with safe, unsafe or unknown verdicts. Remove nothing.
-    history:
-      - 'user: recover the remote exchanges after the laptop restart'
-      - 'assistant: Every exchange is accounted for and the run has ended.'
-    active: [daintree.hosts.recover-and-clean-up]
-    confusable_with: [daintree.hosts.recover-and-clean-up]
-    run: 2026-10-16-synthetic-audit

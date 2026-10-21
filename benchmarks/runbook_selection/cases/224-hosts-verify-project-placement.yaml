@@ -35,19 +35,6 @@ cases:
       required: [daintree.hosts.verify-project-placement]
       optional: [daintree.hosts.foundation]
 
-  - id: verify-project-placement-repository-revision-identity
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      The issue's third request, in an agent's words. Decided by the deliverable "its
-      remote URLs against ours, its full commit SHA against the one wanted".
-    messages:
-      - role: user
-        content: Verify repository and revision identity for selected host/project lanes.
-    expect:
-      required: [daintree.hosts.verify-project-placement]
-      optional: [daintree.hosts.foundation]
-
   - id: verify-project-placement-agent-compare-each-host
     category: single-runbook
     note: >-
@@ -258,18 +245,6 @@ cases:
         content: Which remote does the project on the laptop host point at? Ask its assistant.
     expect:
       required: [daintree.hosts.ask-host-assistant]
-      optional: [daintree.hosts.foundation]
-
-  - id: verify-project-placement-reverse-start-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Readying assistants. start-swarm: "Claude Code or Codex ready on every Remote Host".
-    messages:
-      - role: user
-        content: Get an assistant ready in our project on every remote host.
-    expect:
-      required: [daintree.hosts.start-swarm]
       optional: [daintree.hosts.foundation]
 
   - id: verify-project-placement-reverse-diagnose-host-differences

@@ -1,18 +1,6 @@
-# daintree.hosts.rebalance-load: the hub relieves pressure across a swarm ALREADY RUNNING on
-# the Remote Hosts. One host is overloaded (swapping, hot, pegged, too many agents), has dropped
-# out, or its agent CLI is out of allowance while others have room: the hub reads dated per-host
-# load, has the pressured host's own assistant run fewer agents and hold what it has not started,
-# moves only that unstarted work to hosts with room (never anything already running), and
-# compares a second reading.
-#
-# Positives are invented situations in agent and user words, short and long, some with a
-# social lead-in, a constraint or an earlier turn; two how-to questions carry docs. Boundaries
-# are requests this runbook wins against a neighbour sharing its words: first placement
-# (place-work), one started unit moved (reassign-host-work), usage read only
-# (check-usage-limits), a stop or change with nothing moved (steer-swarm), this machine's own
-# load (relieve-resource-contention), readying assistants (start-swarm), re-planning local agents
-# (reprioritize-work), parking a run (park-swarm). Followups and topic shifts are a rebalance
-# decided after a status answer, a usage table, a placement or a stop. Machine names are generic.
+# daintree.hosts.rebalance-load: Rebalance a running swarm off an overloaded or unavailable Remote Host
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.rebalance-load.md
+
 runbook: daintree.hosts.rebalance-load
 run: runbook-2026-10-issue-127
 
@@ -36,7 +24,6 @@ positives:
   - the swarm is choking one machine, cut it to two agents there and send the rest of its queue elsewhere
   - Spread the swarm's pending work more evenly; the host with the most agents is swapping and its readings keep getting worse
   - why is everything landing on one host? move the backlog around so the busiest machine isn't melting
-  - The fourth Remote Host lost its enrolled assistant after taking three of the run's units, none of which were read; withdraw them and place them on hosts with room
   - throttle the swarm on the hot machine and redistribute what it hasn't started
   - one host is out of allowance and another is overheating, rebalance the remaining swarm work across the healthy ones
   - I need the swarm balanced again before this afternoon, the studio is way over capacity
@@ -146,14 +133,6 @@ followups:
     history:
       - "user: the tower is too hot, move some swarm work off it"
       - "assistant: The tower's assistant cut to two agents and held four units; those four went to the other hosts."
-  - query: Take a fresh load reading now and show what improved; do not shift the units that are already running just to make the counts equal.
-    history:
-      - 'user: ease the pressure on the remote host that was swapping'
-      - 'assistant: Its lane lowered concurrency and released two unstarted units, which were placed on the idle host. Three original agents remain active.'
-    active: [daintree.hosts.rebalance-load, daintree.hosts.place-work]
-    confusable_with: [daintree.hosts.place-work]
-    run: 2026-10-16-synthetic-audit
-
 topic_shifts:
   - query: right, now one of them is drowning, spread the load better
     history:

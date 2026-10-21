@@ -241,19 +241,6 @@ cases:
       required: [daintree.hosts.connect-host]
       optional: [daintree.hosts.foundation]
 
-  - id: open-project-on-host-reverse-start-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Assistants readied per host. daintree.hosts.start-swarm decides it: "Claude Code or Codex ready on
-      every Remote Host".
-    messages:
-      - role: user
-        content: get one assistant lane enrolled per host here before any work is sent
-    expect:
-      required: [daintree.hosts.start-swarm]
-      optional: [daintree.hosts.foundation]
-
   - id: open-project-on-host-reverse-delegate-to-host
     category: routing-trap
     note: >-
@@ -299,19 +286,3 @@ cases:
         content: update my feature branch with the latest main
     expect:
       required: [daintree.git.sync-with-base]
-
-  - id: open-project-on-host-reverse-survey-hosts
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A read-only look at what the hosts hold. daintree.hosts.survey-hosts decides it: "ONE read-only
-      report, host by host".
-    messages:
-      - role: user
-        content: show me every Remote Host with the projects it has and who is enrolled there, change nothing
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
-
-  # Control twins (issue #159): the same requests against the control catalog,
-  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

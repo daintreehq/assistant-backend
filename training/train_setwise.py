@@ -80,7 +80,7 @@ from daintree_assistant_server.runbooks.local.documents import (  # noqa: E402
 from training.common import (  # noqa: E402
     build_query,
     canonical_active,
-    corpus_rows,
+    corpus_snapshot,
     device,
     stable_split,
 )
@@ -272,7 +272,7 @@ def main() -> int:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    rows = corpus_rows(Path(args.data))
+    rows, training_corpus = corpus_snapshot(Path(args.data))
     if args.canonical_active:
         rows = [
             {**r, "active_ids": canonical_active(r.get("active_ids") or [], catalog)}
@@ -1021,6 +1021,7 @@ def main() -> int:
         json.dumps(
             {
                 "base_model": args.base_model,
+                "training_corpus": training_corpus,
                 "hidden_size": hidden_size,
                 "d_model": args.d_model,
                 "layers": args.layers,

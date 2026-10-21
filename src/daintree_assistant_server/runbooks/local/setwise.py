@@ -204,6 +204,8 @@ class RunbookTable:
     digests: dict[str, str]
     #: Which encoder precision produced these vectors ("int8" / "fp32").
     precision: str
+    # Precision alone cannot distinguish two retrained encoders of the same type.
+    encoder_fingerprint: str = ""
 
 
 def _since(started: float) -> float:
@@ -215,11 +217,25 @@ def document_digest(document: str) -> str:
     return hashlib.sha256(document.encode()).hexdigest()
 
 
+def encoder_fingerprint(directory: Path, *, quantized: bool, doc_max: int, variant: str) -> str:
+    digest = hashlib.sha256(f"{doc_max}:{variant}".encode())
+    files = (
+        "retriever/model.onnx",
+        "retriever/tokenizer.json",
+        "ranking/tokenizer.json",
+        "ranking/model_int8.onnx" if quantized else "ranking/model.onnx",
+    )
+    for name in files:
+        with (directory / name).open("rb") as handle:
+            digest.update(name.encode() + b"\0" + hashlib.file_digest(handle, "sha256").digest())
+    return digest.hexdigest()
+
+
 #: Distinct runbook documents whose vectors are held across table replacements.
 #: Sized for a catalog an order of magnitude larger than today's 39 plus room for
 #: runbook-learning rewrites; at ~3 KB a pair this is single-digit megabytes.
 _VEC_MEMO_MAX = 2048
-#: Tables kept by catalog revision: one per host model's catalog.
+#: Keep the live catalog and a narrowed/edited evaluation view without rebuilding.
 _TABLES_MAX = 2
 
 
@@ -258,6 +274,9 @@ class SetwiseClassifier:
         #: fp32 in both modes. It is not plain "int8": a table stamped that was
         #: built with an int8 retriever, and must re-embed rather than be reused.
         self._precision = "int8-ranker" if quantized else "fp32"
+        self._encoder_fingerprint = encoder_fingerprint(
+            directory, quantized=quantized, doc_max=self._doc_max, variant=self._doc_variant
+        )
         self._retriever = _session(directory / "retriever" / "model.onnx")
         self._ranker = _session(
             directory / "ranking" / ("model_int8.onnx" if quantized else "model.onnx")
@@ -278,9 +297,7 @@ class SetwiseClassifier:
         # freshly loaded instance silently caps at exactly the number this is
         # trying to measure against. It reported "fits" for every string in the
         # world, which is a counter that always agrees.
-        self._counter_tok = Tokenizer.from_file(
-            str(directory / "retriever" / "tokenizer.json")
-        )
+        self._counter_tok = Tokenizer.from_file(str(directory / "retriever" / "tokenizer.json"))
         self._counter_tok.no_truncation()
         self._counter_tok.no_padding()
 
@@ -292,8 +309,7 @@ class SetwiseClassifier:
         expected = {"query", "candidates", "features", "mask"}
         if head_inputs != expected:
             raise ValueError(
-                f"set-wise head expects inputs {sorted(expected)}, graph has "
-                f"{sorted(head_inputs)}"
+                f"set-wise head expects inputs {sorted(expected)}, graph has {sorted(head_inputs)}"
             )
         cand_dim = self._head.get_inputs()[
             [i.name for i in self._head.get_inputs()].index("candidates")
@@ -319,16 +335,9 @@ class SetwiseClassifier:
 
         self._lock = threading.Lock()
         #: catalog revision -> the table built for it, oldest first, at most
-        #: ``_TABLES_MAX``: the server alternates between two catalogs (one per host
-        #: model, ``catalog.load_catalogs``), and one slot would rebuild a table on
-        #: every alternation. Replaced wholesale, never mutated, so a reader gets a
-        #: consistent revision-to-table mapping from whichever dict it read; a
-        #: revision paired with another catalog's table is exactly the stale answer
-        #: the digest check exists to prevent. The revision is a fast path only;
-        #: the digest comparison in ``sync`` is the correctness check. It skips
-        #: re-rendering and re-hashing every runbook document on a turn where the
-        #: catalog has not changed at all: microseconds at 38 runbooks,
-        #: milliseconds at 1,000, and this sits on the first-byte path.
+        #: ``_TABLES_MAX``. Retain a live catalog and a narrowed/edited view so
+        #: offline inspection or a catalog refresh can reuse their immutable tables.
+        #: Document digests remain the correctness check; revisions are a fast path.
         self._tables: dict[str | None, RunbookTable] = {}
         #: The table the latest ``sync`` returned, whichever path returned it: what
         #: ``table`` (and ``select`` with no catalog) reads. Not the newest entry of
@@ -347,7 +356,11 @@ class SetwiseClassifier:
             # Only adopt the shipped table if it was built by THIS precision's
             # encoders (see ``_precision``). A mismatch simply re-embeds — a
             # second or so at startup — rather than serving mixed vectors.
-            if table is not None and table.precision == self._precision:
+            if (
+                table is not None
+                and table.precision == self._precision
+                and table.encoder_fingerprint == self._encoder_fingerprint
+            ):
                 # No revision: the shipped table was built against the catalog at
                 # BUILD time, and the live catalog may have moved since. Keying it
                 # by None forces the first sync through the digest check.
@@ -413,8 +426,7 @@ class SetwiseClassifier:
 
         ids = tuple(sorted(catalog.selectable_ids))
         wanted = {
-            sid: runbook_document(catalog.get(sid).meta, variant=self._doc_variant)
-            for sid in ids
+            sid: runbook_document(catalog.get(sid).meta, variant=self._doc_variant) for sid in ids
         }
         digests = {sid: document_digest(doc) for sid, doc in wanted.items()}
 
@@ -440,9 +452,7 @@ class SetwiseClassifier:
                 if keep.get(sid) == digests.get(sid)
             }
 
-            retrieval = np.zeros(
-                (len(ids), self._retrieval_dim(current)), dtype=np.float32
-            )
+            retrieval = np.zeros((len(ids), self._retrieval_dim(current)), dtype=np.float32)
             ranking = np.zeros((len(ids), self._ranking_dim(current)), dtype=np.float32)
             # Anything the CURRENT table cannot supply is looked up in the digest
             # memo before it is sent to the encoders. `_tables` holds two tables,
@@ -492,6 +502,7 @@ class SetwiseClassifier:
                 ranking=ranking,
                 digests=digests,
                 precision=self._precision,
+                encoder_fingerprint=self._encoder_fingerprint,
             )
             self._remember(table)
             self._keep(revision, table)
@@ -667,9 +678,7 @@ class SetwiseClassifier:
         probs = 1.0 / (1.0 + np.exp(-runbook_logits[0][:n]))
         count = int(np.argmax(card_logits[0]))
         order = np.argsort(-probs)
-        ranked = [
-            (table.ids[int(chosen.indices[int(j)])], float(probs[int(j)])) for j in order
-        ]
+        ranked = [(table.ids[int(chosen.indices[int(j)])], float(probs[int(j)])) for j in order]
         picked, rejected = admit_with_reasons(ranked, active, count, max_active)
         # Which actives dense retrieval missed and this turn had to seat by hand.
         # Empty on almost every turn today (32 of 38 runbooks are on the ballot
@@ -677,8 +686,7 @@ class SetwiseClassifier:
         # which the old top-k-only policy would have been silently evicting
         # in-progress workflows.
         reserved_ids = tuple(
-            table.ids[int(i)] for i, was in zip(chosen.indices, chosen.reserved, strict=True)
-            if was
+            table.ids[int(i)] for i, was in zip(chosen.indices, chosen.reserved, strict=True) if was
         )
 
         # THE DOCS DECISION IS TAKEN ON A DIFFERENT STRING FROM THE RUNBOOK ONE.
@@ -912,11 +920,7 @@ def admit_with_reasons(
             if prob < SetwiseClassifier.BONUS_FLOOR:
                 rejected[sid] = REJECTED_BONUS_FLOOR
                 continue
-            if (
-                active
-                and sid not in active
-                and prob < SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
-            ):
+            if active and sid not in active and prob < SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE:
                 rejected[sid] = REJECTED_NEWCOMER_FLOOR
                 continue
             picked.append(sid)
@@ -958,9 +962,7 @@ def _run_encoder(
     encoded = tokenizer.encode_batch(texts)
     ids = np.array([e.ids for e in encoded], dtype=np.int64)
     mask = np.array([e.attention_mask for e in encoded], dtype=np.int64)
-    out: np.ndarray = session.run(
-        None, {"input_ids": ids, "attention_mask": mask}
-    )[0]
+    out: np.ndarray = session.run(None, {"input_ids": ids, "attention_mask": mask})[0]
     if normalize:
         out = out / np.linalg.norm(out, axis=-1, keepdims=True).clip(min=1e-9)
     return out.astype(np.float32)
@@ -979,6 +981,9 @@ def _load_table(path: Path) -> RunbookTable | None:
         ranking=data["ranking"].astype(np.float32),
         digests=digests,
         precision=str(data["precision"]),
+        encoder_fingerprint=str(data["encoder_fingerprint"])
+        if "encoder_fingerprint" in data
+        else "",
     )
 
 
@@ -990,4 +995,5 @@ def save_table(path: Path, table: RunbookTable) -> None:
         retrieval=table.retrieval,
         ranking=table.ranking,
         precision=np.array(table.precision),
+        encoder_fingerprint=np.array(table.encoder_fingerprint),
     )

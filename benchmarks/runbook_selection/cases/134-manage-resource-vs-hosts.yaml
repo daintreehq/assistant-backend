@@ -58,22 +58,6 @@ cases:
       required: [daintree.worktree.manage-resource]
       optional: [daintree.foundation]
 
-  - id: manage-resource-lane-told-to-bring-up
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      A hub's message reaching a lane that plainly asks for a worktree's devbox: "wants to
-      provision, pause or resume it" applies, with a status read first and the repository
-      command approval still in force. The message handler and the hosts foundation may ride
-      along.
-    messages:
-      - role: user
-        content: The hub asked me to bring the worktree's cloud devbox back up. Check its status before doing anything.
-    expect:
-      required: [daintree.worktree.manage-resource]
-      optional: [daintree.foundation, daintree.hosts.handle-hub-message, daintree.hosts.foundation]
-
-  # ----------------------------------------------- the devbox wins, hosts must not ride
   - id: manage-resource-reverse-place-work
     category: routing-trap
     note: >-
@@ -125,20 +109,6 @@ cases:
         content: set up the server I just built as a Daintree Remote Host
     expect:
       required: [daintree.hosts.connect-host]
-      optional: [daintree.hosts.foundation]
-
-  - id: manage-resource-trap-start-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      An assistant readied on each server is daintree.hosts.start-swarm ("Claude Code or Codex
-      ready on every Remote Host"). The ready table is not resource status, so
-      daintree.worktree.manage-resource must not be picked.
-    messages:
-      - role: user
-        content: get an assistant ready on every remote server for this repo and tell me which ones are ready
-    expect:
-      required: [daintree.hosts.start-swarm]
       optional: [daintree.hosts.foundation]
 
   - id: manage-resource-trap-delegate-named-host
@@ -207,26 +177,6 @@ cases:
       required: [daintree.terminals.run-visible-command]
 
   # ------------------------------------ a host exchange earlier in the conversation
-  - id: manage-resource-after-host-delegation
-    host_model: inbox
-    category: continuation
-    note: >-
-      A turn after work was handed to a Remote Host asks about the worktree's devbox:
-      "asks about a worktree's cloud devbox or remote resource status". The earlier delegation
-      does not carry it, so daintree.hosts.delegate-to-host must not be picked again.
-    messages:
-      - role: user
-        content: have the studio machine look into the flaky checkout test
-      - role: assistant
-        content: Sent to the studio machine's assistant; the exchange is working.
-      - role: user
-        content: meanwhile is the devbox on the billing worktree still running?
-    expect:
-      required: [daintree.worktree.manage-resource]
-      optional: [daintree.foundation]
-
-  # Control twins (issue #159): the same requests against the control catalog,
-  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
   - id: manage-resource-trap-start-swarm-control
     category: routing-trap
     host_model: control

@@ -1,16 +1,6 @@
-# daintree.hosts.race-and-review: on the hub, work done on Remote Hosts judged by a machine or
-# agent that did not build it. A race: the same task built on several hosts, each pushing its own
-# branch, ranked blind by an agent that built none. A cross-review: one host's pushed commit
-# reviewed on another host, findings sent back to the builder for a capped number of rounds.
-#
-# Positives are invented situations in agent and user words, short and long, some with a social
-# lead-in, two how-to questions marked docs. Boundaries are requests this runbook wins against a
-# neighbour whose vocabulary they share: the same work tabled with no judging (swarm-fan-out), one
-# unit or a hand-over (delegate-to-host), combining branches (integrate-host-branches), contests
-# and reviews among agents on this machine (competition, review-change, relay-review-feedback,
-# ask-and-relay, cross-review-cohort), and the lane's side (review-for-hub, run-local-cohort,
-# do-delegated-work). Followups and topic shifts are a race or review as the next turn after a
-# host pushed, or after a fleet read. Machine names are generic.
+# daintree.hosts.race-and-review: Race a task across remote hosts, or have another host review one's work
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.race-and-review.md
+
 runbook: daintree.hosts.race-and-review
 run: runbook-2026-10-issue-94
 

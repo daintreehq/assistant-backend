@@ -1,16 +1,6 @@
-# daintree.hosts.coordinate-dev-services: the hub gets development services that run on
-# DIFFERENT Remote Hosts reaching each other: each connection's calling process and address
-# written down and checked from where the caller runs, dependencies started first, and one
-# marked request proving the end-to-end path.
-#
-# Positives are invented stacks in agent and user words, short and long, some with a social
-# lead-in, a constraint or an earlier turn; one how-to question carries docs. Boundaries are
-# requests this runbook wins against a neighbour whose vocabulary they share: a plan of
-# dependent code units (execute-distributed-workflow), an interface to agree or change
-# (coordinate-contract-change), one hand-over (delegate-to-host), a host's own side of a demo
-# (demo-for-hub), per-worktree resources on one machine (provision-local-environment), a port
-# clash (free-busy-port) and an open preview's own failure (debug-web-app). Followups are the
-# stack as a second turn. Machine names are generic.
+# daintree.hosts.coordinate-dev-services: Get dev services on different Remote Hosts reaching each other
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.coordinate-dev-services.md
+
 runbook: daintree.hosts.coordinate-dev-services
 run: runbook-2026-10-issue-126
 

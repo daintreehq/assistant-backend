@@ -1,25 +1,10 @@
-# daintree.hosts.coordinate-contract-change: the hub has one interface contract (an API, a schema, a
-# message format) between projects on different Remote Hosts agreed and frozen at a commit in the one
-# repository that holds it, briefs each side with that exact version on its own repository's base,
-# carries each change as a new version the affected hosts pause for and adopt, and rejects results
-# built on an older version.
-#
-# Positives are invented situations in agent and user words, short and long, some with a social
-# lead-in, an earlier turn or an observation; two how-to questions carry docs. Boundaries are
-# requests this runbook wins against a neighbour whose vocabulary they share: both sides on this
-# machine (contract-first-split), a staged plan (execute-distributed-workflow), one unit for one host
-# (delegate-to-host), a stop or change of sent work (steer-swarm), finished work combined
-# (integrate-host-branches), and the lanes' own building and testing (do-delegated-work,
-# verify-for-hub). Followups and topic shifts are the contract as a second turn. Machine names are
-# generic.
+# daintree.hosts.coordinate-contract-change: Agree and amend one interface contract across Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.coordinate-contract-change.md
+
 runbook: daintree.hosts.coordinate-contract-change
 run: runbook-2026-10-issue-148
 
 positives:
-  - coordinate an interface contract between a server repository on one remote host and a client repository on another, then have both lanes implement it
-  - version a shared protobuf schema across two host projects and keep track of which version each lane builds against
-  - freeze the OpenAPI spec in the backend repository at a commit and have the remote frontend lane copy that exact file before it builds
-  - one remote lane asked for a contract amendment mid-build; pause the other side, get version two committed and record each side's adoption
   - a remote side finished against a superseded contract version; reject that result and get it onto the current one
   - settle the message format between a producer service and a consumer service that sit in separate repositories on different Remote Hosts
   - hub workflow for a cross-repository API contract drafted by an agent, approved by the user, then handed to every implementing host
@@ -46,27 +31,19 @@ positives:
       couple of example messages written up and agreed first, then each machine builds its side against exactly that
       version. If either side needs the format changed partway, it should come back to me rather than improvise.
   - query: >-
-      The user wants a typed client package in one repository on remote host A and the REST service it calls in another
-      repository on remote host B, built at the same time. The interface should be drafted on a branch by the service
-      side's lane, shown to the user, then sent to both lanes pinned to that commit; any change goes through the hub as a
-      new version.
-  - query: >-
       Halfway through, the consumer host found the message needs a correlation id. I don't want each machine patching
       its own copy. Hold the producer, get the shared format updated as a proper new version, then tell both machines
       to move to it and let me know when each one has confirmed.
-  - establish which repository holds the authoritative copy of a cross-host api schema and have the other repository's lane copy it at a pinned commit
   - the shared schema for my two remote projects, can we version it so changes don't slip in quietly
   - tell the producer machine to stop and wait, the event schema it builds against is being revised
   - the contract between the cli repo and the api repo moved to a new commit; get both hosts onto it and check what they built against it
   - before the two hosts hand anything back, make sure they're both on the same spec version
   - we need an api contract the ios repo and the backend repo can both build against, and they're on different machines
-  - both remote lanes have to agree the rpc interface before either implements it; have an agent draft it and show me
   - the host that owns the schema wants to add an enum value; treat it as a new contract version and work out who needs to adopt it
   - manage a breaking change to an interface shared by services in three repositories on different Remote Hosts, from pause to confirmed adoption
   - sorry to pile on, the payments host asked whether it can change the refund response. if yes, do it as a new contract version and get the checkout host onto it as well
   - keep the backend host and the frontend host on one contract version while they build in parallel
   - pin the shared types package version both of my remote repos build against and refuse any result built on an older one
-  - the consumer lane replied that the error shape in the contract doesn't cover timeouts; decide that with me and roll it out to both sides
   - make the schema repository the source of truth for the two services on my other machines, and have each service copy it unchanged
   - get the interface between the worker repo on the linux box and the scheduler repo on the mac agreed, frozen and built on both sides
   - query: and do it as a proper contract the two of them share, not each one guessing at the shape

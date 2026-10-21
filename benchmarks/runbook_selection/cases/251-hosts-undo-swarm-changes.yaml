@@ -228,36 +228,3 @@ cases:
       optional: [daintree.hosts.foundation, daintree.foundation]
 
   # --------------------------------- lane receivers (retrain owed at authoring)
-  - id: undo-swarm-changes-lane-revert-run-commits
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      On the receiving host: the local procedure does the reverting, the envelope rides along.
-      Decided by this runbook's fence "as a Remote Host's own assistant reverting in its project
-      (daintree.git.undo-agent-changes)" and the local runbook's "Use when an agent changed
-      things the user wants taken back while everything else stays". At base it selected
-      daintree.hosts.clean-up-for-hub; at authoring this hub runbook (retrain owed).
-    messages:
-      - role: user
-        content: The hub asked me to revert the commits its run made on this project's branch and keep everything else.
-    expect:
-      required: [daintree.git.undo-agent-changes]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
-
-  - id: undo-swarm-changes-lane-exact-commits
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A lane given the exact commits by the hub: "as a Remote Host's own assistant reverting in
-      its project (daintree.git.undo-agent-changes)". At base this selected
-      daintree.git.undo-agent-changes 0.996; with this hub runbook present it moved here
-      (retrain owed).
-    messages:
-      - role: user
-        content: 'Hub request on this lane: revert exactly these three commits from the run on branch run/checkout/api, newest first, keep unrelated staged and untracked work, no push'
-    expect:
-      required: [daintree.git.undo-agent-changes]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
-
-  # Control twins (issue #159): the same requests against the control catalog,
-  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

@@ -57,8 +57,6 @@ positives:
     run: 2026-09-28-round6
   - query: pg_restore /Users/sam/db/feature-flags.dump into the feature-flags worktree's own database; prove the target is local before writing anything.
     run: 2026-09-28-round6
-  - query: "Lane task from the hub: run the pending migrations for the worktree on branch run-12/unit-5 here, confirm the database is the worktree's own and not a forward to something shared, and report the schema version and the commit that was tested."
-    run: runbook-2026-10-issue-133
   - query: "Resolve the database connection of the checkout on this machine and establish whether the localhost port is a tunnel to a different environment before any reseed; if identity cannot be established, report that instead of proceeding."
     run: runbook-2026-10-issue-133
   - query: "Work out which server and database a reset in the feature checkout would hit, comparing it with the main checkout and the other worktrees on this host. Read-only: run nothing that writes."

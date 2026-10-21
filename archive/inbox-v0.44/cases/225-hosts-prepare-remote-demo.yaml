@@ -1,0 +1,27 @@
+# daintree.hosts.prepare-remote-demo: the hub's side of a demo on a Remote Host. The person,
+# at the Shell, wants a feature running on another machine at an exact commit and wants to
+# look at it from here; the hub briefs the host's assistant, checks its reply and tells the
+# person how this Shell reaches the page.
+#
+# Recall: the issue's own three requests, an agent-phrased task, a casual line and two
+# requests about the forwarded address. Traps: against the local demo
+# (daintree.workflow.prepare-feature-demo), a preview that is already open
+# (daintree.runtime.debug-web-app), a busy port (daintree.runtime.free-busy-port), a question
+# for the host's assistant (daintree.hosts.ask-host-assistant), plain work on a host
+# (daintree.hosts.delegate-to-host) and the lane's own receiver (daintree.hosts.demo-for-hub),
+# each with a reverse case where the neighbour wins.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: prepare-remote-demo-reverse-lane
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A request from the hub arriving on this host is daintree.hosts.demo-for-hub ("Use on a Remote
+      Host's lane when the hub asks THIS machine to prepare a DEMO"); this runbook is the hub's.
+    messages:
+      - role: user
+        content: "Hub message: bring up the dashboard branch here as a demo with sample data and reply with the port and the SHA served"
+    expect:
+      required: [daintree.hosts.demo-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

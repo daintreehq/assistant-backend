@@ -51,8 +51,6 @@ positives:
     run: runbook-2026-10-issue-136
   - query: "plugin skill release-kit.sign-off isn't in this machine's list. don't copy anything over from the other host, just tell the hub it's not here"
     run: runbook-2026-10-issue-136
-  - query: "This lane's host has its own plugins installed; the hub wants its security-review skill used on the auth diff here."
-    run: runbook-2026-10-issue-136
   - query: "hey, quick one: is the tdd plugin skill available on this host? if so have the agent here follow it on the parser change"
     run: runbook-2026-10-issue-136
   - query: "The skill I loaded wants to push the branch and open a PR, but the request was a local fix only. Skip those steps and have the agent here report them as skipped."

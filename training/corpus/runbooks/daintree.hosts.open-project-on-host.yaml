@@ -1,14 +1,6 @@
-# daintree.hosts.open-project-on-host: the person wants THIS project (or branch) on a Remote Host
-# that is already added, through Daintree's project dialog: the host's existing copy of the
-# repository or a fresh clone, with the person approving the matching, the clone folder, any
-# push and any setup. The assistant briefs what git carries (and what stays on this machine),
-# opens the dialog once, and reports where the project opened.
-#
-# Boundaries are the words this shares with adding the machine (connect-host), readying
-# assistants on a host that already has the project (start-swarm), work sent to a host
-# (delegate-to-host), choosing hosts for pieces of work (place-work), a local worktree
-# (create-plain-worktree) and catching a branch up with its base (sync-with-base). Reverse rows
-# live in those runbooks' files.
+# daintree.hosts.open-project-on-host: Open this project on a Remote Host
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.open-project-on-host.md
+
 runbook: daintree.hosts.open-project-on-host
 run: runbook-2026-10-issue-123
 

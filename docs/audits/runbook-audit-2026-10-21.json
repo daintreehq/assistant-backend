@@ -1,0 +1,177 @@
+{
+  "catalog": {
+    "runbooks": 140,
+    "selectable": 140,
+    "revision": "sha256:92b3dd643f370c2e811bfa47a3f80d184afa5dadd8239f3313410c750dedb0c8",
+    "routing_revision": "routing:2a6b266aebae55c7eca30a75dd7f10a4",
+    "domains": {
+      "agents": 12,
+      "ci": 4,
+      "context": 2,
+      "core": 2,
+      "debug": 2,
+      "deps": 1,
+      "edits": 2,
+      "explore": 1,
+      "forge": 6,
+      "git": 11,
+      "hosts": 33,
+      "memory": 1,
+      "orchestration": 30,
+      "plugins": 1,
+      "recipe": 1,
+      "release": 5,
+      "review": 6,
+      "runtime": 5,
+      "security": 1,
+      "skills": 1,
+      "terminals": 2,
+      "workflow": 5,
+      "worktree": 6
+    }
+  },
+  "corpus": {
+    "curated_rows": 21586,
+    "compiled_rows": 21586,
+    "compiled_sha256": "a4358f77558babae7e45be118f9f185d7b1c87f62849edc11fdb1bb7d2af7c60",
+    "retired_protocol_rows": 0,
+    "near_collision_rows_quarantined": 1,
+    "final_leakage_scan": []
+  },
+  "training": {
+    "trained_label_count": 139,
+    "untrained_ids": [
+      "daintree.agents.choose-agent-model"
+    ],
+    "retired_trained_ids": [],
+    "routing_revision_at_train": "routing:e8f19c63e81edd63c862d269af9ed2dc",
+    "corpus_at_train": null,
+    "retriever_corpus_at_train": null
+  },
+  "index": {
+    "path": ".tmp/runbook-audit/vectors.npz",
+    "expected_encoder_fingerprint": "f72154c25b5f213952e6e8f5b7d6f094a8785bd391ab22301ca64306f918f6bb",
+    "cached_encoder_fingerprint": "f72154c25b5f213952e6e8f5b7d6f094a8785bd391ab22301ca64306f918f6bb",
+    "encoder_matches": true,
+    "documents_match": true,
+    "rows": 140
+  },
+  "document_budget": {
+    "cap": 512,
+    "maximum_by_stage": {
+      "retriever": 511,
+      "ranking": 511
+    },
+    "over_cap": {
+      "retriever": {},
+      "ranking": {}
+    }
+  },
+  "app_capture": {
+    "commits": [
+      "1006cbca719950c122d995c7b378138a3968aaa2"
+    ],
+    "versions": [
+      "0.45.0"
+    ],
+    "tools_by_caller": {
+      "external": 35,
+      "help-core": 42,
+      "help-full": 91,
+      "pane-core": 79,
+      "pane-full": 79,
+      "relayed-core": 37,
+      "relayed-full": 80
+    }
+  },
+  "archive": {
+    "inbox_overrides": 69,
+    "evaluation_cases": 417,
+    "curated_rows": 229
+  },
+  "measurement": {
+    "baseline_locked_cache": {
+      "cases_total": 1730,
+      "cases_passed": 1564,
+      "recall_pass_cases": 1684,
+      "candidate_miss_trials": 0,
+      "recall_miss_trials": 43,
+      "precision_extra_trials": 158,
+      "forbidden_cases": 0,
+      "docs": {
+        "scored_trials": 31,
+        "correct_trials": 30,
+        "missed_lookup_trials": 1,
+        "spurious_lookup_trials": 0
+      },
+      "stages": {
+        "candidate_miss": 0,
+        "rank_miss": 35,
+        "floor_reject": 0,
+        "cardinality_short": 1,
+        "cap_full": 6,
+        "background_reuse": 1
+      },
+      "passed": true
+    },
+    "rebuilt_cache": {
+      "cases_total": 1730,
+      "cases_passed": 1565,
+      "recall_pass_cases": 1675,
+      "candidate_miss_trials": 0,
+      "recall_miss_trials": 52,
+      "precision_extra_trials": 156,
+      "forbidden_cases": 0,
+      "docs": {
+        "scored_trials": 31,
+        "correct_trials": 30,
+        "missed_lookup_trials": 1,
+        "spurious_lookup_trials": 0
+      },
+      "stages": {
+        "candidate_miss": 0,
+        "rank_miss": 43,
+        "floor_reject": 0,
+        "cardinality_short": 2,
+        "cap_full": 6,
+        "background_reuse": 1
+      },
+      "passed": true
+    },
+    "loaded_set_changes": 68
+  },
+  "integrity": {
+    "original_cases": 2147,
+    "active_cases": 1730,
+    "archived_cases": 417,
+    "case_values_preserved": true,
+    "frozen_runbooks_byte_identical": 69,
+    "current_runbook_content_hashes_preserved": true,
+    "selectable_routing_revision_preserved": true,
+    "raw_journals_changed": false
+  },
+  "publication": {
+    "status": "blocked",
+    "reason": "Google Cloud reauthentication required",
+    "committed_lock_unchanged": true,
+    "changed_candidate_files": [
+      "vectors.npz"
+    ],
+    "encoder_and_head_weights_changed": false
+  },
+  "verification": {
+    "app_capture_tests_passed": 1,
+    "app_host_contract_tests_passed": 190,
+    "app_runbook_wiring_tests_passed": 17,
+    "wheel_current_runbooks": 140,
+    "wheel_contains_legacy_catalog": false,
+    "warm_and_cold_rebuilt_decisions_identical_cases": 1730,
+    "ruff": "passed",
+    "mypy_source_files": 26,
+    "backend_tests_passed": 818,
+    "backend_coverage_percent": 96.13,
+    "backend_coverage_floor_percent": 90.0,
+    "staged_manifest_locked_files": 6,
+    "committed_lock_restored_after_verification": true
+  }
+}

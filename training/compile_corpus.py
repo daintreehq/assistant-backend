@@ -56,7 +56,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from benchmarks.runbook_selection.cases import load_cases  # noqa: E402
 from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
     default_runbooks_dir,
     load_catalog,
@@ -69,6 +68,7 @@ from training.corpus_source import (  # noqa: E402
     Example,
     source_files,
 )
+from training.protocol import retired_inbox_reason  # noqa: E402
 
 DATA = ROOT / "training" / "data"
 CORPUS_OUT = DATA / "selection.jsonl"
@@ -83,28 +83,29 @@ def norm(text: str) -> str:
 
 
 def _benchmark_strings() -> set[str]:
-    """Protect every evaluation suite, including sealed holdout rounds.
+    """Protect active, holdout and archived cases without loading retired catalogs.
 
-    Read these mechanically for exclusion only. Case text must never be fed to
-    a data writer or used as a source of training examples.
-
-    Both host models' suites (``cases.py``, ``host_model``): an inbox-only case is
-    held out from training as much as a control one, whichever catalog trains.
+    Historical evaluation wording stays held out even after its procedures stop
+    shipping. Read text mechanically; never use it to author training examples.
     """
-    from benchmarks.runbook_selection.cases import CASES_DIR, HOST_MODELS
-    from daintree_assistant_server.runbooks.catalog import load_catalogs
+    import yaml
 
-    catalogs = load_catalogs()
+    from benchmarks.runbook_selection.cases import CASES_DIR
+
+    files = [
+        *CASES_DIR.glob("*.yaml"),
+        *(CASES_DIR.parent / "holdout").rglob("*.yaml"),
+        *(ROOT / "archive" / "inbox-v0.44" / "cases").glob("*.yaml"),
+    ]
     out: set[str] = set()
-    suites = [CASES_DIR, *sorted((CASES_DIR.parent / "holdout").glob("*/"))]
-    for suite in suites:
-        for model in HOST_MODELS:
-            for case in load_cases(catalogs.for_model(model), cases_dir=suite, model=model):
-                for msg in case.messages:
-                    if isinstance(msg.content, str):
-                        out.add(norm(msg.content))
-                if case.turn_context:
-                    out.add(norm(case.turn_context))
+    for path in sorted(files):
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for case in data["cases"]:
+            for message in case.get("messages", []):
+                if isinstance(message.get("content"), str):
+                    out.add(norm(message["content"]))
+            if isinstance(case.get("turn_context"), str):
+                out.add(norm(case["turn_context"]))
     out.discard("")
     return out
 
@@ -155,6 +156,9 @@ def compile_corpus(
     rows: list[dict[str, Any]] = []
 
     def admit(ex: Example) -> bool:
+        reason = retired_inbox_reason(ex.query, ex.history, (*ex.expect, *ex.active))
+        if reason:
+            raise CorpusError(f"{ex.origin}: {reason}; archive or rewrite this example")
         query = " ".join(ex.query.split())
         if not query:
             stats["dropped_empty"] += 1
@@ -193,26 +197,28 @@ def compile_corpus(
         seen_inputs[input_key] = signature
 
         stats[ex.source] += 1
-        rows.append({
-            "query": query,
-            "history": list(ex.history),
-            "active_ids": list(ex.active),
-            "expect_ids": expect,
-            "is_docs": ex.is_docs,
-            # Which KIND of empty this row teaches — an acknowledgement and a
-            # weather question are both empty but not the same lesson.
-            "empty_kind": ex.empty_kind if not expect else None,
-            # Authored, not mined: the runbooks a HUMAN judged this confusable
-            # with. `train_retriever` unions these with what it mines from the
-            # live encoder, because the two answer different questions — what a
-            # person thinks is confusable, and what this checkpoint gets wrong.
-            "confusable_with": confusable,
-            "source": ex.source,
-            # Provenance the flat corpus never had: which generation run wrote
-            # this row, and which curated file it can be edited in.
-            "run": ex.run,
-            "origin": ex.origin,
-        })
+        rows.append(
+            {
+                "query": query,
+                "history": list(ex.history),
+                "active_ids": list(ex.active),
+                "expect_ids": expect,
+                "is_docs": ex.is_docs,
+                # Which KIND of empty this row teaches — an acknowledgement and a
+                # weather question are both empty but not the same lesson.
+                "empty_kind": ex.empty_kind if not expect else None,
+                # Authored, not mined: the runbooks a HUMAN judged this confusable
+                # with. `train_retriever` unions these with what it mines from the
+                # live encoder, because the two answer different questions — what a
+                # person thinks is confusable, and what this checkpoint gets wrong.
+                "confusable_with": confusable,
+                "source": ex.source,
+                # Provenance the flat corpus never had: which generation run wrote
+                # this row, and which curated file it can be edited in.
+                "run": ex.run,
+                "origin": ex.origin,
+            }
+        )
         return True
 
     # Materialised before anything is read from it, so a malformed file late in
@@ -255,9 +261,7 @@ def _build_lock(
         # the revision and changes nothing about what this corpus can label, so
         # hashing the revision would fail the corpus check on every prose fix.
         # Which ids exist is the thing a corpus can actually go stale against.
-        "label_space_sha256": hashlib.sha256(
-            "\n".join(sorted(valid_ids)).encode()
-        ).hexdigest(),
+        "label_space_sha256": hashlib.sha256("\n".join(sorted(valid_ids)).encode()).hexdigest(),
         "label_space_size": len(valid_ids),
         "by_source": dict(sorted(Counter(r["source"] for r in rows).items())),
         "by_run": dict(sorted(Counter(r["run"] for r in rows).items())),
@@ -321,8 +325,7 @@ def main() -> int:
         committed_lock = LOCK_OUT.read_text(encoding="utf-8") if LOCK_OUT.is_file() else ""
         if committed_lock != serialise_lock(lock):
             print(
-                "training/data/corpus-lock.json is stale.\n"
-                "Run:  python -m training.compile_corpus",
+                "training/data/corpus-lock.json is stale.\nRun:  python -m training.compile_corpus",
                 file=sys.stderr,
             )
             return 1

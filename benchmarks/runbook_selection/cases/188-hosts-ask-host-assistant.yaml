@@ -161,20 +161,6 @@ cases:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation]
 
-  - id: ask-host-reverse-foundation-setup
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. Switching messaging on is the foundation's ("how to switch it on"), and
-      this runbook fences it: "for setting up messaging with another machine or finding out
-      why its assistant is unreachable (daintree.hosts.foundation)". No question is put to
-      anyone, so this runbook must not ride along.
-    messages:
-      - role: user
-        content: turn on messaging so this Shell can reach the assistant on my laptop host
-    expect:
-      required: [daintree.hosts.foundation]
-
   - id: ask-host-not-ci-diagnosis
     category: routing-trap
     note: >-
@@ -285,20 +271,3 @@ cases:
     expect:
       required: [daintree.hosts.ask-host-assistant]
       optional: [daintree.hosts.foundation]
-
-  - id: ask-host-reverse-swarm-setup
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. An enrolled assistant on every remote machine before work goes out is
-      start-swarm's "a swarm SET UP across their other machines before handing out work";
-      nothing is asked of any one host.
-    messages:
-      - role: user
-        content: before anything goes out, make sure each of my remote machines has an assistant enrolled in this project
-    expect:
-      required: [daintree.hosts.start-swarm]
-      optional: [daintree.hosts.foundation]
-
-  # Control twins (issue #159): the same requests against the control catalog,
-  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

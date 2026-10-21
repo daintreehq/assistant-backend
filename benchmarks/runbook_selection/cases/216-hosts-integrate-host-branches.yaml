@@ -41,20 +41,6 @@ cases:
       required: [daintree.hosts.integrate-host-branches]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: integrate-host-branches-issue-coordinate
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      The issue's third request, hub shorthand, quoted in the positive clause ("coordinate one host
-      integrating pinned artifacts from the other lanes"). Before this runbook it selected
-      daintree.hosts.integrate-for-hub.
-    messages:
-      - role: user
-        content: Coordinate one host integrating pinned artifacts from the other lanes.
-    expect:
-      required: [daintree.hosts.integrate-host-branches]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
   - id: integrate-host-branches-agent-phrased
     category: single-runbook
     note: >-
@@ -158,20 +144,6 @@ cases:
       required: [daintree.hosts.integrate-host-branches]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: integrate-host-branches-not-lane
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The hub chooses and briefs the integrator: "Use on the hub, the person's own Shell", not "on
-      the host chosen to do the merging (daintree.hosts.integrate-for-hub)".
-    messages:
-      - role: user
-        content: From the hub, choose which remote host integrates the two finished units and send it the pinned commits.
-    expect:
-      required: [daintree.hosts.integrate-host-branches]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
-  # ------------------------------------------------------------------ reverse traps: the neighbour wins
   - id: integrate-host-branches-trap-one-unit
     category: routing-trap
     note: >-
@@ -210,17 +182,3 @@ cases:
     expect:
       required: [daintree.git.integrate-agent-branches]
       optional: [daintree.foundation]
-
-  - id: integrate-host-branches-trap-lane
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      This machine is the lane doing the merge: daintree.hosts.integrate-for-hub ("Use when the hub
-      has chosen this lane as its integrator"), which fences "the hub's side
-      (daintree.hosts.integrate-host-branches)".
-    messages:
-      - role: user
-        content: The hub made this lane its integrator for the export run; merge the pinned commits here in its order
-    expect:
-      required: [daintree.hosts.integrate-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

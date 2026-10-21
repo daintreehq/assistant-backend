@@ -1,8 +1,6 @@
-# daintree.hosts.ask-host-assistant: one question to the assistant on one Remote Host, its
-# answer relayed with attribution. Rows are invented situations in agents' search wording
-# and people's own words; host names are invented nicknames or what the machine is. The
-# boundaries name only neighbours whose routing text does not already exclude another
-# machine's assistant.
+# daintree.hosts.ask-host-assistant: Ask a remote host's assistant one question
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.ask-host-assistant.md
+
 runbook: daintree.hosts.ask-host-assistant
 run: runbook-2026-10-issue-88
 
@@ -40,19 +38,11 @@ positives:
   - the mini's assistant has seen the new lint warnings, ask it which ones matter
   - ask the second machine's assistant whether its worktree has uncommitted changes
   - relay my question to the assistant on the build box, did the last deploy roll back
-  - query: ask atlas whether it's still busy with the schema migration
-    history:
-      - "user: is atlas connected? it's the linux box I added as a remote host"
-      - "assistant: Yes, atlas is connected and its assistant in the api project is enrolled for this Shell."
   - query: ask sirius how the docs rewrite is coming along
     history:
       - "user: which of my machines can you reach from here?"
       - "assistant: Two remote hosts: sirius, the office iMac, and kestrel, the linux server."
   - query: kestrel is the linux server I added as a remote host; ask its assistant what it thinks went wrong with the release build
-  - query: ask it whether the API tests pass there
-    history:
-      - "user: is the build box online?"
-      - "assistant: Yes, it's connected, and its assistant in the api project is enrolled for this Shell."
   - query: ok, ask the mini's assistant what it's in the middle of
     history:
       - "user: which assistants can you reach on the mini?"
@@ -98,14 +88,6 @@ topic_shifts:
     history:
       - "user: start a worktree for the docs fix"
       - "assistant: Created the worktree docs-fix from main."
-  - query: 'Separate question for that remote assistant: what does it think the memory spike came from? Relay its answer; no further task.'
-    history:
-      - 'user: have the server fix the log format'
-      - 'assistant: Its pushed change is verified and that exchange is complete.'
-    active: [daintree.hosts.delegate-to-host]
-    confusable_with: [daintree.hosts.delegate-to-host]
-    run: 2026-10-16-synthetic-audit
-
 boundaries:
   - query: ask the other mac's assistant why its project picked that schema
     confusable_with: [daintree.agents.ask-running-agent]

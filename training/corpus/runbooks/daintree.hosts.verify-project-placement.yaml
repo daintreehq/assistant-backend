@@ -1,9 +1,6 @@
-# daintree.hosts.verify-project-placement: before work goes to a Remote Host, the hub checks that
-# the project chosen there is the intended repository at the intended revision, by asking that
-# project's own assistant for its remotes, full SHA, clean state and setup, never by trusting a
-# name, path or id. Rows are invented situations in agents' search wording and people's own
-# words; hosts are invented nicknames or what the machine is. Boundaries name neighbours whose
-# routing text does not already exclude an identity check; the reverse rows live with them.
+# daintree.hosts.verify-project-placement: Check a host's project is the intended repository before sending work
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.verify-project-placement.md
+
 runbook: daintree.hosts.verify-project-placement
 run: runbook-2026-10-issue-124
 
@@ -21,7 +18,6 @@ positives:
   - Read-only identity check of the project that would receive this task on the second machine, including whether its remote is a fork
   - Verify the intended repository and revision on the build machine's project, redacting any credentials embedded in remote URLs before reporting
   - The host project's path looks right but I suspect it is a stale second clone; confirm remote and commit through its own assistant
-  - Verify that each host lane we plan to use sits in a checkout of the same repository and is clean enough to take the task
   - Report per host whether its project is the same repository, a fork, a different repository or unverified, plus what the person has to choose
   # --- people's own words
   - I have a project called web on the mini and another one called web on the build box, are they both our repo?
@@ -57,10 +53,6 @@ positives:
       Our host project ids look identical on two machines because both were cloned from the same
       commit. Agents shouldn't trust that, so verify each project's remote URL and SHA through the
       assistant that works in it, and give me a verdict per machine.
-  - query: >-
-      The studio laptop's assistant is only enrolled in one of its two projects. Check the
-      repository identity of the enrolled one, and tell me what would be needed to inspect the
-      other rather than asking the enrolled assistant to look in the wrong folder.
   - query: >-
       One host reports a project whose path matches ours exactly and another reports a different
       path with the same repository name. Paths are per machine, so compare remotes and commits
@@ -124,10 +116,6 @@ followups:
     history:
       - "user: confirm the mini's project is the same repository as mine"
       - "assistant: It matches by remote and full SHA, and the working tree is clean."
-  - query: ask again now that I've enrolled its assistant
-    history:
-      - "user: check which of the host projects is our repo"
-      - "assistant: One project has no assistant enrolled, so it stays unverified until you turn that on."
   - query: what would it take to check the one that isn't listed
     history:
       - "user: verify our repo on the build host"
@@ -146,7 +134,3 @@ topic_shifts:
     history:
       - "user: rename this agent to reviewer"
       - "assistant: Renamed it to reviewer."
-  - query: before the next task goes out, double check the machine's checkout is the same repo
-    history:
-      - "user: how many tasks are still open on the hosts"
-      - "assistant: Two exchanges are still working and one has finished."

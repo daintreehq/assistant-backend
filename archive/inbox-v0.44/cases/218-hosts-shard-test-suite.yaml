@@ -1,0 +1,27 @@
+# daintree.hosts.shard-test-suite: the hub's side of one test suite split between Remote
+# Hosts. This Shell's hub takes one suite at one exact commit, has each host's assistant run a
+# disjoint part of it, and merges the parts into one report checked against the suite's own
+# test list.
+#
+# Recall: the issue's own three requests, an agent-phrased and a long user-phrased
+# description, and the follow-up shape (a shard that came back empty, run again and folded
+# in). Traps: one per declared neighbour where this runbook wins (the same work on every host,
+# different pieces placed per host, checks on this machine, the same checks per environment, a
+# lane running its one shard), and a reverse case for each where the neighbour wins and this
+# runbook must not ride along, plus one for several agents splitting tests on this machine
+# (daintree.orchestration.fan-out-work).
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: shard-test-suite-reverse-lane-shard
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      This machine is the lane running one shard the hub assigned. daintree.hosts.verify-for-hub
+      owns it ("one shard of a suite"); the hub's split must not ride along.
+    messages:
+      - role: user
+        content: the hub assigned this machine the second of three test shards at commit 4b7e; run only that part in a clean worktree and send the counts back
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

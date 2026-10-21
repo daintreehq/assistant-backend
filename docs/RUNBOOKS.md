@@ -6,7 +6,7 @@ task, get the best-matching runbooks back with the foundation, and follow the on
 that fits. A runbook is only useful if search **finds** it for the right request,
 and an agent that reads it can **carry it out** correctly.
 
-The catalog lives in [`src/daintree_assistant_server/runbooks/files`](../src/daintree_assistant_server/runbooks/files),
+The catalog lives in [`src/daintree_assistant_server/runbooks/catalog`](../src/daintree_assistant_server/runbooks/catalog),
 one Markdown file per runbook. Growing it is the main work in this repository.
 
 ## Who reads a runbook
@@ -64,16 +64,12 @@ twice: the call against the help surface, and its `tool` and `args` against the
 relayed surface of the same tier, so a Core example cannot run the Full-only command
 runner on a host.
 
-**Two catalogs.** v0.44 clients drive their hosts through an inbox (hub, lanes,
-tasks), and later builds control them directly, so the server serves each its own
-catalog ([MCP.md](MCP.md#host-model-and-host-state)). `runbooks/files/` is the control
-catalog, the one you edit. `runbooks/inbox/` holds the v0.44 copies, frozen, of every
-hosts runbook and of each shared runbook whose text differs between the models; its
-surfaces are frozen beside it in `tests/fixtures/daintree_mcp/inbox/`. Every other
-runbook is shared. Before changing a shared runbook in a way a v0.44 client cannot
-follow (a tool v0.44 lacks, `host.call`), copy it into `inbox/` first;
-`tests/unit/test_catalogs.py` pins that directory and refuses a copy identical to its
-shared runbook.
+**One current catalog.** `runbooks/catalog/<domain>/<id>.md` is the only authoring
+source and the only tree the server loads. Directory names organize files; stable
+ids and metadata define routing and foundation dependencies. `core/` contains the
+root foundation and diagnostics. The retired docs marker is in `archive/assistant-cli/`. Retired inbox
+procedures, captures, cases and trial plans are in `archive/inbox-v0.44/`, outside
+the package. Never copy them into the active catalog to preserve old compatibility.
 
 A caller with a host connected gets `daintree.hosts.foundation` with every runbook,
 so a pane runbook's host branch is a sentence or two ("on a host, each step through
@@ -176,9 +172,7 @@ It gets no empty notice or checkpoint sections.
    `project.runCommand` through `host.call`, else an agent there), which a control
    caller with a host connected gets with every runbook; the forge (`gh`, naming the repository)
    stays in your own shell, since pushed state is the same everywhere; an
-   app-tool-only runbook calls its tools on the work's machine. A shared runbook is
-   also served to v0.44, which lacks `host.call` and `project.runCommand`, so its line
-   points at the hosts foundation instead of naming them. Never write "delegate" for
+   app-tool-only runbook calls its tools on the work's machine. A general runbook points at the hosts foundation for the route and caller-specific tools. Never write "delegate" for
    these steps: it means handing work to the host's assistant, not the default. Beside
    a step, say only what that line leaves wrong: a path handed to an agent on another
    machine is not shared (put the content in the prompt); a fetch or push that moves a
@@ -202,7 +196,7 @@ It gets no empty notice or checkpoint sections.
 | `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `help-core` or `help-full` for `daintree.hosts.*`) |
 | `optionalTools` | no | app action ids a conditional branch, caller variant or enhancement calls |
 | `requires` | no | other runbook ids whose instructions must be read first |
-| `hostEligibility` | `daintree.hosts.*` only, and required there | the caller host state it fits: `connected`, `configured` or `any` (`lane` only in the frozen inbox catalog) ([MCP.md](MCP.md#host-model-and-host-state)); search leaves it out for a caller whose reported state does not fit |
+| `hostEligibility` | `daintree.hosts.*` only, and required there | the caller host state it fits: `connected`, `configured` or `any` ([MCP.md](MCP.md#host-model-and-host-state)); search leaves it out for a caller whose reported state does not fit |
 
 Unknown keys are rejected (`runbooks/models.py`). A tool may not be both required and
 optional. The nearest domain foundation is delivered automatically and needs no
@@ -213,7 +207,7 @@ in the step that uses them.
 
 ## Adding one
 
-1. Create `runbooks/files/<id>.md`.
+1. Create `runbooks/catalog/<domain>/<id>.md`.
 2. Add a case under `benchmarks/runbook_selection/cases/` that **requires** it, and a
    routing trap against a declared neighbour.
 3. Verify:

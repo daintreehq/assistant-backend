@@ -8,12 +8,9 @@ request carrying one gets that session's record of what it was already sent
 (``mcp_sessions.py``). The id changes what a reply repeats, never whether a
 request is served: an unknown id is adopted, and a missing one is no session.
 
-Daintree names the caller's host model and coarse host state in headers on every
-POST (``runbooks/host_state.py``). The model picks the catalog the whole request is
-served from (``runbooks/catalog.py``, ``load_catalogs``), and the host state narrows
-what its search offers and whether the hosts foundation rides along with every
-runbook. Both are read per request and never kept between them: no request depends
-on another.
+Every request uses the current catalog. Daintree's coarse host state narrows
+search and determines whether the hosts foundation accompanies other procedures.
+It is read per request and never stored in the delivery session.
 
 Open by design: anyone can add this server to their agent. A search is the local
 classifier over public runbooks, so there is no credential to hold and nothing a
@@ -40,13 +37,8 @@ from ..runbook_mcp import (
     error_reply,
     handle_message,
 )
-from ..runbooks.catalog import Catalogs
-from ..runbooks.host_state import (
-    HOST_CONTROL_HEADER,
-    HOSTS_HEADER,
-    LANE_HEADER,
-    parse_caller_state,
-)
+from ..runbooks.catalog import view_for
+from ..runbooks.host_state import HOSTS_HEADER, parse_host_state
 
 router = APIRouter()
 logger = get_logger("daintree.mcp")
@@ -88,16 +80,11 @@ async def mcp_post(request: Request) -> Response:
         return _send(error_reply(None, PARSE_ERROR, "Parse error.", status=400))
 
     container = request.app.state.container
-    catalogs: Catalogs = container.catalogs
     sessions: SessionMemory = container.sessions
-    caller = parse_caller_state(
-        request.headers.getlist(HOST_CONTROL_HEADER),
-        _header(request, HOSTS_HEADER),
-        _header(request, LANE_HEADER),
-    )
-    view = catalogs.view_for(caller)
-    selector = container.selector_for(caller.model)
-    host_state = caller.hosts
+    values = request.headers.getlist(HOSTS_HEADER)
+    host_state = parse_host_state(values[0]) if len(values) == 1 else None
+    view = view_for(container.catalog, host_state)
+    selector = container.selector
 
     reply = await handle_message(
         message,
@@ -122,9 +109,7 @@ async def mcp_post(request: Request) -> Response:
         rpc_method=reply.method,
         status=reply.status,
         results=reply.results,
-        host_model=caller.model,
         hosts=host_state.hosts if host_state is not None else None,
-        lane_reachable=host_state.lane_reachable if host_state is not None else None,
         duration_ms=round((time.perf_counter() - started) * 1000, 1),
     )
     # Rendered first: only a reply that serialized marks its runbooks as sent.

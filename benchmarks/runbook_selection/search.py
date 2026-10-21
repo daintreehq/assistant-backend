@@ -17,8 +17,8 @@ from pathlib import Path
 
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.runbook_mcp import MAX_QUERY_CHARS, MAX_RESULTS_CAP
-from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
-from daintree_assistant_server.runbooks.host_state import HostModel, HostState
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
+from daintree_assistant_server.runbooks.host_state import HostState
 from daintree_assistant_server.runbooks.local.documents import fit_query, query_document
 from daintree_assistant_server.runbooks.local.paths_local import selector_artifact_dir
 from daintree_assistant_server.runbooks.local.runtime import InferencePool
@@ -55,7 +55,6 @@ def search(
     *,
     limit: int,
     host_state: HostState | None = None,
-    model: HostModel = "control",
 ) -> tuple[Catalog, list[SearchResult], list[bool]]:
     """Rankings, plus whether each query had to be shrunk to fit the encoder.
 
@@ -67,7 +66,7 @@ def search(
     it with ``fit_query``, the benchmark with ``query_document``, and they agree
     byte for byte only when the query fits.
     """
-    catalog = load_catalogs().for_model(model)
+    catalog = load_catalog()
     classifier = SetwiseClassifier(selector_artifact_dir())
     classifier.sync(catalog)
     shrunk = []
@@ -83,8 +82,7 @@ def search(
         # Stripped as the tool strips it (`runbook_mcp.py`), so a padded query
         # pasted from a transcript ranks exactly as it did for the caller.
         return [
-            await selector.search(query.strip(), limit=limit, exclude=exclude)
-            for query in queries
+            await selector.search(query.strip(), limit=limit, exclude=exclude) for query in queries
         ]
 
     try:

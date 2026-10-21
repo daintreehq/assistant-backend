@@ -131,11 +131,9 @@ if [ "$STATUS" = "200" ]; then
   [ "$VERDICT" = "ok" ] && pass "/readyz is ready with a non-empty catalog" \
                         || fail "/readyz body is wrong" "$VERDICT"
   REVISION="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("catalog_revision",""))' "$WORK/body")"
-  INBOX_REVISION="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("inbox_catalog_revision",""))' "$WORK/body")"
 else
   fail "/readyz answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
   REVISION=""
-  INBOX_REVISION=""
 fi
 
 STATUS="$(get /version)"
@@ -184,26 +182,26 @@ if [ "$STATUS" = "200" ]; then
                         || fail "search ranked the wrong runbook first" "$VERDICT"
   if [ -n "$REVISION" ]; then
     VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$REVISION")"
-    [ "$VERDICT" = "ok" ] && pass "search and /readyz agree on the control catalog revision" \
+    [ "$VERDICT" = "ok" ] && pass "search and /readyz agree on the current catalog revision" \
                           || fail "search catalog_revision differs from /readyz" "$VERDICT"
   fi
 else
   fail "MCP tools/call answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"
 fi
 
-# A v0.44 client sends no host-control header and is served the inbox catalog: the
-# same canonical query, ranked over it, carrying its revision.
+# A manually configured MCP client sends no host-control header and must receive
+# the same current catalog and canonical route.
 STATUS="$(rpc '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"search_runbooks","arguments":{"query":"rename my terminals so I can tell the agents apart","max_results":3}}}')"
 if [ "$STATUS" = "200" ]; then
   VERDICT="$(check '(lambda r: r["isError"] is False and r["structuredContent"]["runbooks"] and r["structuredContent"]["runbooks"][0]["id"] == expected and r["structuredContent"]["runbooks"][0]["selected"] is True or r)(body["result"])' daintree.terminals.rename)"
   [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is answered from a ranked catalog" \
                         || fail "the search without Daintree-Host-Control is wrong" "$VERDICT"
-  if [ -n "$INBOX_REVISION" ]; then
-    VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$INBOX_REVISION")"
-    [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is served the inbox catalog" \
+  if [ -n "$REVISION" ]; then
+    VERDICT="$(check 'body["result"]["structuredContent"]["catalog_revision"] == expected or body["result"]["structuredContent"]["catalog_revision"]' "$REVISION")"
+    [ "$VERDICT" = "ok" ] && pass "a caller without Daintree-Host-Control is served the current catalog" \
                           || fail "a caller without Daintree-Host-Control got another catalog" "$VERDICT"
   else
-    fail "/readyz names no inbox catalog revision"
+    fail "/readyz names no catalog revision"
   fi
 else
   fail "MCP tools/call without a host model answered $STATUS" "$(head -c 300 "$WORK/body" 2>/dev/null)"

@@ -35,13 +35,9 @@ conversation ─────────┤                                     
   OTHER turn open behind it. It is not yet as good as a trained runbook (4/14 vs
   13/14; see "Retraining when runbooks change" below), but the catalog keeps
   working, which is the part that used to break.
-- **It trains on the control catalog and serves both.** The server holds a catalog
-  per host model (`runbooks/catalog.py`, `load_catalogs`): every training script reads
-  the control catalog (`runbooks/files/`), and the frozen inbox catalog v0.44 clients
-  are served shares its encoders, embedded the same way. Its hosts runbooks keep
-  routing text close to their control counterparts and borrow their training; the
-  v0.44-only lane runbooks are reached zero-shot. `bench local` gates each catalog on
-  its own suite, so a retrain that costs v0.44 routing fails there.
+- **One current catalog.** Training and serving read `runbooks/catalog/`.
+  Retired inbox examples are archived, excluded from compilation and refused if
+  reintroduced. Archived evaluation text remains protected from leakage.
 - **Catalog size does not reach the head.** It always sees `k` (32) candidates.
   Growth costs one table row (~4.5KB) and one cosine, not a wider head.
 - **The shortlist's order is not information.** The head has no positional
@@ -144,15 +140,31 @@ cycles the benchmark has drifted toward
 a dev set — before any final adoption claim, write a fresh ~50-case signoff set
 blind.
 
-## Retraining when runbooks change
+## Re-embedding and retraining are different operations
 
-`.claude/skills/retrain-selector` is the runbook, and the first thing it says is
-that **a retrain is no longer what makes a runbook selectable**. A new runbook is
-embedded on load and can be selected that turn. What a retrain buys is that the
-runbook becomes *competitive*: measured against a both-stages holdout, a
-never-trained runbook takes 4 of 14 of its own benchmark cases against 13 of 14
-trained, because it wins only the requests no neighbour also claims. If a new
-runbook lands in a crowded neighbourhood, it needs data — in both directions.
+Moving files or editing procedure bodies preserves routing and needs no new
+weights. Editing title, summary or `whenToUse` invalidates that document's vectors;
+serving re-embeds it on startup. Build a derived index explicitly with the runtime
+venv, without PyTorch or a network call:
+
+```bash
+.venv/bin/python -m training.refresh_index --out .tmp/runbooks/vectors.npz
+```
+
+Caches are bound to the encoder graphs, tokenizers, document cap, rendering variant
+and precision. A cache without that identity is ignored and rebuilt. The command
+leaves `selector.lock` and the locked artifact alone. To package a refreshed cache,
+include it in a newly published selector artifact and update the lock together;
+never overwrite a locked file without its matching release metadata.
+
+Retraining changes the encoders or head. It is warranted by measured retrieval or
+ranking failures, new contested procedures, or a corpus correction whose lesson
+must change in the weights. The set-wise head has no per-runbook parameters, so
+adding a procedure remains searchable before training. Train stage 1 before stage 2
+when both change; re-embedding cannot remove lessons already learned from retired
+corpus rows. New training runs stamp the exact input corpus hash and row count in
+both stages' metadata, carried through export. Historical weights without that
+stamp keep unknown corpus provenance; do not fill it with today's corpus hash.
 
 ## Files
 

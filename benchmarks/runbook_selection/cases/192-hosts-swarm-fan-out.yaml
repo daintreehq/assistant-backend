@@ -32,24 +32,6 @@ cases:
       required: [daintree.hosts.swarm-fan-out]
       optional: [daintree.hosts.foundation]
 
-  - id: swarm-fan-out-swarm-it
-    host_model: inbox
-    category: continuation
-    note: >-
-      The issue's bare request as a second turn: the first turn names the Remote Hosts and the one
-      task each should do. Decided by "the SAME WORK done on EVERY Remote Host this Shell
-      reaches" and "one copy per machine".
-    messages:
-      - role: user
-        content: I want the slug helper with a unit test written on every one of my other machines, the same task for each host, a branch apiece
-      - role: assistant
-        content: Every Remote Host has an enrolled assistant. Do you want me to send each host that same task now?
-      - role: user
-        content: Swarm it.
-    expect:
-      required: [daintree.hosts.swarm-fan-out]
-      optional: [daintree.hosts.foundation]
-
   - id: swarm-fan-out-every-host-compare
     category: single-runbook
     note: >-
@@ -104,20 +86,6 @@ cases:
       optional: [daintree.hosts.foundation]
 
   # ------------------------------------------------------------- routing traps
-  - id: swarm-fan-out-not-start-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The lanes are ready and the work goes out. Decided by "the SAME WORK done on EVERY Remote
-      Host" against the carve-out "readying an assistant on each host with no work sent
-      (daintree.hosts.start-swarm)".
-    messages:
-      - role: user
-        content: every host already has its assistant enrolled; send each of them the export endpoint task, own branch each, and table the commits
-    expect:
-      required: [daintree.hosts.swarm-fan-out]
-      optional: [daintree.hosts.foundation]
-
   - id: swarm-fan-out-not-delegate-to-host
     category: routing-trap
     note: >-
@@ -166,19 +134,6 @@ cases:
       required: [daintree.hosts.swarm-fan-out]
       optional: [daintree.hosts.foundation]
 
-  - id: swarm-fan-out-not-handle-hub-message
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The hub's side of the exchange. Decided by "EVERY Remote Host this Shell reaches" against
-      "a host's own assistant receiving the hub's message (daintree.hosts.handle-hub-message)".
-    messages:
-      - role: user
-        content: 'hub side: send every host''s assistant the same build task and gather each one''s branch and sha into a table'
-    expect:
-      required: [daintree.hosts.swarm-fan-out]
-      optional: [daintree.hosts.foundation]
-
   - id: swarm-fan-out-not-do-delegated-work
     category: routing-trap
     note: >-
@@ -188,20 +143,6 @@ cases:
     messages:
       - role: user
         content: from the Shell, have the assistant on every host implement the parser in a new worktree there and send me each one's sha
-    expect:
-      required: [daintree.hosts.swarm-fan-out]
-      optional: [daintree.hosts.foundation]
-
-  - id: swarm-fan-out-not-check-usage
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A table per machine of work done, not usage left. Decided by "one table with a row per
-      host (project, agent CLI, branch, commit SHA, checks, pane)" against "agent usage left on
-      each host (daintree.hosts.check-usage-limits)".
-    messages:
-      - role: user
-        content: I'm at the main machine, every host's lane should build the settings toggle on its own branch, then table the shas
     expect:
       required: [daintree.hosts.swarm-fan-out]
       optional: [daintree.hosts.foundation]
@@ -230,71 +171,6 @@ cases:
         content: have the build box's assistant alone fix the date parsing bug and push a branch for it
     expect:
       required: [daintree.hosts.delegate-to-host]
-      optional: [daintree.hosts.foundation]
-
-  - id: swarm-fan-out-reverse-start-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Ready, nothing sent. daintree.hosts.start-swarm owns "The deliverable is a ready table
-      (host, project, slot, agent, generation) plus what needs the person, with no work sent".
-    messages:
-      - role: user
-        content: line up a Claude assistant per remote machine for the api project, nothing to do yet
-    expect:
-      required: [daintree.hosts.start-swarm]
-      optional: [daintree.hosts.foundation]
-
-  - id: swarm-fan-out-reverse-recover
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Work already sent, after a restart. daintree.hosts.recover-and-clean-up owns "which
-      delegated exchanges finished, which are still open".
-    messages:
-      - role: user
-        content: the run I gave all the hosts before the hub restarted, which of those exchanges ever finished?
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
-  - id: swarm-fan-out-reverse-handle-hub-message
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The lane reading the hub's message. daintree.hosts.handle-hub-message owns "the hub, the
-      assistant on the person's main machine, has messaged it".
-    messages:
-      - role: user
-        content: the hub sent every host the same parser task; read the message in my inbox and handle it here
-    expect:
-      required: [daintree.hosts.handle-hub-message]
-      optional: [daintree.hosts.foundation]
-
-  - id: swarm-fan-out-reverse-do-delegated-work
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      This lane's own unit. daintree.hosts.do-delegated-work owns "when the hub asks THIS
-      machine to implement, fix or build something as one unit of work".
-    messages:
-      - role: user
-        content: hub message, implement the parser on this lane's run branch like the other hosts are doing, and reply with the sha
-    expect:
-      required: [daintree.hosts.do-delegated-work]
-      optional: [daintree.hosts.foundation, daintree.hosts.handle-hub-message]
-
-  - id: swarm-fan-out-reverse-check-usage
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Usage per host. daintree.hosts.check-usage-limits owns "how much Claude Code or Codex
-      allowance each Remote Host this Shell reaches has left".
-    messages:
-      - role: user
-        content: which of my remote hosts still has Claude allowance this week? one row per machine
-    expect:
-      required: [daintree.hosts.check-usage-limits]
       optional: [daintree.hosts.foundation]
 
   - id: swarm-fan-out-reverse-local-fan-out

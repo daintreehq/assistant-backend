@@ -1,0 +1,41 @@
+# daintree.hosts.open-project-on-host: the person wants THIS project or branch on a Remote Host
+# that is already added, through Daintree's project dialog (the host's existing copy of the
+# repository or a fresh clone), with the dialog's push, clone folder and setup left to the
+# person. Recall cases in agent and user words (the issue's three requests among them, an
+# existing copy, a fresh clone, uncommitted and unpushed work, a repository with no remote, a
+# fork, and a clone that was cut off), a routing trap per declared neighbour where this
+# runbook wins, and reverse traps where the neighbour wins and this one must not ride along:
+# daintree.hosts.connect-host, daintree.hosts.start-swarm, daintree.hosts.delegate-to-host,
+# daintree.hosts.place-work, daintree.worktree.create-plain-worktree and
+# daintree.git.sync-with-base. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: open-project-on-host-reverse-start-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Assistants readied per host. daintree.hosts.start-swarm decides it: "Claude Code or Codex ready on
+      every Remote Host".
+    messages:
+      - role: user
+        content: get one assistant lane enrolled per host here before any work is sent
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-reverse-survey-hosts
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A read-only look at what the hosts hold. daintree.hosts.survey-hosts decides it: "ONE read-only
+      report, host by host".
+    messages:
+      - role: user
+        content: show me every Remote Host with the projects it has and who is enrolled there, change nothing
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

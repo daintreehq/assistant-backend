@@ -76,8 +76,6 @@ positives:
     run: runbook-2026-10-issue-121
   - query: I need a proper write-up of why the multi-machine run stalled, with times
     run: runbook-2026-10-issue-121
-  - query: 'Hub task: the run across the three remote hosts is finished and two units are missing. Reconstruct from each host''s exchange records when every unit was accepted, woken, read and answered, which stamps are absent, and which claims do not survive a check against the shared remote.'
-    run: runbook-2026-10-issue-121
   - query: 'Our rollout over four remote hosts failed on Tuesday night: two finished by midnight, one never came back and one pushed a branch nobody asked for. Nothing should be re-run. Find out where it first went off the plan and why the slow one was slow, with the times.'
     run: runbook-2026-10-issue-121
   - query: The cross-host test sharding finished with one shard delivered twice and another never started. Produce a post-mortem that attributes every statement to the host or person that made it and does not replay any of the work.
@@ -91,8 +89,6 @@ positives:
   - query: 'Post-mortem needed for the multi-host job that ended yesterday. Evidence only: task records, the shared remote and what the hosts themselves say. Name the earliest evidenced divergence, then the contributing factors.'
     run: runbook-2026-10-issue-121
   - query: 'We lost most of a day to the run on the other machines. Reconstruct it: when each host got its message, when it looked at it, when it answered, and which of its answers we can actually back up with a commit.'
-    run: runbook-2026-10-issue-121
-  - query: After the cross-host run, one lane's task record shows it was accepted at once and answered two hours later. Work out what the two hours were, attributing anything the lane says to the lane, and fold it into a timeline.
     run: runbook-2026-10-issue-121
   - query: hey, rough day. the run on the remote machines went sideways, can you work out exactly why and what we should change
     run: runbook-2026-10-issue-121
@@ -210,20 +206,11 @@ boundaries:
   - query: what went wrong with last night's local Codex run, and what should the next brief say
     confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-121
-  - query: why did the claude run on my other machine rewrite half the repo, post-mortem the exchange with the remote host
-    confusable_with: [daintree.agents.postmortem-run]
-    run: runbook-2026-10-issue-121
-  - query: the run split over two remote machines failed and I want a post-mortem of the whole exchange, not one pane
-    confusable_with: [daintree.agents.postmortem-run]
-    run: runbook-2026-10-issue-121
   - query: the hosts finished already, so no need to follow them. I want to know why the run went the way it did
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-121
   - query: the run on my remote hosts is over and I don't want to keep watching it; explain the stall and the duplicate work with the evidence
     confusable_with: [daintree.hosts.supervise-swarm]
-    run: runbook-2026-10-issue-121
-  - query: not where things stand, I already know that. I want to know why each exchange with the remote machines took as long as it did
-    confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-121
   - query: the hosts all answered; what I don't understand is why the replies took hours and one named the wrong commit
     confusable_with: [daintree.hosts.recover-and-clean-up]
@@ -254,9 +241,6 @@ boundaries:
     run: runbook-2026-10-issue-121
   - query: list what we should change after the failed run on the remote machines, and give me a way to reproduce each problem, not a memory note
     confusable_with: [daintree.memory.manage-project-memory]
-    run: runbook-2026-10-issue-121
-  - query: the run is dead and the work is spread over several hosts; what happened, in order, from the exchange records
-    confusable_with: [daintree.hosts.recover-and-clean-up]
     run: runbook-2026-10-issue-121
   - query: no more waiting on the hosts. a retrospective of the failed run, per host, with what each claimed and what the remote shows
     confusable_with: [daintree.hosts.supervise-swarm, daintree.hosts.recover-and-clean-up]

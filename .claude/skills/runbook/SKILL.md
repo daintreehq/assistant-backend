@@ -311,7 +311,7 @@ For an improvement, read the target's `git log --oneline -- <file>` and the case
 that name it.
 
 **C. Does anything already claim, or deny, this?**
-`grep -rn "<the capability's verbs>" src/daintree_assistant_server/runbooks/files/`
+`grep -rn "<the capability's verbs>" src/daintree_assistant_server/runbooks/catalog/`
 and the same for "cannot", "never", "has no". A runbook stating a limitation that
 stopped being true is the most expensive failure there is: the model obeys it while
 every cheap signal stays green.
@@ -391,7 +391,7 @@ change, its grounding, the size delta, and the case that would have caught it.
 > You are in a read-only sandbox; read files and run read-only commands, write
 > nothing. Default position: this design is wrong. Read `<W>/issue.md`,
 > `<W>/research.md`, `<W>/design.md`, `docs/RUNBOOKS.md`,
-> `src/daintree_assistant_server/runbooks/files/daintree.foundation.md`, the neighbour
+> `src/daintree_assistant_server/runbooks/catalog/core/daintree.foundation.md`, the neighbour
 > runbooks `<paths>`, and the app action sources `<paths on origin/develop, via git
 > show>`. Find: claims about actions the source contradicts; a neighbour the routing
 > text will lose to or steal from; anything the caller does itself that should be
@@ -491,10 +491,9 @@ corpus rows stay, the retrain is owed, the prose stops.
   pane. A third trial only to confirm a body fix.
 - **Not trialable** (a sidebar-only caller, Remote Hosts, other machines, accounts):
   record the owed run in `$W/trials/owed.md`: who can run it, where, the exact
-  prompts, and what to check. A hosts runbook's run is also an entry in
-  `references/owed-trials.yaml`, and its failure cases are scenario ids from
-  `references/failure-scenarios.yaml` (`dtrb.sh plan scenarios --runbook <id>`), not a
-  copied matrix. If the issue's "Done when" requires it, the PR says `Part of #N`.
+  prompts, and what to check, against today's help and relayed surfaces. The old
+  inbox trial planner is archived and does not validate direct host control.
+  If the issue's "Done when" requires a live trial, the PR says `Part of #N`.
 
 Run, judge and classify each trial (RUNBOOK / MODEL / ROUTING / APP / HARNESS). Fix
 **bodies** for RUNBOOK findings, restart the runbook server, reset and reseed, and
@@ -528,7 +527,7 @@ added a runbook and the first pass found at least one real problem.
    side and recompile, never hand-merge. A conflict in a case file: keep both sides'
    cases. A conflict in a runbook: re-read both versions and keep both intents.
 2. **Did the base move under the baseline?** If `git diff --name-only <the base you
-   branched from> origin/develop` touches `runbooks/files/`, `benchmarks/`,
+   branched from> origin/develop` touches `runbooks/catalog/`, `benchmarks/`,
    `training/corpus/` or the selector artifact, retake the baseline from a clean
    worktree of `origin/develop` (source first: sourcing changes directory):
 
@@ -692,7 +691,7 @@ than two runners at once.
 | `references/cases-and-corpus.md` | case shape, categories, what a runbook owes, corpus rows, blind verification, compiling |
 | `references/proof.md` | the five evidence layers, and the rule that a claim may not exceed its strongest one |
 | `references/trials.md` | the live-trial kit in `scripts/trial/`: isolation, cost, procedure, scenarios, prompts, judging, classifying |
-| `references/hub-lane-trials.md` | hub and lane trials (staged and fleet), the owed-trial register and the failure and recovery scenarios |
+| `references/host-control-trials.md` | current help/relay callers, evidence boundaries and owed live trials |
 | `references/issue-format.md` | the shape of a runbook issue, and how this skill reads one |
 | `references/templates.md` | design note, PR body, final reports |
 | `docs/RUNBOOKS.md`, `CLAUDE.md` | the repository's own authoring guide and rules; they win over anything here |

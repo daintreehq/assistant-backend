@@ -16,7 +16,7 @@ Two stages (`runbooks/local/selector.py`, `setwise.py`):
 
 - **Only `title`, `summary` and `whenToUse` are embedded.** A body-only edit moves no
   vector, changes no routing, and owes no routing measurement or corpus rows.
-- **Neither stage has per-runbook weights.** A new file in `runbooks/files/` is
+- **Neither stage has per-runbook weights.** A new file in `runbooks/catalog/` is
   embedded at load and is searchable at once. *Reachable is not competitive*: three
   runbooks held out of training scored 4/14 on their cases against 13/14 trained. A
   new runbook wins requests only it plausibly answers and loses contested ones to

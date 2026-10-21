@@ -1,6 +1,6 @@
 ---
 name: retrain-selector
-description: "Retrain the local two-stage runbook selector to make new or edited runbooks route COMPETITIVELY. Not required to make a runbook selectable at all — the set-wise head has no per-runbook weights, so a runbook added to runbooks/files/ is embedded on load and reachable that turn — but a never-trained runbook loses contested requests to established neighbours (measured 4/14 vs 13/14), so a runbook sharing vocabulary with an existing one still needs data. User-initiated only: run when the user asks for a retrain (normally once on develop, after a batch of runbook work merges); any other run names it as owed instead of running it."
+description: "Retrain the local two-stage runbook selector to make new or edited runbooks route COMPETITIVELY. Not required to make a runbook selectable at all — the set-wise head has no per-runbook weights, so a runbook added to runbooks/catalog/ is embedded on load and reachable that turn — but a never-trained runbook loses contested requests to established neighbours (measured 4/14 vs 13/14), so a runbook sharing vocabulary with an existing one still needs data. User-initiated only: run when the user asks for a retrain (normally once on develop, after a batch of runbook work merges); any other run names it as owed instead of running it."
 argument-hint: "(optional) space-separated runbook ids that are NEW, so data generation focuses there"
 allowed-tools:
   - Bash
@@ -101,7 +101,7 @@ The selector is **two stages** (`runbooks/local/setwise.py`):
    runbook embeddings together, and returns a logit per candidate plus the docs
    and cardinality decisions.
 
-**Neither stage has per-runbook parameters.** A runbook added to `runbooks/files/` is
+**Neither stage has per-runbook parameters.** A runbook added to `runbooks/catalog/` is
 embedded by `SetwiseClassifier.sync()` the moment the catalog loads it, gets a
 row in the table, and can be selected that turn — no provenance gate, no
 degraded window. Under the fixed-head classifier that preceded it, a new runbook

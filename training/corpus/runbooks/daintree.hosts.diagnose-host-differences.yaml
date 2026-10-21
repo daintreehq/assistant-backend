@@ -1,16 +1,6 @@
-# daintree.hosts.diagnose-host-differences: from this Shell's hub, why one commit passes on one
-# Remote Host and fails on another. Each host's assistant checks its checkout against the pinned
-# commit, reproduces without changes and reports a non-secret fingerprint; the hub compares and
-# ranks the differences by evidence, fixing nothing.
-#
-# Positives are invented situations in agent and user words, short and long, some with a social
-# lead-in or an earlier turn. Boundaries are requests this runbook wins against a neighbour whose
-# vocabulary they share: a matrix of results (run-validation-matrix), a fix here
-# (ci.diagnose-and-fix), one question to one host (ask-host-assistant), a lane testing a commit
-# (verify-for-hub), messaging gates (diagnose-messaging), machine load
-# (relieve-resource-contention), and the runbooks the starting sweep picked (swarm-fan-out,
-# delegate-to-host, provision-local-environment). Followups are the diagnosis as a second turn.
-# Machine names are generic.
+# daintree.hosts.diagnose-host-differences: Find why one commit behaves differently on two hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.diagnose-host-differences.md
+
 runbook: daintree.hosts.diagnose-host-differences
 run: runbook-2026-10-issue-119
 

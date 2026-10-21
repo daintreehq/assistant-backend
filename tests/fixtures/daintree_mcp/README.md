@@ -3,31 +3,26 @@
 What the Daintree desktop app's MCP server (`/mcp` on the app's loopback port)
 sends each class of caller in `tools/list`: the exact wire tool entries
 (`name`, `description`, `inputSchema`, `outputSchema`, `annotations`, `_meta`),
-captured from the app itself rather than written by hand. The control catalog's
-runbooks (`runbooks/files/`) are checked against these. The inbox catalog served
-to v0.44 clients is checked against its own frozen capture in `inbox/`.
+captured from the app itself rather than written by hand. All current runbooks
+(`runbooks/catalog/`) are checked against these captures. Retired v0.44 surfaces
+are historical material in `archive/inbox-v0.44/surfaces/`.
 
-**Source:** `daintreehq/daintree` commit `f45fa04b3b` ("Merge pull request
-#13514 from daintreehq/feature/issue-13496-message-assistants-like-agent-terminals"),
-app `develop` with direct host control (#13493: `host.list`, `host.call`), the
-window-less host loop and its command runner (#13495: `project.runCommand`),
-relayed idle notices (#13500) and assistant messaging as agent messaging with the
-inbox retired (#13496: `assistant.list`, `assistant.start`, `agent.readQuota`).
-App version 0.44.0 (unreleased build), MCP SDK 1.30, protocol `2025-11-25`.
-Captured 2026-10-18. Previous capture: `f91badae47` (2026-10-18, the inbox
-model; frozen in `inbox/`).
+**Source:** `daintreehq/daintree` commit `1006cbca719950c122d995c7b378138a3968aaa2`,
+`develop`, app 0.45.0. Captured 2026-10-21. This includes direct host control,
+assistant messaging through agent terminals, background agent placement and
+`terminal.placeOwned`. The capture also ran 190 app host-control contract tests.
 
-| file | caller | tier | tools | `mcp.surface` hash |
-|---|---|---|---|---|
-| `pane-core.json` | agent CLI in a Daintree pane, project MCP = Core | `core` | 78 (34 run, 44 ask first) | `6440e552…` |
-| `pane-full.json` | agent CLI in a Daintree pane, project MCP = Full | `full` | 78 | `5ce81f4c…` |
-| `help-core.json` | Daintree's sidebar assistant (help session) on a Shell with a Remote Host, Tool set = Core | `core` | 41 | `c9ba0b84…` |
-| `help-full.json` | the same sidebar assistant, Tool set = Full | `full` | 90 | `ce7bfbc7…` |
-| `relayed-core.json` | what a Remote Host offers a Shell's assistant inside `host.call`, Core | `core` | 36 | `8419db95…` |
-| `relayed-full.json` | the same relayed session, Full | `full` | 79 | `2a33fb16…` |
-| `external.json` | API-key client (or no key set), not bound to a workspace | `external` | 34 | `3ceda0e9…` |
+| file | tools | `mcp.surface` hash |
+|---|---|---|
+| `external.json` | 35 | `713376a5…` |
+| `help-core.json` | 42 | `cf11205c…` |
+| `help-full.json` | 91 | `93d756c0…` |
+| `pane-core.json` | 79 | `834035d0…` |
+| `pane-full.json` | 79 | `ab8e37f0…` |
+| `relayed-core.json` | 37 | `5b17fc0d…` |
+| `relayed-full.json` | 80 | `7f7f87b2…` |
 
-Full hashes are in each file's `capture.surface_hash`.
+Full hashes and caller/tier details are in each file's `capture`.
 
 ## Host control: the help and relayed surfaces
 

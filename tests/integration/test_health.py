@@ -16,15 +16,13 @@ def test_liveness_on_both_paths(client: TestClient) -> None:
         assert client.get(path).json() == {"status": "ok"}
 
 
-def test_ready_reports_both_catalogs(client: TestClient, app: Any) -> None:
-    catalogs = app.state.container.catalogs
+def test_ready_reports_the_current_catalog(client: TestClient, app: Any) -> None:
+    catalog = app.state.container.catalog
     body = client.get("/readyz").json()
     assert body == {
         "status": "ready",
-        "catalog_revision": catalogs.control.revision,
-        "runbooks": len(catalogs.control.selectable_ids),
-        "inbox_catalog_revision": catalogs.inbox.revision,
-        "inbox_runbooks": len(catalogs.inbox.selectable_ids),
+        "catalog_revision": catalog.revision,
+        "runbooks": len(catalog.selectable_ids),
     }
 
 
@@ -59,9 +57,10 @@ def test_a_failed_startup_is_unready_not_dead(monkeypatch: Any) -> None:
 
 
 def test_request_id_is_echoed_or_minted(client: TestClient) -> None:
-    assert client.get("/healthz", headers={"X-Request-Id": "abc-123"}).headers[
-        "x-request-id"
-    ] == "abc-123"
+    assert (
+        client.get("/healthz", headers={"X-Request-Id": "abc-123"}).headers["x-request-id"]
+        == "abc-123"
+    )
     minted = client.get("/healthz", headers={"X-Request-Id": "has spaces\n"}).headers[
         "x-request-id"
     ]

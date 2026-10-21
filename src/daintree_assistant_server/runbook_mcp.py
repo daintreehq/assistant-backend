@@ -188,8 +188,8 @@ TOOL_DEFINITION: dict[str, Any] = {
     "title": "Search Daintree runbooks",
     "description": (
         "Find the Daintree runbooks that fit a task. Describe the outcome the way a "
-        "user would ask for it (\"ask one agent a question and bring back its "
-        "answer\"), not as keywords, and keep it short: no transcripts, terminal "
+        'user would ask for it ("ask one agent a question and bring back its '
+        'answer"), not as keywords, and keep it short: no transcripts, terminal '
         "output or secrets. Keep how the user wants it done, not just the code change: "
         "several agents, a time limit, a running agent, a review loop, a plugin skill or a "
         "slash command decide which procedure fits. Returns up to max_results runbooks, "
@@ -239,7 +239,7 @@ GET_TOOL_DEFINITION: dict[str, Any] = {
     "name": GET_TOOL_NAME,
     "title": "Get a Daintree runbook by id",
     "description": (
-        "Return one Daintree runbook by its exact id (e.g. \"daintree.foundation\"), "
+        'Return one Daintree runbook by its exact id (e.g. "daintree.foundation"), '
         "with its full procedure in `instructions` and its prerequisite instructions in "
         "`supporting_runbooks` (by id and a note when this session already has them). "
         "Use it for a runbook named by another runbook, a search result or a checkpoint, "
@@ -381,7 +381,7 @@ async def handle_message(
 ) -> McpReply:
     """Answer ONE JSON-RPC message.
 
-    ``catalog`` is the caller's own (``catalog.Catalogs.view_for``), and ``attach``
+    ``catalog`` is the caller's own (``catalog.view_for``), and ``attach``
     what it gets with every runbook served in full (``Catalog.supporting_for``).
 
     ``delivered`` is what the caller's session was already sent in full (runbook
@@ -481,9 +481,7 @@ async def handle_message(
     if method == "ping":
         return _result(request_id, {}, method=method)
     if method == "tools/list":
-        return _result(
-            request_id, {"tools": list(TOOL_DEFINITIONS), **_CACHE_HINTS}, method=method
-        )
+        return _result(request_id, {"tools": list(TOOL_DEFINITIONS), **_CACHE_HINTS}, method=method)
     if method == "tools/call":
         version = headers.protocol_version or meta_version
         if version is not None and version not in _HANDSHAKE_VERSIONS:

@@ -44,22 +44,6 @@ cases:
       required: [daintree.hosts.run-validation-matrix]
       optional: [daintree.hosts.foundation]
 
-  - id: run-validation-matrix-agent-outcome
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      Agent-phrased outcome. Decided by the deliverable "one matrix with a row per requested
-      environment (platform, architecture, runtime versions, checks)" and "shown as passed, failed
-      with the failing tests".
-    messages:
-      - role: user
-        content: >-
-          From the hub, have each remote host test the exact SHA under its own OS and Node version
-          and bring back a pass/fail/could-not-run row per environment
-    expect:
-      required: [daintree.hosts.run-validation-matrix]
-      optional: [daintree.hosts.foundation]
-
   - id: run-validation-matrix-user-two-pythons
     category: single-runbook
     note: >-
@@ -226,32 +210,3 @@ cases:
         content: we already have the per-platform test results from the hosts; is 3.2 good to ship?
     expect:
       required: [daintree.release.assess-readiness]
-
-  - id: run-validation-matrix-reverse-lane-one-row
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The lane's side: the hub asked this machine for one environment. daintree.hosts.verify-for-hub,
-      "the hub asks this lane to TEST or VERIFY a commit" and "one environment row of the hub's matrix".
-      This runbook must not ride along.
-    messages:
-      - role: user
-        content: the hub wants this machine to test commit 3f9e0d1 under node 20 only and send back the counts
-    expect:
-      required: [daintree.hosts.verify-for-hub]
-      optional: [daintree.hosts.foundation]
-
-  - id: run-validation-matrix-reverse-lane-matrix-row
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The lane's side in matrix words: daintree.hosts.verify-for-hub, "one environment row of the
-      hub's matrix". This runbook must not ride along; it excludes "one host testing its own row for
-      the hub (daintree.hosts.verify-for-hub)". An honest measurement of an untrained runbook: its
-      "matrix" vocabulary still pulls it in as an extra until a retrain on the boundary rows.
-    messages:
-      - role: user
-        content: the hub asked this machine to run its matrix row for a commit, macOS arm64 with python 3.12, no fixes
-    expect:
-      required: [daintree.hosts.verify-for-hub]
-      optional: [daintree.hosts.foundation]

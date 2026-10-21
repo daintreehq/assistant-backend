@@ -1,0 +1,67 @@
+# daintree.hosts.diagnose-host-differences: the hub works out why one commit passes on one Remote
+# Host and fails on another. Each host's assistant checks its checkout against the pinned commit,
+# reproduces without changes and reports a non-secret fingerprint; the hub ranks the differences
+# by evidence and fixes nothing.
+# Recall cases are the issue's three requests plus agent- and user-phrased outcomes. Routing traps:
+# this runbook wins against each declared neighbour. Reverse traps: the neighbour wins and this
+# runbook must not ride along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: diagnose-host-differences-agent-outcome
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "each host's checkout compared with the commit", "the
+      failure reproduced there without edits" and "a comparable non-secret environment fingerprint
+      from each host".
+    messages:
+      - role: user
+        content: >-
+          From the hub, find out why one commit passes its tests on one remote host and fails on
+          another: check each host's checkout against the SHA, have it reproduce the failure
+          without changes, and compare runtime versions, locale and installed dependencies
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-not-verify-for-hub
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub, after its lanes tested one SHA, wants the cause of the split.
+      daintree.hosts.verify-for-hub must not be picked: this text excludes "a host testing a commit
+      it was sent (daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: the hub asked both lanes to test the same sha; one passed and one failed, now find the cause by comparing the two hosts
+    expect:
+      required: [daintree.hosts.diagnose-host-differences]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-host-differences-reverse-verify-for-hub
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The lane's side, testing the hub's commit: daintree.hosts.verify-for-hub wins on "the hub asks
+      this lane to TEST or VERIFY a commit"; this runbook must not ride along. The lane's message
+      handler may ride along, as in the verify-for-hub cases.
+    messages:
+      - role: user
+        content: the hub's request is to confirm whether 3b9e2f4 compiles on this arm machine and passes its smoke tests; leave the code as it is
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]
+
+  - id: diagnose-host-differences-reverse-diagnose-messaging
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A send that came back paused: daintree.hosts.diagnose-messaging wins on "cannot message or
+      start the Daintree assistant on it"; this runbook must not ride along.
+    messages:
+      - role: user
+        content: the send to the mac host came back paused, why can't I reach its assistant
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]

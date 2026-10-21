@@ -56,24 +56,6 @@ cases:
       required: [daintree.hosts.park-swarm]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: park-swarm-agent-phrased
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      How a hub agent describes the task to search. Decided by "a resume record kept where the
-      person chooses (per host: project, slot, branch, SHA, pushed or not, uncommitted files,
-      panes, open questions, what must not be redone, and which hosts never acknowledged)".
-    messages:
-      - role: user
-        content: >-
-          Hub task: park the in-flight run on the Remote Hosts until tomorrow. Each host's
-          assistant stops its agents with their work kept; record per host the branch, HEAD,
-          whether it is pushed and the uncommitted files, and flag any host that never
-          acknowledged.
-    expect:
-      required: [daintree.hosts.park-swarm]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
   - id: park-swarm-resume-after-shell-reboot
     category: single-runbook
     note: >-
@@ -125,21 +107,6 @@ cases:
       required: [daintree.hosts.park-swarm]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: park-swarm-trap-not-recover
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      After a hub restart, the request is to resume a parked run, not an account of what
-      happened: "the hub restarted, pick the parked remote run back up from its record", against
-      the fence "an account of what happened while away, or cleanup
-      (daintree.hosts.recover-and-clean-up)".
-    messages:
-      - role: user
-        content: The hub restarted. Resume the remote run we parked yesterday from its record.
-    expect:
-      required: [daintree.hosts.park-swarm]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
   - id: park-swarm-trap-not-steer-for-hub
     category: routing-trap
     note: >-
@@ -179,32 +146,3 @@ cases:
     expect:
       required: [daintree.orchestration.park-work]
       optional: [daintree.foundation]
-
-  - id: park-swarm-reverse-recover-rebuild
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse: a catch-up after a restart with nothing parked. daintree.hosts.recover-and-clean-up
-      owns "rebuild where every exchange with the Remote Hosts stands after a restart, a new hub
-      or a dropped link, from each host's task records"; this runbook fences "an account of what
-      happened while away".
-    messages:
-      - role: user
-        content: Daintree restarted on this Mac. Rebuild where every delegated exchange with the remote hosts stands from their task records.
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
-  - id: park-swarm-reverse-steer-for-hub-lane
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse: the lane receiving the hub's pause. daintree.hosts.steer-for-hub owns "on a Remote
-      Host's lane to STOP, PAUSE or CHANGE the work of the AGENTS it launched for one of the
-      hub's runs"; this runbook fences "the receiving machine stopping its own agents".
-    messages:
-      - role: user
-        content: "Message from the hub: pause the agents this lane launched for its parser run and report each one's HEAD and uncommitted files."
-    expect:
-      required: [daintree.hosts.steer-for-hub]
-      optional: [daintree.hosts.foundation, daintree.foundation]

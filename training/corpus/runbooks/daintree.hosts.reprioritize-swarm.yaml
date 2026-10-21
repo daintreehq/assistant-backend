@@ -1,19 +1,6 @@
-# daintree.hosts.reprioritize-swarm: the hub re-planning a run busy on the Remote Hosts when
-# something urgent jumps the queue.
-# Each running task is kept, paused with a resume note or redirected through its host's own
-# assistant, the urgent work is started first on a lane with the repository and room, the pause
-# counts only when the lane's reply says so, and a paused task resumes only on the person's word.
-#
-# Rows: urgent-priority requests in people's own words and as hub agents describe them (a
-# release blocker, a hotfix, a security patch, an outage fix), some with the units named, some
-# asking which gave way; followups after the run's state was read, after the pause was
-# acknowledged and after the urgent work finished (resume only what is named); and boundaries
-# against re-planning agents on this machine (daintree.orchestration.reprioritize-work), stopping
-# or changing a run with nothing urgent (daintree.hosts.steer-swarm), parking for later
-# (daintree.hosts.park-swarm), placing a new batch with no preemption
-# (daintree.hosts.place-work), following a run (daintree.hosts.supervise-swarm) and moving one
-# unit off a failing host (daintree.hosts.reassign-host-work), each with reverse rows in that
-# neighbour's file.
+# daintree.hosts.reprioritize-swarm: Make room on the Remote Hosts for urgent work
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.reprioritize-swarm.md
+
 runbook: daintree.hosts.reprioritize-swarm
 run: runbook-2026-10-issue-150
 
@@ -33,7 +20,6 @@ positives:
     the long benchmark. A blocker bug in the installer just landed from QA. Keep the benchmark
     going, pause the two cleanups at a safe point with notes, and put one agent on the installer
     bug on each host that has the repository.
-  - 'Hub agent: priority change from the person. The login fix now outranks the current batch on the Remote Hosts; decide per task whether it continues, pauses or turns to the fix, and report which lanes confirmed.'
   - this flaky deploy script is blocking the whole team, move some of the remote agents onto it and hold their old tasks
   - put the urgent fix at the front of my remote queue and park only as much of the running work as it takes to start it
   - Can you bump the data-loss bug above everything that's running on my other computers? Hold the least important jobs and tell me what you paused.
@@ -44,16 +30,10 @@ positives:
   - Priority one just changed. I want my remote hosts on the broken build, and the half-finished feature work paused with a precise note on the next step so nobody redoes anything.
   - drop everything non-essential on the other machines, the regression in the importer needs two agents now
   - switch the remote swarm to the urgent hotfix, keep what is nearly done and pause the rest
-  - >-
-    A vulnerability report just arrived. Three Remote Hosts are in the middle of a feature run.
-    Find the ones with the repository checked out, pause the least advanced work there so the lanes
-    can start patch workers in clean worktrees, leave the nearly finished tasks alone, and confirm
-    each pause with the lane before you count the room as free.
   - the build server host is the only one with the signing keys, and the hotfix needs it, so make that host's current work give way
   - Emergency. Clear two remote workers for the rollback fix, put their current work on hold with notes, and keep everything else going.
   - one of the remote tasks is now far less important than the new bug. pause it, move that agent to the bug, and make sure its work is kept
   - we got a priority-zero ticket. reshuffle the other machines around it and give me the list of what was paused, what was redirected and what was left alone
-  - 'Delegated exchanges are in flight on three hosts for the migration run. A new urgent bug needs capacity: ask the lanes which agents can pause cleanly, free the room, start the bug work, and keep every pause recorded for a later resume.'
   - I know the remote hosts are busy but this takes priority. Re-rank their work and get on it.
   - pause the benchmarks running on the hosts, the p0 fix needs the CPU and agents more
   - morning! the nightly run is still going on the other machines and an urgent patch came in overnight, can you put it first and hold the nightly stuff?
@@ -80,10 +60,6 @@ followups:
     history:
       - "user: urgent hotfix on the remote hosts, free some capacity"
       - "assistant: I would keep the migration, pause the docs task and the refactor, and put two workers on the hotfix. The refactor has uncommitted work that stays in place. Proceed?"
-  - query: did the docs host confirm it paused, or can I not count its room yet?
-    history:
-      - "user: pause the remote docs work for the urgent fix"
-      - "assistant: The pause went to both lanes. One has answered."
   - query: actually the second bug is more urgent than the first, move the agents over to it
     history:
       - "user: urgent crash fix on the remote hosts, pause the rest"
@@ -116,8 +92,6 @@ boundaries:
     confusable_with: [daintree.orchestration.reprioritize-work]
   - query: take the nice-to-have tasks of the remote run down so the urgent patch has agents to use, leave the important ones alone
     confusable_with: [daintree.hosts.steer-swarm]
-  - query: tell the lanes to pause two of the tasks I sent them because something more important arrived, and report which ones stopped
-    confusable_with: [daintree.hosts.steer-swarm]
   - query: the blocker is more important than the docs and refactor work running on the hosts, so have those hosts give up their agents to it, and I will tell you which ones to restart afterwards
     confusable_with: [daintree.hosts.park-swarm]
   - query: pause part of the remote run with notes on where each task stopped so the urgent fix can have those agents, I will say when to resume
@@ -130,7 +104,5 @@ boundaries:
     confusable_with: [daintree.hosts.supervise-swarm]
   - query: nothing is broken on the hosts, they are just busy, but the new blocker needs workers there before anything else
     confusable_with: [daintree.hosts.reassign-host-work]
-  - query: pause the lower-priority work on my hosts and start the urgent bug, then tell me which lanes acknowledged
-    confusable_with: [daintree.hosts.steer-swarm]
   - query: an urgent production bug arrived and my remote hosts are running long tasks, free capacity there before anything else
     confusable_with: [daintree.debug.investigate-outage]

@@ -1,0 +1,63 @@
+# daintree.hosts.coordinate-contract-change: the hub has one interface contract (an API, a schema,
+# a message format) agreed and frozen at a commit in the one repository that holds it, briefs the
+# hosts building each side in their own repositories with that version, carries each change as a
+# new version the affected hosts pause for and adopt, and rejects results built on an older one.
+# Recall cases are the issue's three requests plus agent- and user-phrased requests: a copy edited
+# instead of amended, a new field mid-build, and two user phrasings (a stale result, a schema agreed
+# before two machines build) that an untrained runbook loses to trained hosts neighbours: honest
+# measurement, retrain owed. Routing traps: this runbook wins against each declared neighbour;
+# reverse traps: each close neighbour wins its own request and this runbook stays out.
+cases:
+  - id: coordinate-contract-change-not-execute-distributed-workflow
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Agent-phrased: the contract and its adoption, not a staged plan. Decided by "The deliverable is
+      the contract's versions and each side's adoption"; this runbook fences "a staged plan of
+      dependent units with no contract to agree or change (daintree.hosts.execute-distributed-workflow)".
+    messages:
+      - role: user
+        content: >-
+          Freeze one versioned interface contract for a producer and a consumer that live in different
+          repositories on two Remote Hosts, brief each host's lane with the pinned contract commit, and
+          record which version each side adopts
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-not-do-delegated-work
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hub's briefing of the lanes, not a lane's own unit. Decided by "each side briefed with that
+      version on its own repository's base"; this runbook fences "on a host's lane building or testing
+      its side (daintree.hosts.do-delegated-work, daintree.hosts.verify-for-hub)".
+    messages:
+      - role: user
+        content: "two repos on two machines, one interface between them: hand each host's lane the frozen contract commit to build against and have it come back to me if the contract must change"
+    expect:
+      required: [daintree.hosts.coordinate-contract-change]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-do-delegated-work
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The lane building its side against a pinned contract. Decided by "Use on a Remote Host's lane when
+      the hub asks THIS machine to implement, fix or build something as one unit of work".
+    messages:
+      - role: user
+        content: "hub message: implement the consumer side against contract commit 4be1c7a in a new worktree and reply with the SHA"
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.hosts.foundation]
+  - id: coordinate-contract-change-reverse-verify-for-hub
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The lane testing a commit for the hub. Decided by "Use when the hub asks this lane to TEST or
+      VERIFY a commit or branch here and report the results, with no fixes".
+    messages:
+      - role: user
+        content: the hub wants this machine to run the contract tests at commit 9f3e2a1 and report the counts, no fixes
+    expect:
+      required: [daintree.hosts.verify-for-hub]
+      optional: [daintree.hosts.foundation]

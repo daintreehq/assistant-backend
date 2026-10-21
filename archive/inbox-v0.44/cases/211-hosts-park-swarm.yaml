@@ -1,0 +1,77 @@
+# daintree.hosts.park-swarm: the hub parking a run on the Remote Hosts for later and resuming it.
+# Each host's own assistant stops its agents with their work left in place (through the hub's
+# steering procedure); the hub keeps a resume record of what every host holds and which hosts
+# never acknowledged, kept where the person chooses; a later hub session resumes the run from
+# fresh host records, never from an old notice, with no second agent on any unit.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, a resume
+# after the hub restarted, and a host that does not answer the park. Traps: this runbook wins
+# against stopping or changing a run with no comeback (daintree.hosts.steer-swarm), parking
+# agents on this machine (daintree.orchestration.park-work), catching up after a restart
+# (daintree.hosts.recover-and-clean-up) and the receiving machine stopping its own agents
+# (daintree.hosts.steer-for-hub); and the reverse traps, where each neighbour keeps its own
+# request and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: park-swarm-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How a hub agent describes the task to search. Decided by "a resume record kept where the
+      person chooses (per host: project, slot, branch, SHA, pushed or not, uncommitted files,
+      panes, open questions, what must not be redone, and which hosts never acknowledged)".
+    messages:
+      - role: user
+        content: >-
+          Hub task: park the in-flight run on the Remote Hosts until tomorrow. Each host's
+          assistant stops its agents with their work kept; record per host the branch, HEAD,
+          whether it is pushed and the uncommitted files, and flag any host that never
+          acknowledged.
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: park-swarm-trap-not-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      After a hub restart, the request is to resume a parked run, not an account of what
+      happened: "the hub restarted, pick the parked remote run back up from its record", against
+      the fence "an account of what happened while away, or cleanup
+      (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: The hub restarted. Resume the remote run we parked yesterday from its record.
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: park-swarm-reverse-recover-rebuild
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse: a catch-up after a restart with nothing parked. daintree.hosts.recover-and-clean-up
+      owns "rebuild where every exchange with the Remote Hosts stands after a restart, a new hub
+      or a dropped link, from each host's task records"; this runbook fences "an account of what
+      happened while away".
+    messages:
+      - role: user
+        content: Daintree restarted on this Mac. Rebuild where every delegated exchange with the remote hosts stands from their task records.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: park-swarm-reverse-steer-for-hub-lane
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse: the lane receiving the hub's pause. daintree.hosts.steer-for-hub owns "on a Remote
+      Host's lane to STOP, PAUSE or CHANGE the work of the AGENTS it launched for one of the
+      hub's runs"; this runbook fences "the receiving machine stopping its own agents".
+    messages:
+      - role: user
+        content: "Message from the hub: pause the agents this lane launched for its parser run and report each one's HEAD and uncommitted files."
+    expect:
+      required: [daintree.hosts.steer-for-hub]
+      optional: [daintree.hosts.foundation, daintree.foundation]

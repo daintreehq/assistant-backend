@@ -174,14 +174,7 @@ def build_coverage(catalog: Catalog, cases: list[BenchCase]) -> list[RunbookCove
     for runbook in catalog.runbooks:
         sid = runbook.id
         if sid not in selectable:
-            # SERVER-PINNED, and therefore not the classifier's to reach. The
-            # documentation runbook is loaded off the turn's `docs_query` (see
-            # config.DOCS_RUNBOOK_ID) and is hidden from the selector's catalog
-            # entirely, so demanding a recall case for it would demand a case
-            # asserting the selector picks something it cannot see — a case that
-            # can only be written by lying about the expectation. Its loading is
-            # covered by unit tests over `resolve_active_runbooks`, which is where a
-            # deterministic rule belongs.
+            # Reserved hidden ids are not the classifier's to choose.
             continue
         nbrs = neighbours[sid]
         rows.append(

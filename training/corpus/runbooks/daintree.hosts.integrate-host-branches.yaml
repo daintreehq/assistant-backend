@@ -1,18 +1,6 @@
-# daintree.hosts.integrate-host-branches: the hub's side of combining what several Remote Hosts
-# built. From the person's Shell, the hub checks each host's result on the shared remote, chooses
-# one host's assistant to do the merging, briefs it with the inputs in order and what each must
-# still satisfy, and verifies the branch it reports holds exactly those inputs.
-#
-# Rows: hub-side combination requests in agents' task descriptions and people's own words, with
-# the situations the procedure handles (a source branch that moved after the job went out, an
-# input never pushed, a host's question about a conflict, choosing which machine merges, the
-# integrator's result checked on the remote, push or PR authority, a reply lost to a restart);
-# followups after a fan-out or a delegated round; docs questions; and boundaries against one
-# unit on one host (daintree.hosts.delegate-to-host), the same work on every host
-# (daintree.hosts.swarm-fan-out), merging on this machine (daintree.git.integrate-agent-branches),
-# the lane doing the merge (daintree.hosts.integrate-for-hub) and different pieces placed across
-# hosts (daintree.hosts.place-work), each with reverse rows in that neighbour's file, plus one
-# reverse row for a restart mid-merge in daintree.hosts.recover-and-clean-up's.
+# daintree.hosts.integrate-host-branches: Have one host combine what several hosts built
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.integrate-host-branches.md
+
 runbook: daintree.hosts.integrate-host-branches
 run: runbook-2026-10-issue-116
 

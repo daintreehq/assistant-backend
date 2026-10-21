@@ -35,21 +35,6 @@ cases:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation]
 
-  - id: supervise-swarm-resume-from-notices
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      An issue request. Decided by the title, "Supervise a run on the Remote Hosts through its
-      delegated exchange updates". execute-durable-workflow rides along on "resume" and
-      "delegated" (its "delegate-then-verify work" and "resume it later"); that extra is the
-      untrained-runbook cost, retrain owed.
-    messages:
-      - role: user
-        content: Resume swarm supervision from delegated exchange notices.
-    expect:
-      required: [daintree.hosts.supervise-swarm]
-      optional: [daintree.hosts.foundation]
-
   - id: supervise-swarm-studios-tell-me-done
     category: single-runbook
     note: >-
@@ -73,23 +58,6 @@ cases:
     messages:
       - role: user
         content: keep the swarm going and answer what you can
-    expect:
-      required: [daintree.hosts.supervise-swarm]
-      optional: [daintree.hosts.foundation]
-
-  - id: supervise-swarm-agent-phrased
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      Agent-phrased outcome. Decided by "once this Shell's work is OUT on the Remote Hosts", "a
-      host's question answered within the person's request", "each finished unit verified by
-      branch, SHA or PR" and "one row per unit at the end".
-    messages:
-      - role: user
-        content: >-
-          Follow the run already out on the Remote Hosts to its end: read each exchange as it
-          moves, answer a host's question inside the original request, check every finished
-          unit's branch and SHA, and give one row per unit.
     expect:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation]
@@ -121,21 +89,6 @@ cases:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation]
 
-  - id: supervise-swarm-update-line
-    host_model: inbox
-    category: background-wake
-    note: >-
-      The hub's own wake line for work it sent, quoted in the positive clause: "the line
-      "Daintree: delegated exchange update (exchanges …)" for work it sent". Before this
-      runbook it routed to execute-durable-workflow at 0.95; two text attempts on each side of
-      that boundary did not move it past the trained owner (measure.md). Retrain owed.
-    messages:
-      - role: user
-        content: "Daintree: delegated exchange update (exchanges 5d0e2a71-8c3f-4e9b-a6d2-7f1c0b9e3a48, b2c4e6f8-1a3b-4c5d-9e7f-2a4b6c8d0e1f)."
-    expect:
-      required: [daintree.hosts.supervise-swarm]
-      optional: [daintree.hosts.foundation]
-
   - id: supervise-swarm-quiet-fourth-host
     category: single-runbook
     note: >-
@@ -150,22 +103,6 @@ cases:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation]
 
-  - id: supervise-swarm-host-message-to-hub
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      A host's own message to the hub mid-run. Decided by "a host's own message answered";
-      handle-hub-message is the lane receiving the hub's message ("Use on a Remote
-      Host's Daintree assistant acting as a lane when the hub, the assistant on the person's main machine, has messaged it"), the
-      other direction. Retrain owed.
-    messages:
-      - role: user
-        content: the build box's assistant just messaged the hub asking which base branch it should use
-    expect:
-      required: [daintree.hosts.supervise-swarm]
-      optional: [daintree.hosts.foundation]
-
-  # ------------------------------------------------------------- routing traps
   - id: supervise-swarm-not-swarm-fan-out
     category: routing-trap
     note: >-
@@ -232,37 +169,6 @@ cases:
       required: [daintree.hosts.supervise-swarm]
       optional: [daintree.hosts.foundation]
 
-  - id: supervise-swarm-not-handle-hub-message
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Said on the hub about the lanes, so not daintree.hosts.handle-hub-message, which is "Use on
-      a Remote Host's Daintree assistant acting as a lane when the hub, the assistant on the person's main machine, has messaged it";
-      decided by "the run kept moving" and "a host's question answered within the person's
-      request".
-    messages:
-      - role: user
-        content: as the hub, keep the run on the remote hosts moving, answer the lanes' in-scope questions and verify each reply
-    expect:
-      required: [daintree.hosts.supervise-swarm]
-      optional: [daintree.hosts.foundation]
-
-  # ------------------------------------------------------------ reverse traps
-  - id: supervise-swarm-reverse-recover
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. An account of the exchanges after a restart is daintree.hosts.recover-and-clean-up
-      ("which delegated exchanges finished, which are still open, which will never be
-      answered"); this runbook keeps a run moving ("the person wants the run followed to its
-      end") and must not ride along.
-    messages:
-      - role: user
-        content: Daintree restarted an hour ago; tell me which of the exchanges I sent the remote hosts finished and which never will
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
-
   - id: supervise-swarm-reverse-swarm-fan-out
     category: routing-trap
     note: >-
@@ -299,21 +205,6 @@ cases:
     expect:
       required: [daintree.orchestration.supervise-fleet]
 
-  - id: supervise-swarm-reverse-handle-hub-message
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. On a lane, the hub's message is daintree.hosts.handle-hub-message ("the hub
-      sent me a message, read it and deal with it"); this runbook is the hub's side and must not ride
-      along.
-    messages:
-      - role: user
-        content: the hub's message just landed in this lane's inbox asking for the lint results; handle it
-    expect:
-      required: [daintree.hosts.handle-hub-message]
-      optional: [daintree.hosts.foundation]
-
-  # ----------------------------------------------- steer-swarm, landed meanwhile
   - id: supervise-swarm-not-steer-swarm
     category: routing-trap
     note: >-

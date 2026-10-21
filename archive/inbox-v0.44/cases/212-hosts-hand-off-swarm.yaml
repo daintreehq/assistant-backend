@@ -1,0 +1,177 @@
+# daintree.hosts.hand-off-swarm: coordination of a run already out on the Remote Hosts passing from
+# one hub session to another on the same Shell (Claude Code to Codex and back). The outgoing hub
+# freezes and writes a hand-over where the person chooses, the person switches the hub (no tool
+# can), and the successor rebuilds every exchange from the Shell's task records, resending nothing,
+# then supervises on. Another Shell's hub cannot take the run over: the plan is person-mediated.
+#
+# Recall: the issue's three requests (two of them still lose to an untrained neighbour: retrain
+# owed), an agent-phrased task, a casual line, the successor's prompt and the other-Shell question.
+# Traps: this runbook wins against a hold to resume later (daintree.hosts.park-swarm), an account
+# of a run after a restart (daintree.hosts.recover-and-clean-up), following a run its own hub sent
+# (daintree.hosts.supervise-swarm) and a coordinator pane's agents on this machine
+# (daintree.orchestration.hand-off-orchestration); and the reverse traps, where each neighbour
+# keeps its own request and this runbook must not ride along.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: hand-off-swarm-issue-fresh-hub
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "the session coordinating a run ALREADY OUT on the Remote Hosts
+      is being REPLACED BY ANOTHER SESSION NOW while the hosts keep working" and the quoted
+      "hand the cross-machine swarm to a fresh hub assistant". At base it selected
+      daintree.memory.manage-project-memory, daintree.orchestration.multi-agent and
+      daintree.orchestration.hand-off-orchestration.
+    messages:
+      - role: user
+        content: Hand this cross-machine swarm to a fresh hub assistant without restarting work.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-issue-handover-document
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "The deliverable is a hand-over between the two
+      sessions: the outgoing one frozen, the hand-over kept where the person chooses". Retrain owed: untrained,
+      it loses to daintree.orchestration.execute-durable-workflow.
+    messages:
+      - role: user
+        content: Write and reconcile a hub-to-hub coordination handover.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How a hub agent describes the task to search. Decided by "is being REPLACED BY ANOTHER
+      SESSION NOW while the hosts keep working" and "where each task stands and with which lane,
+      open questions, what must never be redone".
+    messages:
+      - role: user
+        content: >-
+          Hand coordination of the in-flight Remote Host run from this hub session to a
+          replacement hub assistant, keeping every outstanding host task and open question.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-successor-take-over
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The successor's own prompt. Decided by "you are the new hub, take over the run from the
+      hand-over the last one wrote" and "the successor reconciling it with this Shell's task
+      records, nothing resent, and supervising on".
+    messages:
+      - role: user
+        content: "Take over the swarm: you are the new hub, the last one left a hand-over in my notes folder."
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-another-shell
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The other-Shell question. Decided by "or whether a hub on another machine can take over a run this one's hub
+      sent"; the answer
+      is a person-mediated plan, not a seamless takeover.
+    messages:
+      - role: user
+        content: The hub on this Mac sent the work to two remote hosts. If I coordinate from a different Mac instead, can it take the run over, or does it need a person-led handover?
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ traps (this runbook wins)
+  - id: hand-off-swarm-trap-not-park-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The hosts keep working while the manager changes: "is being REPLACED BY ANOTHER SESSION NOW
+      while the hosts keep working", against the fence "putting the run on hold to resume later
+      (daintree.hosts.park-swarm)".
+    messages:
+      - role: user
+        content: Swap the hub assistant for Codex while the work on the other machines carries on, and make sure the next session knows every outstanding task.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-trap-not-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A planned change of hub with a hand-over to write, not an account after the fact:
+      "The deliverable is a hand-over between the two sessions", against the fence "an account of a run after a
+      restart or dropped link with no hand-over, or a cleanup
+      (daintree.hosts.recover-and-clean-up)".
+    messages:
+      - role: user
+        content: "The Codex hub is about to replace this one: leave a note with where each remote task stands, so the new session picks up the run instead of asking me to start over."
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-trap-not-supervise
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The person is replacing the session that sent the run: "is being REPLACED BY ANOTHER SESSION
+      NOW", against the fence "following a run its own hub sent
+      (daintree.hosts.supervise-swarm)".
+    messages:
+      - role: user
+        content: The previous hub session sent this run to the other machines and I am replacing it; the new session should pick it up and keep it going to the end.
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-trap-not-hand-off-orchestration
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The run is on the Remote Hosts and no local pane changes hands: "the session coordinating a run
+      ALREADY OUT on the Remote Hosts is being REPLACED BY ANOTHER SESSION", against the fence "a coordinator pane's
+      agents on this machine (daintree.orchestration.hand-off-orchestration)".
+    messages:
+      - role: user
+        content: "Hub session change mid-run: the old one is out of context. Write the hand-over for the swarm out on the hosts and say how I switch."
+    expect:
+      required: [daintree.hosts.hand-off-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  # ------------------------------------------------------------------ reverse traps (neighbour wins)
+  - id: hand-off-swarm-reverse-park-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse: the same hub resumes later. daintree.hosts.park-swarm owns "a run ALREADY SENT to
+      their Remote Hosts must be PUT ON HOLD TO COME BACK TO"; this runbook fences "putting the
+      run on hold to resume later".
+    messages:
+      - role: user
+        content: Park the cross-machine run until tomorrow, the same hub resumes it later.
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hand-off-swarm-reverse-recover-and-clean-up
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse: the same assistant is still the hub and wants an account. daintree.hosts.recover-and-clean-up
+      owns "which delegated exchanges finished, which are still open, which will never be
+      answered"; this runbook fences "an account of a run after a restart or dropped link with no
+      hand-over".
+    messages:
+      - role: user
+        content: Daintree restarted overnight and the same assistant is still the hub; list which remote tasks finished and which never came back.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]

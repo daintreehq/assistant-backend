@@ -83,9 +83,7 @@ def test_runbook_files_are_named_for_a_real_runbook() -> None:
     from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
 
     selectable = set(load_catalog(default_runbooks_dir()).selectable_ids)
-    named = {
-        Path(f.path).stem for f in source_files() if f.runbook is not None
-    }
+    named = {Path(f.path).stem for f in source_files() if f.runbook is not None}
     assert named <= selectable, f"curated files for unknown runbooks: {sorted(named - selectable)}"
 
 
@@ -155,9 +153,7 @@ def test_no_runbook_is_starved_of_examples() -> None:
     from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
 
     selectable = set(load_catalog(default_runbooks_dir()).selectable_ids)
-    counts = Counter(
-        sid for ex in load_examples() for sid in ex.expect
-    )
+    counts = Counter(sid for ex in load_examples() for sid in ex.expect)
     missing = sorted(selectable - set(counts))
     assert not missing, f"selectable runbooks with no training examples: {missing}"
 
@@ -180,11 +176,39 @@ def test_the_corpus_readme_exists() -> None:
 #: or int unless the dumper quotes them, and a training query really can be the
 #: single word "no". The rest are YAML's structural sigils in leading position.
 _ADVERSARIAL = [
-    "yes", "no", "on", "off", "true", "false", "null", "~", "123", "1.5",
-    "2026-08-29", "- dash lead", ": colon lead", "#hash lead", "  padded  ",
-    "tab\there", "quote's and \"double\"", "emoji 🚀 ok", "{brace}", "[bracket]",
-    "*star", "&anchor", "multi\nline", "|pipe", ">gt", "end colon:", "%percent",
-    "@at", "`tick", "0o17", "0x1f", ".inf", ".nan",
+    "yes",
+    "no",
+    "on",
+    "off",
+    "true",
+    "false",
+    "null",
+    "~",
+    "123",
+    "1.5",
+    "2026-08-29",
+    "- dash lead",
+    ": colon lead",
+    "#hash lead",
+    "  padded  ",
+    "tab\there",
+    'quote\'s and "double"',
+    "emoji 🚀 ok",
+    "{brace}",
+    "[bracket]",
+    "*star",
+    "&anchor",
+    "multi\nline",
+    "|pipe",
+    ">gt",
+    "end colon:",
+    "%percent",
+    "@at",
+    "`tick",
+    "0o17",
+    "0x1f",
+    ".inf",
+    ".nan",
 ]
 
 
@@ -243,9 +267,7 @@ def test_a_runbook_file_round_trips_every_optional_field(tmp_path: Path) -> None
         )
         for i, q in enumerate(_ADVERSARIAL)
     ]
-    write_runbook_file(
-        tmp_path / "runbooks" / f"{runbook}.yaml", runbook, written, run="probe"
-    )
+    write_runbook_file(tmp_path / "runbooks" / f"{runbook}.yaml", runbook, written, run="probe")
     (read_back,) = [f for f in source_files(tmp_path) if f.path.startswith("runbooks/")]
 
     # Sections regroup an example by its source, so the file's order is not the
@@ -271,37 +293,32 @@ def test_a_runbook_file_round_trips_every_optional_field(tmp_path: Path) -> None
 def test_evaluation_protection_includes_holdout_history_and_turn_context(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from types import SimpleNamespace
-
     from benchmarks.runbook_selection import cases
     from training import compile_corpus
 
     main = tmp_path / "cases"
     sealed = tmp_path / "holdout" / "sealed-round"
-    main.mkdir()
-    sealed.mkdir(parents=True)
+    archived = tmp_path / "archive" / "inbox-v0.44" / "cases"
+    for directory in (main, sealed, archived):
+        directory.mkdir(parents=True)
     monkeypatch.setattr(cases, "CASES_DIR", main)
-
-    models: list[str] = []
-
-    def load(_catalog: object, *, cases_dir: Path, model: str) -> list:
-        models.append(model)
-        if cases_dir == main:
-            return []
-        assert cases_dir == sealed
-        return [SimpleNamespace(
-            messages=[SimpleNamespace(content=f"Earlier protected {model} message!")],
-            turn_context="Protected runtime context.",
-        )]
-
-    monkeypatch.setattr(compile_corpus, "load_cases", load)
+    monkeypatch.setattr(compile_corpus, "ROOT", tmp_path)
+    (sealed / "sealed.yaml").write_text(
+        "cases:\n  - id: sealed\n    messages:\n      - content: Earlier protected message!\n"
+        "    turn_context: Protected runtime context.\n"
+    )
+    # The retired id cannot be loaded against the current catalog. Its text still
+    # has to be excluded from training, without reviving that catalog at startup.
+    (archived / "old.yaml").write_text(
+        "cases:\n  - id: old\n    host_model: inbox\n    expect:\n"
+        "      required: [daintree.hosts.handle-hub-message]\n"
+        "    messages:\n      - content: Archived protected message!\n"
+    )
     assert compile_corpus._benchmark_strings() == {
-        "earlier protected control message",
-        "earlier protected inbox message",
+        "earlier protected message",
         "protected runtime context",
+        "archived protected message",
     }
-    # Both host models' suites are protected, the inbox-only cases included.
-    assert sorted(set(models)) == ["control", "inbox"]
 
 
 def test_an_unknown_key_in_an_example_is_refused(tmp_path: Path) -> None:
@@ -318,9 +335,7 @@ def test_an_unknown_key_in_an_example_is_refused(tmp_path: Path) -> None:
     (tmp_path / "runbooks").mkdir()
     (tmp_path / "shared").mkdir()
     (tmp_path / "shared" / "no-task.yaml").write_text(
-        yaml.safe_dump(
-            {"source": "no_task", "examples": [{"query": "hi", "confusables": ["x"]}]}
-        )
+        yaml.safe_dump({"source": "no_task", "examples": [{"query": "hi", "confusables": ["x"]}]})
     )
     with pytest.raises(CorpusError, match="unknown key"):
         list(source_files(tmp_path))
@@ -392,11 +407,15 @@ def test_a_second_confusability_judgement_is_merged_not_dropped(tmp_path: Path) 
 
     ingest(
         [_example(query, source="boundary", confusable_with=("daintree.foundation",))],
-        run="run-a", valid=valid, root=tmp_path,
+        run="run-a",
+        valid=valid,
+        root=tmp_path,
     )
     stats = ingest(
         [_example(query, source="boundary", confusable_with=("daintree.diagnostics",))],
-        run="run-b", valid=valid, root=tmp_path,
+        run="run-b",
+        valid=valid,
+        root=tmp_path,
     )
     assert stats["merged_confusable_with"] == 1
 

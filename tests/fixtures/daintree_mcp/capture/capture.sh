@@ -105,7 +105,7 @@ mkdir -p "$out"
     CAPTURE_APP_COMMIT="$commit" \
     CAPTURE_APP_BRANCH="$branch" \
     CAPTURE_AT="${CAPTURE_AT:-}" \
-    ./node_modules/.bin/vitest run src/services/actions/__tests__/captureMcpSurfaces.test.ts
+    npm test -- src/services/actions/__tests__/captureMcpSurfaces.test.ts
   # The host-control contract a listing cannot show, proven by the app's own
   # tests at the same commit: who the runtime counts as one of this machine's
   # assistants and the per-host switch (HostCallRuntime, install), a call's
@@ -140,7 +140,7 @@ mkdir -p "$out"
       exit 1
     fi
   done
-  ./node_modules/.bin/vitest run "${contract_tests[@]}"
+  npm test -- "${contract_tests[@]}"
 )
 
 node -e '

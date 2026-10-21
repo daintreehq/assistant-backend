@@ -1,18 +1,12 @@
-# daintree.hosts.foundation: the cross-host messaging domain foundation.
-#
-# Rows here are the requests the foundation keeps once the specific daintree.hosts.*
-# runbooks exist: how messaging between machines works, switching it on, consent and
-# enrollment, tool tiers, what an outcome or a notice means, and why another machine's
-# assistant cannot be reached. Asking one host a question, delegating work, surveying
-# hosts, usage, fan-out, placement, racing, recovery and a lane handling the hub's
-# message belong to those runbooks, so they are deliberately absent.
+# daintree.hosts.foundation: Work on another machine
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.foundation.md
+
 runbook: daintree.hosts.foundation
 run: runbook-2026-10-issue-86
 
 positives:
   - query: Explain how the Shell's sidebar assistant reaches the assistant on a Remote Host and which settings have to be on first
     docs: true
-  - Check whether the assistant in a remote host's project is enrolled for this Shell before messaging it
   - query: Find out what the person must allow before the hub may start an assistant on a host
     docs: true
   - Set up assistant messaging between this Shell and a remote host that was just added
@@ -26,18 +20,9 @@ positives:
     docs: true
   - query: Confirm whether two remote hosts can message each other directly or only through the hub
     docs: true
-  - query: "Explain what a \"delegated exchange update\" line typed into the hub means"
-    docs: true
-  - query: Tell the user what has to be true on both machines for their assistants to exchange messages
-    docs: true
   - query: Explain what completed means on a message the hub sent to another machine
     docs: true
 
-  - query: >-
-      The user asks whether the assistant on their Linux build host can message this
-      Shell's assistant first, unprompted, how such a message would show up here and how
-      it gets answered. No exchange is in flight.
-    docs: true
   - query: >-
       Before any work is handed to a remote machine, confirm this sidebar session can
       message hosts at all: the host tools are offered and the host in question has
@@ -64,8 +49,6 @@ foundation:
   - query: do I need the full tool set to message assistants on other hosts
     docs: true
   - query: can a claude agent in one of my panes message the assistant on another host
-    docs: true
-  - query: explain hub and lane in the remote hosts messaging setup
     docs: true
   - query: I paused messages between machines, does the work on the other mac stop too
     docs: true

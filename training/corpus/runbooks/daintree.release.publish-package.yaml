@@ -55,8 +55,6 @@ positives:
     run: runbook-2026-10-issue-138
   - query: hey, tests passed everywhere. now only the release machine publishes the sdk, 5.0.0 to latest, and tell me what npm shows
     run: runbook-2026-10-issue-138
-  - query: This lane was told by the hub to publish a pinned commit as the package's next release. Confirm the registry and account here match what the hub named before uploading, and ask back if they differ.
-    run: runbook-2026-10-issue-138
   - query: prevent a second host from publishing the same package version while we recover from the dropped connection
     run: runbook-2026-10-issue-138
   - query: Cut the 2.4.0 release of the library from the designated publisher host only; the other machines inspect the packed files for secrets and report.

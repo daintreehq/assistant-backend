@@ -1,0 +1,40 @@
+# The caller's reported host state (`host_state`, sent by Daintree as the Daintree-Hosts
+# and Daintree-Lane headers). A search leaves out the daintree.hosts.* runbooks the state
+# does not fit, before the shortlist, so the rest of the catalog ranks as if they were not
+# there. Every message here is an existing case's, verbatim, so the unreported twin of
+# each pair is already in the suite and the corpus contamination gate is unchanged.
+#
+# Pairs: the same fan-out request with no hosts and with a connected host; a lane's inbox
+# wake line on a machine with no hosts of its own; and one case per eligibility class that
+# must stay reachable in the state it was declared for (connected, configured, any).
+
+cases:
+  - id: host-state-lane-wake-no-hosts
+    host_model: inbox
+    category: host-state
+    note: >-
+      handle-hub-message-wake-line on a lane: reachable by a hub's assistant, with no hosts
+      of its own. Lane runbooks follow whether the caller can be messaged, so every hub
+      runbook is left out and the lane's own stays.
+    host_state: {hosts: none, lane: reachable}
+    messages:
+      - role: user
+        content: "Daintree: assistant inbox has a new message (exchange 6a2d9f14-0b7e-4c53-8e21-c4f07b9a3d58). Read it with assistant.getInbox."
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: host-state-recover-hosts-down
+    host_model: inbox
+    category: host-state
+    note: >-
+      report-swarm-results-reverse-recover-and-clean-up with hosts configured but none
+      connected: recovery is wanted right after hosts drop, so configured runbooks stay
+      offered while every connected-only one is left out.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: The hub restarted while my other machines were working. Rebuild from each host's task records where every exchange I sent stands.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation, daintree.foundation]

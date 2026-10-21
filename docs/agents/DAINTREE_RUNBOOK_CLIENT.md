@@ -19,18 +19,12 @@ notices. Notices reach an agent because Daintree types a line into the prompt of
 the pane that asked for them. An API-key client has no pane to type into, so it gets
 no `notify` argument and no `terminal.notifyWhenIdle`.
 
-Which hosts get the full experience (Daintree app `feature/mcp-cleanup` at
-`cab0d52`, the build `tests/fixtures/daintree_mcp` was captured from):
-
-- **Claude Code in a Daintree pane**: Daintree writes the pane's own `daintree`
-  connection when the project's Daintree MCP setting is not `off`. The setting
-  defaults to `off`. This connection has the full pane surface and notices.
-- **Codex**: Daintree gives a Codex pane no connection of its own in this build. Codex
-  reaches Daintree as the sidebar assistant, which gets notices, or as an API-key
-  client the user configures, which gets none. Runbooks tell an API-key caller to use
-  a bounded wait or ask the user to continue.
-- **Anything else** connected with an API key: the curated `external` surface, with
-  no notices.
+The current Daintree app provisions local MCP for supported agent panes, including
+Claude Code and Codex, when the project's MCP setting is enabled. Its registry's
+`capabilities.launchMcp` is the authority on supported CLIs. Help sessions get their
+own tiered connection. API-key clients get the curated external surface without
+pane notices. The captured caller surfaces are documented in
+[`tests/fixtures/daintree_mcp`](../../tests/fixtures/daintree_mcp/README.md).
 
 ### Adding the runbook server
 
@@ -42,14 +36,10 @@ claude mcp add --transport http daintree-runbooks https://assistant.daintree.org
 codex mcp add daintree-runbooks --url https://assistant.daintree.org/v1/daintree/mcp
 ```
 
-When Daintree itself configures the connection for an assistant it launches, it also
-sends headers on every request ([MCP.md](../MCP.md#host-model-and-host-state)):
-`Daintree-Host-Control: 1`, naming the host-control model its build speaks, and the
-caller's coarse host state as `Daintree-Hosts` (Claude Code's `headers` on the
-`type: "http"` entry, Codex's `http_headers`). A connection without
-`Daintree-Host-Control` is served the inbox catalog v0.44 clients get, whose host
-procedures need v0.44's messaging tools; one without `Daintree-Hosts` is offered its
-model's whole catalog.
+All connections receive the current catalog. When Daintree provisions a help
+session it also sends its coarse host state as `Daintree-Hosts`; without it search
+offers the whole catalog. `Daintree-Host-Control: 1` remains harmless when current
+clients send it to this server. Inbox procedures for v0.44 are retired.
 
 Check the installed client's `--help` and configuration scope before changing
 someone's existing setup. Never put a Daintree bearer in a committed config or an

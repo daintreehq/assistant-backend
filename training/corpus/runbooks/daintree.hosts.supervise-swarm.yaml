@@ -1,18 +1,6 @@
-# daintree.hosts.supervise-swarm: the hub follows work already out on the Remote Hosts to the end
-# of the run on its delegated exchange update lines: waits quietly, answers a host's question within
-# the person's request, brings decisions to the person, verifies each finished unit by artifact, and
-# checks once on a host left quiet after its peers are in.
-#
-# Positives are invented situations in agent and user words, short and long, some with a social
-# lead-in or an earlier turn, plus the hub's own update line for work it sent (hex ids invented).
-# Boundaries are requests this runbook wins against neighbours whose vocabulary they share: the
-# sending runbooks (swarm-fan-out, place-work, delegate-to-host), changing a run's course
-# (steer-swarm), local fleet triage (supervise-fleet), local watching (watch-outcome), the lane's
-# side of messaging (handle-hub-message), the after-restart account (recover-and-clean-up),
-# readiness (start-swarm), one-off questions (ask-host-assistant) and a dependent plan
-# (execute-distributed-workflow). Questions from a host and a quiet host, which land on
-# answer-waiting-agent and recover-agent today, are positives. Followups and topic shifts are
-# supervision asked for right after the work went out. Machine names are generic.
+# daintree.hosts.supervise-swarm: Supervise a run on the Remote Hosts and write its verified final report
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.supervise-swarm.md
+
 runbook: daintree.hosts.supervise-swarm
 run: runbook-2026-10-issue-109
 positives:
@@ -28,23 +16,10 @@ positives:
   - the build box is still busy with its unit and the others are done, keep waiting on it and check what it pushes
   - keep shepherding the cross-machine job, I don't need progress updates, just the end result and any decisions
   - see the remote swarm through, answer anything inside what I already asked for, and hold anything bigger for me
-  - The hub sent the logging refactor to three Remote Hosts twenty minutes ago and ended its turn; follow those exchanges until each is completed and verified, answering in-scope questions from the lanes
   - Four hosts are an hour into the OAuth callback rework; the user is offline until evening and wants the run carried to the end, each pushed branch checked on the shared remote before it counts
-  - The linux host's lane asked whether the brief's no-new-dependencies rule covers a dev-only test helper; the user said earlier that test tooling is fine, and the other three hosts are still working
   - The user left for a flight after the hub sent the docs-site migration to every host; nothing should reach them except a choice only they can make, and each finished host's commit should be confirmed
-  - 'Daintree: delegated exchange update (exchange 0f4c2a9e-7b13-4d58-a2c6-91e8f3b7d045).'
-  - 'Daintree: delegated exchange update (exchanges 6a1d93f0-2c4e-4b7a-8e15-d07c2f9a3b61, e89b04c7-5f2a-4c1d-9b36-4a7e0d2c18f5, 3c7e15a2-9d04-4f6b-b8a1-2e5c9f0d7a34).'
-  - query: 'Daintree: delegated exchange update (exchange 9b2e6f41-0a3c-4d87-b5e2-6c1f8a0d4e93).'
-    history:
-      - 'user: send the lint autofix to every remote host on its own branch and keep it moving'
-      - 'assistant: Sent to all four hosts, one exchange each. I will read each update as it arrives and verify the branches.'
-  - query: 'Daintree: delegated exchange update (exchanges 47d1c0b8-e2f9-4a63-9c05-b18e7d3a6f20, 2f9a6e3c-81d4-4b07-a5e9-c3d0f7b14a86).'
-    history:
-      - 'user: have the minis each port the config loader and tell me when they are done'
-      - 'assistant: Both minis have their briefs and are working. I will come back on their updates.'
   - one of the hosts wants to know if it can bump a dev dependency to get its tests green, the others are still running
   - the linux server is asking whether it should push its branch or wait, everything else is still in progress
-  - a lane came back with input-required asking which of two config formats to keep, deal with it if it is covered by what I said
   - the remote mac asked if it can delete the old fixtures folder as part of its unit, everyone else is still busy
   - three hosts reported in ten minutes ago but the last one is still on working with nothing since it started
   - every machine has replied except the build box, which has been quiet for half an hour now
@@ -55,16 +30,12 @@ positives:
     history:
       - 'user: keep an eye on the remote run and verify what comes back'
       - 'assistant: Three of four hosts are still working; I will check each result as it arrives.'
-  - pick up the delegated exchanges where they are and keep the run on the remote boxes going
   - carry on with the multi-host run from its updates, verify each finished unit and report at the end
-  - an update came in on the exchanges the hub sent this morning, handle it
   - the remote host has said working for forty minutes while its peers finished long ago, find out where it stands
   - one host seems stuck on its unit and never sent an update, the rest are done
   - is the last remote machine hung or just slow? it's the only one that hasn't replied
   - anything need me from the run on my other machines? keep it moving
-  - all the hosts have their copies of the brief, follow each exchange and table the verified shas at the end
   - one of the remote hosts' assistants is waiting on an answer from me about its unit, answer it if it's inside the brief
-  - the lanes on two hosts both asked questions, answer them within what I originally asked
   - the server host is waiting on a yes or no about skipping a slow test, decide it within the scope I gave
   - keep the linux box and both minis working as briefed and tell me only if one of them needs a decision from me
   - the mini is behind the others but still committing; don't shift its unit anywhere, keep following it till it's done
@@ -164,11 +135,7 @@ boundaries:
     confusable_with: [daintree.orchestration.watch-outcome]
   - query: the work went out to my other macs before lunch, keep tabs on it until they're all back
     confusable_with: [daintree.orchestration.watch-outcome]
-  - query: I'm stepping out, follow the hosts' exchanges and tell me what they each produced when I return
-    confusable_with: [daintree.orchestration.watch-outcome]
   - a host's assistant just sent me a blocker about the run, read it and answer it if you can
-  - on the hub, a message from the build box arrived in our inbox mid-run asking about scope
-  - the remote lanes are all mid-task, keep them going from here and verify each reply
   - query: no crash, no restart, the remote boxes are just still busy; stay with them until each result is checked
     confusable_with: [daintree.hosts.recover-and-clean-up]
   - query: the hosts are still mid-run, keep going and tell me when one of them needs a decision
@@ -241,10 +208,6 @@ boundaries:
     active: [daintree.hosts.swarm-fan-out]
     confusable_with: [daintree.hosts.audit-host-workspaces]
     run: 2026-10-16-synthetic-audit
-  - query: The remote compiler task is progressing on its original machine. Keep following its exchange and answer its questions until its artifact is verified.
-    active: [daintree.hosts.delegate-to-host]
-    confusable_with: [daintree.hosts.reassign-host-work]
-    run: 2026-10-16-synthetic-audit
   - query: Each remote machine has a different unit and its own branch. Keep the run going, handle their questions and check the returned commits.
     active: [daintree.hosts.place-work]
     confusable_with: [daintree.hosts.resolve-task-collisions]
@@ -294,18 +257,10 @@ boundaries:
   - query: don't tell me why it went wrong, just list for each host what it delivered, what failed and what is missing
     confusable_with: [daintree.agents.postmortem-run]
     run: runbook-2026-10-issue-120
-  - query: the run on the other machines ended, so write up its final results from the hub, the hosts' lanes only get a read-only question each
-    run: runbook-2026-10-issue-120
-  - query: all the lanes have replied to the hub, so write its final account of the run from their answers and the remote, rather than carrying out anything a lane was asked
-    run: runbook-2026-10-issue-120
   - query: pull together what each remote host produced for the run and which ones never answered, a single roundup please
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: runbook-2026-10-issue-140
 followups:
-  - query: ok, now keep an eye on all of them and answer what you can
-    history:
-      - 'user: send every host the date helper task on its own branch'
-      - 'assistant: Sent to all three hosts, one exchange each, no waitMs. I have ended the turn until their updates come in.'
   - query: great, stay on it till they're all done, I only want to hear about decisions
     history:
       - 'user: split these five issues across my machines'
@@ -314,10 +269,6 @@ followups:
     history:
       - 'user: get the linux server to fix the flaky upload test'
       - 'assistant: Sent to the linux server''s assistant with the base SHA and a new branch. It is working.'
-  - query: keep them going while I'm out, answer anything inside the brief
-    history:
-      - 'user: have every remote host try the retry wrapper'
-      - 'assistant: All four hosts accepted their exchange and are working.'
   - query: and if one of them asks something, handle it unless it needs me
     history:
       - 'user: send the same refactor to the minis'
@@ -395,18 +346,10 @@ followups:
     confusable_with: [daintree.hosts.supervise-swarm]
     run: 2026-10-16-synthetic-audit
 topic_shifts:
-  - query: now that they're all working, keep the run moving and tell me when a decision comes up
-    history:
-      - 'user: which of my machines can take work right now? pick three and send each its unit'
-      - 'assistant: Three hosts have an enrolled assistant in this project; I sent each its unit.'
   - query: forget the usage numbers for now, just keep the hosts' units going until they finish
     history:
       - 'user: how much codex allowance do the hosts have left?'
       - 'assistant: One table: every host has most of its weekly allowance; their units are still running.'
-  - query: never mind that, the run on the remote machines is still going, keep following it
-    history:
-      - 'user: what does a delegated exchange update line mean?'
-      - 'assistant: It says an exchange you sent changed state; it names ids, never the content.'
   - query: The correction is acknowledged everywhere. Keep the remote run moving from here and bring me only decisions outside the brief.
     history:
       - 'user: tell the remote hosts the new error policy'
@@ -430,9 +373,3 @@ topic_shifts:
       - 'assistant: Done and committed on the docs branch.'
     run: runbook-2026-10-issue-120
 wakes:
-  - query: 'Daintree: delegated exchange update (exchange 6127e050-374a-4fd4-8ddd-d1facd035ca9).'
-    history:
-      - 'user: from this hub, have the remote tower implement the export toggle and follow it to completion'
-      - 'assistant: Sent one exchange to its assistant. The task is working and I will process its updates.'
-    active: [daintree.hosts.delegate-to-host, daintree.hosts.survey-hosts]
-    run: 2026-10-16-synthetic-audit

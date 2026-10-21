@@ -8,20 +8,6 @@
 # daintree.hosts.ask-host-assistant.
 
 cases:
-  - id: survey-hosts-agent-phrased
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      How an agent writes the issue's request. Decided by "The deliverable is ONE read-only
-      report, host by host: what was observed and when, projects and assistants, open
-      exchanges as recorded, and what needs the person".
-    messages:
-      - role: user
-        content: "Survey the remote hosts: connection, load, enrolled assistants and open exchanges"
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
-
   - id: survey-hosts-user-going-on
     category: single-runbook
     note: >-
@@ -56,35 +42,6 @@ cases:
         content: >-
           Give me a one-page status of the remote machines: who is connected, how loaded,
           which assistants are available, and anything blocked on me. Don't send anything.
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
-
-  - id: survey-hosts-projects-without-assistants
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      The refinement's host to project to assistant slot view, read-only. Decided by "which
-      projects have an assistant running and taking messages" and "Nothing is sent, started or
-      recovered".
-    messages:
-      - role: user
-        content: >-
-          Report each Remote Host's projects and whether each has an assistant enrolled and
-          available, read-only, starting nothing
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
-
-  - id: survey-hosts-open-exchanges-needing-me
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      Open exchanges and the ones that wait on the person. Decided by "which exchanges with
-      them are still open, and whether anything waits on the person".
-    messages:
-      - role: user
-        content: List the exchanges still open with my other machines and which of them need my answer
     expect:
       required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
@@ -141,22 +98,6 @@ cases:
       required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
 
-  - id: survey-hosts-not-start-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Whether each host's assistant is enrolled, read-only. survey-hosts says "readying
-      assistants or finding who can take work (daintree.hosts.start-swarm)";
-      nothing is asked to be started or readied, so start-swarm is an extra.
-    messages:
-      - role: user
-        content: >-
-          Check each remote host and tell me whether its assistant is enrolled and taking
-          messages, and which exchanges are still open
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
-
   - id: survey-hosts-not-usage-limits
     category: routing-trap
     note: >-
@@ -166,21 +107,6 @@ cases:
     messages:
       - role: user
         content: Report which remote hosts are connected and which are not, and when each was last seen
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
-
-  - id: survey-hosts-not-supervise-swarm
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A snapshot of open exchanges, not watching a run. survey-hosts says "watching the
-      hosts while work runs, and answering what they ask (daintree.hosts.supervise-swarm)".
-    messages:
-      - role: user
-        content: >-
-          Read-only: list the open exchanges per remote host with their states and flag any
-          that are waiting on a question to the user
     expect:
       required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
@@ -224,65 +150,6 @@ cases:
     expect:
       required: [daintree.orchestration.supervise-fleet]
       optional: [daintree.foundation]
-
-  - id: survey-hosts-reverse-start-assistants
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. An assistant to be running on every host is daintree.hosts.start-swarm's "Claude Code
-      or Codex ready on every Remote Host"; survey-hosts only reports and starts nothing.
-    messages:
-      - role: user
-        content: Put a Claude assistant on every connected machine for this repo; none of them should be left without one
-    expect:
-      required: [daintree.hosts.start-swarm]
-      optional: [daintree.hosts.foundation]
-
-  - id: survey-hosts-reverse-usage
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. Allowance left per host is daintree.hosts.check-usage-limits's
-      deliverable, "one table of figures each host's assistant read off that machine's own
-      usage screen"; survey-hosts reads no usage.
-    messages:
-      - role: user
-        content: What's left of my Codex plan on the Mac mini and on the Linux tower? One figure per machine
-    expect:
-      required: [daintree.hosts.check-usage-limits]
-      optional: [daintree.hosts.foundation]
-
-  - id: survey-hosts-reverse-diagnose
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. One listed assistant that will not take messages, with the gate wanted, is
-      daintree.hosts.diagnose-messaging's "diagnosis per host and assistant"; survey-hosts
-      reports state and does not diagnose.
-    messages:
-      - role: user
-        content: The host assistant on my second Mac is listed as unavailable; tell me why messages to it don't go through
-    expect:
-      required: [daintree.hosts.diagnose-messaging]
-      optional: [daintree.hosts.foundation]
-
-  - id: survey-hosts-reverse-recover
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      Reverse trap. Rebuilding where sent work stands after the hub restarted is
-      daintree.hosts.recover-and-clean-up's "per-host account of every exchange from the
-      records"; survey-hosts says "where work already sent stands, finished or unanswered
-      (daintree.hosts.recover-and-clean-up)".
-    messages:
-      - role: user
-        content: >-
-          The hub restarted and I lost track of what I sent to the other machines. Rebuild
-          from the hosts' own records which exchanges finished, which are still open and which
-          will never be answered.
-    expect:
-      required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
 
   - id: survey-hosts-reverse-follow-run
     category: routing-trap
@@ -336,22 +203,6 @@ cases:
       required: [daintree.hosts.survey-hosts]
       optional: [daintree.hosts.foundation]
 
-  - id: survey-hosts-not-recover-and-clean-up
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A current picture of the open exchanges and what waits on the person is "which exchanges
-      with them are still open, and whether anything waits on the person" as recorded now, not
-      "where work already sent stands, finished or unanswered (daintree.hosts.recover-and-clean-up)".
-    messages:
-      - role: user
-        content: Which exchanges with my Remote Hosts are open right now, and is anything waiting on me? Just the current picture.
-    expect:
-      required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
-  # Control twins (issue #159): the same requests against the control catalog,
-  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.
   - id: survey-hosts-reverse-start-assistants-control
     category: routing-trap
     host_model: control

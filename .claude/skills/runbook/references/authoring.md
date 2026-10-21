@@ -52,8 +52,7 @@ Record the decision and the measurement behind it in the design note.
 ## Ids and namespaces
 
 `daintree.<namespace>.<leaf>`, kebab-case leaf, filename stem equal to the id.
-Existing namespaces (`ls src/daintree_assistant_server/runbooks/files | cut -d. -f2 |
-sort | uniq -c`): `orchestration`, `agents`, `git`, `worktree`, `review`, `forge`,
+Existing namespaces (`ls src/daintree_assistant_server/runbooks/catalog/`): `orchestration`, `agents`, `git`, `worktree`, `review`, `forge`,
 `workflow`, `runtime`, `release`, `ci`, `terminals`, `edits`, `debug`, `context`, and
 single-runbook ones. Reuse one when the runbook shares its judgment.
 
@@ -100,9 +99,8 @@ is checked against two sources:
    names it). `requiredTools`, `optionalTools`, tagged examples and any action-shaped
    name in a body are checked against them. `requiredTools` must be on the caller's
    surface: `pane-core`, or for `daintree.hosts.*` one of `help-core`/`help-full`
-   (`test_required_tools_are_on_the_callers_surface`, `CALLER_POLICY`). The frozen
-   inbox catalog (`runbooks/inbox/`, v0.44) is checked against `inbox/` there, which
-   still has `hub-full`/`lane-full`; edit neither.
+   (`test_required_tools_are_on_the_callers_surface`, `CALLER_POLICY`). Retired inbox
+   procedures and captures live in `archive/inbox-v0.44/` and are not authoring sources.
 
 When the two disagree, the capture is stale. Refreshing it is a change to every
 runbook's validation, so it is in scope only when the issue authorises it (see

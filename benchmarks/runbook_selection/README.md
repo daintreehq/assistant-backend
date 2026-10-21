@@ -50,11 +50,10 @@ well below the measurement, so a precision collapse still reddens the suite.
 
 ```bash
 # from the repo root, venv active
-python -m benchmarks.runbook_selection.bench local         # THE gate: shipped ONNX, free, both catalogs
+python -m benchmarks.runbook_selection.bench local         # THE gate: shipped ONNX, free, current catalog
 python -m benchmarks.runbook_selection.bench local --fp32  # same, unquantised
 python -m benchmarks.runbook_selection.bench list          # validate cases
 python -m benchmarks.runbook_selection.bench coverage      # per-runbook coverage matrix
-python -m benchmarks.runbook_selection.bench pairs         # paired hub/lane scenarios (inbox), per end
 python -m benchmarks.runbook_selection.bench search "…"    # queries as search_runbooks ranks them
 
 python -m benchmarks.runbook_selection.bench compare results/a.json results/b.json
@@ -64,12 +63,10 @@ Everything here is offline and free. `local` and `report` exit NON-ZERO on a
 quality failure, graded by `runbook_selection_local_verdict()` in `quality.py`;
 `report` regrades a saved run under today's floors.
 
-**Two suites.** The server serves a catalog per host model (`runbooks/catalog.py`,
-`load_catalogs`): the control catalog to builds that send `Daintree-Host-Control: 1`,
-the frozen inbox catalog to v0.44. `local` and `coverage` qualify each against its own
-suite and fail if either fails; `--host-model control|inbox` runs one. `list` and
-`search` take the same flag (default control). A pass on one never stands in for the
-other.
+**One active suite.** `local` and `coverage` qualify the current catalog. Retired
+inbox-only cases live in `archive/inbox-v0.44/cases/`; they are not scored as current
+product behavior, but their exact text remains excluded from training. Case ids,
+messages and expectations of the active suite are preserved across the restructure.
 
 ## Cases (`cases/*.yaml`)
 
@@ -88,11 +85,9 @@ Each case freezes a conversation, the prior active-runbook set, optional
     optional: [daintree.foundation]     # allowed, not demanded
 ```
 
-A case may carry `host_model: control` or `host_model: inbox`; without one it holds for
-both and is scored against each, so every id it names must exist in both catalogs.
-Cases naming a runbook only one model has, paired hub/lane cases and a reachable lane
-are the inbox model's; their control twins (merged runbooks mapped to what absorbed
-them, retired lane runbooks dropped) carry `host_model: control`.
+Old `host_model: control` annotations are accepted for frozen case compatibility.
+An inbox annotation, role pair or lane state in the active suite fails loading;
+those belong in the archive. Current `host_state` accepts only `hosts`.
 
 Scoring is strict per trial: `missing = required - picked` (recall failure),
 `extra = picked - (required + optional)` (precision failure), pass = neither, not
@@ -104,52 +99,6 @@ The `optional` slot exists mainly for the domain foundation
 documented default, but a lean pick of just the specific also passes. Expectations
 encode **product intent** — when a case's ground truth is debatable, the case
 carries a `note` saying why.
-
-### Paired hub/lane cases (`scenario` + `role`, `bench pairs`)
-
-The inbox model's (v0.44) only, each `host_model: inbox`: the control model has no
-lanes, and a host's assistant that receives a brief searches the ordinary catalog
-(`cases/1160-hosts-receiver-briefs.yaml`).
-
-A hosts scenario is one piece of work seen from both ends: the person's request on the
-hub, and the receiving lane's search after it has read the hub's brief. Cases that name
-a `scenario` and a `role` (`hub` or `lane`) are scored by `bench local` like any other,
-and additionally fail when they load a runbook their caller cannot execute:
-
-```yaml
-- id: pair-implement-lane-brief
-  scenario: implement
-  role: lane
-  category: single-runbook
-  brief: |-                       # what the hub sent: the query is drawn from its objective
-    Objective: ... Deliverable: ...
-    Scope: ...
-    Report: ...
-    Stop: ...
-  messages:
-    - role: user
-      content: Implement the hub's login test fix on its own branch in a new worktree
-  expect:
-    required: [daintree.hosts.do-delegated-work]
-    forbid: [daintree.hosts.run-local-cohort]     # optional, on top of the role's own
-```
-
-- **`forbid`** is `expect.forbid` plus, for a role, the other end's runbooks (a hosts
-  runbook whose baseline needs a `host.*` tool is the hub's; any other hosts baseline is
-  a lane's, `cases.baseline_role`). A forbidden runbook in the loaded set fails recall
-  even when the right one loaded: it would be delivered in full to a caller that must
-  not follow it. A case cannot expect what it forbids.
-  `forbid: [daintree.hosts.*]` forbids every hosts procedure at both ends: the person's own
-  request on one machine, where nothing from the swarm may load.
-- **Queries** are one sentence of 8 to 15 words, as the app tells the assistant to
-  search (the lane's bare wake line is the one exception), and never name a runbook id.
-- **Structure** (`pairs.validate_pairs`, run on every case load): each scenario has both
-  ends, a successful selection at each, a trap (`routing-trap` or `no-task`) and a lane
-  case carrying the hub's emitted `brief` with Objective, Scope, Report and Stop lines,
-  by reference and under 900 characters.
-- **`bench pairs`** runs only these cases on the shipped selector and prints each end's
-  loaded set, the stage that lost any missing runbook and any forbidden load; it exits 1
-  on a failure, so a retrain-owed miss is loud. `bench local` stays the verdict.
 
 ### Coverage (`bench coverage`)
 
@@ -234,7 +183,6 @@ python -m benchmarks.runbook_selection.bench coverage
 python -m benchmarks.runbook_selection.bench local --out "$R/wave-after.json"
 python -m benchmarks.runbook_selection.bench compare "$R/wave-before.json" "$R/wave-after.json"
 python -m benchmarks.runbook_selection.bench scale        # ~2 min; today's size, 200, 500, 1000
-python -m benchmarks.runbook_selection.bench pairs        # the hub/lane pairs, end by end
 git worktree remove ../wave-base
 ```
 
@@ -243,7 +191,7 @@ so those rows are snapshots), then the case-aligned delta: every shared case who
 loaded set moved, with what EACH side lost. A case that fails on both sides counts as
 neither fixed nor broken, so only the two loss lists show it losing something new.
 Before explaining a move, check whether the case or the runbooks around it changed
-(`git diff <base> -- benchmarks/runbook_selection/cases src/daintree_assistant_server/runbooks/files`)
+(`git diff <base> -- benchmarks/runbook_selection/cases src/daintree_assistant_server/runbooks/catalog`)
 and whether the artifact did (the `git rev-parse` above at both commits): with the
 artifact unchanged, every move is the catalog's doing.
 

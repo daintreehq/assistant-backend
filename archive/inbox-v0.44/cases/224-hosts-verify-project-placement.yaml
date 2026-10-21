@@ -1,0 +1,35 @@
+# daintree.hosts.verify-project-placement: before work goes to a Remote Host, the hub checks
+# that the project chosen there is the intended repository at the intended revision, by
+# asking that project's own assistant (canonical remote, full SHA, clean state, setup), never
+# by trusting a name, path or id. Recall cases: the issue's three requests (scrubbed), agent-
+# and user-phrased outcomes, and the four situations it must resolve (same name, a fork, a
+# renamed folder, a project the host does not list). Routing traps: this runbook wins against
+# each declared neighbour. Reverse traps: the neighbour wins and this runbook must not ride
+# along. The hosts foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: verify-project-placement-repository-revision-identity
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's third request, in an agent's words. Decided by the deliverable "its
+      remote URLs against ours, its full commit SHA against the one wanted".
+    messages:
+      - role: user
+        content: Verify repository and revision identity for selected host/project lanes.
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]
+
+  - id: verify-project-placement-reverse-start-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Readying assistants. start-swarm: "Claude Code or Codex ready on every Remote Host".
+    messages:
+      - role: user
+        content: Get an assistant ready in our project on every remote host.
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]

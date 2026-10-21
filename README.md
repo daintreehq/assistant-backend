@@ -25,8 +25,8 @@ The tools, their result shapes and the protocol details are in [docs/MCP.md](doc
 
 ## How search works
 
-Runbooks are Markdown files with YAML frontmatter in
-`src/daintree_assistant_server/runbooks/files/`. Search is a local two-stage
+The current catalog is grouped by domain. Runbooks are Markdown files with YAML frontmatter in
+`src/daintree_assistant_server/runbooks/catalog/`. Search is a local two-stage
 classifier (`runbooks/local/`), in process, with no model call:
 
 1. A fine-tuned bi-encoder embeds the query and takes the 32 nearest runbooks by
@@ -43,7 +43,7 @@ measurements behind the design.
 ## Adding runbooks
 
 [docs/RUNBOOKS.md](docs/RUNBOOKS.md) is the authoring guide. In short: add
-`runbooks/files/<id>.md` (filename stem = `id`), give it a `whenToUse` that says when
+`runbooks/catalog/<domain>/<id>.md` (filename stem = `id`), give it a `whenToUse` that says when
 it applies and names confusable neighbours by fully-qualified id, add a benchmark
 case under `benchmarks/runbook_selection/cases/` that requires it, then:
 
@@ -52,6 +52,11 @@ pytest tests/unit
 python -m benchmarks.runbook_selection.bench coverage   # every runbook has a case
 python -m benchmarks.runbook_selection.bench local      # routing quality gate
 ```
+
+The retired v0.44 inbox catalog, captures, cases and trial plans live in
+`archive/inbox-v0.44/`. They are historical material, never loaded or packaged.
+All clients now receive the current direct-control catalog; v0.44 messaging is no
+longer supported. See [the audit](docs/audits/RUNBOOK_AUDIT_2026-10-21.md).
 
 ## Development
 

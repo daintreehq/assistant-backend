@@ -1,4 +1,5 @@
 .venv/
+.venv-train/
 .git/
 __pycache__/
 *.pyc
@@ -20,6 +21,8 @@ infra/
 # The Dockerfile only copies pyproject.toml, README.md, requirements.lock and
 # src/, so everything below is context the daemon transfers and never reads.
 benchmarks/
+archive/
+training/
 docs/
 build/
 .tmp/

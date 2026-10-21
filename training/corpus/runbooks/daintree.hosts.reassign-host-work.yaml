@@ -1,20 +1,6 @@
-# daintree.hosts.reassign-host-work: the hub moves ONE unit already delegated to a Remote Host
-# that cannot carry on (dropped off the network, unreachable, stuck, out of allowance on the
-# agent CLI the work needs, or missing that CLI) to a different host, as a new task that
-# references the original: what the first host pushed is checked first, the old worker is
-# stopped with an acknowledgement or its risk is put to the person, one owner publishes, and a
-# returning first host is reconciled with neither attempt lost.
-#
-# Positives are invented situations in agent and user words, short and long, some with a
-# social lead-in, a constraint or an earlier turn; two how-to questions carry docs. Boundaries
-# are requests this runbook wins against a neighbour sharing its words: an account of
-# exchanges with nothing moved (recover-and-clean-up), first placement (place-work), new work
-# for a named host (delegate-to-host), another agent in the same checkout (hand-off-task), a
-# lane stopping its own agents (steer-for-hub), a host that will not connect or take messages
-# (connect-host, diagnose-messaging), usage figures (check-usage-limits), re-planning local
-# agents (reprioritize-work), two local agents on one task (resolve-task-collisions). Followups
-# and topic shifts are a move decided after an account, a usage table or a cleanup, and the
-# first host coming back after a move. Machine names are generic.
+# daintree.hosts.reassign-host-work: Reassign a remote host's unfinished work to another host
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.reassign-host-work.md
+
 runbook: daintree.hosts.reassign-host-work
 run: runbook-2026-10-issue-113
 
@@ -25,7 +11,6 @@ positives:
   - my laptop host went to sleep in the middle of the search indexing ticket, can another host pick it up without redoing what's done
   - the remote assistant has been sitting on the migration task since lunch and nobody is near that machine, move the job to the workstation
   - move the onboarding copy fix off the mini, it turns out claude isn't signed in there and the task needs it
-  - A delegated unit's host shows disconnected and its exchange is still open; the user has accepted the risk that the old worker may still be running and wants the remainder done elsewhere on a fresh branch
   - hey quick one, the tower crashed while working on the cache invalidation bug. can another machine take over? keep whatever it already committed
   - the host doing the api pagination change has gone dark. fine for another machine to finish it, just don't let both of them open a PR
   - The Remote Host assigned the flaky end to end test fix exhausted its Claude Code usage; the unit should continue on a host with Codex signed in, without retrying the approaches that already failed
@@ -40,7 +25,6 @@ positives:
   - hand the leftover part of the sync refactor to another host, the first one died after pushing the schema change
   - take the stuck accessibility audit off the workstation and give it to the mini, don't start it from scratch
   - The release run's fourth unit has had no progress for three hours and its host keeps flapping between connected and disconnected; the user wants it off that machine
-  - A unit's host can no longer run the agent CLI the brief named after a sign-out there; another enrolled host has that CLI and the same repository
   - morning! the mini disappeared from the host list overnight with the logging cleanup half finished, can the studio take it from where it got to
   - the box doing the image resizing work is out of codex quota till friday, move that task somewhere with quota
   - I think the second host is hung on the auth refactor. stop it if you can and let the fourth host finish the job
@@ -86,11 +70,6 @@ positives:
     history:
       - "user: check codex usage on the hosts"
       - "assistant: The linux host shows its Codex allowance used up; the two macs have plenty left."
-  - query: just move it, don't wait for that machine
-    history:
-      - "user: is the second host ever coming back with the cache fix?"
-      - "assistant: It is disconnected; the exchange is still open and its branch has one pushed commit."
-
 boundaries:
   - query: the link to the tower dropped and it won't be back today; don't just tell me what's open, move its half done unit to another host
     confusable_with: [daintree.hosts.recover-and-clean-up]

@@ -4,10 +4,7 @@ Runbook tests read the app's action ids and input schemas from here rather than
 from a hand-written list, so a refreshed capture changes what every test accepts
 at once.
 
-There are two generations, one per host model's catalog (``runbooks/catalog.py``,
-``load_catalogs``): the control catalog is checked against the current app's
-capture, and the inbox catalog against the v0.44.0 capture frozen with it in
-``inbox/``. Every reader takes the ``model`` whose generation it reads.
+The current app capture is the authority. Retired captures are offline in archive/.
 """
 
 from __future__ import annotations
@@ -17,11 +14,11 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Literal
 
-Model = Literal["control", "inbox"]
-MODELS: tuple[Model, ...] = ("control", "inbox")
+Model = Literal["control"]
+MODELS: tuple[Model, ...] = ("control",)
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "daintree_mcp"
-GENERATIONS: dict[Model, Path] = {"control": FIXTURES, "inbox": FIXTURES / "inbox"}
+GENERATIONS: dict[Model, Path] = {"control": FIXTURES}
 
 #: Every captured caller, per generation. Also the default order an untagged
 #: example is read in: the agent pane first, because that is the path runbooks are
@@ -34,15 +31,6 @@ SURFACES_BY_MODEL: dict[Model, tuple[str, ...]] = {
         "help-full",
         "relayed-core",
         "relayed-full",
-        "external",
-    ),
-    "inbox": (
-        "pane-core",
-        "pane-full",
-        "help-core",
-        "help-full",
-        "hub-full",
-        "lane-full",
         "external",
     ),
 }
@@ -76,21 +64,9 @@ def rebuild_delta(base_tools: list[dict[str, Any]], delta: dict[str, Any]) -> li
 
 @cache
 def capture(surface: str, model: Model = "control") -> dict[str, Any]:
-    """One surface's capture as ``{"capture": ..., "tools": [...]}``.
-
-    The inbox generation's hub and lane surfaces are stored as a delta against the
-    sidebar surface of the same tier (``<name>.delta.json``: ``added``, ``changed``,
-    ``removed``), because they are that surface plus a handful of messaging tools.
-    They are rebuilt here, so every test reads every surface the same way.
-    """
-    directory = GENERATIONS[model]
-    whole = directory / f"{surface}.json"
-    if whole.exists():
-        data: dict[str, Any] = json.loads(whole.read_text(encoding="utf-8"))
-        return data
-    delta = json.loads((directory / f"{surface}.delta.json").read_text(encoding="utf-8"))
-    base = capture(delta["capture"]["delta_of"], model)
-    return {"capture": delta["capture"], "tools": rebuild_delta(base["tools"], delta)}
+    """One current surface's complete capture."""
+    path = GENERATIONS[model] / f"{surface}.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def input_schemas(surface: str, model: Model = "control") -> dict[str, Any]:
@@ -122,15 +98,10 @@ PANE_CALLERS: tuple[str, ...] = ("pane-core",)
 
 #: Domains whose runbooks are followed by a caller other than an agent pane.
 #:
-#: `daintree.hosts` is sidebar-only by design. In the control model the caller is
-#: the Shell's own assistant, which alone is offered `host.list` and `host.call`, at
-#: either Tool set; an agent pane never is. In the inbox model it is the hub (any
-#: sidebar assistant on a Shell with a Remote Host) or a lane (the sidebar assistant
-#: on a machine listening as a host), checked at Tool set = Full, the widest listing;
-#: messaging itself is the same at Core, as the hub-core and lane-core captures record.
+#: `daintree.hosts` is sidebar-only: the Shell's own assistant is offered
+#: `host.list` and `host.call`, at either Tool set; an agent pane never is.
 CALLER_POLICY_BY_MODEL: dict[Model, dict[str, tuple[str, ...]]] = {
     "control": {"daintree.hosts": ("help-core", "help-full")},
-    "inbox": {"daintree.hosts": ("hub-full", "lane-full")},
 }
 CALLER_POLICY = CALLER_POLICY_BY_MODEL["control"]
 
@@ -139,31 +110,24 @@ HOST_CONTROL_TOOLS = frozenset({"host.list", "host.call"})
 #: The surfaces a host offers inside `host.call`, by the calling surface's tier.
 RELAYED_SURFACE = {"help-core": "relayed-core", "help-full": "relayed-full"}
 
-#: The inbox model's cross-host messaging tools: the hub's `host.*` reach and a
-#: lane's inbox. Offered only to sidebar-assistant sessions messaging can reach.
-HUB_TOOLS = frozenset(
+#: Retired action ids must not reappear in current instructions or captures.
+MESSAGING_TOOLS = frozenset(
     {
-        "host.list",
-        "host.listAssistants",
         "host.sendMessage",
+        "host.listAssistants",
         "host.getTask",
         "host.listTasks",
         "host.cancelTask",
         "host.startAssistant",
         "host.readQuota",
+        "assistant.getInbox",
+        "assistant.reply",
+        "assistant.sendMessage",
     }
 )
-LANE_TOOLS = frozenset({"assistant.getInbox", "assistant.reply", "assistant.sendMessage"})
-MESSAGING_TOOLS = HUB_TOOLS | LANE_TOOLS
-
-#: The surfaces only a non-pane caller is captured on, which an untagged example in a
-#: pane runbook never resolves to: the inbox model's hub and lane, and the relayed
-#: session a host offers, which is reached only inside `host.call`.
 NON_PANE_SURFACES_BY_MODEL: dict[Model, tuple[str, ...]] = {
     "control": ("relayed-core", "relayed-full"),
-    "inbox": ("hub-full", "lane-full"),
 }
-MESSAGING_SURFACES = NON_PANE_SURFACES_BY_MODEL["inbox"]
 
 
 def baseline_callers(runbook_id: str, model: Model = "control") -> tuple[str, ...]:
@@ -196,8 +160,8 @@ def baseline_violation(
 def untagged_example_surfaces(runbook_id: str, model: Model = "control") -> tuple[str, ...]:
     """Where an untagged example in this runbook is validated: the first of these
     offering the action. A hosts runbook's own callers only; for any other runbook
-    every surface but the non-pane ones, pane first, so a pane runbook's hub-branch
-    example must name its surface (``surface=hub-full``) to validate at all."""
+    every surface but the non-pane ones, pane first, so a pane runbook's sidebar-branch
+    example must name its surface (``surface=help-full``) to validate at all."""
     callers = baseline_callers(runbook_id, model)
     if callers != PANE_CALLERS:
         return callers

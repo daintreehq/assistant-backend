@@ -1,16 +1,6 @@
-# daintree.hosts.execute-distributed-workflow: the hub carries a PLAN of dependent units across
-# Remote Hosts and their repositories to the end, releasing a unit only when the commits it depends
-# on are verified on the shared remote, keeping failed and blocked units visible, and picking the
-# plan up again after a hub restart.
-#
-# Positives are invented situations in agent and user words, short and long, some with a social
-# lead-in, a constraint or an earlier turn; two how-to questions carry docs. Boundaries are
-# requests this runbook wins against a neighbour whose vocabulary they share: a chain or fan-in
-# that is more than one relay (delegate-to-host), a list whose pieces depend on each other
-# (place-work), different stages per host rather than one brief copied (swarm-fan-out), a
-# dependent plan whose units sit on other machines (execute-durable-workflow), and a restart where
-# the plan is to continue rather than be accounted for (recover-and-clean-up). Followups and topic
-# shifts are the plan as a second turn. Machine names are generic.
+# daintree.hosts.execute-distributed-workflow: Run a dependent plan across Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.execute-distributed-workflow.md
+
 runbook: daintree.hosts.execute-distributed-workflow
 run: runbook-2026-10-issue-115
 
@@ -175,10 +165,6 @@ followups:
     history:
       - "user: run the contract, server and docs plan over my machines"
       - "assistant: Contract verified; server running on the linux host; docs waits on it."
-  - query: drop the mobile unit from the plan and continue with the rest
-    history:
-      - "user: run the four-unit plan across the hosts"
-      - "assistant: The mobile unit is blocked: its host has no enrolled assistant. Web and docs are waiting on the api."
   - query: ok the contract is fixed and pushed now, send what was blocked on it
     history:
       - "user: keep the cross-machine plan going"

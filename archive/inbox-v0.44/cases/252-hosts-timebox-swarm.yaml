@@ -1,0 +1,44 @@
+# daintree.hosts.timebox-swarm: the hub giving one or several Remote Hosts a fixed time on a task.
+# Each host's assistant holds its own box on its own machine; the hub sends one bounded brief per
+# host with an absolute deadline, ends its turn, and reports a row per host at the bound (finished
+# early, stopped by the deadline, stopped late, blocked, unconfirmed or not reached) with that
+# host's own times and partial work. Nothing on the sending machine keeps time.
+#
+# Recall: the issue's three requests, an agent-phrased task description, a casual line, a
+# pre-launch "can they enforce it" request, and the follow-up at the bound. Traps: this runbook
+# wins against a local time box (daintree.orchestration.timebox-attempt), unbounded sends
+# (daintree.hosts.swarm-fan-out, daintree.hosts.delegate-to-host), a stop of work already sent
+# (daintree.hosts.steer-swarm) and deferred starts (daintree.orchestration.watch-outcome); and the
+# reverse traps, where each neighbour keeps its own request and this runbook must not ride along,
+# including a receiving host's own assistant given a deadline by the hub.
+
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: timebox-swarm-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      How a hub agent describes the task to search. Decided by "FIXED AMOUNT OF TIME starting
+      now" and "with that host's own times, how far it got and next steps". At
+      base it selected daintree.orchestration.timebox-attempt.
+    messages:
+      - role: user
+        content: Send a time-boxed attempt to each Remote Host's assistant with an absolute deadline, have each lane stop its agent at the deadline and report partial results with stop evidence
+    expect:
+      required: [daintree.hosts.timebox-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: timebox-swarm-reverse-lane-given-deadline
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      On the receiving host, the lane carries out the bounded attempt itself:
+      daintree.orchestration.timebox-attempt "A Remote Host's assistant given its deadline in a
+      hub message follows this too". This runbook's fence: "or on a host whose own assistant was
+      handed such a deadline (daintree.orchestration.timebox-attempt)".
+    messages:
+      - role: user
+        content: "hub message: you have until 15:10 on this host's clock to attempt the upgrade, stop at the deadline and report partial results"
+    expect:
+      required: [daintree.orchestration.timebox-attempt]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.handle-hub-message]

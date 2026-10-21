@@ -1,11 +1,6 @@
-# daintree.hosts.delegate-to-host: the hub hands one unit of work to the assistant enrolled
-# on one Remote Host, ends its turn, verifies the branch, SHA or PR that host reports, and
-# relays a verified result to a second host when the next piece depends on it.
-#
-# Positives are invented situations in agent and user words. Boundaries are requests this
-# runbook wins against a local owner whose vocabulary they share (a code change, a flaky
-# test, a hand-over, a later start, an issue, a PR). Followups are the relay or the check as
-# a second turn after a unit was sent. Machine names are generic.
+# daintree.hosts.delegate-to-host: Delegate work to a remote host or its assistant
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.delegate-to-host.md
+
 runbook: daintree.hosts.delegate-to-host
 run: runbook-2026-10-issue-89
 positives:
@@ -24,17 +19,14 @@ positives:
   - Have the remote host's assistant rewrite the README's install section for the new installer and confirm its branch on the shared remote before telling the user
   - Have the assistant on the remote build host add CSV import to the admin dashboard from the current main commit and verify the SHA it reports
   - Delegate the cache invalidation fix to another machine's Daintree assistant, end the turn, and on its reply confirm the pushed branch matches the commit it claims
-  - Ask the hub-enrolled assistant in the payments project on a remote host to implement the refund endpoint and open a pull request, then check the PR head
   - Get a remote host's assistant to make the logging change on a fresh branch and report each test command with its result
   - Brief the assistant on a Remote Host to add input validation to the signup form, scoped to that project, pushing only a branch
   - Get the assistant on the user's second Mac to replace the hand-rolled date formatting in the mobile app with the shared helper, then confirm its branch on the remote
   - Delegate updating the API reference for the new pagination parameters to the assistant on the Linux host and check what it pushed
   - Route the fix for the crash on empty uploads to the assistant in the uploads project on the remote host and confirm the commit before telling the user
-  - Hand the extraction of the billing client into its own package to the assistant on a Remote Host and pick it up again when its exchange moves
   - The user wants the assistant on their Linux workstation to port the image resizing helper to the new storage API, push a branch and open a draft pull request. The work should be checked against the shared remote before anyone says it is done.
   - Hand the migration of the notifications table to the assistant on the remote build host. It should branch from the current main commit, run the project's own migration tests there, and report the commit SHA and test results; nothing should be merged.
   - 'The user is at the Shell and wants a second machine to take on a self-contained task: add rate limiting to the public upload route in the API project, commit it on its own branch, and send back the branch and SHA so the user can review it later.'
-  - The other Mac has the repository open with an assistant enrolled for this Shell. The user wants it to fix the timezone bug in the scheduler and push a branch; confirm the pushed commit before reporting back.
   - Get the GPU workstation to write the benchmark harness for the inference module, because only that machine has the hardware for it, and verify the commit it pushes.
   - The user says their mini is idle and wants it to take the Python 3.12 compatibility fixes in the CLI project, open a PR, and tell them when it is up.
   - when the linux box has pushed the schema change, have the mac mini build the migration script on top of it
@@ -56,8 +48,6 @@ positives:
   - query: User has three remote hosts connected and wants the swarm ready before lunch; they are not sure which hosts let the hub start assistants and want to hear what to switch on
     run: runbook-2026-10-issue-102
   - query: Some of the user's hosts kept their assistants in this project from last week's run and others were rebooted since; they want every host to have one again without doubling up
-    run: runbook-2026-10-issue-102
-  - query: Ready an assistant lane on the Linux build server and the Mac mini for this repository without dispatching any tasks
     run: runbook-2026-10-issue-102
   - query: The user switched on assistant messaging for four hosts this morning but may not have allowed starts on all of them; they want assistants in this repository wherever possible and a list of the hosts still waiting on them
     run: runbook-2026-10-issue-102
@@ -122,21 +112,6 @@ positives:
   - query: I'm about to run a big refactor across machines, first just get the assistants in place on each host and show me where they landed
     run: runbook-2026-10-issue-102
   - query: thanks for that. next, can you set up assistants for this repo on the remote machines and let me know which ones you couldn't
-    run: runbook-2026-10-issue-102
-  - query: do it for all of them
-    history:
-      - 'user: is there an assistant on the mac mini for this project?'
-      - 'assistant: No. The project is listed there, but no assistant is enrolled for this Shell.'
-    run: runbook-2026-10-issue-102
-  - query: ok get them ready
-    history:
-      - 'user: which of my hosts have this repo?'
-      - 'assistant: The Mac mini and the Linux box both list it; neither has an assistant enrolled for you.'
-    run: runbook-2026-10-issue-102
-  - query: go ahead and start the missing ones
-    history:
-      - 'user: get my hosts ready for this repo'
-      - 'assistant: Two hosts already have enrolled assistants. The Linux box has none yet and its start setting is on.'
     run: runbook-2026-10-issue-102
   - query: fine, use codex there then
     history:
@@ -430,9 +405,6 @@ boundaries:
   - query: get the assistant on my other mac ready in this project so I can message it later
     confusable_with: [daintree.hosts.foundation]
     run: runbook-2026-10-issue-102
-  - query: enroll an assistant on each remote host for this project
-    confusable_with: [daintree.hosts.foundation]
-    run: runbook-2026-10-issue-102
   - query: my other two macs should each have claude running in this project
     confusable_with: [daintree.diagnostics]
     run: runbook-2026-10-issue-102
@@ -445,9 +417,6 @@ boundaries:
   - query: which remote machine has room for an assistant in this repo
     confusable_with: [daintree.runtime.relieve-resource-contention]
     run: runbook-2026-10-issue-102
-  - query: bootstrap the assistant lanes on each host for this repo
-    confusable_with: [daintree.deps.upgrade-dependency]
-    run: runbook-2026-10-issue-102
   - query: get an assistant ready on the build box for this repo, I'll hand it the flaky test later
     confusable_with: [daintree.hosts.delegate-to-host]
     run: runbook-2026-10-issue-102
@@ -457,12 +426,6 @@ boundaries:
   - query: check which of my remote machines have an assistant that could take a task, without sending anything yet
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
-  - query: every host is added already, get an assistant enrolled on each one for the api repo
-    confusable_with: [daintree.hosts.connect-host]
-    run: runbook-2026-10-issue-122
-  - query: the machines show connected under hosts; ready a codex lane on each before I split the work
-    confusable_with: [daintree.hosts.connect-host]
-    run: runbook-2026-10-issue-122
   - query: get claude ready on each host for this project, but no work goes out yet
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
@@ -470,9 +433,6 @@ boundaries:
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
   - query: spin up the swarm for the web repo on all the hosts, assistants only, the tasks come tomorrow
-    confusable_with: [daintree.hosts.swarm-fan-out]
-    run: runbook-2026-10-issue-92
-  - query: I need an enrolled assistant on each of the four machines in the billing project before anything else
     confusable_with: [daintree.hosts.swarm-fan-out]
     run: runbook-2026-10-issue-92
   - query: get an assistant going on every host in this repo, and if any refuse tell me what to switch on
@@ -490,9 +450,6 @@ boundaries:
   - query: get the assistants ready on the linux and mac hosts in this repo so I can run a test matrix afterwards, nothing sent yet
     confusable_with: [daintree.hosts.run-validation-matrix]
     run: runbook-2026-10-issue-117
-  - query: before the cross-platform test run, make sure every host has an enrolled assistant in this project and show me the ready table
-    confusable_with: [daintree.hosts.run-validation-matrix]
-    run: runbook-2026-10-issue-117
   - query: get an assistant ready in this repo on every remote host before I hand anything out
     confusable_with: [daintree.hosts.supervise-swarm]
     run: runbook-2026-10-issue-109
@@ -505,9 +462,6 @@ boundaries:
   - query: which of my other machines have a ready assistant in this project, start the missing ones if I allow it
     confusable_with: [daintree.hosts.verify-project-placement]
     run: runbook-2026-10-issue-124
-  - query: The project is already open on every remote host; get an assistant enrolled in each one before any work goes out
-    confusable_with: [daintree.hosts.open-project-on-host]
-    run: runbook-2026-10-issue-123
   - query: Which remote hosts have an assistant ready in this repository? Start one on the hosts that lack it
     confusable_with: [daintree.hosts.open-project-on-host]
     run: runbook-2026-10-issue-123
@@ -520,9 +474,6 @@ boundaries:
   - query: which machines can I give work to right now? start assistants where they are missing and allowed
     confusable_with: [daintree.hosts.survey-hosts]
     run: runbook-2026-10-issue-87
-  - query: is the other machine's assistant enrolled for this shell yet
-    confusable_with: [daintree.hosts.foundation]
-    run: runbook-2026-10-coordinator
   - query: is the remote machine's assistant ready to take work from this shell
     confusable_with: [daintree.hosts.foundation, daintree.worktree.manage-resource]
     run: runbook-2026-10-coordinator
@@ -535,18 +486,12 @@ boundaries:
   - query: make sure every one of my remote servers has an assistant running for this repo before I send anything out
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
-  - query: Which remote hosts already have an enrolled assistant in this project? Start one on any that don't, if I allow it.
-    confusable_with: [daintree.worktree.manage-resource]
-    run: runbook-2026-10-issue-134
   - query: bring my other machines up to ready for this project, one assistant each, and list who is ready
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
   - query: get the build box and the mac mini both ready with a Codex assistant for the repo
     confusable_with: [daintree.worktree.manage-resource]
     run: runbook-2026-10-issue-134
-  - query: Get assistants enrolled in the project on the remote API and web machines before I send either any work. Leave the dev servers stopped.
-    confusable_with: [daintree.hosts.coordinate-dev-services]
-    run: 2026-10-16-synthetic-audit
   - query: There is no remote run to hand over yet. Get an assistant ready in this repository on my other two machines first.
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: 2026-10-16-synthetic-audit
@@ -575,11 +520,6 @@ followups:
       - 'user: which of my hosts are connected?'
       - 'assistant: The Mac mini and the Linux tower are connected; the laptop host is offline.'
     run: runbook-2026-10-issue-102
-  - query: and start one on the tower too
-    history:
-      - 'user: is the mac mini''s assistant enrolled for this project?'
-      - 'assistant: Yes: slot 0, Codex, with a current generation for this Shell.'
-    run: runbook-2026-10-issue-102
 topic_shifts:
   - query: Send the remote assistant a new job to fix the cause it identified, with a branch and checked commit as the deliverable.
     history:
@@ -600,17 +540,3 @@ topic_shifts:
       - 'assistant: Codex shows 62% of the weekly limit left, resetting Monday.'
     active: [daintree.agents.check-usage-limits]
     run: runbook-2026-10-issue-102
-  - query: Enroll one assistant for the telemetry repository on each connected Remote Host and return the ready lanes; no job has been assigned.
-    history:
-      - 'user: compare the Claude usage left on my machines'
-      - 'assistant: Both remote hosts reported their allowance and reset times.'
-    active: [daintree.agents.check-usage-limits]
-    confusable_with: [daintree.agents.check-usage-limits]
-    run: 2026-10-16-synthetic-audit
-  - query: Prepare missing enrolled assistants in this repository on those Remote Hosts so they can take work; return the ready table.
-    history:
-      - 'user: give me a snapshot of my remote machines'
-      - 'assistant: Two connected hosts list this project but no enrolled assistant.'
-    active: [daintree.hosts.survey-hosts]
-    confusable_with: [daintree.hosts.survey-hosts]
-    run: 2026-10-16-synthetic-audit

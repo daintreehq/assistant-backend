@@ -116,20 +116,6 @@ cases:
       required: [daintree.hosts.race-and-review]
       optional: [daintree.hosts.foundation]
 
-  - id: race-and-review-agent-cross-review
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      Agent-phrased cross-review from the hub. Decided by "one host's pushed commit reviewed at
-      that SHA by a different host, ideally under another agent CLI".
-    messages:
-      - role: user
-        content: From the hub, have one Remote Host review the commit another Remote Host pushed, using a different agent CLI, and bring back the findings
-    expect:
-      required: [daintree.hosts.race-and-review]
-      optional: [daintree.hosts.foundation]
-
-  # ------------------------------------------------------------ routing traps
   - id: race-and-review-trap-swarm-fan-out
     category: routing-trap
     note: >-
@@ -165,20 +151,6 @@ cases:
     messages:
       - role: user
         content: don't merge the hosts' branches, just have a reviewer that built none of them say which attempt is best
-    expect:
-      required: [daintree.hosts.race-and-review]
-      optional: [daintree.hosts.foundation]
-
-  - id: race-and-review-trap-delegate
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      One host's work reviewed by another host. Decided by "one host's pushed commit reviewed
-      at that SHA by a different host"; daintree.hosts.delegate-to-host is "one unit of work or
-      the person's own branch reviewed on one host".
-    messages:
-      - role: user
-        content: from the hub, have one remote host review the work another remote host pushed
     expect:
       required: [daintree.hosts.race-and-review]
       optional: [daintree.hosts.foundation]
@@ -295,43 +267,3 @@ cases:
     expect:
       required: [daintree.hosts.integrate-host-branches]
       optional: [daintree.hosts.foundation]
-
-  - id: race-and-review-reverse-review-for-hub
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A lane given a review to do. daintree.hosts.review-for-hub wins on "on a host's lane,
-      building or reviewing what the hub sent" (this runbook's fence).
-    messages:
-      - role: user
-        content: 'hub message: review the race attempt at commit 4be21f0 against the criteria and reply findings only'
-    expect:
-      required: [daintree.hosts.review-for-hub]
-      optional: [daintree.hosts.foundation]
-
-  - id: race-and-review-reverse-run-local-cohort
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      The hub asked THIS machine for rival attempts. daintree.hosts.run-local-cohort wins on
-      "several attempts there", on a host's lane (this runbook's fence).
-    messages:
-      - role: user
-        content: the hub asked this machine for two rival takes on the importer, each in its own worktree, and which one is better
-    expect:
-      required: [daintree.hosts.run-local-cohort]
-      optional: [daintree.hosts.foundation]
-
-  - id: race-and-review-reverse-do-delegated-work
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      This machine is one entry in the hub's race and only builds its own unit. The race's
-      fence sends that to the lane: "on a host's lane, building or reviewing what the hub sent
-      (daintree.hosts.do-delegated-work, daintree.hosts.review-for-hub ...)".
-    messages:
-      - role: user
-        content: The hub picked this machine as one entry in its race; build the retry logic here on the branch its brief names and reply with the commit.
-    expect:
-      required: [daintree.hosts.do-delegated-work]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

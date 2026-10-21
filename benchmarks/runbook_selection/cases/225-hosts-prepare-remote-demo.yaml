@@ -228,16 +228,3 @@ cases:
     expect:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation, daintree.foundation]
-
-  - id: prepare-remote-demo-reverse-lane
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A request from the hub arriving on this host is daintree.hosts.demo-for-hub ("Use on a Remote
-      Host's lane when the hub asks THIS machine to prepare a DEMO"); this runbook is the hub's.
-    messages:
-      - role: user
-        content: "Hub message: bring up the dashboard branch here as a demo with sample data and reply with the port and the SHA served"
-    expect:
-      required: [daintree.hosts.demo-for-hub]
-      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.foundation]

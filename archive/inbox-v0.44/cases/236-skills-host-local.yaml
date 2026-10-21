@@ -1,0 +1,75 @@
+# daintree.skills.use-plugin-skill on a machine that is not the one the person is sitting at:
+# plugin skills are per host (installed set, versions, trust), so the skill is looked up
+# and loaded on the machine whose agent will follow it, a missing plugin is a blocker
+# rather than something copied across, and a loaded skill never widens the request.
+# Traps hold its boundary with the hub's delegation (daintree.hosts.do-delegated-work,
+# daintree.hosts.delegate-to-host), a CLI's own command (daintree.agents.run-agent-command)
+# and building a plugin (daintree.plugins.develop-project-plugin).
+cases:
+  # ------------------------------------------------------------------ recall
+  - id: skills-host-resolve-agent-phrased
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Agent-phrased: resolve and load the skill on the machine that executes it. Deciding
+      clause: "the skill found by its exact id on the machine that will run it and loaded".
+    messages:
+      - role: user
+        content: Resolve which plugin skills this host lists for the delegated review task, load the matching one by its listed id here, and have an agent in the task checkout follow it within the hub brief
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: skills-host-remote-box-user
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Receiving-lane wording: the hub's machine is not the one that runs the work, so the skill
+      installed here is used. Deciding clause: "use the installed plugin skill on this remote host".
+    messages:
+      - role: user
+        content: The hub drives from the laptop, but its plugin copy is not what runs on this machine; use the plugin skill installed here for the cleanup
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: skills-host-missing-plugin-blocker
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The skill the hub named is not on this machine: the answer is the blocker, not a copy.
+      Deciding clause: "or the blocker when that machine does not have, trust or support the
+      plugin (never copied from another host)".
+    messages:
+      - role: user
+        content: this machine does not list the release-kit plugin skill the hub asked for; tell the hub it is missing rather than copying my plugins folder across
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.handle-hub-message]
+
+  - id: skills-host-scope-expanding-skill
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The loaded skill asks for publication the hub request never did. Deciding clause: "its
+      steps carried out by an open or new agent briefed with that id and checked from its report".
+    messages:
+      - role: user
+        content: the plugin skill this host loaded says to publish the package and delete the old tag, but the hub only asked for a local fix; keep the agent inside the hub request
+    expect:
+      required: [daintree.skills.use-plugin-skill]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: skills-host-trap-hub-work-order
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A work order the hub sent to this host that only mentions a skill is the delegated unit.
+      Fence: "for a whole work unit the hub delegated to this host that only names a skill among
+      its terms (daintree.hosts.do-delegated-work)".
+    messages:
+      - role: user
+        content: "Hub work order for this machine: on a new branch, implement the export endpoint and follow the plugin skill for API design if it is installed here; reply with the commit"
+    expect:
+      required: [daintree.hosts.do-delegated-work]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.handle-hub-message]

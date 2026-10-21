@@ -1,0 +1,206 @@
+# daintree.hosts.diagnose-messaging: this Shell's hub working out why a Remote Host it can
+# see cannot have its assistant messaged or started (the per-host switches, this machine's
+# or that assistant's acceptance, the link, a pause, a rate limit), sending nothing. Recall cases in agent and user words; traps where it
+# must win against daintree.diagnostics (its one declared neighbour) and against
+# daintree.hosts.handle-hub-message, daintree.hosts.start-swarm and
+# daintree.hosts.recover-and-clean-up; reverse traps where each of those, or the hosts
+# foundation alone, wins and this runbook must not ride along. Three cases (marked) miss on
+# the shipped selector: the runbook is untrained against established neighbours, and they
+# wait on the retrain.
+
+cases:
+  - id: diagnose-messaging-agent-reachability
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's agent-phrased request. Decided by "wants to know which gate is in the
+      way" and the deliverable ending "sending nothing".
+    messages:
+      - role: user
+        content: Diagnose host assistant reachability without resending the task.
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-agent-gate-evidence
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      An agent's query carrying the observations named in the positive clause, a send
+      that came back "policy_rejected" and an assistant listed "without a generation". The
+      deliverable is "a diagnosis per host and assistant: the gate, what the tools showed".
+    messages:
+      - role: user
+        content: >-
+          Find out which gate stops this Shell from messaging the Remote Host's assistant:
+          send result was policy_rejected and the lane lists without a generation. Do not
+          resend.
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-rate-limited-user
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      A user naming a refusal the positive clause lists: "rate_limited". The
+      foundation's one line on limits may ride along; the diagnosis is this runbook's.
+      RETRAIN OWED: the shipped selector picks the hosts foundation alone (rank_miss).
+    messages:
+      - role: user
+        content: sends to the render machine come back rate_limited; why?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-see-server-not-assistant
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's user-phrased request: the user "can SEE another machine from this Shell"
+      but "cannot message or start the Daintree assistant on it". RETRAIN OWED: the shipped
+      selector selects nothing here (rank_miss); an untrained runbook does not reach the
+      cut on this short question.
+    messages:
+      - role: user
+        content: Why can I see the server but not message its assistant?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-see-host-not-diagnostics
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The issue's measured baseline query (the issue saw daintree.diagnostics take it).
+      Nothing on this machine misbehaves; the host is visible and its assistant cannot be
+      messaged or started: the user "cannot message or start the Daintree assistant on
+      it". The carve-out "Do not use for Daintree itself misbehaving
+      on this machine (daintree.diagnostics)" keeps diagnostics out, and no lane is
+      handling a message, so daintree.hosts.handle-hub-message is an extra too.
+    messages:
+      - role: user
+        content: Why can the hub see the host but not start or message its assistant?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-machine-setting-not-diagnostics
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A refusal naming this machine's own setting sounds like daintree.diagnostics, but it
+      is a messaging gate, "a send or start that came back opted_out", while the hosts are
+      listed. Diagnostics is fenced off: "Do not use for Daintree itself misbehaving on
+      this machine (daintree.diagnostics)".
+    messages:
+      - role: user
+        content: My sidebar session can list the hosts but every send fails, saying this machine's setting is off. What is blocking it?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-outcomes-not-lane-handler
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      The issue's request naming two refusals the positive clause lists ("opted_out,
+      paused, lane_unavailable"). The person is at this Shell, not a host's assistant
+      handling the hub's message, so daintree.hosts.handle-hub-message ("Use on a Remote
+      Host's Daintree assistant acting as a lane") is an extra. RETRAIN OWED: the shipped selector picks handle-hub-message and
+      daintree.diagnostics (rank_miss); two text attempts that won it pulled lane cases.
+    messages:
+      - role: user
+        content: The hub says opted_out or lane_unavailable; what do I need to change?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-start-refused-not-start-swarm
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      A start refused and only the reason wanted: "cannot message or start the Daintree
+      assistant on it, and wants to know which gate is in the way". Nothing is being made
+      ready, so daintree.hosts.start-swarm ("wants a swarm SET UP across their other
+      machines before handing out work") is an extra.
+    messages:
+      - role: user
+        content: the hub refuses to start an assistant on my linux box and I'm not setting anything up yet, just tell me which setting is off
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-refused-not-recover
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      New messages refused while the link is up and nothing restarted: the person "cannot
+      message or start the Daintree assistant on it, and wants to know which gate is in the
+      way". No exchange is being accounted for, so daintree.hosts.recover-and-clean-up
+      ("why a task sent to a Remote Host never came back, usually after Daintree
+      restarted") is an extra.
+    messages:
+      - role: user
+        content: Nothing restarted and the link is up, but every new message to the studio is refused. Which gate is it?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-reverse-swarm-setup
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap. Readying assistants before work goes out is daintree.hosts.start-swarm
+      ("wants a swarm SET UP across their other machines before handing out work"); nothing
+      has been refused, so this runbook must not ride along.
+    messages:
+      - role: user
+        content: get a codex assistant ready on each of my remote hosts in this repo before I hand out work
+    expect:
+      required: [daintree.hosts.start-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-reverse-restart-account
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap. Rebuilding where every delegated exchange stands after a restart is
+      daintree.hosts.recover-and-clean-up ("where things stand with the work handed to
+      another machine"); no gate is in question.
+    messages:
+      - role: user
+        content: After the Shell came back from a restart, go through each Remote Host's task records and tell me which delegated exchanges are still open
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: diagnose-messaging-reverse-lane-exchange-closed
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap. A host's own assistant whose reply to the hub was refused is
+      daintree.hosts.handle-hub-message ("Use on a Remote Host's Daintree assistant acting
+      as a lane"); the hub's diagnosis does not apply.
+    messages:
+      - role: user
+        content: This lane's reply to the hub came back EXCHANGE_CLOSED; what now?
+    expect:
+      required: [daintree.hosts.handle-hub-message]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: diagnose-messaging-reverse-first-switch-on
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap. Turning messaging on for a new host is the hosts foundation's "how to
+      switch it on"; nothing has failed, so there is no gate to diagnose and this runbook
+      must not ride along.
+    messages:
+      - role: user
+        content: turn on assistant messaging between this Shell and my new build server
+    expect:
+      required: [daintree.hosts.foundation]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

@@ -150,8 +150,6 @@ positives:
     run: runbook-2026-10-issue-91
   - query: pull the credits balance and the weekly codex limit from every host's assistant
     run: runbook-2026-10-issue-91
-  - query: host.list shows three connected hosts, two with Codex lanes and one with a Claude Code lane. The user plans to split a large refactor across them this week and wants each host's remaining allowance and next reset first, per host, not combined.
-    run: runbook-2026-10-issue-91
   - query: A remote host's Claude Code sessions have been stopping mid-task since this morning and the user thinks that machine is on the smaller plan. Find out what its usage screen says is left and when it resets, and do the same for the other host for comparison.
     run: runbook-2026-10-issue-91
 boundaries:
@@ -395,9 +393,6 @@ boundaries:
     run: runbook-2026-10-issue-91
   - query: tell the assistant on the office mac to check its codex limits and report back here
     run: runbook-2026-10-issue-91
-  - query: how much codex usage is left on each of my machines
-    confusable_with: [daintree.hosts.delegate-to-host, daintree.agents.check-usage-limits]
-    run: runbook-2026-10-issue-91
   - query: 'put a question to the build host''s assistant: how much codex allowance does that machine have left'
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-91
@@ -585,13 +580,6 @@ topic_shifts:
       - 'assistant: Three are working and one is waiting on a question in terminal 4.'
     active: [daintree.orchestration.supervise-fleet]
     run: runbook-2026-10-issue-91
-  - query: What Claude and Codex allowance is left on the remote machines right now? Read the usage screens there and give me one row for each account.
-    history:
-      - 'user: catch me up after the connection dropped'
-      - 'assistant: All earlier exchanges are accounted for; nothing needs recovering.'
-    active: [daintree.hosts.recover-and-clean-up]
-    confusable_with: [daintree.hosts.recover-and-clean-up]
-    run: 2026-10-16-synthetic-audit
   - query: Before deciding any placement, read each remote machine usage screen and report the remaining Claude allowance and resets only.
     history:
       - 'user: split the new tracker issues across the hosts'

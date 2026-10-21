@@ -1,19 +1,6 @@
-# daintree.hosts.steer-swarm: the hub stopping or correcting a run it already sent to one or
-# several Remote Hosts. Messages no host has read are withdrawn; every host that has read its
-# task gets a scoped stop or correction for its own assistant to carry out; each host is then
-# reported as acknowledged, already finished, unresolved or disconnected from what its
-# assistant answers, never from a canceled record.
-#
-# Rows: stop and correction requests in people's own words and as hub agents describe them,
-# with the situations the procedure handles (unread and working tasks in one run, a host that
-# dropped off, a cancel already pressed whose agent may still be running, messaging paused,
-# hosts already finished, one host of several, dirty work that must survive, a push already in
-# flight); followups after the run's state has been read; and boundaries against the
-# receiving machine's own steering (daintree.hosts.steer-for-hub), local steering
-# (daintree.agents.steer-running-agent), local parking (daintree.orchestration.park-work),
-# sending new or reworked work (daintree.hosts.delegate-to-host,
-# daintree.hosts.swarm-fan-out) and catching up on or cleaning up after a run
-# (daintree.hosts.recover-and-clean-up), each with reverse rows in that neighbour's file.
+# daintree.hosts.steer-swarm: Stop or change a run already sent to the Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.steer-swarm.md
+
 runbook: daintree.hosts.steer-swarm
 run: runbook-2026-10-issue-110
 
@@ -28,7 +15,6 @@ positives:
   - 'Hub: an in-flight cross-machine run must change course. Every host''s workers should stop editing generated files; confirm per host that the change landed.'
   - Stop the remote run, but only on the hosts that haven't finished yet. Leave the finished ones alone and tell me which those were.
   - hey quick one, the thing I sent to all the hosts, stop it, I found the bug myself
-  - Two of my remote exchanges say cancel requested, yet the build log on one of those hosts is still scrolling. Get those machines actually stopped.
   - The docs migration I sent out to my servers needs a tighter scope, only the guides folder and not the API reference. Get that to each host.
   - scrap the remote swarm, I gave it the wrong base branch
   - The run on the remote hosts is burning through usage. Stop it everywhere and tell me what each machine had done so far.
@@ -41,11 +27,6 @@ positives:
     down the wrong path, rewriting the router instead of extending it. I want all four told to
     extend the existing router and leave the public routes alone, without throwing away what
     they've done, and I want to know which hosts actually took the correction.
-  - >-
-    The user wants the cross-host run they started earlier called off. The records show one
-    exchange still unread, two hosts working and one host disconnected. Get the run stopped
-    wherever it can be, and report per host whether a worker confirmed it, was already done, or
-    could not be reached.
   - stop the remote job, I need those machines free for a demo in ten minutes
   - The hosts are working on the wrong issue, I pasted the wrong link. Stop them all.
   - Every machine on the perf run should measure with the release build instead of debug. Pass that along and let them keep going.
@@ -53,7 +34,6 @@ positives:
   - Tell my other computers to stop the dependency upgrade. An advisory just came out for the version they're moving to.
   - Can you stop the swarm? Keep their worktrees, I'll look at the branches tomorrow.
   - The remote run's acceptance now needs a clean typecheck as well as the tests. Update every host still working on it.
-  - Halt the job on both Remote Hosts. I need a per-machine answer from each assistant, not just the exchange status.
   - 'Hub agent: the person says the parser run on the Remote Hosts is no longer needed. Stop it on each host and report which hosts confirmed.'
   - Could you stop what the other Mac is doing for me? It's the export task I sent it before lunch.
   - Stop the cross-machine run except on the host that's already writing up its PR; tell me where that one is.
@@ -70,7 +50,6 @@ positives:
     the CSV export to keep its header row; the hosts are mid-run. Get the change to each host's
     assistant without restarting the work, and list which hosts acknowledged it.
   - I sent a task to the mini and it hasn't even picked it up yet. Withdraw it, and stop the other host's copy too.
-  - is there any way to know the agents on the other machines really stopped? the exchange just says canceled. stop them properly
   - Pull the plug on the remote parser run. Nothing should be reverted or cleaned up, just stopped.
   - 'New plan for the multi-host run: Windows support is out of scope now. Nothing else about the task changes.'
   - query: ok, stop it on all of them

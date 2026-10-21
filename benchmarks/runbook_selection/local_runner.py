@@ -54,8 +54,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.runbooks.catalog import Catalog, load_catalogs
-from daintree_assistant_server.runbooks.host_state import HostModel
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
 from daintree_assistant_server.runbooks.local import setwise as S
 from daintree_assistant_server.runbooks.local.documents import last_user_text, query_document
 from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
@@ -66,7 +65,12 @@ from .scoring import percentile, score_trial, summarize
 
 ARTIFACT = (
     Path(__file__).resolve().parents[2]
-    / "src" / "daintree_assistant_server" / "runbooks" / "local" / "artifacts" / "selector"
+    / "src"
+    / "daintree_assistant_server"
+    / "runbooks"
+    / "local"
+    / "artifacts"
+    / "selector"
 )
 
 #: Cap on active runbooks, mirroring ``Settings.max_active_runbooks``. Read from the
@@ -136,11 +140,7 @@ def _attribute(
         # REJECTED_CARDINALITY, or a runbook that was somehow neither picked nor
         # rejected. Attributed to the count head only when the count is what
         # stood in its way; see ``_STAGE_BY_REASON``.
-        stage = (
-            "cardinality_short"
-            if probability >= SetwiseClassifier.BONUS_FLOOR
-            else "rank_miss"
-        )
+        stage = "cardinality_short" if probability >= SetwiseClassifier.BONUS_FLOOR else "rank_miss"
     return StageLoss(case.id, missing, stage, probability)
 
 
@@ -151,19 +151,14 @@ def run_local(
     cases: list[BenchCase] | None = None,
     quantized: bool = True,
     id_filter: str | None = None,
-    host_model: HostModel = "control",
 ) -> dict[str, Any]:
     """Score the shipped artifact over one host model's corpus, against that model's
     catalog (the control catalog by default). No API calls, no key."""
     artifact = artifact or ARTIFACT
-    catalog = catalog if catalog is not None else load_catalogs().for_model(host_model)
+    catalog = catalog if catalog is not None else load_catalog()
     # The UNFILTERED corpus is the expectation, whatever this run executes.
-    whole = load_cases(catalog, model=host_model)
-    cases = (
-        cases
-        if cases is not None
-        else load_cases(catalog, id_filter=id_filter, model=host_model)
-    )
+    whole = load_cases(catalog)
+    cases = cases if cases is not None else load_cases(catalog, id_filter=id_filter)
 
     clf = SetwiseClassifier(artifact, quantized=quantized)
     clf.sync(catalog)
@@ -222,24 +217,28 @@ def run_local(
             # and that STRUCTURAL rule, not a model error — and dropping it here
             # (which an earlier version did) left the stage histogram silently
             # short of the miss count it is supposed to explain.
-            losses.extend(
-                StageLoss(case.id, sid, "background_reuse", None) for sid in missing
-            )
+            losses.extend(StageLoss(case.id, sid, "background_reuse", None) for sid in missing)
         else:
             for name, value in sel.timings.items():
                 spans.setdefault(name, []).append(value)
             reserved_cases += bool(sel.reserved_ids)
             ranked = dict(sel.ranked)
             losses.extend(
-                _attribute(case, sid, ranked=ranked, rejected=sel.rejected)
-                for sid in missing
+                _attribute(case, sid, ranked=ranked, rejected=sel.rejected) for sid in missing
             )
 
         results.append(
             score_trial(
-                case, 0, picked,
-                degraded=False, latency_s=latency_s, confidence=None,
-                task_type=None, reason=None, prompt_tokens=None, completion_tokens=None,
+                case,
+                0,
+                picked,
+                degraded=False,
+                latency_s=latency_s,
+                confidence=None,
+                task_type=None,
+                reason=None,
+                prompt_tokens=None,
+                completion_tokens=None,
                 docs_query=docs_q,
             )
         )
@@ -257,7 +256,6 @@ def run_local(
         candidates=clf.candidates,
         quantized=quantized,
         id_filter=id_filter,
-        host_model=host_model,
     )
 
 
@@ -275,7 +273,6 @@ def build_local_doc(
     candidates: int,
     quantized: bool = True,
     id_filter: str | None = None,
-    host_model: HostModel = "control",
 ) -> dict[str, Any]:
     """Assemble the result document, expectations and verdict.
 
@@ -343,7 +340,7 @@ def build_local_doc(
         "suite": "runbook_selection_local",
         "meta": {
             "benchmark": "runbook_selection_local",
-            "host_model": host_model,
+            "host_model": "control",
             "artifact": str(artifact),
             "precision": "int8" if quantized else "fp32",
             "catalog_revision": catalog.revision,
@@ -355,9 +352,7 @@ def build_local_doc(
             # One trial a case, deliberately: the local selector is
             # deterministic, so a second trial is a second copy of the first.
             "trials_expected": len(whole_corpus),
-            "docs_trials_expected": sum(
-                1 for c in whole_corpus if c.expect_docs is not None
-            ),
+            "docs_trials_expected": sum(1 for c in whole_corpus if c.expect_docs is not None),
             "categories_expected": sorted({c.category for c in whole_corpus}),
         },
         "summary": summary,
@@ -409,12 +404,12 @@ def print_local(doc: dict[str, Any]) -> None:
     print("\nper-stage latency (ms):")
     for name, block in summary["spans_ms"].items():
         print(
-            f"  {name:16} p50 {block['p50']:7.2f}  p90 {block['p90']:7.2f}  "
-            f"max {block['max']:7.2f}"
+            f"  {name:16} p50 {block['p50']:7.2f}  p90 {block['p90']:7.2f}  max {block['max']:7.2f}"
         )
 
     wrong = [
-        (cid, ids) for cid, ids in zip(doc["case_ids"], doc.get("forbidden") or [], strict=False)
+        (cid, ids)
+        for cid, ids in zip(doc["case_ids"], doc.get("forbidden") or [], strict=False)
         if ids
     ]
     if wrong:
@@ -464,9 +459,7 @@ def _print_category_compare(sa: dict[str, Any], sb: dict[str, Any]) -> None:
     these rows are two snapshots side by side rather than a per-case delta; the
     case-aligned lists below are the delta.
     """
-    blocks = [
-        (s.get("recall_pass_categories") or {}, s.get("categories") or {}) for s in (sa, sb)
-    ]
+    blocks = [(s.get("recall_pass_categories") or {}, s.get("categories") or {}) for s in (sa, sb)]
     names = sorted({name for recall, strict in blocks for name in (*recall, *strict)})
     if not names:
         return
@@ -477,9 +470,7 @@ def _print_category_compare(sa: dict[str, Any], sb: dict[str, Any]) -> None:
     print("by category, whole suites (recall-pass A -> B, strict A -> B):")
     for name in names:
         (ra, ta), (rb, tb) = ((r.get(name, {}), t.get(name, {})) for r, t in blocks)
-        print(
-            f"  {name:22} {cell(ra):>9} -> {cell(rb):<9}  {cell(ta):>9} -> {cell(tb)}"
-        )
+        print(f"  {name:22} {cell(ra):>9} -> {cell(rb):<9}  {cell(ta):>9} -> {cell(tb)}")
 
 
 def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
@@ -496,12 +487,9 @@ def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
     sa, sb = a["summary"], b["summary"]
     print("\n== bench local: A vs B ==")
     for label, key in (("recall-pass", "recall_pass_cases"), ("strict", "cases_passed")):
-        print(
-            f"{label:14} A {sa[key]}/{sa['cases_total']}   B {sb[key]}/{sb['cases_total']}"
-        )
+        print(f"{label:14} A {sa[key]}/{sa['cases_total']}   B {sb[key]}/{sb['cases_total']}")
     print(
-        f"{'candidate_miss':14} A {sa['candidate_miss_trials']}   "
-        f"B {sb['candidate_miss_trials']}"
+        f"{'candidate_miss':14} A {sa['candidate_miss_trials']}   B {sb['candidate_miss_trials']}"
     )
     _print_category_compare(sa, sb)
     common = sorted(set(ca) & set(cb))

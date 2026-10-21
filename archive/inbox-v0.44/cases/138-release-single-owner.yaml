@@ -1,0 +1,66 @@
+# One owner for a deploy or a package publish when the swarm builds and checks in
+# parallel: the hub's brief to the one designated host, that host's own target check,
+# and a lost reply read from the platform or registry instead of handed to another host.
+# Targets: daintree.release.deploy-and-verify, daintree.release.publish-package.
+# Neighbours the cases pin: daintree.hosts.run-validation-matrix (read-only checks),
+# daintree.hosts.reassign-host-work (a unit moved to another machine), the release
+# neighbours already fenced in their own files.
+cases:
+  # --- daintree.release.deploy-and-verify across hosts ---
+  - id: release-owner-deploy-issue-build-everywhere
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The issue's own phrasing for the whole swarm job. The deploy clause "Also when a swarm
+      of hosts shares the work and exactly one host is the deployer of a deploy authorised
+      now: the hub's brief to it, its check of its own target, and its lost reply reconciled
+      against the platform." decides it; the plan runbooks (start-swarm, execute-
+      distributed-workflow) carry the build side and may ride along.
+    messages:
+      - role: user
+        content: Build across the swarm but deploy once from the designated host.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional:
+        - daintree.hosts.foundation
+        - daintree.hosts.start-swarm
+        - daintree.hosts.execute-distributed-workflow
+        - daintree.hosts.swarm-fan-out
+        - daintree.hosts.run-validation-matrix
+
+  - id: release-owner-deploy-lane-preflight
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The receiving lane's wording: its check of its own target before it writes, then what
+      serves. The deploy clause "Also when a swarm of hosts shares the work and exactly one
+      host is the deployer of a deploy authorised now: the hub's brief to it, its check of
+      its own target, and its lost reply reconciled against the platform." decides it; the
+      lane-side envelope runbooks may ride along.
+    messages:
+      - role: user
+        content: >-
+          The hub asked this host to deploy commit 4be19c2 to staging. First check that
+          this machine's cloud account is the staging one, then deploy once and report
+          what is serving.
+    expect:
+      required: [daintree.release.deploy-and-verify]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation, daintree.hosts.do-delegated-work]
+
+  - id: release-owner-publish-lane-timeout
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      The lane's view of a lost reply. The publish clause "Also when a swarm of hosts shares
+      the work and exactly one host is the publisher of a publish authorised now: the hub's
+      brief to it, its check of its own registry account and channel, and its lost reply
+      reconciled against the registry." covers it; the lane-side envelope runbook may ride
+      along.
+    messages:
+      - role: user
+        content: >-
+          hub message: publish the sdk 2.1.0 from here, the other hosts only verify. the
+          publish call timed out, did it go through
+    expect:
+      required: [daintree.release.publish-package]
+      optional: [daintree.hosts.handle-hub-message, daintree.hosts.foundation]

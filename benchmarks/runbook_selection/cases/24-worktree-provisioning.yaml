@@ -180,22 +180,6 @@ cases:
       required: [daintree.worktree.provision-local-environment]
       optional: [daintree.foundation]
 
-  - id: provision-hosts-lane-no-setup-config
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      A lane's own project with no lifecycle config yet. Decided by "configuring the project's
-      worktree lifecycle scripts themselves" and "give every worktree its own URL" style per-worktree
-      resources.
-    messages:
-      - role: user
-        content: >-
-          a lane here should get its worktree its own port and database; the project has no setup
-          config yet
-    expect:
-      required: [daintree.worktree.provision-local-environment]
-      optional: [daintree.foundation]
-
   - id: provision-hosts-trap-ask-only
     category: routing-trap
     note: >-

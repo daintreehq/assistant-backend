@@ -1,18 +1,6 @@
-# daintree.hosts.prepare-host-maintenance: the hub readying a Remote Host for a planned update,
-# restart or reboot. Before it: an impact report per host (projects, enrolled assistants, open
-# exchanges, and what the hub cannot see), then each enrolled assistant's acknowledged checkpoint
-# (branch, SHA, pushed or not, uncommitted files, writes in flight). After the person restarts
-# it: projects, assistants and exchanges reconciled before anything more is sent.
-#
-# Rows: planned-maintenance requests as people phrase them and as hub agents describe the task,
-# short and long, some behind a social lead-in or a history turn, and the return turn after a
-# restart; followups; and boundaries against catching up after an unplanned restart
-# (daintree.hosts.recover-and-clean-up), putting a run on hold (daintree.hosts.park-swarm),
-# stopping or changing a run (daintree.hosts.steer-swarm), a plain read of the hosts
-# (daintree.hosts.survey-hosts), adding a host (daintree.hosts.connect-host), Daintree failing on
-# this machine (daintree.diagnostics), following a run (daintree.hosts.supervise-swarm) and
-# moving the hub role (daintree.hosts.hand-off-swarm), each with reverse rows in that
-# neighbour's file.
+# daintree.hosts.prepare-host-maintenance: Prepare a Remote Host for an update or restart, then reconcile
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.prepare-host-maintenance.md
+
 runbook: daintree.hosts.prepare-host-maintenance
 run: runbook-2026-10-issue-130
 
@@ -39,15 +27,9 @@ positives:
   - thanks, that sorted the test failures. next thing, the lab host needs its Daintree restarted tonight, get its work checkpointed
   - i have to reboot the lab server for a kernel patch and daintree runs on it. what happens to the jobs i handed it
   - the machine hosting my projects gets a power cycle at six, make sure the assistants on it have saved what they were doing
-  - 'Hub task: the user power-cycles the linux host at nine. Two exchanges with it are open and one of its projects has no assistant. Say what that restart ends and which part cannot be known from here.'
   - query: how do i update the remote host without losing the work the assistants are doing for me? do it for the mac mini
     docs: true
   - Before the host's Daintree update goes in, find out whether any assistant over there has a push or pull request under way, and keep new work off it.
-  - the update on the host is done. verify its projects are still listed, its assistants are enrolled again, and that nothing I sent before was resent
-  - query: back from the host restart. which of my open tasks over there are dead now and which assistants need me to switch something on
-    history:
-      - "user: i'm restarting the remote host for an update, get it ready"
-      - "assistant: Its one enrolled assistant stopped at a safe point and pushed. Two other projects there I can't see into. Restart when you like."
   - after the daintree upgrade on the server, check the host looks right, same projects, assistants back, and tell me what's still outstanding before we continue
   - query: we restarted the box. don't send it anything yet, tell me which assistants came back and what became of the earlier tasks
     history:
@@ -63,7 +45,6 @@ positives:
   - what will a restart of the server interrupt
   - the host's back from the update, reconcile it
   - I'm updating Daintree on three remote machines one at a time. Start with the build server, give me the impact and the checkpoints, then wait for me.
-  - 'Agent task: the person will restart the Remote Host''s Daintree in ten minutes. List the open exchanges and enrolled assistants, ask each assistant for a checkpoint, and say plainly what is not covered.'
   - query: ok, get it saved first
     history:
       - "user: i need to update daintree on the mac mini this evening"
@@ -96,8 +77,6 @@ boundaries:
     confusable_with: [daintree.hosts.park-swarm, daintree.hosts.steer-swarm]
   - query: the rest of the run keeps going. Just get the build server's assistants stopped safely before its restart.
     confusable_with: [daintree.hosts.steer-swarm]
-  - query: list each remote host's projects and open exchanges, because I'm going to restart one of them tonight
-    confusable_with: [daintree.hosts.survey-hosts]
   - query: show me what's on the mac mini and what the restart cuts off, not a general overview of my hosts
     confusable_with: [daintree.hosts.survey-hosts]
   - query: a host that already works for me needs a newer Daintree build. What will the update interrupt over there?
@@ -132,14 +111,6 @@ followups:
     history:
       - "user: save the work on the server before I update it"
       - "assistant: The first assistant pushed its branch. The second hasn't replied yet."
-  - query: It has finished the planned update. Check projects, enrolled lanes and the pre-update exchanges before any more work goes to that host.
-    history:
-      - 'user: checkpoint the remote build host before I update Daintree there'
-      - 'assistant: Both enrolled assistants reported their branches and saved state. The impact record lists what the hub could not observe.'
-    active: [daintree.hosts.prepare-host-maintenance, daintree.hosts.connect-host]
-    confusable_with: [daintree.hosts.recover-and-clean-up]
-    run: 2026-10-16-synthetic-audit
-
 topic_shifts:
   - query: "separate thing: I'm restarting Daintree on the remote server tonight, so tell me what that will stop"
     history:
@@ -149,13 +120,6 @@ topic_shifts:
     history:
       - "user: what did the build server finish today?"
       - "assistant: Both of its tasks completed and the branches are pushed."
-  - query: Before the person restarts Daintree on the connected build host this afternoon, inventory what will stop and obtain checkpoints from its enrolled assistants.
-    history:
-      - 'user: why did the send to the build host bounce?'
-      - 'assistant: Messaging is enabled again; the person now plans to update Daintree on that host.'
-    active: [daintree.hosts.survey-hosts]
-    confusable_with: [daintree.hosts.survey-hosts]
-    run: 2026-10-16-synthetic-audit
   - query: Before restarting just the build host tonight, obtain its projects impact report and acknowledged checkpoints for all work there.
     history:
       - 'user: park the image-conversion swarm until tomorrow'

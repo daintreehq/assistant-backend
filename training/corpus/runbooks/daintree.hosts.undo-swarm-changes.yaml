@@ -1,19 +1,6 @@
-# daintree.hosts.undo-swarm-changes: the hub backing out exactly the code one named run changed
-# across its Remote Hosts' repositories. Writers are stopped first, dependents are reverted
-# before what they build on, each host's own assistant follows the local undo procedure through
-# a fresh agent, and every revert is checked against what the lane reports.
-#
-# Rows: reversal requests in people's own words and as hub agents describe them, with the
-# situations the procedure handles (two repositories with a dependency between them, hand
-# edits and other agents' work to keep, a run still writing, a host that restarted mid-revert,
-# a hunk nobody can attribute, a consumer outside the run); followups after a run reported or
-# was stopped; and boundaries against the local undo procedure
-# (daintree.git.undo-agent-changes), stopping a run (daintree.hosts.steer-swarm), cleaning up
-# its resources (daintree.hosts.recover-and-clean-up), a deployment rollback
-# (daintree.release.rollback-deployment) and running a dependent plan forward
-# (daintree.hosts.execute-distributed-workflow), each with reverse rows in that neighbour's
-# file. Lane-side rows (a host asked by the hub to revert in its own project) live in
-# daintree.git.undo-agent-changes.yaml.
+# daintree.hosts.undo-swarm-changes: Undo a run's code changes across Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.undo-swarm-changes.md
+
 runbook: daintree.hosts.undo-swarm-changes
 run: runbook-2026-10-issue-151
 

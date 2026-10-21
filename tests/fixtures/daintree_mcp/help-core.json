@@ -2,8 +2,8 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "f45fa04b3b614fb40ea17dc374c08a46f2b5553a",
-    "app_version": "0.44.0",
+    "app_commit": "1006cbca719950c122d995c7b378138a3968aaa2",
+    "app_version": "0.45.0",
     "caller_origin": "help",
     "session_origin": "help",
     "tier": "core",
@@ -26,12 +26,12 @@
       "added_remote_hosts": true,
       "manifest_source": "view"
     },
-    "captured_at": "2026-10-18",
+    "captured_at": "2026-10-21",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "c9ba0b84d67b24317701c517bf580492c5b204c7dbb49c28265f8e8ae3a07dcd",
+    "surface_hash": "cf11205c747ba4ce9178368b9361424ae69417be147ac22a32f595a1837b466d",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
-    "tool_count": 41,
+    "tool_count": 42,
     "context_gated_tools": [],
     "notes": [
       "tools[].daintree.reach 'caller': admitted by its caller rule rather than the tier allowlist (mayControlAssistants for assistant.list, assistant.start and agent.readQuota; mayRunProjectCommand for project.runCommand). No grant widens either."
@@ -51,8 +51,8 @@
           "added_remote_hosts": true,
           "manifest_source": "view"
         },
-        "tool_count": 39,
-        "surface_hash": "f1968bc6d4cdc0fd6780a093dfcbba18366526b0c2014ec1cccb311fc4463f07",
+        "tool_count": 40,
+        "surface_hash": "d4c81ea67036b2a419ec1dbeefd309c8bbf1bd9c7824aacf903146c8230cbc58",
         "added": [],
         "removed": [
           "host.call",
@@ -74,8 +74,8 @@
           "added_remote_hosts": true,
           "manifest_source": "viewless-help"
         },
-        "tool_count": 30,
-        "surface_hash": "282269b3d69f490d89b9b522584b25c23fe110b9101631159f8c047b4456a10d",
+        "tool_count": 31,
+        "surface_hash": "674869a82dfa6a913ad6895055563cbf06e90b83ba3f2c22c49264dd56c7e0f7",
         "added": [],
         "removed": [
           "agent.launchMany",
@@ -265,9 +265,10 @@
             "enum": [
               "grid",
               "dock",
-              "overlay"
+              "overlay",
+              "background"
             ],
-            "description": "\"grid\" main grid (default), \"dock\" sidebar dock, \"overlay\" floating overlay."
+            "description": "Default \"grid\". \"background\" runs it unmounted until restored."
           },
           "cwd": {
             "description": "Absolute launch directory, not a worktree selector. Defaults to the worktree root.",
@@ -407,7 +408,8 @@
                 "type": "string",
                 "enum": [
                   "grid",
-                  "dock"
+                  "dock",
+                  "background"
                 ]
               },
               {
@@ -2837,6 +2839,75 @@
         "title": "Notify when terminal is idle",
         "readOnlyHint": false,
         "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "terminal",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "terminal.placeOwned",
+      "wire_name": "terminal.placeOwned",
+      "description": "Move a panel this session created or was handed to the background, dock or grid; its process keeps running. Never takes focus or moves the user. Other panels are refused.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "terminalId": {
+            "type": "string",
+            "description": "Panel `id` this session created or was handed."
+          },
+          "location": {
+            "type": "string",
+            "enum": [
+              "grid",
+              "dock",
+              "background"
+            ],
+            "description": "Where to put it."
+          }
+        },
+        "required": [
+          "terminalId",
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "grid",
+                  "dock",
+                  "background"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the panel is now. Null means nothing was targeted (no panel named and none focused)."
+          }
+        },
+        "required": [
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Place owned terminal",
+        "readOnlyHint": false,
+        "idempotentHint": false,
         "destructiveHint": false,
         "openWorldHint": true
       },

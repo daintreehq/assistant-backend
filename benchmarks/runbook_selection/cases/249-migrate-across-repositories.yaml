@@ -63,19 +63,6 @@ cases:
       required: [daintree.hosts.migrate-across-repositories]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: migrate-across-repositories-agent-phrased
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      How the hub describes the campaign to search: "one row per selected repository, counted once
-      however many hosts hold a clone", with a pilot and residuals per repository.
-    messages:
-      - role: user
-        content: 'Hub task: carry one codemod through the four repositories the person selected on the Remote Hosts, each repository once even where two hosts clone it, with a pilot first and residual matches reported per repository.'
-    expect:
-      required: [daintree.hosts.migrate-across-repositories]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
   - id: migrate-across-repositories-user-phrased
     category: single-runbook
     note: >-
@@ -88,24 +75,6 @@ cases:
       required: [daintree.hosts.migrate-across-repositories]
       optional: [daintree.hosts.foundation, daintree.foundation]
 
-  - id: migrate-across-repositories-new-form-answered
-    host_model: inbox
-    category: continuation
-    note: >-
-      Second turn: the person settles a form the rulebook lacked and the campaign carries on, "a
-      pilot whose rulebook every host follows and only the person amends".
-    messages:
-      - role: user
-        content: replace the legacy logging calls in the api and billing repos, both on my other machines
-      - role: assistant
-        content: The billing repository's lane reported a logging call made through a wrapper that the rules do not cover. I have held the units not sent yet.
-      - role: user
-        content: rewrite those through the new logger too, add that to the rules, and carry on with both repos
-    expect:
-      required: [daintree.hosts.migrate-across-repositories]
-      optional: [daintree.hosts.foundation, daintree.foundation]
-
-  # ------------------------------------------------------------------ traps
   - id: migrate-across-repositories-not-local-sweep
     category: routing-trap
     note: >-

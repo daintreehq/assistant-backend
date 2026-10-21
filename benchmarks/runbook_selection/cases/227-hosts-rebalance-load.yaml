@@ -75,20 +75,6 @@ cases:
       required: [daintree.hosts.rebalance-load]
       optional: [daintree.hosts.foundation]
 
-  - id: rebalance-load-unavailable-host
-    host_model: inbox
-    category: single-runbook
-    note: >-
-      The unavailable-host scenario. Decided by "a host dropped out mid-run" and "only that
-      unstarted work placed on hosts with room".
-    messages:
-      - role: user
-        content: one of the swarm hosts went offline; several units the hub had queued for it were never sent, spread those across the remaining hosts
-    expect:
-      required: [daintree.hosts.rebalance-load]
-      optional: [daintree.hosts.foundation]
-
-  # ------------------------------------------------------------- routing traps
   - id: rebalance-load-not-place-work
     category: routing-trap
     note: >-
@@ -186,19 +172,6 @@ cases:
         content: The studio died halfway through the auth fix it had already pushed two commits for; have another host finish that one unit.
     expect:
       required: [daintree.hosts.reassign-host-work]
-      optional: [daintree.hosts.foundation]
-
-  - id: check-usage-limits-not-rebalance-load
-    host_model: inbox
-    category: routing-trap
-    note: >-
-      A usage read with nothing moved. check-usage-limits's "how much Claude Code or Codex
-      allowance each Remote Host this Shell reaches has left".
-    messages:
-      - role: user
-        content: For the swarm hosts, read off what each one's Codex usage screen says right now, one row per machine.
-    expect:
-      required: [daintree.hosts.check-usage-limits]
       optional: [daintree.hosts.foundation]
 
   - id: steer-swarm-not-rebalance-load

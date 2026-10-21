@@ -1,0 +1,41 @@
+# Seeing a project plugin's panel: daintree.plugins.develop-project-plugin.
+#
+# A request to look at a plugin panel (its layout, what it shows now, whether it renders)
+# belongs to the plugin runbook, which sees it through the plugin's panel preview or asks
+# the user, never through a debug-port relaunch of Daintree. The first three cases are the
+# requests that should find it; the reverse trap keeps a question about the project's own
+# UI code with daintree.explore.repository.
+
+cases:
+  - id: develop-project-plugin-host-lane-state-report
+    host_model: inbox
+    category: single-runbook
+    note: >-
+      Receiver wording, from the host's own assistant. Decided by "or its exact state and
+      the reason it is not" and the example "my plugin isn't loading".
+    messages:
+      - role: user
+        content: >-
+          Lane report: the hub's person cannot see the plugin's panel on their Shell; check the
+          plugin's state on this host.
+    expect:
+      required: [daintree.plugins.develop-project-plugin]
+      optional: [daintree.foundation]
+
+  - id: develop-project-plugin-host-reverse-messaging-consent
+    host_model: inbox
+    category: routing-trap
+    note: >-
+      Reverse trap: an assistant on a visible host that cannot be started or messaged is
+      daintree.hosts.diagnose-messaging's ("can SEE another machine from this Shell (a Remote
+      Host listed or connected here) but cannot message or start the Daintree assistant on
+      it"); the word approval does not make it a plugin question, so the plugin runbook must
+      not ride along.
+    messages:
+      - role: user
+        content: I can see the server host but starting its assistant fails; which approval does the person there still owe?
+    expect:
+      required: [daintree.hosts.diagnose-messaging]
+
+  # Control twins (issue #159): the same requests against the control catalog,
+  # merged runbooks mapped to what absorbed them and retired lane runbooks dropped.

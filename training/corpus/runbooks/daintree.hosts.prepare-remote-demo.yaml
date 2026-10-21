@@ -1,12 +1,6 @@
-# Training examples whose answer is `daintree.hosts.prepare-remote-demo` and nothing else.
-#
-# The hub's side of a demo on a Remote Host: the person, at their Shell, wants a change
-# running on another machine at an exact commit and wants to look at it from here. The hub
-# briefs that host's assistant, checks its reply against the commit it pinned and tells the
-# person how this Shell reaches the page, never claiming the host's localhost for them.
-# Boundaries are mined from its "do not use for" clauses; the local demo, a preview that is
-# already open, a busy port, a question for the host's assistant, plain work on a host and
-# the lane's own receiver each win their reverse rows in their own files.
+# daintree.hosts.prepare-remote-demo: Have a Remote Host prepare a demo and show the person how to open it
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.prepare-remote-demo.md
+
 runbook: daintree.hosts.prepare-remote-demo
 run: runbook-2026-10-issue-125
 

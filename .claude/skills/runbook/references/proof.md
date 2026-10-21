@@ -103,15 +103,13 @@ In the PR and the final report, name the layer for each claim, plainly:
 > the sidebar assistant with Remote Hosts configured, which the pane trial harness
 > cannot stand up. A live run from a Claude Code and a Codex hub is owed."
 
-## Paired roles
+## Host callers
 
-A hub runbook and its receiving lane runbook are two callers, so each end is its own
-claim at its own layer: selection at both ends and no wrong-role load (`bench pairs`),
-contract and delivery per caller (`tests/unit/test_paired_roles.py`), grounding of how
-each caller is led to search (`hub-lane-trials.md`, Paired role evidence). A delivery
-statement about the pair may not exceed its weaker end: "the hub finds it" is not "the
-lane finds it", and a lane handed the receiving runbook by id proves nothing about
-discovery. The live pair is `paired-role-entry` in `owed-trials.yaml`.
+A Shell's help session, the relayed tool session and a delegated assistant terminal
+are different callers. Validate each against the current capture. Delivery and
+ownership claims need the app's contract tests and a live scenario on that path;
+sidebar selection alone does not prove the receiving assistant handled its brief.
+See `host-control-trials.md`. Archived inbox pairs prove only their historical model.
 
 ## The two mistakes most runs make
 
