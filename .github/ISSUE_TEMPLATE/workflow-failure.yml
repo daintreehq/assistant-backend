@@ -1,0 +1,64 @@
+name: Assistant workflow failed
+description: Tell us what you asked, what you expected, and where the Assistant went wrong.
+title: "[Workflow] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the Daintree Assistant. Reports are contributions;
+        you do not need to write code or identify a runbook.
+
+        **This issue is public.** Remove credentials, private code, personal details,
+        machine names and identifying paths. Include only a short redacted excerpt;
+        do not attach full transcripts, session exports or diagnostic bundles.
+        Report vulnerabilities through the private link on the issue chooser.
+  - type: textarea
+    id: task
+    attributes:
+      label: What did you ask the Assistant to do?
+      description: Include the task or request, with private details replaced by placeholders.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: Describe the outcome that would have made this workflow successful.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened?
+      description: Where did it stop or go wrong? Say if the failure is intermittent.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and environment
+      description: Use “unknown” for anything you cannot find. No machine names or personal paths.
+      value: |
+        Daintree version:
+        Agent and agent version:
+        Operating system:
+        Local work or remote host:
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction or a short redacted example (optional)
+      description: Useful steps, a few relevant lines, or an error message. Full logs are unnecessary.
+  - type: input
+    id: runbook
+    attributes:
+      label: Runbook ID or backend build SHA (optional)
+      description: Only if already available. You do not need to investigate this to submit a report.
+  - type: checkboxes
+    id: public-content
+    attributes:
+      label: Public report
+      options:
+        - label: I have removed credentials and private or identifying information from this report and its attachments.
+          required: true

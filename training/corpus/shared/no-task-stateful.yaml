@@ -2278,7 +2278,7 @@ examples:
   - query: cheers
     history:
       - 'user: label #510 as bug and assign me'
-      - 'assistant: #510 now has label `bug`, assigned to @gpriday — read back confirmed.'
+      - 'assistant: #510 now has label `bug`, assigned to @example-user — read back confirmed.'
     run: 2026-10-16-synthetic-audit
   - query: hm, that's more convoluted than i'd like tbh
     history:
@@ -2345,7 +2345,7 @@ examples:
   - query: i'll merge it myself tomorrow, don't touch it
     history:
       - 'user: approve #610'
-      - 'assistant: Approved #610 as @gpriday; review state now APPROVED, not merged.'
+      - 'assistant: Approved #610 as @example-user; review state now APPROVED, not merged.'
     active: [daintree.forge.land-pull-request]
     run: 2026-09-24-selector-hardening
   - query: ok, thanks

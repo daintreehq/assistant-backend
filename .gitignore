@@ -36,7 +36,6 @@ coverage.xml
 # Written by the CI coverage step and read by tools/coverage_floors.py.
 coverage.json
 htmlcov/
-htmlcov/
 .mypy_cache/
 .ruff_cache/
 .cache/
@@ -47,6 +46,21 @@ htmlcov/
 !.env.example
 .env.local
 .env.*.local
+# Local agent configuration can contain credentials, personal paths and sessions.
+/.mcp.json
+/.claude/settings.local.json
+/.claude/worktrees/
+/.codex/config.toml
+/.codex/sessions/
+# Private keys and cloud credential exports never belong in this repository.
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+credentials.json
+application_default_credentials.json
+*.log
 
 # OS
 .DS_Store
@@ -76,7 +90,7 @@ training/models/
 training/logs/
 # Per-run result JSONs and the report page. Chunky, regenerable, and the numbers
 # that matter are transcribed into training/EXPERIMENTS.md — which is the record.
-# The report is published as a claude.ai artifact, not carried in the repo.
+# Reports remain local; selected measurements are recorded in EXPERIMENTS.md.
 training/results/
 # NOT ignored, and each for its own reason — the corpus is three planes:
 #   training/journals/  RAW. What a generating agent actually returned. Committed

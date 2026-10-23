@@ -24,7 +24,7 @@
 
 set -uo pipefail
 
-PROJECT="${PROJECT:-daintree-research}"
+PROJECT="${PROJECT:-}"
 REGION="${REGION:-us-central1}"
 SERVICE="${SERVICE:-daintree-assistant}"
 
@@ -51,6 +51,10 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$URL" ]; then
+  if [ -z "$PROJECT" ]; then
+    echo "Pass --url https://host or set PROJECT to your Google Cloud project ID." >&2
+    exit 2
+  fi
   URL="$(gcloud run services describe "$SERVICE" --region="$REGION" \
           --project="$PROJECT" --format='value(status.url)' 2>/dev/null)"
 fi

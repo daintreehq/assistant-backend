@@ -6,29 +6,6 @@ about today's behaviour against the source before acting on it.
 
 ---
 
-## Drop the old model versions from Git LFS history
-
-**Trigger: when someone decides to spend the history rewrite.** The model left Git (it is a
-bucket object named by `selector.lock`), so no new LFS data accrues. But 50 LFS objects, about
-3.5 GB, are still referenced by old commits and sit in GitHub's LFS storage and every full
-clone's `.git/lfs`. Nothing needs them: no old model is ever restored from Git.
-
-Dropping them needs a decision, not a script:
-
-- `git filter-repo` over `src/.../artifacts/selector` rewrites every commit id from the first
-  model onward, and `develop` and `main` need a force-push. Open branches, worktrees and any
-  stash would have to be rebased or discarded, and the released commit SHAs (the build SHA that
-  `/version` reports) stop existing in history.
-- Rewriting history does not by itself free GitHub's LFS storage: the unreferenced objects stay
-  until GitHub purges them (support request) or the repository is recreated. Check GitHub's
-  current LFS docs before choosing.
-- Locally, `git lfs prune` is safe and reclaims `.git/lfs`, but it is the only copy of those
-  objects if the remote ever loses them.
-
-Leaving it costs the existing ~3.5 GB and nothing more.
-
----
-
 ## Bound anonymous traffic on the public endpoint
 
 **Trigger: before the MCP endpoint is announced, or the first time request volume
@@ -42,22 +19,6 @@ caller's share of it, so a single noisy client can make search unavailable for
 everyone. Options, cheapest first: Cloud Armor rate-limiting per IP in front of the
 service; a per-IP token bucket in process (per-instance, so approximate); an
 optional API key that raises a caller above an anonymous limit.
-
----
-
-## Retire the old secrets and their IAM grants
-
-**Trigger: once a release of this branch has been serving for a day without a
-rollback.** Rolling back to a pre-cutover revision needs those secrets mounted,
-so they stay until rollback is no longer plausible.
-
-The deploy no longer mounts anything (`--clear-secrets`), but Secret Manager still
-holds `baseten-api-key`, `cerebras-api-key`, `openrouter-api-key`,
-`state-signing-key-current`, `state-salt` and `staging-allowed-subject-digests`, and
-the runtime service account still holds `secretAccessor` on each. Delete the
-secrets (and with them the grants), and remove `roles/secretmanager.viewer` from
-the deploy service account, which `bootstrap.sh` no longer grants but does not
-revoke. The provider keys should also be revoked at the providers.
 
 ---
 

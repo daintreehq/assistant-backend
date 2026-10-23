@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 21650,
-  "compiled_sha256": "73d91fa742bc476bd5f3af7b071517767f5ff3a719cf0a02884317ca816b10af",
+  "compiled_sha256": "e129f9520fbbc7bbd06d31039a6b37f3ffe7ce1a63678baddc32f2e4123c88b7",
   "label_space_sha256": "b9f99ceccd9c80f1c5c5e831abab384571694263c56ef7b8d1194f09308748b6",
   "label_space_size": 143,
   "by_source": {
@@ -299,7 +299,7 @@
       "examples": 226,
       "rows": 226,
       "runbook": "daintree.forge.manage-issue",
-      "sha256": "07421a5f599a244300fecb2e01340976065e89adf82817c6e5b974bb3ce37ed3"
+      "sha256": "97f3730f8d6a1205aca1e81c822ae4b92a2fab2c828203140247b98d657ea4ea"
     },
     "runbooks/daintree.forge.triage-issue-backlog.yaml": {
       "examples": 61,
@@ -971,7 +971,7 @@
       "examples": 745,
       "rows": 745,
       "runbook": "daintree.worktree.relocate-agents",
-      "sha256": "a49ebd4a11c6ac08a670226824f3e63edc9c78f3edf12a7e6d88f45b22246713"
+      "sha256": "4fec39bd5ed5170ef376081cb8f3ae7894b9d1dd92cd915dc321310079d31f75"
     },
     "shared/boundary.yaml": {
       "examples": 192,
@@ -1013,7 +1013,7 @@
       "examples": 567,
       "rows": 567,
       "runbook": null,
-      "sha256": "2b39fa1c46facbdb1caae689978aec4f288f8cc0c2b08309a2665e699f4baa22"
+      "sha256": "698f91775dd6030b0d7d62424d8213ed0bd3f59d9a4a01876e59210092075796"
     },
     "shared/no-task.yaml": {
       "examples": 118,

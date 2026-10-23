@@ -17,6 +17,10 @@ pipeline had the opposite property — the retired ``augment_context.py`` measur
 a second application taking the corpus from 9,903 rows to 10,405 — and shipped a
 one-shot guard against itself rather than being safe to re-run.
 
+**Privacy review precedes ingestion.** The entire input is copied into this
+public repository. Review and redact it according to training/DATA_POLICY.md;
+never pass a real user session or an unreviewed transcript to this tool.
+
 **The journal is archived, not consumed.** ``training/journals/`` is committed
 and append-only: it is the only record of what a generating agent actually
 returned, and the corpus above it is a curated view that a human is expected to

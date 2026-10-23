@@ -35,7 +35,7 @@ positives:
   - 'issue for this please: readyz still returns 200 with runbook learning on in prod. that''s just wrong.'
   - can you file it and put the docs label on? it's about the missing worktree documentation
   - change the title on the token issue so it says it's only on refresh
-  - someone needs to own 91. dave hasn't touched it in three weeks, swap him for me — gpriday.
+  - someone needs to own 91. dave hasn't touched it in three weeks, swap him for me — example-user.
   - reopen 7 and label it bug while you're in there
   - log a ticket for the memory thing before i forget
   - search open issues for anything about the retry loop, and if there's nothing, file one
@@ -43,7 +43,7 @@ positives:
   - before you file it just double check the tracker hasn't already got one about the CSV encoding
   - look through the open bugs, find the websocket reconnect one, and slap a p2 on it
   - grab the ticket about the migration timeout and give it a better title
-  - pull up 412 and assign it to me, my login is gpriday
+  - pull up 412 and assign it to me, my login is example-user
   - 422 needs reopening — someone closed it but the bug is still very much there
   - that got closed way too early. put it back.
   - i don't want to comment on it, just change the title so people can actually find it
@@ -62,7 +62,7 @@ positives:
   - write the ticket up. no agent, no worktree, i just want it in the tracker.
   - three separate issues out of that review, one per finding, all labelled tech-debt
   - turn each of those bullets into its own ticket
-  - on the deploy bug issue — ops and p1 labels, and put me down as assignee, gpriday
+  - on the deploy bug issue — ops and p1 labels, and put me down as assignee, example-user
   - File a public issue for the login crash and include the reproduction steps I gave you.
   - Turn this bug report into a forge ticket, but do not start working on it.
   - Create an issue called Cache eviction races under load.
@@ -252,7 +252,7 @@ followups:
       - 'user: file a bug for the checkout double-submit, label it p2'
       - 'assistant: Created #631 in daintreehq/assistant with the p2 label, read back and confirmed. URL: https://github.com/daintreehq/assistant/issues/631'
     active: [daintree.forge.manage-issue]
-  - query: gpriday
+  - query: example-user
     history:
       - 'user: open an issue for the perf regression and assign it to me'
       - 'assistant: Before I create it — I can''t resolve your forge login from anything I can see. What''s your username on the forge?'
@@ -317,7 +317,7 @@ followups:
       - 'user: Update issue 40''s body.'
       - 'assistant: I read the current issue and prepared the replacement text.'
     active: [daintree.forge.manage-issue]
-  - query: My login is gpriday; assign that account.
+  - query: My login is example-user; assign that account.
     history:
       - 'user: Assign ticket 22 to me.'
       - 'assistant: This surface cannot resolve your forge login.'

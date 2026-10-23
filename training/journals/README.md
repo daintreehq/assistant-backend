@@ -1,8 +1,10 @@
 # Raw generation journals
 
-Exactly what a generating agent returned, unedited. **Append-only, and
-committed.** Nothing trains from these directly; they exist so that a row in the
-curated corpus can be traced back to the run that produced it.
+Reviewed synthetic generation records. **Public, append-only after privacy
+review, and committed.** Nothing trains from these directly; they exist so that a
+row in the curated corpus can be traced back to the run that produced it. Read
+[the data policy](../DATA_POLICY.md) before importing a journal. Real session
+transcripts belong in ignored local storage, not here.
 
 ```
 training/journals/   ← you are here. RAW.
@@ -48,8 +50,10 @@ changes nothing. It refuses to overwrite an archived journal whose content
 differs, because this is the one plane that cannot be rebuilt from any other:
 reuse a `--run` and you get an error rather than a silently replaced record.
 
-Never edit a file in this directory; correct the curated YAML instead, which
-is what it is for. Note that ingest's no-op property is about the CORPUS: if
+Correct labels and examples in the curated YAML rather than editing these
+records. Privacy redaction is the exception: remove identifying material from
+every data plane, as described in the data policy. Existing records were
+redacted during the public-repository cleanup on 2026-10-23. Note that ingest's no-op property is about the CORPUS: if
 you prune a run and then re-ingest its journal, the rows come back.
 
 The `2026-10-16-synthetic-audit--*` journals contain audit action records rather

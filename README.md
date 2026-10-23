@@ -1,82 +1,137 @@
-# Daintree runbooks
+# Daintree Assistant
 
-An MCP server that supplies Daintree runbooks: procedures that Claude Code
-and Codex follow to orchestrate work in Daintree. They cover launching visible agents
-and waiting on them through Daintree notices, worktrees, reviews, and issue and PR
-workflows. `search_runbooks` takes a plain-language task and returns the runbooks
-that fit, ranked, with their full instructions. `get_runbook` fetches one by id.
-Both return the foundation runbook each procedure builds on, in full once per MCP
-session. Anyone can add it: no credential, no account.
+The runbooks and selection backend for the [Daintree Assistant](https://daintree.org).
+Runbooks are procedures that help an assistant coordinate agents, manage worktrees,
+review work, recover from failures, and finish tasks in Daintree.
 
-The server supplies instructions only. The actions the runbooks call
-(`agent.launch`, `terminal.getStatus`, `terminal.notifyWhenIdle`, …) come from the
-Daintree app's own MCP connection. See
-[docs/agents/DAINTREE_RUNBOOK_CLIENT.md](docs/agents/DAINTREE_RUNBOOK_CLIENT.md).
+This repository is public so you can inspect those procedures and help improve
+them by reporting what happened when a workflow failed or was missing.
+
+## Help improve the Assistant
+
+**Issues are contributions. You do not need to write code.**
+
+[Report a workflow that failed](https://github.com/daintreehq/assistant-backend/issues/new?template=workflow-failure.yml)
+or [suggest a missing workflow](https://github.com/daintreehq/assistant-backend/issues/new?template=missing-workflow.yml).
+The most useful reports tell us:
+
+- what you asked the Assistant to do;
+- what you expected to happen;
+- what actually happened, including where it stopped or went wrong;
+- your Daintree version, agent and agent version, and operating system;
+- a short, redacted example, if one helps explain the problem.
+
+Wrong runbook selections, procedures that get stuck, incorrect assumptions about
+your setup, and missing workflows all belong here. You do not need to know which
+runbook was involved. Search existing issues first, and omit credentials, private
+code, personal paths and full transcripts.
+
+**We do not accept pull request contributions.** Maintainers investigate reports
+and implement the changes. Public pull request creation is restricted to
+repository collaborators. See [CONTRIBUTING.md](CONTRIBUTING.md) for reporting
+guidance and [SECURITY.md](SECURITY.md) for private vulnerability reports.
+
+## Use the runbooks
+
+The hosted MCP endpoint is public and requires no account or credential:
 
 ```json
 {
   "mcpServers": {
-    "daintree-runbooks": { "type": "http", "url": "https://assistant.daintree.org/v1/daintree/mcp" }
+    "daintree-runbooks": {
+      "type": "http",
+      "url": "https://assistant.daintree.org/v1/daintree/mcp"
+    }
   }
 }
 ```
 
-The tools, their result shapes and the protocol details are in [docs/MCP.md](docs/MCP.md).
+`search_runbooks` selects procedures for a plain-language task. `get_runbook`
+retrieves a procedure by ID. Selected procedures include their instructions and
+supporting foundations; neighbouring search results carry metadata. Foundation
+instructions are delivered once per MCP session unless explicitly requested again.
 
-## How search works
+This server supplies instructions. Daintree's own MCP connection supplies the
+actions that operate agents, terminals, worktrees and hosts. The app and this
+backend are separate projects; making this backend public does not install or
+launch Daintree.
 
-The current catalog is grouped by domain. Runbooks are Markdown files with YAML frontmatter in
-`src/daintree_assistant_server/runbooks/catalog/`. Search is a local two-stage
-classifier (`runbooks/local/`), in process, with no model call:
+See the [MCP contract](docs/MCP.md) and
+[client setup](docs/agents/DAINTREE_RUNBOOK_CLIENT.md).
 
-1. A fine-tuned bi-encoder embeds the query and takes the 32 nearest runbooks by
-   cosine from a table of embedded runbook documents (title, summary, `whenToUse`).
-2. A set-wise head scores those 32 together and predicts how many the query needs,
-   zero included. Its ranking is the result; its admitted set is `selected`.
+## How selection works
 
-The head reads runbook *embeddings*, not runbook ids, so a runbook added to the
-catalog is embedded on load and searchable with no retrain. A retrain
-(`.claude/skills/retrain-selector`, pipeline in `training/`) is what makes a new
-runbook competitive against trained neighbours. `training/EXPERIMENTS.md` has the
-measurements behind the design.
+Runbooks are Markdown files with YAML frontmatter in
+[`src/daintree_assistant_server/runbooks/catalog/`](src/daintree_assistant_server/runbooks/catalog/).
+Selection runs locally in the server, without a hosted model call:
 
-## Adding runbooks
+1. A fine-tuned bi-encoder retrieves the 32 nearest runbooks for a task.
+2. A set-wise head ranks those candidates and selects how many apply, including zero.
 
-[docs/RUNBOOKS.md](docs/RUNBOOKS.md) is the authoring guide. In short: add
-`runbooks/catalog/<domain>/<id>.md` (filename stem = `id`), give it a `whenToUse` that says when
-it applies and names confusable neighbours by fully-qualified id, add a benchmark
-case under `benchmarks/runbook_selection/cases/` that requires it, then:
+The head reads embeddings rather than per-runbook IDs. New runbooks can be
+embedded when the catalog loads; training improves their selection against
+similar procedures. The [training guide](training/README.md) and
+[experiment record](training/EXPERIMENTS.md) describe the design and measurements.
+
+## Repository guide
+
+| Path | Contents |
+| --- | --- |
+| `src/daintree_assistant_server/` | MCP server, selector runtime and current runbooks |
+| `docs/MCP.md` | Tools, response shapes and protocol behaviour |
+| `docs/RUNBOOKS.md` | Maintainer guide to writing and validating procedures |
+| `benchmarks/` | Selection cases and routing quality checks |
+| `training/` | Synthetic training examples, curation and training tools |
+| `tests/` | Server, catalog, selector and deployment checks |
+| `infra/gcp/` | Maintainer deployment and smoke-test scripts |
+| `archive/` | Retired procedures and experiments, excluded from the package |
+
+The retired v0.44 inbox catalog is historical material. All clients receive the
+current direct-control catalog; the archive is never loaded or packaged.
+
+## Maintainer setup
+
+Python 3.12 is required. Reporting an issue requires none of these tools.
 
 ```bash
-pytest tests/unit
-python -m benchmarks.runbook_selection.bench coverage   # every runbook has a case
-python -m benchmarks.runbook_selection.bench local      # routing quality gate
-```
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]" -c requirements.lock
 
-The retired v0.44 inbox catalog, captures, cases and trial plans live in
-`archive/inbox-v0.44/`. They are historical material, never loaded or packaged.
-All clients now receive the current direct-control catalog; v0.44 messaging is no
-longer supported. See [the audit](docs/audits/RUNBOOK_AUDIT_2026-10-21.md).
-
-## Development
-
-```bash
-training/fetch_selector.sh                # the selector model, as selector.lock names it (needs gcloud)
-python3.12 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]" -c requirements.lock
-
-pytest
 ruff check .
 mypy --strict src
-
-cp .env.example .env                      # optional; sets PORT=8473
-./dev                                     # serve the MCP endpoint locally
+python -m training.compile_corpus --check
+python -m benchmarks.runbook_selection.bench coverage
 ```
 
-## Deploying
+The selector's model binaries are stored separately from Git. Full server startup,
+model-dependent tests and routing evaluation require the exact files named by
+`selector.lock`. The current artifact store requires authorised Google Cloud
+access; a public clone alone does not grant that access. The hosted endpoint above
+is available without downloading a model.
 
-Pushing to `main` deploys to Cloud Run through `cloudbuild.yaml`: build, deploy a
-no-traffic candidate, run `infra/gcp/smoke.sh` against it (including a real
-search), then promote. Use the `/release` skill rather than doing it by hand.
-`infra/gcp/` holds the one-time setup, the smoke test and a rollback script; see
-[infra/gcp/README.md](infra/gcp/README.md).
+With access to the artifact store and `gcloud` installed:
+
+```bash
+training/fetch_selector.sh
+python -m pytest --cov --cov-report=term:skip-covered
+python -m benchmarks.runbook_selection.bench local
+
+cp .env.example .env
+./dev
+```
+
+The local MCP URL with the example settings is
+`http://127.0.0.1:8473/v1/daintree/mcp`. Runbook changes follow the checks in the
+[maintainer authoring guide](docs/RUNBOOKS.md). Training and cloud deployment
+require separate maintainer access and explicit authorisation.
+
+Changes land on `develop`. Pushing `main` deploys through Cloud Build: build a
+candidate, smoke-test it, then promote it. See
+[deployment instructions](infra/gcp/README.md).
+
+## Licence
+
+The original code, runbooks and synthetic data in this repository are available
+under the [MIT licence](LICENSE). Third-party dependencies and base models retain
+their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

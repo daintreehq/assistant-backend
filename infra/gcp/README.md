@@ -1,7 +1,7 @@
 # Deploying Daintree runbook search
 
-The service is a stateless, unauthenticated MCP server with one tool,
-`search_runbooks`, served at:
+The service is a stateless, unauthenticated MCP server with two tools,
+`search_runbooks` and `get_runbook`, served at:
 
 ```
 https://assistant.daintree.org/v1/daintree/mcp
@@ -21,6 +21,28 @@ that pipeline — they do not replace it.
 | `bootstrap.sh` | idempotent one-time GCP setup: registry, both service accounts, the GitHub connection, the build trigger, the domain mapping, and the public cutover when asked for |
 | `smoke.sh` | the assertion suite. Run by hand against any host, and run by the build against the candidate as the pre-promotion gate |
 | `rollback.sh` | moves traffic back to the previous Ready revision, selected by name |
+
+## Maintainer access and settings
+
+Cloud administration requires maintainer credentials. Set `PROJECT` explicitly
+in your local shell before bootstrap, rollback or Cloud Run URL discovery:
+
+```bash
+export PROJECT=your-google-cloud-project-id
+```
+
+No project is selected implicitly. `REGION` and `SERVICE` can also be set; their
+defaults are `us-central1` and `daintree-assistant`. The model bucket named by
+`selector.lock` is an authenticated artifact store, not a credential or a public
+download. To deploy in your own project, publish the selector into a bucket you
+control, update the lock and set `SELECTOR_BUCKET` for bootstrap to that bucket's
+name. Never commit account credentials or local environment files.
+
+Public smoke testing needs only `bash`, `curl` and Python, with an explicit URL:
+
+```bash
+./infra/gcp/smoke.sh --url https://assistant.daintree.org
+```
 
 ## The pipeline
 
@@ -65,7 +87,7 @@ release:
 
 ```bash
 gcloud run services describe daintree-assistant --region=us-central1 \
-  --format='value(status.traffic[].tag)'
+  --project="$PROJECT" --format='value(status.traffic[].tag)'
 ```
 
 ## Public access
@@ -84,7 +106,7 @@ binding; revoking is a command you run yourself:
 
 ```bash
 gcloud run services remove-iam-policy-binding daintree-assistant \
-  --region=us-central1 --member=allUsers --role=roles/run.invoker
+  --region=us-central1 --project="$PROJECT" --member=allUsers --role=roles/run.invoker
 ```
 
 An invoker binding is per-SERVICE, so on a public service every candidate tag URL

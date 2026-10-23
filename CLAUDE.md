@@ -1,6 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides maintainer guidance for working in this public repository.
+Public contributions are issue reports; pull requests are restricted to repository
+collaborators. See CONTRIBUTING.md. Never commit raw sessions, credentials or
+identifying user details; training/DATA_POLICY.md applies to every data plane.
 
 ## What this service is
 
@@ -222,7 +225,7 @@ retrain-triggered entries (reservation retention, renamed routing text, `k=64` a
 runbooks, domain foundations).
 
 **The model is not in Git.** The ONNX graphs, tokenizer vocabularies and `vectors.npz` live in a
-private bucket (`gs://daintree-research-selector`), one object per distinct content, named by
+maintainer-controlled bucket (named in `selector.lock`), one object per distinct content, named by
 SHA-256; `selector.lock` (committed) lists each file's path, hash and size, and is the model's
 identity. `training/fetch_selector.sh` puts them in place (files that already match are left
 alone, and downloads are cached in `~/.cache/daintree-selector`, so a worktree is a copy, not a
@@ -237,9 +240,9 @@ git-ignored local copies; Git never holds a model version.
 
 **Training runs on a temporary Lambda GPU.** Follow
 [the retrain workflow](.claude/skills/retrain-selector/SKILL.md) for capacity,
-SSH setup, CUDA dependencies and cleanup. Never run the trainers on this Mac or
-an Apple-silicon Studio: the retriever exceeds their practical memory budget
-and takes hours. Local index rebuilding, evaluation and tests are lightweight.
+SSH setup, CUDA dependencies and cleanup. Use a CUDA host with enough memory
+for the selected training batch size. Local index rebuilding, evaluation and
+tests are lightweight.
 Start training only when the user explicitly asks to retrain, normally after
 their batch of changes has merged. General requests to fix, finish, test or
 commit work do not authorize training or renting a GPU.
@@ -282,13 +285,12 @@ guard → model fetch by lock → build → push → deploy a **no-traffic** rev
 (env replaced wholesale, `--clear-secrets`, readback verified) → `infra/gcp/smoke.sh`
 against the tag's URL, including a real search → promote to 100% → `release-gate` retires
 the tag and renders the verdict. The first-ever deploy of a service goes out at 100% behind
-an identity-token `/readyz` check. Project `daintree-research`, region `us-central1`,
-service `daintree-assistant`.
+an identity-token `/readyz` check. Operators must set `PROJECT` explicitly;
+the deployment scripts document the remaining settings.
 
 **Where it is live:** `https://assistant.daintree.org`, a Cloud Run domain mapping onto
 `daintree-assistant`, so the MCP endpoint is `https://assistant.daintree.org/v1/daintree/mcp`.
-The raw Cloud Run URL (`https://daintree-assistant-aijjq62rdq-uc.a.run.app`) serves the same
-revision. Every release reaches both; check the domain with
+Check the public domain with
 `./infra/gcp/smoke.sh --url https://assistant.daintree.org --expect-build-sha <sha>`.
 
 Use the **`/release` skill** rather than doing it by hand. `infra/gcp/bootstrap.sh` is the

@@ -108,8 +108,7 @@ runbooks leave them to the host:
    file `git rev-parse --git-path info/exclude` names. See the foundation runbook.
 4. **Which continuation mechanisms really exist.** Daintree notices, when the pane is
    offered them. Anything else must be a verified host feature: a Claude Code
-   monitor or scheduled task, or a Codex environment's own facility. The dated
-   inventories in [`CLAUDE_CODE.md`](CLAUDE_CODE.md) and [`CODEX.md`](CODEX.md)
-   describe what particular environments had. They are optional extras, and no
-   runbook requires them. The primary path must work because Daintree reactivates
+   monitor or scheduled task, or another environment's own facility. Verify that
+   facility in the actual client; installed tools and continuation mechanisms
+   vary by version and configuration. The primary path must work because Daintree reactivates
    the pane, not because a host monitor happened to cover for a broken notice.

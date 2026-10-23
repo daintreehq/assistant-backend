@@ -15,6 +15,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Prompt/runbook files ship as package data. requirements.lock is a constraints
 # file: it pins versions but only the runtime deps from pyproject get installed.
 COPY pyproject.toml README.md requirements.lock ./
+COPY LICENSE THIRD_PARTY_NOTICES.md ./
+COPY third_party ./third_party
 COPY src ./src
 RUN pip install . -c requirements.lock
 

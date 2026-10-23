@@ -1,0 +1,44 @@
+name: Missing Assistant workflow
+description: Describe a task the Assistant should handle and the outcome you want.
+title: "[Workflow request] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the task in your own words; a runbook design or code is unnecessary.
+        Maintainers investigate and implement changes. Pull request contributions
+        are not accepted.
+
+        **This issue is public.** Use placeholders for private details. Do not attach
+        credentials, private code, full transcripts or diagnostic bundles.
+  - type: textarea
+    id: task
+    attributes:
+      label: What task do you want the Assistant to handle?
+      description: Give an example request and enough context to understand the workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should a successful outcome look like?
+      description: Describe what you want to accomplish, including any relevant constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: What happens today? (optional)
+      description: If you tried it, describe the response or workaround. Redact private details.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and environment (optional)
+      description: Daintree version, agent and version, operating system, and local or remote work, if relevant.
+  - type: checkboxes
+    id: public-content
+    attributes:
+      label: Public report
+      options:
+        - label: I have removed credentials and private or identifying information from this report and its attachments.
+          required: true

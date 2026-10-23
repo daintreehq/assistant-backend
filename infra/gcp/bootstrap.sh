@@ -24,7 +24,7 @@
 
 set -euo pipefail
 
-PROJECT="${PROJECT:-daintree-research}"
+PROJECT="${PROJECT:?Set PROJECT to your Google Cloud project ID}"
 REGION="${REGION:-us-central1}"              # Cloud Run + Artifact Registry
 SERVICE="${SERVICE:-daintree-assistant}"
 AR_REPO="${AR_REPO:-daintree}"

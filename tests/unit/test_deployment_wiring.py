@@ -37,7 +37,7 @@ _SUBSTITUTED = {
     "${_RUNTIME_SA}": "daintree-assistant-run",
 }
 _BUILTINS = {
-    "PROJECT_ID": "daintree-research",
+    "PROJECT_ID": "example-project",
     "COMMIT_SHA": "0123456789abcdef0123456789abcdef01234567",
     "SHORT_SHA": "0123456",
 }

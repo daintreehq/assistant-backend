@@ -30,6 +30,9 @@ hooks:
 
 # /runbook: one runbook change, issue to pull request
 
+This is a repository-maintainer workflow. Public contributions are issues, as
+described in CONTRIBUTING.md; external pull requests are not accepted.
+
 A runbook is a procedure Claude Code or Codex follows to do one kind of work in
 Daintree, found through the public `search_runbooks` MCP this repository serves. It
 is only worth having if search **finds** it for the right request and an agent that

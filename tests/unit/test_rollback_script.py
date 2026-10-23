@@ -104,7 +104,11 @@ exit 99
 
 def _run(tmp_path: Path, service, revisions, *args: str) -> subprocess.CompletedProcess[str]:
     bin_dir = _fake_gcloud(tmp_path, service, revisions)
-    env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "PROJECT": "example-project",
+    }
     return subprocess.run(
         ["bash", str(SCRIPT), *args],
         capture_output=True, text=True, env=env, cwd=REPO_ROOT, timeout=60,
@@ -259,7 +263,11 @@ def test_an_unreadable_revision_list_refuses_rather_than_guessing(tmp_path: Path
         f'echo "boom" >&2; exit 1\n'
     )
     gcloud.chmod(0o755)
-    env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "PROJECT": "example-project",
+    }
     r = subprocess.run(["bash", str(SCRIPT), "--dry-run"], capture_output=True,
                        text=True, env=env, cwd=REPO_ROOT, timeout=60)
     assert r.returncode == 2

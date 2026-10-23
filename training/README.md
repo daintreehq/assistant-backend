@@ -55,14 +55,21 @@ conversation ─────────┤                                     
 
 ## Environment
 
+This is a maintainer workflow; public contributions are
+[issue reports](../CONTRIBUTING.md). Read the [data policy](DATA_POLICY.md) before
+ingesting examples. Full evaluation needs the model named by `selector.lock`;
+`training/fetch_selector.sh` currently requires authorised access to the artifact
+store. A public clone alone does not provide the model binaries.
+
 ```bash
 python3.12 -m venv .venv-train
 .venv-train/bin/pip install -r training-requirements.txt
 .venv-train/bin/pip install -e ".[dev]"
 ```
 
-Training auto-selects MPS on Apple silicon (measured 5.7x faster than CPU for
-training; inference stays CPU/ONNX regardless).
+Training uses a separately authorised CUDA GPU. The trainers also expose CPU
+and MPS backends for experiments; the shipped recipe is documented in the
+retrain workflow. Serving uses CPU/ONNX.
 
 ## The corpus is three planes
 
@@ -94,7 +101,7 @@ get the same bytes.
 
 Training and export run on a temporary Lambda CUDA GPU; follow
 [the retrain workflow](../.claude/skills/retrain-selector/SKILL.md) for setup and
-cleanup. Never run the trainers on the user's Mac or a Studio. Index refresh,
+cleanup. Use a CUDA training host with adequate memory. Index refresh,
 compilation and evaluation can run locally.
 Training starts only on an explicit user request, normally after the intended
 batch of changes has merged; routine audit and commit work does not start it.

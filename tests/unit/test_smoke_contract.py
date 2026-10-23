@@ -197,7 +197,7 @@ def _serve(deployment: dict[str, Any]) -> Iterator[tuple[str, list[str | None]]]
 def _run(*args: str, path: str | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
         ["bash", str(_SMOKE), *args],
-        env={"PATH": path or os.environ["PATH"]},
+        env={"PATH": path or os.environ["PATH"], "PROJECT": "example-project"},
         capture_output=True,
         text=True,
         timeout=120,

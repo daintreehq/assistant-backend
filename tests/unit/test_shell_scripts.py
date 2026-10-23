@@ -15,13 +15,43 @@ and these two failure classes are exactly the ones static analysis can settle.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = sorted((REPO_ROOT / "infra" / "gcp").glob("*.sh"))
+
+
+@pytest.mark.parametrize(
+    ("relative", "args"),
+    [
+        ("infra/gcp/bootstrap.sh", []),
+        ("infra/gcp/rollback.sh", ["--list"]),
+        ("infra/gcp/smoke.sh", []),
+        (".claude/skills/release/watch-build.sh", ["a" * 40, "us-central1"]),
+    ],
+)
+def test_cloud_operations_require_an_explicit_project_before_calling_gcloud(
+    tmp_path: Path, relative: str, args: list[str],
+) -> None:
+    """A public checkout must not silently target the maintainer's cloud account."""
+    called = tmp_path / "called"
+    binary = tmp_path / "gcloud"
+    binary.write_text(f'#!/bin/sh\ntouch "{called}"\nexit 1\n')
+    binary.chmod(0o755)
+    env = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"}
+    env.pop("PROJECT", None)
+    result = subprocess.run(
+        ["/bin/bash", str(REPO_ROOT / relative), *args],
+        env=env, text=True, capture_output=True, timeout=10,
+    )
+    assert result.returncode != 0
+    assert "Set PROJECT" in result.stderr or "set PROJECT" in result.stderr
+    assert not called.exists()
 
 #: Variables the shell or the environment supplies. Kept short and explicit —
 #: a long allowlist is how a real undefined-variable bug gets excused.

@@ -1,5 +1,9 @@
 # The curated corpus — source of truth for the selector's training data
 
+All data planes are public. Read the [data policy](../DATA_POLICY.md) before
+adding examples or ingesting journals. Commit synthetic, generalised scenarios;
+keep raw user sessions out of every tracked directory.
+
 Everything under this directory is **hand-editable and reviewable**. It is the
 input to `python -m training.compile_corpus`, which produces
 `training/data/selection.jsonl`. That file is a **build artifact**: do not edit

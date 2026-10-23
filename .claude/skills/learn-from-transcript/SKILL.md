@@ -43,7 +43,7 @@ to look for.
 - **Runbooks are served to anyone.** The MCP endpoint is public. Nothing from a
   transcript goes into a runbook body or routing text except the generalised
   lesson: no project names, paths, people, issue numbers or pasted content. Cases
-  and corpus rows live in this private repo but shape a model that ships; scrub
+  and corpus rows are public and shape a model that ships; scrub
   them the same way while keeping the query's shape.
 - **Measure routing, never assert it.** `bench search` is free and instant. A
   routing claim with no measurement behind it does not go in the ledger.

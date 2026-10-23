@@ -16,6 +16,14 @@ infra/
 # secrets as `.env` itself, and a pattern that only names the canonical
 # file ships them into the build context on the first `cp .env .env.bak`.
 .env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+credentials.json
+application_default_credentials.json
+*.log
 .DS_Store
 
 # The Dockerfile only copies pyproject.toml, README.md, requirements.lock and
@@ -27,6 +35,10 @@ docs/
 build/
 .tmp/
 .claude/
+.codex/
+.mcp.json
 .daintree/
 .github/
 uv.lock
+# Local leftovers from the retired package path must not enter a build context.
+src/daintree_assistant_server/skills/

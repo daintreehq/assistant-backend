@@ -15,7 +15,7 @@ set -uo pipefail
 
 SHA=${1:?commit sha required}
 REGION=${2:?build region required}
-PROJECT=daintree-research
+PROJECT=${PROJECT:?Set PROJECT to your Google Cloud project ID}
 TRIGGER=deploy-main
 INTERVAL=20
 FIND_DEADLINE=300   # the trigger normally fires within seconds of the push

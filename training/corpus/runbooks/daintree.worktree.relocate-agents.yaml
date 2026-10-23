@@ -906,7 +906,7 @@ followups:
   - query: give me the exporter path again, i want to cd there
     history:
       - 'user: these three are all fighting over the same checkout, split them up'
-      - 'assistant: Created wt_9fa2 feat/importer at /Users/greg/src/acme-importer, wt_9fa3 feat/exporter at /Users/greg/src/acme-exporter, wt_9fa4 feat/schema at /Users/greg/src/acme-schema. Filed term_4a1, term_4a2, term_4a3 under them and told each to continue in its new directory.'
+      - 'assistant: Created wt_9fa2 feat/importer at /Users/example/src/acme-importer, wt_9fa3 feat/exporter at /Users/example/src/acme-exporter, wt_9fa4 feat/schema at /Users/example/src/acme-schema. Filed term_4a1, term_4a2, term_4a3 under them and told each to continue in its new directory.'
     active: [daintree.worktree.relocate-agents]
   - query: what's the full absolute path for the billing one
     history:
@@ -923,7 +923,7 @@ followups:
       - 'user: each of those agents needs its own worktree'
       - 'assistant: Created three and redirected all three agents.'
       - 'user: which terminal ended up where'
-      - 'assistant: term_88a → wt_2001 /Users/greg/work/api-cache, term_88b → wt_2002 /Users/greg/work/api-ratelimit, term_88c → wt_2003 /Users/greg/work/api-metrics.'
+      - 'assistant: term_88a → wt_2001 /Users/example/work/api-cache, term_88b → wt_2002 /Users/example/work/api-ratelimit, term_88c → wt_2003 /Users/example/work/api-metrics.'
     active: [daintree.worktree.relocate-agents]
   - query: what were the ids again, i lost the scrollback
     history:
@@ -1139,7 +1139,7 @@ followups:
   - query: hold on, both of those should be off release/2.4 not develop
     history:
       - 'user: give the running agents their own worktrees'
-      - 'assistant: wt_e1 feat/pdf-export /Users/greg/src/app-pdf, wt_e2 feat/csv-export /Users/greg/src/app-csv. Both agents redirected.'
+      - 'assistant: wt_e1 feat/pdf-export /Users/example/src/app-pdf, wt_e2 feat/csv-export /Users/example/src/app-csv. Both agents redirected.'
     active: [daintree.worktree.relocate-agents]
   - query: are they definitely on different branches now
     history:
@@ -1236,7 +1236,7 @@ topic_shifts:
       - 'user: fan the backlog out across agents'
       - 'assistant: Six agents are running, one per issue.'
       - 'user: are they all in the same repo dir?'
-      - 'assistant: Yes, all six launched from /Users/greg/src/acme.'
+      - 'assistant: Yes, all six launched from /Users/example/src/acme.'
     active: [daintree.orchestration.fan-out-work]
   - query: give each of those agents its own branch and folder
     history:
@@ -1251,7 +1251,7 @@ topic_shifts:
   - query: that agent and the one from earlier need separate worktrees, move them
     history:
       - 'user: spawn an agent to refactor the auth middleware'
-      - 'assistant: term_c9 launched on the auth refactor in /Users/greg/src/acme.'
+      - 'assistant: term_c9 launched on the auth refactor in /Users/example/src/acme.'
     active: [daintree.edits.spawn-visible-agent]
   - query: it's clashing with the other terminal, put both of them in their own worktrees
     history:
@@ -1298,7 +1298,7 @@ topic_shifts:
   - query: the two agents that exist should get one of these each — move them in
     history:
       - 'user: create a worktree for feat/search'
-      - 'assistant: Created wt_501 feat/search at /Users/greg/src/acme-search off develop. Nothing launched in it.'
+      - 'assistant: Created wt_501 feat/search at /Users/example/src/acme-search off develop. Nothing launched in it.'
     active: [daintree.worktree.create-plain-worktree]
   - query: now take the running agents and file them into their own worktrees
     history:
@@ -1308,7 +1308,7 @@ topic_shifts:
   - query: instead of that, just move the agents that are already running into separate trees
     history:
       - 'user: check out release/2.4 as a worktree'
-      - 'assistant: wt_702 created at /Users/greg/src/acme-2.4 for the existing release/2.4 branch.'
+      - 'assistant: wt_702 created at /Users/example/src/acme-2.4 for the existing release/2.4 branch.'
     active: [daintree.worktree.create-plain-worktree]
   - query: give every one of those live agents its own worktree
     history:

@@ -26,7 +26,7 @@
 
 set -uo pipefail
 
-PROJECT="${PROJECT:-daintree-research}"
+PROJECT="${PROJECT:-}"
 REGION="${REGION:-us-central1}"
 SERVICE="${SERVICE:-daintree-assistant}"
 TARGET=""
@@ -51,6 +51,11 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+if [ -z "$PROJECT" ]; then
+  echo "Set PROJECT to your Google Cloud project ID before using rollback." >&2
+  exit 2
+fi
 
 bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 fail() { printf '\033[31mFAIL\033[0m  %s\n' "$1" >&2; }

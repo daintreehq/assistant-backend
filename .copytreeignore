@@ -1,132 +1,24 @@
-# .copytreeignore — what `copytree` should NOT include when packaging this
-# project as context for an AI agent. gitignore-style syntax, evaluated after
-# .gitignore.
-#
-# Goal: a PURE-CODE bundle. Everything needed to understand and change the
-# server — source, runbook bodies, docs, deploy
-# and CI config — and nothing that is an environment, a cache, a build
-# artifact, a captured fixture, a model weight, or a second copy of a
-# different repository.
-#
-# .gitignore already removes the environments, caches, build artifacts and
-# real .env files, and CopyTree drops binaries and junk on its own, so this
-# file deliberately carries ONLY the rules that go further than those two.
-# Keep it that way: `copytree ignore check .` flags any rule here that has
-# stopped doing work of its own.
-#
-#   copytree inspect .        what would be selected, by directory
-#   copytree ignore check .   what these rules remove, and which are dead
-#   copytree plan .           the exact final export
-#
-# Escape hatches — `--force-include` overrides these rules (a CLI `-x` does
-# not), so nothing here is permanently out of reach:
-#   copytree . --force-include 'tests/**'         # + the test suite
-#   copytree . --force-include 'benchmarks/**'    # + the benchmark harness
-#   copytree . --force-include 'cli/**'           # + the vendored Go CLI
-#
-# Recommended invocation for this repo:
-#
-#   copytree . --secrets off
-#
-# The default `--secrets redact` scanner has no true positives here — nothing
-# tracked in this repo is a credential — but 15 false positives, and it
-# rewrites the exact lines an agent most needs to read: `token =
-# _extract_bearer(authorization)` in auth.py, every `api_key=` argument
-# threading the caller's key through providers/, and every `max_tokens=`.
-# A bundle that mangles the credential path is worse than no bundle. Turning
-# the policy off also restores .env.example (8 KB documenting every setting),
-# which the secret-FILE rule drops and --force-include cannot override.
-#
-# That is only safe because the real .env can never reach the export: it is
-# gitignored, and the rule at the foot of this file states it again so the
-# guarantee does not rest on the secret policy that is being switched off.
+# Context bundles exclude generated data, local sessions and model binaries.
+# .gitignore also applies. Keep the bundler's secret detection enabled and review
+# the export before sharing it. Force-include specific source paths when needed.
 
-# ---------------------------------------------------------------------------
-# Vendored CLI submodule (~1.5 MB of Go, a quarter of the old export)
-#
-# cli/ is a git submodule tracking the separate Daintree CLI repo. It is not
-# part of this Python package, build, or test scope, and the server/client
-# boundary it implements is already described prose-first in CLAUDE.md and
-# specified in docs/DAINTREE_API.md. Walking it here means an agent burns its
-# context on a codebase it was not asked to change. Note it carries its own
-# .claude/ and .github/, which is why those rules appear twice in a check.
-# ---------------------------------------------------------------------------
-cli/
-
-# ---------------------------------------------------------------------------
-# Training corpus and exported model artifacts
-#
-# training/ keeps its CODE — the local selector's pipeline is part of this
-# system, and EXPERIMENTS.md records which designs were already built and
-# abandoned, which is the single most expensive thing for an agent to
-# rediscover. What goes is the corpus and what it produces: the assembled
-# JSONL, the 40 KB catalog digest, and the exported vector table the server
-# loads at runtime (189 KB of base64 that reads as noise). Checkpoints and
-# sweep results under training/models/ and training/results/ are gitignored
-# already; the wildcards below are what catches a stray export anywhere else.
-# ---------------------------------------------------------------------------
 training/data/
+training/corpus/
+training/journals/
 src/daintree_assistant_server/runbooks/local/artifacts/
 *.npz
 *.onnx
 *.jsonl
-
-# ---------------------------------------------------------------------------
-# Captured fixtures (generated, not authored)
-#
-# A 91 KB dump of the CLI's `Registry.OpenAITools` — JSON schema restating
-# what cli/ already declares, refreshed by hand from the submodule. The
-# regeneration recipe lives beside the file for whoever needs it. Its sibling
-# projection, tests/fixtures/cli_tool_names.txt, goes with the test suite.
-# ---------------------------------------------------------------------------
-benchmarks/_harness/fixtures/
-
-# ---------------------------------------------------------------------------
-# Test suite (~1.2 MB, larger than the source it covers)
-#
-# Excluded by default, not because it is unimportant but because it is
-# derivative: the contracts it pins are stated in src/ and docs/, and a single
-# module here runs to 94 KB. Pull it back with `--force-include 'tests/**'`
-# when the task is actually about the tests.
-# ---------------------------------------------------------------------------
+archive/
 tests/
-
-# ---------------------------------------------------------------------------
-# Benchmark harness (~670 KB)
-#
-# The READMEs are kept — each states what its suite measures and what it
-# gates, which is the part that explains the system. Runners, scoring code and
-# the YAML case corpora are harness implementation detail. Excluded by
-# extension rather than by directory so the READMEs survive the rule.
-# ---------------------------------------------------------------------------
 benchmarks/**/*.py
 benchmarks/**/*.yaml
 benchmarks/**/*.json
-
-# ---------------------------------------------------------------------------
-# Claude Code tooling + git worktrees (huge; pure duplication)
-#
-# .claude/worktrees/<name>/ is a full second checkout of this repo created by
-# `git worktree`. It is gitignored, but because each worktree is its own git
-# boundary, copytree re-evaluates ignore rules *inside* it (where everything
-# is tracked) and walks the entire duplicate. None of .claude/ (local
-# settings, worktrees, session state) belongs in a bundle of the project.
-# ---------------------------------------------------------------------------
 .claude/
-
-# ---------------------------------------------------------------------------
-# Real environment files
-#
-# Deliberately duplicates .gitignore, so `copytree ignore check .` will call
-# this rule redundant. Keep it: the recommended invocation above disables the
-# secret policy, and this is what makes that safe without depending on a
-# second file staying correct.
-# ---------------------------------------------------------------------------
+.codex/
+.mcp.json
 .env
 .env.*
 !.env.example
-
-# Local training traces. Content-bearing by design — a bundle that swept these up
-# would be shipping user messages, tool arguments and terminal output to whoever
-# receives it.
-.tmp/traces/
+.tmp/
+.daintree/

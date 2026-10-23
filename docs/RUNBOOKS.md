@@ -1,5 +1,10 @@
 # Writing runbooks
 
+This is the maintainer authoring guide. Public contributions are
+[issue reports](../CONTRIBUTING.md): failed workflows, expected outcomes and
+missing procedures. Pull request contributions are not accepted; the branch,
+review and trial workflows below are for repository maintainers.
+
 A runbook is a procedure that Claude Code or Codex follows to do one kind of work in
 Daintree. Agents find them through the [runbook MCP server](MCP.md): they describe a
 task, get the best-matching runbooks back with the foundation, and follow the one
@@ -246,3 +251,9 @@ session for:
 
 Cases it adds live in `benchmarks/runbook_selection/cases/19-from-transcripts.yaml`
 with `tx-` ids.
+
+This repository, including benchmark cases and training journals, is public.
+Keep raw transcripts and diagnostic bundles in ignored local storage. Before
+adding any example, remove identifying paths, people, machines, private project
+details and credentials. Generalise the lesson rather than copying a user's
+conversation. See the [training data policy](../training/DATA_POLICY.md).

@@ -23,11 +23,14 @@ release candidate, smoke-test it, promote it to 100%.
 Your job is to make sure the right commit gets there, that it was green before it
 went, and that what is actually serving afterwards is what you shipped.
 
-## Constants
+## Deployment settings
+
+Set `PROJECT` from your local maintainer environment before any cloud operation.
+Do not add account identifiers or credentials to this file.
 
 | thing | value |
 |---|---|
-| GCP project | `daintree-research` |
+| GCP project | `$PROJECT`, set explicitly by the maintainer |
 | Cloud Run service | `daintree-assistant` |
 | Serving region | `us-central1` |
 | Build trigger | `deploy-main` |
@@ -40,7 +43,7 @@ preflight (after the auth check) and reuse it for every `gcloud builds` call:
 
 ```bash
 BUILD_REGION=$(for r in us-central1 europe-west1 us-east1 us-west1; do
-  gcloud builds triggers describe deploy-main --region="$r" --project=daintree-research \
+  gcloud builds triggers describe deploy-main --region="$r" --project="$PROJECT" \
     >/dev/null 2>&1 && echo "$r" && break
 done)
 ```
@@ -99,7 +102,7 @@ one's `promote` can land after the newer one and quietly put the older commit ba
 on 100%. In gcloud mode:
 
 ```bash
-gcloud builds list --region="$BUILD_REGION" --project=daintree-research \
+gcloud builds list --region="$BUILD_REGION" --project="$PROJECT" \
   --filter='status=(QUEUED OR WORKING)' --format='value(id,substitutions.COMMIT_SHA)'
 ```
 
@@ -182,7 +185,7 @@ If there was nothing to merge and the user wants a redeploy of current main:
 
 ```bash
 gcloud builds triggers run deploy-main --region="$BUILD_REGION" \
-  --branch=main --project=daintree-research
+  --branch=main --project="$PROJECT"
 ```
 
 ### 5. Watch the build
@@ -225,7 +228,7 @@ overlapping builds, which is exactly the risk preflight guards against.
 **If it ends in anything but `SUCCESS`:**
 
 ```bash
-gcloud builds log <id> --region="$BUILD_REGION" --project=daintree-research \
+gcloud builds log <id> --region="$BUILD_REGION" --project="$PROJECT" \
   --stream=false > /tmp/release-build.log
 tail -80 /tmp/release-build.log
 ```
@@ -266,7 +269,7 @@ This is the part that makes it a release rather than a push.
 
 ```bash
 URL=$(gcloud run services describe daintree-assistant --region=us-central1 \
-  --project=daintree-research --format='value(status.url)')
+  --project="$PROJECT" --format='value(status.url)')
 # public mode: URL=https://assistant.daintree.org
 
 curl -fsS "$URL/health"     # {"status":"ok"}
@@ -296,7 +299,7 @@ revision holds the traffic and that the service is Ready:
 
 ```bash
 gcloud run services describe daintree-assistant --region=us-central1 \
-  --project=daintree-research \
+  --project="$PROJECT" \
   --format='value(status.traffic.filter(percent=100).revisionName,status.conditions.filter(type=Ready).status)'
 ```
 
@@ -311,7 +314,7 @@ reason in production, so read the real error from the logs:
 
 ```bash
 gcloud run services logs read daintree-assistant --region=us-central1 \
-  --project=daintree-research --limit=50
+  --project="$PROJECT" --limit=50
 ```
 
 ### 7. Resync the working branch
@@ -338,10 +341,10 @@ Traffic moves back to the previous revision immediately — no rebuild:
 
 ```bash
 gcloud run revisions list --service=daintree-assistant --region=us-central1 \
-  --project=daintree-research --limit=5 --format='value(metadata.name)'
+  --project="$PROJECT" --limit=5 --format='value(metadata.name)'
 
 gcloud run services update-traffic daintree-assistant --region=us-central1 \
-  --project=daintree-research --to-revisions=<previous-revision>=100
+  --project="$PROJECT" --to-revisions=<previous-revision>=100
 ```
 
 Then fix forward on the branch and release again. Do not revert `main` to undo a
