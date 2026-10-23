@@ -1,0 +1,27 @@
+# Training examples whose answer is `daintree.hosts.sync-with-origin` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.hosts.sync-with-origin
+run: transcript-2026-10-23-multi-host-drain
+positives:
+  - "get main up to date on every remote host"
+  - "have each of my machines pull the latest develop, fast-forward only"
+  - "are the build box and the mini still behind origin? bring them current"
+  - "update the checkout on both remote hosts to whatever origin main is now"
+  - "before anything new starts over there, make sure the remote machines have fetched and fast-forwarded develop"
+  - "pull origin on all connected hosts and tell me which ones couldn't fast-forward"
+  - "Synchronise the base branch on each remote host with the remote, without touching local changes"
+  - "the other Macs are probably stale; fetch and fast-forward their develop"
+  - "sync every host's copy of the repo with origin and list each one's commit afterwards"
+  - "make the servers pull the newest main, but don't reset or stash anything on them"
+  - "one of my hosts keeps branching from an old develop; catch all of them up with origin"
+  - "bring this machine and both hosts level with origin develop"
+boundaries:
+  - query: "have both remote machines pull develop so the next issues start from it"
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: "on every host, fast-forward the main checkout to origin and report back"
+    confusable_with: [daintree.hosts.swarm-fan-out]
+  - query: "update develop on the remote boxes; it's only the base branch, no feature branches"
+    confusable_with: [daintree.git.sync-with-base]

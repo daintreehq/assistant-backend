@@ -1,0 +1,26 @@
+# Training examples whose answer is `daintree.agents.resume-after-usage-limit` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.agents.resume-after-usage-limit
+run: transcript-2026-10-23-multi-host-drain
+positives:
+  - "all my Claude panes hit the five-hour limit; get them going again when it resets"
+  - "the agents ran out of allowance mid-task, carry each one on after the reset at 2pm"
+  - "usage limit reached on every agent on the second host, resume them once it clears"
+  - "they all stopped with 'limit resets 4am'. pick them back up then, don't start anything new before"
+  - "wait for the limit reset and tell each stopped agent to continue where it left off"
+  - "Resume the agents that were halted by the plan's usage cap once the window resets"
+  - "my agents are sitting on the usage-limit screen, nudge them after it resets"
+  - "the weekly limit hit halfway through; when it resets, continue the same agents, don't redo their work"
+  - "the remote host's Claude account is out until 3:10, hold off and then continue every agent it stopped"
+  - "several panes say usage limit reached; once that's over get them all moving again in their own sessions"
+  - "after the reset, check which agents came back by themselves and continue the rest"
+boundaries:
+  - query: "my agents hit the usage limit; just continue them later, no need to switch to another agent"
+    confusable_with: [daintree.agents.hand-off-task]
+  - query: "the agents stopped on the usage limit, keep them waiting and carry them on when it resets"
+    confusable_with: [daintree.agents.recover-agent]
+  - query: "they've hit the cap; when does it reset, and get them working again then"
+    confusable_with: [daintree.agents.check-usage-limits]

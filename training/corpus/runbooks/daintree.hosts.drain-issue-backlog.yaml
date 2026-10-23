@@ -1,0 +1,64 @@
+# Training examples whose answer is `daintree.hosts.drain-issue-backlog` and nothing else.
+#
+# Sections name what kind of evidence a row is; see ../README.md. An example is
+# either a bare query string or a mapping (query/history/active/confusable_with).
+# Rows whose answer is several runbooks, or none, live in ../shared/.
+runbook: daintree.hosts.drain-issue-backlog
+run: transcript-2026-10-23-multi-host-drain
+positives:
+  - "work through the whole backlog across my two build machines, six agents on each, and do the merging from here"
+  - "keep both remote hosts busy with issues until the tracker is empty; this laptop only coordinates"
+  - "split the open issues between the Mac mini and the workstation, ten at a time, merging between batches on this machine"
+  - "run the issue agents on my other two Macs and keep the picking and merging here"
+  - "drain the ready issues across both servers, refilling each one as its agents finish"
+  - "put four issues at a time on each of my three hosts and keep going until nothing is left, merge the PRs as they go green"
+  - "I want the heavy lifting on the remote machines: pick batches here, run the work there, merge here, repeat until done"
+  - "Process the issue backlog using both connected hosts as workers, with this machine selecting batches and landing pull requests"
+  - "one host gets eight issues and the other gets twelve, keep that ratio every batch until the queue is drained"
+  - "spread the backlog over my machines so none of them sits idle, and keep the merges flowing"
+  - "every batch, have both remote boxes pull develop first, then start an agent per issue on them"
+  - "keep refilling the slots on each host from the issue list and merge whenever finished PRs are waiting"
+  - "the work agents run on the two remote hosts, the merge runs on the second one, and you orchestrate from here"
+  - "carry on draining issues overnight across both remote machines"
+  - "use the build box and the spare Mac as workers for the backlog; I don't want any issue agents on this laptop"
+  - "cap the first host at five agents and the second at ten, and keep feeding them issues until the backlog runs dry"
+boundaries:
+  - query: "the issues are already split: these eight go to the first host, those ten to the second, merge here between batches and keep going"
+    confusable_with: [daintree.hosts.place-work]
+  - query: "keep both hosts' agent slots full from the backlog and land their PRs on develop as they pass"
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: "two machines, half the issues each, batch after batch with a merge in between, until everything is closed"
+    confusable_with: [daintree.orchestration.work-in-waves]
+  - query: "not the same task on every host: each host gets its own share of the issue list, and keep picking more as they finish"
+    confusable_with: [daintree.hosts.swarm-fan-out]
+followups:
+  - query: "how long will the rest of the backlog take at this pace?"
+    history:
+      - "user: Drain the backlog across both remote hosts and merge here between batches."
+      - "assistant: Batch three has landed; 40 issues remain and the next pick is running."
+    active: [daintree.hosts.drain-issue-backlog]
+    confusable_with: [daintree.agents.check-usage-limits]
+  - query: "stop handing out new issues for now, but let everything already running finish and merge"
+    history:
+      - "user: Keep both hosts' slots full from the issue backlog."
+      - "assistant: Fourteen agents are working across the two hosts and five issues are queued."
+    active: [daintree.hosts.drain-issue-backlog]
+    confusable_with: [daintree.orchestration.park-work]
+  - query: "from the next merge on, run it in the second host's main checkout rather than here"
+    history:
+      - "user: Drain the issues across both hosts and merge here."
+      - "assistant: The merge here is on its last train; both hosts are full."
+    active: [daintree.hosts.drain-issue-backlog]
+    confusable_with: [daintree.hosts.integrate-host-branches]
+  - query: "give the first host ten slots from now on and the second only six"
+    history:
+      - "user: Split the backlog between my two remote hosts, eight each."
+      - "assistant: Batch two is running: eight agents on each host."
+    active: [daintree.hosts.drain-issue-backlog]
+    confusable_with: [daintree.hosts.rebalance-load]
+  - query: "no more launches, let the last ones finish, do one final merge, then I'm shutting everything down"
+    history:
+      - "user: Keep feeding issues to both remote machines and merging here."
+      - "assistant: Seven agents are working on the second host and the merge is landing their PRs."
+    active: [daintree.hosts.drain-issue-backlog]
+    confusable_with: [daintree.orchestration.workspace-cleanup]

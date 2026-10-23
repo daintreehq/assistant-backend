@@ -63,6 +63,12 @@ positives:
       - "assistant: Placed on the second host (Claude Code, 12% CPU); sent, waiting on its reply."
 
 boundaries:
+  - query: "I have five unrelated bugs and two remote hosts; decide which machine takes which and show me first"
+    confusable_with: [daintree.hosts.drain-issue-backlog]
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "which of my hosts has the most room for these three tasks?"
+    confusable_with: [daintree.hosts.drain-issue-backlog]
+    run: transcript-2026-10-23-multi-host-drain
   - query: don't give every machine the same thing, each host gets a different bug from this list
     confusable_with: [daintree.hosts.swarm-fan-out]
   - query: send these issues out to the hosts, one issue per machine, whichever can take it

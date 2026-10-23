@@ -37,6 +37,12 @@ positives:
   - query: its context window is full, start a fresh session that carries on where it left off
     run: 2026-09-28-catalog-expansion-refine
 boundaries:
+  - query: "Claude is on its usage limit until tonight; have Codex finish the parser task in that worktree now"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "the agent ran out of allowance and I can't wait for the reset, hand its task to another agent"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: transcript-2026-10-23-multi-host-drain
   - query: Claude on the export task is out of usage; have Codex finish it in the same worktree.
     confusable_with: [daintree.agents.ask-running-agent]
   - query: Claude hit its usage cap on the importer; get Codex to finish it in the same checkout.

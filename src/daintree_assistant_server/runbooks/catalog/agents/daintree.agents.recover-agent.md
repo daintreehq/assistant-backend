@@ -30,7 +30,7 @@ On a host: call these tools on the agent's machine; an agent there runs any shel
    - Exited, or a CLI error at a shell prompt: report the error with credentials removed. A bare prompt with no error is ambiguous, not grounds to relaunch.
    - Slow: `working` with recent output.
    - Asking or at an approval: not hung; use daintree.agents.answer-waiting-agent.
-   - Provider error (rate limit, auth, network): report it; waiting fixes nothing.
+   - Provider error (auth, network): report it; waiting fixes nothing. A usage limit naming its reset is fixed by waiting: daintree.agents.resume-after-usage-limit.
    - One turn cut off ("went to sleep mid-response", a dropped connection) with the CLI back at its prompt, unlike a failure that persists: a send reaches the same conversation. Once continuing is authorized, one send (`terminal.sendCommandOwned`, `notify:true, handback:true`) naming where it stopped and asking it to check `git status` first. Two stopped in one checkout: continue only the one that owns its changes; unclear is daintree.orchestration.resolve-task-collisions.
    - Wrong locator (per-entry `error`, id missing from the listing): check for a truncated id, a filter or the trash and resume the same observation. Never relaunch a healthy agent because an id was wrong.
    - Lost ownership: RESOURCE_NOT_OWNED from an owned tool is not evidence the terminal is missing; status reads show whether it exists. Ask for a hand-over or leave the action to the user.

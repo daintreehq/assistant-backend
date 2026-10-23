@@ -6,6 +6,14 @@
 runbook: daintree.agents.choose-agent-model
 run: runbook-2026-10-19-choose-agent-model
 positives:
+  - query: "go through this batch and mark which issues a Sonnet agent can manage and which need Opus"
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "the light tickets should run on the mid model and the gnarly ones on the frontier model; you sort them"
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "size every issue in the batch as light, standard or heavy so each launches on the right model"
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "which of these twelve issues are simple enough for a cheaper model?"
+    run: transcript-2026-10-23-multi-host-drain
   - "pick a model for each of these jobs based on how hard they are"
   - "which model should I put on the flaky websocket reconnect bug"
   - "the changelog entry is trivial so give it a small model, the cache invalidation bug gets the big one"
@@ -36,6 +44,12 @@ positives:
   - "use the cheapest model that can still do the version bump properly"
   - "I'd like you to decide the model for this one, it's a nasty memory leak"
 boundaries:
+  - query: "the hosts are settled, one runs Sonnet and the other Opus; decide which issues are easy enough for the Sonnet one"
+    confusable_with: [daintree.hosts.place-work]
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "for every batch, the easy issues should get Sonnet and the hard ones Opus; work out which is which"
+    confusable_with: [daintree.hosts.drain-issue-backlog]
+    run: transcript-2026-10-23-multi-host-drain
   - query: "the state machine rewrite is subtle and the renames are busywork; which model should each one get?"
     confusable_with: [daintree.orchestration.spike-options]
   - query: "give the easy tickets and the hard ticket different models, your call"

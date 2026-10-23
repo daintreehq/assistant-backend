@@ -9,7 +9,7 @@ requiredTools:
   - host.call
 hostEligibility: configured
 ---
-The Shell keeps no record of what was sent: the account is what you kept, checked against what each host shows now. An earlier session's notices never reach a later one. An agent an earlier session launched is readable but no longer yours to send to or close: the person, or that host's assistant, closes it. A host's assistant stays reachable (send, interrupt); close only one you started.
+The Shell keeps no record of what was sent: the account is what you kept, checked against what each host shows now. An earlier session's notices never reach a later one. An agent an earlier session launched, or one from before its host's Daintree restarted, is readable but no longer yours to send to or close: the person, or that host's assistant, closes it. A host's assistant stays reachable (send, interrupt); close only one you started.
 
 Procedure:
 1. References, per unit: host, project, terminal id and title, worktree, branch, brief, last SHA or PR, from this conversation, a checkpoint, or a park or hand-over record the person names. None: say so and ask which run; match only what the person describes. Never infer a brief or acceptance from a pane title or branch name, and never rebuild a task list from the hosts.
@@ -19,7 +19,8 @@ Procedure:
    - Finished: stopped with its handback for that brief, and its branch at a SHA on the remote; verified only as the foundation's proving a finish says.
    - Still working: leave it; following it to its end is daintree.hosts.supervise-swarm.
    - Waiting on a question, approval or error on its screen: to the person, verbatim.
-   - Will not finish: exited, gone, or its host restarted, with nothing pushed. What is left is its worktree and any unpushed edits there: say where.
+   - Killed by its host's Daintree restart (still listed, `terminal.getStatus` says output unavailable): its worktree and conversation survive. Revive it only on the person's word, or in a run they asked you to keep going, once: at Full, `agentSessionHistory.list` (`worktreeId`) there, then `agentSessionHistory.resume` by exact `sessionId` (a repeat never makes a second agent); else, Claude Code only, `agent.launch` in that worktree with `agentLaunchFlags:["--continue","--fork-session"]` (plain `--continue` fails on the session id Daintree assigns), which reopens the latest conversation there: only if it was that worktree's one agent. See its own task back on screen, then one send to carry on. Its dead pane is the person's to close there, never to resume: two agents would share one worktree.
+   - Will not finish: exited or gone, with nothing pushed. What is left is its worktree and any unpushed edits there: say where.
    - Unmatched: a run-looking terminal or worktree no reference names: listed apart, never claimed.
    Resend only on the person's word, as new work (daintree.hosts.delegate-to-host; on another host, daintree.hosts.reassign-host-work), briefed in full by shared reference, once nothing still writes that unit.
 5. Cleanup: only what the request names (panes only means panes), for a named run, never a unit still working (stopping it first is daintree.hosts.steer-swarm). Per host and project:

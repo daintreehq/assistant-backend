@@ -5,6 +5,10 @@ runbook: daintree.hosts.recover-and-clean-up
 run: runbook-2026-10-issue-95
 
 positives:
+  - query: "the second host's Daintree crashed and every agent there died; work out which worktrees still hold their work and bring the agents back"
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "after the remote app restarted, revive the agents that were running there in their own conversations"
+    run: transcript-2026-10-23-multi-host-drain
   - Daintree restarted while five tasks were out on the other hosts; which of them still have someone working on them
   - Determine whether the migration task sent to the second host is still being worked on, given its assistant now lists with no generation
   - After the network link to the hosts was down for a while, check each host's task records and report what moved during the outage

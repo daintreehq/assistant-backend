@@ -72,6 +72,12 @@ positives:
   - query: "Drain ready issues using the user's /next-up picker, /ship per issue in its own worktree, and /land-all once the batch settles; repeat until the picker comes back empty"
     run: transcript-2026-10-16-batch-workflows
 boundaries:
+  - query: "all of these issues go to my one remote host, in waves, merging each wave before the next"
+    confusable_with: [daintree.hosts.drain-issue-backlog]
+    run: transcript-2026-10-23-multi-host-drain
+  - query: "drain the backlog in merge-gated rounds on the build box only"
+    confusable_with: [daintree.hosts.drain-issue-backlog]
+    run: transcript-2026-10-23-multi-host-drain
   - query: start wave 1 of the approved breakdown, and once it's merged go on to wave 2
     confusable_with: [daintree.orchestration.decompose-work]
   - query: work through these 9 issues three at a time, but merge each group of three before starting the next group

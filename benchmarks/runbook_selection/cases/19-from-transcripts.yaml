@@ -602,7 +602,8 @@ cases:
       chosen the host. Decided by work-in-waves' "here or on one other machine they
       name, whatever they call it (a Remote Host), where the next wave starts only once
       the previous wave's pull requests are merged" and place-work's fence "several issues all for ONE machine the person
-      named, whatever they call it".
+      named, whatever they call it". drain-issue-backlog (session f9a68c1f) is for work split between
+      two or more hosts, so it is forbidden too; untrained, it takes this case today.
     host_state: {hosts: connected}
     messages:
       - role: user
@@ -612,7 +613,7 @@ cases:
     expect:
       required: [daintree.orchestration.work-in-waves]
       optional: [daintree.foundation, daintree.hosts.foundation]
-      forbid: [daintree.hosts.place-work]
+      forbid: [daintree.hosts.place-work, daintree.hosts.drain-issue-backlog]
 
   - id: tx-host-all-issues-user-words
     category: routing-trap
@@ -625,6 +626,8 @@ cases:
       ride along. Decided by
       place-work's fence "several issues all for ONE machine the person named,
       whatever they call it (a batch or merge-gated waves there".
+      drain-issue-backlog (session f9a68c1f) splits work between two or more hosts:
+      forbidden here too; untrained, it takes this case today.
     host_state: {hosts: connected}
     messages:
       - role: user
@@ -635,7 +638,7 @@ cases:
         - daintree.foundation
         - daintree.hosts.foundation
         - daintree.workflow.find-issue-work
-      forbid: [daintree.hosts.place-work]
+      forbid: [daintree.hosts.place-work, daintree.hosts.drain-issue-backlog]
 
   - id: tx-why-issue-left-out-mid-drain
     category: continuation
@@ -679,3 +682,309 @@ cases:
         content: Please can you give me the transcript file for this chat.
     expect:
       required: []
+
+  # Session f9a68c1f, 2026-10-22/23: the sidebar assistant drained an issue backlog
+  # for 13 hours across two Remote Hosts, this machine picking and merging.
+
+  - id: tx-drain-across-hosts-agent-query
+    category: routing-trap
+    note: >-
+      Session f9a68c1f (2026-10-22), the agent's own query. Served place-work 0.995
+      selected (delegate-to-host, integrate-host-branches below; work-in-waves absent),
+      whose procedure is a one-off placement table ("Initial placement only"). Decided by
+      drain-issue-backlog's "an issue BACKLOG or batches of issues worked across SEVERAL
+      machines: agents on two or more Remote Hosts they name … while this machine (or one
+      host they name) picks the issues and merges" and place-work's fence "issues worked through in successive
+      batches on hosts whose shares the person already set".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Work issue batches across two remote hosts, merge their PRs, then start the next batch
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.place-work]
+
+  - id: tx-drain-across-hosts-user-words
+    category: routing-trap
+    note: >-
+      Same session, the user's request scrubbed of names. Read alone it went to
+      integrate-host-branches 0.998 ("merge on this machine" across hosts). Decided by
+      drain-issue-backlog's "drain the backlog, 8 issues on one studio and 10 on the
+      other, merge here" and "tell the hosts to pull develop before each batch".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Work in batches of 16 until the backlog is drained: 8 issues on one host and 8
+          on the other. When a batch is done, clear out the worktrees, make sure CI
+          passes, do the merge on this machine, and tell both hosts to pull the latest
+          develop. Then keep going.
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.sync-with-origin]
+      forbid: [daintree.hosts.integrate-host-branches, daintree.hosts.place-work]
+
+  - id: tx-drain-hub-keeps-slots-full
+    category: single-runbook
+    note: >-
+      Same session, after the user switched the run from rounds to a flow. Read alone it
+      went to integrate-host-branches and work-in-waves. Decided by drain-issue-backlog's
+      "keep both hosts' slots full until nothing is left".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Keep both remote hosts' agent slots full from the issue backlog: refill each
+          host as its agents finish, and merge whenever finished PRs go green
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: tx-drain-estimate-mid-run
+    category: continuation
+    note: >-
+      Same session, mid-run, asked twice. Read alone the question selected
+      check-usage-limits 0.99 ("rate"); the assistant answered from measured throughput,
+      new-issue inflow and the longest dependency chain. Decided by drain-issue-backlog's
+      "how long will the drain take at this rate".
+    host_state: {hosts: connected}
+    active: [daintree.hosts.drain-issue-backlog]
+    messages:
+      - role: user
+        content: >-
+          Drain the backlog across my two remote hosts, half the issues on each, and
+          merge on this machine between batches
+      - role: assistant
+        content: >-
+          Batch 1 has landed: 16 PRs merged. The next pick is running here.
+      - role: user
+        content: At the rate the last batch took, with 116 issues left, how long will this take?
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.agents.check-usage-limits]
+
+  - id: tx-drain-hold-before-restart
+    category: continuation
+    note: >-
+      Same session: the user paused dispatch to rebuild the app. Read alone,
+      "remember the queued issues" selected manage-project-memory 0.999. The assistant
+      held picks and launches, let running units and the merge finish and kept the
+      queue. Decided by drain-issue-backlog's "stop starting new work but let the
+      running ones finish".
+    host_state: {hosts: connected}
+    active: [daintree.hosts.drain-issue-backlog]
+    messages:
+      - role: user
+        content: >-
+          Drain the backlog across my two remote hosts, half the issues on each, and
+          merge on this machine between batches
+      - role: assistant
+        content: >-
+          20 agents are working across both hosts and the merge is landing PRs. Six
+          more issues are queued.
+      - role: user
+        content: >-
+          Don't distribute any more work to the hosts, but don't end any current work.
+          Remember where you are and which issues are queued; we'll resume after I
+          rebuild and restart Daintree.
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.memory.manage-project-memory]
+
+  - id: tx-drain-wind-down
+    category: continuation
+    note: >-
+      Same session, the end of the night: stop launching, let the running agents
+      finish, one last merge. Decided by drain-issue-backlog's "stop starting new work
+      but let the running ones finish".
+    host_state: {hosts: connected}
+    active: [daintree.hosts.drain-issue-backlog]
+    messages:
+      - role: user
+        content: >-
+          Drain the backlog across my two remote hosts, half the issues on each, and
+          merge on this machine between batches
+      - role: assistant
+        content: >-
+          Eight agents are running on the second host and the merge there is landing
+          their PRs. One more issue is queued.
+      - role: user
+        content: >-
+          Don't start any additional agents. Let the ones that already started finish,
+          do the final merge, and then I'm going to reboot.
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: tx-drain-merge-on-a-host
+    category: continuation
+    note: >-
+      Same session: the user moved the merge from this machine to one host's main
+      worktree. Read alone it selected integrate-host-branches 0.99. Decided by
+      drain-issue-backlog's "run the merges on the second host from now on".
+    host_state: {hosts: connected}
+    active: [daintree.hosts.drain-issue-backlog]
+    messages:
+      - role: user
+        content: >-
+          Drain the backlog across my two remote hosts, half the issues on each, and
+          merge on this machine between batches
+      - role: assistant
+        content: >-
+          The merge here has landed 34 PRs and is on its last train. Both hosts are
+          full.
+      - role: user
+        content: >-
+          Let the current merge finish, but in future start the merge runs in the main
+          worktree of the second host instead of here.
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.integrate-host-branches]
+
+  - id: tx-sync-hosts-pull-often
+    category: routing-trap
+    note: >-
+      Same session: the user asked for the hosts to pull origin often so new issues
+      start on the latest base. Read alone it selected swarm-fan-out 0.98 and
+      prepare-host-maintenance 0.96. A worktree create never fetches, so an unfetched
+      host branches from a stale base. Decided by sync-with-origin's "tell every host to
+      pull develop" and "new work on the hosts must start from the latest develop".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Each host needs to be told fairly often to pull updates, so new issues start on
+          the latest develop. Can you do this directly or tell another agent to do it?
+    expect:
+      required: [daintree.hosts.sync-with-origin]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.swarm-fan-out]
+
+  - id: tx-sync-hosts-pull-develop
+    category: routing-trap
+    note: >-
+      Same session, the user's first request's last step. Read alone it selected
+      delegate-to-host 0.997. Decided by sync-with-origin's "a repository's checkout on
+      their other machines brought UP TO DATE with origin" and delegate-to-host being
+      "one task handed to one host".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Make sure that on both remote machines you tell them to pull any changes from origin develop
+    expect:
+      required: [daintree.hosts.sync-with-origin]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.delegate-to-host]
+
+  - id: tx-usage-limit-continue-on-host
+    category: routing-trap
+    note: >-
+      Same session: one host's account hit its five-hour limit and every agent there
+      stopped ("Usage limit reached · limit resets 3:10am"). The assistant held launches
+      on that account and, after the reset, sent each stopped pane one continue; all
+      finished. Read alone it selected recover-and-clean-up. Decided by
+      resume-after-usage-limit's "the work should carry on in the SAME agents once the
+      limit resets".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          All eight agents on the remote host stopped at "Usage limit reached, resets
+          3:10am". Carry each one on after the reset.
+    expect:
+      required: [daintree.agents.resume-after-usage-limit]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.recover-and-clean-up]
+
+  - id: tx-usage-limit-continue-not-hand-off
+    category: routing-trap
+    note: >-
+      Same lesson, worded for agents on this machine. Read alone it selected
+      hand-off-task 0.9999, which gives the task to a DIFFERENT agent. Decided by
+      resume-after-usage-limit's "the work should carry on in the SAME agents once the
+      limit resets" and its fence "to have a DIFFERENT agent or CLI finish the task now".
+    messages:
+      - role: user
+        content: My Claude agents hit their usage limit and stopped mid-task. Continue them once the limit resets.
+    expect:
+      required: [daintree.agents.resume-after-usage-limit]
+      optional: [daintree.foundation]
+      forbid: [daintree.agents.hand-off-task]
+
+  - id: tx-usage-threshold-stop-dispatch
+    category: single-runbook
+    note: >-
+      Same session: not searched; the assistant launched a pane with `/usage` as its
+      prompt, and the user pointed out the runbook it could have used. Routed correctly
+      at 1.0; pinned. Decided by check-usage-limits' "how close they are to a weekly or
+      five-hour cap … on the Remote Hosts this Shell controls".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          The first host is getting close to its usage limit. Check its Claude usage
+          every now and then, and stop sending it issues when it reaches about 90% of its
+          weekly allowance.
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.drain-issue-backlog]
+
+  - id: tx-model-split-batch-agent-query
+    category: routing-trap
+    note: >-
+      Same session, the agent's own query: nothing selected (place-work 0.29,
+      choose-agent-model 0.02), and it fetched choose-agent-model by id after the user
+      said a runbook should exist. Decided by choose-agent-model's "sort this batch of
+      issues into the ones Sonnet can handle and the ones that need Opus". Fails on the
+      shipped model (rank_miss): owed to a retrain.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Choose which issues in a batch suit a Sonnet agent and which need Opus
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+      forbid: [daintree.hosts.place-work]
+
+  - id: tx-model-split-across-named-hosts
+    category: routing-trap
+    note: >-
+      Same session, the user's words: the hosts were already chosen, only the model per
+      difficulty was open. Read alone it selected place-work 0.998. Decided by
+      choose-agent-model's "sort this batch of issues into the ones Sonnet can handle and
+      the ones that need Opus" and place-work's fence "only which model each issue gets
+      by difficulty once the hosts are chosen". Fails on the shipped model (rank_miss):
+      owed to a retrain.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          For each batch, give all the easy issues to the first host and make sure it
+          runs Sonnet, and give the harder ones to the second host on Opus.
+    expect:
+      required: [daintree.agents.choose-agent-model]
+      optional: [daintree.foundation, daintree.hosts.foundation, daintree.hosts.drain-issue-backlog]
+      forbid: [daintree.hosts.place-work]
+
+  - id: tx-host-restart-revive-agents
+    category: single-runbook
+    note: >-
+      Same session: memory pressure restarted Daintree on one host and killed every
+      agent and the merge. The assistant took stock of each worktree, then relaunched
+      each agent in its own conversation (`--continue --fork-session`), and listed the
+      dead panes for the person. Routed at 0.998; pinned for the body's revival branch.
+      Decided by recover-and-clean-up's "usually after Daintree restarted … which will
+      never finish, and whether to send one again".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Daintree on the remote host restarted and killed all the agents and the merge
+          run. Get them going again where they stopped.
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.foundation, daintree.hosts.foundation]

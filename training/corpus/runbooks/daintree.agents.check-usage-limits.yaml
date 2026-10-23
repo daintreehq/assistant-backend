@@ -6,6 +6,8 @@
 runbook: daintree.agents.check-usage-limits
 run: 2026-09-24-agent-usage-limits
 positives:
+  - query: "read the weekly allowance on both remote machines before I send them more work"
+    run: transcript-2026-10-23-multi-host-drain
   - how much of my claude allowance is left this week
   - what percentage of my codex plan have i burned through
   - is my weekly cap on claude code nearly used up
