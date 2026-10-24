@@ -12,7 +12,7 @@ requiredTools:
 optionalTools:
   - terminal.readLastMessageOwned
   - terminal.sendCommand
-hostEligibility: any
+hostEligibility: configured
 ---
 Each assistant is handled once, from what the person already said. This sweep answers; it never starts, restarts or closes an assistant to fill a gap.
 
