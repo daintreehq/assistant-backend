@@ -30,6 +30,6 @@ On a host: call these tools on each participant's machine.
 5. Append the reply's public part to the log, keep `[Operator]` notes out of every peer's messages (they may still go to the user), and advance that speaker's last-seen position. A reply from anyone else, or for an earlier turn, is logged as late, never as the current turn. Fold a user interjection into the next speaker's message; never restart.
 6. A speaker cannot "message" another directly: relay what it wants sent yourself. New scope, edits, spawning or closing go to the user. A speaker whose wait times out: tell the user who; with three or more the user may skip it for this lap, and its later reply is relayed as late.
 
-End at agreement, the bound, a clear wrap-up or the user's stop; never force another lap. Interrupt (`terminal.interruptOwned`) only if the user asks. Close only the recorded participant ids, on request.
+End at agreement, the bound, a clear wrap-up or the user's stop; never force another lap. Interrupt (`terminal.interruptOwned`) only if the user asks. Ended at agreement, a wrap-up or the user's stop, and reported: close the participants you launched, per the foundation, in one `terminal.closeMany`. Stopped at the bound: keep them all and ask whether to go on.
 
 Report back: participants with terminal ids; a concise synthesis (key points, agreements, disagreements); operator notes worth surfacing; turns taken, skipped or late speakers; whether it ended, was cancelled or awaits a reply (and from which terminal); any cleanup.

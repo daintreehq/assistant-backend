@@ -46,6 +46,6 @@ Procedure:
 
 On notice or resume: the prep agent's "works" is a claim until step 5 shows it. A question within scope: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`; seeding an unproven database or changing code goes to the user.
 
-Stop and recovery: one corrective round to the prep agent for a setup failure; then hand over what stands. A preview panel never sends a notice: do not end the turn waiting on it. Never launch a second preview. Leave everything running; stop only on request.
+Stop and recovery: one corrective round to the prep agent for a setup failure; then hand over what stands. A preview panel never sends a notice: do not end the turn waiting on it. Never launch a second preview. Leave the demo running; stop it only on request.
 
 Report back: worktree, branch and the revision shown; how to open the demo (panel or terminal id, URL); what was seeded, where, and how to reset it; the walkthrough; works (exercised by you or claimed by the agent, kept apart), stubbed, missing, known bugs; what is running and the prep agent's terminal id.

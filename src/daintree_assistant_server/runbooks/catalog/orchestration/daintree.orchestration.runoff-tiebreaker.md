@@ -21,6 +21,6 @@ On a host: call these tools on each terminal's machine.
 6. A reply to the original ballot is stale, and an old label is never mapped through the runoff map. Accept only the tied entries. An ambiguous answer gets one clarification, then is invalid. A voter that cannot choose abstains under the rules; never force a vote, and never silently drop a ballot: it changes the denominator.
 7. Tally the runoff from zero under the inherited scoring; show a combined leaderboard only labelled as combined. One leader wins. Still tied: apply the tie-break the user already gave (anything it needs, such as a runner-up, asked on this ballot and mapped through this round's map) before reporting; with none, or still tied, report the tie and ask. A result a missing vote could change is provisional and crowns no one.
 
-One runoff per request. Close only on request, the recorded cohort ids, confirmed from `closedIds`.
+One runoff per request. Once a winner is reported, close the voters and entrants this contest launched, per the foundation, in one `terminal.closeMany`, confirmed from `closedIds`, keeping a winning entrant the user may work with next. Still tied or provisional: close none; the next round needs them.
 
 Report back: the runoff entries; each voter's de-blinded choice and reason; eligible, received and valid counts, naming absent voters; the runoff tally (and a labelled combined one if shown); the winner or the remaining tie and the options put to the user; any cleanup.
