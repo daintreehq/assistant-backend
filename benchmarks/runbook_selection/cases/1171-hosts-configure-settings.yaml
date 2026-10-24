@@ -70,8 +70,8 @@ cases:
   - id: configure-settings-trap-copy-one-key
     category: routing-trap
     note: >-
-      One named value on a host, not a category copy from this machine. Decided by "a NAMED
-      SETTING on their other machines read or changed" and "a host's alert about idle terminals
+      One named value on a host, not a category copy from this machine. Decided by "one of the
+      HOST SETTINGS Daintree can change from here read or changed on their other machines" and "a host's alert about idle terminals
       and its minutes"; daintree.hosts.copy-portable-settings fences "one named setting read or
       changed by key on hosts" back here.
     messages:
@@ -150,8 +150,8 @@ cases:
     category: routing-trap
     note: >-
       Which hosts' cards Canopy lists is Canopy's own view filter, not any host's canopyMode: no
-      host setting changes and no procedure is owed ("Canopy's own filter of which hosts' cards it
-      shows is not canopyMode: never enable or disable a host to change a view"). Nothing from
+      host setting changes and no procedure is owed ("Canopy's filter of which hosts' cards it shows
+      is not canopyMode: never change a host to change a view"). Nothing from
       the hosts procedures loads; the foundations may ride along.
     messages:
       - role: user

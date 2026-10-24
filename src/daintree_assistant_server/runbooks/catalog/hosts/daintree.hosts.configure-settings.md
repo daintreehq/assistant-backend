@@ -18,7 +18,7 @@ hostEligibility: configured
 {"operation":"read","hostIds":["<hostId>","<hostId>"],"keys":["canopyMode"]}
 ```
 
-3. Preview: one patch for the hosts named, up to 8. Over 8: say so; for Canopy the person's own "Enable Canopy on all hosts…" in Canopy's host menu takes them all in one dialog; else batches, each its own approval, only if the person agrees.
+3. Preview: one patch for the hosts named, up to 8. Over 8: say one preview cannot cover them; offer batches, each its own approval, only if the person agrees.
 
 ```json tool=host.settings
 {"operation":"preview","hostIds":["<hostId>","<hostId>"],"patch":{"canopyMode":"on"}}
@@ -31,7 +31,7 @@ hostEligibility: configured
 {"operation":"apply","ticket":"<ticket>"}
 ```
 
-   The app asks the person once, in this assistant's window, listing each host and change and, where Canopy turns on, that the host sends its agents' terminal output to Daintree's servers. That dialog is the only approval: never the request, a pairing or an argument of yours. The app holds the revisions and the host's launch in the ticket and refuses a write against any other. Read the top level first; nothing was written when it is: `expired` (spent by its first apply, old, or another assistant's), `opted_out` (control off for a host: the whole apply stopped), `policy_rejected` "declined" (stop: a change only on a new request) or "couldn't be asked" (the person opens the assistant's window, then a new preview).
+   The app asks the person once, in this assistant's window, listing each host and change and, where Canopy turns on, that the host sends its agents' terminal output to Daintree's servers. That dialog is the only approval: never the request, a pairing or an argument of yours. The app holds the revisions and the host's launch in the ticket and refuses a write against any other. Read the top level first. `expired` (spent by its first apply, old, or another assistant's): this attempt wrote nothing, an earlier one may have; read the named keys before reporting or retrying. Nothing was written when it is `opted_out` (control off for a host: the whole apply stopped), `policy_rejected` "declined" (stop: a change only on a new request) or "couldn't be asked" (the person opens the assistant's window, then a new preview).
 5. Per host: `ok` changed, or already set; `conflict`: it changed there or restarted since the preview, but "Canopy was shown there, but not turned on" means the rest landed; `policy_rejected` (the host refused), `disconnected`, `unsupported` (old Daintree, or an answer it could not read), `rate_limited` (wait, then preview again); `ambiguous`: may have landed. Quote each `detail`.
 6. Verify: read the named keys on every host the apply reached. The values are each host's own.
 
