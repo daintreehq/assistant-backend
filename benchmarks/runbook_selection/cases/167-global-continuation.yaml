@@ -1,0 +1,101 @@
+# Continuing work across this machine's projects, as Daintree's global Assistant would be asked
+# after a restart. Recall cases: picking up unfinished work across every local project, and
+# continuing only the parts already authorised, both decided by status-and-resume's "pick up /
+# resume something from an earlier session" and "what is still open or in flight"; the executing
+# runbook may ride along. Traps, by deliverable: work sent to other machines is
+# daintree.hosts.recover-and-clean-up; brand-new work across projects is a fan-out, not a resume;
+# a bare what-exists-now listing is the foundation's; passing coordination to a successor is
+# daintree.orchestration.hand-off-orchestration. Written without the selector model on the
+# authoring machine: unmeasured until `bench local` runs.
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: global-continue-unfinished-all-local-projects
+    category: single-runbook
+    note: >-
+      The issue's request. Several projects on one machine, nothing on another: the local
+      sweep ("pick up / resume something from an earlier session"), never the hosts recovery.
+      Continuing the plan itself may bring execute-durable-workflow along.
+    messages:
+      - role: user
+        content: Continue my unfinished work across all projects on this machine.
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.orchestration.execute-durable-workflow]
+
+  - id: global-continue-authorised-parts-still-running
+    category: single-runbook
+    note: >-
+      What is still running, then only the already-authorised continuation: "what is still
+      open or in flight" decides it; status-and-resume hands continuing back to the runbook
+      that started the work.
+    messages:
+      - role: user
+        content: show me what is still running and keep going with the parts I already said yes to
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.orchestration.execute-durable-workflow]
+
+  - id: global-reconcile-runs-every-local-project-after-restart
+    category: single-runbook
+    note: >-
+      Agent-phrased: reconciling saved run checkpoints against live state in each local project
+      after Daintree restarted. status-and-resume owns "the saved run checkpoint itself" and
+      the reconciliation; nothing went to another machine.
+    messages:
+      - role: user
+        content: After Daintree restarted, reconcile the saved run checkpoints with live terminals in every local project and resume the authorised units
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.orchestration.execute-durable-workflow]
+
+  # ------------------------------------------------------------------- traps
+  - id: global-continuation-trap-remote-machines
+    category: routing-trap
+    note: >-
+      Work sent to other machines, picked up after a restart: status-and-resume declines it
+      ("work sent to assistants on other machines (daintree.hosts.recover-and-clean-up)").
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: after the restart, find out where the jobs I handed to my other machines got to
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: global-continuation-trap-new-work-each-project
+    category: routing-trap
+    note: >-
+      Brand-new work spread over several projects resumes nothing: one agent per item is
+      daintree.orchestration.fan-out-work, so the status sweep must not be loaded.
+    messages:
+      - role: user
+        content: start fresh, put an agent on the lint upgrade in each of my projects at once
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: global-continuation-trap-plain-inventory
+    category: routing-trap
+    note: >-
+      A plain what-exists-now listing with nothing to resume is the foundation alone ("a plain
+      what-exists-right-now read ... which terminals, agents"); status-and-resume declines "a
+      plain what-exists-now read of terminals, worktrees or queues".
+    messages:
+      - role: user
+        content: just list the agent terminals open in each project right now, nothing else
+    expect:
+      required: [daintree.foundation]
+
+  - id: global-continuation-trap-explicit-handover
+    category: routing-trap
+    note: >-
+      Explicitly passing coordination of a live run to a successor is
+      daintree.orchestration.hand-off-orchestration, which status-and-resume fences ("to pass a
+      live run's coordination to a successor session"); a saved file never transfers standing.
+    messages:
+      - role: user
+        content: hand coordination of this whole multi-agent run over to a new coordinator session that picks up from your notes
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation]
