@@ -21,7 +21,7 @@ Procedure:
 {"hostId":"<host>","projectId":"<project>","tool":"agent.launch","args":{"agentId":"claude","model":"<only if set>","worktreeId":"<worktreeId>","name":"<run> · #<n>","prompt":"<command> <n>","requestedId":"<saved first>","notify":true,"focusPolicy":"preserve"}}
 ```
 
-   `launched:false` (`host-memory`, `panel-limit`): nothing started; the issue waits for a slot. A slash command takes no `handback` (it would join the arguments). First launch per model per host: read its banner (`terminal.getOutput`) for the model.
+   `launched:false` (`panel-limit`, `missing-cli`): nothing started; report the issue with its reason. A slash command takes no `handback` (it would join the arguments). First launch per model per host: read its banner (`terminal.getOutput`) for the model.
 5. Refill: once a host's free or nearly free slots reach about a quarter of its cap, pick again, a count per host in words. Beyond the free slots, create worktrees now (claiming the issues) and launch in pick order as slots free, each fast-forwarded to `origin/<base>` first when it holds no changes or commits (`project.runCommand` there, its HEAD checked after).
 6. Finished: its command's end marker, then its PR's checks on the forge. Red goes back to its agent (`terminal.sendCommandOwned` there), unless a running merge has taken the PR.
 7. If asked to merge: whenever finished PRs wait and none runs, in the chosen machine's main checkout once clean on the base. A merge that rescans takes PRs whose agent still works, and two writers on one branch collide: name those PRs to it as off-limits until their units finish. One taken anyway: tell its agent to fetch before any push and never force-push over the merge; report a collision. Done is its marker and each PR `MERGED`.
