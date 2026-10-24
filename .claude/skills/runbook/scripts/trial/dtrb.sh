@@ -4,19 +4,28 @@
 #
 #   dtrb.sh build [ref]            clone + build the app for e2e (default: origin/develop)
 #   dtrb.sh runbooks serve|start|stop|status   (serve = foreground; prefer it)
-#   dtrb.sh up [run-name]          seed a scratch project and hold an isolated Daintree open
+#   dtrb.sh up [--hosts N] [run-name]   seed a scratch project and hold an isolated Daintree open;
+#         --hosts 1-3: also N isolated Remote Hosts (Host mode, private sshd on 127.0.0.1),
+#         each with a clone of the scratch repo at the same base commit, added to the Shell
 #   dtrb.sh trial [opts] "prompt"  launch one agent pane with the prompt; wait; summarise
 #         --agent claude|codex (claude)  --model M (haiku)  --timeout MIN (20)  --id NAME
 #         --flag ARG (repeatable, verbatim CLI flag)  --no-wait  -f PROMPT_FILE
 #         --background [--name TITLE]  launch a worker as the user would; no trial pane owns it
 #         --adopt ID[,ID]              hand those terminals to the trial pane at launch
+#         --assistant                  type the prompt into the Shell's own Daintree Assistant
+#                                      (the host.* caller) instead of launching a pane
 #   dtrb.sh wait <trial-id>        wait for a trial to settle, then summarise
 #   dtrb.sh summary <trial-id> [--full|--json]
 #   dtrb.sh send "<text>" [terminal-id]   type a user follow-up into the trial pane mid-trial
 #   dtrb.sh adopt <id[,id]> <orchestrator-pane-id>   the user's mid-trial hand-over gesture
 #   dtrb.sh hold on|off            keep the running trial from settling while you act by hand
 #   dtrb.sh reset                  close agent panes, restore the scratch repo to its seed
-#   dtrb.sh mcp <action> '<json>'  call the ISOLATED app's MCP with its API key
+#   dtrb.sh mcp [--as help] [--on HOST] <action> '<json>'   call an ISOLATED app's MCP:
+#         default the Shell with its API key (external surface); --as help the Shell as
+#         its own assistant (help-core/-full: host.list, host.call); --on HOST a Remote
+#         Host's own MCP with its API key (to check what a host.call did there)
+#   dtrb.sh hosts                  the run's Remote Hosts (name, hostId, projectId, ...)
+#   dtrb.sh snap                   screenshot + terminal dump of the Shell and every host window
 #   dtrb.sh project                print the running trial project's path
 #   dtrb.sh status | down          show state | close the app and stop the holder
 #   dtrb.sh purge [run-name]       delete stopped runs and their scratch projects
@@ -42,6 +51,9 @@ if [ -n "${DTRB_RUNNER:-}" ]; then
   RUNBOOKS_PORT="${RUNBOOKS_PORT:-$((8620 + DTRB_N))}"
 fi
 E2E_ROOT="${E2E_ROOT:-$HOME/.cache/daintree-runbook-e2e}"
+if [ -z "${DAINTREE_APP_REPO:-}" ] && [ ! -d "$HOME/Projects/Daintree/daintree" ] && [ -d "$HOME/Projects/daintree/.git" ]; then
+  DAINTREE_APP_REPO="$HOME/Projects/daintree"
+fi
 APP_SRC="${DAINTREE_APP_REPO:-$HOME/Projects/Daintree/daintree}"
 APP="${DTRB_APP:-$HOME/.cache/daintree-runbook-e2e/app}"
 RUNBOOKS_PORT="${RUNBOOKS_PORT:-8611}"
@@ -271,7 +283,20 @@ EOF
   printf '.mcp.json\n.claude/\n.daintree/\nCLAUDE.local.md\n' >>"$dir/.git/info/exclude"
 }
 
+# A Remote Host's copy of the scratch project: a clone of the same bare origin, so the
+# Shell and every host start from one base commit, with the same agent config.
+seed_host_project() {
+  local src="$1" dir="$2" f
+  git clone --quiet -b main "$src/../origin.git" "$dir"
+  for f in .mcp.json .claude CLAUDE.local.md; do [ -e "$src/$f" ] && cp -R "$src/$f" "$dir/$f"; done
+  printf '.mcp.json\n.claude/\n.daintree/\nCLAUDE.local.md\n' >>"$dir/.git/info/exclude"
+}
+
 cmd_up() {
+  local nhosts="${DTRB_HOSTS:-0}"
+  if [ "${1:-}" = --hosts ]; then nhosts="${2:?--hosts N}"; shift 2; fi
+  case "$nhosts" in 0|1|2|3) ;; *) die "--hosts takes 0-3" ;; esac
+  [ "$nhosts" = 0 ] || [ -x /usr/sbin/sshd ] || die "--hosts needs /usr/sbin/sshd (macOS)"
   [ -f "$APP/.dtrb-built" ] || die "no app build; run: dtrb.sh build"
   [ -f "$APP/dist-electron/electron/main.js" ] || die "app build incomplete; run: dtrb.sh build"
   local name="${1:-$(date +%Y%m%d-%H%M%S)}"
@@ -281,9 +306,13 @@ cmd_up() {
      && kill -0 "$(cat "$E2E_ROOT/current/holder.pid")" 2>/dev/null; then
     die "a run is already up ($(current_run)); dtrb.sh down first"
   fi
-  if lsof -nP -iTCP:"$MCP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    die "port $MCP_PORT is taken; set DTRB_MCP_PORT (or DTRB_RUNNER/DTRB_N)"
-  fi
+  local port i
+  # The Shell's MCP port, and each host's at +51, +52, ...
+  for port in "$MCP_PORT" $(for i in $(seq 1 "$nhosts"); do echo $((MCP_PORT + 50 + i)); done); do
+    if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+      die "port $port is taken; set DTRB_MCP_PORT (or DTRB_RUNNER/DTRB_N)"
+    fi
+  done
   curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:$RUNBOOKS_PORT/readyz" 2>/dev/null \
     || say "warning: no runbook server on $RUNBOOKS_PORT yet (dtrb.sh runbooks serve)"
   mkdir -p "$run"
@@ -293,8 +322,17 @@ cmd_up() {
   local proj; proj="$PROJECTS_ROOT/$(openssl rand -hex 2)/tally"
   echo "$proj" >"$run/project-path"
   seed_project "$proj"
+  local hproj hprojs=""
+  : >"$run/host-projects"
+  for i in $(seq 1 "$nhosts"); do
+    hproj="$PROJECTS_ROOT/$(openssl rand -hex 2)/tally"
+    seed_host_project "$proj" "$hproj"
+    echo "$hproj" >>"$run/host-projects"
+    hprojs="${hprojs:+$hprojs:}$hproj"
+  done
   mkdir -p "$APP/e2e/dtrb"
   cp "$HERE/harness/hold.spec.ts" "$APP/e2e/dtrb/hold.spec.ts"
+  cp "$HERE/harness/hosts.ts" "$APP/e2e/dtrb/hosts.ts"
   cp "$HERE/harness/playwright.dtrb.config.ts" "$APP/playwright.dtrb.config.ts"
   ln -sfn "$run" "$E2E_ROOT/current"
   say "starting isolated Daintree (user data $run/userdata, MCP port $MCP_PORT)"
@@ -304,9 +342,9 @@ cmd_up() {
     DTRB_TIER="${DTRB_TIER:-full}" DTRB_SKIP_PERMISSIONS="${DTRB_SKIP_PERMISSIONS:-1}" \
     DTRB_SKIP_CONFIRMATIONS="${DTRB_SKIP_CONFIRMATIONS:-1}" DTRB_APPROVE_DIALOGS="${DTRB_APPROVE_DIALOGS:-0}" \
     DTRB_HOLD_HOURS="${DTRB_HOLD_HOURS:-8}" DTRB_QUIET_MS="${DTRB_QUIET_MS:-45000}" \
+    DTRB_HOST_PROJECTS="$hprojs" DTRB_HELP_TIER="${DTRB_HELP_TIER:-core}" DTRB_RUNBOOKS_URL="$RUNBOOKS_URL" \
     nohup npx playwright test --config playwright.dtrb.config.ts >"$run/playwright.log" 2>&1 & echo $! >"$run/holder.pid")
-  local i
-  for i in $(seq 1 120); do
+  for i in $(seq 1 $((120 + 120 * nhosts))); do
     [ -f "$run/state.json" ] && break
     kill -0 "$(cat "$run/holder.pid")" 2>/dev/null || { tail -30 "$run/playwright.log" >&2; die "holder exited"; }
     sleep 1
@@ -317,7 +355,7 @@ cmd_up() {
 }
 
 cmd_trial() {
-  local agent=claude model=haiku timeout=20 wait=1 id="" flags=() prompt bg=0 adopt="" pname=""
+  local agent=claude model=haiku timeout=20 wait=1 id="" flags=() prompt bg=0 adopt="" pname="" assistant=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --agent) agent="$2"; shift 2 ;;
@@ -329,6 +367,7 @@ cmd_trial() {
       --background) bg=1; wait=0; shift ;;
       --adopt) adopt="$2"; shift 2 ;;
       --name) pname="$2"; shift 2 ;;
+      --assistant) assistant=1; shift ;;
       -f) prompt="$(cat "$2")"; shift 2 ;;
       *) prompt="$1"; shift ;;
     esac
@@ -344,10 +383,11 @@ cmd_trial() {
   if [ "$agent" = codex ]; then
     flags+=("-c" "mcp_servers.daintree-runbooks.url=$RUNBOOKS_URL")
   fi
-  "$PY" - "$run/inbox/$id.json" "$agent" "$model" "$timeout" "$prompt" "$bg" "$adopt" "$pname" "${flags[@]+"${flags[@]}"}" <<'PY'
+  "$PY" - "$run/inbox/$id.json" "$agent" "$model" "$timeout" "$prompt" "$bg" "$adopt" "$pname" "$assistant" "${flags[@]+"${flags[@]}"}" <<'PY'
 import json, sys
-out, agent, model, timeout, prompt, bg, adopt, pname, *flags = sys.argv[1:]
+out, agent, model, timeout, prompt, bg, adopt, pname, assistant, *flags = sys.argv[1:]
 req = {"agentId": agent, "prompt": prompt, "timeoutMin": float(timeout), "flags": flags}
+if assistant == "1": req["assistant"] = True
 if bg == "1": req["background"] = True
 if adopt: req["adopt"] = adopt.split(",")
 if pname: req["name"] = pname
@@ -445,10 +485,65 @@ cmd_reset() {
   say "panes closed; scratch repo back at its seed"
 }
 
+json_field() { "$PY" -c 'import json,sys;print(json.load(open(sys.argv[1])).get(sys.argv[2], ""))' "$1" "$2"; }
+
+# One field of the run's state.json: the Shell's, or a host's by name, index or hostId.
+state_field() {
+  "$PY" - "$1/state.json" "$2" "${3:-}" <<'PY'
+import json, sys
+state, field, host = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3]
+if not host:
+    print(state[field]); sys.exit(0)
+hosts = state.get("hosts") or []
+for i, h in enumerate(hosts, 1):
+    if host in (h["name"], str(i), h.get("hostId")):
+        print(h[field]); sys.exit(0)
+sys.exit(f"no host {host!r} in this run (hosts: {[h['name'] for h in hosts]})")
+PY
+}
+
 cmd_mcp() {
+  local run as="" on="" i; run="$(current_run)"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --as) as="$2"; shift 2 ;;
+      --on) on="$2"; shift 2 ;;
+      *) break ;;
+    esac
+  done
+  if [ -n "$on" ]; then
+    "$PY" "$HERE/mcp_call.py" "$(state_field "$run" mcpUrl "$on")" "$(state_field "$run" mcpApiKeyFile "$on")" "$@"
+    return
+  fi
+  case "$as" in
+    "") "$PY" "$HERE/mcp_call.py" "$(state_field "$run" mcpUrl)" "$run/mcp-api-key" "$@" ;;
+    help)
+      # The Shell's own assistant's bearer, live while its PTY runs. None yet (or the
+      # assistant was closed): ask the holder to start one.
+      if [ ! -f "$run/help-session.json" ] || [ -n "${DTRB_RESTART_ASSISTANT:-}" ]; then
+        touch "$run/provision-help"
+        for i in $(seq 1 90); do [ -e "$run/provision-help" ] || break; sleep 1; done
+        [ -e "$run/provision-help" ] && die "the holder did not start the assistant"
+        [ -f "$run/help-session.json" ] || die "no assistant started; see $run/holder.log"
+      fi
+      "$PY" "$HERE/mcp_call.py" "$(state_field "$run" mcpUrl)" "$run/help-session.json" "$@" ;;
+    *) die "--as help is the only other caller" ;;
+  esac
+}
+
+cmd_snap() {
+  local run i; run="$(current_run)"
+  touch "$run/snap"
+  for i in $(seq 1 60); do [ -e "$run/snap" ] || break; sleep 1; done
+  [ -e "$run/snap" ] && die "the holder did not take the snap"
+  ls -d "$run"/snaps/* | tail -1
+}
+
+cmd_hosts() {
   local run; run="$(current_run)"
-  "$PY" "$HERE/mcp_call.py" "$(sed -n 's/.*"mcpUrl": "\(.*\)".*/\1/p' "$run/state.json")" \
-    "$run/mcp-api-key" "$@"
+  "$PY" -c 'import json,sys
+for h in json.load(open(sys.argv[1])).get("hosts") or []:
+    print(json.dumps(h))' "$run/state.json"
 }
 
 
@@ -477,8 +572,17 @@ cmd_down() {
     for i in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
     kill "$pid" 2>/dev/null || true
   fi
-  # Belt and braces: only processes carrying THIS run's user-data dir.
+  # Belt and braces: only processes carrying THIS run's user-data dirs, and its sshds.
   pkill -f "user-data-dir=$run/userdata" 2>/dev/null || true
+  local hj ud sp
+  for hj in "$run"/host*/host.json; do
+    [ -f "$hj" ] || continue
+    ud="$(json_field "$hj" userData)"; sp="$(json_field "$hj" sshdPid)"
+    [ -n "$ud" ] && pkill -f "user-data-dir=$ud" 2>/dev/null || true
+    case "$sp" in ''|*[!0-9]*) ;; *)
+      if [ "$sp" -gt 1 ] && ps -p "$sp" -o command= 2>/dev/null | grep -q '/usr/sbin/sshd'; then kill "$sp" 2>/dev/null || true; fi ;;
+    esac
+  done
   say "down: $run (kept for inspection; dtrb.sh purge removes it)"
 }
 
@@ -493,6 +597,19 @@ cmd_purge() {
       say "skipping $run: still up"; continue; fi
     proj="$(cat "$run/project-path" 2>/dev/null || true)"
     [ -n "$proj" ] && rm -rf "$(dirname "$proj")"
+    # Each host's project directory, and its root (sshd keys, HOME, userData) under /tmp.
+    local hp hdir hj hroot
+    if [ -f "$run/host-projects" ]; then
+      while IFS= read -r hp; do
+        hdir="${hp%/tally}"
+        case "$hdir" in "$PROJECTS_ROOT"/?*) rm -rf "$hdir" ;; esac
+      done <"$run/host-projects"
+    fi
+    for hj in "$run"/host*/host.json; do
+      [ -f "$hj" ] || continue
+      hroot="$(json_field "$hj" root)"
+      case "$hroot" in /private/tmp/dtrb-h?*|/tmp/dtrb-h?*) rm -rf "$hroot" ;; esac
+    done
     rm -rf "$run"; say "purged $run${proj:+ and $(dirname "$proj")}"
   done
   [ -L "$E2E_ROOT/current" ] && [ ! -e "$E2E_ROOT/current" ] && rm -f "$E2E_ROOT/current"
@@ -503,6 +620,8 @@ case "${1:-}" in
   build) shift; cmd_build "$@" ;;
   runbooks) shift; cmd_runbooks "$@" ;;
   up) shift; cmd_up "$@" ;;
+  hosts) shift; cmd_hosts ;;
+  snap) shift; cmd_snap ;;
   trial) shift; cmd_trial "$@" ;;
   wait) shift; cmd_wait "$@" ;;
   summary) shift; cmd_summary "$@" ;;
@@ -515,5 +634,5 @@ case "${1:-}" in
   status) shift; cmd_status ;;
   down) shift; cmd_down ;;
   purge) shift; cmd_purge "$@" ;;
-  *) sed -n '2,35p' "$0"; exit 2 ;;
+  *) sed -n '2,40p' "$0"; exit 2 ;;
 esac
