@@ -174,11 +174,11 @@ scenarios:
     states: ["pending: never advance or end your turn on it with nothing coming", "Recheck with `terminal.getStatus`", "a `lastHandback` for that prompt \\(a send's by its `submissionToken`\\) and the answer in the text, not just a marker", "Stopped without it: act on its screen", "Still working: `terminal.waitUntilIdleBatch` on those", "paced to the work", "a minute for a vote", "never back-to-back, never one long silent wait", "Stop on the answer, exit, closure, cancellation or long overdue"]
 
   - id: short-run-needs-no-checkpoint-file
-    situation: A one- or two-round orchestration, or the sidebar assistant with a scratch folder.
-    must: Keep state in the conversation; for a long run use the scratch folder first.
-    must_not: Write a checkpoint into the user's repository from the sidebar.
+    situation: A one- or two-round orchestration, or Daintree's own assistant with a persistent checkpoint folder.
+    must: Keep state in the conversation; for a long run use the checkpoint folder, which survives restarts, first.
+    must_not: Keep a long run's checkpoint in the scratch folder a restart clears, or in the user's repository from the sidebar.
     runbooks: [daintree.foundation]
-    states: ["For one or two rounds your conversation is the record", "DAINTREE_ASSISTANT_SCRATCH_DIR", "outside the user's repository", "git rev-parse --git-path info/exclude"]
+    states: ["For one or two rounds your conversation is the record", "DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR", "survives restarts", "git rev-parse --git-path info/exclude"]
 
   - id: same-kind-launches-are-distinct
     situation: Two participants of the same agent kind are launched for one task.

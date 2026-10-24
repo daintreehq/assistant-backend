@@ -52,7 +52,7 @@ API-key client: no `notify`, `terminal.notifyWhenIdle` or `*Many`. Omit `notify`
 
 ## Long runs
 
-For one or two rounds your conversation is the record. Long runs: checkpoint locally, never on the work's host. Use `$DAINTREE_ASSISTANT_SCRATCH_DIR` if set (per sidebar restart, outside the user's repository), else `.daintree/runbook-runs/<run-id>.json` in your checkout, listed in `$(git rev-parse --git-path info/exclude)`. Per unit: terminal id, step, submission token; write atomically; keep one writer. A corrupt or stale record is a recovery problem, not permission to replay. On cancellation keep a tombstone so a late notice cannot restart work. A deadline written in a checkpoint wakes nothing.
+For one or two rounds your conversation is the record. Long runs: checkpoint locally, never on the work's host: `$DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` if set (survives restarts), else `.daintree/runbook-runs/<run-id>.json` in your checkout, listed in `$(git rev-parse --git-path info/exclude)`. Per unit: host, project, terminal id, step, submission token; write atomically; keep one writer. A corrupt or stale record is a recovery problem, not permission to replay, nor standing. On cancellation keep a tombstone so a late notice cannot restart work. A deadline written in a checkpoint wakes nothing.
 
 ## Proving a finish
 
