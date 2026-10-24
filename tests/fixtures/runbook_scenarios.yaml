@@ -496,6 +496,62 @@ scenarios:
     runbooks: [daintree.agents.poll-pinned-agents]
     states: ["no tie is left for a runoff", "keeping any still running or stopped on a question or approval"]
 
+  - id: failed-or-unverified-panes-stay-open
+    situation: The caller launched an agent whose result failed or could not be verified.
+    must: Leave that pane open for the user and name it.
+    must_not: Close it with the ones that finished cleanly.
+    runbooks: [daintree.foundation]
+    states: ["close yours once done", "a failed or unverified one stays open"]
+
+  - id: multi-agent-cohort-closes-once-reported
+    situation: A multi-agent discussion has converged and its synthesis is reported; one participant was an open agent the user named.
+    must: Close the participants it launched in one batch, by the foundation's rule; keep all of them if the user wants another round.
+    must_not: Close the user's own agent, or leave every launched participant running.
+    runbooks: [daintree.orchestration.multi-agent, daintree.foundation]
+    states: ["Once it is reported, close the participants you launched, per the foundation", "all stay open if the user wants another round", "a failed or unverified one stays open"]
+
+  - id: conversation-keeps-panes-at-the-bound
+    situation: A facilitated conversation stops at its lap bound with a progress report.
+    must: Keep every participant open and ask whether to go on; close the launched ones only once it ends at agreement, a wrap-up or the user's stop.
+    must_not: Close participants the next lap would need.
+    runbooks: [daintree.orchestration.conversation]
+    states: ["Ended at agreement, a wrap-up or the user's stop, and reported: close the participants you launched", "Stopped at the bound: keep them all and ask whether to go on"]
+
+  - id: interview-keeps-winner-and-provisional-cohort
+    situation: An interview's verdict is reported, or the interview ended with no verdict or a provisional one.
+    must: After a final verdict, close the launched candidates and judge but keep the winner; with no or a provisional verdict, close none; "close the losers" closes only the losing candidates.
+    must_not: Close the winner, or close anyone on a provisional result.
+    runbooks: [daintree.orchestration.interview]
+    states: ["Once the verdict is reported, close the candidates and judge you launched", "keeping the winner the user may work with next", "No verdict, or a provisional one: close none", "\"close the losers\" instead closes only the losing candidates"]
+
+  - id: runoff-and-competition-keep-the-electorate
+    situation: A competition ends tied, or its runoff is still tied or provisional.
+    must: Keep every entrant and voter open for the runoff; close all but a winning entrant only once a final result is reported.
+    must_not: Close voters a runoff reuses because their entries lost.
+    runbooks: [daintree.orchestration.competition, daintree.orchestration.runoff-tiebreaker]
+    states: ["Keep every terminal open", "Once a final result is reported, close all but the winners, per the foundation", "Still tied or provisional: close none; the next round needs them", "keeping a winning entrant the user may work with next"]
+
+  - id: debate-loser-closes-only-on-request-mid-debate
+    situation: A debate eliminates a participant and continues, then later ends.
+    must: Mid-debate, close the loser only if the user says so; once the debate is over and reported, close the participants it launched.
+    must_not: Close a loser on its own initiative mid-debate, or leave the finished cohort running.
+    runbooks: [daintree.orchestration.debate-elimination]
+    states: ["mid-debate, close a loser only if the user says close", "Once the debate is over and reported, close the participants you launched"]
+
+  - id: failed-one-off-agents-stay-open
+    situation: A postmortem analyst failed or found no transcript, or a poll voter was excluded for an error.
+    must: Report it and leave its pane open for the user.
+    must_not: Close it with the agents that finished cleanly.
+    runbooks: [daintree.agents.postmortem-run, daintree.agents.poll-pinned-agents]
+    states: ["reported and left open, never relaunched", "or excluded for an error"]
+
+  - id: relayed-answer-agent-closes
+    situation: A one-question agent's full answer has been relayed.
+    must: Close its pane, unless the reply was partial or failed, files changed, or the user wants to follow up there.
+    must_not: Leave it running by default, or close one whose answer was cut.
+    runbooks: [daintree.agents.ask-and-relay]
+    states: ["Then close it \\(`terminal.closeOwned`", "unless the reply was partial or failed, files changed", "its terminal closed or kept and why"]
+
   - id: watch-scheduling-without-mechanism
     situation: The user wants something done at 6pm and no scheduler exists.
     must: Say so and offer what is real.

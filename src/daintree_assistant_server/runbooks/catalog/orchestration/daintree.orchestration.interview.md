@@ -32,6 +32,6 @@ On a host: call these tools on the work's machine; `gh -R <owner/repo>` from you
 5. Then send the judge all answers together, labelled consistently beside each question, plus "follow-ups, or is a decision ready?", with `waitForReply:true`. If the judge knows who the candidates are, the interview is attributed; say so. An answer for an older set is filed under that set.
 6. Stop at the judge's verdict or the budget. A top 2 needs two eligible candidates; never invent a finalist. With no verdict at the budget, report the unresolved criteria. If an absent candidate or missing verification could change the outcome, the result is provisional and says which.
 
-Close only on request: "close the losers" keeps the winner and the judge, confirmed from `closedIds`.
+Once the verdict is reported, close the candidates and judge you launched, per the foundation, in one `terminal.closeMany`, confirmed from `closedIds`, keeping the winner the user may work with next. No verdict, or a provisional one: close none. The user's "close the losers" instead closes only the losing candidates.
 
 Report back: the winner and the judge's reasoning in its own terms (and the top 2 on a verified run); rounds taken; missing or late candidates; evidence the judge checked versus what candidates claimed; any file changes reported; terminals closed.
