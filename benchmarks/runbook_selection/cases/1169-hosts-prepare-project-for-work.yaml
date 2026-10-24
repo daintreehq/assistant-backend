@@ -1,0 +1,274 @@
+# daintree.hosts.prepare-project-for-work: the person wants THIS project made present on a
+# connected Remote Host so work can run there, done by the Shell's assistant through Daintree's
+# machine-led preparation (the host's matching copy or a clone, the branch's worktree when
+# asked) with no dialog, window, push or setup, then the requested work continued there.
+# Recall cases in agent and user words (the issue's three requests among them), a routing trap
+# per declared neighbour where this runbook wins, and reverse traps where the neighbour wins
+# and this one must not ride along: daintree.hosts.open-project-on-host,
+# daintree.hosts.connect-host, daintree.hosts.delegate-to-host, daintree.hosts.place-work and
+# daintree.hosts.verify-project-placement. Two cases moved here from
+# 223-hosts-open-project-on-host.yaml when this owner arrived: bare presence on a host, with no
+# window or dialog asked for, is no longer the dialog's. The hosts foundation may ride along.
+# Written without the selector model on the machine: none of these was probed with bench
+# search, and the untrained runbook is expected to lose contested ones until a retrain.
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: prepare-project-issue-start-agent
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "made present on a connected Remote Host so work
+      can run there" and "the work started there through that address".
+    messages:
+      - role: user
+        content: Put this repo on the other studio and start an agent there.
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-issue-continue-branch
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "the branch's worktree when asked" and "the work
+      started there through that address".
+    messages:
+      - role: user
+        content: Make sure that host has this project, then continue the task on its branch.
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-issue-no-window
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "done by you with no dialog or window".
+    messages:
+      - role: user
+        content: Prepare this project on the build machine without opening a window there.
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-agent-phrased
+    category: single-runbook
+    note: >-
+      Agent-phrased search_runbooks query. Decided by "the host's own projectId", "its existing
+      copy found or a clone made there with nothing pushed, set up, copied or opened".
+    messages:
+      - role: user
+        content: Bring the current project to the connected Remote Host without the project dialog, reuse its existing copy or clone it there, and return the host's projectId for launching an agent
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-user-casual-fix
+    category: single-runbook
+    note: >-
+      User-phrased, the project missing and work wanted. Decided by "the server has never had
+      this repo, get it there and have an agent fix the test".
+    messages:
+      - role: user
+        content: the linux box doesn't have this repo yet, get it over there and have claude sort out the flaky login test
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-branch-worktree
+    category: single-runbook
+    note: >-
+      The branch's worktree made on the host. Decided by "(and the branch's worktree when
+      asked)".
+    messages:
+      - role: user
+        content: set up my current branch in a worktree on the mac mini so an agent can carry on there, I don't want to click through anything
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-several-copies
+    category: single-runbook
+    note: >-
+      A choice only the person can settle. Decided by "any choice only the person can settle
+      (several copies, a fork, unpushed commits, no remote) brought back".
+    messages:
+      - role: user
+        content: get this project ready on the server for an agent; if it finds more than one copy there, ask me which one
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-fresh-clone
+    category: single-runbook
+    note: >-
+      Moved from 223. Bare presence, no window or dialog asked for. Decided by "made present
+      on a connected Remote Host" and "a clone made there"; the dialog's own text now names
+      opening in a window or the dialog.
+    messages:
+      - role: user
+        content: this repo is not on the Linux server at all, so clone it there for me
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-connected-host-state
+    category: host-state
+    note: >-
+      The same deliverable for a caller reporting a connected host; hostEligibility connected
+      keeps it on the ballot. Decided by "made present on a connected Remote Host so work can
+      run there".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: the build server is missing this project, put it there and have an agent run the test suite
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  # ---------------------------------------- traps: this runbook wins, neighbour out
+  - id: prepare-project-trap-not-a-window
+    category: routing-trap
+    note: >-
+      Present for work, no window wanted: "opening or switching to the project in a window
+      there, or the project dialog (daintree.hosts.open-project-on-host)" is fenced out.
+    messages:
+      - role: user
+        content: I don't need to see it there, just make sure the second Mac has this project so its agents can work in it
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: open-project-on-host-trap-no-work-yet
+    category: routing-trap
+    note: >-
+      Moved from 223. The project made ready for later work, no task sent: "work for a host
+      that already has the project (daintree.hosts.delegate-to-host)" is fenced out, and no
+      window is asked for.
+    messages:
+      - role: user
+        content: get this project onto my other Mac so it is ready to be worked on there later
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-trap-host-already-connected
+    category: routing-trap
+    note: >-
+      The host is connected already; the project is the task: "adding a machine or a host
+      that will not connect (daintree.hosts.connect-host)" is fenced out.
+    messages:
+      - role: user
+        content: the studio Mac shows connected in Hosts now, so bring this repo onto it and start codex on the open issue
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-trap-host-lacks-project
+    category: routing-trap
+    note: >-
+      Work for a host that lacks the project: "work for a host that already has the project
+      (daintree.hosts.delegate-to-host)" is fenced out; the project comes first.
+    messages:
+      - role: user
+        content: the build box has never had this repository; clone it there and then have an agent on it fix the checkout bug
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-trap-named-host
+    category: routing-trap
+    note: >-
+      One host named, the project missing there: "choosing hosts for pieces of work by load or
+      capacity (daintree.hosts.place-work)" is fenced out.
+    messages:
+      - role: user
+        content: put this project on the mac mini specifically, not whichever host is free, and start the agent there
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-trap-not-only-a-check
+    category: routing-trap
+    note: >-
+      Make it present, not only check a candidate: "only checking which host project is the
+      intended repository (daintree.hosts.verify-project-placement)" is fenced out.
+    messages:
+      - role: user
+        content: if the server has no copy of this repo, clone one there; if it has one, use it, and give me the id to run things in
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------- reverse traps: neighbour wins, this one stays out
+  - id: prepare-project-reverse-open-window
+    category: routing-trap
+    note: >-
+      The person wants to see the project in a window there. daintree.hosts.open-project-on-host
+      decides it: "OPENED on a Remote Host they already added, in a window there or through
+      Daintree's project dialog".
+    messages:
+      - role: user
+        content: open this project in a new window on the build server so I can look around in it myself
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-reverse-dialog-push
+    category: routing-trap
+    note: >-
+      Unpushed commits the person wants pushed so the host gets them: only the dialog pushes.
+      daintree.hosts.open-project-on-host decides it: "the push or history copy only it makes"
+      in this runbook's fence, "push my branch and open it" on its own.
+    messages:
+      - role: user
+        content: push my unpushed branch through Daintree's project dialog and open it on the other Mac
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-reverse-connect-host
+    category: routing-trap
+    note: >-
+      The machine is not a host yet. daintree.hosts.connect-host decides it: "ANOTHER MAC OR
+      LINUX MACHINE added to Daintree as a Remote Host".
+    messages:
+      - role: user
+        content: my linux server isn't in Daintree yet, add it as a host over ssh first
+    expect:
+      required: [daintree.hosts.connect-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-reverse-delegate
+    category: routing-trap
+    note: >-
+      The host already has the project. daintree.hosts.delegate-to-host decides it: "ONE piece
+      of WORK done on another machine".
+    messages:
+      - role: user
+        content: the build box already has this repo checked out; have an agent there fix the date parsing bug and push a branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-reverse-place-work
+    category: routing-trap
+    note: >-
+      Several pieces over hosts by capacity. daintree.hosts.place-work decides it: "DIFFERENT,
+      independent pieces of work".
+    messages:
+      - role: user
+        content: here are five unrelated tickets, put each on whichever of my machines has the most room
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: prepare-project-reverse-verify
+    category: routing-trap
+    note: >-
+      Read-only identity check. daintree.hosts.verify-project-placement decides it: "a
+      read-only identity check of each candidate project".
+    messages:
+      - role: user
+        content: before I send anything, check whether the project on the server is really our repo or a fork, and don't change anything
+    expect:
+      required: [daintree.hosts.verify-project-placement]
+      optional: [daintree.hosts.foundation]

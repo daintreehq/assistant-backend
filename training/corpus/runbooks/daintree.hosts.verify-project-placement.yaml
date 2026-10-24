@@ -67,6 +67,12 @@ positives:
       - "assistant: Yes, both are listed with an assistant in each."
 
 boundaries:
+  - query: don't clone or change anything, just tell me whether the server's project is really our repository at the pinned commit
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: "read-only please: is the copy on the linux host our upstream or a fork, before I bring anything over"
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
   - query: before I split these tasks across my machines, verify that each machine's project is our repository at the commit I pushed
     confusable_with: [daintree.hosts.place-work]
   - query: before handing the pagination fix to the server, confirm the project there is our repository and not a lookalike

@@ -63,6 +63,12 @@ positives:
       - "assistant: Placed on the second host (Claude Code, 12% CPU); sent, waiting on its reply."
 
 boundaries:
+  - query: I have four separate tickets and three machines; decide which host takes each by how busy they are
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: pick whichever connected machine has the most free capacity for this refactor and send it there
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
   - query: "I have five unrelated bugs and two remote hosts; decide which machine takes which and show me first"
     confusable_with: [daintree.hosts.drain-issue-backlog]
     run: transcript-2026-10-23-multi-host-drain

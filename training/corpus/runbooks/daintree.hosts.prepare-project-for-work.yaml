@@ -1,0 +1,113 @@
+# daintree.hosts.prepare-project-for-work: Bring this project to a Remote Host for work, without the dialog
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.prepare-project-for-work.md
+# Rows marked "moved" were labelled daintree.hosts.open-project-on-host before this owner
+# existed: bare presence on a host, with no window or dialog asked for.
+
+runbook: daintree.hosts.prepare-project-for-work
+run: runbook-2026-10-24-issue-169
+
+positives:
+  # --- agent-written task descriptions
+  - The user wants the repository open in this Shell present on their connected render host so an agent can pick up the open ticket there; find the host's copy or clone one, then launch the agent through the host's own project id
+  - Make this project available on the Linux host without the switch dialog and report the projectId the host assigned, whether it reused a copy or cloned, and what was left on this machine
+  - Bring the current branch's worktree to the second Mac at the remote's commit so a worker there can continue the refactor; ask the user before going past any unpushed commits
+  - The host has never had this repository. Prepare it there through Daintree, ask the user only if the app returns a question, and then hand the issue to Codex on that host
+  - Prepare the project on the office desktop for an agent run; no window should open on either machine and no setup recipe should run
+  - The user asked for this repo on the home server so an agent can run the slow integration tests there; get it present and start the run through the returned address
+  - Ensure the connected tower has a copy of the project open here; if the app reports two candidate copies, put both paths to the user and wait for their pick
+  - A previous attempt to bring this project to the host timed out with no answer; reconcile by calling the same preparation again rather than starting a second clone
+  - The app came back with a question that the branch has commits not on the remote; relay it to the user and only accept the remote's commit if they agree
+  - Get this repository onto the remote build host for agent work; the host's assistant-access setting may be off, and if it refuses, report the setting and change nothing
+  - The user wants their current branch continued on the studio machine by Claude Code. Make the branch's worktree there through Daintree, then launch the agent in it
+  - Put this project on the connected Mac mini and give the user the host's own project id and folder; they will send work to it in a later message
+  - First make the project present on the build host, then delegate the failing test there within the user's original brief, with nothing pushed
+  # --- users in their own words
+  - get this repo on the mini so claude can work on it there
+  - can you set this project up on my other box, no need to open anything
+  - make sure the workstation has this project and start codex on the bug
+  - put this project on the studio machine and keep going with the task there
+  - the server should already have a clone somewhere, use it if so, otherwise clone it
+  - ready this repo on the linux machine for an agent please
+  - bring my branch to the desktop at home so an agent can finish it overnight
+  - hey, could you get this project onto the build machine and run the tests there? I don't want to click through a dialog
+  - just get it there quietly, no windows popping up on the other mac
+  - prep the project on the second laptop, I'll send it work in a bit
+  - is there a way to have the remote host grab this repo itself and then have an agent pick up the ticket
+  # --- long form
+  - I'm working on this project here and want an agent on my home server to take the next task. The server is connected as a host but I don't think it has this repository. Get it there however Daintree does that without me clicking through anything, tell me what got left behind on this laptop, and then start the agent.
+  - My feature branch has two commits I haven't pushed. I want the branch continued on the build host by an agent, but I don't want anything pushed for me. Set it up there and tell me what you need from me.
+  # --- moved from daintree.hosts.open-project-on-host (presence only)
+  - The user is about to travel and wants the repository they have open ready on the desktop at home, which is connected as a Remote Host
+  - Put the user's current project on the remote host without moving this window or this conversation
+  - can you get this repo onto the linux box
+  - does the server have a copy of this already? if not clone it
+  - put this project on my other mac but don't touch what's already there
+  - bring this repo over to the workstation in the garage
+  - put my notes repo on the pi
+  - use the copy that's already on the server rather than cloning again
+  - hi! hope you're well. I've got the server set up as a host, could you get this project over there?
+  - query: I want my repo on the studio server, can you do that?
+    history:
+      - "user: the studio server shows as connected now"
+      - "assistant: Good. Tell me the project and I can help with the next step."
+
+boundaries:
+  - query: put the project on the desk machine so I can pick the work up there myself later
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.open-project-on-host]
+  - query: no window needed on the build server, just have the project there so I can hand it work
+    confusable_with: [daintree.hosts.open-project-on-host]
+  - query: skip the transfer dialog and make sure the repo is on the other Mac for an agent
+    confusable_with: [daintree.hosts.open-project-on-host]
+  - query: the tower is connected in Hosts already; have it pick up this repository and start a worker on the open issue
+    confusable_with: [daintree.hosts.connect-host]
+  - query: the host has no copy of this repository yet, so get it there first and then have an agent there take the bug
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: put the project on the render host, then send it the failing snapshot test to fix
+    confusable_with: [daintree.hosts.delegate-to-host]
+  - query: I already know which machine, the linux box; it just needs the repo before anything can run there
+    confusable_with: [daintree.hosts.place-work]
+  - query: if the server has a matching clone use that, otherwise make one, and tell me which happened
+    confusable_with: [daintree.hosts.verify-project-placement]
+  # --- moved from daintree.hosts.open-project-on-host (presence only)
+  - query: Host mode is on at the studio Mac and it is listed; the next step is getting this project onto it
+    confusable_with: [daintree.hosts.connect-host, daintree.hosts.open-project-on-host]
+  - query: that machine does not have the repo at all; get the repository onto it first
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.open-project-on-host]
+  - query: I only want the repository to exist on the second Mac for now, there is no task for it
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.open-project-on-host]
+  - query: nobody has a copy of this repo yet; get the project onto the machine I pick
+    confusable_with: [daintree.hosts.place-work, daintree.hosts.open-project-on-host]
+  - query: bring the branch I am on to the home server along with the project
+    confusable_with: [daintree.worktree.create-plain-worktree, daintree.hosts.open-project-on-host]
+  - query: the desktop at home has an older clone; use it and put my branch in
+    confusable_with: [daintree.git.sync-with-base, daintree.hosts.open-project-on-host]
+  - query: Put this repository on the Linux server so I can work in it there, cloning it if it is missing
+    confusable_with: [daintree.hosts.copy-portable-settings, daintree.hosts.open-project-on-host]
+
+followups:
+  - query: use the one in my projects folder
+    history:
+      - "user: get this repo onto the build server for an agent"
+      - "assistant: The host has two copies of this repository and Daintree wants you to pick one: one in your projects folder and one in a scratch folder."
+  - query: fine, start from what's on the remote, keep my local commits here
+    history:
+      - "user: put my branch on the mac mini and have codex continue it"
+      - "assistant: Daintree reports three commits on this branch that are not on the remote. It can make the host's worktree at the remote's commit and leave them here, or you can push first."
+  - query: try again, it should be back now
+    history:
+      - "user: get this repo onto the studio machine"
+      - "assistant: The host dropped off before Daintree answered, so I don't know yet whether the clone was made. Calling again the same way will find it rather than clone twice."
+  - query: the server already has a copy, use that one
+    history:
+      - "user: put this repo on the build server"
+      - "assistant: I can clone it there or reuse a copy if one exists. Which would you like?"
+
+topic_shifts:
+  - query: okay, and get this project onto the linux host so an agent can run there too
+    history:
+      - "user: which of my hosts are connected?"
+      - "assistant: Two are connected: the build box and the linux host."
+  - query: the new host is connected, so get this repository onto it
+    history:
+      - "user: add my spare mac as a host"
+      - "assistant: It is saved and shows Connected, with its projects listed."

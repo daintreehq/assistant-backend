@@ -14,26 +14,19 @@ positives:
   - Open this project on the host and report whether the dialog used an existing copy or cloned a new one, and where the project ended up
   - The remote host has two clones of this repository, one of them a fork; make sure the user picks which copy opens rather than choosing for them
   - The user asked for this project on the Linux server. Explain that uncommitted files and the .env stay here, then open the dialog
-  - Put the user's current project on the remote host without moving this window or this conversation
   - The user wants the host's copy of the project opened as it is, with no branch checked out there and nothing pushed
   - A clone onto the remote host was interrupted by a reconnect and the user cannot tell whether the project exists there; reconcile it through the dialog without cloning twice
   - Hand this repo to the second machine through Daintree; the user wants to approve the clone folder and does not want any setup script run
   - After the dialog finishes, confirm the project shows in the host's project list under its own id rather than this machine's
   - The user has added a Remote Host and wants to continue this branch there; open the project through the dialog so they can decide about the push
   - Find out whether the home server already holds a copy of the repository open in this window and open that copy instead of making a second clone
-  - The user is about to travel and wants the repository they have open ready on the desktop at home, which is connected as a Remote Host
   - The user wants to carry on from their desktop at home, which is already a Remote Host. Say what the host would receive from this project, then start the project dialog
   - Before opening the project on the host, tell the user which of their local changes will not be copied over, then open the dialog and let them choose the folder
   - The project on the host should be the host's own copy with its own settings; open it through the dialog and copy nothing from the user's local configuration
   - Open this repository on the Linux host on the branch the user is on, and tell them the host will use its own credentials to clone
   # --- users in their own words
   - open this project on my mac mini
-  - can you get this repo onto the linux box
   - i want my branch on the other computer, it hasn't been pushed yet
-  - does the server have a copy of this already? if not clone it
-  - put this project on my other mac but don't touch what's already there
-  - bring this repo over to the workstation in the garage
-  - use the copy that's already on the server rather than cloning again
   - open it on the build server and leave this window alone
   - I'd like to carry on with this project from my second laptop, which Daintree already has as a host. Can you start that for me?
   - the host cloned the repo into the wrong folder last time, this time let me pick where
@@ -43,8 +36,6 @@ positives:
   - can i work on this repo from the server instead of the laptop
   - i cloned this on the server a while ago, find it and open it rather than cloning again
   - is it ok to push my branch so the other mac can open it
-  - put my notes repo on the pi
-  - hi! hope you're well. I've got the server set up as a host, could you get this project over there?
   # --- long form
   - I've been working on this project on my laptop and I want to carry on from the home server tonight. The server is already added as a Remote Host and I'm fairly sure I cloned the repo there once, but I can't remember where. I've got a couple of uncommitted edits and a branch I haven't pushed. Open the project there in a way that keeps whatever is on the server intact and tell me exactly what will and won't make it across.
   - The Linux box is connected. This project is a private repository reached over SSH and the box has never had it. I'd like it cloned there into the usual projects folder with no setup scripts, and the project opened in a new window. I'll click through the dialog myself.
@@ -52,37 +43,16 @@ positives:
   - Pushing my branch to the shared remote from here is fine, but only if I say so. I want this project on the build server on that branch, and I'd rather the server's existing checkout not be touched if it has work in it. What would you do?
   - My laptop has the project with a feature branch and some half-finished edits. The desktop at home is connected as a Remote Host and has an older clone of the same repo in a different folder. I'd like to carry on from the desktop tomorrow, so open the project there, use the clone it already has, and bring the branch in. I don't want the half-finished edits copied or pushed.
   - "Observation: the project's remote is on a self-hosted forge that is only reachable over the user's VPN, and the Remote Host may not be on it. Constraint: the dialog clones as the host, with the host's network and credentials. Outcome wanted: the project open on the host if it can reach the forge, otherwise a plain explanation of what the user has to fix."
-  - query: I want my repo on the studio server, can you do that?
-    history:
-      - "user: the studio server shows as connected now"
-      - "assistant: Good. Tell me the project and I can help with the next step."
 
 boundaries:
   - query: the Linux server shows Connected in the Hosts list, so now I want this repo open on it
     confusable_with: [daintree.hosts.connect-host]
-  - query: Host mode is on at the studio Mac and it is listed; the next step is getting this project onto it
-    confusable_with: [daintree.hosts.connect-host]
   - query: clone this repo onto the box and open it there, getting assistants running on it can be a later step
     confusable_with: [daintree.hosts.delegate-to-host]
-  - query: that machine does not have the repo at all; get the repository onto it first
-    confusable_with: [daintree.hosts.delegate-to-host]
-  - query: I only want the repository to exist on the second Mac for now, there is no task for it
-    confusable_with: [daintree.hosts.delegate-to-host]
-  - query: put the project on the desk machine so I can pick the work up there myself later
-    confusable_with: [daintree.hosts.delegate-to-host]
-  - query: nobody has a copy of this repo yet; get the project onto the machine I pick
-    confusable_with: [daintree.hosts.place-work]
-  - query: bring the branch I am on to the home server along with the project
-    confusable_with: [daintree.worktree.create-plain-worktree]
   - query: check this branch out for me on the other machine's copy
     confusable_with: [daintree.worktree.create-plain-worktree]
-  - query: the desktop at home has an older clone; use it and put my branch in
-    confusable_with: [daintree.git.sync-with-base]
   - query: take the latest commits over to the server's copy of this project
     confusable_with: [daintree.git.sync-with-base]
-  - query: Put this repository on the Linux server so I can work in it there, cloning it if it is missing
-    confusable_with: [daintree.hosts.copy-portable-settings]
-    run: runbook-2026-10-issue-129
   - query: Does the build box have a copy of this project yet, or does it need a clone?
     confusable_with: [daintree.hosts.copy-portable-settings]
     run: runbook-2026-10-issue-129
@@ -96,6 +66,19 @@ boundaries:
     confusable_with: [daintree.hosts.resolve-task-collisions]
     run: 2026-10-16-synthetic-audit
 
+  - query: open the repo in its own window on the studio Mac, I want to look through it there before any agent touches it
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: switch this window over to the server's copy of the project
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: my branch has commits nobody else has; push them through Daintree's dialog and open the project on the build host
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: this repo has no remote at all, so send its history to the server through the project dialog
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+
 followups:
   - query: do the same on the second server
     history:
@@ -105,10 +88,6 @@ followups:
     history:
       - "user: get this project onto the home server"
       - "assistant: It can be cloned there through Daintree's dialog; your uncommitted edits stay on this machine and the dialog asks before pushing anything. Shall I open it?"
-  - query: the server already has a copy, use that one
-    history:
-      - "user: put this repo on the build server"
-      - "assistant: I can clone it there or reuse a copy if one exists. Which would you like?"
   - query: and keep my unpushed commits here for now
     history:
       - "user: open this branch on the second mac"
@@ -130,10 +109,6 @@ topic_shifts:
     history:
       - "user: make a worktree for the cache branch"
       - "assistant: The worktree for the cache branch is created and ready."
-  - query: the new host is connected, so get this repository onto it
-    history:
-      - "user: add my spare mac as a host"
-      - "assistant: It is saved and shows Connected, with its projects listed."
   - query: The host overview is enough. Open the current project on the connected render server now; let me choose its clone folder in the dialog.
     history:
       - 'user: what projects are on the render server?'

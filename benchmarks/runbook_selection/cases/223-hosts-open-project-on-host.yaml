@@ -7,7 +7,9 @@
 # runbook wins, and reverse traps where the neighbour wins and this one must not ride along:
 # daintree.hosts.connect-host, daintree.hosts.start-swarm, daintree.hosts.delegate-to-host,
 # daintree.hosts.place-work, daintree.worktree.create-plain-worktree and
-# daintree.git.sync-with-base. The hosts foundation may ride along (optional).
+# daintree.git.sync-with-base. Bare presence on a host for work, with no window or dialog,
+# moved to daintree.hosts.prepare-project-for-work (cases in 1169, and a reverse trap here).
+# The hosts foundation may ride along (optional).
 
 cases:
   # ------------------------------------------------------------------- recall
@@ -55,18 +57,6 @@ cases:
     messages:
       - role: user
         content: the other Mac already has a checkout of this repo, open that one instead of cloning a second copy
-    expect:
-      required: [daintree.hosts.open-project-on-host]
-      optional: [daintree.hosts.foundation]
-
-  - id: open-project-on-host-fresh-clone
-    category: single-runbook
-    note: >-
-      A fresh clone. Decided by "does that machine already have a copy of this repo, or clone
-      it there" and "get my repo onto my other Mac".
-    messages:
-      - role: user
-        content: this repo is not on the Linux server at all, so clone it there for me
     expect:
       required: [daintree.hosts.open-project-on-host]
       optional: [daintree.hosts.foundation]
@@ -180,26 +170,27 @@ cases:
       required: [daintree.hosts.open-project-on-host]
       optional: [daintree.hosts.foundation]
 
-  - id: open-project-on-host-trap-no-work-yet
+  - id: open-project-on-host-trap-window-no-work-yet
     category: routing-trap
     note: >-
-      The project only, no task for the host: "work sent to a host (daintree.hosts.delegate-to-host)" is
-      fenced out.
+      A window on the host, no task for it: "work sent to a host
+      (daintree.hosts.delegate-to-host)" is fenced out, and the window keeps it off
+      daintree.hosts.prepare-project-for-work.
     messages:
       - role: user
-        content: get this project onto my other Mac so it is ready to be worked on there later
+        content: open this project in a window on my other Mac; I'll decide what to work on there later
     expect:
       required: [daintree.hosts.open-project-on-host]
       optional: [daintree.hosts.foundation]
 
-  - id: open-project-on-host-trap-no-host-chosen
+  - id: open-project-on-host-trap-dialog-host-i-pick
     category: routing-trap
     note: >-
-      Putting the project on a host, not choosing hosts for work: "choosing which host should take
-      pieces of work (daintree.hosts.place-work)" is fenced out.
+      The dialog for a host the person picks, not pieces of work spread over hosts: "choosing
+      which host should take pieces of work (daintree.hosts.place-work)" is fenced out.
     messages:
       - role: user
-        content: none of my hosts has this repo yet; put the project on the one with the most room
+        content: none of my hosts has this repo yet; open the project dialog so I can clone it onto the one I pick
     expect:
       required: [daintree.hosts.open-project-on-host]
       optional: [daintree.hosts.foundation]
@@ -286,3 +277,16 @@ cases:
         content: update my feature branch with the latest main
     expect:
       required: [daintree.git.sync-with-base]
+
+  - id: open-project-on-host-reverse-prepare-for-work
+    category: routing-trap
+    note: >-
+      Present for work with no window. daintree.hosts.prepare-project-for-work decides it:
+      "made present on a connected Remote Host so work can run there, done by you with no
+      dialog or window"; this runbook fences it out.
+    messages:
+      - role: user
+        content: no need to open anything on the studio Mac, just get this repo there and have an agent start on the bug
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.foundation]

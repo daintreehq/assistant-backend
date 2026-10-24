@@ -122,6 +122,12 @@ positives:
       - 'assistant: The tower answered opted_out: starting assistants is turned off for it in this Shell''s host settings.'
     run: runbook-2026-10-issue-102
 boundaries:
+  - query: the render host already has our repo open as a project; have an agent there update the snapshot tests and push a branch
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: the second Mac has this project already, so just send it the pagination ticket and tell me the commit
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
   - query: have the assistant on the build box add the missing null check in the parser and push a branch
     confusable_with: [daintree.edits.spawn-visible-agent]
   - query: the mini should do the webhook retry change, not an agent on this machine
@@ -494,6 +500,12 @@ boundaries:
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: 2026-10-16-synthetic-audit
 followups:
+  - query: now start claude on the ticket there
+    history:
+      - "user: make sure the home server has this project"
+      - "assistant: It is there now: the host cloned it and gave it its own project id. Two uncommitted files stayed on this machine."
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
   - query: when it's pushed, have the mini start the client against that commit
     history:
       - 'user: get the linux box to add the orders endpoint and push a branch'
