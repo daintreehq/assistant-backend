@@ -988,3 +988,81 @@ cases:
     expect:
       required: [daintree.hosts.recover-and-clean-up]
       optional: [daintree.foundation, daintree.hosts.foundation]
+
+  # Combined-journey pane trials, 2026-10-24 (Claude Code haiku and Codex in an isolated
+  # Daintree). Each query is the agent's search_runbooks query as sent, scrubbed. All
+  # routed at 0.999 or better with a host connected; pinned because a host connected is
+  # exactly where the local owner must keep these words.
+  - id: tx-journey-restart-resume-batch
+    category: routing-trap
+    note: >-
+      Session de571da1, 2026-10-24: after an app restart, the agent resumed a local fix
+      batch from its checkpoint without relaunching the finished or running units.
+      Decided by status-and-resume's "from run checkpoints, live Daintree state" and its
+      fence "work sent to assistants on other machines
+      (daintree.hosts.recover-and-clean-up)": everything here is on this machine.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Daintree restarted mid-way through a batch of fix agents in a project. Resume the
+          batch from its saved state: report where each piece stands, without relaunching
+          agents that are already running or finished.
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: tx-journey-restart-reconcile-batch
+    category: single-runbook
+    note: >-
+      Codex session 01a16c31, 2026-10-24, the same restart in Codex's words. It read the
+      checkpoint, reconciled each unit, then fetched the runbook that started the batch
+      by id to continue it. Decided by status-and-resume's "pick up / resume something
+      from an earlier session"; the body's "continuing happens under the runbook that
+      started the work" is what the follow-up get_runbook obeyed.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Recover a fix batch in this project after Daintree restarted halfway through.
+          Reconcile existing agents, worktrees, issues and PRs, resume unfinished work
+          without duplicating running or completed work, and report each piece's status.
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: tx-journey-cleanup-keep-uncommitted
+    category: routing-trap
+    note: >-
+      Session e242ba84, 2026-10-24: a broad teardown with dirty work kept; the agent
+      proposed the set and asked once (workspace-cleanup step 4). Decided by
+      workspace-cleanup's "a cleanup request in the user's own words";
+      daintree.hosts.recover-and-clean-up, the nearest neighbour, is for "what a run left
+      on the Remote Hosts".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Clean up after a finished fix batch: close the agent panes and remove the
+          worktrees it left behind, but keep any worktree that still has uncommitted work,
+          and report what was removed and what was kept.
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: tx-journey-rolling-one-at-a-time
+    category: single-runbook
+    note: >-
+      Session 75c101e5, 2026-10-24: a rolling queue with a cap of one, then "stop
+      assigning" mid-run; the agent let the running unit finish and started nothing
+      else. Decided by fan-out-work's "a ROLLING QUEUE under a cap".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Work through a list of three small issues from a repo file, one agent per issue
+          in its own worktree, at most one agent running at a time, starting the next when
+          one finishes; each agent makes the change and commits it on its branch
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation, daintree.hosts.foundation]
